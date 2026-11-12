@@ -100,8 +100,16 @@ never enlarges the picture (D11, D25).
 
 ## Ready check
 
-The check before Start: permissions, chosen sources, free disk space
-(D14).
+The check before Start: the permissions, the displays (at least one,
+each readable), the chosen audio sources, the output folder (created
+if missing, and written to), and free disk space there for the
+required recording hours (D14, D28).
+
+## Required recording hours
+
+The setting `requiredRecordingHours`: how many hours of recording the
+free disk space in the output folder must hold for the ready check to
+pass (D27).
 
 ## Snapshot release
 
@@ -110,7 +118,8 @@ is merged (D4).
 
 ## Release
 
-The GitHub release published by each merge to `main` (D4).
+The GitHub release published by each merge to `main`, except a merge
+that changes only Markdown files, which publishes nothing (D4, D23).
 
 ## v1
 

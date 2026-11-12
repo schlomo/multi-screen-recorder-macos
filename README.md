@@ -108,9 +108,10 @@ Once, on the Mac:
    `sudo xcode-select -s /Applications/Xcode.app`. The Command Line
    Tools alone build the app but cannot run the tests.
 2. The signing certificate, in Keychain Access › Certificate Assistant ›
-   Create a Certificate…: name `Multi Screen Recorder Signing`, identity
-   type Self-Signed Root, certificate type Code Signing, "Let me
-   override defaults" ticked, validity 3650 days (the default is one
+   Create a Certificate…: a name containing `Multi Screen Recorder
+   Signing`, such as `Multi Screen Recorder Signing (<your name>)`;
+   identity type Self-Signed Root, certificate type Code Signing, "Let
+   me override defaults" ticked, validity 3650 days (the default is one
    year, and a new certificate means granting both permissions again),
    the rest unchanged, in the login keychain.
 3. For the pipeline, by the repository owner only: export the
@@ -125,14 +126,17 @@ Once, on the Mac:
 Then:
 
 ```sh
-scripts/test        # runs the unit tests
-scripts/build-app   # builds, signs and zips the app into build/
+scripts/test        # runs the tests
+scripts/build-app   # compiles and assembles the app in build/
+scripts/sign-app    # signs it and zips it into build/
 ```
 
-`scripts/build-app` signs with the identity named in
-`SIGNING_IDENTITY`, by default `Multi Screen Recorder Signing`. How
-the pipeline, versions and signing fit together is in
-[docs/design/delivery.md](docs/design/delivery.md).
+`scripts/sign-app` signs with the identity named in
+`SIGNING_IDENTITY`, by default `Multi Screen Recorder Signing`, which
+matches any certificate whose name contains it, such as
+`Multi Screen Recorder Signing (Schlomo)`; `SIGNING_IDENTITY=-` signs
+ad hoc, for a local check only. How the pipeline, versions and signing
+fit together is in [docs/design/delivery.md](docs/design/delivery.md).
 
 ## Feedback
 

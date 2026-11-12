@@ -282,12 +282,14 @@ Package.swift             Swift 6 language mode, macOS 26, arm64
 Sources/RecorderLogic/    pure logic, Foundation only, fully unit-tested
 Sources/RecorderCore/     ScreenCaptureKit, AVFoundation and Core Audio adapters
 Sources/msr/              entry point: the command line and the app
-Tests/RecorderLogicTests/ Swift Testing
+Tests/RecorderLogicTests/ Swift Testing, as all tests
+Tests/RecorderCoreTests/  the adapters that need no device or permission
+Tests/CommandTests/       msr and scripts/version, run as commands
 Resources/                Info.plist, entitlements
 scripts/                  see delivery.md
 ```
 
-Swift Package Manager and a bundling script rather than an Xcode
+Swift Package Manager and bundling scripts rather than an Xcode
 project, whose project file cannot be reviewed by hand. One dependency:
 Swift Argument Parser, Apple's own package for command lines.
 
@@ -297,7 +299,13 @@ Swift Argument Parser, Apple's own package for command lines.
 (which frame lands on which tick, still periods of 60 s and more, late
 ticks), geometry for every recording resolution and change case,
 settings and flags and their errors, file naming, manifest states,
-crash markers, the version. Capture itself cannot run in CI, which has
+crash markers, the version, and the text of the examples in this
+document, which the tests hold to the code. `RecorderCoreTests` test
+the output folder probe against scratch folders. `CommandTests` run
+the built `msr` with a scratch `HOME` (`msr settings` and
+`msr version`, which prompt for nothing; also through a symbolic link
+into an app bundle) and `scripts/version` in scratch git repositories.
+Capture itself cannot run in CI, which has
 no way to grant the permissions [ASSUMED]; it is verified on a Mac with
 `scripts/acceptance/`, which drives `msr record` and checks the files
 with `ffprobe`, and by the v1 gate.
@@ -332,19 +340,24 @@ None.
 
 Built (skeleton PR): `msr list`, `msr check`, `msr settings`,
 `msr version`, the settings file, the ready check and the app window
-with it (Start always disabled, "This build cannot record yet."), the
-About window, the code layout above except `scripts/acceptance/`, and
-the unit tests of settings, geometry, the disk estimate, the ready
-check, `msr list` and the version. The recorder PR builds the rest:
+with it (the summary of what Start records, "Check again", Start
+always disabled, "This build cannot record yet."), the About window,
+the code layout above except `scripts/acceptance/`, and the tests of
+settings, geometry, the disk estimate, the ready check, the output
+folder probe, the window's summary, `msr list`, the version, the exit
+codes and `scripts/version`. The recorder PR builds the rest:
 `msr record`, recording, the recording manifest, crash markers,
 timecode, the Dock badge and Stop.
 
-Details the design left open, as built: a key missing from the
-settings file takes its default; the output folder must start with `/`
-or `~`; the two number settings must be greater than 0; a settings
-file that cannot be used makes a command exit 1. `msr version` prints
-the full version string and the commit, such as
-`0.2.0-dev+a1b2c3d (a1b2c3d)`, from the bundle's Info.plist keys
-`MSRVersion` and `MSRCommit`; outside a bundle it prints
-`development build (not bundled)`. The settings file is found through
-`HOME`.
+Details the design left open, as built and confirmed by the owner
+(D25, D28): a key missing from the settings file takes its default; the
+output folder must start with `/` or `~`; the two number settings must
+be greater than 0; a settings file that cannot be used makes every
+command that reads the settings exit 78. `msr version` prints the full
+version string and the commit, such as `0.2.0-dev+a1b2c3d (a1b2c3d)`,
+from the bundle's Info.plist keys `MSRVersion` and `MSRCommit`;
+outside a bundle it prints `development build (not bundled)`. The
+settings file is found through `HOME`. The disk estimate follows its
+rule, scaled by each frame's pixel count (3.7 GB in the `msr check`
+example above). The recording resolution box turns with a portrait
+display (1080×1920 for a 2160×3840 display at 1080p).

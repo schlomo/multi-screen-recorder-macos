@@ -220,28 +220,34 @@ this is how they map per tool.
 
 ## Running the tests
 
-`scripts/test` runs the unit tests (Swift Testing, `swift test`);
-`scripts/build-app` builds, signs and zips the app into `build/`
-(`SIGNING_IDENTITY=-` signs ad hoc, for a local check only).
+`scripts/test` runs the tests (Swift Testing, `swift test`), including
+those that run `msr settings`, `msr version` and `scripts/version` as
+commands; `scripts/build-app` compiles and assembles the app in
+`build/`, `scripts/sign-app` signs and zips it (`SIGNING_IDENTITY=-`
+signs ad hoc, for a local check only).
 
 ## Facts that bite
 
 - Building and testing need macOS 26 or later on Apple silicon with
-  Xcode 26; a Linux container (such as a cloud agent session) can edit
-  and review but not build or run anything. Say UNVERIFIED for any
-  change not built and run on a Mac or by CI.
+  Xcode 26 or later; CI has Xcode 26.6 (Swift 6.3), and the package
+  must build there ([delivery.md](docs/design/delivery.md)). A Linux
+  container (such as a cloud agent session) can edit and review but not
+  build or run anything. Say UNVERIFIED for any change not built and
+  run on a Mac or by CI.
 - The Command Line Tools alone build the package but cannot run the
   tests: Swift Testing needs Xcode, selected and with its licence
   accepted (`scripts/test` checks this first).
 - `msr` without arguments starts the app, and the app and `msr check`
   run the ready check, which requests any never-asked permission, so
-  macOS shows a prompt on the person's screen; `msr list` reads the
-  devices. An agent runs none of these on a person's Mac unasked.
+  macOS shows a prompt on the person's screen, and creates the output
+  folder if it is missing; `msr list` reads the devices. An agent runs
+  none of these on a person's Mac unasked.
   `msr version`, `msr settings` (it writes the settings file with the
   defaults if there is none; `HOME` decides where) and the tests are
   safe.
 - Real capture needs the Screen & System Audio Recording and
   Microphone permissions, granted by a person on the Mac. Capture
   behaviour is verified on the owner's Mac (the v1 gate in
-  `backlog.md`); whether CI can capture at all is an open question
-  there.
+  `backlog.md`); capture cannot run in CI, which has no way to grant
+  the permissions [ASSUMED] ([recorder.md](docs/design/recorder.md),
+  "Tests").

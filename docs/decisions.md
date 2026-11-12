@@ -280,7 +280,8 @@ architect's reading.
 
 ## D17: Swift, always the latest toolchain (2026-11-12)
 
-- **Status:** in force
+- **Status:** superseded in part by D28 (which toolchain the pipeline
+  uses)
 - **Context:** Asked "is swift the right tool here? Or better rust?",
   with "only AI will develop here, with human supervision and partial
   review", the owner ruled: "yes to latest swift, and we always aim for
@@ -416,3 +417,111 @@ architect's reading.
 - **Consequences:** True HDR highlights are tone-mapped by macOS before
   they are recorded.
 - **Evidence:** [design/recorder.md](design/recorder.md).
+
+## D25: Details the design left open, as built in PR #1 (2026-11-12)
+
+- **Status:** in force; choice 3 superseded by D28
+- **Context:** PR #1 listed seven choices where the design was silent.
+  The owner: "confirm all but 2 - why not accept any output folder? 7 -
+  I guess for portrait screens we rotate the dimensions, no?" and,
+  after the architect explained that only relative paths are rejected,
+  "ok, keep 2 as is, I didn't realize you meant a config item".
+- **Decision:** The seven choices stand as built, except the seventh:
+  (1) a key missing from the settings file takes its default; (2) the
+  output folder must start with `/` or `~`, and the two number settings
+  must be greater than 0; (3) a settings file that cannot be used makes
+  every command exit 1; (4) `msr version` prints the full version and
+  the commit, from the Info.plist keys `MSRVersion` and `MSRCommit`;
+  (5) the settings file is found through `HOME`; (6) the disk estimate
+  follows its rule, scaled by each frame's pixel count, so the design's
+  example reads 3.7 GB, not 4.0 GB; (7) the recording resolution box
+  rotates for a portrait display: 2160×3840 at 1080p records 1080×1920,
+  not 606×1080.
+- **Consequences:** A portrait display file is as sharp as a landscape
+  one at the same recording resolution, and larger than before.
+- **Evidence:** [PR #1](https://github.com/schlomo/multi-screen-recorder-macos/pull/1),
+  [design/recorder.md](design/recorder.md) "Build state".
+
+## D26: The window says what Start records; About shows the purpose (2026-11-12)
+
+- **Status:** in force
+- **Context:** The owner: "about dialoge should not mention previous
+  art but the short purpose text", "the main screen should briefly
+  explain what it is actually doing", "the ready check should be
+  collapsed if all green".
+- **Decision:** The About window shows the version, the licence, the
+  short purpose text and the GitHub Issues link, without the credit to
+  the former upstream; the main window explains what Start records; an
+  all-green ready check is collapsed. The architect's reading: the
+  purpose text is the README's opening paragraph, one string in the
+  code; the credit stays in the README (D1), and no earlier entry put
+  it in the About window, so none is superseded. The explanation is two
+  or three lines at the top of the window, built from the current
+  settings and devices and tested: every display, the audio sources,
+  where the files go, and that recording continues when displays or
+  audio sources change. All green shows one line, "Ready to record",
+  that expands on click; any red item shows the list expanded with its
+  fix.
+- **Consequences:** The window's text follows the settings and devices
+  and is tested like the rest of `RecorderLogic`.
+- **Evidence:** [PR #1](https://github.com/schlomo/multi-screen-recorder-macos/pull/1),
+  [design/recorder.md](design/recorder.md) "The app".
+
+## D27: The setting `readyCheckHours` is named `requiredRecordingHours` (2026-11-12)
+
+- **Status:** in force
+- **Context:** The owner asked "what are these? "readyCheckHours": 2,
+  "lowDiskWarningMinutes": 20" and ruled "confirmed, rename to
+  requiredRecordingHours".
+- **Decision:** The settings key is `requiredRecordingHours`, its flag
+  `--required-recording-hours`. The architect's reading: nothing is
+  released, so there is no migration and no alias.
+- **Consequences:** A settings file written by an earlier snapshot
+  release with `readyCheckHours` stops with "unknown key"; the app
+  offers "Reset to defaults".
+- **Evidence:** [PR #1](https://github.com/schlomo/multi-screen-recorder-macos/pull/1),
+  [design/recorder.md](design/recorder.md) "Settings file".
+
+## D28: Rulings on the adversarial review of PR #1 (2026-11-12)
+
+- **Status:** in force
+- **Context:** The architect put seven recommendations from the
+  adversarial review of PR #1 to the owner, who answered "Accept all
+  seven".
+- **Decision:** The architect's wording of what was accepted:
+  (1) `msr` started through a symbolic link re-executes itself at its
+  fully resolved real path with the same arguments, so it finds its app
+  bundle. (2) The ready check has an "Output folder" item before "Free
+  disk space": it creates the folder with its parents if missing and
+  writes and deletes a probe file in it; free disk space is measured on
+  the folder itself and left out when the folder fails. (3) The app
+  re-runs the ready check when it becomes active and on "Check again";
+  with the Microphone permission granted and no microphone, the
+  permission item passes and the "Audio" item alone fails, with "no
+  microphone". (4) Toolchain: the pipeline uses the latest Xcode and
+  Swift that GitHub's generally available macOS runner image offers
+  (today Xcode 26.6, Swift 6.3), not a preview image; revisited when a
+  newer runner image is generally available. This narrows D17's
+  "latest released" wording and replaces it in part. (5) Credentials:
+  `scripts/ci-import-signing-certificate` is the one place that reads
+  the signing certificate from the environment and puts it into a
+  keychain, because macOS has no tool that reads a certificate from the
+  environment itself; this is a ruling on how "Credentials are pure
+  injection" applies here, not a change of the principle; no other
+  code touches the secret; the key is imported non-extractable and only
+  after compilation has finished, with building (`scripts/build-app`)
+  and signing (`scripts/sign-app`) split for it. (6) The architecture
+  doc and the backlog were edited on this work branch once, because
+  design and build arrive together; the rule itself is unchanged.
+  (7) The scripts are tested from the Swift test suite
+  (`scripts/version` in scratch git repositories, and it stops on a
+  shallow clone), and a settings file that cannot be used makes every
+  command that reads the settings exit 78 (`EX_CONFIG`), so `msr check`
+  exiting 1 means only "not ready"; this replaces D25's choice 3.
+- **Consequences:** The package's tools version follows the runner
+  image, not the newest Xcode on a developer's Mac. A branch's scripts
+  still run while the key is in the CI keychain (D23's accepted risk,
+  narrowed).
+- **Evidence:** [PR #1](https://github.com/schlomo/multi-screen-recorder-macos/pull/1),
+  [design/delivery.md](design/delivery.md),
+  [design/recorder.md](design/recorder.md).
