@@ -39,7 +39,7 @@ only:
 | `--audio-mode` | `none`, `default-microphone` (`all-inputs` arrives with that feature) |
 | `--system-audio` | `on`, `off` |
 | `--output-folder` | a folder |
-| `--ready-check-hours` | a number |
+| `--required-recording-hours` | a number |
 | `--low-disk-warning-minutes` | a number |
 
 `msr list` prints:
@@ -63,7 +63,7 @@ ok    Microphone permission
 ok    Displays: 2
 ok    Audio: MacBook Pro Microphone (default), system audio
 FAIL  Free disk space: 3.1 GB in ~/Movies/Multi Screen Recorder, 3.7 GB needed for 2 hours
-      Fix: free up space, or lower --ready-check-hours
+      Fix: free up space, or lower --required-recording-hours
 Not ready.
 ```
 
@@ -81,7 +81,7 @@ written with the defaults on first start (D13, D19):
   "audioMode": "default-microphone",
   "systemAudio": true,
   "outputFolder": "~/Movies/Multi Screen Recorder",
-  "readyCheckHours": 2,
+  "requiredRecordingHours": 2,
   "lowDiskWarningMinutes": 20
 }
 ```
@@ -95,7 +95,7 @@ once its feature exists (no `agc` key until AGC is built).
 Items: the Screen & System Audio Recording permission, the Microphone
 permission (unless the audio mode is `none`), at least one display, the
 chosen audio sources, and free disk space in the output folder for
-`readyCheckHours`.
+`requiredRecordingHours`.
 
 - A permission that was never asked for is requested, so macOS shows
   its prompt; a denied one is reported with the System Settings path.

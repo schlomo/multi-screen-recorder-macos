@@ -12,7 +12,7 @@ public enum SettingKey: String, CaseIterable, Sendable {
     case audioMode
     case systemAudio
     case outputFolder
-    case readyCheckHours
+    case requiredRecordingHours
     case lowDiskWarningMinutes
 
     public var flagName: String {
@@ -26,7 +26,7 @@ public struct Settings: Equatable, Sendable {
     public var systemAudio: Bool
     /// As written in the settings file, possibly starting with `~`.
     public var outputFolder: String
-    public var readyCheckHours: Double
+    public var requiredRecordingHours: Double
     public var lowDiskWarningMinutes: Double
 
     public init(
@@ -34,14 +34,14 @@ public struct Settings: Equatable, Sendable {
         audioMode: AudioMode,
         systemAudio: Bool,
         outputFolder: String,
-        readyCheckHours: Double,
+        requiredRecordingHours: Double,
         lowDiskWarningMinutes: Double
     ) {
         self.resolution = resolution
         self.audioMode = audioMode
         self.systemAudio = systemAudio
         self.outputFolder = outputFolder
-        self.readyCheckHours = readyCheckHours
+        self.requiredRecordingHours = requiredRecordingHours
         self.lowDiskWarningMinutes = lowDiskWarningMinutes
     }
 
@@ -50,7 +50,7 @@ public struct Settings: Equatable, Sendable {
         audioMode: .defaultMicrophone,
         systemAudio: true,
         outputFolder: "~/Movies/Multi Screen Recorder",
-        readyCheckHours: 2,
+        requiredRecordingHours: 2,
         lowDiskWarningMinutes: 20
     )
 
@@ -183,10 +183,10 @@ extension Settings {
             guard let parsed = validFolder(text) else { throw invalid(Expected.folder) }
             outputFolder = parsed
         case (.outputFolder, _): throw invalid(Expected.folder)
-        case (.readyCheckHours, .number(let number)):
+        case (.requiredRecordingHours, .number(let number)):
             guard let parsed = validPositive(number) else { throw invalid(Expected.positiveNumber) }
-            readyCheckHours = parsed
-        case (.readyCheckHours, _): throw invalid(Expected.positiveNumber)
+            requiredRecordingHours = parsed
+        case (.requiredRecordingHours, _): throw invalid(Expected.positiveNumber)
         case (.lowDiskWarningMinutes, .number(let number)):
             guard let parsed = validPositive(number) else { throw invalid(Expected.positiveNumber) }
             lowDiskWarningMinutes = parsed
@@ -201,7 +201,7 @@ extension Settings {
             (.audioMode, jsonString(audioMode.rawValue)),
             (.systemAudio, systemAudio ? "true" : "false"),
             (.outputFolder, jsonString(outputFolder)),
-            (.readyCheckHours, jsonNumber(readyCheckHours)),
+            (.requiredRecordingHours, jsonNumber(requiredRecordingHours)),
             (.lowDiskWarningMinutes, jsonNumber(lowDiskWarningMinutes)),
         ].map { "  \(jsonString($0.0.rawValue)): \($0.1)" }
         return "{\n" + lines.joined(separator: ",\n") + "\n}\n"
@@ -231,9 +231,9 @@ extension Settings {
             case .outputFolder:
                 guard let parsed = validFolder(text) else { throw invalid(Expected.folder) }
                 settings.outputFolder = parsed
-            case .readyCheckHours:
+            case .requiredRecordingHours:
                 guard let parsed = Double(text).flatMap(validPositive) else { throw invalid(Expected.positiveNumber) }
-                settings.readyCheckHours = parsed
+                settings.requiredRecordingHours = parsed
             case .lowDiskWarningMinutes:
                 guard let parsed = Double(text).flatMap(validPositive) else { throw invalid(Expected.positiveNumber) }
                 settings.lowDiskWarningMinutes = parsed

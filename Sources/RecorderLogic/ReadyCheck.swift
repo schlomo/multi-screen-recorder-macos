@@ -140,12 +140,12 @@ public enum ReadyCheck {
                 fix: "choose an output folder on a disk that is connected (--output-folder)")
         case .bytes(let free):
             let frameSizes = facts.displays.map { settings.resolution.frameSize(forDisplay: $0.pixelSize) }
-            let needed = DiskEstimate.bytesNeeded(frameSizes: frameSizes, hours: settings.readyCheckHours)
+            let needed = DiskEstimate.bytesNeeded(frameSizes: frameSizes, hours: settings.requiredRecordingHours)
             return ReadyCheckItem(
                 title: "Free disk space: \(DiskEstimate.gigabytes(Double(free))) in \(folder),"
-                    + " \(DiskEstimate.gigabytes(needed)) needed for \(hoursText(settings.readyCheckHours))",
+                    + " \(DiskEstimate.gigabytes(needed)) needed for \(hoursText(settings.requiredRecordingHours))",
                 passed: Double(free) >= needed,
-                fix: "free up space, or lower --ready-check-hours")
+                fix: "free up space, or lower --required-recording-hours")
         }
     }
 

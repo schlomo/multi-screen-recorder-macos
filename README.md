@@ -77,14 +77,14 @@ ln -s "/Applications/Multi Screen Recorder.app/Contents/MacOS/msr" ~/bin/msr
 Each flag overrides a setting for this run only: `--resolution`
 (`native`, `4k`, `1440p`, `1200p`, `1080p`, `720p`), `--audio-mode`
 (`none`, `default-microphone`), `--system-audio` (`on`, `off`),
-`--output-folder`, `--ready-check-hours`, `--low-disk-warning-minutes`.
+`--output-folder`, `--required-recording-hours`, `--low-disk-warning-minutes`.
 A usage error exits 64. The settings live in
 `~/Library/Application Support/Multi Screen Recorder/settings.json`; an
 unknown key or invalid value there stops every command with an error
 naming the key (exit 1), and the app offers "Reset to defaults".
 
 ```sh
-msr check --audio-mode none --ready-check-hours 4
+msr check --audio-mode none --required-recording-hours 4
 msr settings --resolution 1440p --save
 ```
 

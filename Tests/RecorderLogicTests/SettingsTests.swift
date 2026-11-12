@@ -9,7 +9,7 @@ import Testing
         #expect(defaults.audioMode == .defaultMicrophone)
         #expect(defaults.systemAudio == true)
         #expect(defaults.outputFolder == "~/Movies/Multi Screen Recorder")
-        #expect(defaults.readyCheckHours == 2)
+        #expect(defaults.requiredRecordingHours == 2)
         #expect(defaults.lowDiskWarningMinutes == 20)
     }
 
@@ -20,7 +20,7 @@ import Testing
               "audioMode": "default-microphone",
               "systemAudio": true,
               "outputFolder": "~/Movies/Multi Screen Recorder",
-              "readyCheckHours": 2,
+              "requiredRecordingHours": 2,
               "lowDiskWarningMinutes": 20
             }
 
@@ -31,7 +31,7 @@ import Testing
     @Test func flagNamesAreTheKeysInKebabCase() {
         #expect(SettingKey.allCases.map(\.flagName) == [
             "--resolution", "--audio-mode", "--system-audio", "--output-folder",
-            "--ready-check-hours", "--low-disk-warning-minutes",
+            "--required-recording-hours", "--low-disk-warning-minutes",
         ])
     }
 }
@@ -47,7 +47,7 @@ import Testing
         settings.audioMode = .none
         settings.systemAudio = false
         settings.outputFolder = "/Volumes/Data/Recordings \"quoted\" \\ back"
-        settings.readyCheckHours = 1.5
+        settings.requiredRecordingHours = 1.5
         settings.lowDiskWarningMinutes = 5
         #expect(try decode(settings.json) == settings)
     }
@@ -75,10 +75,10 @@ import Testing
         (#"{"outputFolder": ""}"#, "outputFolder"),
         (#"{"outputFolder": "relative/folder"}"#, "outputFolder"),
         (#"{"outputFolder": 3}"#, "outputFolder"),
-        (#"{"readyCheckHours": 0}"#, "readyCheckHours"),
-        (#"{"readyCheckHours": -1}"#, "readyCheckHours"),
-        (#"{"readyCheckHours": "2"}"#, "readyCheckHours"),
-        (#"{"readyCheckHours": true}"#, "readyCheckHours"),
+        (#"{"requiredRecordingHours": 0}"#, "requiredRecordingHours"),
+        (#"{"requiredRecordingHours": -1}"#, "requiredRecordingHours"),
+        (#"{"requiredRecordingHours": "2"}"#, "requiredRecordingHours"),
+        (#"{"requiredRecordingHours": true}"#, "requiredRecordingHours"),
         (#"{"lowDiskWarningMinutes": null}"#, "lowDiskWarningMinutes"),
     ])
     func invalidValueNamesTheKey(json: String, key: String) throws {
@@ -115,7 +115,7 @@ import Testing
             .audioMode: "none",
             .systemAudio: "off",
             .outputFolder: "~/Desktop/Recordings",
-            .readyCheckHours: "0.5",
+            .requiredRecordingHours: "0.5",
             .lowDiskWarningMinutes: "10",
         ])
         #expect(settings == Settings(
@@ -123,7 +123,7 @@ import Testing
             audioMode: .none,
             systemAudio: false,
             outputFolder: "~/Desktop/Recordings",
-            readyCheckHours: 0.5,
+            requiredRecordingHours: 0.5,
             lowDiskWarningMinutes: 10
         ))
     }
@@ -144,8 +144,8 @@ import Testing
         (.audioMode, "all-inputs"),
         (.systemAudio, "true"),
         (.outputFolder, ""),
-        (.readyCheckHours, "two"),
-        (.readyCheckHours, "0"),
+        (.requiredRecordingHours, "two"),
+        (.requiredRecordingHours, "0"),
         (.lowDiskWarningMinutes, "-5"),
         (.lowDiskWarningMinutes, "nan"),
     ])

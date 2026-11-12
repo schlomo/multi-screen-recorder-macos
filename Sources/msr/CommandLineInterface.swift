@@ -26,8 +26,8 @@ struct SettingsFlags: ParsableArguments {
     @Option(help: "Output folder: a path starting with / or ~.")
     var outputFolder: String?
 
-    @Option(help: "Hours of free disk space the ready check asks for.")
-    var readyCheckHours: String?
+    @Option(help: "Hours of recording the free disk space must hold.")
+    var requiredRecordingHours: String?
 
     @Option(help: "The low disk space warning threshold, in minutes.")
     var lowDiskWarningMinutes: String?
@@ -38,7 +38,7 @@ struct SettingsFlags: ParsableArguments {
             (.audioMode, audioMode),
             (.systemAudio, systemAudio),
             (.outputFolder, outputFolder),
-            (.readyCheckHours, readyCheckHours),
+            (.requiredRecordingHours, requiredRecordingHours),
             (.lowDiskWarningMinutes, lowDiskWarningMinutes),
         ]
         return Dictionary(uniqueKeysWithValues: pairs.compactMap { key, value in value.map { (key, $0) } })

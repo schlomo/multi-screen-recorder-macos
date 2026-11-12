@@ -32,7 +32,7 @@ import Testing
             ok    Displays: 2
             ok    Audio: MacBook Pro Microphone (default), system audio
             FAIL  Free disk space: 3.1 GB in ~/Movies/Multi Screen Recorder, 4.0 GB needed for 2 hours
-                  Fix: free up space, or lower --ready-check-hours
+                  Fix: free up space, or lower --required-recording-hours
             Not ready.
 
             """
@@ -108,7 +108,7 @@ import Testing
     @Test func diskEstimateUsesTheRecordingResolution() throws {
         var settings = Settings.defaults
         settings.resolution = .p720
-        settings.readyCheckHours = 1
+        settings.requiredRecordingHours = 1
         let result = ReadyCheck.evaluate(facts(), settings: settings)
         let item = try #require(result.items.last)
         #expect(item.title == "Free disk space: 100.0 GB in ~/Movies/Multi Screen Recorder, 0.9 GB needed for 1 hour")
