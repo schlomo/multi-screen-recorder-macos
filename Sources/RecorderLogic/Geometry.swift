@@ -54,6 +54,13 @@ public enum RecordingResolution: String, CaseIterable, Sendable {
         let fitted = box.map { fit(display, into: display.isPortrait ? $0.rotated : $0) } ?? display
         return FrameSize(width: roundedDownToEven(fitted.width), height: roundedDownToEven(fitted.height))
     }
+
+    /// Whether a display's file continues when its pixel size changes: only
+    /// while the fitted frame size stays the same; otherwise the file ends
+    /// and a new one starts at the new frame size (D30).
+    public func displayFileContinues(from oldPixelSize: FrameSize, to newPixelSize: FrameSize) -> Bool {
+        frameSize(forDisplay: oldPixelSize) == frameSize(forDisplay: newPixelSize)
+    }
 }
 
 private func fit(_ size: FrameSize, into box: FrameSize) -> FrameSize {

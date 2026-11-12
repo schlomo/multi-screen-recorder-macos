@@ -56,7 +56,8 @@ recording that was not finalized (D20).
 The video file for one display, with the audio tracks of every audio
 source present when it started.
 A display that disappears or whose stream fails ends its display file;
-a new one begins when it is back.
+a new one begins when it is back. A display whose fitted frame size
+changes also ends its file, and a new one begins at once (D30).
 
 ## Tick
 

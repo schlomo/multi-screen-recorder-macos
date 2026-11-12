@@ -173,7 +173,8 @@ architect's reading.
 
 ## D11: Constant 30 fps video with a chosen recording resolution (2026-11-12)
 
-- **Status:** in force
+- **Status:** superseded in part by D30 (a display whose size changes
+  mid-file)
 - **Context:** Recordings are edited in DaVinci Resolve on 30 fps
   timelines, which needs a constant frame rate; a recorder tested by the
   owner stamped new screen content up to 76 s early after a still
@@ -563,3 +564,33 @@ architect's reading.
   signing scripts (accepted risks in the design).
 - **Evidence:** [PR #1](https://github.com/schlomo/multi-screen-recorder-macos/pull/1),
   [design/delivery.md](design/delivery.md).
+
+## D30: A new display file when the fitted frame size changes (2026-11-12)
+
+- **Status:** in force
+- **Context:** D11 kept a display file's frame size when the display
+  changed mid-file, shrinking or centring the picture. The owner:
+  "native means that we start with the current resolution and if it
+  changes then we scale into it, right? and new displays get recorded
+  at their native resolution on first contact? Or native means always
+  restart recording on resolution change? I think the latter is more
+  correct to meet the expectations. In any case, a resolution change
+  carries a small visual flicker / glitch so a <1s gap in recording
+  might be OK, too" and, to the rule the architect then proposed, "yes,
+  confirm frame size, shape rule and restart on shape change, good
+  thinking".
+- **Decision:** The architect's wording, confirmed by the owner: the
+  frame size is the display's pixel size fitted into the recording
+  resolution box, the box turning with a portrait display. While a
+  display's fitted frame size stays the same, its file continues,
+  whatever else changed about the display. When the fitted frame size
+  changes, the display's current file ends and a new file starts at
+  the new frame size, like after a reconnect. At `native` every
+  pixel-size change is such a change; at `1080p` 3840×2160 to 5120×2880
+  is not, 3440×1440 to 1920×1080 is. Replaces D11's shrinking and
+  centring of a display that changes mid-file.
+- **Consequences:** A gap of under one second in that display's files
+  at the change, also in the audio tracks inside them, while the other
+  displays' files continue; a display that flaps between modes makes
+  many short files, each valid.
+- **Evidence:** [design/recorder.md](design/recorder.md) "Frame size".

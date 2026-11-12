@@ -93,3 +93,43 @@ import Testing
         }
     }
 }
+
+/// A display file continues while the display's fitted frame size stays the
+/// same; when it changes, the file ends and a new one starts (D30).
+@Suite struct FrameSizeChangeTests {
+    private let uhd = FrameSize(width: 3840, height: 2160)
+    private let fiveK = FrameSize(width: 5120, height: 2880)
+    private let ultrawide = FrameSize(width: 3440, height: 1440)
+    private let fullHD = FrameSize(width: 1920, height: 1080)
+
+    @Test func theExamplesFittedFrameSizes() {
+        #expect(RecordingResolution.p1080.frameSize(forDisplay: uhd) == fullHD)
+        #expect(RecordingResolution.p1080.frameSize(forDisplay: fiveK) == fullHD)
+        #expect(RecordingResolution.p1080.frameSize(forDisplay: ultrawide) == FrameSize(width: 1920, height: 802))
+        #expect(RecordingResolution.p1080.frameSize(forDisplay: fullHD) == fullHD)
+    }
+
+    @Test func atNativeEveryPixelSizeChangeStartsANewFile() {
+        #expect(RecordingResolution.native.displayFileContinues(from: uhd, to: fiveK) == false)
+        #expect(RecordingResolution.native.displayFileContinues(from: ultrawide, to: fullHD) == false)
+    }
+
+    @Test func at1080pTheSameFittedFrameSizeContinuesTheFile() {
+        #expect(RecordingResolution.p1080.displayFileContinues(from: uhd, to: fiveK))
+    }
+
+    @Test func at1080pAnotherFittedFrameSizeStartsANewFile() {
+        #expect(RecordingResolution.p1080.displayFileContinues(from: ultrawide, to: fullHD) == false)
+    }
+
+    @Test func anUnchangedPixelSizeContinuesTheFile() {
+        for resolution in RecordingResolution.allCases {
+            #expect(resolution.displayFileContinues(from: ultrawide, to: ultrawide))
+        }
+    }
+
+    @Test func turningADisplayToPortraitStartsANewFile() {
+        #expect(RecordingResolution.p1080.displayFileContinues(
+            from: uhd, to: FrameSize(width: 2160, height: 3840)) == false)
+    }
+}

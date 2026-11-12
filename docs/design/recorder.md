@@ -134,6 +134,7 @@ One recording folder per recording, named by its local start time
   2026-11-12 14.03.05 Display 1 - Built-in Retina Display.mov
   2026-11-12 14.03.05 Display 2 - LG HDR 4K.mov
   2026-11-12 14.27.41 Display 2 - LG HDR 4K.mov    ← back after a reconnect
+  2026-11-12 14.41.10 Display 1 - Built-in Retina Display.mov    ← new frame size after a mode change
   recording.json
 ```
 
@@ -168,7 +169,9 @@ every change:
     }
   ],
   "events": [
-    { "at": 1446.2, "event": "display disconnected", "display": "LG HDR 4K" }
+    { "at": 1446.2, "event": "display disconnected", "display": "LG HDR 4K" },
+    { "at": 2285.0, "event": "display frame size changed", "display": "Built-in Retina Display",
+      "from": [1670, 1080], "to": [1662, 1080] }
   ]
 }
 ```
@@ -244,13 +247,23 @@ it writes a variable frame rate with its own track layout.
 (*data*; independent of the keyframe interval), so a crash loses at
 most the last 2 s.
 
-**Frame size (D11).** Fixed when a display file starts: the display's
-pixel size shrunk into the recording resolution box, proportions kept,
-never enlarged, each side rounded down to an even number. The box turns
-with a portrait display (taller than wide): at 1080p a 2160×3840
-display records at 1080×1920 (D25). A display
-that changes mid-file keeps the frame size: a larger picture is shrunk
-to fit, a smaller or reshaped one is centred with black borders.
+**Frame size (D11, D30).** A display file's frame size is the
+display's pixel size fitted into the recording resolution box:
+proportions kept, never enlarged, each side rounded down to an even
+number. The box turns with a portrait display (taller than wide): at
+1080p a 2160×3840 display records at 1080×1920 (D25). While a
+display's fitted frame size stays the same, its file continues,
+whatever else changed about the display. When the fitted frame size
+changes, the display's current file ends and a new file starts at the
+new frame size, like after a reconnect, with the event `display frame
+size changed` (the display, the old and the new frame size) in the
+manifest. At `native` every pixel-size change is such a change; at
+`1080p` a change from 3840×2160 to 5120×2880 is not (both give
+1920×1080), while 3440×1440 to 1920×1080 is (1920×802 to 1920×1080).
+The cost: a gap of under one second in that display's files at the
+change, also in the audio tracks inside those files, while the other
+displays' files continue unbroken; a display that flaps between modes
+makes many short files, each valid.
 
 **Audio (D12, D22).** Every channel of an audio input is its own mono
 track, named `Microphone: <device>, channel <n>`; system audio is one
