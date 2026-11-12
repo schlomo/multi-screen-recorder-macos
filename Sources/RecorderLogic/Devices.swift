@@ -16,6 +16,15 @@ public struct DisplayInfo: Equatable, Sendable {
     }
 }
 
+/// A display or audio input the system lists but does not fully describe.
+public struct DeviceReadError: Error, Equatable, Sendable, CustomStringConvertible {
+    public let description: String
+
+    public init(_ description: String) {
+        self.description = description
+    }
+}
+
 public struct NumberedDisplay: Equatable, Sendable {
     public var number: Int
     public var display: DisplayInfo

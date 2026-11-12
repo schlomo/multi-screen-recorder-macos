@@ -13,19 +13,24 @@ import Testing
         #expect(defaults.lowDiskWarningMinutes == 20)
     }
 
-    @Test func defaultsRenderExactlyAsTheDocumentedFile() {
-        let expected = """
-            {
-              "resolution": "1080p",
-              "audioMode": "default-microphone",
-              "systemAudio": true,
-              "outputFolder": "~/Movies/Multi Screen Recorder",
-              "requiredRecordingHours": 2,
-              "lowDiskWarningMinutes": 20
-            }
+    static let documentedFile = """
+        {
+          "resolution": "1080p",
+          "audioMode": "default-microphone",
+          "systemAudio": true,
+          "outputFolder": "~/Movies/Multi Screen Recorder",
+          "requiredRecordingHours": 2,
+          "lowDiskWarningMinutes": 20
+        }
 
-            """
-        #expect(Settings.defaults.json == expected)
+        """
+
+    @Test func defaultsRenderExactlyAsTheDocumentedFile() {
+        #expect(Settings.defaults.json == Self.documentedFile)
+    }
+
+    @Test func theDesignDocumentsTheDefaults() throws {
+        #expect(try repositoryFile("docs/design/recorder.md").contains("```json\n\(Self.documentedFile)```\n"))
     }
 
     @Test func flagNamesAreTheKeysInKebabCase() {

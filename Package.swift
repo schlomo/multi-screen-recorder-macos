@@ -37,5 +37,10 @@ let package = Package(
             dependencies: ["RecorderLogic"],
             swiftSettings: strictSettings
         ),
+        .testTarget(
+            name: "RecorderCoreTests",
+            dependencies: ["RecorderCore", "RecorderLogic"],
+            swiftSettings: strictSettings
+        ),
     ]
 )

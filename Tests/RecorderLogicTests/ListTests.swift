@@ -32,26 +32,26 @@ import Testing
 }
 
 @Suite struct ListRenderingTests {
-    @Test func rendersExactlyAsTheDesign() {
-        let displays = numberDisplays([
-            DisplayInfo(name: "LG HDR 4K", pixelSize: FrameSize(width: 3840, height: 2160), isMain: false, originX: 1728, originY: 0),
-            DisplayInfo(name: "Built-in Retina Display", pixelSize: FrameSize(width: 3456, height: 2234), isMain: true, originX: 0, originY: 0),
-        ])
-        let inputs = [
-            AudioInputInfo(name: "MacBook Pro Microphone", channelCount: 1, isDefault: true),
-            AudioInputInfo(name: "RØDE Wireless GO II RX", channelCount: 2, isDefault: false),
-        ]
-        let expected = """
-            Displays
-              1  Built-in Retina Display   3456×2234  records at 1670×1080
-              2  LG HDR 4K                 3840×2160  records at 1920×1080
-            Audio inputs
-              MacBook Pro Microphone (default), 1 channel
-              RØDE Wireless GO II RX, 2 channels
-            System audio: available
+    static let designExample = """
+        Displays
+          1  Built-in Retina Display   3456×2234  records at 1670×1080
+          2  LG HDR 4K                 3840×2160  records at 1920×1080
+        Audio inputs
+          MacBook Pro Microphone (default), 1 channel
+          RØDE Wireless GO II RX, 2 channels
+        System audio: available
 
-            """
-        #expect(renderList(displays: displays, resolution: .p1080, audioInputs: inputs, systemAudioAvailable: true) == expected)
+        """
+
+    @Test func rendersExactlyAsTheDesign() {
+        let rendered = renderList(
+            displays: numberDisplays(DesignExample.displays), resolution: .p1080,
+            audioInputs: DesignExample.audioInputs, systemAudioAvailable: true)
+        #expect(rendered == Self.designExample)
+    }
+
+    @Test func theDesignShowsTheExample() throws {
+        #expect(try repositoryFile("docs/design/recorder.md").contains("```\n\(Self.designExample)```\n"))
     }
 
     @Test func rendersEmptySectionsAndUnavailableSystemAudio() {

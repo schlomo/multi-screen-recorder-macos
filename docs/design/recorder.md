@@ -62,6 +62,7 @@ ok    Screen & System Audio Recording permission
 ok    Microphone permission
 ok    Displays: 2
 ok    Audio: MacBook Pro Microphone (default), system audio
+ok    Output folder: ~/Movies/Multi Screen Recorder
 FAIL  Free disk space: 3.1 GB in ~/Movies/Multi Screen Recorder, 3.7 GB needed for 2 hours
       Fix: free up space, or lower --required-recording-hours
 Not ready.
@@ -92,17 +93,27 @@ once its feature exists (no `agc` key until AGC is built).
 
 ## Ready check
 
-Items: the Screen & System Audio Recording permission, the Microphone
-permission (unless the audio mode is `none`), at least one display, the
-chosen audio sources, and free disk space in the output folder for
+Items, in this order: the Screen & System Audio Recording permission,
+the Microphone permission (unless the audio mode is `none`), the
+displays (at least one, each readable), the chosen audio sources, the
+output folder, and free disk space in the output folder for
 `requiredRecordingHours`.
 
 - A permission that was never asked for is requested, so macOS shows
   its prompt; a denied one is reported with the System Settings path.
 - A grant is proven, not just read: the check fetches the display list
-  and opens the microphone.
-- Disk estimate (*data*): 1 GB per display per hour at 1080p, scaled by
-  the frame's pixel count.
+  and opens the default microphone. With the Microphone permission
+  granted but no microphone connected, there is nothing to open: the
+  permission item passes and the audio item alone fails, with "no
+  microphone".
+- Output folder: the check creates it with its parents if it is
+  missing, then writes and deletes a file in it; a failure names the
+  path and the reason.
+- Free disk space is measured on the output folder itself. Disk
+  estimate (*data*): 1 GB per display per hour at 1080p, scaled by the
+  frame's pixel count of each display at the recording resolution.
+- One cause, one red item: when the output folder fails or the
+  displays cannot be read, the free disk space item is left out.
 
 ## Output on disk
 

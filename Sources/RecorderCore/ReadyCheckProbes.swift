@@ -5,15 +5,16 @@ import RecorderLogic
 import ScreenCaptureKit
 
 /// Runs the ready check's probes on this Mac. A permission that was never
-/// asked for is requested, so macOS shows its prompt.
+/// asked for is requested, so macOS shows its prompt; a missing output folder
+/// is created.
 @MainActor
 public func runReadyCheck(settings: Settings, homeFolder: URL) async -> ReadyCheckResult {
     let facts = ReadyCheckFacts(
         screenRecording: await probeScreenRecording(),
         microphone: settings.audioMode == .none ? nil : await probeMicrophone(),
-        displays: currentDisplays(),
-        defaultMicrophone: defaultAudioInput(),
-        freeSpace: freeSpace(in: settings.outputFolderURL(homeFolder: homeFolder)))
+        displays: Result { () throws(DeviceReadError) in try currentDisplays() },
+        defaultMicrophone: defaultAudioInputName(),
+        outputFolder: probeOutputFolder(settings.outputFolderURL(homeFolder: homeFolder)))
     return ReadyCheck.evaluate(facts, settings: settings)
 }
 
@@ -38,7 +39,9 @@ public func probeScreenRecording() async -> PermissionProbe {
 }
 
 /// Asks for the Microphone permission if never asked, then proves the grant
-/// by opening the default microphone.
+/// by opening the default microphone. Without a microphone there is nothing
+/// to open, so the granted permission stands; the ready check's audio item
+/// reports the missing microphone.
 public func probeMicrophone() async -> PermissionProbe {
     switch AVCaptureDevice.authorizationStatus(for: .audio) {
     case .authorized:
@@ -50,13 +53,11 @@ public func probeMicrophone() async -> PermissionProbe {
     @unknown default:
         return .notGranted
     }
-    return openDefaultMicrophone()
+    return openMicrophone(AVCaptureDevice.default(for: .audio))
 }
 
-private func openDefaultMicrophone() -> PermissionProbe {
-    guard let device = AVCaptureDevice.default(for: .audio) else {
-        return .failed("there is no default microphone")
-    }
+func openMicrophone(_ device: AVCaptureDevice?) -> PermissionProbe {
+    guard let device else { return .granted }
     let session = AVCaptureSession()
     do {
         let input = try AVCaptureDeviceInput(device: device)
@@ -71,17 +72,24 @@ private func openDefaultMicrophone() -> PermissionProbe {
     }
 }
 
-/// Free space for important use on the volume of the folder, or of its
-/// nearest existing parent folder when it does not exist yet.
-public func freeSpace(in folder: URL) -> FreeSpace {
-    var candidate = folder.standardizedFileURL
-    while !FileManager.default.fileExists(atPath: candidate.path(percentEncoded: false)) {
-        let parent = candidate.deletingLastPathComponent()
-        if parent == candidate { break }
-        candidate = parent
-    }
+/// Creates the output folder with its parents if it is missing, then writes
+/// and deletes a file in it; if that works, measures the free space there.
+public func probeOutputFolder(_ folder: URL) -> OutputFolderProbe {
+    let probeFile = folder.appending(path: ".msr-write-probe-\(UUID().uuidString)")
     do {
-        let values = try candidate.resourceValues(forKeys: [.volumeAvailableCapacityForImportantUsageKey])
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        try Data().write(to: probeFile, options: .withoutOverwriting)
+        try FileManager.default.removeItem(at: probeFile)
+    } catch {
+        return .unusable(error.localizedDescription)
+    }
+    return .usable(freeSpace(in: folder))
+}
+
+/// Free space for important use on the volume of the folder.
+private func freeSpace(in folder: URL) -> FreeSpace {
+    do {
+        let values = try folder.resourceValues(forKeys: [.volumeAvailableCapacityForImportantUsageKey])
         guard let bytes = values.volumeAvailableCapacityForImportantUsage else {
             return .unreadable("the volume does not report its free space")
         }

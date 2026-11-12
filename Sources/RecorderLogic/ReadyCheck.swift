@@ -13,27 +13,35 @@ public enum FreeSpace: Equatable, Sendable {
     case unreadable(String)
 }
 
+/// Whether a file can be written into the output folder, and if so the
+/// free space there.
+public enum OutputFolderProbe: Equatable, Sendable {
+    case usable(FreeSpace)
+    case unusable(String)
+}
+
 /// What the probes found on this Mac, for the ready check to judge.
 public struct ReadyCheckFacts: Sendable {
     public var screenRecording: PermissionProbe
     /// Nil when the audio mode needs no microphone, so it was not probed.
     public var microphone: PermissionProbe?
-    public var displays: [DisplayInfo]
-    public var defaultMicrophone: AudioInputInfo?
-    public var freeSpace: FreeSpace
+    public var displays: Result<[DisplayInfo], DeviceReadError>
+    /// The name of the default audio input; nil when there is none.
+    public var defaultMicrophone: String?
+    public var outputFolder: OutputFolderProbe
 
     public init(
         screenRecording: PermissionProbe,
         microphone: PermissionProbe?,
-        displays: [DisplayInfo],
-        defaultMicrophone: AudioInputInfo?,
-        freeSpace: FreeSpace
+        displays: Result<[DisplayInfo], DeviceReadError>,
+        defaultMicrophone: String?,
+        outputFolder: OutputFolderProbe
     ) {
         self.screenRecording = screenRecording
         self.microphone = microphone
         self.displays = displays
         self.defaultMicrophone = defaultMicrophone
-        self.freeSpace = freeSpace
+        self.outputFolder = outputFolder
     }
 }
 
@@ -73,17 +81,19 @@ public enum ReadyCheck {
     static let microphoneTitle = "Microphone permission"
     static let terminalNote = "; started from a terminal, the terminal app needs it"
 
+    /// One item per cause: a free disk space item appears only when the
+    /// displays could be read and the output folder is usable.
     public static func evaluate(_ facts: ReadyCheckFacts, settings: Settings) -> ReadyCheckResult {
         var items = [screenRecordingItem(facts.screenRecording)]
         if settings.audioMode != .none {
             items.append(microphoneItem(facts.microphone ?? .notGranted))
         }
-        items.append(ReadyCheckItem(
-            title: "Displays: \(facts.displays.count)",
-            passed: !facts.displays.isEmpty,
-            fix: "connect a display"))
+        items.append(displaysItem(facts.displays))
         items.append(audioItem(facts.defaultMicrophone, settings: settings))
-        items.append(diskItem(facts, settings: settings))
+        items.append(outputFolderItem(facts.outputFolder, settings: settings))
+        if case .success(let displays) = facts.displays, case .usable(let freeSpace) = facts.outputFolder {
+            items.append(diskItem(freeSpace, displays: displays, settings: settings))
+        }
         return ReadyCheckResult(items: items)
     }
 
@@ -112,14 +122,24 @@ public enum ReadyCheck {
         }
     }
 
-    private static func audioItem(_ defaultMicrophone: AudioInputInfo?, settings: Settings) -> ReadyCheckItem {
+    private static func displaysItem(_ displays: Result<[DisplayInfo], DeviceReadError>) -> ReadyCheckItem {
+        switch displays {
+        case .success(let displays):
+            ReadyCheckItem(title: "Displays: \(displays.count)", passed: !displays.isEmpty, fix: "connect a display")
+        case .failure(let error):
+            ReadyCheckItem(title: "Displays: cannot be read (\(error))", passed: false,
+                           fix: "reconnect the displays, then check again")
+        }
+    }
+
+    private static func audioItem(_ defaultMicrophone: String?, settings: Settings) -> ReadyCheckItem {
         var sources: [String] = []
         var missingMicrophone = false
         if settings.audioMode == .defaultMicrophone {
             if let defaultMicrophone {
-                sources.append(defaultMicrophone.label)
+                sources.append("\(defaultMicrophone) (default)")
             } else {
-                sources.append("no default microphone")
+                sources.append("no microphone")
                 missingMicrophone = true
             }
         }
@@ -130,17 +150,29 @@ public enum ReadyCheck {
             fix: missingMicrophone ? "connect a microphone, or set the audio mode to none (--audio-mode none)" : nil)
     }
 
-    private static func diskItem(_ facts: ReadyCheckFacts, settings: Settings) -> ReadyCheckItem {
+    private static func outputFolderItem(_ probe: OutputFolderProbe, settings: Settings) -> ReadyCheckItem {
         let folder = settings.outputFolder
-        switch facts.freeSpace {
+        return switch probe {
+        case .usable:
+            ReadyCheckItem(title: "Output folder: \(folder)", passed: true, fix: nil)
+        case .unusable(let reason):
+            ReadyCheckItem(title: "Output folder: \(folder) cannot be used (\(reason))", passed: false,
+                           fix: "choose another output folder (--output-folder)")
+        }
+    }
+
+    private static func diskItem(_ freeSpace: FreeSpace, displays: [DisplayInfo], settings: Settings) -> ReadyCheckItem {
+        let folder = settings.outputFolder
+        switch freeSpace {
         case .unreadable(let reason):
             return ReadyCheckItem(
                 title: "Free disk space: unknown in \(folder) (\(reason))",
                 passed: false,
-                fix: "choose an output folder on a disk that is connected (--output-folder)")
+                fix: "choose an output folder on another disk (--output-folder)")
         case .bytes(let free):
-            let frameSizes = facts.displays.map { settings.resolution.frameSize(forDisplay: $0.pixelSize) }
-            let needed = DiskEstimate.bytesNeeded(frameSizes: frameSizes, hours: settings.requiredRecordingHours)
+            let needed = DiskEstimate.bytesNeeded(
+                frameSizes: displays.map { settings.resolution.frameSize(forDisplay: $0.pixelSize) },
+                hours: settings.requiredRecordingHours)
             return ReadyCheckItem(
                 title: "Free disk space: \(DiskEstimate.gigabytes(Double(free))) in \(folder),"
                     + " \(DiskEstimate.gigabytes(needed)) needed for \(hoursText(settings.requiredRecordingHours))",

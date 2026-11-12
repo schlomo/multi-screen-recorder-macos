@@ -69,11 +69,11 @@ extension CommandLineInterface {
 
         func run() async throws {
             let settings = try standardSettingsFile().load()
-            let displays = await currentDisplays()
+            let displays = try await currentDisplays()
             print(renderList(
                 displays: numberDisplays(displays),
                 resolution: settings.resolution,
-                audioInputs: currentAudioInputs(),
+                audioInputs: try currentAudioInputs(),
                 systemAudioAvailable: screenRecordingIsGranted()
             ), terminator: "")
         }
