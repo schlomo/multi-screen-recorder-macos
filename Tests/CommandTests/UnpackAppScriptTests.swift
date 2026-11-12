@@ -1,8 +1,9 @@
 import Foundation
 import Testing
 
-/// Runs scripts/unpack-app on scratch archives in a scratch checkout, since
-/// the script unpacks into the build/ folder of the repository it lives in.
+/// Runs scripts/unpack-app, and with it Tools/unpack_app.py, on scratch
+/// archives in a scratch checkout, since the script unpacks into the build/
+/// folder of the repository it lives in.
 @Suite struct UnpackAppScriptTests {
     private static let bundle = "Multi Screen Recorder.app"
 
@@ -13,10 +14,12 @@ import Testing
     init() throws {
         scratch = try ScratchFolder("UnpackAppScriptTests")
         checkout = scratch.url.appending(path: "checkout", directoryHint: .isDirectory)
-        let scripts = checkout.appending(path: "scripts", directoryHint: .isDirectory)
-        try FileManager.default.createDirectory(at: scripts, withIntermediateDirectories: true)
-        try FileManager.default.copyItem(
-            at: repositoryRoot.appending(path: "scripts/unpack-app"), to: scripts.appending(path: "unpack-app"))
+        for (folder, file) in [("scripts", "unpack-app"), ("Tools", "unpack_app.py")] {
+            let target = checkout.appending(path: folder, directoryHint: .isDirectory)
+            try FileManager.default.createDirectory(at: target, withIntermediateDirectories: true)
+            try FileManager.default.copyItem(
+                at: repositoryRoot.appending(path: "\(folder)/\(file)"), to: target.appending(path: file))
+        }
         sources = scratch.url.appending(path: "sources/inner", directoryHint: .isDirectory)
         let macOS = sources.appending(path: "\(Self.bundle)/Contents/MacOS", directoryHint: .isDirectory)
         try FileManager.default.createDirectory(at: macOS, withIntermediateDirectories: true)
@@ -32,7 +35,7 @@ import Testing
     private func archive(_ members: String...) throws -> URL {
         let archive = scratch.url.appending(path: "app.tar")
         let outcome = try run(URL(filePath: "/usr/bin/env"),
-                              ["tar", "-cPf", archive.path(percentEncoded: false)] + members, in: sources)
+                              ["tar", "--no-mac-metadata", "-cPf", archive.path(percentEncoded: false)] + members, in: sources)
         try #require(outcome.status == 0, "tar failed: \(outcome.errors)")
         return archive
     }
@@ -110,5 +113,66 @@ import Testing
         #expect(outcome.status == 1)
         #expect(outcome.errors.contains("points outside"))
         #expect(try buildContents().isEmpty)
+    }
+
+    /// A minimal bundle in a hand-written archive, with the given extra members.
+    private func handWritten(_ extra: [(String, TarArchive.Kind)]) throws -> URL {
+        var tar = TarArchive()
+        tar.add("\(Self.bundle)/", .folder)
+        tar.add("\(Self.bundle)/Contents/", .folder)
+        tar.add("\(Self.bundle)/Contents/MacOS/", .folder)
+        tar.add("\(Self.bundle)/Contents/MacOS/msr", .file("#!/bin/sh\n", executable: true))
+        for (name, kind) in extra { tar.add(name, kind) }
+        let url = scratch.url.appending(path: "hand.tar")
+        try tar.write(to: url)
+        return url
+    }
+
+    @Test func aHandWrittenGoodArchiveIsUnpacked() throws {
+        defer { scratch.remove() }
+        let outcome = try unpack(try handWritten([]))
+        #expect(outcome.status == 0, "\(outcome.errors)")
+        let program = build.appending(path: "\(Self.bundle)/Contents/MacOS/msr").path(percentEncoded: false)
+        #expect(FileManager.default.isExecutableFile(atPath: program))
+    }
+
+    @Test func aBundleThatIsASymbolicLinkStops() throws {
+        defer { scratch.remove() }
+        var tar = TarArchive()
+        tar.add(Self.bundle, .symbolicLink(to: "../scripts"))
+        let url = scratch.url.appending(path: "hostile.tar")
+        try tar.write(to: url)
+        let outcome = try unpack(url)
+        #expect(outcome.status == 1)
+        #expect(outcome.errors.contains("not a folder"), "\(outcome.errors)")
+        #expect(try buildContents().isEmpty)
+    }
+
+    @Test func aMemberWrittenThroughASymbolicLinkStops() throws {
+        defer { scratch.remove() }
+        let outcome = try unpack(try handWritten([
+            ("\(Self.bundle)/Contents/Resources", .symbolicLink(to: "MacOS")),
+            ("\(Self.bundle)/Contents/Resources/planted", .file("planted")),
+        ]))
+        #expect(outcome.status == 1)
+        #expect(outcome.errors.contains("through the symbolic link"), "\(outcome.errors)")
+        #expect(try buildContents().isEmpty)
+    }
+
+    @Test(arguments: ["../../outside", "/etc/hosts", "beside"])
+    func aHardLinkToATargetOutsideTheBundleStops(target: String) throws {
+        defer { scratch.remove() }
+        let outcome = try unpack(try handWritten([("\(Self.bundle)/Contents/hard", .hardLink(to: target))]))
+        #expect(outcome.status == 1)
+        #expect(outcome.errors.contains("hard link"), "\(outcome.errors)")
+        #expect(try buildContents().isEmpty)
+    }
+
+    @Test func aHardLinkInsideTheBundleIsAccepted() throws {
+        defer { scratch.remove() }
+        let outcome = try unpack(try handWritten([
+            ("\(Self.bundle)/Contents/copy", .hardLink(to: "\(Self.bundle)/Contents/MacOS/msr")),
+        ]))
+        #expect(outcome.status == 0, "\(outcome.errors)")
     }
 }

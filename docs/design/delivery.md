@@ -18,7 +18,7 @@ in CI:
 | `scripts/version` | Prints the version of the current checkout; stops on a shallow clone |
 | `scripts/build-app` | Compiles `msr`, assembles the app bundle in `build/`, signs it ad hoc with the real signing's options, and archives it as `build/msr-app.tar` |
 | `scripts/smoke-test` | Runs the bundled `msr` with a scratch `HOME`: version (also through a symbolic link), settings, `--save`, exit 78 and exit 64; nothing that needs a permission, a display or a microphone |
-| `scripts/unpack-app` | Unpacks the app archive into an empty `build/`, refusing absolute paths, `..`, anything outside the bundle and symbolic links pointing out of it |
+| `scripts/unpack-app` | Unpacks the app archive into an empty `build/`, checking every member first and writing them itself (`Tools/unpack_app.py`): the bundle must be a folder; it refuses absolute paths, `..`, anything outside the bundle, a member below a symbolic link, a symbolic link that is absolute or uses `..`, a hard link to anything but an earlier file of the bundle, and any other kind of member |
 | `scripts/sign-app` | Checks the bundle's version, commit and identifier, re-signs it, checks the signature, identifier, hardened runtime and entitlements, and zips it into `build/` |
 | `scripts/ci-import-signing-certificate` | CI only: puts the certificate from the secret into a temporary keychain |
 | `scripts/publish-snapshot-release` | Creates or replaces a PR's snapshot release |
@@ -46,9 +46,10 @@ signing job refuses each as a carrier of code:
 
 - **A cache:** the signing jobs restore none.
 - **The artifact:** data only. `scripts/unpack-app` unpacks it into an
-  empty `build/` with the path checks above, and nothing from it is
-  ever executed; `scripts/sign-app` reads the bundle with `codesign`
-  and `plutil` only.
+  empty `build/` with the checks above, relying on no tar's defaults
+  (its checks are in Python's standard library, `python3` from the
+  `PATH`), and nothing from it is ever executed; `scripts/sign-app`
+  reads the bundle with `codesign` and `plutil` only.
 - **Scripts:** a signing job runs the scripts of its own checkout of
   the same commit, never ones from the artifact.
 

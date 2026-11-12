@@ -284,9 +284,10 @@ Sources/RecorderCore/     ScreenCaptureKit, AVFoundation and Core Audio adapters
 Sources/msr/              entry point: the command line and the app
 Tests/RecorderLogicTests/ Swift Testing, as all tests
 Tests/RecorderCoreTests/  the adapters that need no device or permission
-Tests/CommandTests/       msr and scripts/version, run as commands
+Tests/CommandTests/       msr, scripts/version, scripts/unpack-app and scripts/sign-app, run as commands
 Resources/                Info.plist, entitlements
 scripts/                  see delivery.md
+Tools/                    unpack_app.py, the archive checks of scripts/unpack-app (Python, standard library only)
 ```
 
 Swift Package Manager and bundling scripts rather than an Xcode
@@ -305,7 +306,9 @@ the output folder probe against scratch folders. `CommandTests` run
 the built `msr` with a scratch `HOME` (`msr settings` and
 `msr version`, which prompt for nothing; also through a symbolic link
 into an app bundle), `scripts/version` in scratch git repositories and
-`scripts/unpack-app` on scratch archives; `scripts/smoke-test` runs the
+`scripts/unpack-app` on scratch archives (some written byte by byte, as
+no tar would write them from a file system), `scripts/sign-app` on a
+scratch bundle; `scripts/smoke-test` runs the
 built app's `msr` the same way in the pipeline.
 Capture itself cannot run in CI, which has
 no way to grant the permissions [ASSUMED]; it is verified on a Mac with

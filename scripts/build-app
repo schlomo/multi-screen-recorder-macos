@@ -36,5 +36,5 @@ codesign --force --options runtime --timestamp=none \
     --sign - "$app"
 codesign --verify --deep --strict "$app"
 
-tar -cf "$archive" -C build "$bundle"
+tar --no-mac-metadata -cf "$archive" -C build "$bundle"
 echo "$archive"
