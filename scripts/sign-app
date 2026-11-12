@@ -1,13 +1,15 @@
 #!/usr/bin/env bash
-# Signs the app bundle from scripts/build-app and zips it into build/. Signs
-# with the identity named in SIGNING_IDENTITY (default "Multi Screen Recorder
-# Signing"), which codesign matches as a substring of the certificate's name
-# in the keychain; this script never sees a secret. SIGNING_IDENTITY=- signs
-# ad hoc, for a local check only.
+# Re-signs the app bundle in build/ with the identity named in
+# SIGNING_IDENTITY (default "Multi Screen Recorder Signing"), which codesign
+# matches as a substring of the certificate's name in the keychain; this
+# script never sees a secret. SIGNING_IDENTITY=- signs ad hoc, for a local
+# check only. Then checks the signed bundle statically, reading it as data and
+# executing nothing from it, and zips it into build/.
 set -euo pipefail
 
-for tool in codesign ditto git; do
-    command -v "$tool" >/dev/null || { echo "scripts/sign-app: $tool is not on the PATH" >&2; exit 1; }
+me="scripts/sign-app"
+for tool in codesign plutil ditto git; do
+    command -v "$tool" >/dev/null || { echo "$me: $tool is not on the PATH" >&2; exit 1; }
 done
 
 cd "$(dirname "$0")/.."
@@ -15,16 +17,40 @@ identity="${SIGNING_IDENTITY:-Multi Screen Recorder Signing}"
 version="$(scripts/version)"
 app="build/Multi Screen Recorder.app"
 zip="build/Multi Screen Recorder ${version}.zip"
+identifier="org.schapiro.multiscreenrecorder"
+runtime_flag=$((0x10000))
 if [[ ! -d "$app" ]]; then
-    echo "scripts/sign-app: $app does not exist; run scripts/build-app first" >&2
+    echo "$me: $app does not exist; run scripts/build-app (or scripts/unpack-app in CI) first" >&2
     exit 1
 fi
+
+stop() {
+    echo "$me: $1" >&2
+    exit 1
+}
 
 rm -f "$zip"
 codesign --force --options runtime --timestamp=none \
     --entitlements Resources/msr.entitlements \
     --sign "$identity" "$app"
-codesign --verify --strict "$app"
+
+codesign --verify --deep --strict "$app" || stop "the signature does not verify"
+codesign --verify --test-requirement="=identifier \"$identifier\"" "$app" \
+    || stop "the identifier is not $identifier"
+
+details="$(codesign --display --verbose=2 "$app" 2>&1)"
+flags_pattern='flags=0x([0-9a-fA-F]+)'
+[[ "$details" =~ $flags_pattern ]] || stop "the code signature reports no flags"
+(( 16#${BASH_REMATCH[1]} & runtime_flag )) || stop "the hardened runtime flag is not set"
+
+entitlements="$(codesign --display --entitlements - --xml "$app" 2>/dev/null | plutil -convert json -o - -)"
+expected_entitlements="$(plutil -convert json -o - Resources/msr.entitlements)"
+[[ "$entitlements" == "$expected_entitlements" ]] \
+    || stop "the entitlements are $entitlements, not $expected_entitlements"
+
+bundled_version="$(plutil -extract MSRVersion raw "$app/Contents/Info.plist")"
+[[ "$bundled_version" == "$version" ]] \
+    || stop "the bundle's version is $bundled_version, but this commit's is $version"
 
 ditto -c -k --keepParent "$app" "$zip"
 echo "$zip"

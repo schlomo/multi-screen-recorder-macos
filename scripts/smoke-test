@@ -1,0 +1,70 @@
+#!/usr/bin/env bash
+# Runs the bundled msr from scripts/build-app with a scratch HOME: only
+# commands that need no permission, display or microphone. Each check is a
+# command and its expected exit code and output.
+set -euo pipefail
+
+me="scripts/smoke-test"
+for tool in git mktemp grep; do
+    command -v "$tool" >/dev/null || { echo "$me: $tool is not on the PATH" >&2; exit 1; }
+done
+
+cd "$(dirname "$0")/.."
+msr="$PWD/build/Multi Screen Recorder.app/Contents/MacOS/msr"
+if [[ ! -x "$msr" ]]; then
+    echo "$me: $msr does not exist; run scripts/build-app first" >&2
+    exit 1
+fi
+expected_version="$(scripts/version) ($(git rev-parse --short=7 HEAD))"
+
+scratch="$(mktemp -d)"
+trap 'rm -rf "$scratch"' EXIT
+home="$scratch/home"
+mkdir -p "$home"
+settings_file="$home/Library/Application Support/Multi Screen Recorder/settings.json"
+
+failures=0
+# check <description> <expected exit code> <text the output must contain> <command…>
+check() {
+    local description="$1" expected_status="$2" expected_text="$3"
+    shift 3
+    local output status=0
+    output="$(HOME="$home" "$@" 2>&1)" || status=$?
+    if [[ "$status" -ne "$expected_status" ]] || ! grep -qF -- "$expected_text" <<<"$output"; then
+        echo "FAIL  $description: exit $status (expected $expected_status), output:" >&2
+        echo "$output" >&2
+        failures=$((failures + 1))
+    else
+        echo "ok    $description"
+    fi
+}
+
+ln -s "$msr" "$scratch/msr"
+
+# check_version <description> <program>: prints exactly this commit's version
+check_version() {
+    local output status=0
+    output="$(HOME="$home" "$2" version 2>&1)" || status=$?
+    if [[ "$status" -ne 0 || "$output" != "$expected_version" ]]; then
+        echo "FAIL  $1: exit $status, printed '$output', expected '$expected_version'" >&2
+        failures=$((failures + 1))
+    else
+        echo "ok    $1"
+    fi
+}
+
+check_version "msr version prints this commit's version" "$msr"
+check_version "msr version through a symbolic link prints the same" "$scratch/msr"
+check "msr settings prints the defaults" 0 '"requiredRecordingHours": 2' "$msr" settings
+check "msr settings --save writes a flag" 0 '"resolution": "720p"' "$msr" settings --resolution 720p --save
+check "msr settings reads the saved file" 0 '"resolution": "720p"' "$msr" settings
+printf '{"agc": true}\n' > "$settings_file"
+check "an unusable settings file exits 78 naming the key" 78 '"agc"' "$msr" settings
+check_version "msr version reads no settings" "$msr"
+check "an unknown flag exits 64" 64 "--bogus" "$msr" settings --bogus
+
+if [[ "$failures" -ne 0 ]]; then
+    echo "$me: $failures check(s) failed" >&2
+    exit 1
+fi
+echo "$me: all checks passed"

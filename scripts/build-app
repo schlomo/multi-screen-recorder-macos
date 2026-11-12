@@ -1,10 +1,12 @@
 #!/usr/bin/env bash
-# Compiles msr and assembles the unsigned app bundle in build/. Signing and
-# zipping are scripts/sign-app, so in CI the signing key enters the keychain
-# only after compilation has finished.
+# Compiles msr, assembles the app bundle in build/, signs it ad hoc with the
+# options the real signing uses (hardened runtime, the entitlements), and
+# archives it as build/msr-app.tar for the signing job: tar, because GitHub's
+# artifact zip drops executable bits. Holds no secret and no identity;
+# scripts/sign-app re-signs the bundle.
 set -euo pipefail
 
-for tool in swift plutil git; do
+for tool in swift plutil git codesign tar; do
     command -v "$tool" >/dev/null || { echo "scripts/build-app: $tool is not on the PATH" >&2; exit 1; }
 done
 
@@ -12,12 +14,14 @@ cd "$(dirname "$0")/.."
 version="$(scripts/version)"
 short_version="${version%%[-+]*}"
 commit="$(git rev-parse --short=7 HEAD)"
-app="build/Multi Screen Recorder.app"
+bundle="Multi Screen Recorder.app"
+app="build/$bundle"
+archive="build/msr-app.tar"
 
 swift build -c release
 bin_path="$(swift build -c release --show-bin-path)"
 
-rm -rf "$app"
+rm -rf build
 mkdir -p "$app/Contents/MacOS"
 cp "$bin_path/msr" "$app/Contents/MacOS/msr"
 plist="$app/Contents/Info.plist"
@@ -27,4 +31,10 @@ plutil -replace CFBundleVersion -string "$short_version" "$plist"
 plutil -replace MSRVersion -string "$version" "$plist"
 plutil -replace MSRCommit -string "$commit" "$plist"
 
-echo "$app"
+codesign --force --options runtime --timestamp=none \
+    --entitlements Resources/msr.entitlements \
+    --sign - "$app"
+codesign --verify --deep --strict "$app"
+
+tar -cf "$archive" -C build "$bundle"
+echo "$archive"

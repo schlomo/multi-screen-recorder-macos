@@ -1,0 +1,51 @@
+#!/usr/bin/env bash
+# Unpacks the app archive from scripts/build-app (the path given) into an
+# empty build/, treating it as data: every member must lie inside the app
+# bundle, with no absolute path and no .. component, and every symbolic link
+# must stay inside the bundle. Stops on any miss; executes nothing from it.
+set -euo pipefail
+
+me="scripts/unpack-app"
+for tool in tar realpath find; do
+    command -v "$tool" >/dev/null || { echo "$me: $tool is not on the PATH" >&2; exit 1; }
+done
+if [[ $# -ne 1 ]]; then
+    echo "$me: give the path of the app archive" >&2
+    exit 1
+fi
+archive="$(realpath "$1")"
+bundle="Multi Screen Recorder.app"
+
+cd "$(dirname "$0")/.."
+if [[ -e build && -n "$(find build -mindepth 1 -maxdepth 1)" ]]; then
+    echo "$me: build/ is not empty; unpack only into an empty build/" >&2
+    exit 1
+fi
+
+members="$(tar -tf "$archive")"
+while IFS= read -r member; do
+    if [[ "$member" == /* ]]; then
+        echo "$me: the member '$member' has an absolute path" >&2
+        exit 1
+    fi
+    if [[ "/$member/" == */../* ]]; then
+        echo "$me: the member '$member' has a .. component" >&2
+        exit 1
+    fi
+    if [[ "$member" != "$bundle" && "$member" != "$bundle/"* ]]; then
+        echo "$me: the member '$member' lies outside $bundle" >&2
+        exit 1
+    fi
+done <<<"$members"
+
+mkdir -p build
+tar -xf "$archive" -C build
+bundle_path="$(realpath "build/$bundle")"
+while IFS= read -r -d '' link; do
+    if ! target="$(realpath "$link" 2>/dev/null)" || [[ "$target" != "$bundle_path" && "$target" != "$bundle_path/"* ]]; then
+        echo "$me: the symbolic link '$link' points outside $bundle" >&2
+        rm -rf "build/$bundle"
+        exit 1
+    fi
+done < <(find "build/$bundle" -type l -print0)
+echo "build/$bundle"
