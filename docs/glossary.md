@@ -1,0 +1,91 @@
+# Glossary
+
+Reference page, not an essay. Every term below is defined **once**,
+here, and used verbatim everywhere else in this project — no synonyms,
+no reusing a defined term for a second meaning (see
+`principles/engineering.md`'s "One word per concept").
+
+Where a concept is designed but not yet implemented, say so explicitly
+rather than letting the definition imply it already exists. As of
+setup, nothing below is implemented.
+
+## Multi Screen Recorder
+
+This product: the app and its command line for macOS. The repository is
+`multi-screen-recorder-macos`; the bundle ID is
+`org.schapiro.multiscreenrecorder`.
+
+## Former upstream
+
+`UBA-PSI/psi-screencapture-macos`, the MIT-licensed project by Dominik
+Herrmann (PSI chair, University of Bamberg) that this one started from.
+Not a source of merges in either direction (D16).
+
+## Reference implementation
+
+The former upstream's code, used only to learn from; this project's
+code is written from scratch (D1).
+
+## Recording
+
+Everything captured between Start and Stop: one or more display files
+and audio files.
+
+## Display file
+
+The video file for one display, with every audio source present when
+it started as its own track.
+A display that disappears or whose stream fails ends its display file;
+a new one begins when it is back.
+
+## Audio source
+
+A device whose sound is recorded: a microphone or other audio input, or
+the system audio.
+
+## System audio
+
+What the Mac plays. A separate switch, independent of the audio mode.
+
+## Audio mode
+
+Which audio inputs are recorded: none, the default microphone, or all
+audio inputs.
+
+## Audio file
+
+The file for an audio source that appeared after the display files
+started; it joins the display files at their next new file (D12).
+
+## Recording resolution
+
+The maximum box a display's picture is shrunk to fit: Native, 4K,
+1440p, 1200p, 1080p or 720p. It never enlarges the picture (D11).
+
+## Ready check
+
+The check before Start: permissions, chosen sources, free disk space
+(D14).
+
+## Snapshot release
+
+The installable build a PR publishes, for trying the change before it
+is merged (D4).
+
+## Release
+
+The GitHub release published by each merge to `main` (D4).
+
+## v1
+
+The first version the owner declares fit for their own use, once it
+passes the v1 gate in `backlog.md`; versions before it are 0.x.
+
+## User's Mac
+
+The only environment the software runs in (D7).
+
+## Homepage
+
+`multiscreenrecorder.schapiro.org`, served by GitHub Pages from a
+separate branch of this repository (D7).
