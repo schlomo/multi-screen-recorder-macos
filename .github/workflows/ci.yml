@@ -47,10 +47,11 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
           persist-credentials: false
+      - run: scripts/build-app
       - run: scripts/ci-import-signing-certificate
         env:
           SIGNING_CERTIFICATE_P12: ${{ secrets.SIGNING_CERTIFICATE_P12 }}
-      - run: scripts/build-app
+      - run: scripts/sign-app
       - run: scripts/publish-snapshot-release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -92,10 +93,11 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
+      - run: scripts/build-app
       - run: scripts/ci-import-signing-certificate
         env:
           SIGNING_CERTIFICATE_P12: ${{ secrets.SIGNING_CERTIFICATE_P12 }}
-      - run: scripts/build-app
+      - run: scripts/sign-app
       - run: scripts/publish-release
         env:
           GH_TOKEN: ${{ github.token }}

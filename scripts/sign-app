@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+# Signs the app bundle from scripts/build-app and zips it into build/. Signs
+# with the identity named in SIGNING_IDENTITY (default "Multi Screen Recorder
+# Signing"), which codesign matches as a substring of the certificate's name
+# in the keychain; this script never sees a secret. SIGNING_IDENTITY=- signs
+# ad hoc, for a local check only.
+set -euo pipefail
+
+for tool in codesign ditto git; do
+    command -v "$tool" >/dev/null || { echo "scripts/sign-app: $tool is not on the PATH" >&2; exit 1; }
+done
+
+cd "$(dirname "$0")/.."
+identity="${SIGNING_IDENTITY:-Multi Screen Recorder Signing}"
+version="$(scripts/version)"
+app="build/Multi Screen Recorder.app"
+zip="build/Multi Screen Recorder ${version}.zip"
+if [[ ! -d "$app" ]]; then
+    echo "scripts/sign-app: $app does not exist; run scripts/build-app first" >&2
+    exit 1
+fi
+
+rm -f "$zip"
+codesign --force --options runtime --timestamp=none \
+    --entitlements Resources/msr.entitlements \
+    --sign "$identity" "$app"
+codesign --verify --strict "$app"
+
+ditto -c -k --keepParent "$app" "$zip"
+echo "$zip"

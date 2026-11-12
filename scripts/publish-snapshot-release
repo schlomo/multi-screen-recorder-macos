@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Creates or replaces the snapshot release of PR PR_NUMBER: a GitHub
-# pre-release tagged pr-<number> with the zip from scripts/build-app.
-# gh reads GH_TOKEN itself.
+# pre-release tagged pr-<number> with the zip from scripts/sign-app. Only
+# while the PR is open and its head is this commit: a run for a superseded
+# push or a closed PR publishes nothing and exits 0. gh reads GH_TOKEN itself.
 set -euo pipefail
 
 for tool in gh git; do
@@ -17,8 +18,20 @@ version="$(scripts/version)"
 zip="build/Multi Screen Recorder ${version}.zip"
 tag="pr-${PR_NUMBER}"
 if [[ ! -f "$zip" ]]; then
-    echo "scripts/publish-snapshot-release: $zip does not exist; run scripts/build-app first" >&2
+    echo "scripts/publish-snapshot-release: $zip does not exist; run scripts/build-app and scripts/sign-app first" >&2
     exit 1
+fi
+
+head="$(git rev-parse HEAD)"
+pr="$(gh pr view "$PR_NUMBER" --json state,headRefOid --jq '.state + " " + .headRefOid')"
+read -r state pr_head <<<"$pr"
+if [[ "$state" != "OPEN" ]]; then
+    echo "scripts/publish-snapshot-release: PR #${PR_NUMBER} is ${state}, not open; publishing nothing" >&2
+    exit 0
+fi
+if [[ "$pr_head" != "$head" ]]; then
+    echo "scripts/publish-snapshot-release: PR #${PR_NUMBER} is now at ${pr_head}, not ${head}; publishing nothing" >&2
+    exit 0
 fi
 
 tags="$(gh release list --limit 1000 --json tagName --jq '.[].tagName')"
@@ -27,6 +40,6 @@ if grep -qFx "$tag" <<<"$tags"; then
 fi
 gh release create "$tag" "$zip" \
     --prerelease \
-    --target "$(git rev-parse HEAD)" \
+    --target "$head" \
     --title "Snapshot PR #${PR_NUMBER}: ${version}" \
     --notes "Snapshot release of pull request #${PR_NUMBER}, replaced on every push and removed when the pull request closes."

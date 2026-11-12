@@ -1,25 +1,23 @@
 #!/usr/bin/env bash
-# Builds, bundles, signs and zips the app into build/. Signs with the identity
-# named in SIGNING_IDENTITY (default "Multi Screen Recorder Signing"), which
-# codesign reads from the keychain; this script never sees a secret.
+# Compiles msr and assembles the unsigned app bundle in build/. Signing and
+# zipping are scripts/sign-app, so in CI the signing key enters the keychain
+# only after compilation has finished.
 set -euo pipefail
 
-for tool in swift codesign ditto plutil git; do
+for tool in swift plutil git; do
     command -v "$tool" >/dev/null || { echo "scripts/build-app: $tool is not on the PATH" >&2; exit 1; }
 done
 
 cd "$(dirname "$0")/.."
-identity="${SIGNING_IDENTITY:-Multi Screen Recorder Signing}"
 version="$(scripts/version)"
 short_version="${version%%[-+]*}"
 commit="$(git rev-parse --short=7 HEAD)"
 app="build/Multi Screen Recorder.app"
-zip="build/Multi Screen Recorder ${version}.zip"
 
 swift build -c release
 bin_path="$(swift build -c release --show-bin-path)"
 
-rm -rf "$app" "$zip"
+rm -rf "$app"
 mkdir -p "$app/Contents/MacOS"
 cp "$bin_path/msr" "$app/Contents/MacOS/msr"
 plist="$app/Contents/Info.plist"
@@ -29,10 +27,4 @@ plutil -replace CFBundleVersion -string "$short_version" "$plist"
 plutil -replace MSRVersion -string "$version" "$plist"
 plutil -replace MSRCommit -string "$commit" "$plist"
 
-codesign --force --options runtime --timestamp=none \
-    --entitlements Resources/msr.entitlements \
-    --sign "$identity" "$app"
-codesign --verify --strict "$app"
-
-ditto -c -k --keepParent "$app" "$zip"
-echo "$zip"
+echo "$app"

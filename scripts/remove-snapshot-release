@@ -9,6 +9,7 @@ if [[ -z "${PR_NUMBER:-}" ]]; then
     exit 1
 fi
 
+cd "$(dirname "$0")/.."
 tag="pr-${PR_NUMBER}"
 tags="$(gh release list --limit 1000 --json tagName --jq '.[].tagName')"
 if grep -qFx "$tag" <<<"$tags"; then

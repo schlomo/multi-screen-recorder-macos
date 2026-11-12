@@ -24,6 +24,11 @@ if [[ -n "$pr_number" && ! "$pr_number" =~ ^[1-9][0-9]*$ ]]; then
     exit 1
 fi
 
+shallow="$(git rev-parse --is-shallow-repository)"
+if [[ "$shallow" != "false" ]]; then
+    echo "scripts/version: $(pwd) is a shallow clone, so the commits on origin/main cannot be counted; fetch its full history" >&2
+    exit 1
+fi
 if ! main_commits="$(git rev-list --count origin/main)"; then
     echo "scripts/version: cannot count the commits on origin/main; fetch it with its full history" >&2
     exit 1

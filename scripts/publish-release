@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# Publishes the release for a merge to main: tag v<version>, with the zip from
-# scripts/build-app built with RELEASE_BUILD=true. gh reads GH_TOKEN itself.
+# Publishes the release for a merge to main: tag v<version>, with the zip that
+# scripts/build-app and scripts/sign-app made with RELEASE_BUILD=true. gh reads
+# GH_TOKEN itself.
 set -euo pipefail
 
 for tool in gh git; do
@@ -15,7 +16,7 @@ cd "$(dirname "$0")/.."
 version="$(scripts/version)"
 zip="build/Multi Screen Recorder ${version}.zip"
 if [[ ! -f "$zip" ]]; then
-    echo "scripts/publish-release: $zip does not exist; run scripts/build-app first" >&2
+    echo "scripts/publish-release: $zip does not exist; run scripts/build-app and scripts/sign-app first" >&2
     exit 1
 fi
 
