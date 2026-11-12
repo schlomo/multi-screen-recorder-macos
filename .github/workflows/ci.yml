@@ -15,7 +15,7 @@ env:
 
 jobs:
   # Holds no secret and no token: compiles, tests, builds and smoke-tests the
-  # app, and hands the unsigned app on as an archive. Forks and Dependabot run
+  # app, and hands the ad hoc signed app on as an archive. Forks and Dependabot run
   # this job only.
   test-and-build:
     if: github.event_name == 'push' || github.event.action != 'closed'

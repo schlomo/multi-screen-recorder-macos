@@ -385,7 +385,8 @@ architect's reading.
 
 ## D23: Pipeline: pre-release per PR, versions count commits, the build never sees the secret (2026-11-12)
 
-- **Status:** in force
+- **Status:** superseded in part by D29 (which script signs, and in
+  which job)
 - **Context:** D4 left the version format and the kind of snapshot
   release open. The owner agreed to the proposals, to "use filters" so
   that documentation pushed to `main` publishes nothing, and to
@@ -484,7 +485,8 @@ architect's reading.
 
 ## D28: Rulings on the adversarial review of PR #1 (2026-11-12)
 
-- **Status:** in force
+- **Status:** superseded in part by D29 (point 5: the key imported
+  "only after compilation" in the same job)
 - **Context:** The architect put seven recommendations from the
   adversarial review of PR #1 to the owner, who answered "Accept all
   seven".
@@ -525,3 +527,36 @@ architect's reading.
 - **Evidence:** [PR #1](https://github.com/schlomo/multi-screen-recorder-macos/pull/1),
   [design/delivery.md](design/delivery.md),
   [design/recorder.md](design/recorder.md).
+
+## D29: Build and sign in separate jobs, with a smoke test in the build (2026-11-12)
+
+- **Status:** in force
+- **Context:** Code that runs during `swift build` (dependency
+  manifests, plugins, macros) can leave a process, a `PATH` shim or an
+  edited script behind for a later step of the same job, so ordering
+  steps in one job does not keep the key away from it. The owner: "then
+  maybe build and sign must happen in separate jobs with artifact
+  passing to ensure that key is in clean environment? And how to
+  prevent builder from seeing that variable (map only into signer?)",
+  then "confirmed, two-job design", then "ok, go with two jobs and
+  smoke test in build."
+- **Decision:** A job without any secret or token tests, builds the
+  app (signed ad hoc with the real options), smoke-tests the bundled
+  `msr` and uploads the app as a tar archive; the signing jobs
+  (`snapshot-release`, `release`) download it, unpack it, import the
+  certificate with the secret mapped into that one step, re-sign,
+  check the signature statically and publish with the token mapped
+  into that one step. Forks and Dependabot get the first job only.
+  The architect's reading: the unit tests, the build and the smoke
+  test share the one job `test-and-build` (one runner start fewer);
+  the signing jobs refuse the three things that cross between jobs: no
+  cache is restored; the artifact is data, unpacked into an empty
+  folder with a path check, never executed; scripts come from the
+  job's own checkout. Replaces D28's "only after compilation" in part,
+  and D23's signing by the build script.
+- **Consequences:** Rests on GitHub giving every hosted job a fresh
+  virtual machine; a self-hosted runner would break it. A poisoned
+  build is still signed, and whoever can push a branch can change the
+  signing scripts (accepted risks in the design).
+- **Evidence:** [PR #1](https://github.com/schlomo/multi-screen-recorder-macos/pull/1),
+  [design/delivery.md](design/delivery.md).

@@ -17,12 +17,14 @@ Recorded by the setup skill; re-run it when any of this changes.
   descriptions carry a generated-with line.
 - **Time zone:** Europe/Berlin, stated with every time shown to people.
 - **Pipeline:** GitHub Actions, `.github/workflows/ci.yml`, wiring the
-  scripts in `scripts/` on a hosted Apple-silicon macOS runner: every
-  push to a PR tests, builds, signs and publishes the PR's snapshot
-  release (a pre-release tagged `pr-<n>`), a closed PR's snapshot
-  release is removed, a push to `main` that changes more than Markdown
-  files publishes a release `v0.<N>.0`; PRs from forks and Dependabot
-  are tested only. Signing needs the repository secret
+  scripts in `scripts/` on hosted Apple-silicon macOS runners: job
+  `test-and-build` tests, builds and smoke-tests without any secret,
+  then a separate signing job signs and publishes, for every push to a
+  PR the PR's snapshot release (a pre-release tagged `pr-<n>`), for a
+  push to `main` that changes more than Markdown files a release
+  `v0.<N>.0`; a closed PR's snapshot release is removed. PRs from forks
+  and Dependabot are tested, built and smoke-tested, never signed or
+  published. Signing needs the repository secret
   `SIGNING_CERTIFICATE_P12` ([delivery.md](docs/design/delivery.md)).
   Who may register pipelines and edit branch policies: the repository
   owner.
@@ -222,9 +224,10 @@ this is how they map per tool.
 
 `scripts/test` runs the tests (Swift Testing, `swift test`), including
 those that run `msr settings`, `msr version` and `scripts/version` as
-commands; `scripts/build-app` compiles and assembles the app in
-`build/`, `scripts/sign-app` signs and zips it (`SIGNING_IDENTITY=-`
-signs ad hoc, for a local check only).
+commands; `scripts/build-app` builds the app in `build/` (signed ad
+hoc), `scripts/smoke-test` runs the bundled `msr` safely, and
+`scripts/sign-app` re-signs and zips it (`SIGNING_IDENTITY=-` signs ad
+hoc, for a local check only).
 
 ## Facts that bite
 

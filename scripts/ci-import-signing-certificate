@@ -3,9 +3,9 @@
 # of a .p12 exported with an empty password) into a temporary keychain, so
 # scripts/sign-app can sign with it by name. The one place that reads the
 # secret: macOS has no tool that reads a certificate from the environment
-# itself. Runs after scripts/build-app, so no compilation runs while the key
-# is in the keychain, and imports the key non-extractable. Never prints the
-# value.
+# itself. Runs only in a signing job, which never compiles and never executes
+# anything from the build job's artifact (docs/design/delivery.md), and
+# imports the key non-extractable. Never prints the value.
 set -euo pipefail
 
 for tool in security base64 codesign; do

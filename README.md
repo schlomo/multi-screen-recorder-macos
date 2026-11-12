@@ -127,8 +127,9 @@ Then:
 
 ```sh
 scripts/test        # runs the tests
-scripts/build-app   # compiles and assembles the app in build/
-scripts/sign-app    # signs it and zips it into build/
+scripts/build-app   # builds the app in build/, signed ad hoc
+scripts/smoke-test  # runs the bundled msr: version, settings, exit codes
+scripts/sign-app    # re-signs it with your certificate and zips it into build/
 ```
 
 `scripts/sign-app` signs with the identity named in

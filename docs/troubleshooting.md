@@ -59,7 +59,8 @@ One row per entry, the error text exactly as in the entry.
 ## Swift tools version newer than the CI runner's Xcode
 
 - **Error:** `package 'multi-screen-recorder-macos' is using Swift tools version 6.4.0 but the installed version is 6.3.3`
-- **Symptom:** the `test` job fails in `scripts/test` before compiling
+- **Symptom:** the `test` job (now `test-and-build`) fails in
+  `scripts/test` before compiling
   anything.
 - **Why:** the newest generally available Apple-silicon runner image
   (`macos-26`) has Xcode 26.6 at most, with Swift 6.3.3, while a Mac
@@ -68,6 +69,6 @@ One row per entry, the error text exactly as in the entry.
 - **Fix:** `// swift-tools-version: 6.3` in `Package.swift`; raise it
   once the runner image the workflow uses ships a newer Xcode, together
   with `DEVELOPER_DIR` in `.github/workflows/ci.yml`.
-- **Verify:** the `test` job passes.
+- **Verify:** the `test-and-build` job passes.
 - **Observed:** 2026-11-12, runner image `macos-26` 20261102.0473.1,
   Xcode 26.6; open.

@@ -304,7 +304,9 @@ document, which the tests hold to the code. `RecorderCoreTests` test
 the output folder probe against scratch folders. `CommandTests` run
 the built `msr` with a scratch `HOME` (`msr settings` and
 `msr version`, which prompt for nothing; also through a symbolic link
-into an app bundle) and `scripts/version` in scratch git repositories.
+into an app bundle), `scripts/version` in scratch git repositories and
+`scripts/unpack-app` on scratch archives; `scripts/smoke-test` runs the
+built app's `msr` the same way in the pipeline.
 Capture itself cannot run in CI, which has
 no way to grant the permissions [ASSUMED]; it is verified on a Mac with
 `scripts/acceptance/`, which drives `msr record` and checks the files
@@ -361,3 +363,11 @@ settings file is found through `HOME`. The disk estimate follows its
 rule, scaled by each frame's pixel count (3.7 GB in the `msr check`
 example above). The recording resolution box turns with a portrait
 display (1080×1920 for a 2160×3840 display at 1080p).
+
+Further details, as built and decided by the architect for PR #1: an
+unset `HOME` exits 78 like an unusable settings file; `msr` that cannot re-execute
+itself at its real path exits 71. When the displays cannot be read,
+the free disk space item is left out, as when the output folder fails.
+The ready check reads only the default microphone's name, not its
+channels. When the free space cannot be read, the fix says "choose an
+output folder on another disk".
