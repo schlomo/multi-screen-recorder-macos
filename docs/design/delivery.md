@@ -10,15 +10,24 @@ developer setup. What the app does is in [recorder.md](recorder.md).
 
 **Scripts hold the behaviour; the pipeline only wires them** (thin CI).
 Each script but the CI-only one runs the same on a developer's Mac and
-in CI:
+in CI. Five are Python (D32): `scripts/version`, `scripts/unpack-app`,
+`scripts/sign-app`, `scripts/smoke-test` and
+`scripts/publish-snapshot-release`; the rest are bash glue around a few
+commands. The Python scripts use the standard library only, so nothing
+is installed, and need Python 3.15 or later, the `python3` on the
+`PATH` of the `macos-26` arm64 runner image (its software list in
+[actions/runner-images](https://github.com/actions/runner-images/blob/main/images/macos/macos-26-arm64-Readme.md),
+image 20261102, lists Python 3.15.2); each stops on an older one with
+an error naming that minimum. The minimum follows the runner image
+when it moves.
 
 | Script | Does |
 |---|---|
-| `scripts/test` | Runs the unit tests, and the tests that run `msr`, `scripts/version`, `scripts/unpack-app` and `scripts/sign-app` as commands |
+| `scripts/test` | Compiles the Python scripts (`python3 -I -m py_compile`), then runs the unit tests and the tests that run `msr` and the scripts as commands |
 | `scripts/version` | Prints the version of the current checkout; stops on a shallow clone |
 | `scripts/build-app` | Compiles `msr`, assembles the app bundle in `build/`, signs it ad hoc with the real signing's options, and archives it as `build/msr-app.tar` |
 | `scripts/smoke-test` | Runs the bundled `msr` with a scratch `HOME`: version (also through a symbolic link), settings, `--save`, exit 78 and exit 64; nothing that needs a permission, a display or a microphone |
-| `scripts/unpack-app` | Unpacks the app archive into an empty `build/`, checking every member first and writing them itself (`Tools/unpack_app.py`): the bundle must be a folder; it refuses absolute paths, `..`, anything outside the bundle, a member below a symbolic link, a symbolic link that is absolute or uses `..`, a hard link to anything but an earlier file of the bundle, and any other kind of member |
+| `scripts/unpack-app` | Unpacks the app archive into an empty `build/` with the `data` filter of Python's `tarfile`, rooted at the bundle folder, which refuses absolute paths, `..` leading out, links pointing out of the bundle and special files; before writing anything the script itself refuses a member outside the bundle, a bundle that is not a folder and a member below a symbolic link of the archive, and it removes what it wrote when the filter refuses a member |
 | `scripts/sign-app` | Checks the bundle's version, commit and identifier, re-signs it, checks the signature, identifier, hardened runtime and entitlements, and zips it into `build/` |
 | `scripts/ci-import-signing-certificate` | CI only: puts the certificate from the secret into a temporary keychain |
 | `scripts/publish-snapshot-release` | Creates or replaces a PR's snapshot release |
@@ -47,9 +56,9 @@ signing job refuses each as a carrier of code:
 - **A cache:** the signing jobs restore none.
 - **The artifact:** data only. `scripts/unpack-app` unpacks it into an
   empty `build/` with the checks above, relying on no tar's defaults
-  (its checks are in Python's standard library, `python3` from the
-  `PATH`), and nothing from it is ever executed; `scripts/sign-app`
-  reads the bundle with `codesign` and `plutil` only.
+  (Python's `tarfile`, `python3` from the `PATH`), and nothing from it
+  is ever executed; `scripts/sign-app` reads the bundle with `codesign`
+  and Python's `plistlib` only.
 - **Scripts:** a signing job runs the scripts of its own checkout of
   the same commit, never ones from the artifact.
 
@@ -132,14 +141,17 @@ GitHub Actions and Swift packages in use.
    `sudo xcodebuild -license accept` and
    `sudo xcode-select -s /Applications/Xcode.app`. The Command Line
    Tools alone build the app but cannot run the tests.
-2. The signing certificate, in Keychain Access › Certificate Assistant ›
+2. Python 3.15 or later as `python3` on the `PATH`, for the scripts
+   (the one macOS ships is older), such as from Homebrew:
+   `brew install python@3.15`.
+3. The signing certificate, in Keychain Access › Certificate Assistant ›
    Create a Certificate…: a name containing `Multi Screen Recorder
    Signing`, such as `Multi Screen Recorder Signing (<your name>)`;
    identity type Self-Signed Root, certificate type Code Signing, "Let
    me override defaults" ticked, validity 3650 days (the default is one
    year, and a new certificate means granting both permissions again),
    the rest unchanged, in the login keychain.
-3. For the pipeline, by the repository owner only: export the
+4. For the pipeline, by the repository owner only: export the
    certificate from My Certificates as `.p12` with an empty password,
    then
 

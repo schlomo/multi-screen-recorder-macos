@@ -1,9 +1,8 @@
 import Foundation
 import Testing
 
-/// Runs scripts/unpack-app, and with it Tools/unpack_app.py, on scratch
-/// archives in a scratch checkout, since the script unpacks into the build/
-/// folder of the repository it lives in.
+/// Runs scripts/unpack-app on scratch archives in a scratch checkout, since
+/// the script unpacks into the build/ folder of the repository it lives in.
 @Suite struct UnpackAppScriptTests {
     private static let bundle = "Multi Screen Recorder.app"
 
@@ -14,12 +13,10 @@ import Testing
     init() throws {
         scratch = try ScratchFolder("UnpackAppScriptTests")
         checkout = scratch.url.appending(path: "checkout", directoryHint: .isDirectory)
-        for (folder, file) in [("scripts", "unpack-app"), ("Tools", "unpack_app.py")] {
-            let target = checkout.appending(path: folder, directoryHint: .isDirectory)
-            try FileManager.default.createDirectory(at: target, withIntermediateDirectories: true)
-            try FileManager.default.copyItem(
-                at: repositoryRoot.appending(path: "\(folder)/\(file)"), to: target.appending(path: file))
-        }
+        let scripts = checkout.appending(path: "scripts", directoryHint: .isDirectory)
+        try FileManager.default.createDirectory(at: scripts, withIntermediateDirectories: true)
+        try FileManager.default.copyItem(
+            at: repositoryRoot.appending(path: "scripts/unpack-app"), to: scripts.appending(path: "unpack-app"))
         sources = scratch.url.appending(path: "sources/inner", directoryHint: .isDirectory)
         let macOS = sources.appending(path: "\(Self.bundle)/Contents/MacOS", directoryHint: .isDirectory)
         try FileManager.default.createDirectory(at: macOS, withIntermediateDirectories: true)

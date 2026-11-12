@@ -39,11 +39,6 @@ public func currentAudioInputs() throws(DeviceReadError) -> [AudioInputInfo] {
     }
 }
 
-/// The name of the default audio input, if there is one.
-public func defaultAudioInputName() -> String? {
-    AVCaptureDevice.default(for: .audio)?.localizedName
-}
-
 private func channelCount(of device: AVCaptureDevice) throws(DeviceReadError) -> Int {
     guard let format = CMAudioFormatDescriptionGetStreamBasicDescription(device.activeFormat.formatDescription) else {
         throw DeviceReadError("the audio input \(device.localizedName) does not report its format")

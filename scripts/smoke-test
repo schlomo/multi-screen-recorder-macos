@@ -1,71 +1,100 @@
-#!/usr/bin/env bash
-# Runs the bundled msr from scripts/build-app with a scratch HOME: only
-# commands that need no permission, display or microphone. Each check is a
-# command and its expected exit code and output.
-set -euo pipefail
+#!/usr/bin/env -S python3 -I
+"""Runs the bundled msr from scripts/build-app with a scratch HOME: only
+commands that need no permission, display or microphone. Each check is a
+command and its expected exit code and output.
+"""
 
-me="scripts/smoke-test"
-for tool in git mktemp grep plutil; do
-    command -v "$tool" >/dev/null || { echo "$me: $tool is not on the PATH" >&2; exit 1; }
-done
+import os
+import plistlib
+import shutil
+import subprocess
+import sys
+import tempfile
+from dataclasses import dataclass
+from pathlib import Path
+from typing import NoReturn
 
-cd "$(dirname "$0")/.."
-msr="$PWD/build/Multi Screen Recorder.app/Contents/MacOS/msr"
-if [[ ! -x "$msr" ]]; then
-    echo "$me: $msr does not exist; run scripts/build-app first" >&2
-    exit 1
-fi
-bundled_version="$(plutil -extract MSRVersion raw "build/Multi Screen Recorder.app/Contents/Info.plist")"
-expected_version="$bundled_version ($(git rev-parse --short=7 HEAD))"
+ME = "scripts/smoke-test"
+MINIMUM_PYTHON = (3, 15)
+if sys.version_info < MINIMUM_PYTHON:
+    sys.exit(f"{ME}: needs Python 3.15 or later (the python3 of the macos-26 runner image), not {sys.version.split()[0]}")
 
-scratch="$(mktemp -d)"
-trap 'rm -rf "$scratch"' EXIT
-home="$scratch/home"
-mkdir -p "$home"
-settings_file="$home/Library/Application Support/Multi Screen Recorder/settings.json"
+APP = Path("build/Multi Screen Recorder.app")
 
-failures=0
-# check <description> <expected exit code> <text the output must contain> <command…>
-check() {
-    local description="$1" expected_status="$2" expected_text="$3"
-    shift 3
-    local output status=0
-    output="$(HOME="$home" "$@" 2>&1)" || status=$?
-    if [[ "$status" -ne "$expected_status" ]] || ! grep -qF -- "$expected_text" <<<"$output"; then
-        echo "FAIL  $description: exit $status (expected $expected_status), output:" >&2
-        echo "$output" >&2
-        failures=$((failures + 1))
-    else
-        echo "ok    $description"
-    fi
-}
 
-ln -s "$msr" "$scratch/msr"
+def stop(message: str) -> NoReturn:
+    sys.exit(f"{ME}: {message}")
 
-# check_version <description> <program>: prints exactly this commit's version
-check_version() {
-    local output status=0
-    output="$(HOME="$home" "$2" version 2>&1)" || status=$?
-    if [[ "$status" -ne 0 || "$output" != "$expected_version" ]]; then
-        echo "FAIL  $1: exit $status, printed '$output', expected '$expected_version'" >&2
-        failures=$((failures + 1))
-    else
-        echo "ok    $1"
-    fi
-}
 
-check_version "msr version prints this commit's version" "$msr"
-check_version "msr version through a symbolic link prints the same" "$scratch/msr"
-check "msr settings prints the defaults" 0 '"requiredRecordingHours": 2' "$msr" settings
-check "msr settings --save writes a flag" 0 '"resolution": "720p"' "$msr" settings --resolution 720p --save
-check "msr settings reads the saved file" 0 '"resolution": "720p"' "$msr" settings
-printf '{"agc": true}\n' > "$settings_file"
-check "an unusable settings file exits 78 naming the key" 78 '"agc"' "$msr" settings
-check_version "msr version reads no settings" "$msr"
-check "an unknown flag exits 64" 64 "--bogus" "$msr" settings --bogus
+@dataclass
+class Checks:
+    home: Path
+    failures: int = 0
 
-if [[ "$failures" -ne 0 ]]; then
-    echo "$me: $failures check(s) failed" >&2
-    exit 1
-fi
-echo "$me: all checks passed"
+    def run(self, program: Path, *arguments: str) -> subprocess.CompletedProcess[str]:
+        return subprocess.run([program, *arguments], env=os.environ | {"HOME": str(self.home)},
+                              stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+
+    def report(self, description: str, passed: bool, failure: str) -> None:
+        if passed:
+            print(f"ok    {description}", flush=True)
+        else:
+            print(f"FAIL  {description}: {failure}", file=sys.stderr)
+            self.failures += 1
+
+    def expect(self, description: str, status: int, text: str, program: Path, *arguments: str) -> None:
+        """The command exits with the status and its output contains the text."""
+        result = self.run(program, *arguments)
+        self.report(description, result.returncode == status and text in result.stdout,
+                    f"exit {result.returncode} (expected {status}), output:\n{result.stdout}")
+
+    def expect_version(self, description: str, program: Path, version: str) -> None:
+        """The program prints exactly this version."""
+        result = self.run(program, "version")
+        printed = result.stdout.removesuffix("\n")
+        self.report(description, result.returncode == 0 and printed == version,
+                    f"exit {result.returncode}, printed '{printed}', expected '{version}'")
+
+
+def main() -> None:
+    if shutil.which("git") is None:
+        stop("git is not on the PATH")
+    os.chdir(Path(__file__).resolve().parent.parent)
+    msr = Path.cwd() / APP / "Contents/MacOS/msr"
+    if not os.access(msr, os.X_OK):
+        stop(f"{msr} does not exist; run scripts/build-app first")
+    try:
+        bundled_version = plistlib.loads((APP / "Contents/Info.plist").read_bytes())["MSRVersion"]
+    except (OSError, plistlib.InvalidFileException, KeyError) as error:
+        stop(f"cannot read MSRVersion from the bundle's Info.plist: {error}")
+    head = subprocess.run(["git", "rev-parse", "--short=7", "HEAD"], check=True,
+                          stdout=subprocess.PIPE, text=True).stdout.strip()
+    expected_version = f"{bundled_version} ({head})"
+
+    with tempfile.TemporaryDirectory() as scratch_name:
+        scratch = Path(scratch_name)
+        home = scratch / "home"
+        home.mkdir()
+        settings_file = home / "Library/Application Support/Multi Screen Recorder/settings.json"
+        linked_msr = scratch / "msr"
+        linked_msr.symlink_to(msr)
+        checks = Checks(home)
+
+        checks.expect_version("msr version prints this commit's version", msr, expected_version)
+        checks.expect_version("msr version through a symbolic link prints the same", linked_msr, expected_version)
+        checks.expect("msr settings prints the defaults", 0, '"requiredRecordingHours": 2', msr, "settings")
+        checks.expect("msr settings --save writes a flag", 0, '"resolution": "720p"',
+                      msr, "settings", "--resolution", "720p", "--save")
+        checks.expect("msr settings reads the saved file", 0, '"resolution": "720p"', msr, "settings")
+        settings_file.write_text('{"agc": true}\n')
+        checks.expect("an unusable settings file exits 78 naming the key", 78, '"agc"', msr, "settings")
+        checks.expect_version("msr version reads no settings", msr, expected_version)
+        checks.expect("an unknown flag exits 64", 64, "--bogus", msr, "settings", "--bogus")
+
+    if checks.failures:
+        stop(f"{checks.failures} check(s) failed")
+    print(f"{ME}: all checks passed")
+
+
+if __name__ == "__main__":
+    main()

@@ -8,14 +8,19 @@ import ScreenCaptureKit
 /// asked for is requested, so macOS shows its prompt; a missing output folder
 /// is created.
 @MainActor
-public func runReadyCheck(settings: Settings, homeFolder: URL) async -> ReadyCheckResult {
-    let facts = ReadyCheckFacts(
+public func probeReadyCheckFacts(settings: Settings, homeFolder: URL) async -> ReadyCheckFacts {
+    ReadyCheckFacts(
         screenRecording: await probeScreenRecording(),
         microphone: settings.audioMode == .none ? nil : await probeMicrophone(),
         displays: Result { () throws(DeviceReadError) in try currentDisplays() },
-        defaultMicrophone: defaultAudioInputName(),
+        audioInputs: Result { () throws(DeviceReadError) in try currentAudioInputs() },
         outputFolder: probeOutputFolder(settings.outputFolderURL(homeFolder: homeFolder)))
-    return ReadyCheck.evaluate(facts, settings: settings)
+}
+
+/// Probes this Mac, as `probeReadyCheckFacts`, and judges what it found.
+@MainActor
+public func runReadyCheck(settings: Settings, homeFolder: URL) async -> ReadyCheckResult {
+    ReadyCheck.evaluate(await probeReadyCheckFacts(settings: settings, homeFolder: homeFolder), settings: settings)
 }
 
 /// Whether the Screen & System Audio Recording permission is granted, without

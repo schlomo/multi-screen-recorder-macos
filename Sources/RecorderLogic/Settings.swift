@@ -54,6 +54,12 @@ public struct Settings: Equatable, Sendable {
         lowDiskWarningMinutes: 20
     )
 
+    /// Whether a recording with these settings records the audio input: the
+    /// default one with the audio mode default microphone.
+    public func records(_ input: AudioInputInfo) -> Bool {
+        audioMode == .defaultMicrophone && input.isDefault
+    }
+
     public func outputFolderURL(homeFolder: URL) -> URL {
         if outputFolder == "~" { return homeFolder }
         if outputFolder.hasPrefix("~/") {

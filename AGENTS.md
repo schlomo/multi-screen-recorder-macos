@@ -222,9 +222,9 @@ this is how they map per tool.
 
 ## Running the tests
 
-`scripts/test` runs the tests (Swift Testing, `swift test`), including
-those that run `msr settings`, `msr version` and `scripts/version` as
-commands; `scripts/build-app` builds the app in `build/` (signed ad
+`scripts/test` compiles the Python scripts, then runs the tests (Swift
+Testing, `swift test`), including those that run `msr settings`,
+`msr version` and the scripts as commands; `scripts/build-app` builds the app in `build/` (signed ad
 hoc), `scripts/smoke-test` runs the bundled `msr` safely, and
 `scripts/sign-app` re-signs and zips it (`SIGNING_IDENTITY=-` signs ad
 hoc, for a local check only).
@@ -240,6 +240,9 @@ hoc, for a local check only).
 - The Command Line Tools alone build the package but cannot run the
   tests: Swift Testing needs Xcode, selected and with its licence
   accepted (`scripts/test` checks this first).
+- Five scripts are Python, standard library only, and need Python 3.15
+  or later as `python3` on the `PATH` (the runner image's; macOS ships
+  an older one); see [delivery.md](docs/design/delivery.md).
 - `msr` without arguments starts the app, and the app and `msr check`
   run the ready check, which requests any never-asked permission, so
   macOS shows a prompt on the person's screen, and creates the output

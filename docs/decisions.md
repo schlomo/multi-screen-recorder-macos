@@ -197,7 +197,9 @@ architect's reading.
 
 ## D12: Audio sources as separate tracks; a file keeps the tracks it started with (2026-11-12)
 
-- **Status:** in force
+- **Status:** superseded in part by D31 (the layout of the audio in the
+  display files, the silence padding, the audio file for a late source;
+  the audio mode and the switches stand)
 - **Context:** Each display file must sync on its own by waveform with
   a separate speaker recording, so it needs the audio. Audio sources
   come and go like displays, and a file writer cannot add a track once
@@ -372,7 +374,8 @@ architect's reading.
 
 ## D22: Every audio input channel is its own mono track (2026-11-12)
 
-- **Status:** in force
+- **Status:** in force; refined by D31 (the channels stay separate
+  mono tracks, now in the audio input's audio file)
 - **Context:** The owner: "all channals stay separate, whatever comes.
   Imagine somebody plugging in a USB wireless mic reseiver with 2
   people on L/R".
@@ -449,7 +452,8 @@ architect's reading.
 
 ## D26: The window says what Start records; About shows the purpose (2026-11-12)
 
-- **Status:** in force
+- **Status:** superseded in part by D33 (the summary lines of what
+  Start records)
 - **Context:** The owner: "about dialoge should not mention previous
   art but the short purpose text", "the main screen should briefly
   explain what it is actually doing", "the ready check should be
@@ -594,3 +598,96 @@ architect's reading.
   displays' files continue; a display that flaps between modes makes
   many short files, each valid.
 - **Evidence:** [design/recorder.md](design/recorder.md) "Frame size".
+
+## D31: One file per source, with guide tracks in the display files (2026-11-12)
+
+- **Status:** in force
+- **Context:** Every display file carried every audio source, padded
+  with silence, with a separate file for a source that arrived late
+  (D12). The owner: "suggest alternatives to writing all audio streams
+  to all display files. In theory, with timecode embedded everywhere we
+  could just write single files per display and audio device and let
+  the editing software puzzle it together (or ffmpeg?)", then "B but
+  microphones and system audio are not mixed together but stay in
+  separate tracks", then "reading 1".
+- **Decision:** The architect's wording of the reading the owner chose:
+  one file per source, all on the shared t0 and tick grid. A display
+  file holds the display's video and its timecode. Each recorded audio
+  input gets its own audio file, a `.mov` with AAC-LC at 48 kHz and one
+  mono track per channel at 128 kbit/s; system audio gets its own, one
+  stereo track at 192 kbit/s; both carry the same time-of-day timecode
+  track. Every display file also carries guide tracks for playback and
+  waveform sync only: "Microphones", one mono mix of the recorded
+  microphone channels at 64 kbit/s, unless the audio mode is `none`, and
+  "System audio", stereo at 96 kbit/s, unless system audio is off; the
+  two are never mixed, the rates are data, and a missing source is
+  silence in its guide track. An audio input that appears starts its
+  audio file then, one that disappears ends it; an audio file is never
+  padded with silence, and a display event never touches it. The files
+  sit beside the display files as `<date time> Microphone - <device
+  name>.mov` and `<date time> System audio.mov`; the manifest lists them
+  like display files, with the events `audio input connected` and
+  `audio input disconnected`. Replaces D12 in part (every source in
+  every display file, the silence padding, the audio file for a late
+  source); refines D22.
+- **Consequences:** An editor places several files per recording by
+  timecode; whether DaVinci Resolve reads the timecode of an audio-only
+  `.mov`, and how Kdenlive places the files, is unproven until the
+  owner's first real recording. A command that joins the files without
+  re-encoding is deferred (`backlog.md`).
+- **Evidence:** [PR #1](https://github.com/schlomo/multi-screen-recorder-macos/pull/1),
+  [design/recorder.md](design/recorder.md) "Audio".
+
+## D32: Scripts in Python where that reads better than bash (2026-11-12)
+
+- **Status:** in force
+- **Context:** The owner: "accept python and convert build scripts to
+  modern python where that improves readability over bash hacks
+  (modern = latest present in default CI image to avoid python
+  installation) with Pathlib and other modern lingo".
+- **Decision:** Python is accepted, also in the signing jobs. The
+  architect's reading of "where that improves readability":
+  `scripts/version`, `scripts/unpack-app` (which absorbs
+  `Tools/unpack_app.py`), `scripts/sign-app`, `scripts/smoke-test` and
+  `scripts/publish-snapshot-release` are Python; `scripts/test`,
+  `scripts/build-app`, `scripts/ci-import-signing-certificate`,
+  `scripts/publish-release` and `scripts/remove-snapshot-release` stay
+  bash. The minimum is the `python3` on the `PATH` of the default
+  `macos-26` arm64 runner image, read from its software list in
+  `actions/runner-images` (3.15 today); each script stops on an older
+  one with an error naming the minimum. Standard library only, so
+  nothing is installed.
+- **Consequences:** A developer's Mac needs that Python as `python3`;
+  the one macOS ships is older. The minimum follows the runner image.
+  The architect's reading: as nothing is installed, the Python platform
+  note's `uv` and `pytest` do not apply here; the Swift suite keeps
+  testing the scripts as commands.
+- **Evidence:** [PR #1](https://github.com/schlomo/multi-screen-recorder-macos/pull/1),
+  [design/delivery.md](design/delivery.md).
+
+## D33: The window shows displays and audio as tables with GB per hour (2026-11-12)
+
+- **Status:** in force
+- **Context:** The owner: "this is actually useful information, the
+  start dialoge should nicely show that IMHO", then "so I think a table
+  makes sense for the display info with: display, physical res, logical
+  res, GB/h and audio similar device, channel count, AGC (future), GB/h
+  and then the total GB/h as sum below that." and "confirmed, go with
+  these adjustments".
+- **Decision:** "What will be recorded" is two tables and a total line.
+  Displays: Display (number and name), Looks like, Drawn at, Records
+  at, GB/h. Audio: one row per audio input (the default one marked) and
+  one for system audio, with Channels (a number, or "stereo") and GB/h;
+  a source not recorded is dimmed and shows "not recorded". Below,
+  "Total <x> GB/h. <hours> hours need <y> GB, <z> GB free.", without
+  the free part when the free space is unknown. The architect's
+  reading: "Looks like" and "Drawn at" instead of logical and physical
+  resolution, because with a HiDPI mode on an ordinary panel the larger
+  size is not the panel's; an added "Records at" column; no AGC column
+  until AGC exists; audio counted in the disk estimate, which the ready
+  check uses too. Replaces D26 in part (the summary lines).
+- **Consequences:** The disk estimate counts every file a recording
+  writes, guide tracks and audio files included, so the ready check
+  asks for a little more space than before.
+- **Evidence:** [PR #1](https://github.com/schlomo/multi-screen-recorder-macos/pull/1),
+  [design/recorder.md](design/recorder.md) "The app".

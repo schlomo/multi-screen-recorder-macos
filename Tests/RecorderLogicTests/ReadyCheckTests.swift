@@ -11,17 +11,19 @@ import Testing
         screenRecording: PermissionProbe = .granted,
         microphonePermission: PermissionProbe? = .granted,
         displays: Result<[DisplayInfo], DeviceReadError>? = nil,
-        defaultMicrophone: String?? = .none,
+        audioInputs: Result<[AudioInputInfo], DeviceReadError> = .success(builtInMicrophoneOnly),
         outputFolder: OutputFolderProbe = .usable(.bytes(100_000_000_000))
     ) -> ReadyCheckFacts {
         ReadyCheckFacts(
             screenRecording: screenRecording,
             microphone: microphonePermission,
             displays: displays ?? .success(fullHDDisplays),
-            defaultMicrophone: defaultMicrophone ?? "MacBook Pro Microphone",
+            audioInputs: audioInputs,
             outputFolder: outputFolder
         )
     }
+
+    private static let builtInMicrophoneOnly = [AudioInputInfo(name: "MacBook Pro Microphone", channelCount: 1, isDefault: true)]
 
     /// The example in docs/design/recorder.md, from the displays of its `msr list` example.
     static let designExample = """
@@ -30,7 +32,7 @@ import Testing
         ok    Displays: 2
         ok    Audio: MacBook Pro Microphone (default), system audio
         ok    Output folder: ~/Movies/Multi Screen Recorder
-        FAIL  Free disk space: 3.1 GB in ~/Movies/Multi Screen Recorder, 3.7 GB needed for 2 hours
+        FAIL  Free disk space: 3.1 GB in ~/Movies/Multi Screen Recorder, 4.3 GB needed for 2 hours
               Fix: free up space, or lower --required-recording-hours
         Not ready.
 
@@ -38,7 +40,8 @@ import Testing
 
     @Test func rendersExactlyAsTheDesign() {
         let result = ReadyCheck.evaluate(
-            facts(displays: .success(DesignExample.displays), outputFolder: .usable(.bytes(3_100_000_000))),
+            facts(displays: .success(DesignExample.displays), audioInputs: .success(DesignExample.audioInputs),
+                  outputFolder: .usable(.bytes(3_100_000_000))),
             settings: .defaults)
         #expect(result.text == Self.designExample)
         #expect(!result.isReady)
@@ -59,15 +62,24 @@ import Testing
         var settings = Settings.defaults
         settings.audioMode = .none
         let result = ReadyCheck.evaluate(
-            facts(microphonePermission: nil, defaultMicrophone: .some(nil)), settings: settings)
+            facts(microphonePermission: nil, audioInputs: .success([])), settings: settings)
         #expect(result.isReady)
         #expect(result.items.map(\.title) == [
             "Screen & System Audio Recording permission",
             "Displays: 2",
             "Audio: system audio",
             "Output folder: ~/Movies/Multi Screen Recorder",
-            "Free disk space: 100.0 GB in ~/Movies/Multi Screen Recorder, 4.0 GB needed for 2 hours",
+            "Free disk space: 100.0 GB in ~/Movies/Multi Screen Recorder, 4.3 GB needed for 2 hours",
         ])
+    }
+
+    @Test func audioModeNoneNeedsNoReadableAudioInputs() {
+        var settings = Settings.defaults
+        settings.audioMode = .none
+        let result = ReadyCheck.evaluate(
+            facts(microphonePermission: nil, audioInputs: .failure(DeviceReadError("broken"))), settings: settings)
+        #expect(result.isReady)
+        #expect(result.items.contains { $0.title.hasPrefix("Free disk space") })
     }
 
     @Test func noAudioAtAllSaysNone() {
@@ -120,13 +132,39 @@ import Testing
     }
 
     @Test func noMicrophoneFailsOnlyTheAudioItem() throws {
-        let result = ReadyCheck.evaluate(facts(defaultMicrophone: .some(nil)), settings: .defaults)
+        let notDefault = [AudioInputInfo(name: "RØDE Wireless GO II RX", channelCount: 2, isDefault: false)]
+        for inputs in [[], notDefault] {
+            let result = ReadyCheck.evaluate(facts(audioInputs: .success(inputs)), settings: .defaults)
+            #expect(result.items.filter { !$0.passed } == [
+                ReadyCheckItem(
+                    title: "Audio: no microphone, system audio",
+                    passed: false,
+                    fix: "connect a microphone, or set the audio mode to none (--audio-mode none)"),
+            ])
+        }
+    }
+
+    @Test func unreadableAudioInputsFailOnceWithTheReason() {
+        let result = ReadyCheck.evaluate(
+            facts(audioInputs: .failure(DeviceReadError("the audio input X does not report its format"))),
+            settings: .defaults)
         #expect(result.items.filter { !$0.passed } == [
             ReadyCheckItem(
-                title: "Audio: no microphone, system audio",
+                title: "Audio: cannot be read (the audio input X does not report its format)",
                 passed: false,
-                fix: "connect a microphone, or set the audio mode to none (--audio-mode none)"),
+                fix: "reconnect the audio inputs, then check again"),
         ])
+        #expect(!result.items.contains { $0.title.hasPrefix("Free disk space") })
+    }
+
+    @Test func theDiskEstimateCountsTheAudioFilesAndGuideTracks() throws {
+        var settings = Settings.defaults
+        settings.requiredRecordingHours = 1
+        let twoChannels = [AudioInputInfo(name: "RØDE Wireless GO II RX", channelCount: 2, isDefault: true)]
+        let result = ReadyCheck.evaluate(facts(audioInputs: .success(twoChannels)), settings: settings)
+        let item = try #require(result.items.last)
+        // two displays at 1080p: 2 × (1 GB video + 72 MB guide tracks), 115.2 MB microphone, 86.4 MB system audio
+        #expect(item.title == "Free disk space: 100.0 GB in ~/Movies/Multi Screen Recorder, 2.3 GB needed for 1 hour")
     }
 
     @Test func diskEstimateUsesTheRecordingResolution() throws {
@@ -135,14 +173,14 @@ import Testing
         settings.requiredRecordingHours = 1
         let result = ReadyCheck.evaluate(facts(), settings: settings)
         let item = try #require(result.items.last)
-        #expect(item.title == "Free disk space: 100.0 GB in ~/Movies/Multi Screen Recorder, 0.9 GB needed for 1 hour")
+        #expect(item.title == "Free disk space: 100.0 GB in ~/Movies/Multi Screen Recorder, 1.2 GB needed for 1 hour")
     }
 
     @Test func theOutputFolderComesBeforeTheFreeDiskSpace() {
         let titles = ReadyCheck.evaluate(facts(), settings: .defaults).items.map(\.title)
         #expect(titles.suffix(2) == [
             "Output folder: ~/Movies/Multi Screen Recorder",
-            "Free disk space: 100.0 GB in ~/Movies/Multi Screen Recorder, 4.0 GB needed for 2 hours",
+            "Free disk space: 100.0 GB in ~/Movies/Multi Screen Recorder, 4.6 GB needed for 2 hours",
         ])
     }
 

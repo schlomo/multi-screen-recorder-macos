@@ -67,20 +67,26 @@ final class StartModel {
         checkAgain()
     }
 
-    /// Reads the devices for "What will be recorded" and re-runs the ready check.
+    /// Reads the devices for "What will be recorded" and re-runs the ready
+    /// check; once it is done, the section shows what the check found,
+    /// the free space included.
     func checkAgain() {
         whatWillBeRecorded = WhatWillBeRecorded(
             settings: settings,
             displays: Result { () throws(DeviceReadError) in try currentDisplays() },
-            audioInputs: Result { () throws(DeviceReadError) in try currentAudioInputs() })
+            audioInputs: Result { () throws(DeviceReadError) in try currentAudioInputs() },
+            outputFolder: nil)
         checkTask?.cancel()
         isChecking = true
         let settings = settings
         let homeFolder = homeFolder
         checkTask = Task {
-            let result = await runReadyCheck(settings: settings, homeFolder: homeFolder)
+            let facts = await probeReadyCheckFacts(settings: settings, homeFolder: homeFolder)
             guard !Task.isCancelled else { return }
-            readyCheck = result
+            readyCheck = ReadyCheck.evaluate(facts, settings: settings)
+            whatWillBeRecorded = WhatWillBeRecorded(
+                settings: settings, displays: facts.displays, audioInputs: facts.audioInputs,
+                outputFolder: facts.outputFolder)
             isChecking = false
         }
     }

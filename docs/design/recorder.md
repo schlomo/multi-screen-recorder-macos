@@ -74,7 +74,7 @@ ok    Microphone permission
 ok    Displays: 2
 ok    Audio: MacBook Pro Microphone (default), system audio
 ok    Output folder: ~/Movies/Multi Screen Recorder
-FAIL  Free disk space: 3.1 GB in ~/Movies/Multi Screen Recorder, 3.7 GB needed for 2 hours
+FAIL  Free disk space: 3.1 GB in ~/Movies/Multi Screen Recorder, 4.3 GB needed for 2 hours
       Fix: free up space, or lower --required-recording-hours
 Not ready.
 ```
@@ -106,8 +106,9 @@ once its feature exists (no `agc` key until AGC is built).
 
 Items, in this order: the Screen & System Audio Recording permission,
 the Microphone permission (unless the audio mode is `none`), the
-displays (at least one, each readable), the chosen audio sources, the
-output folder, and free disk space in the output folder for
+displays (at least one, each readable), the chosen audio sources (the
+audio inputs readable when the audio mode records one), the output
+folder, and free disk space in the output folder for
 `requiredRecordingHours`.
 
 - A permission that was never asked for is requested, so macOS shows
@@ -121,10 +122,17 @@ output folder, and free disk space in the output folder for
   missing, then writes and deletes a file in it; a failure names the
   path and the reason.
 - Free disk space is measured on the output folder itself. Disk
-  estimate (*data*): 1 GB per display per hour at 1080p, scaled by the
-  frame's pixel count of each display at the recording resolution.
-- One cause, one red item: when the output folder fails or the
-  displays cannot be read, the free disk space item is left out.
+  estimate, file by file at the encoding rates (*data*, see "Encoding"):
+  a display file is its video, 1 GB per hour at 1080p scaled by the
+  pixel count of its frame size, plus its guide tracks; an audio file is
+  its tracks' bit rates. The item compares the total of every file the
+  recording would write, for `requiredRecordingHours`, with the free
+  space. For the devices of the `msr list` example at the defaults that
+  is 2.2 GB per hour, 4.3 GB for 2 hours (the tables in "The app" show
+  each file).
+- One cause, one red item: when the output folder fails, or the
+  displays or the audio inputs the recording needs cannot be read, the
+  free disk space item is left out.
 - In the app the check runs when the window opens, when the app becomes
   active again (unless a check is still running), after every settings
   change, and on "Check again". It never runs while a recording is
@@ -139,10 +147,19 @@ One recording folder per recording, named by its local start time
 ~/Movies/Multi Screen Recorder/2026-11-12 14.03.05/
   2026-11-12 14.03.05 Display 1 - Built-in Retina Display.mov
   2026-11-12 14.03.05 Display 2 - LG HDR 4K.mov
+  2026-11-12 14.03.05 Microphone - RØDE Wireless GO II RX.mov
+  2026-11-12 14.03.05 System audio.mov
+  2026-11-12 14.19.52 Microphone - RØDE Wireless GO II RX.mov    ← back after its receiver was switched off
   2026-11-12 14.27.41 Display 2 - LG HDR 4K.mov    ← back after a reconnect
   2026-11-12 14.41.10 Display 1 - Built-in Retina Display.mov    ← new frame size after a mode change
   recording.json
 ```
+
+One file per source, each named by its own start time (D31): a display
+file per display, an audio file per recorded audio input
+(`<date time> Microphone - <device name>.mov`) and one for system audio
+(`<date time> System audio.mov`). Here the default microphone is the
+RØDE receiver.
 
 Display 1 is the main display; the others are numbered left to right,
 later arrivals in order of appearance. A display keeps its number for
@@ -166,15 +183,31 @@ every change:
       "end": null,
       "timecode": "14:03:05:04",
       "state": "recording",
-      "audioTracks": [
-        "Microphone: RØDE Wireless GO II RX, channel 1",
-        "Microphone: RØDE Wireless GO II RX, channel 2",
-        "System audio"
-      ],
+      "guideTracks": ["Microphones", "System audio"],
       "framesRepeatedForLateness": 0
+    },
+    {
+      "name": "2026-11-12 14.03.05 Microphone - RØDE Wireless GO II RX.mov",
+      "audioSource": "RØDE Wireless GO II RX",
+      "channels": 2,
+      "start": 0.0,
+      "end": 912.4,
+      "timecode": "14:03:05:04",
+      "state": "finalized"
+    },
+    {
+      "name": "2026-11-12 14.03.05 System audio.mov",
+      "audioSource": "System audio",
+      "channels": "stereo",
+      "start": 0.0,
+      "end": null,
+      "timecode": "14:03:05:04",
+      "state": "recording"
     }
   ],
   "events": [
+    { "at": 912.4, "event": "audio input disconnected", "audioSource": "RØDE Wireless GO II RX" },
+    { "at": 1007.0, "event": "audio input connected", "audioSource": "RØDE Wireless GO II RX" },
     { "at": 1446.2, "event": "display disconnected", "display": "LG HDR 4K" },
     { "at": 2285.0, "event": "display frame size changed", "display": "Built-in Retina Display",
       "from": [1670, 1080], "to": [1662, 1080] }
@@ -184,6 +217,8 @@ every change:
 
 `start`, `end` and `at` are seconds from the recording's start on the
 shared clock. `state` is `recording`, `finalized` or `not finalized`.
+An audio file's `channels` is the number of its mono tracks, or
+`stereo` for system audio.
 
 **Parallel recordings.** A recording claims its recording folder by
 creating it and refuses if it already exists. Recordings into different
@@ -201,21 +236,49 @@ manifest's state to `not finalized` and remove the marker.
 
 - **Start:** a small window. At the top, a section "What will be
   recorded", built from the settings and the devices connected now and
-  refreshed whenever the ready check runs: one row per display (number,
-  name, the size as in `msr list`, "records at" its frame size); one
-  row per audio input (name and channels), the input that will be
-  recorded marked and every other one dimmed with "not recorded in this
-  version" (with the audio mode `none` all are dimmed and the section
-  says the microphone is not recorded); one row for system audio,
-  recorded or off; below, the output folder and "Recording continues
-  when displays or audio sources change." If the devices cannot be
-  read, the section shows that error once; the ready check's items
-  stay as they are. Then the recording resolution, audio mode, system
-  audio and output folder; the ready check, with "Check again"; and
-  Start. All green, the ready check is one line, "Ready to record",
-  that expands on click to its items; any red item shows every item,
-  with the fix under each red one. Start is disabled while the ready
-  check fails.
+  refreshed whenever the ready check runs (D33): two tables and a
+  total line.
+  - Displays: the number and name, "Looks like" (the size in points),
+    "Drawn at" (the pixel size, shown also where both are equal),
+    "Records at" (the frame size) and GB/h (the display file, its
+    guide tracks included).
+  - Audio: one row per audio input (its name, the default one marked
+    "(default)", and its number of channels), then one row "System
+    audio" (stereo), with GB/h (the audio file). A source not recorded
+    is dimmed and shows "not recorded": every input with the audio
+    mode `none`, every input but the default one with
+    `default-microphone`, and the system audio row when it is off.
+  - GB/h has one decimal; under 0.05 it shows "<0.1".
+  - The total line: "Total <x> GB/h. <requiredRecordingHours> hours
+    need <y> GB, <z> GB free.", without the free part while the free
+    space is unknown (the ready check has not finished yet, or its
+    output folder item failed).
+  - Below, the output folder and "Recording continues when displays or
+    audio sources change." If the devices cannot be read, the section
+    shows that error once instead of the tables and the total; the
+    ready check's items stay as they are.
+
+  Then the recording resolution, audio mode, system audio and output
+  folder; the ready check, with "Check again"; and Start. All green,
+  the ready check is one line, "Ready to record", that expands on click
+  to its items; any red item shows every item, with the fix under each
+  red one. Start is disabled while the ready check fails. For the
+  devices of the `msr list` example, the defaults and the free space
+  of the `msr check` example, the section shows:
+
+| Display | Looks like | Drawn at | Records at | GB/h |
+|---|---|---|---|---|
+| 1 Built-in Retina Display | 1728×1117 | 3456×2234 | 1670×1080 | 0.9 |
+| 2 LG HDR 4K | 3840×2160 | 3840×2160 | 1920×1080 | 1.1 |
+
+| Audio | Channels | GB/h |
+|---|---|---|
+| MacBook Pro Microphone (default) | 1 | 0.1 |
+| RØDE Wireless GO II RX | 2 | not recorded |
+| System audio | stereo | 0.1 |
+
+Total 2.2 GB/h. 2 hours need 4.3 GB, 3.1 GB free.
+
 - **Recording:** the window closes; the Dock icon shows a red badge with
   the elapsed minutes. Low disk space shows as a "!" badge and a
   bouncing Dock icon; no notification, which would need a third
@@ -243,15 +306,21 @@ never early. No tick is ever dropped: when the encoder is not ready, the
 tick is written late with its correct timestamp and counted in
 `framesRepeatedForLateness`.
 
-**Timecode (D21).** Each display file carries a timecode track: local
-time of day at 30 fps, non-drop. All files share t0 and the tick grid,
-so their timecodes agree to the frame and an editor can place a
-later-starting file by timecode.
+**Timecode (D21, D31).** Every display file and every audio file
+carries a timecode track: local time of day at 30 fps, non-drop. All
+files share t0 and the tick grid, so their timecodes agree to the frame
+and an editor can place every file, also a later-starting one, by
+timecode. Unproven until the owner's first real recording: that
+DaVinci Resolve reads the timecode of an audio-only `.mov`, and how
+Kdenlive places the files (see "Open questions").
 
 **Encoding (D21, values are *data*).** HEVC 8-bit through the hardware
 encoder in `.mov`; keyframe every 2 s; quality-targeted variable bit
-rate with a ceiling. Audio AAC-LC at 48 kHz, 128 kbit/s per mono track,
-192 kbit/s for system audio. Every display is recorded in SDR, also one
+rate with a ceiling. Audio AAC-LC at 48 kHz: in an audio file
+128 kbit/s per mono track and 192 kbit/s for the system audio's stereo
+track; in a display file 64 kbit/s for the guide track "Microphones"
+and 96 kbit/s for the guide track "System audio". Every display is
+recorded in SDR, also one
 in HDR mode, with its colour space tagged so editors show the colours
 unchanged (D24). Apple's `SCRecordingOutput` is not used:
 it writes a variable frame rate with its own track layout.
@@ -273,19 +342,29 @@ size changed` (the display, the old and the new frame size) in the
 manifest. At `native` every pixel-size change is such a change; at
 `1080p` a change from 3840×2160 to 5120×2880 is not (both give
 1920×1080), while 3440×1440 to 1920×1080 is (1920×802 to 1920×1080).
-The cost: a gap of under one second in that display's files at the
-change, also in the audio tracks inside those files, while the other
-displays' files continue unbroken; a display that flaps between modes
-makes many short files, each valid.
+The cost: a gap of under one second at the change in that display's
+video and guide tracks only; the audio files and the other displays'
+files continue unbroken; a display that flaps between modes makes many
+short display files, each valid.
 
-**Audio (D12, D22).** Every channel of an audio input is its own mono
-track, named `Microphone: <device>, channel <n>`; system audio is one
-stereo track. Each display file gets the tracks of every source present
-when it starts; a source that disappears is padded with silence. The
-microphone comes from an `AVCaptureSession` on the default input; system
-audio from a ScreenCaptureKit stream of its own, so a failing display
-stream never takes the audio with it. Buffers are placed on the shared
-clock and written to every open display file.
+**Audio (D12, D22, D31).** One audio file per source, beside the
+display files. Each recorded audio input gets its own audio file, a
+`.mov` with one mono track per channel, named
+`Microphone: <device>, channel <n>`; system audio gets its own audio
+file with one stereo track. Both carry the timecode track. An audio
+input that appears starts its audio file then (event `audio input
+connected`); one that disappears ends its file (event `audio input
+disconnected`); an audio file is never padded with silence, and a
+display event never touches an audio file. For playback and waveform
+sync, every display file also carries guide tracks: "Microphones", one
+mono mix of all recorded microphone channels, unless the audio mode is
+`none`; "System audio", stereo, unless system audio is off. The two are
+never mixed together, and a source that is missing is silence in its
+guide track. The microphone comes from an `AVCaptureSession` on the
+default input; system audio from a ScreenCaptureKit stream of its own,
+so a failing display stream never takes the audio with it. Buffers are
+placed on the shared clock and written to the audio files and the
+guide tracks of every open display file.
 
 **Displays coming and going (D14).** A display that appears gets a
 stream and a display file; one that vanishes has its file finalized. A
@@ -310,10 +389,9 @@ Sources/RecorderCore/     ScreenCaptureKit, AVFoundation and Core Audio adapters
 Sources/msr/              entry point: the command line and the app
 Tests/RecorderLogicTests/ Swift Testing, as all tests
 Tests/RecorderCoreTests/  the adapters that need no device or permission
-Tests/CommandTests/       msr, scripts/version, scripts/unpack-app and scripts/sign-app, run as commands
+Tests/CommandTests/       msr and the scripts in scripts/, run as commands
 Resources/                Info.plist, entitlements
 scripts/                  see delivery.md
-Tools/                    unpack_app.py, the archive checks of scripts/unpack-app (Python, standard library only)
 ```
 
 Swift Package Manager and bundling scripts rather than an Xcode
@@ -333,9 +411,11 @@ the built `msr` with a scratch `HOME` (`msr settings` and
 `msr version`, which prompt for nothing; also through a symbolic link
 into an app bundle), `scripts/version` in scratch git repositories and
 `scripts/unpack-app` on scratch archives (some written byte by byte, as
-no tar would write them from a file system), `scripts/sign-app` on a
-scratch bundle; `scripts/smoke-test` runs the
-built app's `msr` the same way in the pipeline.
+no tar would write them from a file system), `scripts/sign-app` and
+`scripts/smoke-test` on a scratch bundle, and
+`scripts/publish-snapshot-release` against a stub `gh`;
+`scripts/smoke-test` runs the built app's `msr` the same way in the
+pipeline.
 Capture itself cannot run in CI, which has
 no way to grant the permissions [ASSUMED]; it is verified on a Mac with
 `scripts/acceptance/`, which drives `msr record` and checks the files
@@ -350,22 +430,27 @@ with `ffprobe`, and by the v1 gate.
   start offset.
 - **A global "one recording at a time" lock:** folder claims allow
   parallel recordings at no extra cost (D20).
-- **Mixing an input down to mono or stereo:** channels may carry
-  different people (D22).
+- **Mixing an input down to mono or stereo in its audio file:**
+  channels may carry different people (D22); only the guide track
+  "Microphones" is a mix, for playback and sync (D31).
 - **A notification for low disk space:** see "The app".
 - **Recording HDR displays as HDR:** files of mixed kinds on one
   timeline, larger files, and weak support outside DaVinci Resolve, for
   content that is rarely HDR (D24).
 - **Sequenced after v0** (D18, `backlog.md`): audio mode `all-inputs`,
-  the audio file for a late audio source (until then a source that
-  appears mid-recording is logged as an event and joins at the next new
-  display file), AGC.
+  AGC.
+- **Every audio source in every display file** (D12): one audio file
+  per source instead, with guide tracks in the display files (D31).
+  Joining the files into one without re-encoding is deferred
+  (`backlog.md`).
 - **The command line driving the running app**, so a terminal needs no
   permissions of its own: deferred (`backlog.md`).
 
 ## Open questions
 
-None.
+- Unproven until the owner's first real recording (D31): that DaVinci
+  Resolve reads the timecode of an audio-only `.mov`, and how Kdenlive
+  places the display files and audio files.
 
 ## Build state
 
@@ -389,14 +474,15 @@ version string and the commit, such as `0.2.0-dev+a1b2c3d (a1b2c3d)`,
 from the bundle's Info.plist keys `MSRVersion` and `MSRCommit`;
 outside a bundle it prints `development build (not bundled)`. The
 settings file is found through `HOME`. The disk estimate follows its
-rule, scaled by each frame's pixel count (3.7 GB in the `msr check`
-example above). The recording resolution box turns with a portrait
+rule, file by file (4.3 GB in the `msr check` example above). The recording resolution box turns with a portrait
 display (1080×1920 for a 2160×3840 display at 1080p).
 
 Further details, as built and decided by the architect for PR #1: an
 unset `HOME` exits 78 like an unusable settings file; `msr` that cannot re-execute
 itself at its real path exits 71. When the displays cannot be read,
 the free disk space item is left out, as when the output folder fails.
-The ready check reads only the default microphone's name, not its
-channels. When the free space cannot be read, the fix says "choose an
+The ready check reads the audio inputs, so the disk estimate counts
+the default microphone's channels; when they cannot be read and the
+audio mode records one, the audio item fails with "reconnect the audio
+inputs, then check again". When the free space cannot be read, the fix says "choose an
 output folder on another disk".

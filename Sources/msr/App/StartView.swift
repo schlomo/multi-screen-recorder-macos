@@ -92,37 +92,49 @@ private struct WhatWillBeRecordedView: View {
     let section: WhatWillBeRecorded
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: 6) {
             Text("What will be recorded").font(.headline)
             if let error = section.devicesError {
                 Label(error, systemImage: "exclamationmark.triangle.fill")
                     .foregroundStyle(.red)
                     .fixedSize(horizontal: false, vertical: true)
-            }
-            ForEach(section.displays, id: \.number) { display in
-                HStack(alignment: .firstTextBaseline, spacing: 8) {
-                    Image(systemName: "display")
-                    Text("\(display.number)  \(display.name)")
-                    Text(display.size).foregroundStyle(.secondary)
-                    Text(display.recordsAt)
+            } else {
+                Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 2) {
+                    header(WhatWillBeRecorded.displayColumns)
+                    ForEach(section.displays, id: \.number) { display in
+                        GridRow {
+                            Text("\(display.number)  \(display.name)")
+                            Text(display.looksLike)
+                            Text(display.drawnAt)
+                            Text(display.recordsAt)
+                            Text(display.gigabytesPerHour).gridColumnAlignment(.trailing)
+                        }
+                    }
                 }
-            }
-            ForEach(Array(section.audioInputs.enumerated()), id: \.offset) { _, input in
-                HStack(alignment: .firstTextBaseline, spacing: 8) {
-                    Image(systemName: input.isRecorded ? "mic.fill" : "mic.slash")
-                    Text("\(input.name), \(input.channels)")
-                    if let note = input.note { Text(note).font(.callout) }
+                Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 2) {
+                    header(WhatWillBeRecorded.audioColumns)
+                    ForEach(Array(section.audio.enumerated()), id: \.offset) { _, source in
+                        GridRow {
+                            Text(source.name)
+                            Text(source.channels)
+                            Text(source.gigabytesPerHour).gridColumnAlignment(.trailing)
+                        }
+                        .foregroundStyle(source.isRecorded ? .primary : .tertiary)
+                    }
                 }
-                .foregroundStyle(input.isRecorded ? .primary : .tertiary)
-            }
-            if let note = section.microphoneNote { Text(note).foregroundStyle(.secondary) }
-            HStack(spacing: 8) {
-                Image(systemName: "speaker.wave.2")
-                Text(section.systemAudio)
+                if let total = section.total { Text(total) }
             }
             Text(section.outputFolder)
             Text(section.continuity).foregroundStyle(.secondary)
         }
+    }
+
+    private func header(_ columns: [String]) -> some View {
+        GridRow {
+            ForEach(columns, id: \.self) { Text($0) }
+        }
+        .font(.caption)
+        .foregroundStyle(.secondary)
     }
 }
 

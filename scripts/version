@@ -1,48 +1,66 @@
-#!/usr/bin/env bash
-# Prints the version of the current checkout. N is the number of commits on
-# origin/main:
-#   RELEASE_BUILD=true  0.<N>.0                (HEAD must be origin/main)
-#   PR_NUMBER=<n>       0.<N+1>.0-pr<n>+<commit>
-#   neither             0.<N+1>.0-dev+<commit>
-set -euo pipefail
+#!/usr/bin/env -S python3 -I
+"""Prints the version of the current checkout. N is the number of commits on
+origin/main:
+  RELEASE_BUILD=true  0.<N>.0                (HEAD must be origin/main)
+  PR_NUMBER=<n>       0.<N+1>.0-pr<n>+<commit>
+  neither             0.<N+1>.0-dev+<commit>
+"""
 
-command -v git >/dev/null || { echo "scripts/version: git is not on the PATH" >&2; exit 1; }
-cd "$(dirname "$0")/.."
+import os
+import re
+import shutil
+import subprocess
+import sys
+from pathlib import Path
+from typing import NoReturn
 
-release_build="${RELEASE_BUILD:-}"
-pr_number="${PR_NUMBER:-}"
-if [[ -n "$release_build" && "$release_build" != "true" ]]; then
-    echo "scripts/version: RELEASE_BUILD must be true or unset, not '$release_build'" >&2
-    exit 1
-fi
-if [[ -n "$release_build" && -n "$pr_number" ]]; then
-    echo "scripts/version: RELEASE_BUILD and PR_NUMBER exclude each other" >&2
-    exit 1
-fi
-if [[ -n "$pr_number" && ! "$pr_number" =~ ^[1-9][0-9]*$ ]]; then
-    echo "scripts/version: PR_NUMBER must be a number, not '$pr_number'" >&2
-    exit 1
-fi
+ME = "scripts/version"
+MINIMUM_PYTHON = (3, 15)
+if sys.version_info < MINIMUM_PYTHON:
+    sys.exit(f"{ME}: needs Python 3.15 or later (the python3 of the macos-26 runner image), not {sys.version.split()[0]}")
 
-shallow="$(git rev-parse --is-shallow-repository)"
-if [[ "$shallow" != "false" ]]; then
-    echo "scripts/version: $(pwd) is a shallow clone, so the commits on origin/main cannot be counted; fetch its full history" >&2
-    exit 1
-fi
-if ! main_commits="$(git rev-list --count origin/main)"; then
-    echo "scripts/version: cannot count the commits on origin/main; fetch it with its full history" >&2
-    exit 1
-fi
-commit="$(git rev-parse --short=7 HEAD)"
+REPOSITORY = Path(__file__).resolve().parent.parent
 
-if [[ -n "$release_build" ]]; then
-    if [[ "$(git rev-parse HEAD)" != "$(git rev-parse origin/main)" ]]; then
-        echo "scripts/version: a release builds origin/main, but HEAD is $commit" >&2
-        exit 1
-    fi
-    echo "0.${main_commits}.0"
-elif [[ -n "$pr_number" ]]; then
-    echo "0.$((main_commits + 1)).0-pr${pr_number}+${commit}"
-else
-    echo "0.$((main_commits + 1)).0-dev+${commit}"
-fi
+
+def stop(message: str) -> NoReturn:
+    sys.exit(f"{ME}: {message}")
+
+
+def git(*arguments: str, failure: str | None = None) -> str:
+    try:
+        result = subprocess.run(["git", *arguments], cwd=REPOSITORY, check=True, stdout=subprocess.PIPE, text=True)
+    except subprocess.CalledProcessError as error:
+        stop(failure or f"git {' '.join(arguments)} failed with exit {error.returncode}")
+    return result.stdout.strip()
+
+
+def main() -> None:
+    if shutil.which("git") is None:
+        stop("git is not on the PATH")
+    release_build = os.environ.get("RELEASE_BUILD", "")
+    pr_number = os.environ.get("PR_NUMBER", "")
+    if release_build not in ("", "true"):
+        stop(f"RELEASE_BUILD must be true or unset, not '{release_build}'")
+    if release_build and pr_number:
+        stop("RELEASE_BUILD and PR_NUMBER exclude each other")
+    if pr_number and not re.fullmatch(r"[1-9][0-9]*", pr_number):
+        stop(f"PR_NUMBER must be a number, not '{pr_number}'")
+
+    if git("rev-parse", "--is-shallow-repository") != "false":
+        stop(f"{REPOSITORY} is a shallow clone, so the commits on origin/main cannot be counted; fetch its full history")
+    main_commits = int(git("rev-list", "--count", "origin/main",
+                           failure="cannot count the commits on origin/main; fetch it with its full history"))
+    commit = git("rev-parse", "--short=7", "HEAD")
+
+    if release_build:
+        if git("rev-parse", "HEAD") != git("rev-parse", "origin/main"):
+            stop(f"a release builds origin/main, but HEAD is {commit}")
+        print(f"0.{main_commits}.0")
+    elif pr_number:
+        print(f"0.{main_commits + 1}.0-pr{pr_number}+{commit}")
+    else:
+        print(f"0.{main_commits + 1}.0-dev+{commit}")
+
+
+if __name__ == "__main__":
+    main()

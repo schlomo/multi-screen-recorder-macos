@@ -54,11 +54,13 @@ confirmed yet.
 
 ## Usage
 
-Start the app from Finder: its window shows what will be recorded
-(every display with what it looks like and the size it records at,
-every audio input with the one recorded marked, system audio, the
-output folder), then the recording resolution, the audio mode, system audio, the
-output folder and the ready check: "Ready to record" when every item
+Start the app from Finder: its window shows what will be recorded (a
+table of the displays, with what each looks like, the size it is
+drawn at and the size it records at; a table of the audio inputs and
+system audio, the ones not recorded dimmed; each with the disk space
+it needs per hour, the total and the free space below; the output
+folder), then the recording resolution, the audio mode, system audio,
+the output folder and the ready check: "Ready to record" when every item
 passes, otherwise each item with a fix for each failing one. Every
 change is saved at once; the ready check runs again after each change,
 when you come back to the app, and on "Check again".
@@ -109,14 +111,17 @@ Once, on the Mac:
    `sudo xcodebuild -license accept` and
    `sudo xcode-select -s /Applications/Xcode.app`. The Command Line
    Tools alone build the app but cannot run the tests.
-2. The signing certificate, in Keychain Access › Certificate Assistant ›
+2. Python 3.15 or later as `python3` on the `PATH`, for the scripts
+   (the one macOS ships is older), such as from Homebrew:
+   `brew install python@3.15`.
+3. The signing certificate, in Keychain Access › Certificate Assistant ›
    Create a Certificate…: a name containing `Multi Screen Recorder
    Signing`, such as `Multi Screen Recorder Signing (<your name>)`;
    identity type Self-Signed Root, certificate type Code Signing, "Let
    me override defaults" ticked, validity 3650 days (the default is one
    year, and a new certificate means granting both permissions again),
    the rest unchanged, in the login keychain.
-3. For the pipeline, by the repository owner only: export the
+4. For the pipeline, by the repository owner only: export the
    certificate from My Certificates as `.p12` with an empty password,
    then
 

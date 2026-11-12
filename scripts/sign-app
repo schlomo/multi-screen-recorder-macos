@@ -1,78 +1,129 @@
-#!/usr/bin/env bash
-# Re-signs the app bundle in build/ with the identity named in
-# SIGNING_IDENTITY (default "Multi Screen Recorder Signing"), which codesign
-# matches as a substring of the certificate's name in the keychain; this
-# script never sees a secret. SIGNING_IDENTITY=- signs ad hoc, for a local
-# check only. Reads the bundle as data and executes nothing from it: first the
-# checks that need no signature, then signing, then the signature's checks;
-# then zips it into build/. The version comes from the bundle, where
-# scripts/build-app wrote it; it must have the form for this build:
-#   PR_NUMBER=<n>       0.<N>.0-pr<n>+<commit>
-#   RELEASE_BUILD=true  0.<N>.0
-#   neither             0.<N>.0-dev+<commit>
-set -euo pipefail
+#!/usr/bin/env -S python3 -I
+"""Re-signs the app bundle in build/ with the identity named in
+SIGNING_IDENTITY (default "Multi Screen Recorder Signing"), which codesign
+matches as a substring of the certificate's name in the keychain; this
+script never sees a secret. SIGNING_IDENTITY=- signs ad hoc, for a local
+check only. Reads the bundle as data and executes nothing from it: first the
+checks that need no signature, then signing, then the signature's checks;
+then zips it into build/. The version comes from the bundle, where
+scripts/build-app wrote it; it must have the form for this build:
+  PR_NUMBER=<n>       0.<N>.0-pr<n>+<commit>
+  RELEASE_BUILD=true  0.<N>.0
+  neither             0.<N>.0-dev+<commit>
+"""
 
-me="scripts/sign-app"
-for tool in codesign plutil ditto git; do
-    command -v "$tool" >/dev/null || { echo "$me: $tool is not on the PATH" >&2; exit 1; }
-done
+import os
+import plistlib
+import re
+import shutil
+import subprocess
+import sys
+from pathlib import Path
+from typing import NoReturn
 
-stop() {
-    echo "$me: $1" >&2
-    exit 1
-}
+ME = "scripts/sign-app"
+MINIMUM_PYTHON = (3, 15)
+if sys.version_info < MINIMUM_PYTHON:
+    sys.exit(f"{ME}: needs Python 3.15 or later (the python3 of the macos-26 runner image), not {sys.version.split()[0]}")
 
-cd "$(dirname "$0")/.."
-identity="${SIGNING_IDENTITY:-Multi Screen Recorder Signing}"
-release_build="${RELEASE_BUILD:-}"
-pr_number="${PR_NUMBER:-}"
-app="build/Multi Screen Recorder.app"
-plist="$app/Contents/Info.plist"
-identifier="org.schapiro.multiscreenrecorder"
-runtime_flag=$((0x10000))
+APP = Path("build/Multi Screen Recorder.app")
+ENTITLEMENTS = Path("Resources/msr.entitlements")
+IDENTIFIER = "org.schapiro.multiscreenrecorder"
+RUNTIME_FLAG = 0x10000
 
-[[ -z "$release_build" || "$release_build" == "true" ]] \
-    || stop "RELEASE_BUILD must be true or unset, not '$release_build'"
-[[ -z "$release_build" || -z "$pr_number" ]] || stop "RELEASE_BUILD and PR_NUMBER exclude each other"
-[[ -z "$pr_number" || "$pr_number" =~ ^[1-9][0-9]*$ ]] || stop "PR_NUMBER must be a number, not '$pr_number'"
-[[ -d "$app" && ! -L "$app" ]] \
-    || stop "$app does not exist; run scripts/build-app (or scripts/unpack-app in CI) first"
 
-head="$(git rev-parse --short=7 HEAD)"
-version="$(plutil -extract MSRVersion raw "$plist")" || stop "the bundle's Info.plist has no MSRVersion"
-commit="$(plutil -extract MSRCommit raw "$plist")" || stop "the bundle's Info.plist has no MSRCommit"
-bundle_identifier="$(plutil -extract CFBundleIdentifier raw "$plist")" \
-    || stop "the bundle's Info.plist has no CFBundleIdentifier"
-[[ "$commit" == "$head" ]] || stop "the bundle was built from $commit, but HEAD is $head"
-[[ "$bundle_identifier" == "$identifier" ]] || stop "the bundle's identifier is $bundle_identifier, not $identifier"
-if [[ -n "$pr_number" ]]; then
-    version_pattern="^0\.[1-9][0-9]*\.0-pr${pr_number}\+${head}$"
-elif [[ -n "$release_build" ]]; then
-    version_pattern='^0\.[1-9][0-9]*\.0$'
-else
-    version_pattern="^0\.[1-9][0-9]*\.0-dev\+${head}$"
-fi
-[[ "$version" =~ $version_pattern ]] || stop "the bundle's version $version does not have the form ${version_pattern}"
-zip="build/Multi Screen Recorder ${version}.zip"
+def stop(message: str) -> NoReturn:
+    sys.exit(f"{ME}: {message}")
 
-rm -f "$zip"
-codesign --force --options runtime --timestamp=none \
-    --entitlements Resources/msr.entitlements \
-    --sign "$identity" "$app"
 
-codesign --verify --deep --strict "$app" || stop "the signature does not verify"
-codesign --verify --test-requirement="=identifier \"$identifier\"" "$app" \
-    || stop "the signed identifier is not $identifier"
+def run(*arguments: str, failure: str) -> str:
+    """Runs a command and returns its output and errors together."""
+    try:
+        result = subprocess.run(arguments, check=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+    except subprocess.CalledProcessError as error:
+        print(error.stdout, end="", file=sys.stderr)
+        stop(failure)
+    return result.stdout
 
-details="$(codesign --display --verbose=2 "$app" 2>&1)"
-flags_pattern='flags=0x([0-9a-fA-F]+)'
-[[ "$details" =~ $flags_pattern ]] || stop "the code signature reports no flags"
-(( 16#${BASH_REMATCH[1]} & runtime_flag )) || stop "the hardened runtime flag is not set"
 
-entitlements="$(codesign --display --entitlements - --xml "$app" 2>/dev/null | plutil -convert json -o - -)"
-expected_entitlements="$(plutil -convert json -o - Resources/msr.entitlements)"
-[[ "$entitlements" == "$expected_entitlements" ]] \
-    || stop "the entitlements are $entitlements, not $expected_entitlements"
+def version_pattern(release_build: str, pr_number: str, head: str) -> str:
+    if pr_number:
+        return rf"0\.[1-9][0-9]*\.0-pr{pr_number}\+{head}"
+    if release_build:
+        return r"0\.[1-9][0-9]*\.0"
+    return rf"0\.[1-9][0-9]*\.0-dev\+{head}"
 
-ditto -c -k --keepParent "$app" "$zip"
-echo "$zip"
+
+def check_before_signing(release_build: str, pr_number: str) -> str:
+    """Checks the environment and the bundle's Info.plist; returns the version."""
+    if release_build not in ("", "true"):
+        stop(f"RELEASE_BUILD must be true or unset, not '{release_build}'")
+    if release_build and pr_number:
+        stop("RELEASE_BUILD and PR_NUMBER exclude each other")
+    if pr_number and not re.fullmatch(r"[1-9][0-9]*", pr_number):
+        stop(f"PR_NUMBER must be a number, not '{pr_number}'")
+    if APP.is_symlink() or not APP.is_dir():
+        stop(f"{APP} does not exist; run scripts/build-app (or scripts/unpack-app in CI) first")
+
+    head = run("git", "rev-parse", "--short=7", "HEAD", failure="cannot read HEAD").strip()
+    try:
+        info = plistlib.loads((APP / "Contents/Info.plist").read_bytes())
+    except (OSError, plistlib.InvalidFileException) as error:
+        stop(f"cannot read the bundle's Info.plist: {error}")
+    for key in ("MSRVersion", "MSRCommit", "CFBundleIdentifier"):
+        if not isinstance(info.get(key), str):
+            stop(f"the bundle's Info.plist has no {key}")
+    version, commit, bundle_identifier = info["MSRVersion"], info["MSRCommit"], info["CFBundleIdentifier"]
+    if commit != head:
+        stop(f"the bundle was built from {commit}, but HEAD is {head}")
+    if bundle_identifier != IDENTIFIER:
+        stop(f"the bundle's identifier is {bundle_identifier}, not {IDENTIFIER}")
+    pattern = version_pattern(release_build, pr_number, head)
+    if not re.fullmatch(pattern, version):
+        stop(f"the bundle's version {version} does not have the form {pattern}")
+    return version
+
+
+def check_signature() -> None:
+    run("codesign", "--verify", "--deep", "--strict", str(APP), failure="the signature does not verify")
+    run("codesign", "--verify", f'--test-requirement==identifier "{IDENTIFIER}"', str(APP),
+        failure=f"the signed identifier is not {IDENTIFIER}")
+
+    details = run("codesign", "--display", "--verbose=2", str(APP), failure="the code signature cannot be read")
+    flags = re.search(r"flags=0x([0-9a-fA-F]+)", details)
+    if flags is None:
+        stop("the code signature reports no flags")
+    if not int(flags[1], 16) & RUNTIME_FLAG:
+        stop("the hardened runtime flag is not set")
+
+    try:
+        signed = subprocess.run(["codesign", "--display", "--entitlements", "-", "--xml", str(APP)],
+                                check=True, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+        entitlements = plistlib.loads(signed.stdout)
+    except (subprocess.CalledProcessError, plistlib.InvalidFileException):
+        stop("the signature's entitlements cannot be read")
+    expected_entitlements = plistlib.loads(ENTITLEMENTS.read_bytes())
+    if entitlements != expected_entitlements:
+        stop(f"the entitlements are {entitlements}, not {expected_entitlements}")
+
+
+def main() -> None:
+    for tool in ("codesign", "ditto", "git"):
+        if shutil.which(tool) is None:
+            stop(f"{tool} is not on the PATH")
+    os.chdir(Path(__file__).resolve().parent.parent)
+    identity = os.environ.get("SIGNING_IDENTITY") or "Multi Screen Recorder Signing"
+    version = check_before_signing(os.environ.get("RELEASE_BUILD", ""), os.environ.get("PR_NUMBER", ""))
+    zip_file = Path(f"build/Multi Screen Recorder {version}.zip")
+
+    zip_file.unlink(missing_ok=True)
+    run("codesign", "--force", "--options", "runtime", "--timestamp=none", "--entitlements", str(ENTITLEMENTS),
+        "--sign", identity, str(APP), failure=f"codesign cannot sign {APP} as '{identity}'")
+    check_signature()
+
+    run("ditto", "-c", "-k", "--keepParent", str(APP), str(zip_file), failure=f"cannot zip {APP}")
+    print(zip_file)
+
+
+if __name__ == "__main__":
+    main()

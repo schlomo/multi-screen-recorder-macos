@@ -11,7 +11,7 @@ far: the recording resolution, audio mode and system audio as settings,
 the ready check, and the pipeline for snapshot releases and releases.
 Nothing a recording produces exists yet (recording, recording folder,
 recording manifest, crash marker, display file, tick, timecode, audio
-track, audio file).
+track, audio file, guide track).
 
 ## Multi Screen Recorder
 
@@ -53,8 +53,8 @@ recording that was not finalized (D20).
 
 ## Display file
 
-The video file for one display, with the audio tracks of every audio
-source present when it started.
+The video file for one display, with its timecode and its guide tracks
+(D31).
 A display that disappears or whose stream fails ends its display file;
 a new one begins when it is back. A display whose fitted frame size
 changes also ends its file, and a new one begins at once (D30).
@@ -66,13 +66,13 @@ every display file gets a frame (D11, D21).
 
 ## Timecode
 
-The time-of-day track in every display file, by which an editor places
-files on a timeline (D21).
+The time-of-day track in every display file and every audio file, by
+which an editor places files on a timeline (D21, D31).
 
 ## Audio track
 
-One track in a display file or audio file: one channel of an audio
-input, mono, or the system audio, stereo (D22).
+One track in an audio file: one channel of an audio input, mono, or
+the system audio, stereo (D22, D31).
 
 ## Audio source
 
@@ -90,8 +90,18 @@ audio inputs.
 
 ## Audio file
 
-The file for an audio source that appeared after the display files
-started; it joins the display files at their next new file (D12).
+The file for one audio source, beside the display files: a recorded
+audio input's audio tracks, one per channel, or the system audio's one
+audio track, with its timecode. It starts when the source appears and
+ends when it disappears, never padded with silence (D31).
+
+## Guide track
+
+A track in a display file for playback and waveform sync only:
+"Microphones", one mono mix of all recorded microphone channels, or
+"System audio", stereo; the two are never mixed together. Which ones a
+display file has follows from the settings alone; a missing source is
+silence in its guide track (D31).
 
 ## Recording resolution
 
