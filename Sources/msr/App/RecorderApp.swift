@@ -18,6 +18,7 @@ enum RecorderApp {
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var startWindow: NSWindow?
     private var aboutWindow: NSWindow?
+    private var model: StartModel?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.mainMenu = makeMainMenu()
@@ -33,11 +34,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             return
         }
         let model = StartModel(homeFolder: home)
+        self.model = model
         startWindow = makeWindow(title: "Multi Screen Recorder", content: StartView(model: model))
         startWindow?.center()
         startWindow?.makeKeyAndOrderFront(nil)
         NSApp.activate()
         model.load()
+    }
+
+    func applicationDidBecomeActive(_ notification: Notification) {
+        model?.appBecameActive()
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {

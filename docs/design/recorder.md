@@ -114,6 +114,9 @@ output folder, and free disk space in the output folder for
   frame's pixel count of each display at the recording resolution.
 - One cause, one red item: when the output folder fails or the
   displays cannot be read, the free disk space item is left out.
+- In the app the check runs when the window opens, when the app becomes
+  active again (unless a check is still running), after every settings
+  change, and on "Check again".
 
 ## Output on disk
 
@@ -181,10 +184,16 @@ manifest's state to `not finalized` and remove the marker.
 
 ## The app
 
-- **Start:** a small window with the recording resolution, audio mode,
-  system audio, output folder, the ready check (each item green or red
-  with its fix) and Start. Start is disabled while the ready check
-  fails.
+- **Start:** a small window. At the top, three lines say what Start
+  records, built from the settings and the devices connected now: every
+  display (named, at the recording resolution), the audio sources, the
+  output folder, and that recording continues when displays or audio
+  sources change. Then the recording resolution, audio mode, system
+  audio and output folder; the ready check, with "Check again"; and
+  Start. All green, the ready check is one line, "Ready to record",
+  that expands on click to its items; any red item shows every item,
+  with the fix under each red one. Start is disabled while the ready
+  check fails.
 - **Recording:** the window closes; the Dock icon shows a red badge with
   the elapsed minutes. Low disk space shows as a "!" badge and a
   bouncing Dock icon; no notification, which would need a third
@@ -192,8 +201,10 @@ manifest's state to `not finalized` and remove the marker.
 - **Stop:** clicking the Dock icon or Quit asks "Stop recording?"
   [Stop] [Continue]. Stop finalizes, then reveals the recording folder
   in Finder. Logout and shutdown finalize without asking.
-- **About:** version, licence, credit to the former upstream, and a link
-  to GitHub Issues that opens in the browser (D15).
+- **About:** version, licence, the purpose (the opening paragraph of the
+  README, one string in the code), and a link to GitHub Issues that
+  opens in the browser (D15, D26). The credit to the former upstream is
+  in the README.
 
 ## How the recorder works
 

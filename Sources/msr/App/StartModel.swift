@@ -3,7 +3,8 @@ import Observation
 import RecorderCore
 import RecorderLogic
 
-/// The start window's state: the settings as saved, and the ready check.
+/// The start window's state: the settings as saved, what Start records, and
+/// the ready check.
 @MainActor
 @Observable
 final class StartModel {
@@ -12,6 +13,7 @@ final class StartModel {
 
     private(set) var settings = Settings.defaults
     private(set) var settingsError: String?
+    private(set) var summary: [String] = []
     private(set) var readyCheck: ReadyCheckResult?
     private(set) var isChecking = false
     @ObservationIgnored private var checkTask: Task<Void, Never>?
@@ -25,7 +27,7 @@ final class StartModel {
         do {
             settings = try settingsFile.load()
             settingsError = nil
-            runReadyCheckAgain()
+            checkAgain()
         } catch {
             settingsError = error.description
             readyCheck = nil
@@ -41,7 +43,7 @@ final class StartModel {
             settingsError = error.description
             return
         }
-        runReadyCheckAgain()
+        checkAgain()
     }
 
     func resetToDefaults() {
@@ -58,7 +60,19 @@ final class StartModel {
         change { $0.outputFolder = Settings.outputFolderSetting(for: folder, homeFolder: homeFolder) }
     }
 
-    private func runReadyCheckAgain() {
+    /// Back in the app, the person may have granted a permission or plugged
+    /// in a device; a check still running is left to finish.
+    func appBecameActive() {
+        guard settingsError == nil, !isChecking else { return }
+        checkAgain()
+    }
+
+    /// Reads the devices for the summary and re-runs the ready check.
+    func checkAgain() {
+        summary = RecordingSummary.lines(
+            settings: settings,
+            displays: Result { () throws(DeviceReadError) in try currentDisplays() },
+            defaultMicrophone: defaultAudioInputName())
         checkTask?.cancel()
         isChecking = true
         let settings = settings

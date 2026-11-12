@@ -38,6 +38,15 @@ public enum RecordingResolution: String, CaseIterable, Sendable {
         }
     }
 
+    /// The name a person reads, in the app and its texts.
+    public var label: String {
+        switch self {
+        case .native: "Native"
+        case .uhd4k: "4K"
+        case .p1440, .p1200, .p1080, .p720: rawValue
+        }
+    }
+
     /// The frame size of a display file: the display's pixel size shrunk into
     /// the box, turned upright for a portrait display, with its proportions
     /// kept, never enlarged, each side rounded down to an even number.

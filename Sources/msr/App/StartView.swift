@@ -10,9 +10,11 @@ struct StartView: View {
             if let error = model.settingsError {
                 SettingsErrorView(message: error) { model.resetToDefaults() }
             } else {
+                SummaryView(lines: model.summary)
+                Divider()
                 SettingsForm(model: model)
                 Divider()
-                ReadyCheckView(result: model.readyCheck, isChecking: model.isChecking)
+                ReadyCheckView(result: model.readyCheck, isChecking: model.isChecking) { model.checkAgain() }
             }
             Divider()
             VStack(alignment: .leading, spacing: 4) {
@@ -86,19 +88,54 @@ private struct SettingsForm: View {
     }
 }
 
+private struct SummaryView: View {
+    let lines: [String]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            ForEach(Array(lines.enumerated()), id: \.offset) { _, line in
+                Text(line).fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+}
+
+/// All green: one line "Ready to record" that expands on click. Any red:
+/// every item, with the fix under each red one.
 private struct ReadyCheckView: View {
     let result: ReadyCheckResult?
     let isChecking: Bool
+    let checkAgain: () -> Void
+
+    @State private var isExpanded = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack {
                 Text("Ready check").font(.headline)
                 if isChecking { ProgressView().controlSize(.small) }
+                Spacer()
+                Button("Check again", action: checkAgain).disabled(isChecking)
             }
             if let result {
-                ForEach(Array(result.items.enumerated()), id: \.offset) { _, item in
-                    ReadyCheckItemRow(item: item)
+                if result.isReady {
+                    Button {
+                        isExpanded.toggle()
+                    } label: {
+                        HStack(spacing: 8) {
+                            Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
+                                .foregroundStyle(.secondary)
+                            Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
+                            Text("Ready to record")
+                        }
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                }
+                if !result.isReady || isExpanded {
+                    ForEach(Array(result.items.enumerated()), id: \.offset) { _, item in
+                        ReadyCheckItemRow(item: item)
+                    }
                 }
             }
         }
@@ -122,16 +159,6 @@ private struct ReadyCheckItemRow: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
-        }
-    }
-}
-
-extension RecordingResolution {
-    var label: String {
-        switch self {
-        case .native: "Native"
-        case .uhd4k: "4K"
-        case .p1440, .p1200, .p1080, .p720: rawValue
         }
     }
 }

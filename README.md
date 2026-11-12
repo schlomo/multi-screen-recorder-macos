@@ -54,9 +54,12 @@ confirmed yet.
 
 ## Usage
 
-Start the app from Finder: its window shows the recording resolution,
-the audio mode, system audio, the output folder and the ready check,
-with a fix for each failing item. Every change is saved at once.
+Start the app from Finder: its window says what Start records, then
+shows the recording resolution, the audio mode, system audio, the
+output folder and the ready check: "Ready to record" when every item
+passes, otherwise each item with a fix for each failing one. Every
+change is saved at once; the ready check runs again after each change,
+when you come back to the app, and on "Check again".
 
 ### Command line
 
