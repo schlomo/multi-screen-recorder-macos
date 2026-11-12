@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+# Publishes the release for a merge to main: tag v<version>, with the zip from
+# scripts/build-app built with RELEASE_BUILD=true. gh reads GH_TOKEN itself.
+set -euo pipefail
+
+for tool in gh git; do
+    command -v "$tool" >/dev/null || { echo "scripts/publish-release: $tool is not on the PATH" >&2; exit 1; }
+done
+if [[ "${RELEASE_BUILD:-}" != "true" ]]; then
+    echo "scripts/publish-release: RELEASE_BUILD must be true" >&2
+    exit 1
+fi
+
+cd "$(dirname "$0")/.."
+version="$(scripts/version)"
+zip="build/Multi Screen Recorder ${version}.zip"
+if [[ ! -f "$zip" ]]; then
+    echo "scripts/publish-release: $zip does not exist; run scripts/build-app first" >&2
+    exit 1
+fi
+
+gh release create "v${version}" "$zip" \
+    --target "$(git rev-parse HEAD)" \
+    --title "Multi Screen Recorder ${version}" \
+    --generate-notes

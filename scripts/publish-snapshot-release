@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+# Creates or replaces the snapshot release of PR PR_NUMBER: a GitHub
+# pre-release tagged pr-<number> with the zip from scripts/build-app.
+# gh reads GH_TOKEN itself.
+set -euo pipefail
+
+for tool in gh git; do
+    command -v "$tool" >/dev/null || { echo "scripts/publish-snapshot-release: $tool is not on the PATH" >&2; exit 1; }
+done
+if [[ -z "${PR_NUMBER:-}" ]]; then
+    echo "scripts/publish-snapshot-release: PR_NUMBER is not set" >&2
+    exit 1
+fi
+
+cd "$(dirname "$0")/.."
+version="$(scripts/version)"
+zip="build/Multi Screen Recorder ${version}.zip"
+tag="pr-${PR_NUMBER}"
+if [[ ! -f "$zip" ]]; then
+    echo "scripts/publish-snapshot-release: $zip does not exist; run scripts/build-app first" >&2
+    exit 1
+fi
+
+tags="$(gh release list --limit 1000 --json tagName --jq '.[].tagName')"
+if grep -qFx "$tag" <<<"$tags"; then
+    gh release delete "$tag" --yes --cleanup-tag
+fi
+gh release create "$tag" "$zip" \
+    --prerelease \
+    --target "$(git rev-parse HEAD)" \
+    --title "Snapshot PR #${PR_NUMBER}: ${version}" \
+    --notes "Snapshot release of pull request #${PR_NUMBER}, replaced on every push and removed when the pull request closes."

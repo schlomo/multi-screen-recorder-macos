@@ -1,0 +1,101 @@
+# Wiring only: every behaviour lives in scripts/ (docs/design/delivery.md).
+name: CI
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, closed]
+  push:
+    branches: [main]
+    paths-ignore: ["**.md"]
+
+permissions: {}
+
+env:
+  DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
+
+jobs:
+  test:
+    if: github.event_name == 'push' || github.event.action != 'closed'
+    runs-on: macos-26
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - run: scripts/test
+
+  snapshot-release:
+    needs: test
+    if: >-
+      github.event_name == 'pull_request'
+      && github.event.action != 'closed'
+      && github.event.pull_request.head.repo.full_name == github.repository
+      && github.event.pull_request.user.login != 'dependabot[bot]'
+    runs-on: macos-26
+    permissions:
+      contents: write
+    concurrency:
+      group: snapshot-release-${{ github.event.pull_request.number }}
+    env:
+      PR_NUMBER: ${{ github.event.pull_request.number }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - run: scripts/ci-import-signing-certificate
+        env:
+          SIGNING_CERTIFICATE_P12: ${{ secrets.SIGNING_CERTIFICATE_P12 }}
+      - run: scripts/build-app
+      - run: scripts/publish-snapshot-release
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+  remove-snapshot-release:
+    if: >-
+      github.event_name == 'pull_request'
+      && github.event.action == 'closed'
+      && github.event.pull_request.head.repo.full_name == github.repository
+      && github.event.pull_request.user.login != 'dependabot[bot]'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    concurrency:
+      group: snapshot-release-${{ github.event.pull_request.number }}
+    env:
+      PR_NUMBER: ${{ github.event.pull_request.number }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - run: scripts/remove-snapshot-release
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+  release:
+    needs: test
+    if: github.event_name == 'push'
+    runs-on: macos-26
+    permissions:
+      contents: write
+    concurrency:
+      group: release
+    env:
+      RELEASE_BUILD: "true"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - run: scripts/ci-import-signing-certificate
+        env:
+          SIGNING_CERTIFICATE_P12: ${{ secrets.SIGNING_CERTIFICATE_P12 }}
+      - run: scripts/build-app
+      - run: scripts/publish-release
+        env:
+          GH_TOKEN: ${{ github.token }}

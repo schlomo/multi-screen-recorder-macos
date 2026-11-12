@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+# CI only: imports the signing certificate from SIGNING_CERTIFICATE_P12 (base64
+# of a .p12 exported with an empty password) into a temporary keychain, so
+# scripts/build-app can sign with it by name. Never prints the value.
+set -euo pipefail
+
+for tool in security base64 codesign; do
+    command -v "$tool" >/dev/null || { echo "scripts/ci-import-signing-certificate: $tool is not on the PATH" >&2; exit 1; }
+done
+if [[ -z "${SIGNING_CERTIFICATE_P12:-}" ]]; then
+    echo "scripts/ci-import-signing-certificate: SIGNING_CERTIFICATE_P12 is not set" >&2
+    exit 1
+fi
+if [[ -z "${RUNNER_TEMP:-}" ]]; then
+    echo "scripts/ci-import-signing-certificate: RUNNER_TEMP is not set; this script runs in CI only" >&2
+    exit 1
+fi
+
+keychain="$RUNNER_TEMP/signing.keychain-db"
+p12="$RUNNER_TEMP/signing.p12"
+trap 'rm -f "$p12"' EXIT
+
+umask 077
+printf '%s' "$SIGNING_CERTIFICATE_P12" | base64 --decode > "$p12"
+
+# The keychain lives only as long as the runner; its empty password guards nothing.
+security create-keychain -p "" "$keychain"
+security set-keychain-settings -lut 21600 "$keychain"
+security unlock-keychain -p "" "$keychain"
+security import "$p12" -k "$keychain" -f pkcs12 -P "" -T "$(command -v codesign)"
+security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "" "$keychain" >/dev/null
+security list-keychains -d user -s "$keychain"

@@ -296,6 +296,21 @@ with `ffprobe`, and by the v1 gate.
 
 ## Build state
 
-Nothing here is built yet. The skeleton PR builds `msr list`,
-`msr check`, `msr settings`, `msr version`, the settings file and the
-app window with the ready check; the recorder PR builds the rest.
+Built (skeleton PR): `msr list`, `msr check`, `msr settings`,
+`msr version`, the settings file, the ready check and the app window
+with it (Start always disabled, "This build cannot record yet."), the
+About window, the code layout above except `scripts/acceptance/`, and
+the unit tests of settings, geometry, the disk estimate, the ready
+check, `msr list` and the version. The recorder PR builds the rest:
+`msr record`, recording, the recording manifest, crash markers,
+timecode, the Dock badge and Stop.
+
+Details the design left open, as built: a key missing from the
+settings file takes its default; the output folder must start with `/`
+or `~`; the two number settings must be greater than 0; a settings
+file that cannot be used makes a command exit 1. `msr version` prints
+the full version string and the commit, such as
+`0.2.0-dev+a1b2c3d (a1b2c3d)`, from the bundle's Info.plist keys
+`MSRVersion` and `MSRCommit`; outside a bundle it prints
+`development build (not bundled)`. The settings file is found through
+`HOME`.

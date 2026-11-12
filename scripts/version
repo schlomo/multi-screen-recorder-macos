@@ -1,0 +1,43 @@
+#!/usr/bin/env bash
+# Prints the version of the current checkout. N is the number of commits on
+# origin/main:
+#   RELEASE_BUILD=true  0.<N>.0                (HEAD must be origin/main)
+#   PR_NUMBER=<n>       0.<N+1>.0-pr<n>+<commit>
+#   neither             0.<N+1>.0-dev+<commit>
+set -euo pipefail
+
+command -v git >/dev/null || { echo "scripts/version: git is not on the PATH" >&2; exit 1; }
+cd "$(dirname "$0")/.."
+
+release_build="${RELEASE_BUILD:-}"
+pr_number="${PR_NUMBER:-}"
+if [[ -n "$release_build" && "$release_build" != "true" ]]; then
+    echo "scripts/version: RELEASE_BUILD must be true or unset, not '$release_build'" >&2
+    exit 1
+fi
+if [[ -n "$release_build" && -n "$pr_number" ]]; then
+    echo "scripts/version: RELEASE_BUILD and PR_NUMBER exclude each other" >&2
+    exit 1
+fi
+if [[ -n "$pr_number" && ! "$pr_number" =~ ^[1-9][0-9]*$ ]]; then
+    echo "scripts/version: PR_NUMBER must be a number, not '$pr_number'" >&2
+    exit 1
+fi
+
+if ! main_commits="$(git rev-list --count origin/main)"; then
+    echo "scripts/version: cannot count the commits on origin/main; fetch it with its full history" >&2
+    exit 1
+fi
+commit="$(git rev-parse --short=7 HEAD)"
+
+if [[ -n "$release_build" ]]; then
+    if [[ "$(git rev-parse HEAD)" != "$(git rev-parse origin/main)" ]]; then
+        echo "scripts/version: a release builds origin/main, but HEAD is $commit" >&2
+        exit 1
+    fi
+    echo "0.${main_commits}.0"
+elif [[ -n "$pr_number" ]]; then
+    echo "0.$((main_commits + 1)).0-pr${pr_number}+${commit}"
+else
+    echo "0.$((main_commits + 1)).0-dev+${commit}"
+fi

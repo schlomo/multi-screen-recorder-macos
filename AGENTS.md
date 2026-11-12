@@ -16,9 +16,14 @@ Recorded by the setup skill; re-run it when any of this changes.
 - **Attribution:** AI-written commits name the model as co-author, PR
   descriptions carry a generated-with line.
 - **Time zone:** Europe/Berlin, stated with every time shown to people.
-- **Pipeline:** none yet. Agreed target: every PR builds an installable
-  snapshot release; merging to `main` publishes a GitHub release
-  (versions from the git history, 0.x until the owner declares v1).
+- **Pipeline:** GitHub Actions, `.github/workflows/ci.yml`, wiring the
+  scripts in `scripts/` on a hosted Apple-silicon macOS runner: every
+  push to a PR tests, builds, signs and publishes the PR's snapshot
+  release (a pre-release tagged `pr-<n>`), a closed PR's snapshot
+  release is removed, a push to `main` that changes more than Markdown
+  files publishes a release `v0.<N>.0`; PRs from forks and Dependabot
+  are tested only. Signing needs the repository secret
+  `SIGNING_CERTIFICATE_P12` ([delivery.md](docs/design/delivery.md)).
   Who may register pipelines and edit branch policies: the repository
   owner.
 - **Backlog:** `backlog.md`. Mapping: its own sections ("Next session
@@ -215,8 +220,9 @@ this is how they map per tool.
 
 ## Running the tests
 
-None yet: the repo holds no code. The first build PR adds the command
-here.
+`scripts/test` runs the unit tests (Swift Testing, `swift test`);
+`scripts/build-app` builds, signs and zips the app into `build/`
+(`SIGNING_IDENTITY=-` signs ad hoc, for a local check only).
 
 ## Facts that bite
 
@@ -224,6 +230,16 @@ here.
   Xcode 26; a Linux container (such as a cloud agent session) can edit
   and review but not build or run anything. Say UNVERIFIED for any
   change not built and run on a Mac or by CI.
+- The Command Line Tools alone build the package but cannot run the
+  tests: Swift Testing needs Xcode, selected and with its licence
+  accepted (`scripts/test` checks this first).
+- `msr` without arguments starts the app, and the app and `msr check`
+  run the ready check, which requests any never-asked permission, so
+  macOS shows a prompt on the person's screen; `msr list` reads the
+  devices. An agent runs none of these on a person's Mac unasked.
+  `msr version`, `msr settings` (it writes the settings file with the
+  defaults if there is none; `HOME` decides where) and the tests are
+  safe.
 - Real capture needs the Screen & System Audio Recording and
   Microphone permissions, granted by a person on the Mac. Capture
   behaviour is verified on the owner's Mac (the v1 gate in

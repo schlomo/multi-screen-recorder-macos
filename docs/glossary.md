@@ -6,8 +6,12 @@ no reusing a defined term for a second meaning (see
 `principles/engineering.md`'s "One word per concept").
 
 Where a concept is designed but not yet implemented, say so explicitly
-rather than letting the definition imply it already exists. As of
-setup, nothing below is implemented.
+rather than letting the definition imply it already exists. Built so
+far: the recording resolution, audio mode and system audio as settings,
+the ready check, and the pipeline for snapshot releases and releases.
+Nothing a recording produces exists yet (recording, recording folder,
+recording manifest, crash marker, display file, tick, timecode, audio
+track, audio file).
 
 ## Multi Screen Recorder
 

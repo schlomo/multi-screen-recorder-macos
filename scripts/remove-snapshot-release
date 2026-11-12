@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+# Removes the snapshot release of the closed PR PR_NUMBER, and its tag.
+# gh reads GH_TOKEN itself.
+set -euo pipefail
+
+command -v gh >/dev/null || { echo "scripts/remove-snapshot-release: gh is not on the PATH" >&2; exit 1; }
+if [[ -z "${PR_NUMBER:-}" ]]; then
+    echo "scripts/remove-snapshot-release: PR_NUMBER is not set" >&2
+    exit 1
+fi
+
+tag="pr-${PR_NUMBER}"
+tags="$(gh release list --limit 1000 --json tagName --jq '.[].tagName')"
+if grep -qFx "$tag" <<<"$tags"; then
+    gh release delete "$tag" --yes --cleanup-tag
+    echo "Removed the snapshot release $tag."
+else
+    echo "There is no snapshot release $tag to remove."
+fi
