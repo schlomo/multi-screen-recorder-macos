@@ -3,8 +3,8 @@ import Observation
 import RecorderCore
 import RecorderLogic
 
-/// The start window's state: the settings as saved, what Start records, and
-/// the ready check.
+/// The start window's state: the settings as saved, what will be recorded,
+/// and the ready check.
 @MainActor
 @Observable
 final class StartModel {
@@ -13,7 +13,7 @@ final class StartModel {
 
     private(set) var settings = Settings.defaults
     private(set) var settingsError: String?
-    private(set) var summary: [String] = []
+    private(set) var whatWillBeRecorded: WhatWillBeRecorded?
     private(set) var readyCheck: ReadyCheckResult?
     private(set) var isChecking = false
     @ObservationIgnored private var checkTask: Task<Void, Never>?
@@ -67,12 +67,12 @@ final class StartModel {
         checkAgain()
     }
 
-    /// Reads the devices for the summary and re-runs the ready check.
+    /// Reads the devices for "What will be recorded" and re-runs the ready check.
     func checkAgain() {
-        summary = RecordingSummary.lines(
+        whatWillBeRecorded = WhatWillBeRecorded(
             settings: settings,
             displays: Result { () throws(DeviceReadError) in try currentDisplays() },
-            defaultMicrophone: defaultAudioInputName())
+            audioInputs: Result { () throws(DeviceReadError) in try currentAudioInputs() })
         checkTask?.cancel()
         isChecking = true
         let settings = settings

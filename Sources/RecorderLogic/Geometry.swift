@@ -1,4 +1,4 @@
-/// A width and height in pixels.
+/// A width and height: in pixels, or in points for what a display looks like.
 public struct FrameSize: Equatable, Hashable, Sendable, CustomStringConvertible {
     public var width: Int
     public var height: Int

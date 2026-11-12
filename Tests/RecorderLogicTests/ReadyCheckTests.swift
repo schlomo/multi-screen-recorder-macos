@@ -3,8 +3,8 @@ import Testing
 
 @Suite struct ReadyCheckTests {
     private let fullHDDisplays = [
-        DisplayInfo(name: "One", pixelSize: FrameSize(width: 1920, height: 1080), isMain: true, originX: 0, originY: 0),
-        DisplayInfo(name: "Two", pixelSize: FrameSize(width: 3840, height: 2160), isMain: false, originX: 1920, originY: 0),
+        DisplayInfo(name: "One", pixelSize: FrameSize(width: 1920, height: 1080), pointSize: FrameSize(width: 1920, height: 1080), isMain: true, originX: 0, originY: 0),
+        DisplayInfo(name: "Two", pixelSize: FrameSize(width: 3840, height: 2160), pointSize: FrameSize(width: 3840, height: 2160), isMain: false, originX: 1920, originY: 0),
     ]
 
     private func facts(

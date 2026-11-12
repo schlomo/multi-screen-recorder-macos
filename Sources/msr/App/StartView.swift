@@ -10,7 +10,7 @@ struct StartView: View {
             if let error = model.settingsError {
                 SettingsErrorView(message: error) { model.resetToDefaults() }
             } else {
-                SummaryView(lines: model.summary)
+                if let section = model.whatWillBeRecorded { WhatWillBeRecordedView(section: section) }
                 Divider()
                 SettingsForm(model: model)
                 Divider()
@@ -88,14 +88,40 @@ private struct SettingsForm: View {
     }
 }
 
-private struct SummaryView: View {
-    let lines: [String]
+private struct WhatWillBeRecordedView: View {
+    let section: WhatWillBeRecorded
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            ForEach(Array(lines.enumerated()), id: \.offset) { _, line in
-                Text(line).fixedSize(horizontal: false, vertical: true)
+            Text("What will be recorded").font(.headline)
+            if let error = section.devicesError {
+                Label(error, systemImage: "exclamationmark.triangle.fill")
+                    .foregroundStyle(.red)
+                    .fixedSize(horizontal: false, vertical: true)
             }
+            ForEach(section.displays, id: \.number) { display in
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Image(systemName: "display")
+                    Text("\(display.number)  \(display.name)")
+                    Text(display.size).foregroundStyle(.secondary)
+                    Text(display.recordsAt)
+                }
+            }
+            ForEach(Array(section.audioInputs.enumerated()), id: \.offset) { _, input in
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Image(systemName: input.isRecorded ? "mic.fill" : "mic.slash")
+                    Text("\(input.name), \(input.channels)")
+                    if let note = input.note { Text(note).font(.callout) }
+                }
+                .foregroundStyle(input.isRecorded ? .primary : .tertiary)
+            }
+            if let note = section.microphoneNote { Text(note).foregroundStyle(.secondary) }
+            HStack(spacing: 8) {
+                Image(systemName: "speaker.wave.2")
+                Text(section.systemAudio)
+            }
+            Text(section.outputFolder)
+            Text(section.continuity).foregroundStyle(.secondary)
         }
     }
 }

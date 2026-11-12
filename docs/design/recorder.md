@@ -52,13 +52,18 @@ only:
 
 ```
 Displays
-  1  Built-in Retina Display   3456×2234  records at 1670×1080
-  2  LG HDR 4K                 3840×2160  records at 1920×1080
+  1  Built-in Retina Display   looks like 1728×1117, drawn at 3456×2234  records at 1670×1080
+  2  LG HDR 4K                 3840×2160                                 records at 1920×1080
 Audio inputs
   MacBook Pro Microphone (default), 1 channel
   RØDE Wireless GO II RX, 2 channels
 System audio: available
 ```
+
+A display is described by what macOS calls "looks like" (its size in
+points) and its pixel size: `3840×2160` where both are equal, `looks
+like 1728×1117, drawn at 3456×2234` where they differ (a HiDPI mode).
+"records at" is the frame size from the pixel size.
 
 `msr check` prints one line per item, `ok` or `FAIL`, a fix under each
 failure, and `Ready.` or `Not ready.` last:
@@ -122,7 +127,8 @@ output folder, and free disk space in the output folder for
   displays cannot be read, the free disk space item is left out.
 - In the app the check runs when the window opens, when the app becomes
   active again (unless a check is still running), after every settings
-  change, and on "Check again".
+  change, and on "Check again". It never runs while a recording is
+  running, activation included (for the recorder PR to honour).
 
 ## Output on disk
 
@@ -193,11 +199,18 @@ manifest's state to `not finalized` and remove the marker.
 
 ## The app
 
-- **Start:** a small window. At the top, three lines say what Start
-  records, built from the settings and the devices connected now: every
-  display (named, at the recording resolution), the audio sources, the
-  output folder, and that recording continues when displays or audio
-  sources change. Then the recording resolution, audio mode, system
+- **Start:** a small window. At the top, a section "What will be
+  recorded", built from the settings and the devices connected now and
+  refreshed whenever the ready check runs: one row per display (number,
+  name, the size as in `msr list`, "records at" its frame size); one
+  row per audio input (name and channels), the input that will be
+  recorded marked and every other one dimmed with "not recorded in this
+  version" (with the audio mode `none` all are dimmed and the section
+  says the microphone is not recorded); one row for system audio,
+  recorded or off; below, the output folder and "Recording continues
+  when displays or audio sources change." If the devices cannot be
+  read, the section shows that error once; the ready check's items
+  stay as they are. Then the recording resolution, audio mode, system
   audio and output folder; the ready check, with "Check again"; and
   Start. All green, the ready check is one line, "Ready to record",
   that expands on click to its items; any red item shows every item,
@@ -358,12 +371,12 @@ None.
 
 Built (skeleton PR): `msr list`, `msr check`, `msr settings`,
 `msr version`, the settings file, the ready check and the app window
-with it (the summary of what Start records, "Check again", Start
+with it ("What will be recorded", "Check again", Start
 always disabled, "This build cannot record yet."), the About window,
 the code layout above except `scripts/acceptance/`, and the tests of
 settings, geometry, the disk estimate, the ready check, the output
-folder probe, the window's summary, `msr list`, the version, the exit
-codes and `scripts/version`. The recorder PR builds the rest:
+folder probe, "What will be recorded", `msr list`, the frame size
+rule, the version, the exit codes and the scripts. The recorder PR builds the rest:
 `msr record`, recording, the recording manifest, crash markers,
 timecode, the Dock badge and Stop.
 

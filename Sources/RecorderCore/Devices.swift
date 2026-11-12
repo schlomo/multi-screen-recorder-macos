@@ -20,6 +20,7 @@ public func currentDisplays() throws(DeviceReadError) -> [DisplayInfo] {
         return DisplayInfo(
             name: screen.localizedName,
             pixelSize: FrameSize(width: mode.pixelWidth, height: mode.pixelHeight),
+            pointSize: FrameSize(width: mode.width, height: mode.height),
             isMain: id == mainID,
             originX: bounds.origin.x,
             originY: bounds.origin.y)

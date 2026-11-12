@@ -2,17 +2,26 @@
 public struct DisplayInfo: Equatable, Sendable {
     public var name: String
     public var pixelSize: FrameSize
+    /// What macOS calls "looks like": the size in points.
+    public var pointSize: FrameSize
     public var isMain: Bool
     /// The top-left corner in the global display space, for numbering left to right.
     public var originX: Double
     public var originY: Double
 
-    public init(name: String, pixelSize: FrameSize, isMain: Bool, originX: Double, originY: Double) {
+    public init(name: String, pixelSize: FrameSize, pointSize: FrameSize, isMain: Bool, originX: Double, originY: Double) {
         self.name = name
         self.pixelSize = pixelSize
+        self.pointSize = pointSize
         self.isMain = isMain
         self.originX = originX
         self.originY = originY
+    }
+
+    /// "3440×1440", or "looks like 3440×1440, drawn at 6880×2880" when the
+    /// display draws more pixels than its points.
+    public var sizeText: String {
+        pointSize == pixelSize ? pixelSize.description : "looks like \(pointSize), drawn at \(pixelSize)"
     }
 }
 
@@ -55,6 +64,8 @@ public struct AudioInputInfo: Equatable, Sendable {
 
     /// "MacBook Pro Microphone (default)" or just the name.
     public var label: String { isDefault ? "\(name) (default)" : name }
+
+    public var channelsText: String { channelCount == 1 ? "1 channel" : "\(channelCount) channels" }
 }
 
 /// The text `msr list` prints.
@@ -69,7 +80,7 @@ public func renderList(
         lines.append("  none")
     } else {
         let numbers = displays.map { String($0.number) }
-        let sizes = displays.map { $0.display.pixelSize.description }
+        let sizes = displays.map(\.display.sizeText)
         let numberWidth = numbers.map(\.count).max() ?? 0
         let nameWidth = displays.map(\.display.name.count).max() ?? 0
         let sizeWidth = sizes.map(\.count).max() ?? 0
@@ -87,8 +98,7 @@ public func renderList(
         lines.append("  none")
     } else {
         for input in audioInputs {
-            let channels = input.channelCount == 1 ? "1 channel" : "\(input.channelCount) channels"
-            lines.append("  \(input.label), \(channels)")
+            lines.append("  \(input.label), \(input.channelsText)")
         }
     }
     lines.append(
