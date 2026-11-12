@@ -29,21 +29,23 @@ credited for the reference implementation.
 
 - **Never lose a recording.** Every failure mode (a crash, a full disk,
   a failed stream, a display or audio source that disappears) leaves
-  readable files and, where possible, keeps recording (D14).
+  readable display files and audio files and, where possible, keeps
+  recording (D14, D31).
 - **Correct by content, not by timestamp.** A frame shows what was on
   the screen at its time; this is verified by looking at the picture,
   because a recorder whose timestamps looked right was off by up to
   76 s in content (D11).
-- **Edit-ready output.** Constant 30 fps, fixed frame size per file,
-  each audio source on its own track, so a file drops into a 30 fps
-  editing timeline and syncs by waveform (D11, D12).
+- **Edit-ready output.** Constant 30 fps, one frame size per display
+  file, each audio source in its own audio file with every channel on
+  its own track, and timecode in every file, so the files drop into a
+  30 fps editing timeline and line up (D11, D21, D30, D31).
 - **Nothing leaves the Mac.** No network access at all (D15).
 
 ## 2. Shape
 
-The skeleton is built (the app window with the ready check, the
-command line without `record`, the pipeline); recording is designed,
-not built yet. The designs:
+The skeleton is built (the app window with the ready check and the
+tables of what will be recorded, the command line without `record`, the
+pipeline); recording is designed, not built yet. The designs:
 [design/recorder.md](design/recorder.md) and
 [design/delivery.md](design/delivery.md).
 
@@ -53,9 +55,9 @@ not built yet. The designs:
 - **Two front ends** over the same core, in one executable: the app
   (window, Dock icon) and the command line (D13, D19).
 - **Settings:** one JSON file shared by both front ends (D13).
-- **Output:** a recording folder per recording, holding a display file
-  per display, an audio file per late audio source, and the recording
-  manifest (D12, D20).
+- **Output:** a recording folder per recording, holding the display
+  files of each display, the audio files of each audio source, and the
+  recording manifest (D20, D31).
 
 ## 3. Decisions in force
 
@@ -67,22 +69,28 @@ contributions back to the former upstream (D16).
 
 ### Platform
 
-macOS 26 and later on Apple silicon only (D10). Swift, always on the
-latest released toolchain (D17).
+macOS 26 and later on Apple silicon only (D10). Swift, on the latest
+toolchain that GitHub's generally available runner image offers (D17,
+D28).
 
 ### Recording
 
 - Video: constant 30 fps on the host clock, hardware encoding, and a
-  recording resolution that only ever shrinks the picture (D11); HEVC
-  in `.mov`, no tick ever dropped, a timecode track in every display
-  file (D21); always SDR (D24).
+  recording resolution that only ever shrinks the picture and turns
+  with a portrait display (D11, D25); a display whose frame size
+  changes gets a new display file (D30); HEVC in `.mov`, no tick ever
+  dropped, a timecode track in every file (D21, D31); always SDR (D24).
 - Audio: none, the default microphone or all inputs, with system audio
-  and AGC as separate switches; a file keeps the tracks it started with
-  (D12); every input channel is its own mono track (D22).
+  and AGC as separate switches (D12); one audio file per source, every
+  input channel its own mono track (D22, D31); each display file
+  carries two guide tracks, microphones and system audio, for playback
+  and syncing (D31).
 - A recording folder and one recording manifest per recording;
   recordings into different folders may run in parallel (D20).
 - Safeguards: a ready check before Start, low-disk warnings,
-  crash-safe fragmented files, keeping the Mac awake (D14).
+  crash-safe fragmented files, keeping the Mac awake (D14). The window
+  shows what will be recorded and what it costs in disk space (D26,
+  D33).
 - No network connections; feedback goes to GitHub Issues (D15).
 
 ### Front ends
@@ -99,8 +107,11 @@ v0 arrives as two PRs, the skeleton and pipeline before the recorder
 installable snapshot release, every merge to `main` publishes a GitHub
 release, versions count from the git history and stay 0.x until v1
 (D4); a snapshot release is a pre-release per PR, a release is
-`v0.<commits on main>.0`, and the build script never handles the
-signing secret (D23). Builds
+`v0.<commits on main>.0` (D23). Building and signing run in separate
+jobs: the job that compiles, tests and smoke-tests holds no secret, and
+the signing jobs never compile or run what was built (D29). Scripts
+with logic are Python from the runner image, standard library only
+(D32). Builds
 are signed with one self-signed certificate; Developer ID signing is
 deferred (D5). Agents push work branches and open draft PRs; only the
 owner merges (D8). AI-written commits and PRs say so (D9).

@@ -305,7 +305,9 @@ architect's reading.
 
 ## D18: v0 in two PRs, with three audio features after it (2026-11-12)
 
-- **Status:** in force
+- **Status:** in force; superseded in part by D31 (the audio file for a
+  late audio source is no longer a feature of its own: every audio
+  source has its own audio file)
 - **Context:** Whether one self-signed certificate keeps the
   permissions across updates (D5) decides whether the delivery model
   works at all, and is cheapest to learn before the recorder exists.
