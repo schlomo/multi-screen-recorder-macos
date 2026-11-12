@@ -41,7 +41,9 @@ credited for the reference implementation.
 
 ## 2. Shape
 
-Designed, not built yet: the repository holds no code. The designs:
+The skeleton is built (the app window with the ready check, the
+command line without `record`, the pipeline); recording is designed,
+not built yet. The designs:
 [design/recorder.md](design/recorder.md) and
 [design/delivery.md](design/delivery.md).
 
@@ -73,7 +75,7 @@ latest released toolchain (D17).
 - Video: constant 30 fps on the host clock, hardware encoding, and a
   recording resolution that only ever shrinks the picture (D11); HEVC
   in `.mov`, no tick ever dropped, a timecode track in every display
-  file (D21).
+  file (D21); always SDR (D24).
 - Audio: none, the default microphone or all inputs, with system audio
   and AGC as separate switches; a file keeps the tracks it started with
   (D12); every input channel is its own mono track (D22).

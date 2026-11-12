@@ -401,3 +401,18 @@ architect's reading.
 - **Consequences:** Release numbers can skip. Developer ID signing,
   when it comes, needs an approval step before the signing job.
 - **Evidence:** [design/delivery.md](design/delivery.md).
+
+## D24: Displays are recorded in SDR (2026-11-12)
+
+- **Status:** in force
+- **Context:** The owner asked "what about HDR? maybe we should use
+  what the display does and leave the conversion to the editor?" and,
+  after the architect recommended SDR for v0, ruled: "OK, stay with
+  SDR."
+- **Decision:** Every display is recorded in SDR (HEVC 8-bit), also one
+  in HDR mode; the colour space is tagged. Closes the question D21 left
+  open. The architect's reading: a `dynamicRange` setting is not
+  planned; it is deferred (`backlog.md`).
+- **Consequences:** True HDR highlights are tone-mapped by macOS before
+  they are recorded.
+- **Evidence:** [design/recorder.md](design/recorder.md).

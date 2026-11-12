@@ -2,15 +2,15 @@
 
 ## Next session starts here
 
-The v0 design is agreed (2026-11-12, D17–D23) and written down in
+The v0 design is agreed (2026-11-12, D17–D24) and written down in
 `docs/design/recorder.md` and `docs/design/delivery.md`. v0 arrives as
 two PRs (D18).
 
-In flight: the skeleton and pipeline PR, on the branch
-`v0-skeleton-and-pipeline`. Next for an architect session: get it
-adversarially reviewed, hand its snapshot release to the owner for the
-check under "In flight", then brief the recorder PR. Before that brief,
-the owner decides the open HDR question (queued item 1).
+In flight: the skeleton and pipeline PR (#1, draft), built and
+publishing a signed snapshot release. Next for an architect session:
+finish its adversarial review, hand its snapshot release to the owner
+for the check under "In flight", then, once it is merged, brief the
+recorder PR.
 
 ## In flight
 
@@ -18,10 +18,8 @@ the owner decides the open HDR question (queued item 1).
   the Swift package, the app window with the ready check, `msr list`,
   `check`, `settings` and `version`, the scripts and the pipeline, the
   README's installation and developer setup.
-  - Waiting on the owner: the developer setup in
-    `docs/design/delivery.md` (Xcode licence and selection, the signing
-    certificate, the repository secret). Until the secret exists the
-    pipeline cannot publish.
+  - The developer setup is done on the owner's Mac (2026-11-12): Xcode
+    selected, the signing certificate, the repository secret.
   - The owner's check on the Mac: install the snapshot release, "Open
     Anyway", start the app from Finder, grant both permissions; after a
     further push, install that snapshot release over the first: both
@@ -30,13 +28,14 @@ the owner decides the open HDR question (queued item 1).
 
 ## Queued
 
-1. **Open decision, the owner's: HDR displays.** Record what the
-   display shows (10-bit HDR, conversion left to the editor) or always
-   SDR. The architect's recommendation, not yet agreed: SDR in v0,
-   correctly tagged, with a `dynamicRange` setting to follow. Needed
-   before the recorder PR is briefed.
+1. **Toolchain catch-up** (D17): the pipeline builds with Xcode 26.6
+   and Swift 6.3, the newest on GitHub's generally available runner
+   image, while the owner's Mac has Xcode 27.2. Move the pipeline and
+   the Swift tools version up as soon as a runner image with Xcode 27
+   is generally available.
 2. **Recorder PR** (D18): the recording core, `msr record`, Start and
-   Stop in the app, timecode (D21), mono tracks per channel (D22),
+   Stop in the app, timecode (D21), mono tracks per channel (D22), SDR
+   with the colour space tagged (D24),
    `scripts/acceptance/`. The system audio stream needs a display to
    attach to and must move when that display disappears.
 3. **Audio after v0** (D12, D18), each its own PR: the audio mode all
@@ -83,6 +82,8 @@ the owner decides the open HDR question (queued item 1).
   before the signing job (D23).
 - **Interface languages other than English** (D13). Revisit when users
   ask for one.
+- **A `dynamicRange` setting** to record an HDR display as HDR (D24).
+  Revisit when the owner records content whose HDR highlights matter.
 - **Rust**, also as a core under a Swift shell (D17). Revisit for a
   Linux or Windows version, or for encoder or container code of our
   own.

@@ -62,7 +62,7 @@ ok    Screen & System Audio Recording permission
 ok    Microphone permission
 ok    Displays: 2
 ok    Audio: MacBook Pro Microphone (default), system audio
-FAIL  Free disk space: 3.1 GB in ~/Movies/Multi Screen Recorder, 4.0 GB needed for 2 hours
+FAIL  Free disk space: 3.1 GB in ~/Movies/Multi Screen Recorder, 3.7 GB needed for 2 hours
       Fix: free up space, or lower --ready-check-hours
 Not ready.
 ```
@@ -207,7 +207,9 @@ later-starting file by timecode.
 **Encoding (D21, values are *data*).** HEVC 8-bit through the hardware
 encoder in `.mov`; keyframe every 2 s; quality-targeted variable bit
 rate with a ceiling. Audio AAC-LC at 48 kHz, 128 kbit/s per mono track,
-192 kbit/s for system audio. Apple's `SCRecordingOutput` is not used:
+192 kbit/s for system audio. Every display is recorded in SDR, also one
+in HDR mode, with its colour space tagged so editors show the colours
+unchanged (D24). Apple's `SCRecordingOutput` is not used:
 it writes a variable frame rate with its own track layout.
 
 **Crash safety (D14, D21).** Files are written in fragments of 2 s
@@ -282,6 +284,9 @@ with `ffprobe`, and by the v1 gate.
 - **Mixing an input down to mono or stereo:** channels may carry
   different people (D22).
 - **A notification for low disk space:** see "The app".
+- **Recording HDR displays as HDR:** files of mixed kinds on one
+  timeline, larger files, and weak support outside DaVinci Resolve, for
+  content that is rarely HDR (D24).
 - **Sequenced after v0** (D18, `backlog.md`): audio mode `all-inputs`,
   the audio file for a late audio source (until then a source that
   appears mid-recording is logged as an event and joins at the next new
@@ -291,8 +296,7 @@ with `ffprobe`, and by the v1 gate.
 
 ## Open questions
 
-- **HDR displays:** record what the display shows (10-bit HDR) or always
-  SDR. Open until the owner decides; tracked in `backlog.md`.
+None.
 
 ## Build state
 
