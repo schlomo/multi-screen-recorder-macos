@@ -17,18 +17,24 @@ runs headless, without arguments it is the app. One binary means one
 code signature and one set of permissions.
 
 `/Applications/Multi Screen Recorder.app/Contents/MacOS/msr`; the
-README shows how to link it into a folder on the `PATH`.
+README shows how to link it into a folder on the `PATH`. Started
+through a symbolic link, `msr` re-executes itself at its fully resolved
+real path with the same arguments, so it finds its app bundle (version,
+signature); if that fails it exits 71 (`EX_OSERR`).
 
 | Command | Does | Exit code |
 |---|---|---|
-| `msr list` | Shows displays, audio inputs and system audio | 0 |
+| `msr list` | Shows displays, audio inputs and system audio | 0, 1 when a display or audio input cannot be read |
 | `msr check [flags]` | Runs the ready check and prints each item | 0 ready, 1 not ready |
 | `msr record [flags] [--duration 1h30m]` | Ready check, then records until Ctrl-C, SIGTERM, SIGHUP or the duration; prints the recording folder at the start and a summary at the end | 0 ok, 1 not ready, 3 ended with an error |
 | `msr settings [flags] [--save]` | Prints the effective settings as JSON; `--save` writes the flags into the settings file | 0 |
 | `msr version` | Prints the version and commit | 0 |
 
 A usage error (unknown command or flag, invalid value) prints a usage
-message and exits 64, the convention of Swift Argument Parser.
+message and exits 64, the convention of Swift Argument Parser. Every
+command that reads the settings (all but `msr version`) exits 78
+(`EX_CONFIG`) when the settings file cannot be used or `HOME` is not
+set, so `msr check` exiting 1 means only "not ready".
 
 Each flag is a settings key in kebab case and overrides it for this run
 only:

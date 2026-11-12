@@ -70,10 +70,13 @@ your `PATH`, for example `~/bin` if that is on yours:
 ln -s "/Applications/Multi Screen Recorder.app/Contents/MacOS/msr" ~/bin/msr
 ```
 
+Started through the link, `msr` re-executes itself from inside the app,
+so it shows the app's version and runs with its signature.
+
 | Command | Does |
 |---|---|
 | `msr list` | Shows displays, audio inputs and system audio |
-| `msr check [flags]` | Runs the ready check; exits 0 when ready, 1 when not |
+| `msr check [flags]` | Runs the ready check; exits 0 when ready, 1 when not; creates the output folder if it is missing |
 | `msr settings [flags] [--save]` | Prints the effective settings as JSON; `--save` writes the flags into the settings file |
 | `msr version` | Prints the version and commit |
 
@@ -83,8 +86,9 @@ Each flag overrides a setting for this run only: `--resolution`
 `--output-folder`, `--required-recording-hours`, `--low-disk-warning-minutes`.
 A usage error exits 64. The settings live in
 `~/Library/Application Support/Multi Screen Recorder/settings.json`; an
-unknown key or invalid value there stops every command with an error
-naming the key (exit 1), and the app offers "Reset to defaults".
+unknown key or invalid value there stops every command that reads the
+settings (all but `msr version`) with an error naming the key, exit
+78, and the app offers "Reset to defaults".
 
 ```sh
 msr check --audio-mode none --required-recording-hours 4

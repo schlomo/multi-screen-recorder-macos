@@ -7,7 +7,10 @@ struct CommandLineInterface: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "msr",
         abstract: "Multi Screen Recorder: records every display and audio source.",
-        discussion: "Without arguments, msr starts the app.",
+        discussion: """
+            Without arguments, msr starts the app. A settings file that cannot be used, \
+            or an unset HOME, makes every command that reads the settings exit 78.
+            """,
         subcommands: [List.self, Check.self, SettingsCommand.self, Version.self]
     )
 }
@@ -54,12 +57,33 @@ struct SettingsFlags: ParsableArguments {
 
     /// The settings file with these flags applied.
     func effectiveSettings(from file: SettingsFile) throws -> Settings {
-        try file.load().applying(flags: values)
+        try readingSettings { try file.load().applying(flags: values) }
     }
 }
 
+/// EX_CONFIG from sysexits: the settings cannot be used. Exit 1 stays
+/// "not ready" for `msr check`.
+let unusableSettingsExitCode = ExitCode(78)
+
+/// Runs a step that reads or writes the settings; a settings file that cannot
+/// be used, or an unset HOME, prints its error and exits 78.
+func readingSettings<Value>(_ step: () throws -> Value) throws -> Value {
+    do {
+        return try step()
+    } catch let error as SettingsFileError {
+        try stopForUnusableSettings(error)
+    } catch let error as MissingHomeFolderError {
+        try stopForUnusableSettings(error)
+    }
+}
+
+private func stopForUnusableSettings(_ error: some Error & CustomStringConvertible) throws -> Never {
+    FileHandle.standardError.write(Data("Error: \(error)\n".utf8))
+    throw unusableSettingsExitCode
+}
+
 private func standardSettingsFile() throws -> SettingsFile {
-    SettingsFile.standard(homeFolder: try homeFolder())
+    try readingSettings { SettingsFile.standard(homeFolder: try homeFolder()) }
 }
 
 extension CommandLineInterface {
@@ -68,7 +92,8 @@ extension CommandLineInterface {
             abstract: "Show displays, audio inputs and system audio.")
 
         func run() async throws {
-            let settings = try standardSettingsFile().load()
+            let file = try standardSettingsFile()
+            let settings = try readingSettings { try file.load() }
             let displays = try await currentDisplays()
             print(renderList(
                 displays: numberDisplays(displays),
@@ -82,13 +107,14 @@ extension CommandLineInterface {
     struct Check: AsyncParsableCommand {
         static let configuration = CommandConfiguration(
             abstract: "Run the ready check and print each item.",
-            discussion: "Exits 0 when ready, 1 when not.")
+            discussion: "Exits 0 when ready, 1 when not, 78 when the settings cannot be used.")
 
         @OptionGroup var flags: SettingsFlags
 
         func run() async throws {
             let settings = try flags.effectiveSettings(from: standardSettingsFile())
-            let result = await runReadyCheck(settings: settings, homeFolder: try homeFolder())
+            let home = try readingSettings { try homeFolder() }
+            let result = await runReadyCheck(settings: settings, homeFolder: home)
             print(result.text, terminator: "")
             if !result.isReady { throw ExitCode(1) }
         }
@@ -107,7 +133,7 @@ extension CommandLineInterface {
         func run() async throws {
             let file = try standardSettingsFile()
             let settings = try flags.effectiveSettings(from: file)
-            if save { try file.save(settings) }
+            if save { try readingSettings { try file.save(settings) } }
             print(settings.json, terminator: "")
         }
     }
