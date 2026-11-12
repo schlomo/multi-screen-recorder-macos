@@ -436,10 +436,13 @@ architect's reading.
   (5) the settings file is found through `HOME`; (6) the disk estimate
   follows its rule, scaled by each frame's pixel count, so the design's
   example reads 3.7 GB, not 4.0 GB; (7) the recording resolution box
-  rotates for a portrait display: 2160×3840 at 1080p records 1080×1920,
-  not 606×1080.
-- **Consequences:** A portrait display file is as sharp as a landscape
-  one at the same recording resolution, and larger than before.
+  rotates for a portrait display. The architect's reading of the
+  owner's question on portrait displays, turned into the rule: a
+  display taller than wide uses the box turned upright, so 2160×3840 at
+  1080p records 1080×1920, not 606×1080.
+- **Consequences:** The architect's reading: a portrait display file is
+  as sharp as a landscape one at the same recording resolution, and
+  larger than before.
 - **Evidence:** [PR #1](https://github.com/schlomo/multi-screen-recorder-macos/pull/1),
   [design/recorder.md](design/recorder.md) "Build state".
 
