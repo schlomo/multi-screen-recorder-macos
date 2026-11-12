@@ -218,7 +218,9 @@ most the last 2 s.
 
 **Frame size (D11).** Fixed when a display file starts: the display's
 pixel size shrunk into the recording resolution box, proportions kept,
-never enlarged, each side rounded down to an even number. A display
+never enlarged, each side rounded down to an even number. The box turns
+with a portrait display (taller than wide): at 1080p a 2160×3840
+display records at 1080×1920 (D25). A display
 that changes mid-file keeps the frame size: a larger picture is shrunk
 to fit, a smaller or reshaped one is centred with black borders.
 

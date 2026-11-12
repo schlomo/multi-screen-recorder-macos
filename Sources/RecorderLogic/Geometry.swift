@@ -10,6 +10,10 @@ public struct FrameSize: Equatable, Hashable, Sendable, CustomStringConvertible 
 
     public var pixelCount: Int { width * height }
 
+    var isPortrait: Bool { height > width }
+
+    var rotated: FrameSize { FrameSize(width: height, height: width) }
+
     public var description: String { "\(width)×\(height)" }
 }
 
@@ -35,10 +39,10 @@ public enum RecordingResolution: String, CaseIterable, Sendable {
     }
 
     /// The frame size of a display file: the display's pixel size shrunk into
-    /// the box with its proportions kept, never enlarged, each side rounded
-    /// down to an even number.
+    /// the box, turned upright for a portrait display, with its proportions
+    /// kept, never enlarged, each side rounded down to an even number.
     public func frameSize(forDisplay display: FrameSize) -> FrameSize {
-        let fitted = box.map { fit(display, into: $0) } ?? display
+        let fitted = box.map { fit(display, into: display.isPortrait ? $0.rotated : $0) } ?? display
         return FrameSize(width: roundedDownToEven(fitted.width), height: roundedDownToEven(fitted.height))
     }
 }

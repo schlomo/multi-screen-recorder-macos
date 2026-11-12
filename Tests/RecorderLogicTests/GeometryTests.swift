@@ -66,9 +66,22 @@ import Testing
             == FrameSize(width: 1000, height: 998))
     }
 
-    @Test func aPortraitDisplayIsShrunkIntoTheSameBox() {
+    @Test(arguments: [
+        (RecordingResolution.native, FrameSize(width: 2160, height: 3840)),
+        (.uhd4k, FrameSize(width: 2160, height: 3840)),
+        (.p1440, FrameSize(width: 1440, height: 2560)),
+        (.p1200, FrameSize(width: 1080, height: 1920)),
+        (.p1080, FrameSize(width: 1080, height: 1920)),
+        (.p720, FrameSize(width: 720, height: 1280)),
+    ])
+    func aPortraitDisplayIsShrunkIntoTheRotatedBox(resolution: RecordingResolution, expected: FrameSize) {
         let portrait = FrameSize(width: 2160, height: 3840)
-        #expect(RecordingResolution.p1080.frameSize(forDisplay: portrait) == FrameSize(width: 606, height: 1080))
+        #expect(resolution.frameSize(forDisplay: portrait) == expected)
+    }
+
+    @Test func aSquareDisplayUsesTheLandscapeBox() {
+        let square = FrameSize(width: 2000, height: 2000)
+        #expect(RecordingResolution.p1080.frameSize(forDisplay: square) == FrameSize(width: 1080, height: 1080))
     }
 
     @Test func keepsProportionsWithinRounding() {

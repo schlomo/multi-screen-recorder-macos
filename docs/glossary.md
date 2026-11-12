@@ -95,7 +95,8 @@ started; it joins the display files at their next new file (D12).
 ## Recording resolution
 
 The maximum box a display's picture is shrunk to fit: Native, 4K,
-1440p, 1200p, 1080p or 720p. It never enlarges the picture (D11).
+1440p, 1200p, 1080p or 720p, turned upright for a portrait display. It
+never enlarges the picture (D11, D25).
 
 ## Ready check
 
