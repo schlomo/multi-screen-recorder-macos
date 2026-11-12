@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # Publishes the release for a merge to main: tag v<version>, with the zip that
-# scripts/build-app and scripts/sign-app made with RELEASE_BUILD=true. gh reads
-# GH_TOKEN itself.
+# scripts/sign-app made with RELEASE_BUILD=true; the version is read from the
+# bundle, where scripts/build-app wrote it. gh reads GH_TOKEN itself.
 set -euo pipefail
 
-for tool in gh git; do
+for tool in gh git plutil; do
     command -v "$tool" >/dev/null || { echo "scripts/publish-release: $tool is not on the PATH" >&2; exit 1; }
 done
 if [[ "${RELEASE_BUILD:-}" != "true" ]]; then
@@ -13,7 +13,7 @@ if [[ "${RELEASE_BUILD:-}" != "true" ]]; then
 fi
 
 cd "$(dirname "$0")/.."
-version="$(scripts/version)"
+version="$(plutil -extract MSRVersion raw "build/Multi Screen Recorder.app/Contents/Info.plist")"
 zip="build/Multi Screen Recorder ${version}.zip"
 if [[ ! -f "$zip" ]]; then
     echo "scripts/publish-release: $zip does not exist; run scripts/build-app and scripts/sign-app first" >&2

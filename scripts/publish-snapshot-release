@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
 # Creates or replaces the snapshot release of PR PR_NUMBER: a GitHub
-# pre-release tagged pr-<number> with the zip from scripts/sign-app. Only
+# pre-release tagged pr-<number> with the zip from scripts/sign-app, its
+# version read from the bundle, where scripts/build-app wrote it. Only
 # while the PR is open and its head is this commit: a run for a superseded
 # push or a closed PR publishes nothing and exits 0. gh reads GH_TOKEN itself.
 set -euo pipefail
 
-for tool in gh git; do
+for tool in gh git plutil; do
     command -v "$tool" >/dev/null || { echo "scripts/publish-snapshot-release: $tool is not on the PATH" >&2; exit 1; }
 done
 if [[ -z "${PR_NUMBER:-}" ]]; then
@@ -14,7 +15,7 @@ if [[ -z "${PR_NUMBER:-}" ]]; then
 fi
 
 cd "$(dirname "$0")/.."
-version="$(scripts/version)"
+version="$(plutil -extract MSRVersion raw "build/Multi Screen Recorder.app/Contents/Info.plist")"
 zip="build/Multi Screen Recorder ${version}.zip"
 tag="pr-${PR_NUMBER}"
 if [[ ! -f "$zip" ]]; then

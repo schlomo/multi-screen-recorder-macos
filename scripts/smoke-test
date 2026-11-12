@@ -5,7 +5,7 @@
 set -euo pipefail
 
 me="scripts/smoke-test"
-for tool in git mktemp grep; do
+for tool in git mktemp grep plutil; do
     command -v "$tool" >/dev/null || { echo "$me: $tool is not on the PATH" >&2; exit 1; }
 done
 
@@ -15,7 +15,8 @@ if [[ ! -x "$msr" ]]; then
     echo "$me: $msr does not exist; run scripts/build-app first" >&2
     exit 1
 fi
-expected_version="$(scripts/version) ($(git rev-parse --short=7 HEAD))"
+bundled_version="$(plutil -extract MSRVersion raw "build/Multi Screen Recorder.app/Contents/Info.plist")"
+expected_version="$bundled_version ($(git rev-parse --short=7 HEAD))"
 
 scratch="$(mktemp -d)"
 trap 'rm -rf "$scratch"' EXIT

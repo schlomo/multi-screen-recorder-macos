@@ -3,8 +3,13 @@
 # SIGNING_IDENTITY (default "Multi Screen Recorder Signing"), which codesign
 # matches as a substring of the certificate's name in the keychain; this
 # script never sees a secret. SIGNING_IDENTITY=- signs ad hoc, for a local
-# check only. Then checks the signed bundle statically, reading it as data and
-# executing nothing from it, and zips it into build/.
+# check only. Reads the bundle as data and executes nothing from it: first the
+# checks that need no signature, then signing, then the signature's checks;
+# then zips it into build/. The version comes from the bundle, where
+# scripts/build-app wrote it; it must have the form for this build:
+#   PR_NUMBER=<n>       0.<N>.0-pr<n>+<commit>
+#   RELEASE_BUILD=true  0.<N>.0
+#   neither             0.<N>.0-dev+<commit>
 set -euo pipefail
 
 me="scripts/sign-app"
@@ -12,22 +17,43 @@ for tool in codesign plutil ditto git; do
     command -v "$tool" >/dev/null || { echo "$me: $tool is not on the PATH" >&2; exit 1; }
 done
 
-cd "$(dirname "$0")/.."
-identity="${SIGNING_IDENTITY:-Multi Screen Recorder Signing}"
-version="$(scripts/version)"
-app="build/Multi Screen Recorder.app"
-zip="build/Multi Screen Recorder ${version}.zip"
-identifier="org.schapiro.multiscreenrecorder"
-runtime_flag=$((0x10000))
-if [[ ! -d "$app" ]]; then
-    echo "$me: $app does not exist; run scripts/build-app (or scripts/unpack-app in CI) first" >&2
-    exit 1
-fi
-
 stop() {
     echo "$me: $1" >&2
     exit 1
 }
+
+cd "$(dirname "$0")/.."
+identity="${SIGNING_IDENTITY:-Multi Screen Recorder Signing}"
+release_build="${RELEASE_BUILD:-}"
+pr_number="${PR_NUMBER:-}"
+app="build/Multi Screen Recorder.app"
+plist="$app/Contents/Info.plist"
+identifier="org.schapiro.multiscreenrecorder"
+runtime_flag=$((0x10000))
+
+[[ -z "$release_build" || "$release_build" == "true" ]] \
+    || stop "RELEASE_BUILD must be true or unset, not '$release_build'"
+[[ -z "$release_build" || -z "$pr_number" ]] || stop "RELEASE_BUILD and PR_NUMBER exclude each other"
+[[ -z "$pr_number" || "$pr_number" =~ ^[1-9][0-9]*$ ]] || stop "PR_NUMBER must be a number, not '$pr_number'"
+[[ -d "$app" && ! -L "$app" ]] \
+    || stop "$app does not exist; run scripts/build-app (or scripts/unpack-app in CI) first"
+
+head="$(git rev-parse --short=7 HEAD)"
+version="$(plutil -extract MSRVersion raw "$plist")" || stop "the bundle's Info.plist has no MSRVersion"
+commit="$(plutil -extract MSRCommit raw "$plist")" || stop "the bundle's Info.plist has no MSRCommit"
+bundle_identifier="$(plutil -extract CFBundleIdentifier raw "$plist")" \
+    || stop "the bundle's Info.plist has no CFBundleIdentifier"
+[[ "$commit" == "$head" ]] || stop "the bundle was built from $commit, but HEAD is $head"
+[[ "$bundle_identifier" == "$identifier" ]] || stop "the bundle's identifier is $bundle_identifier, not $identifier"
+if [[ -n "$pr_number" ]]; then
+    version_pattern="^0\.[1-9][0-9]*\.0-pr${pr_number}\+${head}$"
+elif [[ -n "$release_build" ]]; then
+    version_pattern='^0\.[1-9][0-9]*\.0$'
+else
+    version_pattern="^0\.[1-9][0-9]*\.0-dev\+${head}$"
+fi
+[[ "$version" =~ $version_pattern ]] || stop "the bundle's version $version does not have the form ${version_pattern}"
+zip="build/Multi Screen Recorder ${version}.zip"
 
 rm -f "$zip"
 codesign --force --options runtime --timestamp=none \
@@ -36,7 +62,7 @@ codesign --force --options runtime --timestamp=none \
 
 codesign --verify --deep --strict "$app" || stop "the signature does not verify"
 codesign --verify --test-requirement="=identifier \"$identifier\"" "$app" \
-    || stop "the identifier is not $identifier"
+    || stop "the signed identifier is not $identifier"
 
 details="$(codesign --display --verbose=2 "$app" 2>&1)"
 flags_pattern='flags=0x([0-9a-fA-F]+)'
@@ -47,10 +73,6 @@ entitlements="$(codesign --display --entitlements - --xml "$app" 2>/dev/null | p
 expected_entitlements="$(plutil -convert json -o - Resources/msr.entitlements)"
 [[ "$entitlements" == "$expected_entitlements" ]] \
     || stop "the entitlements are $entitlements, not $expected_entitlements"
-
-bundled_version="$(plutil -extract MSRVersion raw "$app/Contents/Info.plist")"
-[[ "$bundled_version" == "$version" ]] \
-    || stop "the bundle's version is $bundled_version, but this commit's is $version"
 
 ditto -c -k --keepParent "$app" "$zip"
 echo "$zip"

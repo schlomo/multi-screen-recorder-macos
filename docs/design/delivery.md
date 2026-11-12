@@ -14,12 +14,12 @@ in CI:
 
 | Script | Does |
 |---|---|
-| `scripts/test` | Runs the unit tests, and the tests that run `msr`, `scripts/version` and `scripts/unpack-app` as commands |
+| `scripts/test` | Runs the unit tests, and the tests that run `msr`, `scripts/version`, `scripts/unpack-app` and `scripts/sign-app` as commands |
 | `scripts/version` | Prints the version of the current checkout; stops on a shallow clone |
 | `scripts/build-app` | Compiles `msr`, assembles the app bundle in `build/`, signs it ad hoc with the real signing's options, and archives it as `build/msr-app.tar` |
 | `scripts/smoke-test` | Runs the bundled `msr` with a scratch `HOME`: version (also through a symbolic link), settings, `--save`, exit 78 and exit 64; nothing that needs a permission, a display or a microphone |
 | `scripts/unpack-app` | Unpacks the app archive into an empty `build/`, refusing absolute paths, `..`, anything outside the bundle and symbolic links pointing out of it |
-| `scripts/sign-app` | Re-signs the app bundle, checks the signature, identifier, hardened runtime, entitlements and version statically, and zips it into `build/` |
+| `scripts/sign-app` | Checks the bundle's version, commit and identifier, re-signs it, checks the signature, identifier, hardened runtime and entitlements, and zips it into `build/` |
 | `scripts/ci-import-signing-certificate` | CI only: puts the certificate from the secret into a temporary keychain |
 | `scripts/publish-snapshot-release` | Creates or replaces a PR's snapshot release |
 | `scripts/remove-snapshot-release` | Removes a closed PR's snapshot release |
@@ -82,6 +82,10 @@ or a closed PR publishes nothing and succeeds.
 
 N grows with every commit on `main`, including Markdown-only ones that
 publish nothing, so release numbers can skip but never repeat. The
+version is computed once, by `scripts/version` in `scripts/build-app`,
+and written into the bundle's `Info.plist` (`MSRVersion`, `MSRCommit`);
+every later script reads it from there as data, so a push to `main`
+between the build job and the signing job cannot change it. The
 bundle's short version is the numeric part; `msr version` and the About
 window show the full string. 1.0 comes when the owner declares v1.
 
@@ -98,12 +102,16 @@ password) into a temporary keychain, the key non-extractable, in a
 signing job that never compiles (D29). It is the one place that reads
 the secret, because macOS has no tool that reads a certificate from the
 environment itself (D28). A missing secret or identity stops with an
-error. After signing, `scripts/sign-app` stops on any miss among:
-`codesign --verify --deep --strict`; the identifier
-`org.schapiro.multiscreenrecorder`; the hardened runtime flag; the
-entitlements equal to `Resources/msr.entitlements` (audio input); the
-`MSRVersion` in the bundle's `Info.plist` equal to what
-`scripts/version` gives for the checked-out commit. The hardened
+error. Before the key is used, `scripts/sign-app` stops on any miss
+among: the bundle is a folder; its `Info.plist` names the commit that
+is checked out (`MSRCommit`), the identifier
+`org.schapiro.multiscreenrecorder`, and a version (`MSRVersion`) of
+the form for this build: with `PR_NUMBER` the snapshot form for exactly
+that PR and commit, with `RELEASE_BUILD=true` the release form
+`0.<N>.0`, otherwise the local form. After signing it stops on any
+miss among: `codesign --verify --deep --strict`; the signed identifier;
+the hardened runtime flag; the entitlements equal to
+`Resources/msr.entitlements` (audio input). The hardened
 runtime is on, with the audio-input entitlement, so behaviour does not
 change when Developer ID signing arrives. `scripts/build-app` already
 signs ad hoc with the same options, so the smoke-tested bundle and the
