@@ -13,7 +13,7 @@ public func probeReadyCheckFacts(settings: Settings, homeFolder: URL) async -> R
         screenRecording: await probeScreenRecording(),
         microphone: settings.audioMode == .none ? nil : await probeMicrophone(),
         displays: Result { () throws(DeviceReadError) in try currentDisplays() },
-        audioInputs: Result { () throws(DeviceReadError) in try currentAudioInputs() },
+        audioInputs: currentAudioInputs(),
         outputFolder: probeOutputFolder(settings.outputFolderURL(homeFolder: homeFolder)))
 }
 

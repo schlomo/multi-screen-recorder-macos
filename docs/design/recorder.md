@@ -24,7 +24,7 @@ signature); if that fails it exits 71 (`EX_OSERR`).
 
 | Command | Does | Exit code |
 |---|---|---|
-| `msr list` | Shows displays, audio inputs and system audio | 0, 1 when a display or audio input cannot be read |
+| `msr list` | Shows displays, audio inputs and system audio | 0, 1 when a display or an audio input the settings record cannot be read |
 | `msr check [flags]` | Runs the ready check and prints each item | 0 ready, 1 not ready |
 | `msr record [flags] [--duration 1h30m]` | Ready check, then records until Ctrl-C, SIGTERM, SIGHUP or the duration; prints the recording folder at the start and a summary at the end | 0 ok, 1 not ready, 3 ended with an error |
 | `msr settings [flags] [--save]` | Prints the effective settings as JSON; `--save` writes the flags into the settings file | 0 |
@@ -106,9 +106,9 @@ once its feature exists (no `agc` key until AGC is built).
 
 Items, in this order: the Screen & System Audio Recording permission,
 the Microphone permission (unless the audio mode is `none`), the
-displays (at least one, each readable), the chosen audio sources (the
-audio inputs readable when the audio mode records one), the output
-folder, and free disk space in the output folder for
+displays (at least one, each readable), the chosen audio sources (each
+audio input the audio mode records readable; another that cannot be
+read does not count), the output folder, and free disk space in the output folder for
 `requiredRecordingHours`.
 
 - A permission that was never asked for is requested, so macOS shows
@@ -131,7 +131,7 @@ folder, and free disk space in the output folder for
   is 2.2 GB per hour, 4.3 GB for 2 hours (the tables in "The app" show
   each file).
 - One cause, one red item: when the output folder fails, or the
-  displays or the audio inputs the recording needs cannot be read, the
+  displays or an audio input the recording records cannot be read, the
   free disk space item is left out.
 - In the app the check runs when the window opens, when the app becomes
   active again (unless a check is still running), after every settings
@@ -147,9 +147,8 @@ One recording folder per recording, named by its local start time
 ~/Movies/Multi Screen Recorder/2026-11-12 14.03.05/
   2026-11-12 14.03.05 Display 1 - Built-in Retina Display.mov
   2026-11-12 14.03.05 Display 2 - LG HDR 4K.mov
-  2026-11-12 14.03.05 Microphone - RØDE Wireless GO II RX.mov
+  2026-11-12 14.03.05 Microphone - MacBook Pro Microphone.mov
   2026-11-12 14.03.05 System audio.mov
-  2026-11-12 14.19.52 Microphone - RØDE Wireless GO II RX.mov    ← back after its receiver was switched off
   2026-11-12 14.27.41 Display 2 - LG HDR 4K.mov    ← back after a reconnect
   2026-11-12 14.41.10 Display 1 - Built-in Retina Display.mov    ← new frame size after a mode change
   recording.json
@@ -158,8 +157,8 @@ One recording folder per recording, named by its local start time
 One file per source, each named by its own start time (D31): a display
 file per display, an audio file per recorded audio input
 (`<date time> Microphone - <device name>.mov`) and one for system audio
-(`<date time> System audio.mov`). Here the default microphone is the
-RØDE receiver.
+(`<date time> System audio.mov`). The manifest below lists exactly
+these files.
 
 Display 1 is the main display; the others are numbered left to right,
 later arrivals in order of appearance. A display keeps its number for
@@ -180,20 +179,31 @@ every change:
       "display": "Built-in Retina Display",
       "frameSize": [1670, 1080],
       "start": 0.0,
-      "end": null,
+      "end": 2285.0,
       "timecode": "14:03:05:04",
-      "state": "recording",
+      "state": "finalized",
       "guideTracks": ["Microphones", "System audio"],
       "framesRepeatedForLateness": 0
     },
     {
-      "name": "2026-11-12 14.03.05 Microphone - RØDE Wireless GO II RX.mov",
-      "audioSource": "RØDE Wireless GO II RX",
-      "channels": 2,
+      "name": "2026-11-12 14.03.05 Display 2 - LG HDR 4K.mov",
+      "display": "LG HDR 4K",
+      "frameSize": [1920, 1080],
       "start": 0.0,
-      "end": 912.4,
+      "end": 1446.2,
       "timecode": "14:03:05:04",
-      "state": "finalized"
+      "state": "finalized",
+      "guideTracks": ["Microphones", "System audio"],
+      "framesRepeatedForLateness": 0
+    },
+    {
+      "name": "2026-11-12 14.03.05 Microphone - MacBook Pro Microphone.mov",
+      "audioSource": "MacBook Pro Microphone",
+      "channels": 1,
+      "start": 0.0,
+      "end": null,
+      "timecode": "14:03:05:04",
+      "state": "recording"
     },
     {
       "name": "2026-11-12 14.03.05 System audio.mov",
@@ -203,11 +213,31 @@ every change:
       "end": null,
       "timecode": "14:03:05:04",
       "state": "recording"
+    },
+    {
+      "name": "2026-11-12 14.27.41 Display 2 - LG HDR 4K.mov",
+      "display": "LG HDR 4K",
+      "frameSize": [1920, 1080],
+      "start": 1476.0,
+      "end": null,
+      "timecode": "14:27:41:04",
+      "state": "recording",
+      "guideTracks": ["Microphones", "System audio"],
+      "framesRepeatedForLateness": 0
+    },
+    {
+      "name": "2026-11-12 14.41.10 Display 1 - Built-in Retina Display.mov",
+      "display": "Built-in Retina Display",
+      "frameSize": [1662, 1080],
+      "start": 2285.0,
+      "end": null,
+      "timecode": "14:41:10:04",
+      "state": "recording",
+      "guideTracks": ["Microphones", "System audio"],
+      "framesRepeatedForLateness": 0
     }
   ],
   "events": [
-    { "at": 912.4, "event": "audio input disconnected", "audioSource": "RØDE Wireless GO II RX" },
-    { "at": 1007.0, "event": "audio input connected", "audioSource": "RØDE Wireless GO II RX" },
     { "at": 1446.2, "event": "display disconnected", "display": "LG HDR 4K" },
     { "at": 2285.0, "event": "display frame size changed", "display": "Built-in Retina Display",
       "from": [1670, 1080], "to": [1662, 1080] }
@@ -254,9 +284,12 @@ manifest's state to `not finalized` and remove the marker.
     space is unknown (the ready check has not finished yet, or its
     output folder item failed).
   - Below, the output folder and "Recording continues when displays or
-    audio sources change." If the devices cannot be read, the section
-    shows that error once instead of the tables and the total; the
-    ready check's items stay as they are.
+    audio sources change." If the displays cannot be read, that error
+    stands in place of the Displays table; an audio input whose
+    channels cannot be read shows "cannot be read" in the Channels
+    column (and "unknown" GB/h if it is recorded). The total line
+    appears only when the displays and every recorded audio input can
+    be read. The ready check's items stay as they are.
 
   Then the recording resolution, audio mode, system audio and output
   folder; the ready check, with "Check again"; and Start. All green,
@@ -334,12 +367,12 @@ display's pixel size fitted into the recording resolution box:
 proportions kept, never enlarged, each side rounded down to an even
 number. The box turns with a portrait display (taller than wide): at
 1080p a 2160×3840 display records at 1080×1920 (D25). While a
-display's fitted frame size stays the same, its file continues,
-whatever else changed about the display. When the fitted frame size
-changes, the display's current file ends and a new file starts at the
+display's frame size stays the same, its file continues, whatever
+else changed about the display. When the frame size changes, the display's current file ends and a new file starts at the
 new frame size, like after a reconnect, with the event `display frame
 size changed` (the display, the old and the new frame size) in the
-manifest. At `native` every pixel-size change is such a change; at
+manifest. At `native` the frame size is the pixel size rounded down
+to even numbers, so nearly every pixel-size change is such a change; at
 `1080p` a change from 3840×2160 to 5120×2880 is not (both give
 1920×1080), while 3440×1440 to 1920×1080 is (1920×802 to 1920×1080).
 The cost: a gap of under one second at the change in that display's
@@ -352,10 +385,17 @@ display files. Each recorded audio input gets its own audio file, a
 `.mov` with one mono track per channel, named
 `Microphone: <device>, channel <n>`; system audio gets its own audio
 file with one stereo track. Both carry the timecode track. An audio
-input that appears starts its audio file then (event `audio input
-connected`); one that disappears ends its file (event `audio input
-disconnected`); an audio file is never padded with silence, and a
-display event never touches an audio file. For playback and waveform
+file starts on a tick of the shared grid, so its timecode is exact. An
+audio input that appears starts its audio file then (event `audio
+input connected`); one that disappears ends its file (event `audio
+input disconnected`); one whose channel count changes ends its audio
+file and starts a new one. System audio's file has the events `system
+audio started` and `system audio stopped`. An audio file is never
+padded with silence, and a display event never touches an audio file.
+A failing audio stream and a full disk are handled for an audio file as
+for a display file (below): the file ends, the stream is restarted
+with the same back-off, and a new audio file starts once there is
+room. For playback and waveform
 sync, every display file also carries guide tracks: "Microphones", one
 mono mix of all recorded microphone channels, unless the audio mode is
 `none`; "System audio", stereo, unless system audio is off. The two are
@@ -375,7 +415,7 @@ gap is an event in the manifest.
 **Disk (D14).** Below the warning threshold: the warning. A writer that
 fails on a full disk ends its file, readable up to the last fragment;
 the recorder checks free space every 5 s and starts new display files
-once there is room. Nothing written is ever deleted.
+and audio files once there is room. Nothing written is ever deleted.
 
 **Keep awake (D14).** A power assertion against idle system and
 display sleep while recording.
@@ -451,6 +491,15 @@ with `ffprobe`, and by the v1 gate.
 - Unproven until the owner's first real recording (D31): that DaVinci
   Resolve reads the timecode of an audio-only `.mov`, and how Kdenlive
   places the display files and audio files.
+- What happens when the default microphone changes during a recording
+  (the owner will rule).
+- Whether `AVAssetWriter` writes a timecode track into an audio-only
+  fragmented `.mov`.
+- How drift between an audio device's clock and the tick grid is
+  handled over hours.
+- Two audio inputs with the same name.
+- Characters in a device name that a file name cannot hold.
+- The gain of the guide track "Microphones".
 
 ## Build state
 
@@ -481,8 +530,9 @@ Further details, as built and decided by the architect for PR #1: an
 unset `HOME` exits 78 like an unusable settings file; `msr` that cannot re-execute
 itself at its real path exits 71. When the displays cannot be read,
 the free disk space item is left out, as when the output folder fails.
-The ready check reads the audio inputs, so the disk estimate counts
-the default microphone's channels; when they cannot be read and the
-audio mode records one, the audio item fails with "reconnect the audio
-inputs, then check again". When the free space cannot be read, the fix says "choose an
+The ready check reads each audio input by itself, so the disk estimate
+counts the default microphone's channels; when the channels of an input
+the audio mode records cannot be read, the audio item fails with
+"reconnect the audio inputs, then check again", and an input that is not
+recorded never fails the check or `msr list`. When the free space cannot be read, the fix says "choose an
 output folder on another disk".

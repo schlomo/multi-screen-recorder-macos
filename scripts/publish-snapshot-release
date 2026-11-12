@@ -14,15 +14,30 @@ import subprocess
 import sys
 from pathlib import Path
 from typing import NoReturn
+from xml.parsers.expat import ExpatError
 
 ME = "scripts/publish-snapshot-release"
 MINIMUM_PYTHON = (3, 15)
 if sys.version_info < MINIMUM_PYTHON:
-    sys.exit(f"{ME}: needs Python 3.15 or later (the python3 of the macos-26 runner image), not {sys.version.split()[0]}")
+    sys.exit(f"{ME}: needs Python {'.'.join(map(str, MINIMUM_PYTHON))} or later (the python3 of the macos-26 runner image),"
+             f" not {sys.version.split()[0]}")
 
 
 def stop(message: str) -> NoReturn:
     sys.exit(f"{ME}: {message}")
+
+
+def bundled_version(info_plist: Path) -> str:
+    """MSRVersion from the bundle's Info.plist, which must be a valid property list with a dictionary at its root."""
+    try:
+        info = plistlib.loads(info_plist.read_bytes())
+    except (OSError, plistlib.InvalidFileException, ExpatError, ValueError) as error:
+        stop(f"cannot read the bundle's Info.plist: {error}")
+    if not isinstance(info, dict):
+        stop("the bundle's Info.plist does not hold a dictionary")
+    if not isinstance(info.get("MSRVersion"), str):
+        stop("the bundle's Info.plist has no MSRVersion")
+    return info["MSRVersion"]
 
 
 def run(*arguments: str) -> str:
@@ -42,11 +57,7 @@ def main() -> None:
         stop("PR_NUMBER is not set")
 
     os.chdir(Path(__file__).resolve().parent.parent)
-    try:
-        info = plistlib.loads(Path("build/Multi Screen Recorder.app/Contents/Info.plist").read_bytes())
-        version = info["MSRVersion"]
-    except (OSError, plistlib.InvalidFileException, KeyError) as error:
-        stop(f"cannot read MSRVersion from the bundle's Info.plist: {error}")
+    version = bundled_version(Path("build/Multi Screen Recorder.app/Contents/Info.plist"))
     zip_file = Path(f"build/Multi Screen Recorder {version}.zip")
     tag = f"pr-{pr_number}"
     if not zip_file.is_file():

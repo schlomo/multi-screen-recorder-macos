@@ -94,7 +94,7 @@ private struct WhatWillBeRecordedView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             Text("What will be recorded").font(.headline)
-            if let error = section.devicesError {
+            if let error = section.displaysError {
                 Label(error, systemImage: "exclamationmark.triangle.fill")
                     .foregroundStyle(.red)
                     .fixedSize(horizontal: false, vertical: true)
@@ -111,19 +111,19 @@ private struct WhatWillBeRecordedView: View {
                         }
                     }
                 }
-                Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 2) {
-                    header(WhatWillBeRecorded.audioColumns)
-                    ForEach(Array(section.audio.enumerated()), id: \.offset) { _, source in
-                        GridRow {
-                            Text(source.name)
-                            Text(source.channels)
-                            Text(source.gigabytesPerHour).gridColumnAlignment(.trailing)
-                        }
-                        .foregroundStyle(source.isRecorded ? .primary : .tertiary)
-                    }
-                }
-                if let total = section.total { Text(total) }
             }
+            Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 2) {
+                header(WhatWillBeRecorded.audioColumns)
+                ForEach(Array(section.audio.enumerated()), id: \.offset) { _, source in
+                    GridRow {
+                        Text(source.name)
+                        Text(source.channels)
+                        Text(source.gigabytesPerHour).gridColumnAlignment(.trailing)
+                    }
+                    .foregroundStyle(source.isRecorded ? .primary : .tertiary)
+                }
+            }
+            if let total = section.total { Text(total) }
             Text(section.outputFolder)
             Text(section.continuity).foregroundStyle(.secondary)
         }

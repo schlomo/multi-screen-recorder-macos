@@ -13,7 +13,10 @@ if [[ "${RELEASE_BUILD:-}" != "true" ]]; then
 fi
 
 cd "$(dirname "$0")/.."
-version="$(plutil -extract MSRVersion raw "build/Multi Screen Recorder.app/Contents/Info.plist")"
+if ! version="$(plutil -extract MSRVersion raw "build/Multi Screen Recorder.app/Contents/Info.plist")"; then
+    echo "scripts/publish-release: cannot read MSRVersion from the bundle's Info.plist" >&2
+    exit 1
+fi
 zip="build/Multi Screen Recorder ${version}.zip"
 if [[ ! -f "$zip" ]]; then
     echo "scripts/publish-release: $zip does not exist; run scripts/build-app and scripts/sign-app first" >&2

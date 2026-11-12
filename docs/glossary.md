@@ -56,8 +56,14 @@ recording that was not finalized (D20).
 The video file for one display, with its timecode and its guide tracks
 (D31).
 A display that disappears or whose stream fails ends its display file;
-a new one begins when it is back. A display whose fitted frame size
-changes also ends its file, and a new one begins at once (D30).
+a new one begins when it is back. A display whose frame size changes
+also ends its file, and a new one begins at once (D30).
+
+## Frame size
+
+The size a display file is recorded at: the display's pixel size fitted
+into the recording resolution box, each side rounded down to an even
+number (D11, D25, D30).
 
 ## Tick
 

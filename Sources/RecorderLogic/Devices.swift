@@ -53,19 +53,38 @@ public func numberDisplays(_ displays: [DisplayInfo]) -> [NumberedDisplay] {
 
 public struct AudioInputInfo: Equatable, Sendable {
     public var name: String
-    public var channelCount: Int
+    /// The number of channels, or why it cannot be read; each input is read by itself.
+    public var channelCount: Result<Int, DeviceReadError>
     public var isDefault: Bool
 
-    public init(name: String, channelCount: Int, isDefault: Bool) {
+    public init(name: String, channelCount: Result<Int, DeviceReadError>, isDefault: Bool) {
         self.name = name
         self.channelCount = channelCount
         self.isDefault = isDefault
     }
 
+    public init(name: String, channelCount: Int, isDefault: Bool) {
+        self.init(name: name, channelCount: .success(channelCount), isDefault: isDefault)
+    }
+
     /// "MacBook Pro Microphone (default)" or just the name.
     public var label: String { isDefault ? "\(name) (default)" : name }
 
-    public var channelsText: String { channelCount == 1 ? "1 channel" : "\(channelCount) channels" }
+    public var channelsText: String {
+        switch channelCount {
+        case .success(1): "1 channel"
+        case .success(let count): "\(count) channels"
+        case .failure(let error): "cannot be read (\(error))"
+        }
+    }
+}
+
+/// The audio inputs a recording with these settings records whose channels cannot be read.
+public func unreadableRecordedInputs(_ audioInputs: [AudioInputInfo], settings: Settings) -> [AudioInputInfo] {
+    audioInputs.filter { input in
+        guard settings.records(input), case .failure = input.channelCount else { return false }
+        return true
+    }
 }
 
 /// The text `msr list` prints.

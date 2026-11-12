@@ -8,7 +8,7 @@ checks that need no signature, then signing, then the signature's checks;
 then zips it into build/. The version comes from the bundle, where
 scripts/build-app wrote it; it must have the form for this build:
   PR_NUMBER=<n>       0.<N>.0-pr<n>+<commit>
-  RELEASE_BUILD=true  0.<N>.0
+  RELEASE_BUILD=true  0.<N>.0, N being the number of commits up to HEAD
   neither             0.<N>.0-dev+<commit>
 """
 
@@ -19,12 +19,14 @@ import shutil
 import subprocess
 import sys
 from pathlib import Path
+from xml.parsers.expat import ExpatError
 from typing import NoReturn
 
 ME = "scripts/sign-app"
 MINIMUM_PYTHON = (3, 15)
 if sys.version_info < MINIMUM_PYTHON:
-    sys.exit(f"{ME}: needs Python 3.15 or later (the python3 of the macos-26 runner image), not {sys.version.split()[0]}")
+    sys.exit(f"{ME}: needs Python {'.'.join(map(str, MINIMUM_PYTHON))} or later (the python3 of the macos-26 runner image),"
+             f" not {sys.version.split()[0]}")
 
 APP = Path("build/Multi Screen Recorder.app")
 ENTITLEMENTS = Path("Resources/msr.entitlements")
@@ -46,12 +48,27 @@ def run(*arguments: str, failure: str) -> str:
     return result.stdout
 
 
-def version_pattern(release_build: str, pr_number: str, head: str) -> str:
+def version_form(release_build: str, pr_number: str, head: str) -> tuple[str, str]:
+    """The pattern the version must match, and the same in words."""
     if pr_number:
-        return rf"0\.[1-9][0-9]*\.0-pr{pr_number}\+{head}"
+        return (rf"0\.[1-9][0-9]*\.0-pr{pr_number}\+{head}",
+                f"of a snapshot of PR #{pr_number} at {head}, 0.<N>.0-pr{pr_number}+{head} such as 0.13.0-pr{pr_number}+{head}")
     if release_build:
-        return r"0\.[1-9][0-9]*\.0"
-    return rf"0\.[1-9][0-9]*\.0-dev\+{head}"
+        commits = run("git", "rev-list", "--count", "HEAD", failure="cannot count the commits up to HEAD").strip()
+        return (rf"0\.{commits}\.0", f"of a release of HEAD, 0.<N>.0 with N the {commits} commits up to HEAD: 0.{commits}.0")
+    return (rf"0\.[1-9][0-9]*\.0-dev\+{head}",
+            f"of a local build at {head}, 0.<N>.0-dev+{head} such as 0.13.0-dev+{head}")
+
+
+def read_info() -> dict[str, object]:
+    """The bundle's Info.plist, which must be a valid property list with a dictionary at its root."""
+    try:
+        info = plistlib.loads((APP / "Contents/Info.plist").read_bytes())
+    except (OSError, plistlib.InvalidFileException, ExpatError, ValueError) as error:
+        stop(f"cannot read the bundle's Info.plist: {error}")
+    if not isinstance(info, dict):
+        stop("the bundle's Info.plist does not hold a dictionary")
+    return info
 
 
 def check_before_signing(release_build: str, pr_number: str) -> str:
@@ -66,10 +83,7 @@ def check_before_signing(release_build: str, pr_number: str) -> str:
         stop(f"{APP} does not exist; run scripts/build-app (or scripts/unpack-app in CI) first")
 
     head = run("git", "rev-parse", "--short=7", "HEAD", failure="cannot read HEAD").strip()
-    try:
-        info = plistlib.loads((APP / "Contents/Info.plist").read_bytes())
-    except (OSError, plistlib.InvalidFileException) as error:
-        stop(f"cannot read the bundle's Info.plist: {error}")
+    info = read_info()
     for key in ("MSRVersion", "MSRCommit", "CFBundleIdentifier"):
         if not isinstance(info.get(key), str):
             stop(f"the bundle's Info.plist has no {key}")
@@ -78,9 +92,9 @@ def check_before_signing(release_build: str, pr_number: str) -> str:
         stop(f"the bundle was built from {commit}, but HEAD is {head}")
     if bundle_identifier != IDENTIFIER:
         stop(f"the bundle's identifier is {bundle_identifier}, not {IDENTIFIER}")
-    pattern = version_pattern(release_build, pr_number, head)
+    pattern, form = version_form(release_build, pr_number, head)
     if not re.fullmatch(pattern, version):
-        stop(f"the bundle's version {version} does not have the form {pattern}")
+        stop(f"the bundle's version {version} does not have the form {form}")
     return version
 
 

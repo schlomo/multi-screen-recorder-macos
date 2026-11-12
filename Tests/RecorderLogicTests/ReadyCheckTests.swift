@@ -11,7 +11,7 @@ import Testing
         screenRecording: PermissionProbe = .granted,
         microphonePermission: PermissionProbe? = .granted,
         displays: Result<[DisplayInfo], DeviceReadError>? = nil,
-        audioInputs: Result<[AudioInputInfo], DeviceReadError> = .success(builtInMicrophoneOnly),
+        audioInputs: [AudioInputInfo] = builtInMicrophoneOnly,
         outputFolder: OutputFolderProbe = .usable(.bytes(100_000_000_000))
     ) -> ReadyCheckFacts {
         ReadyCheckFacts(
@@ -40,7 +40,7 @@ import Testing
 
     @Test func rendersExactlyAsTheDesign() {
         let result = ReadyCheck.evaluate(
-            facts(displays: .success(DesignExample.displays), audioInputs: .success(DesignExample.audioInputs),
+            facts(displays: .success(DesignExample.displays), audioInputs: DesignExample.audioInputs,
                   outputFolder: .usable(.bytes(3_100_000_000))),
             settings: .defaults)
         #expect(result.text == Self.designExample)
@@ -62,7 +62,7 @@ import Testing
         var settings = Settings.defaults
         settings.audioMode = .none
         let result = ReadyCheck.evaluate(
-            facts(microphonePermission: nil, audioInputs: .success([])), settings: settings)
+            facts(microphonePermission: nil, audioInputs: []), settings: settings)
         #expect(result.isReady)
         #expect(result.items.map(\.title) == [
             "Screen & System Audio Recording permission",
@@ -77,7 +77,7 @@ import Testing
         var settings = Settings.defaults
         settings.audioMode = .none
         let result = ReadyCheck.evaluate(
-            facts(microphonePermission: nil, audioInputs: .failure(DeviceReadError("broken"))), settings: settings)
+            facts(microphonePermission: nil, audioInputs: [Self.unreadable(isDefault: true)]), settings: settings)
         #expect(result.isReady)
         #expect(result.items.contains { $0.title.hasPrefix("Free disk space") })
     }
@@ -134,7 +134,7 @@ import Testing
     @Test func noMicrophoneFailsOnlyTheAudioItem() throws {
         let notDefault = [AudioInputInfo(name: "RØDE Wireless GO II RX", channelCount: 2, isDefault: false)]
         for inputs in [[], notDefault] {
-            let result = ReadyCheck.evaluate(facts(audioInputs: .success(inputs)), settings: .defaults)
+            let result = ReadyCheck.evaluate(facts(audioInputs: inputs), settings: .defaults)
             #expect(result.items.filter { !$0.passed } == [
                 ReadyCheckItem(
                     title: "Audio: no microphone, system audio",
@@ -144,10 +144,20 @@ import Testing
         }
     }
 
-    @Test func unreadableAudioInputsFailOnceWithTheReason() {
+    private static func unreadable(isDefault: Bool) -> AudioInputInfo {
+        AudioInputInfo(name: "X", channelCount: .failure(DeviceReadError("the audio input X does not report its format")),
+                       isDefault: isDefault)
+    }
+
+    @Test func anUnreadableInputThatIsNotRecordedPasses() {
         let result = ReadyCheck.evaluate(
-            facts(audioInputs: .failure(DeviceReadError("the audio input X does not report its format"))),
-            settings: .defaults)
+            facts(audioInputs: Self.builtInMicrophoneOnly + [Self.unreadable(isDefault: false)]), settings: .defaults)
+        #expect(result.isReady)
+        #expect(result.items.contains { $0.title.hasPrefix("Free disk space") })
+    }
+
+    @Test func anUnreadableRecordedInputFailsOnceWithTheReason() {
+        let result = ReadyCheck.evaluate(facts(audioInputs: [Self.unreadable(isDefault: true)]), settings: .defaults)
         #expect(result.items.filter { !$0.passed } == [
             ReadyCheckItem(
                 title: "Audio: cannot be read (the audio input X does not report its format)",
@@ -161,7 +171,7 @@ import Testing
         var settings = Settings.defaults
         settings.requiredRecordingHours = 1
         let twoChannels = [AudioInputInfo(name: "RØDE Wireless GO II RX", channelCount: 2, isDefault: true)]
-        let result = ReadyCheck.evaluate(facts(audioInputs: .success(twoChannels)), settings: settings)
+        let result = ReadyCheck.evaluate(facts(audioInputs: twoChannels), settings: settings)
         let item = try #require(result.items.last)
         // two displays at 1080p: 2 × (1 GB video + 72 MB guide tracks), 115.2 MB microphone, 86.4 MB system audio
         #expect(item.title == "Free disk space: 100.0 GB in ~/Movies/Multi Screen Recorder, 2.3 GB needed for 1 hour")

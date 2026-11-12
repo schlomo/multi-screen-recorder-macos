@@ -74,7 +74,7 @@ final class StartModel {
         whatWillBeRecorded = WhatWillBeRecorded(
             settings: settings,
             displays: Result { () throws(DeviceReadError) in try currentDisplays() },
-            audioInputs: Result { () throws(DeviceReadError) in try currentAudioInputs() },
+            audioInputs: currentAudioInputs(),
             outputFolder: nil)
         checkTask?.cancel()
         isChecking = true

@@ -64,3 +64,28 @@ struct ScratchFolder {
         try? FileManager.default.removeItem(at: url)
     }
 }
+
+/// An Info.plist the scripts that read the bundle must refuse with a message.
+enum InfoPlistDamage: CaseIterable, Sendable {
+    case truncated
+    case arrayAtTheRoot
+
+    var message: String {
+        switch self {
+        case .truncated: "cannot read the bundle's Info.plist"
+        case .arrayAtTheRoot: "the bundle's Info.plist does not hold a dictionary"
+        }
+    }
+
+    func write(to url: URL) throws {
+        switch self {
+        case .truncated:
+            let whole = try PropertyListSerialization.data(
+                fromPropertyList: ["MSRVersion": "0.2.0-dev+abcdef0"], format: .xml, options: 0)
+            try whole.prefix(whole.count / 2).write(to: url)
+        case .arrayAtTheRoot:
+            try PropertyListSerialization.data(fromPropertyList: ["0.2.0-dev+abcdef0"], format: .xml, options: 0)
+                .write(to: url)
+        }
+    }
+}

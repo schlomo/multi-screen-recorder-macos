@@ -50,6 +50,22 @@ import Testing
         #expect(rendered == Self.designExample)
     }
 
+    @Test func anInputWhoseChannelsCannotBeReadIsListedWithTheReason() {
+        let unreadable = AudioInputInfo(name: "X", channelCount: .failure(DeviceReadError("no format")), isDefault: false)
+        let rendered = renderList(displays: [], resolution: .p1080, audioInputs: [unreadable], systemAudioAvailable: true)
+        #expect(rendered.contains("\n  X, cannot be read (no format)\n"))
+    }
+
+    @Test func onlyARecordedInputThatCannotBeReadCounts() {
+        let unreadable = AudioInputInfo(name: "X", channelCount: .failure(DeviceReadError("no format")), isDefault: false)
+        let unreadableDefault = AudioInputInfo(name: "Y", channelCount: .failure(DeviceReadError("no format")), isDefault: true)
+        #expect(unreadableRecordedInputs([unreadable], settings: .defaults).isEmpty)
+        #expect(unreadableRecordedInputs([unreadable, unreadableDefault], settings: .defaults) == [unreadableDefault])
+        var none = Settings.defaults
+        none.audioMode = .none
+        #expect(unreadableRecordedInputs([unreadableDefault], settings: none).isEmpty)
+    }
+
     @Test func theDesignShowsTheExample() throws {
         #expect(try repositoryFile("docs/design/recorder.md").contains("```\n\(Self.designExample)```\n"))
     }

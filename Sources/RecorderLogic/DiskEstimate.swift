@@ -17,13 +17,16 @@ public enum DiskEstimate {
 
     public static let systemAudioFileBytesPerHour = bytesPerHour(bitRate: Encoding.systemAudioTrackBitRate)
 
-    /// Every file a recording with these settings and devices writes.
-    public static func bytesPerHour(settings: Settings, displays: [DisplayInfo], audioInputs: [AudioInputInfo]) -> Double {
+    /// Every file a recording with these settings and devices writes; nil
+    /// when the channels of an audio input it records cannot be read.
+    public static func bytesPerHour(settings: Settings, displays: [DisplayInfo], audioInputs: [AudioInputInfo]) -> Double? {
         let displayFiles = displays.map {
             displayFileBytesPerHour(frameSize: settings.resolution.frameSize(forDisplay: $0.pixelSize), settings: settings)
         }
-        let audioInputFiles = audioInputs.filter(settings.records).map {
-            audioInputFileBytesPerHour(channelCount: $0.channelCount)
+        var audioInputFiles: [Double] = []
+        for input in audioInputs where settings.records(input) {
+            guard case .success(let channelCount) = input.channelCount else { return nil }
+            audioInputFiles.append(audioInputFileBytesPerHour(channelCount: channelCount))
         }
         let systemAudioFile = settings.systemAudio ? systemAudioFileBytesPerHour : 0
         return (displayFiles + audioInputFiles).reduce(systemAudioFile, +)

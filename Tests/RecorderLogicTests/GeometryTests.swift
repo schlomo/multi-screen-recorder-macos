@@ -94,7 +94,7 @@ import Testing
     }
 }
 
-/// A display file continues while the display's fitted frame size stays the
+/// A display file continues while the display's frame size stays the
 /// same; when it changes, the file ends and a new one starts (D30).
 @Suite struct FrameSizeChangeTests {
     private let uhd = FrameSize(width: 3840, height: 2160)

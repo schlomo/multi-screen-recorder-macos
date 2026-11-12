@@ -29,10 +29,11 @@ import Testing
 
     /// Archives the given members with bsdtar, run in the sources folder;
     /// -P keeps absolute paths and `..` as given.
-    private func archive(_ members: String...) throws -> URL {
+    private func archive(_ members: String..., compressed: Bool = false) throws -> URL {
         let archive = scratch.url.appending(path: "app.tar")
         let outcome = try run(URL(filePath: "/usr/bin/env"),
-                              ["tar", "--no-mac-metadata", "-cPf", archive.path(percentEncoded: false)] + members, in: sources)
+                              ["tar", "--no-mac-metadata", compressed ? "-czPf" : "-cPf", archive.path(percentEncoded: false)]
+                                  + members, in: sources)
         try #require(outcome.status == 0, "tar failed: \(outcome.errors)")
         return archive
     }
@@ -171,5 +172,47 @@ import Testing
             ("\(Self.bundle)/Contents/copy", .hardLink(to: "\(Self.bundle)/Contents/MacOS/msr")),
         ]))
         #expect(outcome.status == 0, "\(outcome.errors)")
+    }
+
+    @Test func aHardLinkThatCannotBeResolvedStops() throws {
+        defer { scratch.remove() }
+        let outcome = try unpack(try handWritten([
+            ("\(Self.bundle)/Contents/deep/", .folder),
+            ("\(Self.bundle)/Contents/deep/1/", .folder),
+            ("\(Self.bundle)/Contents/deep/1/2/", .folder),
+            ("\(Self.bundle)/Contents/deep/1/2/s", .symbolicLink(to: "../../..")),
+            ("\(Self.bundle)/Contents/h", .hardLink(to: "\(Self.bundle)/Contents/deep/1/2/s")),
+        ]))
+        #expect(outcome.status == 1)
+        #expect(outcome.errors.contains("cannot be extracted"), "\(outcome.errors)")
+        #expect(try buildContents().isEmpty)
+    }
+
+    @Test func aMemberWithDotDotInsideTheBundleStops() throws {
+        defer { scratch.remove() }
+        let outcome = try unpack(try handWritten([
+            ("\(Self.bundle)/Contents/x/", .folder),
+            ("\(Self.bundle)/Contents/Resources", .symbolicLink(to: "MacOS")),
+            ("\(Self.bundle)/Contents/x/../Resources/planted", .file("planted")),
+        ]))
+        #expect(outcome.status == 1)
+        #expect(outcome.errors.contains("has a .. component"), "\(outcome.errors)")
+        #expect(try buildContents().isEmpty)
+    }
+
+    @Test func aMemberNamedTwiceStops() throws {
+        defer { scratch.remove() }
+        let outcome = try unpack(try handWritten([("\(Self.bundle)/Contents/MacOS/msr", .file("other"))]))
+        #expect(outcome.status == 1)
+        #expect(outcome.errors.contains("appears twice"), "\(outcome.errors)")
+        #expect(try buildContents().isEmpty)
+    }
+
+    @Test func aCompressedArchiveStops() throws {
+        defer { scratch.remove() }
+        let outcome = try unpack(try archive(Self.bundle, compressed: true))
+        #expect(outcome.status == 1)
+        #expect(outcome.errors.contains("is not a plain tar archive"), "\(outcome.errors)")
+        #expect(try buildContents().isEmpty)
     }
 }

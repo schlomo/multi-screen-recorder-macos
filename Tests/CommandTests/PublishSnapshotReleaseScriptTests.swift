@@ -112,4 +112,34 @@ import Testing
         #expect(outcome.errors.contains("PR_NUMBER is not set"))
         #expect(try ghCalls().isEmpty)
     }
+
+    @Test(arguments: InfoPlistDamage.allCases)
+    func aDamagedInfoPlistStops(damage: InfoPlistDamage) throws {
+        defer { scratch.remove() }
+        try stubGH(state: "OPEN", headRefOid: head)
+        try damage.write(to: checkout.appending(path: "build/Multi Screen Recorder.app/Contents/Info.plist"))
+        let outcome = try publish()
+        #expect(outcome.status == 1)
+        #expect(outcome.errors.contains(damage.message), "\(outcome.errors)")
+        #expect(!outcome.errors.contains("Traceback"))
+        #expect(try ghCalls().isEmpty)
+    }
+
+    /// scripts/publish-release reads the same Info.plist, with plutil.
+    @Test(arguments: InfoPlistDamage.allCases)
+    func publishReleaseStopsOnADamagedInfoPlist(damage: InfoPlistDamage) throws {
+        defer { scratch.remove() }
+        try stubGH(state: "OPEN", headRefOid: head)
+        try FileManager.default.copyItem(
+            at: repositoryRoot.appending(path: "scripts/publish-release"),
+            to: checkout.appending(path: "scripts/publish-release"))
+        try damage.write(to: checkout.appending(path: "build/Multi Screen Recorder.app/Contents/Info.plist"))
+        let path = try #require(ProcessInfo.processInfo.environment["PATH"])
+        let outcome = try run(checkout.appending(path: "scripts/publish-release"),
+                              environment: ["RELEASE_BUILD": "true", "PATH": "\(bin.path(percentEncoded: false)):\(path)"],
+                              in: scratch.url)
+        #expect(outcome.status == 1)
+        #expect(outcome.errors.contains("cannot read MSRVersion from the bundle's Info.plist"), "\(outcome.errors)")
+        #expect(try ghCalls().isEmpty)
+    }
 }

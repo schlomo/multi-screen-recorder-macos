@@ -79,4 +79,14 @@ import Testing
         #expect(outcome.status == 1)
         #expect(outcome.errors.contains("run scripts/build-app first"))
     }
+
+    @Test(arguments: InfoPlistDamage.allCases)
+    func aDamagedInfoPlistStops(damage: InfoPlistDamage) throws {
+        defer { scratch.remove() }
+        try damage.write(to: checkout.appending(path: "build/Multi Screen Recorder.app/Contents/Info.plist"))
+        let outcome = try smokeTest()
+        #expect(outcome.status == 1)
+        #expect(outcome.errors.contains(damage.message), "\(outcome.errors)")
+        #expect(!outcome.errors.contains("Traceback"))
+    }
 }

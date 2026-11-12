@@ -7,7 +7,7 @@ import Testing
     private func section(
         _ edit: (inout Settings) -> Void = { _ in },
         displays: Result<[DisplayInfo], DeviceReadError> = .success(DesignExample.displays),
-        audioInputs: Result<[AudioInputInfo], DeviceReadError> = .success(DesignExample.audioInputs),
+        audioInputs: [AudioInputInfo] = DesignExample.audioInputs,
         outputFolder: OutputFolderProbe? = designFolder
     ) -> WhatWillBeRecorded {
         var settings = Settings.defaults
@@ -17,7 +17,7 @@ import Testing
 
     @Test func theDefaultsWithTheDesignsDevices() {
         #expect(section() == WhatWillBeRecorded(
-            devicesError: nil,
+            displaysError: nil,
             displays: [
                 .init(number: 1, name: "Built-in Retina Display", looksLike: "1728×1117", drawnAt: "3456×2234",
                       recordsAt: "1670×1080", gigabytesPerHour: "0.9"),
@@ -69,7 +69,7 @@ import Testing
         let inputs = DesignExample.audioInputs.map {
             AudioInputInfo(name: $0.name, channelCount: $0.channelCount, isDefault: false)
         }
-        let audio = section(audioInputs: .success(inputs)).audio
+        let audio = section(audioInputs: inputs).audio
         #expect(audio.map(\.name) == ["MacBook Pro Microphone", "RØDE Wireless GO II RX", "System audio"])
         #expect(audio.dropLast().allSatisfy { !$0.isRecorded })
     }
@@ -93,17 +93,31 @@ import Testing
             == "Files go to /Volumes/Data/Recordings")
     }
 
-    @Test func unreadableDevicesShowTheErrorOnceAndNoRowsAndNoTotal() {
-        let error = DeviceReadError("the display X does not report its display mode")
-        for broken in [
-            section(displays: .failure(error)),
-            section(audioInputs: .failure(error)),
-            section(displays: .failure(error), audioInputs: .failure(DeviceReadError("other"))),
-        ] {
-            #expect(broken.devicesError == "The devices cannot be read: the display X does not report its display mode")
-            #expect(broken.displays.isEmpty)
-            #expect(broken.audio.isEmpty)
-            #expect(broken.total == nil)
-        }
+    @Test func unreadableDisplaysShowTheErrorInPlaceOfTheirTableAndNoTotal() {
+        let broken = section(displays: .failure(DeviceReadError("the display X does not report its display mode")))
+        #expect(broken.displaysError == "The displays cannot be read: the display X does not report its display mode")
+        #expect(broken.displays.isEmpty)
+        #expect(broken.audio == section().audio)
+        #expect(broken.total == nil)
+    }
+
+    private static func unreadable(isDefault: Bool) -> AudioInputInfo {
+        AudioInputInfo(name: "X", channelCount: .failure(DeviceReadError("no format")), isDefault: isDefault)
+    }
+
+    @Test func anUnreadableInputThatIsNotRecordedIsARowAndKeepsTheTotal() {
+        let withUnreadable = section(audioInputs: DesignExample.audioInputs + [Self.unreadable(isDefault: false)])
+        #expect(withUnreadable.audio[2]
+            == .init(name: "X", channels: "cannot be read", isRecorded: false, gigabytesPerHour: "not recorded"))
+        #expect(withUnreadable.displays == section().displays)
+        #expect(withUnreadable.total == section().total)
+    }
+
+    @Test func anUnreadableRecordedInputLeavesTheTotalOut() {
+        let broken = section(audioInputs: [Self.unreadable(isDefault: true)])
+        #expect(broken.audio.first
+            == .init(name: "X (default)", channels: "cannot be read", isRecorded: true, gigabytesPerHour: "unknown"))
+        #expect(broken.displays == section().displays)
+        #expect(broken.total == nil)
     }
 }

@@ -14,8 +14,8 @@ public enum Encoding {
     public static let systemAudioGuideTrackBitRate = 96_000
 }
 
-/// An audio track in every display file for playback and waveform sync
-/// only; the audio files hold the sources themselves.
+/// A guide track: a track in every display file for playback and waveform
+/// sync only; the audio files hold the sources themselves.
 public enum GuideTrack: Equatable, Sendable {
     case microphones
     case systemAudio

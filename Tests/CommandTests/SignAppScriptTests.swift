@@ -82,12 +82,44 @@ import Testing
         #expect(zipExists(version))
     }
 
+    /// The checkout has one commit, so a release of it is 0.1.0.
     @Test func aReleaseHasNoSuffix() throws {
         defer { scratch.remove() }
-        try writeInfo(version: "0.12.0")
+        try writeInfo(version: "0.1.0")
         let outcome = try signApp(["RELEASE_BUILD": "true"])
         #expect(outcome.status == 0, "\(outcome.errors)")
-        #expect(zipExists("0.12.0"))
+        #expect(zipExists("0.1.0"))
+    }
+
+    @Test func aReleaseWhoseNumberIsNotTheCommitCountStops() throws {
+        defer { scratch.remove() }
+        try writeInfo(version: "0.999.0")
+        let outcome = try signApp(["RELEASE_BUILD": "true"])
+        #expect(outcome.status == 1)
+        #expect(outcome.errors.contains("does not have the form of a release of HEAD, 0.<N>.0 with N the 1 commits up to HEAD: 0.1.0"),
+                "\(outcome.errors)")
+        #expect(try isUnsignedByThisRun())
+    }
+
+    @Test func theFormIsNamedInWords() throws {
+        defer { scratch.remove() }
+        try writeInfo(version: "0.13.0-dev+\(head)")
+        let outcome = try signApp(["PR_NUMBER": "7"])
+        #expect(outcome.status == 1)
+        #expect(outcome.errors.contains(
+            "does not have the form of a snapshot of PR #7 at \(head), 0.<N>.0-pr7+\(head) such as 0.13.0-pr7+\(head)"),
+                "\(outcome.errors)")
+    }
+
+    @Test(arguments: InfoPlistDamage.allCases)
+    func aDamagedInfoPlistStopsBeforeSigning(damage: InfoPlistDamage) throws {
+        defer { scratch.remove() }
+        try damage.write(to: checkout.appending(path: "build/Multi Screen Recorder.app/Contents/Info.plist"))
+        let outcome = try signApp()
+        #expect(outcome.status == 1)
+        #expect(outcome.errors.contains(damage.message), "\(outcome.errors)")
+        #expect(!outcome.errors.contains("Traceback"))
+        #expect(try isUnsignedByThisRun())
     }
 
     @Test(arguments: [

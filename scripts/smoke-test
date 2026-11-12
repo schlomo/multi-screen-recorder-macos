@@ -13,17 +13,32 @@ import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 from typing import NoReturn
+from xml.parsers.expat import ExpatError
 
 ME = "scripts/smoke-test"
 MINIMUM_PYTHON = (3, 15)
 if sys.version_info < MINIMUM_PYTHON:
-    sys.exit(f"{ME}: needs Python 3.15 or later (the python3 of the macos-26 runner image), not {sys.version.split()[0]}")
+    sys.exit(f"{ME}: needs Python {'.'.join(map(str, MINIMUM_PYTHON))} or later (the python3 of the macos-26 runner image),"
+             f" not {sys.version.split()[0]}")
 
 APP = Path("build/Multi Screen Recorder.app")
 
 
 def stop(message: str) -> NoReturn:
     sys.exit(f"{ME}: {message}")
+
+
+def bundled_version(info_plist: Path) -> str:
+    """MSRVersion from the bundle's Info.plist, which must be a valid property list with a dictionary at its root."""
+    try:
+        info = plistlib.loads(info_plist.read_bytes())
+    except (OSError, plistlib.InvalidFileException, ExpatError, ValueError) as error:
+        stop(f"cannot read the bundle's Info.plist: {error}")
+    if not isinstance(info, dict):
+        stop("the bundle's Info.plist does not hold a dictionary")
+    if not isinstance(info.get("MSRVersion"), str):
+        stop("the bundle's Info.plist has no MSRVersion")
+    return info["MSRVersion"]
 
 
 @dataclass
@@ -63,13 +78,10 @@ def main() -> None:
     msr = Path.cwd() / APP / "Contents/MacOS/msr"
     if not os.access(msr, os.X_OK):
         stop(f"{msr} does not exist; run scripts/build-app first")
-    try:
-        bundled_version = plistlib.loads((APP / "Contents/Info.plist").read_bytes())["MSRVersion"]
-    except (OSError, plistlib.InvalidFileException, KeyError) as error:
-        stop(f"cannot read MSRVersion from the bundle's Info.plist: {error}")
+    version = bundled_version(APP / "Contents/Info.plist")
     head = subprocess.run(["git", "rev-parse", "--short=7", "HEAD"], check=True,
                           stdout=subprocess.PIPE, text=True).stdout.strip()
-    expected_version = f"{bundled_version} ({head})"
+    expected_version = f"{version} ({head})"
 
     with tempfile.TemporaryDirectory() as scratch_name:
         scratch = Path(scratch_name)

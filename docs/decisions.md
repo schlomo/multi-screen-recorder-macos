@@ -239,7 +239,9 @@ architect's reading.
 
 ## D14: Safeguards against losing a recording (2026-11-12)
 
-- **Status:** in force
+- **Status:** in force; extended by D31's change to audio files (the
+  architect's reading: the restart of a failing stream and the recovery
+  after a full disk apply to an audio file as to a display file)
 - **Context:** "Focus on reliability and preventing data loss, and
   minimal gaps on screen changes."
 - **Decision:** Before Start, a ready check confirms both permissions,
@@ -355,7 +357,8 @@ architect's reading.
 
 ## D21: HEVC in .mov, no dropped tick, timecode in every display file (2026-11-12)
 
-- **Status:** in force
+- **Status:** in force; refined by D31 (audio files carry the timecode
+  track too; display files carry guide tracks, not the audio tracks)
 - **Context:** The draft skipped a tick the encoder could not take,
   which breaks the constant frame rate (D11). The owner agreed to never
   dropping one and added: "we need to write timecode into the files as
@@ -569,7 +572,7 @@ architect's reading.
 - **Evidence:** [PR #1](https://github.com/schlomo/multi-screen-recorder-macos/pull/1),
   [design/delivery.md](design/delivery.md).
 
-## D30: A new display file when the fitted frame size changes (2026-11-12)
+## D30: A new display file when the frame size changes (2026-11-12)
 
 - **Status:** in force
 - **Context:** D11 kept a display file's frame size when the display
@@ -586,15 +589,15 @@ architect's reading.
 - **Decision:** The architect's wording, confirmed by the owner: the
   frame size is the display's pixel size fitted into the recording
   resolution box, the box turning with a portrait display. While a
-  display's fitted frame size stays the same, its file continues,
-  whatever else changed about the display. When the fitted frame size
+  display's frame size stays the same, its file continues,
+  whatever else changed about the display. When the frame size
   changes, the display's current file ends and a new file starts at
   the new frame size, like after a reconnect. At `native` every
   pixel-size change is such a change; at `1080p` 3840×2160 to 5120×2880
   is not, 3440×1440 to 1920×1080 is. Replaces D11's shrinking and
   centring of a display that changes mid-file.
 - **Consequences:** A gap of under one second in that display's files
-  at the change, also in the audio tracks inside them, while the other
+  at the change, also in the guide tracks inside them, while the other
   displays' files continue; a display that flaps between modes makes
   many short files, each valid.
 - **Evidence:** [design/recorder.md](design/recorder.md) "Frame size".

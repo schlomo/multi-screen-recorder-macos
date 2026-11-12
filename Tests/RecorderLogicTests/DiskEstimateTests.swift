@@ -54,9 +54,9 @@ import Testing
         #expect(DiskEstimate.systemAudioFileBytesPerHour == 86_400_000)
     }
 
-    @Test func theTotalCountsEveryFileARecordingWrites() {
-        let total = DiskEstimate.bytesPerHour(
-            settings: settings(), displays: DesignExample.displays, audioInputs: DesignExample.audioInputs)
+    @Test func theTotalCountsEveryFileARecordingWrites() throws {
+        let total = try #require(DiskEstimate.bytesPerHour(
+            settings: settings(), displays: DesignExample.displays, audioInputs: DesignExample.audioInputs))
         let retina = 1670.0 * 1080 / (1920 * 1080) * 1_000_000_000 + 72_000_000
         let lg = 1_000_000_000.0 + 72_000_000
         #expect(abs(total - (retina + lg + 57_600_000 + 86_400_000)) < 1)
@@ -66,6 +66,12 @@ import Testing
         #expect(DiskEstimate.bytesPerHour(
             settings: silent, displays: DesignExample.displays, audioInputs: DesignExample.audioInputs)
             == DiskEstimate.bytesPerHour(settings: silent, displays: DesignExample.displays, audioInputs: []))
+    }
+
+    @Test func aRecordedInputWhoseChannelsCannotBeReadLeavesTheTotalUnknown() {
+        let unreadable = AudioInputInfo(name: "X", channelCount: .failure(DeviceReadError("no format")), isDefault: true)
+        #expect(DiskEstimate.bytesPerHour(settings: settings(), displays: DesignExample.displays, audioInputs: [unreadable]) == nil)
+        #expect(DiskEstimate.bytesPerHour(settings: silent, displays: DesignExample.displays, audioInputs: [unreadable]) != nil)
     }
 
     @Test func noDisplaysNeedNoSpaceForVideo() {

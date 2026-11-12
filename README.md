@@ -14,10 +14,12 @@ manages the settings.
 - **Every display, as displays come and go.** Each display gets its own
   video file. Plugging in a projector, removing it, or switching
   mirroring does not stop the recording.
-- **Every audio source on its own track.** No audio, the default
+- **Every audio source in its own file.** No audio, the default
   microphone, or all audio inputs, plus the system audio if you want it.
-  Each display file carries them as separate tracks, so it can be synced
-  by waveform with a separate recording.
+  Each source gets an audio file of its own, each channel its own
+  track; every display file also carries two guide tracks, the
+  microphones and the system audio, for playback and for syncing by
+  waveform with a separate recording.
 - **Edit-ready video.** A constant 30 frames per second, with a fixed
   frame size per file and a recording resolution you choose (Native,
   4K, 1440p, 1200p, 1080p or 720p), only ever scaled down.

@@ -95,12 +95,14 @@ extension CommandLineInterface {
             let file = try standardSettingsFile()
             let settings = try readingSettings { try file.load() }
             let displays = try await currentDisplays()
+            let audioInputs = currentAudioInputs()
             print(renderList(
                 displays: numberDisplays(displays),
                 resolution: settings.resolution,
-                audioInputs: try currentAudioInputs(),
+                audioInputs: audioInputs,
                 systemAudioAvailable: screenRecordingIsGranted()
             ), terminator: "")
+            if !unreadableRecordedInputs(audioInputs, settings: settings).isEmpty { throw ExitCode(1) }
         }
     }
 

@@ -28,13 +28,14 @@ public func currentDisplays() throws(DeviceReadError) -> [DisplayInfo] {
 }
 
 /// The audio inputs, the default one marked. Listing needs no permission.
-public func currentAudioInputs() throws(DeviceReadError) -> [AudioInputInfo] {
+public func currentAudioInputs() -> [AudioInputInfo] {
     let devices = AVCaptureDevice.DiscoverySession(
         deviceTypes: [.microphone, .external], mediaType: .audio, position: .unspecified
     ).devices
     let defaultID = AVCaptureDevice.default(for: .audio)?.uniqueID
-    return try devices.map { device throws(DeviceReadError) in
-        AudioInputInfo(name: device.localizedName, channelCount: try channelCount(of: device),
+    return devices.map { device in
+        AudioInputInfo(name: device.localizedName,
+                       channelCount: Result { () throws(DeviceReadError) in try channelCount(of: device) },
                        isDefault: device.uniqueID == defaultID)
     }
 }

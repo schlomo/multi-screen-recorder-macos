@@ -6,6 +6,7 @@ public struct WhatWillBeRecorded: Equatable, Sendable {
     public static let displayColumns = ["Display", "Looks like", "Drawn at", "Records at", "GB/h"]
     public static let audioColumns = ["Audio", "Channels", "GB/h"]
     static let notRecorded = "not recorded"
+    static let cannotBeRead = "cannot be read"
 
     public struct Display: Equatable, Sendable {
         public var number: Int
@@ -25,19 +26,20 @@ public struct WhatWillBeRecorded: Equatable, Sendable {
         public var gigabytesPerHour: String
     }
 
-    /// Set when the devices cannot be read; the section then shows no rows and no total.
-    public var devicesError: String?
+    /// Set when the displays cannot be read; it stands in place of the Displays table.
+    public var displaysError: String?
     public var displays: [Display]
     public var audio: [Audio]
+    /// Nil unless the displays and the audio inputs the recording records can be read.
     public var total: String?
     public var outputFolder: String
     public var continuity: String
 
     public init(
-        devicesError: String?, displays: [Display], audio: [Audio], total: String?,
+        displaysError: String?, displays: [Display], audio: [Audio], total: String?,
         outputFolder: String, continuity: String
     ) {
-        self.devicesError = devicesError
+        self.displaysError = displaysError
         self.displays = displays
         self.audio = audio
         self.total = total
@@ -50,33 +52,42 @@ public struct WhatWillBeRecorded: Equatable, Sendable {
     public init(
         settings: Settings,
         displays readDisplays: Result<[DisplayInfo], DeviceReadError>,
-        audioInputs readAudioInputs: Result<[AudioInputInfo], DeviceReadError>,
+        audioInputs: [AudioInputInfo],
         outputFolder: OutputFolderProbe?
     ) {
         self.init(
-            devicesError: nil, displays: [], audio: [], total: nil,
+            displaysError: nil, displays: [], audio: [], total: nil,
             outputFolder: "Files go to \(settings.outputFolder)",
             continuity: "Recording continues when displays or audio sources change.")
-        switch (readDisplays, readAudioInputs) {
-        case (.success(let displayInfos), .success(let inputs)):
+        switch readDisplays {
+        case .success(let displayInfos):
             displays = numberDisplays(displayInfos).map { Self.display($0, settings: settings) }
-            audio = inputs.map { input in
-                let isRecorded = settings.records(input)
-                return Audio(
-                    name: input.label, channels: String(input.channelCount), isRecorded: isRecorded,
-                    gigabytesPerHour: isRecorded
-                        ? DiskEstimate.gigabytesPerHour(DiskEstimate.audioInputFileBytesPerHour(channelCount: input.channelCount))
-                        : Self.notRecorded)
+            if let bytesPerHour = DiskEstimate.bytesPerHour(
+                settings: settings, displays: displayInfos, audioInputs: audioInputs) {
+                total = Self.total(bytesPerHour, settings: settings, outputFolder: outputFolder)
             }
-            audio.append(Audio(
-                name: "System audio", channels: "stereo", isRecorded: settings.systemAudio,
-                gigabytesPerHour: settings.systemAudio
-                    ? DiskEstimate.gigabytesPerHour(DiskEstimate.systemAudioFileBytesPerHour) : Self.notRecorded))
-            total = Self.total(
-                DiskEstimate.bytesPerHour(settings: settings, displays: displayInfos, audioInputs: inputs),
-                settings: settings, outputFolder: outputFolder)
-        case (.failure(let error), _), (_, .failure(let error)):
-            devicesError = "The devices cannot be read: \(error)"
+        case .failure(let error):
+            displaysError = "The displays cannot be read: \(error)"
+        }
+        audio = audioInputs.map { Self.audio($0, settings: settings) }
+        audio.append(Audio(
+            name: "System audio", channels: "stereo", isRecorded: settings.systemAudio,
+            gigabytesPerHour: settings.systemAudio
+                ? DiskEstimate.gigabytesPerHour(DiskEstimate.systemAudioFileBytesPerHour) : Self.notRecorded))
+    }
+
+    /// An input whose channels cannot be read says so; its GB/h is unknown if it is recorded.
+    private static func audio(_ input: AudioInputInfo, settings: Settings) -> Audio {
+        let isRecorded = settings.records(input)
+        return switch input.channelCount {
+        case .success(let count):
+            Audio(name: input.label, channels: String(count), isRecorded: isRecorded,
+                  gigabytesPerHour: isRecorded
+                      ? DiskEstimate.gigabytesPerHour(DiskEstimate.audioInputFileBytesPerHour(channelCount: count))
+                      : notRecorded)
+        case .failure:
+            Audio(name: input.label, channels: cannotBeRead, isRecorded: isRecorded,
+                  gigabytesPerHour: isRecorded ? "unknown" : notRecorded)
         }
     }
 

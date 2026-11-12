@@ -27,7 +27,7 @@ when it moves.
 | `scripts/version` | Prints the version of the current checkout; stops on a shallow clone |
 | `scripts/build-app` | Compiles `msr`, assembles the app bundle in `build/`, signs it ad hoc with the real signing's options, and archives it as `build/msr-app.tar` |
 | `scripts/smoke-test` | Runs the bundled `msr` with a scratch `HOME`: version (also through a symbolic link), settings, `--save`, exit 78 and exit 64; nothing that needs a permission, a display or a microphone |
-| `scripts/unpack-app` | Unpacks the app archive into an empty `build/` with the `data` filter of Python's `tarfile`, rooted at the bundle folder, which refuses absolute paths, `..` leading out, links pointing out of the bundle and special files; before writing anything the script itself refuses a member outside the bundle, a bundle that is not a folder and a member below a symbolic link of the archive, and it removes what it wrote when the filter refuses a member |
+| `scripts/unpack-app` | Unpacks the app archive into an empty `build/` with the `data` filter of Python's `tarfile`, rooted at the bundle folder, which refuses absolute paths, links pointing out of the bundle and special files; before writing anything the script itself refuses an archive that is not a plain tar, a member named twice, a member outside the bundle or with a `..` component (the build writes none), a bundle that is not a folder and a member below a symbolic link of the archive; a member that cannot be extracted stops it, and it removes what it wrote when it stops |
 | `scripts/sign-app` | Checks the bundle's version, commit and identifier, re-signs it, checks the signature, identifier, hardened runtime and entitlements, and zips it into `build/` |
 | `scripts/ci-import-signing-certificate` | CI only: puts the certificate from the secret into a temporary keychain |
 | `scripts/publish-snapshot-release` | Creates or replaces a PR's snapshot release |
@@ -118,7 +118,9 @@ is checked out (`MSRCommit`), the identifier
 `org.schapiro.multiscreenrecorder`, and a version (`MSRVersion`) of
 the form for this build: with `PR_NUMBER` the snapshot form for exactly
 that PR and commit, with `RELEASE_BUILD=true` the release form
-`0.<N>.0`, otherwise the local form. After signing it stops on any
+`0.<N>.0` with N the number of commits up to `HEAD` (the release job
+checks out the full history for it; the snapshot job needs only the
+commit), otherwise the local form. After signing it stops on any
 miss among: `codesign --verify --deep --strict`; the signed identifier;
 the hardened runtime flag; the entitlements equal to
 `Resources/msr.entitlements` (audio input). The hardened
