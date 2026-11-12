@@ -29,14 +29,45 @@ code is written from scratch (D1).
 ## Recording
 
 Everything captured between Start and Stop: one or more display files
-and audio files.
+and audio files, in one recording folder.
+
+## Recording folder
+
+The folder holding one recording, named by its local start time. A
+recording claims it by creating it (D20).
+
+## Recording manifest
+
+`recording.json` in the recording folder: the settings, every file with
+its start on the shared clock and its state, and the events (D20).
+
+## Crash marker
+
+The file a recording process keeps while it records, naming its
+recording folder; one left behind by a process that is gone marks a
+recording that was not finalized (D20).
 
 ## Display file
 
-The video file for one display, with every audio source present when
-it started as its own track.
+The video file for one display, with the audio tracks of every audio
+source present when it started.
 A display that disappears or whose stream fails ends its display file;
 a new one begins when it is back.
+
+## Tick
+
+One of the instants, 1/30 s apart from the recording's start, at which
+every display file gets a frame (D11, D21).
+
+## Timecode
+
+The time-of-day track in every display file, by which an editor places
+files on a timeline (D21).
+
+## Audio track
+
+One track in a display file or audio file: one channel of an audio
+input, mono, or the system audio, stereo (D22).
 
 ## Audio source
 

@@ -277,3 +277,127 @@ architect's reading.
 - **Consequences:** A later session should not reintroduce
   upstream-compatibility flags as a fix.
 - **Evidence:** the setup commit.
+
+## D17: Swift, always the latest toolchain (2026-11-12)
+
+- **Status:** in force
+- **Context:** Asked "is swift the right tool here? Or better rust?",
+  with "only AI will develop here, with human supervision and partial
+  review", the owner ruled: "yes to latest swift, and we always aim for
+  latest with rather fast upgrades. dependabot for patches".
+- **Decision:** The product is written in Swift, in the Swift 6
+  language mode with strict concurrency checking and warnings treated
+  as errors. The toolchain is the latest released Swift and Xcode,
+  upgraded soon after each release. Dependabot proposes dependency
+  updates. The architect's reading: Dependabot covers the GitHub
+  Actions and Swift packages in use; a toolchain upgrade is a change of
+  its own.
+- **Consequences:** Rust is set aside, also as a core under a Swift
+  shell; revisit only for a Linux or Windows version or for encoder or
+  container code of our own (`backlog.md`).
+- **Evidence:** [design/recorder.md](design/recorder.md).
+
+## D18: v0 in two PRs, with three audio features after it (2026-11-12)
+
+- **Status:** in force
+- **Context:** Whether one self-signed certificate keeps the
+  permissions across updates (D5) decides whether the delivery model
+  works at all, and is cheapest to learn before the recorder exists.
+  The owner agreed to the split and the scope ("A–F").
+- **Decision:** v0 arrives as two PRs: first the skeleton and pipeline
+  (the app window with the ready check, `msr list`, `check`, `settings`
+  and `version`, signing, snapshot release and release), then the
+  recorder. v0 records with the audio mode none or default microphone,
+  plus system audio. The audio mode all inputs, the audio file for a
+  late audio source, and AGC follow in later PRs; D12 stays in force.
+  Replaces the "one longer-lived PR" plan in `backlog.md`.
+- **Consequences:** Until then a source that appears mid-recording
+  joins only at the next new display file.
+- **Evidence:** [design/recorder.md](design/recorder.md).
+
+## D19: The command line is the app's executable; flags mirror the settings (2026-11-12)
+
+- **Status:** in force
+- **Context:** The draft's flags and settings keys used different words
+  for one thing. The owner: "yes, needs to be self-explanatory for
+  human and AI".
+- **Decision:** The app's executable `msr` is the command line: with
+  arguments it runs headless, without it is the app. Commands: `list`,
+  `check`, `record`, `settings`, `version`. Every settings key has a
+  flag of the same name in kebab case, with the same values. A key
+  exists only once its feature does. Low disk space is shown by a Dock
+  badge and a bouncing Dock icon, not a notification.
+- **Consequences:** Started from a terminal, macOS attributes the
+  permissions to the terminal app. Usage errors exit 64 (Swift Argument
+  Parser).
+- **Evidence:** [design/recorder.md](design/recorder.md).
+
+## D20: Recording folder, recording manifest, parallel recordings (2026-11-12)
+
+- **Status:** in force
+- **Context:** On two recorders at once the owner ruled: "should
+  prevent multiple invoications on same folder, nice if we can support
+  multiple parallel recordings that don't conflict".
+- **Decision:** Each recording has its own recording folder, named by
+  its local start time; each display file's name starts with its own
+  date and time. One recording manifest, `recording.json`, replaces the
+  reference implementation's JSON file beside each display file. A
+  recording claims its folder by creating it and refuses if it exists;
+  recordings into different folders may run in parallel, each with its
+  own crash marker. The app runs one recording at a time.
+- **Consequences:** File names are unique outside their folder and sort
+  by time.
+- **Evidence:** [design/recorder.md](design/recorder.md).
+
+## D21: HEVC in .mov, no dropped tick, timecode in every display file (2026-11-12)
+
+- **Status:** in force
+- **Context:** The draft skipped a tick the encoder could not take,
+  which breaks the constant frame rate (D11). The owner agreed to never
+  dropping one and added: "we need to write timecode into the files as
+  resolve can read them unless this is super hard". Output "must work
+  on free too (and other editor apps)"; the owner checks once with
+  Kdenlive.
+- **Decision:** Display files are HEVC 8-bit in `.mov` with AAC audio,
+  written in fragments of 2 s, with a keyframe every 2 s; both values
+  are data. Every tick is written; a late one keeps its timestamp and
+  is counted. Each display file carries a time-of-day timecode track at
+  30 fps. Apple's `SCRecordingOutput` is not used.
+- **Consequences:** If timecode cannot be combined with fragmented
+  writing, that goes back to the owner rather than being dropped.
+  Whether HDR displays are recorded as HDR is open (`backlog.md`).
+- **Evidence:** [design/recorder.md](design/recorder.md).
+
+## D22: Every audio input channel is its own mono track (2026-11-12)
+
+- **Status:** in force
+- **Context:** The owner: "all channals stay separate, whatever comes.
+  Imagine somebody plugging in a USB wireless mic reseiver with 2
+  people on L/R".
+- **Decision:** Each channel of an audio input is written as its own
+  mono track, named by device and channel; nothing is mixed down. The
+  architect's reading: system audio, a stereo mix by nature, stays one
+  stereo track.
+- **Consequences:** An input with many channels adds that many tracks
+  to every display file. Refines D12's "each source is its own track".
+- **Evidence:** [design/recorder.md](design/recorder.md).
+
+## D23: Pipeline: pre-release per PR, versions count commits, the build never sees the secret (2026-11-12)
+
+- **Status:** in force
+- **Context:** D4 left the version format and the kind of snapshot
+  release open. The owner agreed to the proposals, to "use filters" so
+  that documentation pushed to `main` publishes nothing, and to
+  accepting that a PR's pipeline run sees the signing secret before
+  review.
+- **Decision:** A snapshot release is a GitHub pre-release per PR, tag
+  `pr-<number>`, replaced on every push and removed when the PR closes.
+  A release is `v0.<N>.0`, N being the number of commits on `main`. A
+  push to `main` that changes only Markdown files publishes nothing.
+  The build script signs with an identity by name and never handles the
+  secret; one CI-only script imports it into a temporary keychain. PRs
+  from forks and from Dependabot are tested but get no snapshot
+  release.
+- **Consequences:** Release numbers can skip. Developer ID signing,
+  when it comes, needs an approval step before the signing job.
+- **Evidence:** [design/delivery.md](design/delivery.md).

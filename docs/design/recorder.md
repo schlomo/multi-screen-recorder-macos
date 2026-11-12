@@ -1,0 +1,301 @@
+# Recorder, app and command line
+
+## What this covers
+
+Everything a person types, reads or finds on disk when using Multi
+Screen Recorder, and how the recorder core produces it. Delivery
+(pipeline, versions, signing) is in [delivery.md](delivery.md). Terms
+are defined in [../glossary.md](../glossary.md).
+
+Built so far: see "Build state" at the end. Values marked *data* are
+starting points, calibrated at the v1 gate (`backlog.md`).
+
+## Command line
+
+The app's own executable is the command line (D19): with arguments it
+runs headless, without arguments it is the app. One binary means one
+code signature and one set of permissions.
+
+`/Applications/Multi Screen Recorder.app/Contents/MacOS/msr`; the
+README shows how to link it into a folder on the `PATH`.
+
+| Command | Does | Exit code |
+|---|---|---|
+| `msr list` | Shows displays, audio inputs and system audio | 0 |
+| `msr check [flags]` | Runs the ready check and prints each item | 0 ready, 1 not ready |
+| `msr record [flags] [--duration 1h30m]` | Ready check, then records until Ctrl-C, SIGTERM, SIGHUP or the duration; prints the recording folder at the start and a summary at the end | 0 ok, 1 not ready, 3 ended with an error |
+| `msr settings [flags] [--save]` | Prints the effective settings as JSON; `--save` writes the flags into the settings file | 0 |
+| `msr version` | Prints the version and commit | 0 |
+
+A usage error (unknown command or flag, invalid value) prints a usage
+message and exits 64, the convention of Swift Argument Parser.
+
+Each flag is a settings key in kebab case and overrides it for this run
+only:
+
+| Flag | Values |
+|---|---|
+| `--resolution` | `native`, `4k`, `1440p`, `1200p`, `1080p`, `720p` |
+| `--audio-mode` | `none`, `default-microphone` (`all-inputs` arrives with that feature) |
+| `--system-audio` | `on`, `off` |
+| `--output-folder` | a folder |
+| `--ready-check-hours` | a number |
+| `--low-disk-warning-minutes` | a number |
+
+`msr list` prints:
+
+```
+Displays
+  1  Built-in Retina Display   3456×2234  records at 1670×1080
+  2  LG HDR 4K                 3840×2160  records at 1920×1080
+Audio inputs
+  MacBook Pro Microphone (default), 1 channel
+  RØDE Wireless GO II RX, 2 channels
+System audio: available
+```
+
+`msr check` prints one line per item, `ok` or `FAIL`, a fix under each
+failure, and `Ready.` or `Not ready.` last:
+
+```
+ok    Screen & System Audio Recording permission
+ok    Microphone permission
+ok    Displays: 2
+ok    Audio: MacBook Pro Microphone (default), system audio
+FAIL  Free disk space: 3.1 GB in ~/Movies/Multi Screen Recorder, 4.0 GB needed for 2 hours
+      Fix: free up space, or lower --ready-check-hours
+Not ready.
+```
+
+Started from a terminal, macOS attributes the permissions to the
+terminal app, not to Multi Screen Recorder; the README says so.
+
+## Settings file
+
+`~/Library/Application Support/Multi Screen Recorder/settings.json`,
+written with the defaults on first start (D13, D19):
+
+```json
+{
+  "resolution": "1080p",
+  "audioMode": "default-microphone",
+  "systemAudio": true,
+  "outputFolder": "~/Movies/Multi Screen Recorder",
+  "readyCheckHours": 2,
+  "lowDiskWarningMinutes": 20
+}
+```
+
+An unknown key or an invalid value stops with an error naming the key;
+the app shows it and offers "Reset to defaults". A key appears only
+once its feature exists (no `agc` key until AGC is built).
+
+## Ready check
+
+Items: the Screen & System Audio Recording permission, the Microphone
+permission (unless the audio mode is `none`), at least one display, the
+chosen audio sources, and free disk space in the output folder for
+`readyCheckHours`.
+
+- A permission that was never asked for is requested, so macOS shows
+  its prompt; a denied one is reported with the System Settings path.
+- A grant is proven, not just read: the check fetches the display list
+  and opens the microphone.
+- Disk estimate (*data*): 1 GB per display per hour at 1080p, scaled by
+  the frame's pixel count.
+
+## Output on disk
+
+One recording folder per recording, named by its local start time
+(D20):
+
+```
+~/Movies/Multi Screen Recorder/2026-11-12 14.03.05/
+  2026-11-12 14.03.05 Display 1 - Built-in Retina Display.mov
+  2026-11-12 14.03.05 Display 2 - LG HDR 4K.mov
+  2026-11-12 14.27.41 Display 2 - LG HDR 4K.mov    ← back after a reconnect
+  recording.json
+```
+
+Display 1 is the main display; the others are numbered left to right,
+later arrivals in order of appearance. A display keeps its number for
+the whole recording.
+
+`recording.json` is the recording manifest, rewritten atomically on
+every change:
+
+```json
+{
+  "app": "Multi Screen Recorder 0.4.0 (a1b2c3d)",
+  "state": "recording",
+  "started": "2026-11-12T14:03:05.120+01:00",
+  "settings": { "resolution": "1080p", "audioMode": "default-microphone", "systemAudio": true },
+  "files": [
+    {
+      "name": "2026-11-12 14.03.05 Display 1 - Built-in Retina Display.mov",
+      "display": "Built-in Retina Display",
+      "frameSize": [1670, 1080],
+      "start": 0.0,
+      "end": null,
+      "timecode": "14:03:05:04",
+      "state": "recording",
+      "audioTracks": [
+        "Microphone: RØDE Wireless GO II RX, channel 1",
+        "Microphone: RØDE Wireless GO II RX, channel 2",
+        "System audio"
+      ],
+      "framesRepeatedForLateness": 0
+    }
+  ],
+  "events": [
+    { "at": 1446.2, "event": "display disconnected", "display": "LG HDR 4K" }
+  ]
+}
+```
+
+`start`, `end` and `at` are seconds from the recording's start on the
+shared clock. `state` is `recording`, `finalized` or `not finalized`.
+
+**Parallel recordings.** A recording claims its recording folder by
+creating it and refuses if it already exists. Recordings into different
+folders may run side by side (several `msr record`, or one beside the
+app); the app itself runs one at a time.
+
+**Crash marker.** While recording, a process keeps
+`~/Library/Application Support/Multi Screen Recorder/active-recordings/<process id>.json`
+naming its recording folder. On the next start, the app and `msr check`
+report each marker whose process is gone ("Recording <folder> was not
+finalized; its files are readable up to the last 2 seconds"), set that
+manifest's state to `not finalized` and remove the marker.
+
+## The app
+
+- **Start:** a small window with the recording resolution, audio mode,
+  system audio, output folder, the ready check (each item green or red
+  with its fix) and Start. Start is disabled while the ready check
+  fails.
+- **Recording:** the window closes; the Dock icon shows a red badge with
+  the elapsed minutes. Low disk space shows as a "!" badge and a
+  bouncing Dock icon; no notification, which would need a third
+  permission and is hidden by Focus modes.
+- **Stop:** clicking the Dock icon or Quit asks "Stop recording?"
+  [Stop] [Continue]. Stop finalizes, then reveals the recording folder
+  in Finder. Logout and shutdown finalize without asking.
+- **About:** version, licence, credit to the former upstream, and a link
+  to GitHub Issues that opens in the browser (D15).
+
+## How the recorder works
+
+**Shared clock.** Everything runs on the host clock. The recording's
+start t0 is one host time; every timestamp in every file is an offset
+from t0.
+
+**Constant 30 fps (D11, D21).** Per display, a ScreenCaptureKit stream
+delivers complete frames when the screen changes; the newest is kept.
+Tick k is at t0 + k/30 s, computed, never accumulated. Every tick
+writes the newest frame captured before it, with exactly the tick's
+timestamp: a frame appears at the first tick after its capture time,
+never early. No tick is ever dropped: when the encoder is not ready, the
+tick is written late with its correct timestamp and counted in
+`framesRepeatedForLateness`.
+
+**Timecode (D21).** Each display file carries a timecode track: local
+time of day at 30 fps, non-drop. All files share t0 and the tick grid,
+so their timecodes agree to the frame and an editor can place a
+later-starting file by timecode.
+
+**Encoding (D21, values are *data*).** HEVC 8-bit through the hardware
+encoder in `.mov`; keyframe every 2 s; quality-targeted variable bit
+rate with a ceiling. Audio AAC-LC at 48 kHz, 128 kbit/s per mono track,
+192 kbit/s for system audio. Apple's `SCRecordingOutput` is not used:
+it writes a variable frame rate with its own track layout.
+
+**Crash safety (D14, D21).** Files are written in fragments of 2 s
+(*data*; independent of the keyframe interval), so a crash loses at
+most the last 2 s.
+
+**Frame size (D11).** Fixed when a display file starts: the display's
+pixel size shrunk into the recording resolution box, proportions kept,
+never enlarged, each side rounded down to an even number. A display
+that changes mid-file keeps the frame size: a larger picture is shrunk
+to fit, a smaller or reshaped one is centred with black borders.
+
+**Audio (D12, D22).** Every channel of an audio input is its own mono
+track, named `Microphone: <device>, channel <n>`; system audio is one
+stereo track. Each display file gets the tracks of every source present
+when it starts; a source that disappears is padded with silence. The
+microphone comes from an `AVCaptureSession` on the default input; system
+audio from a ScreenCaptureKit stream of its own, so a failing display
+stream never takes the audio with it. Buffers are placed on the shared
+clock and written to every open display file.
+
+**Displays coming and going (D14).** A display that appears gets a
+stream and a display file; one that vanishes has its file finalized. A
+stream that fails finalizes its file and is restarted after 1 s,
+backing off to 10 s (*data*), for as long as the display exists. Each
+gap is an event in the manifest.
+
+**Disk (D14).** Below the warning threshold: the warning. A writer that
+fails on a full disk ends its file, readable up to the last fragment;
+the recorder checks free space every 5 s and starts new display files
+once there is room. Nothing written is ever deleted.
+
+**Keep awake (D14).** A power assertion against idle system and
+display sleep while recording.
+
+## Code layout
+
+```
+Package.swift             Swift 6 language mode, macOS 26, arm64
+Sources/RecorderLogic/    pure logic, Foundation only, fully unit-tested
+Sources/RecorderCore/     ScreenCaptureKit, AVFoundation and Core Audio adapters
+Sources/msr/              entry point: the command line and the app
+Tests/RecorderLogicTests/ Swift Testing
+Resources/                Info.plist, entitlements
+scripts/                  see delivery.md
+```
+
+Swift Package Manager and a bundling script rather than an Xcode
+project, whose project file cannot be reviewed by hand. One dependency:
+Swift Argument Parser, Apple's own package for command lines.
+
+## Tests
+
+`scripts/test` runs the unit tests of `RecorderLogic`: the tick grid
+(which frame lands on which tick, still periods of 60 s and more, late
+ticks), geometry for every recording resolution and change case,
+settings and flags and their errors, file naming, manifest states,
+crash markers, the version. Capture itself cannot run in CI, which has
+no way to grant the permissions [ASSUMED]; it is verified on a Mac with
+`scripts/acceptance/`, which drives `msr record` and checks the files
+with `ffprobe`, and by the v1 gate.
+
+## Not covered, and rejected
+
+- **Rust**, also as a core under a Swift shell: every framework call
+  would be `unsafe` through generated bindings (D17).
+- **One JSON file per display file** (the reference implementation):
+  with a constant frame rate on a shared clock a file needs only its
+  start offset.
+- **A global "one recording at a time" lock:** folder claims allow
+  parallel recordings at no extra cost (D20).
+- **Mixing an input down to mono or stereo:** channels may carry
+  different people (D22).
+- **A notification for low disk space:** see "The app".
+- **Sequenced after v0** (D18, `backlog.md`): audio mode `all-inputs`,
+  the audio file for a late audio source (until then a source that
+  appears mid-recording is logged as an event and joins at the next new
+  display file), AGC.
+- **The command line driving the running app**, so a terminal needs no
+  permissions of its own: deferred (`backlog.md`).
+
+## Open questions
+
+- **HDR displays:** record what the display shows (10-bit HDR) or always
+  SDR. Open until the owner decides; tracked in `backlog.md`.
+
+## Build state
+
+Nothing here is built yet. The skeleton PR builds `msr list`,
+`msr check`, `msr settings`, `msr version`, the settings file and the
+app window with the ready check; the recorder PR builds the rest.
