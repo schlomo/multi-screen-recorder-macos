@@ -6,11 +6,12 @@ The v0 design is agreed (2026-11-12, D17–D33) and written down in
 `docs/design/recorder.md` and `docs/design/delivery.md`. v0 arrives as
 two PRs (D18).
 
-The skeleton and pipeline PR (#1) is built, reviewed in three rounds
+The skeleton and pipeline PR (#1) is built, adversarially reviewed
 and publishes a signed snapshot release. Until it is merged, what is
 left is under "In flight": the owner's check on the Mac and the merge.
 Next for an architect session once it is merged: get the owner's
-ruling on the default microphone (first open question in
+ruling on what happens when the default microphone changes during a
+recording (listed under "Open questions" in
 `docs/design/recorder.md`), then brief the recorder PR; the app icon PR
 can run beside it.
 
@@ -72,6 +73,16 @@ can run beside it.
    - A display mode change can arrive as a disconnect and a reconnect;
      short-lived modes need a settle time, or they make many short
      files.
+   - Small findings left from the last review of PR #1, to fix with it:
+     the manifest has no event for a display that connects, though it
+     has one for an audio input; the glossary's "Audio file" does not
+     name the channel count change that ends one; `scripts/unpack-app`
+     compares member names case-sensitively on a case-insensitive file
+     system (nothing leaves the bundle, but its claim about symbolic
+     links is then not literally true); an `Info.plist` with a
+     malformed date still gives a Python traceback instead of a
+     message (it stops either way); `scripts/sign-app` says "the 1
+     commits".
 3. **Audio after v0** (D12, D18), each its own PR: the audio mode all
    inputs; AGC, with its own design, its column in the window's Audio
    table and the HDMI test.
