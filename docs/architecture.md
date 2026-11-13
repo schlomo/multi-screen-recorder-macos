@@ -95,7 +95,7 @@ D28).
 - Safeguards: a ready check before Start, low-disk warnings,
   crash-safe fragmented files, keeping the Mac awake (D14). The window
   shows what will be recorded and what it costs in disk space (D26,
-  D33).
+  D33), and follows displays and audio inputs as they change (D36).
 - No network connections; feedback goes to GitHub Issues (D15).
 
 ### Front ends

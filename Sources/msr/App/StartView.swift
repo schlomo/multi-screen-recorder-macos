@@ -112,6 +112,11 @@ private struct WhatWillBeRecordedView: View {
                     }
                 }
             }
+            if let error = section.audioError {
+                Label(error, systemImage: "exclamationmark.triangle.fill")
+                    .foregroundStyle(.red)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
             Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 2) {
                 header(WhatWillBeRecorded.audioColumns)
                 ForEach(Array(section.audio.enumerated()), id: \.offset) { _, source in
@@ -153,7 +158,7 @@ private struct ReadyCheckView: View {
                 Text("Ready check").font(.headline)
                 if isChecking { ProgressView().controlSize(.small) }
                 Spacer()
-                Button("Check again", action: checkAgain).disabled(isChecking)
+                Button("Check again", action: checkAgain)
             }
             if let result {
                 if result.isReady {

@@ -123,14 +123,16 @@ read does not count), the output folder, and free disk space in the output folde
   its prompt; a denied one is reported with the System Settings path.
 - The screen recording grant is proven, not just read: the check
   fetches the display list. The Microphone permission is read, and no
-  microphone is opened: a capture session opened for a moment on every
-  check crashed the app inside macOS when the default microphone was
-  unplugged (owner's Mac, 2026-11-13;
-  [troubleshooting.md](../troubleshooting.md)). With the permission
-  granted but no microphone connected, the permission item passes and
-  the audio item alone fails, with "no microphone". The audio inputs
-  are read from Core Audio's device list, which creates no capture
-  object.
+  microphone is opened (D36, waiting for the owner's yes): the app
+  crashed inside macOS after the default microphone was unplugged
+  (owner's Mac, 2026-11-13), and the capture session an earlier ready
+  check opened for a moment on every run is the cause [ASSUMED]. With
+  the permission granted but no microphone connected, the permission
+  item passes and the audio item alone fails, with "no microphone".
+  The audio inputs are read from Core Audio's device list, which
+  creates no capture object; if that list, the default audio input or
+  a device's name cannot be read, the audio item fails with the reason
+  and `msr list` stops with it.
 - Output folder: the check creates it with its parents if it is
   missing, then writes and deletes a file in it; a failure names the
   path and the reason.
@@ -144,15 +146,21 @@ read does not count), the output folder, and free disk space in the output folde
   is 2.2 GB per hour, 4.3 GB for 2 hours (the tables in "The app" show
   each file).
 - One cause, one red item: when the output folder fails, or the
-  displays or an audio input the recording records cannot be read, the
-  free disk space item is left out.
+  displays, the audio inputs or an audio input the recording records
+  cannot be read, the free disk space item is left out. With the audio
+  mode `none`, audio inputs that cannot be read fail nothing.
 - In the app the check runs when the window opens, when the app becomes
-  active again (unless a check is still running), when a display or an
-  audio input comes, goes or changes, after every settings change, and
-  on "Check again"; the tables of what will be recorded follow with it.
-  A burst of changes gives one check, 0.3 s after the last (*data*).
-  While a menu of the window is open nothing in the window changes; a
-  change that arrives then is acted on when the menu closes. It never
+  active again (unless a check is still running), when a display
+  comes, goes or changes, when an audio device comes or goes, when the
+  default audio input changes, after every settings change, and on
+  "Check again"; the tables of what will be recorded follow with it.
+  Other changes of an audio input, such as its channels, show with the
+  next check. A burst of changes gives one check, 0.3 s after the last
+  (*data*). While a menu of the app is open or a control is dragged,
+  the window's content does not change by itself; the check's result
+  shows when the menu closes (the app crashed in AppKit's window
+  layout during a display change while a menu was open; a change of
+  the content under the menu is the cause [ASSUMED]). It never
   runs while a recording is running, activation included (for the
   recorder PR to honour).
 
@@ -419,9 +427,9 @@ mono mix of all recorded microphone channels, unless the audio mode is
 `none`; "System audio", stereo, unless system audio is off. The two are
 never mixed together, and a source that is missing is silence in its
 guide track. The microphone comes from an `AVCaptureSession` on the
-default input (to be tried before it is built: the ready check's
-short-lived capture sessions crashed the app when the microphone was
-unplugged, see "Ready check"); system audio from a ScreenCaptureKit stream of its own,
+default input (to be tried before it is built: the app crashed after
+the microphone was unplugged, and the ready check's short-lived
+capture sessions are the cause [ASSUMED], see "Ready check"); system audio from a ScreenCaptureKit stream of its own,
 so a failing display stream never takes the audio with it. Buffers are
 placed on the shared clock and written to the audio files and the
 guide tracks of every open display file.
@@ -466,7 +474,10 @@ ticks), geometry for every recording resolution and change case,
 settings and flags and their errors, file naming, manifest states,
 crash markers, the version, and the text of the examples in this
 document, which the tests hold to the code. `RecorderCoreTests` test
-the output folder probe against scratch folders. `CommandTests` run
+the output folder probe against scratch folders, and that this Mac's
+audio inputs can be read and their changes watched, which needs no
+permission and shows no prompt. The window's refresh on device changes
+has no test yet (`backlog.md`, recorder PR). `CommandTests` run
 the built `msr` with a scratch `HOME` (`msr settings` and
 `msr version`, which prompt for nothing; also through a symbolic link
 into an app bundle), `scripts/version` in scratch git repositories and
@@ -531,8 +542,8 @@ with it ("What will be recorded", "Check again", Start
 always disabled, "This build cannot record yet."), the About window,
 the code layout above, and the tests of
 settings, geometry, the disk estimate, the ready check, the output
-folder probe, "What will be recorded", `msr list`, the frame size
-rule, the version, the exit codes and the scripts. The recorder PR builds the rest:
+folder probe, the audio input listing, "What will be recorded",
+`msr list`, the frame size rule, the version, the exit codes and the scripts. The recorder PR builds the rest:
 `msr record`, recording, the recording manifest, crash markers,
 timecode, the Dock badge and Stop.
 

@@ -93,32 +93,3 @@ import Testing
         #expect(try String(contentsOf: folder, encoding: .utf8) == "not a folder")
     }
 }
-
-@Suite struct AudioInputTests {
-    @Test func onlyDevicesWithInputChannelsAreAudioInputsAndTheDefaultIsMarked() {
-        let readings = [
-            AudioDeviceReading(id: 41, name: "Speakers", inputChannelCount: nil),
-            AudioDeviceReading(id: 42, name: "Desk Microphone", inputChannelCount: .success(1)),
-            AudioDeviceReading(id: 43, name: "Interface", inputChannelCount: .success(2)),
-        ]
-        #expect(audioInputs(from: readings, defaultInput: 43) == [
-            AudioInputInfo(name: "Desk Microphone", channelCount: 1, isDefault: false),
-            AudioInputInfo(name: "Interface", channelCount: 2, isDefault: true),
-        ])
-    }
-
-    @Test func anInputWhoseChannelsCannotBeReadKeepsItsReason() {
-        let error = DeviceReadError("no channels")
-        let readings = [AudioDeviceReading(id: 7, name: "Broken", inputChannelCount: .failure(error))]
-        #expect(audioInputs(from: readings, defaultInput: nil) == [
-            AudioInputInfo(name: "Broken", channelCount: .failure(error), isDefault: false),
-        ])
-    }
-
-    /// Listing needs no permission and no device, so it runs anywhere.
-    @Test func thisMacsAudioInputsAreListedWithAtMostOneDefault() {
-        let inputs = currentAudioInputs()
-        #expect(inputs.filter(\.isDefault).count <= 1)
-        #expect(inputs.allSatisfy { !$0.name.isEmpty })
-    }
-}

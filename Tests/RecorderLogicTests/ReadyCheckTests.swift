@@ -12,13 +12,14 @@ import Testing
         microphoneGranted: Bool? = true,
         displays: Result<[DisplayInfo], DeviceReadError>? = nil,
         audioInputs: [AudioInputInfo] = builtInMicrophoneOnly,
+        audioInputsError: DeviceReadError? = nil,
         outputFolder: OutputFolderProbe = .usable(.bytes(100_000_000_000))
     ) -> ReadyCheckFacts {
         ReadyCheckFacts(
             screenRecording: screenRecording,
             microphoneGranted: microphoneGranted,
             displays: displays ?? .success(fullHDDisplays),
-            audioInputs: audioInputs,
+            audioInputs: audioInputsError.map { .failure($0) } ?? .success(audioInputs),
             outputFolder: outputFolder
         )
     }
@@ -162,6 +163,28 @@ import Testing
                 fix: "reconnect the audio inputs, then check again"),
         ])
         #expect(!result.items.contains { $0.title.hasPrefix("Free disk space") })
+    }
+
+    private static let unreadableList = DeviceReadError("the list of audio devices cannot be read (Core Audio error 560947818)")
+
+    @Test func anUnreadableListOfAudioInputsFailsOnceWithTheReason() {
+        let result = ReadyCheck.evaluate(facts(audioInputsError: Self.unreadableList), settings: .defaults)
+        #expect(result.items.filter { !$0.passed } == [
+            ReadyCheckItem(
+                title: "Audio: cannot be read (the list of audio devices cannot be read (Core Audio error 560947818))",
+                passed: false,
+                fix: "reconnect the audio inputs, then check again"),
+        ])
+        #expect(!result.items.contains { $0.title.hasPrefix("Free disk space") })
+    }
+
+    @Test func audioModeNoneNeedsNoReadableListOfAudioInputs() {
+        var settings = Settings.defaults
+        settings.audioMode = .none
+        let result = ReadyCheck.evaluate(
+            facts(microphoneGranted: nil, audioInputsError: Self.unreadableList), settings: settings)
+        #expect(result.isReady)
+        #expect(result.items.contains { $0.title.hasPrefix("Free disk space") })
     }
 
     @Test func theDiskEstimateCountsTheAudioFilesAndGuideTracks() throws {

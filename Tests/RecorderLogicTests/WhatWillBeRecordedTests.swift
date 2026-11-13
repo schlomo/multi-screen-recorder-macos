@@ -8,11 +8,13 @@ import Testing
         _ edit: (inout Settings) -> Void = { _ in },
         displays: Result<[DisplayInfo], DeviceReadError> = .success(DesignExample.displays),
         audioInputs: [AudioInputInfo] = DesignExample.audioInputs,
+        audioInputsError: DeviceReadError? = nil,
         outputFolder: OutputFolderProbe? = designFolder
     ) -> WhatWillBeRecorded {
         var settings = Settings.defaults
         edit(&settings)
-        return WhatWillBeRecorded(settings: settings, displays: displays, audioInputs: audioInputs, outputFolder: outputFolder)
+        return WhatWillBeRecorded(settings: settings, displays: displays,
+            audioInputs: audioInputsError.map { .failure($0) } ?? .success(audioInputs), outputFolder: outputFolder)
     }
 
     @Test func theDefaultsWithTheDesignsDevices() {
@@ -24,6 +26,7 @@ import Testing
                 .init(number: 2, name: "LG HDR 4K", looksLike: "3840×2160", drawnAt: "3840×2160",
                       recordsAt: "1920×1080", gigabytesPerHour: "1.1"),
             ],
+            audioError: nil,
             audio: [
                 .init(name: "MacBook Pro Microphone (default)", channels: "1", isRecorded: true, gigabytesPerHour: "0.1"),
                 .init(name: "RØDE Wireless GO II RX", channels: "2", isRecorded: false, gigabytesPerHour: "not recorded"),
@@ -119,5 +122,19 @@ import Testing
             == .init(name: "X (default)", channels: "cannot be read", isRecorded: true, gigabytesPerHour: "unknown"))
         #expect(broken.displays == section().displays)
         #expect(broken.total == nil)
+    }
+
+    @Test func anUnreadableListOfAudioInputsIsSaidAndLeavesTheTotalOut() {
+        let broken = section(audioInputsError: DeviceReadError("no list"))
+        #expect(broken.audioError == "The audio inputs cannot be read: no list")
+        #expect(broken.audio.map(\.name) == ["System audio"])
+        #expect(broken.displays == section().displays)
+        #expect(broken.total == nil)
+    }
+
+    @Test func audioModeNoneKeepsTheTotalWithoutTheListOfAudioInputs() {
+        let broken = section({ $0.audioMode = .none }, audioInputsError: DeviceReadError("no list"))
+        #expect(broken.audioError == "The audio inputs cannot be read: no list")
+        #expect(broken.total == section({ $0.audioMode = .none }).total)
     }
 }

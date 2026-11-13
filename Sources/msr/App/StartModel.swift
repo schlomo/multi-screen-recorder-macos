@@ -18,7 +18,10 @@ final class StartModel {
     private(set) var isChecking = false
     @ObservationIgnored private var checkTask: Task<Void, Never>?
     @ObservationIgnored private var refreshTask: Task<Void, Never>?
-    @ObservationIgnored private var gate = RefreshGate()
+
+    /// How long the devices get to settle before they are read again: one
+    /// change of a display or an audio device arrives as a burst of notices.
+    static let deviceChangeSettleTime = Duration.milliseconds(300)
 
     init(homeFolder: URL) {
         self.homeFolder = homeFolder
@@ -69,27 +72,21 @@ final class StartModel {
         refreshSoon()
     }
 
-    /// A display or an audio input came, went or changed.
+    /// A display came, went or changed, an audio device came or went, or the
+    /// default audio input changed.
     func devicesChanged() {
         refreshSoon()
     }
 
-    func menuOpened() {
-        gate.menuOpened()
-    }
-
-    func menuClosed() {
-        if gate.menuClosed() { refreshSoon() }
-    }
-
-    /// Re-reads the devices and re-runs the ready check shortly, once for a
-    /// burst of changes, and never while a menu of the window is open.
+    /// Re-reads the devices and re-runs the ready check once the devices
+    /// have settled, once for a burst of changes.
     private func refreshSoon() {
         guard settingsError == nil else { return }
         refreshTask?.cancel()
         refreshTask = Task {
-            try? await Task.sleep(for: .milliseconds(300))
-            guard !Task.isCancelled, gate.changeArrived() else { return }
+            try? await Task.sleep(for: Self.deviceChangeSettleTime)
+            await untilNoMenuIsOpen()
+            guard !Task.isCancelled else { return }
             checkAgain()
         }
     }
@@ -101,7 +98,7 @@ final class StartModel {
         whatWillBeRecorded = WhatWillBeRecorded(
             settings: settings,
             displays: Result { () throws(DeviceReadError) in try currentDisplays() },
-            audioInputs: currentAudioInputs(),
+            audioInputs: Result { () throws(DeviceReadError) in try currentAudioInputs() },
             outputFolder: nil)
         checkTask?.cancel()
         isChecking = true
@@ -109,15 +106,26 @@ final class StartModel {
         let homeFolder = homeFolder
         checkTask = Task {
             let facts = await probeReadyCheckFacts(settings: settings, homeFolder: homeFolder)
+            await untilNoMenuIsOpen()
+            // A newer check has replaced this one and shows its own result.
             guard !Task.isCancelled else { return }
-            // A menu opened meanwhile: nothing changes under it, and the check
-            // that runs when it closes shows the result.
-            guard gate.changeArrived() else { return }
             readyCheck = ReadyCheck.evaluate(facts, settings: settings)
             whatWillBeRecorded = WhatWillBeRecorded(
                 settings: settings, displays: facts.displays, audioInputs: facts.audioInputs,
                 outputFolder: facts.outputFolder)
             isChecking = false
+        }
+    }
+
+    /// Returns at once in the normal case, and otherwise when the open menu
+    /// or the dragged control is let go: while the app tracks one, the main
+    /// run loop is not in its default mode. The window's content does not
+    /// change under an open menu; the app was ended by an exception in
+    /// AppKit's window layout while a menu was open, and a change of the
+    /// content at that moment is the cause [ASSUMED].
+    private func untilNoMenuIsOpen() async {
+        await withCheckedContinuation { continuation in
+            RunLoop.main.perform(inModes: [.default]) { continuation.resume() }
         }
     }
 }

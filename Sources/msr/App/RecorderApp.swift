@@ -19,13 +19,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var startWindow: NSWindow?
     private var aboutWindow: NSWindow?
     private var model: StartModel?
-    private var audioInputWatcher: AudioInputWatcher?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.mainMenu = makeMainMenu()
-        let home: URL
+        let model: StartModel
         do {
-            home = try homeFolder()
+            model = StartModel(homeFolder: try homeFolder())
+            try watchAudioInputs { model.devicesChanged() }
         } catch {
             let alert = NSAlert()
             alert.messageText = "Multi Screen Recorder cannot start"
@@ -34,29 +34,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             NSApp.terminate(nil)
             return
         }
-        let model = StartModel(homeFolder: home)
+        // Posted when a display comes or goes or changes its resolution.
+        _ = NotificationCenter.default.addObserver(
+            forName: NSApplication.didChangeScreenParametersNotification, object: nil, queue: .main
+        ) { _ in
+            MainActor.assumeIsolated { model.devicesChanged() }
+        }
         self.model = model
         startWindow = makeWindow(title: "Multi Screen Recorder", content: StartView(model: model))
         startWindow?.center()
         startWindow?.makeKeyAndOrderFront(nil)
         NSApp.activate()
         model.load()
-        watchDevicesAndMenus(model)
-    }
-
-    /// The window follows displays and audio inputs as they change, and holds
-    /// still while one of its menus is open.
-    private func watchDevicesAndMenus(_ model: StartModel) {
-        audioInputWatcher = AudioInputWatcher { model.devicesChanged() }
-        let center = NotificationCenter.default
-        let observe = { (name: Notification.Name, action: @escaping @MainActor () -> Void) in
-            _ = center.addObserver(forName: name, object: nil, queue: .main) { _ in
-                MainActor.assumeIsolated(action)
-            }
-        }
-        observe(NSApplication.didChangeScreenParametersNotification) { model.devicesChanged() }
-        observe(NSMenu.didBeginTrackingNotification) { model.menuOpened() }
-        observe(NSMenu.didEndTrackingNotification) { model.menuClosed() }
     }
 
     func applicationDidBecomeActive(_ notification: Notification) {
@@ -76,9 +65,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func makeWindow(title: String, content: some View) -> NSWindow {
-        // The window takes its size from the content's preferred size. Left to
-        // layout constraints, a display change under the window made AppKit
-        // give up after too many layout passes and end the app.
+        // The window takes its size from the content's preferred size. The app
+        // was ended by an exception in AppKit's window layout after a display
+        // changed; sizing the window by layout constraints is the cause [ASSUMED].
         let hosting = NSHostingController(rootView: content)
         hosting.sizingOptions = [.preferredContentSize]
         let window = NSWindow(contentViewController: hosting)
