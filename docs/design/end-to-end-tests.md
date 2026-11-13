@@ -1,16 +1,17 @@
 # End-to-end tests
 
-**Status: proposed, not signed off, nothing built or tried.** The owner
-asked for this document (2026-11-13) after ruling that automated
-end-to-end tests run on the owner's Mac first (D34). It stays on its
-work branch until the owner signs it off; merging it is that sign-off.
-The same change then records it in the decisions log and removes
-"proposed" here, in [recorder.md](recorder.md) "Tests", in the
-backlog's item and in the glossary.
+**Status: proposed, not signed off, nothing built.** The owner asked
+for this document (2026-11-13) after ruling that automated end-to-end
+tests run on the owner's Mac first (D34), and has since ruled on five
+of its open questions (D35). It stays on its work branch until the
+owner signs it off; merging it is that sign-off. The same change then
+records the sign-off in the decisions log and removes "proposed" here,
+in [recorder.md](recorder.md) "Tests", in the backlog's item and in
+the glossary.
 
 Every statement about what a tool or macOS does comes from web
 research of 2026-11-13 (sources at the end) and is UNVERIFIED on this
-project's Mac until the experiments under "Unknowns" have run.
+project's Mac, except what "Unknowns" marks as tried.
 
 ## What this covers
 
@@ -52,21 +53,33 @@ any scenario. So three kinds of scenario use the same code:
   time. A failure prints its seed, and the seed replays the sequence.
   This covers ground no one thought of.
 
-**Three parts, kept apart:**
+**Three parts, kept apart, all Swift, in the package** (the owner left
+the language to the architect, D35; the reasons are under "Why not
+otherwise"). They are one executable of its own, never in the app
+bundle, which `scripts/build-app` assembles from `msr` alone.
+`scripts/end-to-end-test` is a few lines that build and start it;
+`scripts/` holds scripts only, so the tests' code and data live in the
+package (D35).
 
-1. **Device helper,** a Swift executable in the package, never in the
-   app bundle. It makes the events and the known picture and sound.
-   Each virtual display lives in a process of its own, so ending the
-   process disconnects it.
-2. **Driver,** a Python program (standard library only, as the scripts
-   of D32): reads a scenario, starts the helper and the recorder,
+1. **Device helper.** It makes the events and the known picture and
+   sound. Each virtual display lives in a process of its own, a
+   subcommand of the executable, so ending the process disconnects it.
+2. **Driver:** reads a scenario, starts the helper and the recorder,
    fires the events on a clock, stops the recorder, runs the
    assertions, prints one line per failed assertion and exits non-zero
    on any. It requires `ffprobe` and `ffmpeg` on the `PATH` up front.
 3. **Assertions,** part of the driver. They read the recording folder,
    as a person would have it afterwards, and what the driver itself
    saw: the recorder's exit status and messages, and the crash marker
-   under the scratch `HOME`.
+   under the scratch `HOME`. They read the recording manifest and the
+   files through code of their own and through `ffprobe` and `ffmpeg`,
+   never through the recorder's code: a fault shared with the recorder
+   would hide itself.
+
+Everything that needs no device and no `ffmpeg` is a library target
+with unit tests in `scripts/test`, so the pipeline gates it: scenarios,
+seeds, sampling, the manifest assertions, reading `ffprobe`'s output,
+and the pattern, drawn and decoded again in memory.
 
 **Each assertion is first seen failing** against a recording folder
 broken on purpose (a frame removed, a track swapped, a file missing
@@ -75,18 +88,15 @@ the broken samples with `ffmpeg` when run, so no media file is
 committed. The samples start from a short recording
 folder that the self-test also builds with `ffmpeg`, in the layout of
 [recorder.md](recorder.md) "Output on disk". The self-test is not part
-of `scripts/test`, which must not come to need `ffmpeg`; `scripts/test`
-compiles the driver, as it does the other Python scripts, and its
-logic that needs no media (scenarios, seeds, the manifest assertions)
-is tested there. That the pipeline does not run the media assertions'
-self-test is an accepted risk, below.
+of `scripts/test`, which must not come to need `ffmpeg`. That the
+pipeline does not run this self-test is an accepted risk, below.
 
 **The Mac's own devices do not leak into the result.** The driver
 lists displays and audio inputs before a run and asserts exactly only
 on the virtual ones it adds; for the Mac's own displays and audio
 inputs it asserts only that their files are readable and listed.
 
-**Started by a person, in that person's session.** A run adds
+**Started by a person, in that person's own session** (D35). A run adds
 displays, covers every display with a pattern and changes the default
 microphone: the Mac cannot be used meanwhile. An agent never starts
 one unasked (`AGENTS.md`, "Facts that bite"). Not part of
@@ -109,7 +119,12 @@ it carry the same tone and cannot be told apart by content; the Mac's
 own microphone records the room and is asserted only as "not silent";
 whether a tone played into a loopback device also lands in system
 audio is unknown. Telling several audio inputs apart by content needs
-a test audio driver that generates a tone per device; see "Unknowns".
+several loopback devices, each with its own tone. The owner: own
+helpers "might be useful if cheap to build" (D35). The cheap way,
+untried: BlackHole comes as three drivers (2, 16 and 64 channels) that
+are said to install side by side, and its source builds further
+drivers under other names; a test audio driver of our own is built
+only if that falls short. See "Unknowns".
 
 ### Error classes
 
@@ -186,24 +201,23 @@ have them yet; they go into the recorder PR's design:
 
 ## Permissions
 
-The two permissions are granted once by a person. Two things are open
-and decide how a run is started:
+The two permissions are granted once by a person.
 
-- **Who holds them.** A `msr` started from a terminal is attributed to
-  the terminal app ([recorder.md](recorder.md), "Command line"), so the
-  terminal app holds Screen Recording and Microphone, and so does
-  every program started in it, an agent's shell included. That is a
-  security cost. Two ways out, neither tried: the driver starts the
-  recorder through macOS (`open`), so that the app holds the
-  permissions, if the driver then still gets what it needs (the
-  recorder's process to signal, its exit status and its messages); or
-  the tests run in a terminal app used for nothing else. The owner
-  chooses once the experiment under "Unknowns" has shown what `open`
-  gives.
-- **Whether they survive a rebuild.** With one signing certificate they
-  should (D5), which D5 itself marks unverified until the owner's check
-  on PR #1. A build signed ad hoc is reported to lose them with every
-  rebuild, so a run always uses a build signed with the certificate.
+- **Who holds them: the app the run is started from** (D35). A `msr`
+  started from a terminal is attributed to the terminal app
+  ([recorder.md](recorder.md), "Command line"), so that app holds
+  Screen Recording and Microphone, and so does every program started in
+  it, an agent's shell included. The owner accepts that: "whoever runs
+  it, if needed the terminal or vscode (my vscode has already)". The
+  driver starts the recorder as its own child process, which gives it
+  the process to signal, the exit status and the messages. Before
+  anything else the driver asks macOS, without raising a prompt,
+  whether both are granted, and stops with the name of the missing
+  permission if not.
+- **Whether they survive a rebuild** then does not depend on the
+  build's signature, because the app the run is started from holds
+  them, not `msr`. [ASSUMED from the attribution above; the first run
+  shows it.]
 
 ## What research found for the recorder
 
@@ -217,8 +231,9 @@ For the recorder PR's design, each UNVERIFIED here:
   this fault in daily use, is a question for the owner.
 - **A plain executable no longer appears in the Screen Recording list**
   (macOS 26.1, called a bug by Apple); see "Permissions".
-- **A build signed ad hoc loses its permissions with every rebuild;**
-  see "Permissions".
+- **A build signed ad hoc is reported to lose its permissions with
+  every rebuild.** That concerns the app started from Finder, which
+  holds its own permissions (D5), not a run of these tests.
 
 ## Safeguards for the person's session
 
@@ -251,7 +266,9 @@ scenarios should take minutes, combinations and random runs as long as
 their time budget; the Mac is not usable during a run. Once: installing
 BlackHole and `ffmpeg`. Building the helper, the driver and the first
 scenarios is the larger cost, estimated at one PR the size of the
-skeleton PR; the pattern decoder is the uncertain part.
+skeleton PR; the pattern decoder is the uncertain part. The pipeline
+compiles and unit-tests the tests' code with every push, which adds to
+its run time.
 
 ## Why not otherwise
 
@@ -274,6 +291,24 @@ skeleton PR; the pattern decoder is the uncertain part.
 - **Faking ScreenCaptureKit and CoreAudio inside the unit tests:** fast
   and worth having for the recorder's logic, but it tests our idea of
   what macOS does, not what it does.
+- **A driver in Python,** beside the other scripts (D32): it would
+  need Python 3.15 on the owner's Mac, which macOS does not ship; its
+  tests would reach `scripts/test` only through commands; and scenario,
+  event and pattern would be defined twice, in Python for the driver
+  and in Swift for the device helper. In Swift the compiler checks all
+  of it, one test suite covers it, and an agent changing an event
+  changes one definition.
+- **The driver inside the Swift test suite,** as tests with a tag:
+  `swift test` would then need displays, permissions and `ffmpeg` for
+  some of its tests, and a random run with a seed and a time budget is
+  a program with arguments, not a test case.
+- **Starting the recorder through macOS (`open`)** so that the app
+  holds the permissions: untried, and the driver would be expected to
+  lose the recorder's process, exit status and messages; the owner
+  accepts the terminal app holding the permissions (D35).
+- **A second user account for the runs:** the owner is at the Mac for
+  a run in any case (D35), and no source says ScreenCaptureKit works
+  in a session that is not in front.
 - **`displayplacer` and `SwitchAudioSource`:** the helper does what
   they do through the same public interfaces, with two tools fewer to
   install.
@@ -285,10 +320,10 @@ skeleton PR; the pattern decoder is the uncertain part.
 - Fast connect and disconnect cycles are reported flaky in macOS
   itself; a failure there must be told apart from a recorder fault,
   and a flake is root-caused, never retried blindly.
-
-- The pipeline does not gate the assertions that read media: their
-  self-test needs `ffmpeg` and runs on a Mac, before a run and when
-  the driver changes. A change that breaks them is seen at the next
+- The pipeline does not gate the self-test, which needs `ffmpeg` and
+  runs on a Mac, before a run and when the driver changes. What it
+  alone covers is whether an assertion still fails on real files
+  broken on purpose; a change that breaks that is seen at the next
   run, not at the PR.
 
 ## Unknowns, each settled by a small experiment
@@ -297,35 +332,32 @@ Throwaway code, run by the owner or on the owner's go-ahead, before
 this design is built:
 
 - a virtual display appears in ScreenCaptureKit and delivers a real
-  picture;
+  picture. **Tried in part** (2026-11-13, macOS 26.7.1, three runs,
+  from an app without Screen Recording): a virtual display of 1920 ×
+  1080 is created without an administrator and is an active display
+  within 0.4 s; AppKit lists it as a screen about a second later, and
+  only to a program that handles its events; macOS placed it left of
+  the main display; it is gone when its process ends; each run got a
+  new display number (5, 6, 7) for the same vendor, product and serial
+  number, so a display number does not identify a display across a
+  reconnect. The capture part stopped as built: Screen Recording was
+  not granted and no prompt was raised. Still open: the picture;
 - two virtual displays, one reconnects: does the wrong-display fault
   show on this Mac;
 - an aggregate device created and removed is seen as an audio input
   appearing and vanishing; a change of its members arrives as a channel
   count change; it needs no administrator;
-- a recorder started through `open` is attributed to the app, not the
-  terminal, and the driver still gets its process to signal, its exit
-  status and its messages, also for a second recording in parallel;
+- BlackHole's drivers install side by side and each carries its own
+  tone;
 - BetterDisplay's command line returns only when the change is done;
 - a tone played into the loopback device is, or is not, in system
   audio and on the speakers.
 
 ## Open questions
 
-- Is the driver Python, or part of the Swift test suite with a tag?
-  Proposed: Python, beside the other scripts.
-- The folder: [recorder.md](recorder.md) names `scripts/acceptance/`,
-  while "acceptance tests" is what the v1 gate calls a person's
-  checks. Proposed: `scripts/end-to-end-test` for the driver, and
-  "acceptance test" kept for the v1 gate.
 - Which items of the v1 gate these tests replace.
-- A test audio driver (an AudioServerPlugIn installed once by an
-  administrator) that presents several audio inputs, each with its own
-  tone: worth building, or is one virtual audio input enough?
-- May a run change the default microphone and add displays in the
-  person's own session, or does it need a second user account (no
-  source says ScreenCaptureKit works in a session that is not in
-  front)?
+- Does the owner's BetterDisplay HiDPI mode work through virtual
+  screens ("What research found for the recorder")?
 
 ## Sources
 

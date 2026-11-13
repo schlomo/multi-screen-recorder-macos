@@ -457,10 +457,10 @@ no tar would write them from a file system), `scripts/sign-app` and
 `scripts/smoke-test` runs the built app's `msr` the same way in the
 pipeline.
 Capture itself cannot run in CI, which has
-no way to grant the permissions [ASSUMED]; it is verified on a Mac with
-`scripts/acceptance/`, which drives `msr record` and checks the files
-with `ffprobe`, and by the v1 gate. A fuller design for automated
-end-to-end tests is proposed, not signed off, in
+no way to grant the permissions [ASSUMED]; it is verified on a Mac by
+end-to-end tests, which drive `msr record` and check the files with
+`ffprobe`, and by the v1 gate. The design of the end-to-end tests is
+proposed, not signed off, in
 [end-to-end-tests.md](end-to-end-tests.md).
 
 ## Not covered, and rejected
@@ -509,7 +509,7 @@ Built (skeleton PR): `msr list`, `msr check`, `msr settings`,
 `msr version`, the settings file, the ready check and the app window
 with it ("What will be recorded", "Check again", Start
 always disabled, "This build cannot record yet."), the About window,
-the code layout above except `scripts/acceptance/`, and the tests of
+the code layout above, and the tests of
 settings, geometry, the disk estimate, the ready check, the output
 folder probe, "What will be recorded", `msr list`, the frame size
 rule, the version, the exit codes and the scripts. The recorder PR builds the rest:

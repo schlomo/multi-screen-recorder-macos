@@ -30,7 +30,9 @@ other file of PR #1 changed. In order, the next architect session:
    command that only reads rewrites the settings file. The glossary
    gains "auto mode" and "looks like".
 3. Gets the owner's sign-off, or changes, on the proposed design for
-   end-to-end tests (queued item 5, draft PR #2).
+   end-to-end tests (queued item 5, draft PR #2). The owner ruled on
+   five of its questions (D35). Its first experiment still needs the
+   capture part: run from an app that holds Screen Recording.
 4. Briefs the recorder PR (queued item 2) with the first end-to-end
    tests.
 
@@ -69,8 +71,8 @@ other file of PR #1 changed. In order, the next architect session:
    Stop in the app, a display file per display and an audio file per
    source with guide tracks (D31), a new display file when the frame
    size changes (D30), timecode in every file (D21, D31), mono tracks
-   per channel (D22), SDR with the colour space tagged (D24),
-   `scripts/acceptance/`. The system audio stream needs a display to
+   per channel (D22), SDR with the colour space tagged (D24). The
+   system audio stream needs a display to
    attach to and must move when that display disappears.
    Its brief must cover what the reviews of PR #1 found for it:
    - This PR also builds auto mode with its setting `auto`, the
@@ -154,8 +156,9 @@ other file of PR #1 changed. In order, the next architect session:
    [docs/design/end-to-end-tests.md](docs/design/end-to-end-tests.md)
    (draft PR #2): tests by error class, what the recorder design must
    provide for them, the experiments that settle its unknowns, and its
-   open questions. Nothing of it is built or tried. The tests are
-   started by a person, never unasked by an agent.
+   open questions. The owner's rulings on it so far are D35. Nothing
+   of it is built; of the experiments, the first has run in part. The
+   tests are started by a person, never unasked by an agent.
 6. **App icon**, its own PR after PR #1 is merged; until then the app
    has the default icon. The owner chose the drawing (2026-11-12):
    three displays fanned in depth on a graphite tile, one red record
