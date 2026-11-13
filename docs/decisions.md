@@ -705,8 +705,9 @@ architect's reading.
 ## D34: Auto mode, a settings file that is never refused, and the owner's other rulings of 2026-11-13 (2026-11-13)
 
 - **Status:** in force; not built yet. `docs/design/recorder.md`, the
-  glossary and the code still describe PR #1 as built and follow in the
-  change that builds this.
+  glossary, the README and the code still describe PR #1 as built and
+  follow in the change that builds this; `docs/architecture.md` names
+  this entry as agreed and not built.
 - **Context:** The owner, on 2026-11-13:
   1. "default microphone should do what it says and follow changes".
   2. "why json config, why not defaults write?", then "keep JSON and
@@ -745,9 +746,10 @@ architect's reading.
      No table of renamed keys before the first release.
   4. Auto mode (the form is the architect's proposal, agreed): one
      setting `auto`, on by default; the other choices stay in the
-     settings file and are ignored while it is on. In auto mode every
-     display is recorded at its "looks like" size, system audio is
-     recorded, and the audio inputs recorded are all built-in and wired
+     settings file and are ignored while it is on. System audio
+     stays a switch of its own, on by default and obeyed in auto mode
+     too. In auto mode every display is recorded at its "looks like"
+     size, and the audio inputs recorded are all built-in and wired
      ones plus the default microphone, whatever it is; a Bluetooth or
      virtual audio input is recorded only when it is the default
      microphone, or when chosen with auto mode off. The window's tables
@@ -762,7 +764,8 @@ architect's reading.
   when `settings.json.previous` is written and overwritten.
 - **Consequences:** Replaces D13's first-start defaults, D18's "all
   inputs after v0", D27's refusal of the earlier key and D28 point 7's
-  exit status for a settings file that cannot be used. A recording in
+  exit status for a settings file that cannot be used. The recorder PR
+  builds points 1, 3 and 4 (`backlog.md`). A recording in
   auto mode takes more disk space than the 1080p default did. "Auto
   mode" and "looks like" need glossary entries with the building
   change.

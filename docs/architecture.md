@@ -85,6 +85,11 @@ D28).
   input channel its own mono track (D22, D31); each display file
   carries two guide tracks, microphones and system audio, for playback
   and syncing (D31).
+- Agreed and not built yet (D34): auto mode, on by default, records
+  every display at its "looks like" size and all built-in and wired
+  audio inputs plus the default microphone; a recording follows a
+  change of the default microphone; a settings file is read, never
+  refused. What AGC does is open (D34).
 - A recording folder and one recording manifest per recording;
   recordings into different folders may run in parallel (D20).
 - Safeguards: a ready check before Start, low-disk warnings,

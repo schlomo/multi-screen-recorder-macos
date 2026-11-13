@@ -71,8 +71,10 @@ other file of PR #1 changed. In order, the next architect session:
    `scripts/acceptance/`. The system audio stream needs a display to
    attach to and must move when that display disappears.
    Its brief must cover what the reviews of PR #1 found for it:
-   - Before any brief, the owner signs off the design text for auto
-     mode and for reading a settings file without refusing it (D34).
+   - This PR also builds auto mode with its setting `auto`, the
+     settings file that is read and never refused, and following a
+     change of the default microphone (D34). Before any brief, the
+     owner signs off the design text for the first two.
      The first end-to-end tests (item 5) are designed with it.
    - The open questions in `docs/design/recorder.md` are answered
      first: the default microphone changing during a recording (ruled:
@@ -216,6 +218,8 @@ other file of PR #1 changed. In order, the next architect session:
 
 ## Done (recent)
 
+- 2026-11-13: the owner's rulings on auto mode, the settings file, the
+  default microphone and end-to-end tests (D34).
 - 2026-11-12: v0 design agreed (D17–D24); it settled the former queued
   items "v0 design", "build and release pipeline" and "test strategy".
 - 2026-11-12: project setup with the starter (D1–D16).
