@@ -123,7 +123,7 @@ read does not count), the output folder, and free disk space in the output folde
   its prompt; a denied one is reported with the System Settings path.
 - The screen recording grant is proven, not just read: the check
   fetches the display list. The Microphone permission is read, and no
-  microphone is opened (D36, waiting for the owner's yes): the app
+  microphone is opened (D36): the app
   crashed inside macOS after the default microphone was unplugged
   (owner's Mac, 2026-11-13), and the capture session an earlier ready
   check opened for a moment on every run is the cause [ASSUMED]. With

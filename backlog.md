@@ -89,8 +89,7 @@ other file of PR #1 changed. In order, the next architect session:
       a popup menu of the window open, and with the folder chooser
       open, they change only when it closes.
     Each crash gets its entry in `docs/troubleshooting.md` once its
-    fix is verified. The owner's yes to D36 point 1 (the Microphone
-    permission is read, no longer proven) is outstanding.
+    fix is verified.
 
 ## Queued
 
@@ -141,6 +140,11 @@ other file of PR #1 changed. In order, the next architect session:
      tests, and their file access moves off the main thread. With the
      seam, the window's refresh on device changes gets tests (one check
      per burst, nothing applied while a menu is open); it has none yet.
+   - From the review of PR #1's crash fixes: `audioInputsToJudge`
+     says with a `switch`, not with `try?` and `?? []`, that audio
+     inputs that cannot be read do not matter with the audio mode
+     `none`, and its comment says what it returns; the unreachable
+     `case .gone` in `audioInputs(devices:…)` goes.
    - The recording manifest is written with `Codable`, not with the
      settings file's hand-written JSON writer.
    - A display mode change can arrive as a disconnect and a reconnect;

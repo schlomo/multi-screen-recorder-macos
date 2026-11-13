@@ -822,9 +822,11 @@ architect's reading.
 
 ## D36: The ready check opens no microphone, and the window follows device changes (2026-11-13)
 
-- **Status:** points 2 and 3 in force; point 1 built and waiting for
-  the owner's yes, because it drops a proof the agreed design had.
-  Built in PR #1; the owner's re-test on the Mac is outstanding.
+- **Status:** in force. Point 1 drops a proof the agreed design had;
+  asked "Accept that the ready check reads the microphone permission
+  without opening the microphone?", the owner answered "Yes, accept"
+  (2026-11-13). Built in PR #1; the owner's re-test on the Mac is
+  outstanding.
   (D35 is on the branch of PR #2.)
 - **Context:** The owner's check of PR #1 on the Mac, 2026-11-13: the
   app crashed on "Check again" after the default microphone was
