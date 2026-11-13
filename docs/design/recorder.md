@@ -458,8 +458,8 @@ no tar would write them from a file system), `scripts/sign-app` and
 pipeline.
 Capture itself cannot run in CI, which has
 no way to grant the permissions [ASSUMED]; it is verified on a Mac by
-end-to-end tests, which drive `msr record` and check the files with
-`ffprobe`, and by the v1 gate. The design of the end-to-end tests is
+end-to-end tests, which drive `msr record` and examine the recording
+folder, and by the v1 gate. The design of the end-to-end tests is
 proposed, not signed off, in
 [end-to-end-tests.md](end-to-end-tests.md).
 

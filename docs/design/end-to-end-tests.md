@@ -35,6 +35,7 @@ provoke it and assertions that detect it.
 
 **The recorder under test is the built app, as shipped,** driven
 through `msr record` with a scratch `HOME` and a scratch output folder.
+A run uses the app that `scripts/build-app` builds from the checkout.
 The recorder has no test mode and no test-only code path.
 
 **A test is a scenario:** a list of timed events while a recording
@@ -207,9 +208,11 @@ The two permissions are granted once by a person.
   started from a terminal is attributed to the terminal app
   ([recorder.md](recorder.md), "Command line"), so that app holds
   Screen Recording and Microphone, and so does every program started in
-  it, an agent's shell included. The owner accepts that: "whoever runs
-  it, if needed the terminal or vscode (my vscode has already)". The
-  driver starts the recorder as its own child process, which gives it
+  it, an agent's shell included. The owner: "whoever runs it, if
+  needed the terminal or vscode (my vscode has already)". The
+  architect's reading: that app may hold them, and the two ways out
+  this document proposed before (starting the recorder through macOS,
+  a terminal app kept for the tests) are not needed. The driver starts the recorder as its own child process, which gives it
   the process to signal, the exit status and the messages. Before
   anything else the driver asks macOS, without raising a prompt,
   whether both are granted, and stops with the name of the missing
@@ -221,7 +224,8 @@ The two permissions are granted once by a person.
 
 ## What research found for the recorder
 
-For the recorder PR's design, each UNVERIFIED here:
+For the recorder PR's design, each UNVERIFIED here unless marked as
+tried:
 
 - **ScreenCaptureKit can deliver the wrong display** after a virtual
   display reconnects when two or more exist (Apple feedback
@@ -229,6 +233,16 @@ For the recorder PR's design, each UNVERIFIED here:
   verify which display a stream delivers. Whether the owner's
   BetterDisplay HiDPI mode works through virtual screens, and so meets
   this fault in daily use, is a question for the owner.
+- **macOS's display ID is not a display's identity.** Tried (see
+  "Unknowns"): the same virtual display got a new display ID each time
+  it was created. A display that comes back during a recording may
+  so have another display ID; the recorder's stable identity for a
+  display (`backlog.md`, recorder PR) cannot be the display ID alone.
+- **AppKit may not list a new screen to a program that does not handle
+  the app's events.** Tried (see "Unknowns"): not listed within 5 s
+  without, listed after about a second with. The recorder lists
+  displays through AppKit today; `msr record` from the command line
+  must be shown to see a display that connects during a recording.
 - **A plain executable no longer appears in the Screen Recording list**
   (macOS 26.1, called a bug by Apple); see "Permissions".
 - **A build signed ad hoc is reported to lose its permissions with
@@ -291,10 +305,9 @@ its run time.
 - **Faking ScreenCaptureKit and CoreAudio inside the unit tests:** fast
   and worth having for the recorder's logic, but it tests our idea of
   what macOS does, not what it does.
-- **A driver in Python,** beside the other scripts (D32): it would
-  need Python 3.15 on the owner's Mac, which macOS does not ship; its
-  tests would reach `scripts/test` only through commands; and scenario,
-  event and pattern would be defined twice, in Python for the driver
+- **A driver in Python,** beside the other scripts (D32): its tests
+  would reach `scripts/test` only through commands, and scenario, event
+  and pattern would be defined twice, in Python for the driver
   and in Swift for the device helper. In Swift the compiler checks all
   of it, one test suite covers it, and an agent changing an event
   changes one definition.
@@ -304,8 +317,9 @@ its run time.
   a program with arguments, not a test case.
 - **Starting the recorder through macOS (`open`)** so that the app
   holds the permissions: untried, and the driver would be expected to
-  lose the recorder's process, exit status and messages; the owner
-  accepts the terminal app holding the permissions (D35).
+  lose the recorder's process, exit status and messages; not needed
+  once the app the run is started from may hold the permissions (the
+  architect's reading in D35).
 - **A second user account for the runs:** the owner is at the Mac for
   a run in any case (D35), and no source says ScreenCaptureKit works
   in a session that is not in front.
@@ -316,7 +330,10 @@ its run time.
 ## Accepted risks
 
 - `CGVirtualDisplay` is private: an update of macOS can break the
-  helper. It is test equipment only and never ships in the app.
+  helper. It is test equipment only and never ships in the app. The
+  package compiles it with everything else, so its declarations of the
+  private interface are its own and are looked up when it runs: a
+  macOS or Xcode without the interface must still build the app.
 - Fast connect and disconnect cycles are reported flaky in macOS
   itself; a failure there must be told apart from a recorder fault,
   and a flake is root-caused, never retried blindly.
@@ -332,16 +349,19 @@ Throwaway code, run by the owner or on the owner's go-ahead, before
 this design is built:
 
 - a virtual display appears in ScreenCaptureKit and delivers a real
-  picture. **Tried in part** (2026-11-13, macOS 26.7.1, three runs,
-  from an app without Screen Recording): a virtual display of 1920 ×
-  1080 is created without an administrator and is an active display
-  within 0.4 s; AppKit lists it as a screen about a second later, and
-  only to a program that handles its events; macOS placed it left of
-  the main display; it is gone when its process ends; each run got a
-  new display number (5, 6, 7) for the same vendor, product and serial
-  number, so a display number does not identify a display across a
-  reconnect. The capture part stopped as built: Screen Recording was
-  not granted and no prompt was raised. Still open: the picture;
+  picture. **Tried in part** (2026-11-13, macOS 26.7.1, three runs as
+  the owner's user without `sudo`, from an app without Screen
+  Recording). Observed: a virtual display of 1920 × 1080 was an active
+  display 0.3 to 0.4 s after it was created, at the left of the main
+  display; AppKit listed it as a screen about a second later in the
+  run that handled the app's events, and not within 5 s in the two
+  runs that did not; every run started with the Mac's two displays, so
+  the virtual display of the run before was gone by then; macOS's
+  display ID was 5, 6 and 7 in the three runs, though the program
+  gave the display the same vendor, product and serial number each
+  time. The capture part did not run: the program asks macOS whether
+  Screen Recording is granted in the way that raises no prompt, and
+  stopped. Still open: the picture;
 - two virtual displays, one reconnects: does the wrong-display fault
   show on this Mac;
 - an aggregate device created and removed is seen as an audio input
