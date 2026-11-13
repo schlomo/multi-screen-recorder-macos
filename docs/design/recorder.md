@@ -82,6 +82,12 @@ Not ready.
 Started from a terminal, macOS attributes the permissions to the
 terminal app, not to Multi Screen Recorder; the README says so.
 
+A permission allowed in the prompt counts at once. Allowed later in
+System Settings, the microphone permission counts only after Multi
+Screen Recorder is quit and started again, while the screen recording
+permission counted without that (seen on the owner's Mac, macOS
+26.7.1); the fix lines of the two items say so.
+
 ## Settings file
 
 `~/Library/Application Support/Multi Screen Recorder/settings.json`,

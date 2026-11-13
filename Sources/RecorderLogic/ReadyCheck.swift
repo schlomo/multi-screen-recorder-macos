@@ -78,7 +78,8 @@ public struct ReadyCheckResult: Equatable, Sendable {
 public enum ReadyCheck {
     static let screenRecordingTitle = "Screen & System Audio Recording permission"
     static let microphoneTitle = "Microphone permission"
-    static let terminalNote = "; started from a terminal, the terminal app needs it"
+    static let restartNote = "quit Multi Screen Recorder and start it again. "
+    static let terminalNote = "If it was started from a terminal, then the terminal app needs the permission."
 
     /// One item per cause: a free disk space item appears only when the
     /// displays and the audio inputs a recording records could be read and
@@ -99,8 +100,8 @@ public enum ReadyCheck {
     }
 
     private static func screenRecordingItem(_ probe: PermissionProbe) -> ReadyCheckItem {
-        let fix = "allow it in System Settings › Privacy & Security › Screen & System Audio Recording,"
-            + " then start again" + terminalNote
+        let fix = "allow it in System Settings › Privacy & Security › Screen & System Audio Recording. "
+            + "If it is still missing after that, " + restartNote + terminalNote
         return switch probe {
         case .granted: ReadyCheckItem(title: screenRecordingTitle, passed: true, fix: nil)
         case .notGranted: ReadyCheckItem(title: screenRecordingTitle, passed: false, fix: fix)
@@ -116,7 +117,8 @@ public enum ReadyCheck {
             ReadyCheckItem(title: microphoneTitle, passed: true, fix: nil)
         case .notGranted:
             ReadyCheckItem(title: microphoneTitle, passed: false,
-                           fix: "allow it in System Settings › Privacy & Security › Microphone" + terminalNote)
+                           fix: "allow it in System Settings › Privacy & Security › Microphone, then "
+                               + restartNote + terminalNote)
         case .failed(let reason):
             ReadyCheckItem(title: "\(microphoneTitle): the default microphone could not be opened (\(reason))",
                            passed: false, fix: "check the input in System Settings › Sound")

@@ -94,7 +94,9 @@ import Testing
         let result = ReadyCheck.evaluate(facts(screenRecording: .notGranted), settings: .defaults)
         let item = try #require(result.items.first)
         #expect(item.passed == false)
-        #expect(item.fix?.contains("System Settings › Privacy & Security › Screen & System Audio Recording") == true)
+        #expect(item.fix == "allow it in System Settings › Privacy & Security › Screen & System Audio Recording. "
+            + "If it is still missing after that, quit Multi Screen Recorder and start it again. "
+            + "If it was started from a terminal, then the terminal app needs the permission.")
         #expect(!result.isReady)
     }
 
@@ -102,7 +104,9 @@ import Testing
         let result = ReadyCheck.evaluate(facts(microphonePermission: .notGranted), settings: .defaults)
         let item = try #require(result.items.first { $0.title == "Microphone permission" })
         #expect(item.passed == false)
-        #expect(item.fix?.contains("System Settings › Privacy & Security › Microphone") == true)
+        #expect(item.fix == "allow it in System Settings › Privacy & Security › Microphone, "
+            + "then quit Multi Screen Recorder and start it again. "
+            + "If it was started from a terminal, then the terminal app needs the permission.")
     }
 
     @Test func aMicrophoneThatCannotBeOpenedFailsWithTheReason() throws {
