@@ -9,7 +9,7 @@ two PRs (D18).
 The skeleton and pipeline PR (#1) is built, adversarially reviewed
 and publishes a signed snapshot release. Until it is merged, what is
 left is under "In flight": the owner's check on the Mac and the merge.
-Next for an architect session once it is merged: the three steps
+Next for an architect session once it is merged: the four steps
 below; the app icon PR can run beside them.
 
 ### Owner's rulings of 2026-11-13 (D34)
@@ -29,8 +29,10 @@ other file of PR #1 changed. In order, the next architect session:
    `settings.json.previous` is written and overwritten, and whether a
    command that only reads rewrites the settings file. The glossary
    gains "auto mode" and "looks like".
-3. Briefs the recorder PR (queued item 2) with the first end-to-end
-   tests (queued item 5).
+3. Gets the owner's sign-off, or changes, on the proposed design for
+   end-to-end tests (queued item 5, draft PR #2).
+4. Briefs the recorder PR (queued item 2) with the first end-to-end
+   tests.
 
 ## In flight
 
@@ -84,6 +86,13 @@ other file of PR #1 changed. In order, the next architect session:
      file name cannot hold, the gain of the "Microphones" guide mix.
    - A display needs a stable identity in `DisplayInfo`; the listing has
      none yet.
+   - What the end-to-end tests need from the recorder design and what
+     research found for it (a reported macOS fault that delivers
+     another display's picture after a reconnect; who holds the
+     permissions when `msr` is started from a terminal): the sections
+     "What the recorder design must provide", "Permissions" and
+     "What research found for the recorder" of
+     `docs/design/end-to-end-tests.md`, all unverified.
    - The app quits when its last window closes; Start closes the
      window, so that must change.
    - The ready check does not run while a recording runs, activation
@@ -142,27 +151,11 @@ other file of PR #1 changed. In order, the next architect session:
      permissions, with the app started from Finder (D5).
 5. **Automated end-to-end tests on the owner's Mac** (D34). The
    proposed design, not signed off, is
-   [docs/design/end-to-end-tests.md](docs/design/end-to-end-tests.md):
-   tests by error class, its open questions, and the experiments that
-   come first. In short:
-   a test changes displays and audio inputs in software while a
-   recording runs, then checks the files with `ffprobe`. What research
-   on 2026-11-13 found, none of it tried here:
-   - Displays: a helper using Apple's private `CGVirtualDisplay`
-     interface adds, removes and resizes virtual displays (reported
-     working on macOS 26; removal takes up to two seconds, and fast
-     create-and-remove cycles are reported flaky); `displayplacer`
-     rotates a display and changes its mode.
-   - Audio inputs: BlackHole as a virtual audio input, aggregate
-     devices created and removed through the public CoreAudio
-     interface, `SwitchAudioSource` to change the default microphone.
-   - Content: a known tone into the virtual audio input and a
-     full-screen pattern with a frame counter on each display.
-   - The permissions are granted once by the owner; the tests run in
-     the owner's own session, so they are started by a person, never
-     unasked by an agent.
-   First step: one small experiment that creates a virtual display and
-   records ten seconds of it.
+   [docs/design/end-to-end-tests.md](docs/design/end-to-end-tests.md)
+   (draft PR #2): tests by error class, what the recorder design must
+   provide for them, the experiments that settle its unknowns, and its
+   open questions. Nothing of it is built or tried. The tests are
+   started by a person, never unasked by an agent.
 6. **App icon**, its own PR after PR #1 is merged; until then the app
    has the default icon. The owner chose the drawing (2026-11-12):
    three displays fanned in depth on a graphite tile, one red record
