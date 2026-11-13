@@ -66,8 +66,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func makeWindow(title: String, content: some View) -> NSWindow {
         // The window takes its size from the content's preferred size. The app
-        // was ended by an exception in AppKit's window layout after a display
-        // changed; sizing the window by layout constraints is the cause [ASSUMED].
+        // was ended by an exception in AppKit's window layout after a display's
+        // mode was switched; sizing the window by layout constraints is one of
+        // two candidates for the cause [ASSUMED], see `StartModel.checkAgain`.
         let hosting = NSHostingController(rootView: content)
         hosting.sizingOptions = [.preferredContentSize]
         let window = NSWindow(contentViewController: hosting)

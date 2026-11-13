@@ -777,10 +777,12 @@ architect's reading.
 - **Status:** points 2 and 3 in force; point 1 built and waiting for
   the owner's yes, because it drops a proof the agreed design had.
   Built in PR #1; the owner's re-test on the Mac is outstanding.
+  (D35 is on the branch of PR #2.)
 - **Context:** The owner's check of PR #1 on the Mac, 2026-11-13: the
   app crashed on "Check again" after the default microphone was
-  unplugged, and crashed while HiDPI was being switched in
-  BetterDisplay; and "it didn't notice the changed
+  unplugged, and crashed after HiDPI was switched in BetterDisplay
+  ("I was changing the HiDPI in Better Display and then suddenly msr
+  crashed"); and "it didn't notice the changed
   resolution till I changed any setting in the app. Better would be
   instant change of the table", "plugging a display in or out didn't
   update the table till I interact with the app". Asked whether to fix
@@ -801,15 +803,18 @@ architect's reading.
      ready check when a display comes, goes or changes, when an audio
      device comes or goes, and when the default audio input changes,
      once per burst of changes. The window takes its size from its
-     content's preferred size, and its content does not change while a
-     menu is open.
+     content's preferred size, and its content does not change by
+     itself while a menu or a modal panel is open or a control is
+     dragged.
 - **Consequences:** A microphone that is listed but cannot be opened is
   no longer found by the ready check; the recorder finds it at Start.
   The whole ready check now also runs on a device change while the app
   is in the background. Before the recorder captures microphones with
   an `AVCaptureSession`, an experiment shows that unplugging one does
   not crash the process (`backlog.md`, recorder PR). Both crash causes
-  are read from the crash reports and assumed, not reproduced, so the
-  fixes are unverified until the owner's re-test; the troubleshooting
+  are read from the crash reports and assumed, not reproduced (for the
+  second crash there are two candidates, the window's sizing and a
+  change of its content under an open menu, and both are changed), so
+  the fixes are unverified until the owner's re-test; the troubleshooting
   log gets its entries then.
 - **Evidence:** [PR #1](https://github.com/schlomo/multi-screen-recorder-macos/pull/1).

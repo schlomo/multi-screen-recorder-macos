@@ -79,7 +79,9 @@ other file of PR #1 changed. In order, the next architect session:
       menu of the window, then switch HiDPI in BetterDisplay; and
       switch HiDPI, then click a popup menu at once.
     - Re-test: the tables follow a display plugged in or out, a HiDPI
-      switch and a microphone plugged in or out, without a click.
+      switch and a microphone plugged in or out, without a click; with
+      a popup menu of the window open, they change only when the menu
+      closes.
     Each crash gets its entry in `docs/troubleshooting.md` once its
     fix is verified. The owner's yes to D36 point 1 (the Microphone
     permission is read, no longer proven) is outstanding.

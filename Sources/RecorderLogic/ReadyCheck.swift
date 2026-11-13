@@ -137,9 +137,12 @@ public enum ReadyCheck {
             ReadyCheckItem(title: "Audio: cannot be read (\(error))", passed: false,
                            fix: "reconnect the audio inputs, then check again")
         }
-        guard let audioInputs = audioInputsToJudge(readAudioInputs, settings: settings) else {
-            guard case .failure(let error) = readAudioInputs else { preconditionFailure("read audio inputs are judged") }
-            return cannotBeRead(error)
+        let audioInputs: [AudioInputInfo]
+        switch readAudioInputs {
+        case .success(let inputs): audioInputs = inputs
+        case .failure(let error):
+            guard settings.audioMode == .none else { return cannotBeRead(error) }
+            audioInputs = []
         }
         if case .failure(let error) = unreadableRecordedInputs(audioInputs, settings: settings).first?.channelCount {
             return cannotBeRead(error)

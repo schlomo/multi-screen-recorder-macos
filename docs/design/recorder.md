@@ -24,7 +24,7 @@ signature); if that fails it exits 71 (`EX_OSERR`).
 
 | Command | Does | Exit code |
 |---|---|---|
-| `msr list` | Shows displays, audio inputs and system audio | 0, 1 when a display or an audio input the settings record cannot be read |
+| `msr list` | Shows displays, audio inputs and system audio | 0, 1 when the displays, the audio inputs or an audio input the settings record cannot be read |
 | `msr check [flags]` | Runs the ready check and prints each item | 0 ready, 1 not ready |
 | `msr record [flags] [--duration 1h30m]` | Ready check, then records until Ctrl-C, SIGTERM, SIGHUP or the duration; prints the recording folder at the start and a summary at the end | 0 ok, 1 not ready, 3 ended with an error |
 | `msr settings [flags] [--save]` | Prints the effective settings as JSON; `--save` writes the flags into the settings file | 0 |
@@ -131,8 +131,8 @@ read does not count), the output folder, and free disk space in the output folde
   item passes and the audio item alone fails, with "no microphone".
   The audio inputs are read from Core Audio's device list, which
   creates no capture object; if that list, the default audio input or
-  a device's name cannot be read, the audio item fails with the reason
-  and `msr list` stops with it.
+  the name of an audio input cannot be read, the audio item fails with
+  the reason and `msr list` stops with it.
 - Output folder: the check creates it with its parents if it is
   missing, then writes and deletes a file in it; a failure names the
   path and the reason.
@@ -156,11 +156,13 @@ read does not count), the output folder, and free disk space in the output folde
   "Check again"; the tables of what will be recorded follow with it.
   Other changes of an audio input, such as its channels, show with the
   next check. A burst of changes gives one check, 0.3 s after the last
-  (*data*). While a menu of the app is open or a control is dragged,
-  the window's content does not change by itself; the check's result
-  shows when the menu closes (the app crashed in AppKit's window
-  layout during a display change while a menu was open; a change of
-  the content under the menu is the cause [ASSUMED]). It never
+  (*data*). While a menu of the app or a modal panel (the folder
+  chooser) is open or a control is dragged, the window's content does
+  not change by itself; the check's result shows when it closes. The
+  app crashed in AppKit's window layout, with a menu open, after HiDPI
+  was switched; the cause is one of two candidates [ASSUMED], a change
+  of the content under the menu or the window's sizing by layout
+  constraints, and both are changed. It never
   runs while a recording is running, activation included (for the
   recorder PR to honour).
 
@@ -311,7 +313,10 @@ manifest's state to `not finalized` and remove the marker.
     output folder item failed).
   - Below, the output folder and "Recording continues when displays or
     audio sources change." If the displays cannot be read, that error
-    stands in place of the Displays table; an audio input whose
+    stands in place of the Displays table; if the audio inputs cannot
+    be read, "The audio inputs cannot be read: <reason>" stands above
+    the Audio table, which then has the system audio row only; an audio
+    input whose
     channels cannot be read shows "cannot be read" in the Channels
     column (and "unknown" GB/h if it is recorded). The total line
     appears only when the displays and every recorded audio input can
@@ -475,9 +480,11 @@ settings and flags and their errors, file naming, manifest states,
 crash markers, the version, and the text of the examples in this
 document, which the tests hold to the code. `RecorderCoreTests` test
 the output folder probe against scratch folders, and that this Mac's
-audio inputs can be read and their changes watched, which needs no
-permission and shows no prompt. The window's refresh on device changes
-has no test yet (`backlog.md`, recorder PR). `CommandTests` run
+audio inputs can be read and a listener for their changes registered,
+which needs no permission and shows no prompt, and that an action
+waiting for the main run loop's default mode runs only there. The
+window's refresh on device changes has no test yet (`backlog.md`,
+recorder PR). `CommandTests` run
 the built `msr` with a scratch `HOME` (`msr settings` and
 `msr version`, which prompt for nothing; also through a symbolic link
 into an app bundle), `scripts/version` in scratch git repositories and
@@ -565,5 +572,10 @@ The ready check reads each audio input by itself, so the disk estimate
 counts the default microphone's channels; when the channels of an input
 the audio mode records cannot be read, the audio item fails with
 "reconnect the audio inputs, then check again", and an input that is not
-recorded never fails the check or `msr list`. When the free space cannot be read, the fix says "choose an
+recorded and whose channels cannot be read never fails the check or
+`msr list`. A device without input channels is not read further. The
+audio inputs as a whole cannot be read when the device list, the name
+of an audio input or, with at least one audio input, the default audio
+input cannot be read. The app does not start, with the reason in an
+alert, when it cannot register for changes of the audio devices. When the free space cannot be read, the fix says "choose an
 output folder on another disk".
