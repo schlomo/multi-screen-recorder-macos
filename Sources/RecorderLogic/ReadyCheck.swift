@@ -27,14 +27,14 @@ public struct ReadyCheckFacts: Sendable {
     /// needs no microphone, so it was not asked.
     public var microphoneGranted: Bool?
     public var displays: Result<[DisplayInfo], DeviceReadError>
-    public var audioInputs: [AudioInputInfo]
+    public var audioInputs: Result<[AudioInputInfo], DeviceReadError>
     public var outputFolder: OutputFolderProbe
 
     public init(
         screenRecording: PermissionProbe,
         microphoneGranted: Bool?,
         displays: Result<[DisplayInfo], DeviceReadError>,
-        audioInputs: [AudioInputInfo],
+        audioInputs: Result<[AudioInputInfo], DeviceReadError>,
         outputFolder: OutputFolderProbe
     ) {
         self.screenRecording = screenRecording
@@ -94,7 +94,8 @@ public enum ReadyCheck {
         items.append(audioItem(facts.audioInputs, settings: settings))
         items.append(outputFolderItem(facts.outputFolder, settings: settings))
         if case .success(let displays) = facts.displays, case .usable(let freeSpace) = facts.outputFolder,
-           let bytesPerHour = DiskEstimate.bytesPerHour(settings: settings, displays: displays, audioInputs: facts.audioInputs) {
+           let audioInputs = audioInputsToJudge(facts.audioInputs, settings: settings),
+           let bytesPerHour = DiskEstimate.bytesPerHour(settings: settings, displays: displays, audioInputs: audioInputs) {
             items.append(diskItem(freeSpace, bytesPerHour: bytesPerHour, settings: settings))
         }
         return ReadyCheckResult(items: items)
@@ -129,10 +130,19 @@ public enum ReadyCheck {
         }
     }
 
-    private static func audioItem(_ audioInputs: [AudioInputInfo], settings: Settings) -> ReadyCheckItem {
+    private static func audioItem(
+        _ readAudioInputs: Result<[AudioInputInfo], DeviceReadError>, settings: Settings
+    ) -> ReadyCheckItem {
+        let cannotBeRead = { (error: DeviceReadError) in
+            ReadyCheckItem(title: "Audio: cannot be read (\(error))", passed: false,
+                           fix: "reconnect the audio inputs, then check again")
+        }
+        guard let audioInputs = audioInputsToJudge(readAudioInputs, settings: settings) else {
+            guard case .failure(let error) = readAudioInputs else { preconditionFailure("read audio inputs are judged") }
+            return cannotBeRead(error)
+        }
         if case .failure(let error) = unreadableRecordedInputs(audioInputs, settings: settings).first?.channelCount {
-            return ReadyCheckItem(title: "Audio: cannot be read (\(error))", passed: false,
-                                  fix: "reconnect the audio inputs, then check again")
+            return cannotBeRead(error)
         }
         var sources: [String] = []
         var missingMicrophone = false

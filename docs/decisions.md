@@ -504,9 +504,7 @@ architect's reading.
 - **Status:** superseded in part by D29 (point 5: the key imported
   "only after compilation" in the same job) and by D34 (point 7: a
   settings file that cannot be used no longer stops with exit status
-  78);
-  and by D36 (point 3: the ready check no longer opens the default
-  microphone)
+  78)
 - **Context:** The architect put seven recommendations from the
   adversarial review of PR #1 to the owner, who answered "Accept all
   seven".
@@ -776,32 +774,42 @@ architect's reading.
 
 ## D36: The ready check opens no microphone, and the window follows device changes (2026-11-13)
 
-- **Status:** in force; built in PR #1, the owner's re-test on the Mac
-  outstanding. (D35 is on the branch of PR #2.)
+- **Status:** points 2 and 3 in force; point 1 built and waiting for
+  the owner's yes, because it drops a proof the agreed design had.
+  Built in PR #1; the owner's re-test on the Mac is outstanding.
 - **Context:** The owner's check of PR #1 on the Mac, 2026-11-13: the
   app crashed on "Check again" after the default microphone was
-  unplugged, and crashed when HiDPI was switched in BetterDisplay
-  (`docs/troubleshooting.md`); and "it didn't notice the changed
+  unplugged, and crashed while HiDPI was being switched in
+  BetterDisplay; and "it didn't notice the changed
   resolution till I changed any setting in the app. Better would be
   instant change of the table", "plugging a display in or out didn't
   update the table till I interact with the app". Asked whether to fix
   both crashes and add live updates in PR #1 before the merge, the
   owner answered "Yes, in PR 1".
-- **Decision:** The architect's choices for the fixes:
+- **Decision:** The architect's choices for the fixes; the owner ruled
+  that they are made in PR #1, not how:
   1. The ready check reads the Microphone permission and no longer
-     opens the default microphone; audio inputs are read from Core
-     Audio's device list instead of through capture devices. This
-     changes D28 point 3's proof for the microphone; the screen
-     recording grant is still proven.
-  2. The window re-reads displays and audio inputs and re-runs the
-     ready check when a display or an audio input comes, goes or
-     changes, once per burst of changes.
-  3. The window takes its size from its content's preferred size, and
-     nothing in it changes while one of its menus is open.
+     opens the default microphone. The agreed design
+     (`docs/design/recorder.md`, "Ready check") said of both
+     permissions "a grant is proven, not just read"; that now holds for
+     the screen recording permission only, and D14's "confirms both
+     permissions" is met for the microphone by reading the permission.
+  2. Audio inputs are read from Core Audio's device list instead of
+     through capture devices. They are listed in Core Audio's order,
+     which may differ from the order before.
+  3. The window re-reads displays and audio inputs and re-runs the
+     ready check when a display comes, goes or changes, when an audio
+     device comes or goes, and when the default audio input changes,
+     once per burst of changes. The window takes its size from its
+     content's preferred size, and its content does not change while a
+     menu is open.
 - **Consequences:** A microphone that is listed but cannot be opened is
   no longer found by the ready check; the recorder finds it at Start.
-  Before the recorder captures microphones with an `AVCaptureSession`,
-  an experiment shows that unplugging one does not crash the process
-  (`backlog.md`, recorder PR). Both crash causes are read from the
-  crash reports, not reproduced.
+  The whole ready check now also runs on a device change while the app
+  is in the background. Before the recorder captures microphones with
+  an `AVCaptureSession`, an experiment shows that unplugging one does
+  not crash the process (`backlog.md`, recorder PR). Both crash causes
+  are read from the crash reports and assumed, not reproduced, so the
+  fixes are unverified until the owner's re-test; the troubleshooting
+  log gets its entries then.
 - **Evidence:** [PR #1](https://github.com/schlomo/multi-screen-recorder-macos/pull/1).

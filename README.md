@@ -66,8 +66,9 @@ folder), then the recording resolution, the audio mode, system audio,
 the output folder and the ready check: "Ready to record" when every item
 passes, otherwise each item with a fix for each failing one. Every
 change is saved at once; the ready check runs again after each change,
-when you come back to the app, when a display or an audio input is
-plugged in, removed or changed, and on "Check again".
+when you come back to the app, when a display is plugged in, removed
+or changed, when an audio device is plugged in or removed, when the
+default audio input changes, and on "Check again".
 
 ### Command line
 

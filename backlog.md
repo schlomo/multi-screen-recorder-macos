@@ -64,10 +64,25 @@ other file of PR #1 changed. In order, the next architect session:
     to do: the second snapshot release installed over the first, the
     old settings file. The snapshot release from Finder with "Open
     Anyway" worked, and both permissions stayed over a quit and start.
-    The check also found two crashes (a microphone unplugged, a display
-    mode changed under an open menu; `docs/troubleshooting.md`) and
-    that the window did not follow device changes; all three are
-    changed in this PR and wait for the owner's re-test.
+    The check also found two crashes and that the window did not
+    follow device changes; all three are changed in this PR (D36), the
+    causes of the crashes are assumed, and the owner's re-test is
+    outstanding:
+    - `EXC_BAD_ACCESS (SIGSEGV)` on the queue
+      `HALC_ProxyNotification Call Listener Queue`, in `CMIOBaseUnits`
+      below `HALDevice::Teardown()`. Re-test: unplug the default
+      microphone with the window open, wait, click "Check again", plug
+      it in again.
+    - `EXC_CRASH (SIGABRT)`, an exception in
+      `-[NSWindow(NSDisplayCycle) _postWindowNeedsLayout]` while a
+      popup menu was tracked. Re-test in both orders: open a popup
+      menu of the window, then switch HiDPI in BetterDisplay; and
+      switch HiDPI, then click a popup menu at once.
+    - Re-test: the tables follow a display plugged in or out, a HiDPI
+      switch and a microphone plugged in or out, without a click.
+    Each crash gets its entry in `docs/troubleshooting.md` once its
+    fix is verified. The owner's yes to D36 point 1 (the Microphone
+    permission is read, no longer proven) is outstanding.
 
 ## Queued
 
@@ -100,12 +115,16 @@ other file of PR #1 changed. In order, the next architect session:
    - The app quits when its last window closes; Start closes the
      window, so that must change.
    - Before microphones are captured with an `AVCaptureSession`, an
-     experiment shows that a microphone unplugged during capture does
-     not crash the process (it did in the ready check of PR #1).
+     experiment shows that unplugging a microphone does not crash the
+     process, during capture and after capture sessions that were
+     opened and closed (the app crashed in PR #1's ready check, which
+     opened one for a moment on every run; D36).
    - The ready check does not run while a recording runs, activation
      included.
    - The ready check probes are free functions: they need a seam for
-     tests, and their file access moves off the main thread.
+     tests, and their file access moves off the main thread. With the
+     seam, the window's refresh on device changes gets tests (one check
+     per burst, nothing applied while a menu is open); it has none yet.
    - The recording manifest is written with `Codable`, not with the
      settings file's hand-written JSON writer.
    - A display mode change can arrive as a disconnect and a reconnect;

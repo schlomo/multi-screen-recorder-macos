@@ -250,7 +250,8 @@ hoc, for a local check only).
   none of these on a person's Mac unasked.
   `msr version`, `msr settings` (it writes the settings file with the
   defaults if there is none; `HOME` decides where) and the tests are
-  safe.
+  safe; the tests read the Mac's audio device list, which shows no
+  prompt.
 - Real capture needs the Screen & System Audio Recording and
   Microphone permissions, granted by a person on the Mac. Capture
   behaviour is verified on the owner's Mac (the v1 gate in

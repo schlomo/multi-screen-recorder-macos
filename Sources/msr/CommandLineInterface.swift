@@ -95,7 +95,7 @@ extension CommandLineInterface {
             let file = try standardSettingsFile()
             let settings = try readingSettings { try file.load() }
             let displays = try await currentDisplays()
-            let audioInputs = currentAudioInputs()
+            let audioInputs = try currentAudioInputs()
             print(renderList(
                 displays: numberDisplays(displays),
                 resolution: settings.resolution,

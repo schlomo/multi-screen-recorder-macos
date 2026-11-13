@@ -11,9 +11,9 @@ import ScreenCaptureKit
 public func probeReadyCheckFacts(settings: Settings, homeFolder: URL) async -> ReadyCheckFacts {
     ReadyCheckFacts(
         screenRecording: await probeScreenRecording(),
-        microphoneGranted: settings.audioMode == .none ? nil : await microphoneIsGranted(),
+        microphoneGranted: settings.audioMode == .none ? nil : await probeMicrophonePermission(),
         displays: Result { () throws(DeviceReadError) in try currentDisplays() },
-        audioInputs: currentAudioInputs(),
+        audioInputs: Result { () throws(DeviceReadError) in try currentAudioInputs() },
         outputFolder: probeOutputFolder(settings.outputFolderURL(homeFolder: homeFolder)))
 }
 
@@ -44,10 +44,11 @@ public func probeScreenRecording() async -> PermissionProbe {
 }
 
 /// Asks for the Microphone permission if never asked, and says whether it is
-/// granted. It opens no microphone: a capture session opened for a moment on
-/// every check left something behind in macOS that crashed the app when the
-/// microphone was unplugged.
-public func microphoneIsGranted() async -> Bool {
+/// granted. It opens no microphone, so the grant is read, not proven: the app
+/// crashed in macOS's audio code after a microphone was unplugged, and the
+/// capture session an earlier ready check opened for a moment on every run is
+/// the cause [ASSUMED].
+public func probeMicrophonePermission() async -> Bool {
     switch AVCaptureDevice.authorizationStatus(for: .audio) {
     case .authorized: true
     case .notDetermined: await AVCaptureDevice.requestAccess(for: .audio)
