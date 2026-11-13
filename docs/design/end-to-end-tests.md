@@ -112,6 +112,10 @@ was shown and played.
 - **Picture:** the helper shows a full-screen pattern on every display:
   blocks that encode the display's identity, a frame counter and the
   time in milliseconds, large enough to survive scaling and HEVC.
+  Tried (see "Unknowns"): a colour does not come back as it was
+  shown, so the blocks are black and white and are read by brightness;
+  the menu bar of macOS covers the top of a virtual display, so the
+  blocks stay below it.
 - **Sound:** a virtual audio input carries a tone and a click once a
   second, played into it by the helper.
 
@@ -350,9 +354,10 @@ Throwaway code, run by the owner or on the owner's go-ahead, before
 this design is built:
 
 - a virtual display appears in ScreenCaptureKit and delivers a real
-  picture. **Tried in part** (2026-11-13, macOS 26.7.1, three runs as
-  the owner's user without `sudo`, from an app without Screen
-  Recording). Observed: a virtual display of 1920 × 1080 was an active
+  picture. **Tried** (2026-11-13, macOS 26.7.1, five runs as the
+  owner's user without `sudo`: three from an app without Screen
+  Recording, then two by the owner from an app that holds it).
+  Observed in the first three: a virtual display of 1920 × 1080 was an active
   display 0.3 to 0.4 s after it was created, at the left of the main
   display; AppKit listed it as a screen about a second later in the
   run that handled the app's events, and not within 5 s in the two
@@ -360,9 +365,17 @@ this design is built:
   the virtual display of the run before was gone by then; macOS's
   display ID was 5, 6 and 7 in the three runs, though the program
   gave the display the same vendor, product and serial number each
-  time. The capture part did not run: the program asks macOS whether
-  Screen Recording is granted in the way that raises no prompt, and
-  stopped. Still open: the picture;
+  time. The capture part did not run in these: the program asks macOS
+  whether Screen Recording is granted in the way that raises no
+  prompt, and stopped. Observed in the owner's two runs (display ID 9
+  and 10): ScreenCaptureKit listed three displays, the virtual one
+  among them at 1920 × 1080; a screenshot of it showed the program's
+  full-screen window, with the menu bar of macOS across the top; the
+  window's magenta (sRGB 1, 0, 1) came back as 1.00, 0.25, 1.00; a
+  stream at 30 frames per second delivered 150 buffers in 5 s, 63 of
+  them complete frames, while the picture changed 50 times; the
+  display was gone 0.11 s after the program released it. Not tried:
+  two virtual displays at once, a mode change, a HiDPI mode;
 - two virtual displays, one reconnects: does the wrong-display fault
   show on this Mac;
 - an aggregate device created and removed is seen as an audio input
