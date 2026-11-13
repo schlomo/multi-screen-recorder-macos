@@ -9,62 +9,28 @@ two PRs (D18).
 The skeleton and pipeline PR (#1) is built, adversarially reviewed
 and publishes a signed snapshot release. Until it is merged, what is
 left is under "In flight": the owner's check on the Mac and the merge.
-Next for an architect session once it is merged: write the design
-text for the owner's rulings of 2026-11-13 (below) and get it signed
-off, then brief the recorder PR; the app icon PR can run beside it.
+Next for an architect session once it is merged: the three steps
+below; the app icon PR can run beside them.
 
-### Owner's rulings of 2026-11-13, not yet in the decisions log
+### Owner's rulings of 2026-11-13 (D34)
 
-They change no file of PR #1. Each gets its entry in
-`docs/decisions.md` in the change that builds it; until then this
-list is their record. The owner's words are quoted.
+Recorded in `docs/decisions.md` as D34; nothing of it is built, and no
+other file of PR #1 changed. In order, the next architect session:
 
-- **Default microphone:** "default microphone should do what it says
-  and follow changes". When the default microphone changes during a
-  recording, the recording follows the new one.
-- **The settings file stays JSON**, "mostly testability for me": the
-  file is found through `HOME`, so every test has its own; the
-  preferences system of macOS (`defaults write`) cannot be isolated
-  that way. Further reasons (architect's): the app and the command
-  line share one file, a choice per device is nested data, and one
-  file can be pasted into an Issue.
-- **An old or damaged settings file is read, never refused:** "we'll
-  need to gracefully read any old config and just write the new, no
-  rejecting". The owner agreed to this form: a known key with a valid
-  value is kept, an unknown key is dropped, an invalid value takes its
-  default, a file that cannot be read gives the defaults; the file is
-  then rewritten in its current form and the earlier one kept once as
-  `settings.json.previous`; everything dropped or replaced is named in
-  the window and on standard error. Exit status 78 remains only for an
-  unset `HOME`. No table of renamed keys before the first release.
-  This replaces parts of D27 and D28.
-- **Auto mode**, on by default and "what happens without any command
-  line args overriding": "novice users just use auto and get a
-  fool-proof recording for the editor to sort through, at the expense
-  of disk space"; "turning auto off exposes more things to configure,
-  like max resolution or more selective recordings"; "info table of
-  what it does stays". The owner agreed to this form:
-  - one setting `auto`; the other choices stay in the settings file
-    and are ignored while it is on;
-  - every display is recorded at its "looks like" size ("looks like is
-    good enough for native resolution in auto mode");
-  - audio: "auto indeed must take sane and safe decisions": all
-    built-in and wired audio inputs plus the default microphone,
-    whatever it is; a Bluetooth or virtual audio input only when it is
-    the default microphone or chosen with auto off (opening a
-    Bluetooth headset's microphone lowers its playback quality; a
-    virtual input gives silent or duplicate audio files);
-  - system audio and AGC remain switches, both on in auto mode.
-  This replaces the first-start defaults of D13 and moves the audio
-  mode all inputs from "Audio after v0" into the recorder PR's design.
-- **AGC is open**, to be discussed with the owner before anything is
-  built on it: "when Mic is set too low it just doesn't catch the
-  speaker and no editor can recover that too. for me AGC means turning
-  up input volume till before it clips and keeping it there". Facts for
-  that talk (architect's): the input volume of a device is one value
-  for all apps, and not every audio input has one that can be set.
-- **End-to-end tests:** "automated end-end test on my laptop is good
-  enough for starters" (queued item 5).
+1. Talks AGC through with the owner: what it does and whether it is on
+   in auto mode (open in D34; the owner's meaning: "turning up input
+   volume till before it clips and keeping it there"). Facts for that
+   talk: the input volume of a device is one value for all apps, and
+   not every audio input has one that can be set.
+2. Writes the design text for auto mode and for reading a settings
+   file without refusing it, and gets it signed off. It must settle
+   what D34 leaves open: with auto mode off, how audio inputs are
+   chosen and what becomes of the audio mode; when
+   `settings.json.previous` is written and overwritten, and whether a
+   command that only reads rewrites the settings file. The glossary
+   gains "auto mode" and "looks like".
+3. Briefs the recorder PR (queued item 2) with the first end-to-end
+   tests (queued item 5).
 
 ## In flight
 
@@ -106,11 +72,11 @@ list is their record. The owner's words are quoted.
    attach to and must move when that display disappears.
    Its brief must cover what the reviews of PR #1 found for it:
    - Before any brief, the owner signs off the design text for auto
-     mode and for reading an old settings file (rulings of 2026-11-13
-     above).
+     mode and for reading a settings file without refusing it (D34).
+     The first end-to-end tests (item 5) are designed with it.
    - The open questions in `docs/design/recorder.md` are answered
-     first: the default microphone changing during a recording (ruled
-     2026-11-13: the recording follows it), whether Apple's file writer puts a timecode track
+     first: the default microphone changing during a recording (ruled:
+     the recording follows it, D34), whether Apple's file writer puts a timecode track
      into an audio-only file, clock drift between an audio device and
      the tick grid, two audio inputs with the same name, device names a
      file name cannot hold, the gain of the "Microphones" guide mix.
@@ -139,8 +105,8 @@ list is their record. The owner's words are quoted.
      commits".
 3. **Audio after v0** (D12, D18): AGC, in its own PR, with its own
    design, its column in the window's Audio table and the HDMI test.
-   What AGC means is open (rulings of 2026-11-13 above). The audio mode
-   all inputs moved into auto mode.
+   What AGC does is open (D34). Recording all audio inputs is no
+   longer here: auto mode brings it (D34).
 4. **v1 gate:** acceptance tests on the owner's Mac (M3 Pro, macOS 26):
    - Timing by content: record a full-screen clock showing
      milliseconds; across a still period of at least 60 s followed by a
@@ -172,8 +138,8 @@ list is their record. The owner's words are quoted.
      decides whether the joining command below is needed.
    - A snapshot release installed over an earlier one keeps both
      permissions, with the app started from Finder (D5).
-5. **Automated end-to-end tests on the owner's Mac** (ruled
-   2026-11-13), designed with the recorder PR's `scripts/acceptance/`:
+5. **Automated end-to-end tests on the owner's Mac** (D34),
+   designed with the recorder PR's `scripts/acceptance/`:
    a test changes displays and audio inputs in software while a
    recording runs, then checks the files with `ffprobe`. What research
    on 2026-11-13 found, none of it tried here:
@@ -219,7 +185,7 @@ list is their record. The owner's words are quoted.
   that play with full sound as they are.
 - **A table of renamed settings keys**, so that a renamed key keeps
   its value. Deferred because nothing is released yet; an old key is
-  dropped and named (rulings of 2026-11-13). Revisit before the first
+  dropped and named (D34). Revisit before the first
   change to a settings key after a release `v0.<N>.0` that people use.
 - **End-to-end tests in the pipeline or in a virtual machine.**
   Research on 2026-11-13: other projects grant the screen recording

@@ -219,7 +219,8 @@ architect's reading.
 
 ## D13: One recorder core, an app and a full command line (2026-11-12)
 
-- **Status:** in force
+- **Status:** in force; superseded in part by D34 (the first-start
+  defaults)
 - **Context:** "One button minimal GUI … start app → approve last
   settings or configure → start recording → click dock icon to end
   recording", and a "full CLI for everything for scripting".
@@ -307,7 +308,8 @@ architect's reading.
 
 - **Status:** in force; superseded in part by D31 (the audio file for a
   late audio source is no longer a feature of its own: every audio
-  source has its own audio file)
+  source has its own audio file) and by D34 (recording all audio
+  inputs is no longer a feature after v0: auto mode brings it)
 - **Context:** Whether one self-signed certificate keeps the
   permissions across updates (D5) decides whether the delivery model
   works at all, and is cheapest to learn before the recorder exists.
@@ -483,7 +485,8 @@ architect's reading.
 
 ## D27: The setting `readyCheckHours` is named `requiredRecordingHours` (2026-11-12)
 
-- **Status:** in force
+- **Status:** in force; superseded in part by D34 (a settings file
+  with the earlier key is no longer refused)
 - **Context:** The owner asked "what are these? "readyCheckHours": 2,
   "lowDiskWarningMinutes": 20" and ruled "confirmed, rename to
   requiredRecordingHours".
@@ -499,7 +502,9 @@ architect's reading.
 ## D28: Rulings on the adversarial review of PR #1 (2026-11-12)
 
 - **Status:** superseded in part by D29 (point 5: the key imported
-  "only after compilation" in the same job)
+  "only after compilation" in the same job) and by D34 (point 7: a
+  settings file that cannot be used no longer stops with exit status
+  78)
 - **Context:** The architect put seven recommendations from the
   adversarial review of PR #1 to the owner, who answered "Accept all
   seven".
@@ -696,3 +701,70 @@ architect's reading.
   asks for a little more space than before.
 - **Evidence:** [PR #1](https://github.com/schlomo/multi-screen-recorder-macos/pull/1),
   [design/recorder.md](design/recorder.md) "The app".
+
+## D34: Auto mode, a settings file that is never refused, and the owner's other rulings of 2026-11-13 (2026-11-13)
+
+- **Status:** in force; not built yet. `docs/design/recorder.md`, the
+  glossary and the code still describe PR #1 as built and follow in the
+  change that builds this.
+- **Context:** The owner, on 2026-11-13:
+  1. "default microphone should do what it says and follow changes".
+  2. "why json config, why not defaults write?", then "keep JSON and
+     record reasoning (mostly testability for me)".
+  3. "we'll need to gracefully read any old config and just write the
+     new, no rejecting".
+  4. "an auto mode, which is on by default and also what happens
+     without any command line args overriding. In auto mode we use
+     native resolutions and record all audio devices. AGC and system
+     audio will still be a toggle, that will also default to on in
+     auto. so novice users just use auto and get a fool-proof recording
+     for the editor to sort through, at the expense of disk space.
+     turning auto off exposes more things to configure, like max
+     resolution or more selective recordings. info table of what it
+     does stays of course."; then "looks like is good enough for native
+     resolution in auto mode" and "auto indeed must take sane and safe
+     decisions".
+  5. "automated end-end test on my laptop is good enough for starters".
+  To the architect's proposals for points 3 and 4: "OK to all
+  suggestions, and yes for next round".
+- **Decision:**
+  1. When the default microphone changes during a recording, the
+     recording follows the new one.
+  2. The settings file stays JSON, because it is found through `HOME`
+     and so every test has its own; the preferences system of macOS
+     cannot be isolated that way. The architect's further reasons: the
+     app and the command line share one file, a choice per device is
+     nested data, and one file can be pasted into an Issue.
+  3. A settings file is read, never refused (the architect's proposal,
+     agreed): a known key with a valid value is kept, an unknown key is
+     dropped, an invalid value takes its default, a file that cannot be
+     read gives the defaults; the file is then rewritten in its current
+     form with the earlier one kept as `settings.json.previous`, and
+     everything dropped or replaced is named in the window and on
+     standard error. Exit status 78 remains for an unset `HOME` only.
+     No table of renamed keys before the first release.
+  4. Auto mode (the form is the architect's proposal, agreed): one
+     setting `auto`, on by default; the other choices stay in the
+     settings file and are ignored while it is on. In auto mode every
+     display is recorded at its "looks like" size, system audio is
+     recorded, and the audio inputs recorded are all built-in and wired
+     ones plus the default microphone, whatever it is; a Bluetooth or
+     virtual audio input is recorded only when it is the default
+     microphone, or when chosen with auto mode off. The window's tables
+     stay.
+  5. Automated end-to-end tests run on the owner's Mac first; tests in
+     the pipeline or in a virtual machine are deferred (`backlog.md`).
+  Open, not decided here: what AGC does and whether it is on in auto
+  mode. The owner wants it on, and wrote later "with AGC we'll be
+  discussing further … for me AGC means turning up input volume till
+  before it clips and keeping it there". Also open until the design
+  text is signed off: how auto mode off relates to the audio mode, and
+  when `settings.json.previous` is written and overwritten.
+- **Consequences:** Replaces D13's first-start defaults, D18's "all
+  inputs after v0", D27's refusal of the earlier key and D28 point 7's
+  exit status for a settings file that cannot be used. A recording in
+  auto mode takes more disk space than the 1080p default did. "Auto
+  mode" and "looks like" need glossary entries with the building
+  change.
+- **Evidence:** [PR #1](https://github.com/schlomo/multi-screen-recorder-macos/pull/1)
+  (this entry and `backlog.md` only; nothing built).
