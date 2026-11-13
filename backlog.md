@@ -9,7 +9,7 @@ two PRs (D18).
 The skeleton and pipeline PR (#1) is built, adversarially reviewed
 and publishes a signed snapshot release. Until it is merged, what is
 left is under "In flight": the owner's check on the Mac and the merge.
-Next for an architect session once it is merged: the three steps
+Next for an architect session once it is merged: the four steps
 below; the app icon PR can run beside them.
 
 ### Owner's rulings of 2026-11-13 (D34)
@@ -29,8 +29,14 @@ other file of PR #1 changed. In order, the next architect session:
    `settings.json.previous` is written and overwritten, and whether a
    command that only reads rewrites the settings file. The glossary
    gains "auto mode" and "looks like".
-3. Briefs the recorder PR (queued item 2) with the first end-to-end
-   tests (queued item 5).
+3. Gets the owner's sign-off, or changes, on the proposed design for
+   end-to-end tests (queued item 5, draft PR #2). The owner ruled on
+   five of its questions (D35). Two of its experiments have run: a
+   virtual display is captured on the owner's Mac, and a new stream
+   on a virtual display that came back delivers the other display's
+   picture, which the recorder design must deal with.
+4. Briefs the recorder PR (queued item 2) with the first end-to-end
+   tests.
 
 ## In flight
 
@@ -95,8 +101,8 @@ other file of PR #1 changed. In order, the next architect session:
    Stop in the app, a display file per display and an audio file per
    source with guide tracks (D31), a new display file when the frame
    size changes (D30), timecode in every file (D21, D31), mono tracks
-   per channel (D22), SDR with the colour space tagged (D24),
-   `scripts/acceptance/`. The system audio stream needs a display to
+   per channel (D22), SDR with the colour space tagged (D24). The
+   system audio stream needs a display to
    attach to and must move when that display disappears.
    Its brief must cover what the reviews of PR #1 found for it:
    - This PR also builds auto mode with its setting `auto`, the
@@ -112,6 +118,14 @@ other file of PR #1 changed. In order, the next architect session:
      file name cannot hold, the gain of the "Microphones" guide mix.
    - A display needs a stable identity in `DisplayInfo`; the listing has
      none yet.
+   - What the end-to-end tests need from the recorder design and what
+     research found for it (a macOS fault that delivers another
+     display's picture after a reconnect, seen on the owner's Mac; who holds the
+     permissions when `msr` is started from a terminal): the sections
+     "What the recorder design must provide", "Permissions" and
+     "What research found for the recorder" of
+     `docs/design/end-to-end-tests.md`, unverified unless marked as
+     tried.
    - The app quits when its last window closes; Start closes the
      window, so that must change.
    - Before microphones are captured with an `AVCaptureSession`, an
@@ -175,26 +189,14 @@ other file of PR #1 changed. In order, the next architect session:
      decides whether the joining command below is needed.
    - A snapshot release installed over an earlier one keeps both
      permissions, with the app started from Finder (D5).
-5. **Automated end-to-end tests on the owner's Mac** (D34),
-   designed with the recorder PR's `scripts/acceptance/`:
-   a test changes displays and audio inputs in software while a
-   recording runs, then checks the files with `ffprobe`. What research
-   on 2026-11-13 found, none of it tried here:
-   - Displays: a helper using Apple's private `CGVirtualDisplay`
-     interface adds, removes and resizes virtual displays (reported
-     working on macOS 26; removal takes up to two seconds, and fast
-     create-and-remove cycles are reported flaky); `displayplacer`
-     rotates a display and changes its mode.
-   - Audio inputs: BlackHole as a virtual audio input, aggregate
-     devices created and removed through the public CoreAudio
-     interface, `SwitchAudioSource` to change the default microphone.
-   - Content: a known tone into the virtual audio input and a
-     full-screen pattern with a frame counter on each display.
-   - The permissions are granted once by the owner; the tests run in
-     the owner's own session, so they are started by a person, never
-     unasked by an agent.
-   First step: one small experiment that creates a virtual display and
-   records ten seconds of it.
+5. **Automated end-to-end tests on the owner's Mac** (D34). The
+   proposed design, not signed off, is
+   [docs/design/end-to-end-tests.md](docs/design/end-to-end-tests.md)
+   (draft PR #2): tests by error class, what the recorder design must
+   provide for them, the experiments that settle its unknowns, and its
+   open questions. The owner's rulings on it so far are D35. Nothing
+   of it is built; of the experiments, the first two have run. The
+   tests are started by a person, never unasked by an agent.
 6. **App icon**, its own PR after PR #1 is merged; until then the app
    has the default icon. The owner chose the drawing (2026-11-12):
    three displays fanned in depth on a graphite tile, one red record
