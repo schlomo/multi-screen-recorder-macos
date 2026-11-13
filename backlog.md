@@ -91,8 +91,8 @@ other file of PR #1 changed. In order, the next architect session:
    - A display needs a stable identity in `DisplayInfo`; the listing has
      none yet.
    - What the end-to-end tests need from the recorder design and what
-     research found for it (a reported macOS fault that delivers
-     another display's picture after a reconnect; who holds the
+     research found for it (a macOS fault that delivers another
+     display's picture after a reconnect, seen on the owner's Mac; who holds the
      permissions when `msr` is started from a terminal): the sections
      "What the recorder design must provide", "Permissions" and
      "What research found for the recorder" of

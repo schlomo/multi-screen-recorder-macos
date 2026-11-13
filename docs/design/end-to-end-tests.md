@@ -120,11 +120,17 @@ was shown and played.
   colors to ensure that no problem creeps in with colors? After all,
   all screen content is colored". So the pattern also carries large
   colour fields (red, green, blue, their mixes) and grey steps from
-  black to white, and an assertion compares them, decoded from the
-  display file, with what was shown. That detects a wrong or missing
-  colour space tag and a wrong range, where black comes back grey and
-  white dull (always SDR with the colour space tagged, D24). The
-  tolerance is calibrated on the first recordings.
+  black to white. Two assertions use them. One reads the display
+  file's colour tags with `ffprobe` (primaries, transfer, matrix,
+  range) and compares them with what the recorder design says it
+  writes (always SDR with the colour space tagged, D24; which colour
+  space, the recorder design must name). The other decodes the fields
+  with `ffmpeg` into sRGB and compares them with the sRGB values the
+  helper drew: that detects a wrong matrix and a wrong range, where
+  black comes back grey and white dull. A wrong primaries or transfer
+  tag does not change decoded values, which is why the tags are
+  asserted themselves. The tolerance is calibrated on the first
+  recordings.
 - **Sound:** a virtual audio input carries a tone and a click once a
   second, played into it by the helper.
 
@@ -146,7 +152,7 @@ only if that falls short. See "Unknowns".
 | Error class | Events that provoke it | Assertions that detect it |
 |---|---|---|
 | **A file is lost or unreadable** | kill the recorder (`kill -9`), also while it finalizes; full disk; output folder made unwritable or its volume removed; sleep; a display or audio input vanishing | every file in the recording folder opens and decodes to its last complete fragment (fragments of 2 s, [recorder.md](recorder.md)); nothing recorded more than one fragment before the event is missing |
-| **Wrong picture** | displays connect and reconnect (a reported macOS fault then delivers another display's picture), mirroring, main display change, many displays at once | the identity decoded from each display file is that file's display; no black stretch; the pattern's counter keeps advancing; the colour fields and grey steps come back as shown, within a tolerance, black as black and white as white |
+| **Wrong picture** | displays connect and reconnect (a macOS fault then delivers another display's picture, seen on the owner's Mac with virtual displays), mirroring, main display change, many displays at once | the identity decoded from each display file is that file's display; no black stretch; the pattern's counter keeps advancing; the colour fields and grey steps come back as shown, within a tolerance, black as black and white as white |
 | **Wrong sound** | audio inputs appear and vanish, default microphone changes, channel count and sample rate change | a virtual audio input's audio file holds the tone, on every track; no silent stretch in it; each guide track is present in every display file |
 | **Wrong timing** | still picture for 60 s, load on the processor, a stalled recorder (`SIGSTOP`, then `SIGCONT`), long random runs | every display file has 30 frames for each second of its length; the time shown in each recorded frame is that frame's time within one frame (a still or late picture is repeated by design, D11, D21, so the counter may repeat but never runs backwards or ahead); the timecode of every file matches its start; the click sits at the frame that shows its time |
 | **A change handled wrongly** | every display and audio event below | the right file ends and the right one begins; a frame size change leaves under one second without picture (D30); the audio files have no gap across it; a display keeps its number; an unchanged frame size continues the file |
@@ -195,7 +201,12 @@ A virtual display is drawn by the same window server and captured
 through the same ScreenCaptureKit as a real one, so these tests should
 show how the recorder handles a change. That removing a virtual
 display looks to the recorder like pulling a cable is an assumption,
-UNVERIFIED.
+UNVERIFIED. One difference may already be known: the wrong-display
+fault shows after a virtual display reconnects ("Unknowns"), and
+whether it shows with the Mac's own displays is untried. Until that
+is tried, a wrong picture after a reconnect is a failed assertion all
+the same: the recorder has to deliver the right display in either
+case, and a recorder that cannot yet keeps those scenarios failing.
 
 ### What the recorder design must provide
 
@@ -244,8 +255,8 @@ tried:
 - **ScreenCaptureKit delivers the wrong display** after a virtual
   display reconnects when two exist (reported as Apple feedback
   FB17797423; BetterDisplay is said to work around it). Tried, and it
-  shows on the owner's Mac (see "Unknowns"): after display A came
-  back, every new stream on A delivered display B's picture, in three
+  shows on the owner's Mac (see "Unknowns"; one run): after display A
+  came back, every new stream on A delivered display B's picture, in three
   reconnects of three, while a screenshot of A through the same
   ScreenCaptureKit display was right. The recorder must verify which
   display a stream delivers, and its design needs a way to get the
@@ -259,6 +270,9 @@ tried:
   ScreenCaptureKit's stream error domain 0.12 to 0.24 s after the
   display went, in three cases of three; a stream on the other display
   kept delivering throughout.
+- **A screenshot's colour space had no name** in that run (see
+  "Unknowns"). The recorder design names the colour space it tags
+  (D24), so it must find out what ScreenCaptureKit delivers.
 - **macOS's display ID is not a display's identity.** Tried (see
   "Unknowns"): the same virtual display got a new display ID each time
   it was created. A display that comes back during a recording may
@@ -400,7 +414,7 @@ this design is built:
   150 buffers in 5 s, 63 of
   them complete frames, while the picture changed 50 times; the
   display was gone 0.11 s after the program released it. Not tried:
-  two virtual displays at once, a mode change, a HiDPI mode;
+  a mode change, a HiDPI mode;
 - two virtual displays, one reconnects: does the wrong-display fault
   show on this Mac. **Tried, and it does** (2026-11-13, one run by the
   owner, from an app that holds Screen Recording). Display A showed
@@ -410,13 +424,16 @@ this design is built:
   stream of each display showed its own colour, with the bytes
   exactly as shown (255, 0, 0 and 0, 0, 255). After each of the three
   reconnects: a screenshot of A showed red and one of B blue; a new
-  stream on A delivered blue, B's picture, as did a second new stream
-  on A started a second later; a new stream on B delivered blue. A
+  stream on A delivered blue, B's picture; a new stream on B delivered
+  blue. After reconnects 1 and 2, a further stream on A, started once
+  those were stopped, also delivered blue. The screenshots' colour
+  space had no name. A
   stream running on B from the start delivered blue throughout and
   never stopped. Each time A went, the stream on A stopped with error
   -3815 of ScreenCaptureKit's stream error domain, 0.16, 0.12 and
   0.24 s after. Not tried: more than one run, a longer wait before
-  the new stream, the Mac's own displays, any way around the fault;
+  the new stream, the Mac's own displays (BetterDisplay can switch
+  one off and on), any way around the fault;
 - an aggregate device created and removed is seen as an audio input
   appearing and vanishing; a change of its members arrives as a channel
   count change; it needs no administrator;
