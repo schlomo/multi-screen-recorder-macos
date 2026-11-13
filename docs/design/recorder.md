@@ -459,7 +459,9 @@ pipeline.
 Capture itself cannot run in CI, which has
 no way to grant the permissions [ASSUMED]; it is verified on a Mac with
 `scripts/acceptance/`, which drives `msr record` and checks the files
-with `ffprobe`, and by the v1 gate.
+with `ffprobe`, and by the v1 gate. A fuller design for automated
+end-to-end tests is proposed, not signed off, in
+[end-to-end-tests.md](end-to-end-tests.md).
 
 ## Not covered, and rejected
 

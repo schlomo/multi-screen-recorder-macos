@@ -140,8 +140,11 @@ other file of PR #1 changed. In order, the next architect session:
      decides whether the joining command below is needed.
    - A snapshot release installed over an earlier one keeps both
      permissions, with the app started from Finder (D5).
-5. **Automated end-to-end tests on the owner's Mac** (D34),
-   designed with the recorder PR's `scripts/acceptance/`:
+5. **Automated end-to-end tests on the owner's Mac** (D34). The
+   proposed design, not signed off, is
+   [docs/design/end-to-end-tests.md](docs/design/end-to-end-tests.md):
+   tests by error class, its open questions, and the experiments that
+   come first. In short:
    a test changes displays and audio inputs in software while a
    recording runs, then checks the files with `ffprobe`. What research
    on 2026-11-13 found, none of it tried here:
