@@ -94,7 +94,8 @@ other file of PR #1 changed. In order, the next architect session:
      permissions when `msr` is started from a terminal): the sections
      "What the recorder design must provide", "Permissions" and
      "What research found for the recorder" of
-     `docs/design/end-to-end-tests.md`, all unverified.
+     `docs/design/end-to-end-tests.md`, unverified unless marked as
+     tried.
    - The app quits when its last window closes; Start closes the
      window, so that must change.
    - The ready check does not run while a recording runs, activation

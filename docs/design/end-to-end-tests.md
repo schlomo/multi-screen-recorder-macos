@@ -371,8 +371,10 @@ this design is built:
   and 10): ScreenCaptureKit listed three displays, the virtual one
   among them at 1920 × 1080; a screenshot of it showed the program's
   full-screen window, with the menu bar of macOS across the top; the
-  window's magenta (sRGB 1, 0, 1) came back as 1.00, 0.25, 1.00; a
-  stream at 30 frames per second delivered 150 buffers in 5 s, 63 of
+  window's magenta (sRGB 1, 0, 1) came back as 1.00, 0.25, 1.00. The
+  first of the two stopped there, at a colour check that was too
+  strict. In the second, a stream at 30 frames per second delivered
+  150 buffers in 5 s, 63 of
   them complete frames, while the picture changed 50 times; the
   display was gone 0.11 s after the program released it. Not tried:
   two virtual displays at once, a mode change, a HiDPI mode;
