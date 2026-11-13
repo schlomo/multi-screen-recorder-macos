@@ -31,8 +31,10 @@ other file of PR #1 changed. In order, the next architect session:
    gains "auto mode" and "looks like".
 3. Gets the owner's sign-off, or changes, on the proposed design for
    end-to-end tests (queued item 5, draft PR #2). The owner ruled on
-   five of its questions (D35). Its first experiment has run: a
-   virtual display is captured on the owner's Mac. The others have not.
+   five of its questions (D35). Two of its experiments have run: a
+   virtual display is captured on the owner's Mac, and a new stream
+   on a virtual display that came back delivers the other display's
+   picture, which the recorder design must deal with.
 4. Briefs the recorder PR (queued item 2) with the first end-to-end
    tests.
 
@@ -158,7 +160,7 @@ other file of PR #1 changed. In order, the next architect session:
    (draft PR #2): tests by error class, what the recorder design must
    provide for them, the experiments that settle its unknowns, and its
    open questions. The owner's rulings on it so far are D35. Nothing
-   of it is built; of the experiments, the first has run. The
+   of it is built; of the experiments, the first two have run. The
    tests are started by a person, never unasked by an agent.
 6. **App icon**, its own PR after PR #1 is merged; until then the app
    has the default icon. The owner chose the drawing (2026-11-12):
