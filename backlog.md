@@ -9,11 +9,62 @@ two PRs (D18).
 The skeleton and pipeline PR (#1) is built, adversarially reviewed
 and publishes a signed snapshot release. Until it is merged, what is
 left is under "In flight": the owner's check on the Mac and the merge.
-Next for an architect session once it is merged: get the owner's
-ruling on what happens when the default microphone changes during a
-recording (listed under "Open questions" in
-`docs/design/recorder.md`), then brief the recorder PR; the app icon PR
-can run beside it.
+Next for an architect session once it is merged: write the design
+text for the owner's rulings of 2026-11-13 (below) and get it signed
+off, then brief the recorder PR; the app icon PR can run beside it.
+
+### Owner's rulings of 2026-11-13, not yet in the decisions log
+
+They change no file of PR #1. Each gets its entry in
+`docs/decisions.md` in the change that builds it; until then this
+list is their record. The owner's words are quoted.
+
+- **Default microphone:** "default microphone should do what it says
+  and follow changes". When the default microphone changes during a
+  recording, the recording follows the new one.
+- **The settings file stays JSON**, "mostly testability for me": the
+  file is found through `HOME`, so every test has its own; the
+  preferences system of macOS (`defaults write`) cannot be isolated
+  that way. Further reasons (architect's): the app and the command
+  line share one file, a choice per device is nested data, and one
+  file can be pasted into an Issue.
+- **An old or damaged settings file is read, never refused:** "we'll
+  need to gracefully read any old config and just write the new, no
+  rejecting". The owner agreed to this form: a known key with a valid
+  value is kept, an unknown key is dropped, an invalid value takes its
+  default, a file that cannot be read gives the defaults; the file is
+  then rewritten in its current form and the earlier one kept once as
+  `settings.json.previous`; everything dropped or replaced is named in
+  the window and on standard error. Exit status 78 remains only for an
+  unset `HOME`. No table of renamed keys before the first release.
+  This replaces parts of D27 and D28.
+- **Auto mode**, on by default and "what happens without any command
+  line args overriding": "novice users just use auto and get a
+  fool-proof recording for the editor to sort through, at the expense
+  of disk space"; "turning auto off exposes more things to configure,
+  like max resolution or more selective recordings"; "info table of
+  what it does stays". The owner agreed to this form:
+  - one setting `auto`; the other choices stay in the settings file
+    and are ignored while it is on;
+  - every display is recorded at its "looks like" size ("looks like is
+    good enough for native resolution in auto mode");
+  - audio: "auto indeed must take sane and safe decisions": all
+    built-in and wired audio inputs plus the default microphone,
+    whatever it is; a Bluetooth or virtual audio input only when it is
+    the default microphone or chosen with auto off (opening a
+    Bluetooth headset's microphone lowers its playback quality; a
+    virtual input gives silent or duplicate audio files);
+  - system audio and AGC remain switches, both on in auto mode.
+  This replaces the first-start defaults of D13 and moves the audio
+  mode all inputs from "Audio after v0" into the recorder PR's design.
+- **AGC is open**, to be discussed with the owner before anything is
+  built on it: "when Mic is set too low it just doesn't catch the
+  speaker and no editor can recover that too. for me AGC means turning
+  up input volume till before it clips and keeping it there". Facts for
+  that talk (architect's): the input volume of a device is one value
+  for all apps, and not every audio input has one that can be set.
+- **End-to-end tests:** "automated end-end test on my laptop is good
+  enough for starters" (queued item 5).
 
 ## In flight
 
@@ -54,9 +105,12 @@ can run beside it.
    `scripts/acceptance/`. The system audio stream needs a display to
    attach to and must move when that display disappears.
    Its brief must cover what the reviews of PR #1 found for it:
+   - Before any brief, the owner signs off the design text for auto
+     mode and for reading an old settings file (rulings of 2026-11-13
+     above).
    - The open questions in `docs/design/recorder.md` are answered
-     first: the default microphone changing during a recording (the
-     owner rules), whether Apple's file writer puts a timecode track
+     first: the default microphone changing during a recording (ruled
+     2026-11-13: the recording follows it), whether Apple's file writer puts a timecode track
      into an audio-only file, clock drift between an audio device and
      the tick grid, two audio inputs with the same name, device names a
      file name cannot hold, the gain of the "Microphones" guide mix.
@@ -83,9 +137,10 @@ can run beside it.
      malformed date still gives a Python traceback instead of a
      message (it stops either way); `scripts/sign-app` says "the 1
      commits".
-3. **Audio after v0** (D12, D18), each its own PR: the audio mode all
-   inputs; AGC, with its own design, its column in the window's Audio
-   table and the HDMI test.
+3. **Audio after v0** (D12, D18): AGC, in its own PR, with its own
+   design, its column in the window's Audio table and the HDMI test.
+   What AGC means is open (rulings of 2026-11-13 above). The audio mode
+   all inputs moved into auto mode.
 4. **v1 gate:** acceptance tests on the owner's Mac (M3 Pro, macOS 26):
    - Timing by content: record a full-screen clock showing
      milliseconds; across a still period of at least 60 s followed by a
@@ -117,7 +172,27 @@ can run beside it.
      decides whether the joining command below is needed.
    - A snapshot release installed over an earlier one keeps both
      permissions, with the app started from Finder (D5).
-5. **App icon**, its own PR after PR #1 is merged; until then the app
+5. **Automated end-to-end tests on the owner's Mac** (ruled
+   2026-11-13), designed with the recorder PR's `scripts/acceptance/`:
+   a test changes displays and audio inputs in software while a
+   recording runs, then checks the files with `ffprobe`. What research
+   on 2026-11-13 found, none of it tried here:
+   - Displays: a helper using Apple's private `CGVirtualDisplay`
+     interface adds, removes and resizes virtual displays (reported
+     working on macOS 26; removal takes up to two seconds, and fast
+     create-and-remove cycles are reported flaky); `displayplacer`
+     rotates a display and changes its mode.
+   - Audio inputs: BlackHole as a virtual audio input, aggregate
+     devices created and removed through the public CoreAudio
+     interface, `SwitchAudioSource` to change the default microphone.
+   - Content: a known tone into the virtual audio input and a
+     full-screen pattern with a frame counter on each display.
+   - The permissions are granted once by the owner; the tests run in
+     the owner's own session, so they are started by a person, never
+     unasked by an agent.
+   First step: one small experiment that creates a virtual display and
+   records ten seconds of it.
+6. **App icon**, its own PR after PR #1 is merged; until then the app
    has the default icon. The owner chose the drawing (2026-11-12):
    three displays fanned in depth on a graphite tile, one red record
    dot on the front display; graphite `#1E2330`, cool white `#E9EEF7`,
@@ -126,7 +201,7 @@ can run beside it.
    a classic `.icns` if a plain package build cannot compile that
    format, and a small-size drawing with two displays and a larger dot
    below 32 px.
-6. **Homepage** (D7): the branch name and how changes reach it
+7. **Homepage** (D7): the branch name and how changes reach it
    (architect); the DNS entry for `multiscreenrecorder.schapiro.org`
    (owner).
 
@@ -142,9 +217,21 @@ can run beside it.
   manifest (D31). Deferred because an editor that reads timecode needs
   none. Revisit when the Kdenlive check fails or the owner wants files
   that play with full sound as they are.
-- **Settings migration.** None exists: an unknown key stops with an
-  error, and nothing is released yet (D27). Revisit before the first
+- **A table of renamed settings keys**, so that a renamed key keeps
+  its value. Deferred because nothing is released yet; an old key is
+  dropped and named (rulings of 2026-11-13). Revisit before the first
   change to a settings key after a release `v0.<N>.0` that people use.
+- **End-to-end tests in the pipeline or in a virtual machine.**
+  Research on 2026-11-13: other projects grant the screen recording
+  permission on GitHub's hosted macOS runners by writing into the
+  permission database, which breaks with macOS versions; a macOS
+  virtual machine (Parallels, Tart) has one display and the host's
+  default microphone, so display changes need the same virtual
+  displays as on the Mac itself, and Parallels Desktop Business adds
+  little here. Deferred because tests on the owner's Mac are "good
+  enough for starters". Revisit when those tests exist and running
+  them by hand becomes the bottleneck; first step then is a throwaway
+  workflow that records ten seconds on a hosted runner.
 - **A snapshot release left behind** by a PR closed with a merge
   conflict (GitHub may not run the removal then; inferred from its
   documentation, never seen). Deferred because the leftover is deleted
