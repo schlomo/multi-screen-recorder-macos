@@ -61,6 +61,19 @@ other file of PR #1 changed. In order, the next architect session:
     to defaults"; the two tables and the total line in the window;
     whether coming back to the app with screen recording denied makes
     macOS prompt again (the ready check runs on every activation).
+    Seen so far (2026-11-13, started through `open`): both prompts name
+    the app; with both denied the ready check names both and "Check
+    again" raises no new prompt; allowed in System Settings, the
+    microphone permission needs a restart of the app and the screen
+    recording permission does not; the fix lines were changed for
+    that. Still
+    to do: the second snapshot release installed over the first, the
+    old settings file. The snapshot release from Finder with "Open
+    Anyway" worked, and both permissions stayed over a quit and start.
+    The check also found two crashes (a microphone unplugged, a display
+    mode changed under an open menu; `docs/troubleshooting.md`) and
+    that the window did not follow device changes; all three are
+    changed in this PR and wait for the owner's re-test.
 
 ## Queued
 
@@ -100,6 +113,9 @@ other file of PR #1 changed. In order, the next architect session:
      tried.
    - The app quits when its last window closes; Start closes the
      window, so that must change.
+   - Before microphones are captured with an `AVCaptureSession`, an
+     experiment shows that a microphone unplugged during capture does
+     not crash the process (it did in the ready check of PR #1).
    - The ready check does not run while a recording runs, activation
      included.
    - The ready check probes are free functions: they need a seam for

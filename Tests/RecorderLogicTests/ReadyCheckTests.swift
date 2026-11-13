@@ -9,14 +9,14 @@ import Testing
 
     private func facts(
         screenRecording: PermissionProbe = .granted,
-        microphonePermission: PermissionProbe? = .granted,
+        microphoneGranted: Bool? = true,
         displays: Result<[DisplayInfo], DeviceReadError>? = nil,
         audioInputs: [AudioInputInfo] = builtInMicrophoneOnly,
         outputFolder: OutputFolderProbe = .usable(.bytes(100_000_000_000))
     ) -> ReadyCheckFacts {
         ReadyCheckFacts(
             screenRecording: screenRecording,
-            microphone: microphonePermission,
+            microphoneGranted: microphoneGranted,
             displays: displays ?? .success(fullHDDisplays),
             audioInputs: audioInputs,
             outputFolder: outputFolder
@@ -62,7 +62,7 @@ import Testing
         var settings = Settings.defaults
         settings.audioMode = .none
         let result = ReadyCheck.evaluate(
-            facts(microphonePermission: nil, audioInputs: []), settings: settings)
+            facts(microphoneGranted: nil, audioInputs: []), settings: settings)
         #expect(result.isReady)
         #expect(result.items.map(\.title) == [
             "Screen & System Audio Recording permission",
@@ -77,7 +77,7 @@ import Testing
         var settings = Settings.defaults
         settings.audioMode = .none
         let result = ReadyCheck.evaluate(
-            facts(microphonePermission: nil, audioInputs: [Self.unreadable(isDefault: true)]), settings: settings)
+            facts(microphoneGranted: nil, audioInputs: [Self.unreadable(isDefault: true)]), settings: settings)
         #expect(result.isReady)
         #expect(result.items.contains { $0.title.hasPrefix("Free disk space") })
     }
@@ -86,7 +86,7 @@ import Testing
         var settings = Settings.defaults
         settings.audioMode = .none
         settings.systemAudio = false
-        let result = ReadyCheck.evaluate(facts(microphonePermission: nil), settings: settings)
+        let result = ReadyCheck.evaluate(facts(microphoneGranted: nil), settings: settings)
         #expect(result.items.contains(ReadyCheckItem(title: "Audio: none", passed: true, fix: nil)))
     }
 
@@ -94,22 +94,19 @@ import Testing
         let result = ReadyCheck.evaluate(facts(screenRecording: .notGranted), settings: .defaults)
         let item = try #require(result.items.first)
         #expect(item.passed == false)
-        #expect(item.fix?.contains("System Settings › Privacy & Security › Screen & System Audio Recording") == true)
+        #expect(item.fix == "allow it in System Settings › Privacy & Security › Screen & System Audio Recording. "
+            + "If it is still missing after that, quit Multi Screen Recorder and start it again. "
+            + "If it was started from a terminal, then the terminal app needs the permission.")
         #expect(!result.isReady)
     }
 
     @Test func aMissingMicrophonePermissionNamesTheSettingsPath() throws {
-        let result = ReadyCheck.evaluate(facts(microphonePermission: .notGranted), settings: .defaults)
+        let result = ReadyCheck.evaluate(facts(microphoneGranted: false), settings: .defaults)
         let item = try #require(result.items.first { $0.title == "Microphone permission" })
         #expect(item.passed == false)
-        #expect(item.fix?.contains("System Settings › Privacy & Security › Microphone") == true)
-    }
-
-    @Test func aMicrophoneThatCannotBeOpenedFailsWithTheReason() throws {
-        let result = ReadyCheck.evaluate(facts(microphonePermission: .failed("device busy")), settings: .defaults)
-        let item = try #require(result.items.first { $0.title.hasPrefix("Microphone permission") })
-        #expect(item.passed == false)
-        #expect(item.title.contains("device busy"))
+        #expect(item.fix == "allow it in System Settings › Privacy & Security › Microphone, "
+            + "then quit Multi Screen Recorder and start it again. "
+            + "If it was started from a terminal, then the terminal app needs the permission.")
     }
 
     @Test func noDisplayFails() throws {

@@ -11,7 +11,7 @@ import ScreenCaptureKit
 public func probeReadyCheckFacts(settings: Settings, homeFolder: URL) async -> ReadyCheckFacts {
     ReadyCheckFacts(
         screenRecording: await probeScreenRecording(),
-        microphone: settings.audioMode == .none ? nil : await probeMicrophone(),
+        microphoneGranted: settings.audioMode == .none ? nil : await microphoneIsGranted(),
         displays: Result { () throws(DeviceReadError) in try currentDisplays() },
         audioInputs: currentAudioInputs(),
         outputFolder: probeOutputFolder(settings.outputFolderURL(homeFolder: homeFolder)))
@@ -43,37 +43,16 @@ public func probeScreenRecording() async -> PermissionProbe {
     }
 }
 
-/// Asks for the Microphone permission if never asked, then proves the grant
-/// by opening the default microphone. Without a microphone there is nothing
-/// to open, so the granted permission stands; the ready check's audio item
-/// reports the missing microphone.
-public func probeMicrophone() async -> PermissionProbe {
+/// Asks for the Microphone permission if never asked, and says whether it is
+/// granted. It opens no microphone: a capture session opened for a moment on
+/// every check left something behind in macOS that crashed the app when the
+/// microphone was unplugged.
+public func microphoneIsGranted() async -> Bool {
     switch AVCaptureDevice.authorizationStatus(for: .audio) {
-    case .authorized:
-        break
-    case .notDetermined:
-        guard await AVCaptureDevice.requestAccess(for: .audio) else { return .notGranted }
-    case .denied, .restricted:
-        return .notGranted
-    @unknown default:
-        return .notGranted
-    }
-    return openMicrophone(AVCaptureDevice.default(for: .audio))
-}
-
-func openMicrophone(_ device: AVCaptureDevice?) -> PermissionProbe {
-    guard let device else { return .granted }
-    let session = AVCaptureSession()
-    do {
-        let input = try AVCaptureDeviceInput(device: device)
-        guard session.canAddInput(input) else { return .failed("the capture session refused it") }
-        session.addInput(input)
-        session.addOutput(AVCaptureAudioDataOutput())
-        session.startRunning()
-        defer { session.stopRunning() }
-        return session.isRunning ? .granted : .failed("the capture session did not start")
-    } catch {
-        return .failed(error.localizedDescription)
+    case .authorized: true
+    case .notDetermined: await AVCaptureDevice.requestAccess(for: .audio)
+    case .denied, .restricted: false
+    @unknown default: false
     }
 }
 

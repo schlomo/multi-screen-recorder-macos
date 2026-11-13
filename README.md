@@ -46,9 +46,10 @@ It runs on macOS 26 and later, on Apple silicon.
    and confirm.
 4. Grant the two permissions when macOS asks: **Screen & System Audio
    Recording** (for the displays and the system audio) and
-   **Microphone**. Both are in System Settings › Privacy & Security;
-   macOS may ask you to restart the app after granting screen
-   recording.
+   **Microphone**. Both are in System Settings › Privacy & Security.
+   A microphone permission allowed there, not in the prompt, counts
+   only after you quit the app and start it again; if the screen
+   recording permission still shows as missing, do the same.
 
 Every build is signed with the same certificate, so a newer build
 installed over an older one should keep both permissions; this is not
@@ -65,7 +66,8 @@ folder), then the recording resolution, the audio mode, system audio,
 the output folder and the ready check: "Ready to record" when every item
 passes, otherwise each item with a fix for each failing one. Every
 change is saved at once; the ready check runs again after each change,
-when you come back to the app, and on "Check again".
+when you come back to the app, when a display or an audio input is
+plugged in, removed or changed, and on "Check again".
 
 ### Command line
 

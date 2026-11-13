@@ -23,21 +23,22 @@ public enum OutputFolderProbe: Equatable, Sendable {
 /// What the probes found on this Mac, for the ready check to judge.
 public struct ReadyCheckFacts: Sendable {
     public var screenRecording: PermissionProbe
-    /// Nil when the audio mode needs no microphone, so it was not probed.
-    public var microphone: PermissionProbe?
+    /// Whether the Microphone permission is granted; nil when the audio mode
+    /// needs no microphone, so it was not asked.
+    public var microphoneGranted: Bool?
     public var displays: Result<[DisplayInfo], DeviceReadError>
     public var audioInputs: [AudioInputInfo]
     public var outputFolder: OutputFolderProbe
 
     public init(
         screenRecording: PermissionProbe,
-        microphone: PermissionProbe?,
+        microphoneGranted: Bool?,
         displays: Result<[DisplayInfo], DeviceReadError>,
         audioInputs: [AudioInputInfo],
         outputFolder: OutputFolderProbe
     ) {
         self.screenRecording = screenRecording
-        self.microphone = microphone
+        self.microphoneGranted = microphoneGranted
         self.displays = displays
         self.audioInputs = audioInputs
         self.outputFolder = outputFolder
@@ -78,7 +79,8 @@ public struct ReadyCheckResult: Equatable, Sendable {
 public enum ReadyCheck {
     static let screenRecordingTitle = "Screen & System Audio Recording permission"
     static let microphoneTitle = "Microphone permission"
-    static let terminalNote = "; started from a terminal, the terminal app needs it"
+    static let restartNote = "quit Multi Screen Recorder and start it again. "
+    static let terminalNote = "If it was started from a terminal, then the terminal app needs the permission."
 
     /// One item per cause: a free disk space item appears only when the
     /// displays and the audio inputs a recording records could be read and
@@ -86,7 +88,7 @@ public enum ReadyCheck {
     public static func evaluate(_ facts: ReadyCheckFacts, settings: Settings) -> ReadyCheckResult {
         var items = [screenRecordingItem(facts.screenRecording)]
         if settings.audioMode != .none {
-            items.append(microphoneItem(facts.microphone ?? .notGranted))
+            items.append(microphoneItem(granted: facts.microphoneGranted ?? false))
         }
         items.append(displaysItem(facts.displays))
         items.append(audioItem(facts.audioInputs, settings: settings))
@@ -99,8 +101,8 @@ public enum ReadyCheck {
     }
 
     private static func screenRecordingItem(_ probe: PermissionProbe) -> ReadyCheckItem {
-        let fix = "allow it in System Settings › Privacy & Security › Screen & System Audio Recording,"
-            + " then start again" + terminalNote
+        let fix = "allow it in System Settings › Privacy & Security › Screen & System Audio Recording. "
+            + "If it is still missing after that, " + restartNote + terminalNote
         return switch probe {
         case .granted: ReadyCheckItem(title: screenRecordingTitle, passed: true, fix: nil)
         case .notGranted: ReadyCheckItem(title: screenRecordingTitle, passed: false, fix: fix)
@@ -110,17 +112,11 @@ public enum ReadyCheck {
         }
     }
 
-    private static func microphoneItem(_ probe: PermissionProbe) -> ReadyCheckItem {
-        switch probe {
-        case .granted:
-            ReadyCheckItem(title: microphoneTitle, passed: true, fix: nil)
-        case .notGranted:
-            ReadyCheckItem(title: microphoneTitle, passed: false,
-                           fix: "allow it in System Settings › Privacy & Security › Microphone" + terminalNote)
-        case .failed(let reason):
-            ReadyCheckItem(title: "\(microphoneTitle): the default microphone could not be opened (\(reason))",
-                           passed: false, fix: "check the input in System Settings › Sound")
-        }
+    private static func microphoneItem(granted: Bool) -> ReadyCheckItem {
+        ReadyCheckItem(
+            title: microphoneTitle, passed: granted,
+            fix: granted ? nil : "allow it in System Settings › Privacy & Security › Microphone, then "
+                + restartNote + terminalNote)
     }
 
     private static func displaysItem(_ displays: Result<[DisplayInfo], DeviceReadError>) -> ReadyCheckItem {

@@ -504,7 +504,9 @@ architect's reading.
 - **Status:** superseded in part by D29 (point 5: the key imported
   "only after compilation" in the same job) and by D34 (point 7: a
   settings file that cannot be used no longer stops with exit status
-  78)
+  78);
+  and by D36 (point 3: the ready check no longer opens the default
+  microphone)
 - **Context:** The architect put seven recommendations from the
   adversarial review of PR #1 to the owner, who answered "Accept all
   seven".
@@ -819,3 +821,35 @@ architect's reading.
   tests' code.
 - **Evidence:** [PR #2](https://github.com/schlomo/multi-screen-recorder-macos/pull/2)
   (design text only).
+
+## D36: The ready check opens no microphone, and the window follows device changes (2026-11-13)
+
+- **Status:** in force; built in PR #1, the owner's re-test on the Mac
+  outstanding.
+- **Context:** The owner's check of PR #1 on the Mac, 2026-11-13: the
+  app crashed on "Check again" after the default microphone was
+  unplugged, and crashed when HiDPI was switched in BetterDisplay
+  (`docs/troubleshooting.md`); and "it didn't notice the changed
+  resolution till I changed any setting in the app. Better would be
+  instant change of the table", "plugging a display in or out didn't
+  update the table till I interact with the app". Asked whether to fix
+  both crashes and add live updates in PR #1 before the merge, the
+  owner answered "Yes, in PR 1".
+- **Decision:** The architect's choices for the fixes:
+  1. The ready check reads the Microphone permission and no longer
+     opens the default microphone; audio inputs are read from Core
+     Audio's device list instead of through capture devices. This
+     changes D28 point 3's proof for the microphone; the screen
+     recording grant is still proven.
+  2. The window re-reads displays and audio inputs and re-runs the
+     ready check when a display or an audio input comes, goes or
+     changes, once per burst of changes.
+  3. The window takes its size from its content's preferred size, and
+     nothing in it changes while one of its menus is open.
+- **Consequences:** A microphone that is listed but cannot be opened is
+  no longer found by the ready check; the recorder finds it at Start.
+  Before the recorder captures microphones with an `AVCaptureSession`,
+  an experiment shows that unplugging one does not crash the process
+  (`backlog.md`, recorder PR). Both crash causes are read from the
+  crash reports, not reproduced.
+- **Evidence:** [PR #1](https://github.com/schlomo/multi-screen-recorder-macos/pull/1).

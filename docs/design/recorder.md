@@ -82,6 +82,14 @@ Not ready.
 Started from a terminal, macOS attributes the permissions to the
 terminal app, not to Multi Screen Recorder; the README says so.
 
+Seen on the owner's Mac (macOS 26.7.1): the microphone permission
+allowed in the prompt counted at once; allowed later in System
+Settings, it counted only after Multi Screen Recorder was quit and
+started again, while the screen recording permission counted without
+that. So the microphone item's fix line asks for the restart, and the
+screen recording item's asks for it only if the permission is still
+missing.
+
 ## Settings file
 
 `~/Library/Application Support/Multi Screen Recorder/settings.json`,
@@ -113,11 +121,16 @@ read does not count), the output folder, and free disk space in the output folde
 
 - A permission that was never asked for is requested, so macOS shows
   its prompt; a denied one is reported with the System Settings path.
-- A grant is proven, not just read: the check fetches the display list
-  and opens the default microphone. With the Microphone permission
-  granted but no microphone connected, there is nothing to open: the
-  permission item passes and the audio item alone fails, with "no
-  microphone".
+- The screen recording grant is proven, not just read: the check
+  fetches the display list. The Microphone permission is read, and no
+  microphone is opened: a capture session opened for a moment on every
+  check crashed the app inside macOS when the default microphone was
+  unplugged (owner's Mac, 2026-11-13;
+  [troubleshooting.md](../troubleshooting.md)). With the permission
+  granted but no microphone connected, the permission item passes and
+  the audio item alone fails, with "no microphone". The audio inputs
+  are read from Core Audio's device list, which creates no capture
+  object.
 - Output folder: the check creates it with its parents if it is
   missing, then writes and deletes a file in it; a failure names the
   path and the reason.
@@ -134,9 +147,14 @@ read does not count), the output folder, and free disk space in the output folde
   displays or an audio input the recording records cannot be read, the
   free disk space item is left out.
 - In the app the check runs when the window opens, when the app becomes
-  active again (unless a check is still running), after every settings
-  change, and on "Check again". It never runs while a recording is
-  running, activation included (for the recorder PR to honour).
+  active again (unless a check is still running), when a display or an
+  audio input comes, goes or changes, after every settings change, and
+  on "Check again"; the tables of what will be recorded follow with it.
+  A burst of changes gives one check, 0.3 s after the last (*data*).
+  While a menu of the window is open nothing in the window changes; a
+  change that arrives then is acted on when the menu closes. It never
+  runs while a recording is running, activation included (for the
+  recorder PR to honour).
 
 ## Output on disk
 
@@ -401,7 +419,9 @@ mono mix of all recorded microphone channels, unless the audio mode is
 `none`; "System audio", stereo, unless system audio is off. The two are
 never mixed together, and a source that is missing is silence in its
 guide track. The microphone comes from an `AVCaptureSession` on the
-default input; system audio from a ScreenCaptureKit stream of its own,
+default input (to be tried before it is built: the ready check's
+short-lived capture sessions crashed the app when the microphone was
+unplugged, see "Ready check"); system audio from a ScreenCaptureKit stream of its own,
 so a failing display stream never takes the audio with it. Buffers are
 placed on the shared clock and written to the audio files and the
 guide tracks of every open display file.

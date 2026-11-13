@@ -19,6 +19,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var startWindow: NSWindow?
     private var aboutWindow: NSWindow?
     private var model: StartModel?
+    private var audioInputWatcher: AudioInputWatcher?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.mainMenu = makeMainMenu()
@@ -40,6 +41,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         startWindow?.makeKeyAndOrderFront(nil)
         NSApp.activate()
         model.load()
+        watchDevicesAndMenus(model)
+    }
+
+    /// The window follows displays and audio inputs as they change, and holds
+    /// still while one of its menus is open.
+    private func watchDevicesAndMenus(_ model: StartModel) {
+        audioInputWatcher = AudioInputWatcher { model.devicesChanged() }
+        let center = NotificationCenter.default
+        let observe = { (name: Notification.Name, action: @escaping @MainActor () -> Void) in
+            _ = center.addObserver(forName: name, object: nil, queue: .main) { _ in
+                MainActor.assumeIsolated(action)
+            }
+        }
+        observe(NSApplication.didChangeScreenParametersNotification) { model.devicesChanged() }
+        observe(NSMenu.didBeginTrackingNotification) { model.menuOpened() }
+        observe(NSMenu.didEndTrackingNotification) { model.menuClosed() }
     }
 
     func applicationDidBecomeActive(_ notification: Notification) {
@@ -59,7 +76,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func makeWindow(title: String, content: some View) -> NSWindow {
-        let window = NSWindow(contentViewController: NSHostingController(rootView: content))
+        // The window takes its size from the content's preferred size. Left to
+        // layout constraints, a display change under the window made AppKit
+        // give up after too many layout passes and end the app.
+        let hosting = NSHostingController(rootView: content)
+        hosting.sizingOptions = [.preferredContentSize]
+        let window = NSWindow(contentViewController: hosting)
         window.title = title
         window.styleMask = [.titled, .closable, .miniaturizable]
         window.isReleasedWhenClosed = false
