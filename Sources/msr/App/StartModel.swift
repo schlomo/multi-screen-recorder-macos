@@ -19,6 +19,8 @@ final class StartModel {
     /// Counts the ready checks started, so only the newest shows its result.
     @ObservationIgnored private var checkNumber = 0
     @ObservationIgnored private var refreshTask: Task<Void, Never>?
+    /// A refresh waits for the main run loop's default mode; a further one is not queued.
+    @ObservationIgnored private var refreshIsWaiting = false
 
     /// How long the devices get to settle before they are read again: one
     /// change of a display or an audio device arrives as a burst of notices.
@@ -86,8 +88,12 @@ final class StartModel {
         refreshTask?.cancel()
         refreshTask = Task {
             try? await Task.sleep(for: Self.deviceChangeSettleTime)
-            guard !Task.isCancelled else { return }
-            whenMainRunLoopIsInDefaultMode { self.checkAgain() }
+            guard !Task.isCancelled, !refreshIsWaiting else { return }
+            refreshIsWaiting = true
+            whenMainRunLoopIsInDefaultMode {
+                self.refreshIsWaiting = false
+                self.checkAgain()
+            }
         }
     }
 

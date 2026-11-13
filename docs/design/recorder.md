@@ -158,7 +158,9 @@ read does not count), the output folder, and free disk space in the output folde
   next check. A burst of changes gives one check, 0.3 s after the last
   (*data*). While a menu of the app or a modal panel (the folder
   chooser) is open or a control is dragged, the window's content does
-  not change by itself; the check's result shows when it closes. The
+  not change by itself; the check's result shows when it closes (that
+  AppKit signals all three the way the app relies on is not observed
+  yet, [ASSUMED] until the owner's re-test). The
   app crashed in AppKit's window layout, with a menu open, after HiDPI
   was switched; the cause is one of two candidates [ASSUMED], a change
   of the content under the menu or the window's sizing by layout

@@ -1,12 +1,19 @@
-import Foundation
+import AppKit
 import Testing
 @testable import RecorderCore
 
 @MainActor
 @Suite struct MainRunLoopTests {
-    /// Runs the main run loop in `mode` for a moment, as AppKit does in
-    /// `.eventTracking` while a menu is open and in `.modalPanel` under a
-    /// modal panel.
+    /// With the application object, `.eventTracking` and `.modalPanel` are
+    /// among the main run loop's common modes, as in the app; an action
+    /// queued for the common modes would run in them.
+    init() {
+        _ = NSApplication.shared
+    }
+
+    /// Runs the main run loop in `mode` for a moment. AppKit is documented
+    /// to do so in `.eventTracking` while a menu is open and in
+    /// `.modalPanel` under a modal panel.
     private func runMainRunLoop(in mode: RunLoop.Mode) {
         let end = Date().addingTimeInterval(0.2)
         // A run loop without a source in the mode returns at once.

@@ -65,7 +65,7 @@ public struct WhatWillBeRecorded: Equatable, Sendable {
         switch readDisplays {
         case .success(let displayInfos):
             displays = numberDisplays(displayInfos).map { Self.display($0, settings: settings) }
-            if let audioInputs = audioInputsToJudge(readAudioInputs, settings: settings),
+            if case .success(let audioInputs) = audioInputsToJudge(readAudioInputs, settings: settings),
                let bytesPerHour = DiskEstimate.bytesPerHour(
                 settings: settings, displays: displayInfos, audioInputs: audioInputs) {
                 total = Self.total(bytesPerHour, settings: settings, outputFolder: outputFolder)

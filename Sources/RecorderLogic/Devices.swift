@@ -88,15 +88,12 @@ public func unreadableRecordedInputs(_ audioInputs: [AudioInputInfo], settings: 
 }
 
 /// The audio inputs a recording with these settings is judged by: none when
-/// it records no audio input, so an unreadable list does not matter then;
-/// nil when it records one and the audio inputs cannot be read.
+/// it records no audio input, so audio inputs that cannot be read do not
+/// matter then.
 public func audioInputsToJudge(
     _ audioInputs: Result<[AudioInputInfo], DeviceReadError>, settings: Settings
-) -> [AudioInputInfo]? {
-    switch audioInputs {
-    case .success(let inputs): inputs
-    case .failure: settings.audioMode == .none ? [] : nil
-    }
+) -> Result<[AudioInputInfo], DeviceReadError> {
+    settings.audioMode == .none ? .success((try? audioInputs.get()) ?? []) : audioInputs
 }
 
 /// The text `msr list` prints.

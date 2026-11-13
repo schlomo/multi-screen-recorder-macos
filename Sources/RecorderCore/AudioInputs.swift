@@ -2,32 +2,51 @@ import CoreAudio
 import Foundation
 import RecorderLogic
 
-/// One audio input as Core Audio reports it, before it becomes an `AudioInputInfo`.
-struct AudioInputReading: Equatable {
-    var id: AudioObjectID
-    var name: String
-    /// The input channels, or why they cannot be read.
-    var channelCount: Result<Int, DeviceReadError>
+/// What a device answers when asked for its input channels.
+enum InputChannels: Equatable {
+    /// The device disappeared since the list was read.
+    case gone
+    case count(Int)
+    case unreadable(String)
 }
 
 /// The audio inputs in Core Audio's order, the default one marked. Listing
-/// needs no permission and creates no capture object. A device without
-/// input channels is not read further, so it cannot fail the listing.
+/// needs no permission and creates no capture object.
 public func currentAudioInputs() throws(DeviceReadError) -> [AudioInputInfo] {
-    var readings: [AudioInputReading] = []
-    for id in try audioDeviceIDs() {
-        if let reading = try readAudioInput(id) { readings.append(reading) }
-    }
-    // Without an audio input no default is asked for: what Core Audio
-    // answers then has not been observed.
-    guard !readings.isEmpty else { return [] }
-    return audioInputs(from: readings, defaultInput: try defaultInputDeviceID())
+    try audioInputs(
+        devices: try audioDeviceIDs(), inputChannels: inputChannels, name: audioDeviceName,
+        defaultInput: defaultInputDeviceID)
 }
 
-func audioInputs(from readings: [AudioInputReading], defaultInput: AudioObjectID) -> [AudioInputInfo] {
-    readings.map {
-        AudioInputInfo(name: $0.name, channelCount: $0.channelCount, isDefault: $0.id == defaultInput)
+/// A device without input channels is asked nothing more, so it cannot fail
+/// the listing; one whose channels cannot be read is listed with the reason,
+/// as it may be an audio input. `name` gives nil for a device that
+/// disappeared. Without an audio input the default is not asked for: what
+/// Core Audio answers then has not been observed.
+func audioInputs(
+    devices: [AudioObjectID],
+    inputChannels: (AudioObjectID) -> InputChannels,
+    name: (AudioObjectID) throws(DeviceReadError) -> String?,
+    defaultInput: () throws(DeviceReadError) -> AudioObjectID
+) throws(DeviceReadError) -> [AudioInputInfo] {
+    var inputs: [(id: AudioObjectID, name: String, channelCount: Result<Int, DeviceReadError>)] = []
+    for id in devices {
+        let channels = inputChannels(id)
+        if channels == .gone || channels == .count(0) { continue }
+        guard let name = try name(id) else { continue }
+        switch channels {
+        case .count(let count):
+            inputs.append((id, name, .success(count)))
+        case .unreadable(let reason):
+            inputs.append((id, name, .failure(
+                DeviceReadError("the audio device \(name) does not report its channels (\(reason))"))))
+        case .gone:
+            continue
+        }
     }
+    guard !inputs.isEmpty else { return [] }
+    let defaultID = try defaultInput()
+    return inputs.map { AudioInputInfo(name: $0.name, channelCount: $0.channelCount, isDefault: $0.id == defaultID) }
 }
 
 /// Calls `changed` on the main actor whenever an audio device comes or goes
@@ -70,30 +89,6 @@ private func defaultInputDeviceID() throws(DeviceReadError) -> AudioObjectID {
     let status = AudioObjectGetPropertyData(systemObject, &address, 0, nil, &size, &id)
     guard status == noErr else { throw DeviceReadError("the default audio input cannot be read (Core Audio error \(status))") }
     return id
-}
-
-/// Nil for a device without input channels, and for one that disappeared
-/// since the list was read. A device whose channels cannot be read is
-/// listed with the reason, as it may be an audio input.
-private func readAudioInput(_ id: AudioObjectID) throws(DeviceReadError) -> AudioInputReading? {
-    let channelCount: (_ name: String) -> Result<Int, DeviceReadError>
-    switch inputChannels(id) {
-    case .gone, .count(0): return nil
-    case .count(let count): channelCount = { _ in .success(count) }
-    case .unreadable(let reason):
-        channelCount = { name in
-            .failure(DeviceReadError("the audio device \(name) does not report its channels (\(reason))"))
-        }
-    }
-    guard let name = try audioDeviceName(id) else { return nil }
-    return AudioInputReading(id: id, name: name, channelCount: channelCount(name))
-}
-
-private enum InputChannels {
-    /// The device disappeared since the list was read.
-    case gone
-    case count(Int)
-    case unreadable(String)
 }
 
 private func inputChannels(_ id: AudioObjectID) -> InputChannels {

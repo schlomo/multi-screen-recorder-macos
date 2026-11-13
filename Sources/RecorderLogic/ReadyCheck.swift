@@ -94,7 +94,7 @@ public enum ReadyCheck {
         items.append(audioItem(facts.audioInputs, settings: settings))
         items.append(outputFolderItem(facts.outputFolder, settings: settings))
         if case .success(let displays) = facts.displays, case .usable(let freeSpace) = facts.outputFolder,
-           let audioInputs = audioInputsToJudge(facts.audioInputs, settings: settings),
+           case .success(let audioInputs) = audioInputsToJudge(facts.audioInputs, settings: settings),
            let bytesPerHour = DiskEstimate.bytesPerHour(settings: settings, displays: displays, audioInputs: audioInputs) {
             items.append(diskItem(freeSpace, bytesPerHour: bytesPerHour, settings: settings))
         }
@@ -138,11 +138,9 @@ public enum ReadyCheck {
                            fix: "reconnect the audio inputs, then check again")
         }
         let audioInputs: [AudioInputInfo]
-        switch readAudioInputs {
+        switch audioInputsToJudge(readAudioInputs, settings: settings) {
         case .success(let inputs): audioInputs = inputs
-        case .failure(let error):
-            guard settings.audioMode == .none else { return cannotBeRead(error) }
-            audioInputs = []
+        case .failure(let error): return cannotBeRead(error)
         }
         if case .failure(let error) = unreadableRecordedInputs(audioInputs, settings: settings).first?.channelCount {
             return cannotBeRead(error)
