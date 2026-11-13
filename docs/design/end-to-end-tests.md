@@ -72,8 +72,14 @@ any scenario. So three kinds of scenario use the same code:
 broken on purpose (a frame removed, a track swapped, a file missing
 from the manifest). The driver keeps these as its self-test: it builds
 the broken samples with `ffmpeg` when run, so no media file is
-committed. The self-test is not part of `scripts/test`, which must not
-come to need `ffmpeg`.
+committed. The samples start from a short recording
+folder that the self-test also builds with `ffmpeg`, in the layout of
+[recorder.md](recorder.md) "Output on disk". The self-test is not part
+of `scripts/test`, which must not come to need `ffmpeg`; `scripts/test`
+compiles the driver, as it does the other Python scripts, and its
+logic that needs no media (scenarios, seeds, the manifest assertions)
+is tested there. That the pipeline does not run the media assertions'
+self-test is an accepted risk, below.
 
 **The Mac's own devices do not leak into the result.** The driver
 lists displays and audio inputs before a run and asserts exactly only
@@ -130,8 +136,7 @@ a test audio driver that generates a tone per device; see "Unknowns".
 | Audio input appears, vanishes, changes its channel count | the helper creates and removes an aggregate device around BlackHole through the public CoreAudio interface | BlackHole installed once (administrator) |
 | Sample rate, input volume | the helper sets them on BlackHole | |
 | Default microphone changes | the helper, through the public CoreAudio interface | |
-| Display sleep | `pmset` | |
-| Sleep and wake | `pmset` | wake is reported unreliable, and the Mac may wake locked, which needs the person: a scenario set of its own, asked for by name, with the person present |
+| Display sleep; sleep and wake | `pmset` | display sleep locks the Mac where macOS is set to ask for the password after it; wake is reported unreliable, and the Mac may wake locked; a locked Mac needs the person: a scenario set of its own, asked for by name, with the person present |
 | Kill, stall, full disk, unwritable folder, volume removed, load | `kill`, a small disk image, `chmod`, `memory_pressure` | |
 | A real USB microphone is pulled; the clock, the date or the time zone changes | the helper captures the USB device so the Mac loses it; the system clock is set | administrator; a scenario set of its own, asked for by name; the USB capture is unproven on macOS 26 |
 
@@ -280,6 +285,11 @@ skeleton PR; the pattern decoder is the uncertain part.
 - Fast connect and disconnect cycles are reported flaky in macOS
   itself; a failure there must be told apart from a recorder fault,
   and a flake is root-caused, never retried blindly.
+
+- The pipeline does not gate the assertions that read media: their
+  self-test needs `ffmpeg` and runs on a Mac, before a run and when
+  the driver changes. A change that breaks them is seen at the next
+  run, not at the PR.
 
 ## Unknowns, each settled by a small experiment
 
