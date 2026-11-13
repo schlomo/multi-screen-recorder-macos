@@ -1,0 +1,67 @@
+#!/usr/bin/env -S python3 -I
+"""Prints the version of the current checkout. N is the number of commits on
+origin/main:
+  RELEASE_BUILD=true  0.<N>.0                (HEAD must be origin/main)
+  PR_NUMBER=<n>       0.<N+1>.0-pr<n>+<commit>
+  neither             0.<N+1>.0-dev+<commit>
+"""
+
+import os
+import re
+import shutil
+import subprocess
+import sys
+from pathlib import Path
+from typing import NoReturn
+
+ME = "scripts/version"
+MINIMUM_PYTHON = (3, 15)
+if sys.version_info < MINIMUM_PYTHON:
+    sys.exit(f"{ME}: needs Python {'.'.join(map(str, MINIMUM_PYTHON))} or later (the python3 of the macos-26 runner image),"
+             f" not {sys.version.split()[0]}")
+
+REPOSITORY = Path(__file__).resolve().parent.parent
+
+
+def stop(message: str) -> NoReturn:
+    sys.exit(f"{ME}: {message}")
+
+
+def git(*arguments: str, failure: str | None = None) -> str:
+    try:
+        result = subprocess.run(["git", *arguments], cwd=REPOSITORY, check=True, stdout=subprocess.PIPE, text=True)
+    except subprocess.CalledProcessError as error:
+        stop(failure or f"git {' '.join(arguments)} failed with exit {error.returncode}")
+    return result.stdout.strip()
+
+
+def main() -> None:
+    if shutil.which("git") is None:
+        stop("git is not on the PATH")
+    release_build = os.environ.get("RELEASE_BUILD", "")
+    pr_number = os.environ.get("PR_NUMBER", "")
+    if release_build not in ("", "true"):
+        stop(f"RELEASE_BUILD must be true or unset, not '{release_build}'")
+    if release_build and pr_number:
+        stop("RELEASE_BUILD and PR_NUMBER exclude each other")
+    if pr_number and not re.fullmatch(r"[1-9][0-9]*", pr_number):
+        stop(f"PR_NUMBER must be a number, not '{pr_number}'")
+
+    if git("rev-parse", "--is-shallow-repository") != "false":
+        stop(f"{REPOSITORY} is a shallow clone, so the commits on origin/main cannot be counted; fetch its full history")
+    main_commits = int(git("rev-list", "--count", "origin/main",
+                           failure="cannot count the commits on origin/main; fetch it with its full history"))
+    commit = git("rev-parse", "--short=7", "HEAD")
+
+    if release_build:
+        if git("rev-parse", "HEAD") != git("rev-parse", "origin/main"):
+            stop(f"a release builds origin/main, but HEAD is {commit}")
+        print(f"0.{main_commits}.0")
+    elif pr_number:
+        print(f"0.{main_commits + 1}.0-pr{pr_number}+{commit}")
+    else:
+        print(f"0.{main_commits + 1}.0-dev+{commit}")
+
+
+if __name__ == "__main__":
+    main()

@@ -16,9 +16,16 @@ Recorded by the setup skill; re-run it when any of this changes.
 - **Attribution:** AI-written commits name the model as co-author, PR
   descriptions carry a generated-with line.
 - **Time zone:** Europe/Berlin, stated with every time shown to people.
-- **Pipeline:** none yet. Agreed target: every PR builds an installable
-  snapshot release; merging to `main` publishes a GitHub release
-  (versions from the git history, 0.x until the owner declares v1).
+- **Pipeline:** GitHub Actions, `.github/workflows/ci.yml`, wiring the
+  scripts in `scripts/` on hosted Apple-silicon macOS runners: job
+  `test-and-build` tests, builds and smoke-tests without any secret,
+  then a separate signing job signs and publishes, for every push to a
+  PR the PR's snapshot release (a pre-release tagged `pr-<n>`), for a
+  push to `main` that changes more than Markdown files a release
+  `v0.<N>.0`; a closed PR's snapshot release is removed. PRs from forks
+  and Dependabot are tested, built and smoke-tested, never signed or
+  published. Signing needs the repository secret
+  `SIGNING_CERTIFICATE_P12` ([delivery.md](docs/design/delivery.md)).
   Who may register pipelines and edit branch policies: the repository
   owner.
 - **Backlog:** `backlog.md`. Mapping: its own sections ("Next session
@@ -215,17 +222,39 @@ this is how they map per tool.
 
 ## Running the tests
 
-None yet: the repo holds no code. The first build PR adds the command
-here.
+`scripts/test` compiles the Python scripts, then runs the tests (Swift
+Testing, `swift test`), including those that run `msr settings`,
+`msr version` and the scripts as commands; `scripts/build-app` builds the app in `build/` (signed ad
+hoc), `scripts/smoke-test` runs the bundled `msr` safely, and
+`scripts/sign-app` re-signs and zips it (`SIGNING_IDENTITY=-` signs ad
+hoc, for a local check only).
 
 ## Facts that bite
 
 - Building and testing need macOS 26 or later on Apple silicon with
-  Xcode 26; a Linux container (such as a cloud agent session) can edit
-  and review but not build or run anything. Say UNVERIFIED for any
-  change not built and run on a Mac or by CI.
+  Xcode 26 or later; CI has Xcode 26.6 (Swift 6.3), and the package
+  must build there ([delivery.md](docs/design/delivery.md)). A Linux
+  container (such as a cloud agent session) can edit and review but not
+  build or run anything. Say UNVERIFIED for any change not built and
+  run on a Mac or by CI.
+- The Command Line Tools alone build the package but cannot run the
+  tests: Swift Testing needs Xcode, selected and with its licence
+  accepted (`scripts/test` checks this first).
+- Five scripts are Python, standard library only, and need Python 3.15
+  or later as `python3` on the `PATH` (the runner image's; macOS ships
+  an older one); see [delivery.md](docs/design/delivery.md).
+- `msr` without arguments starts the app, and the app and `msr check`
+  run the ready check, which requests any never-asked permission, so
+  macOS shows a prompt on the person's screen, and creates the output
+  folder if it is missing; `msr list` reads the devices. An agent runs
+  none of these on a person's Mac unasked.
+  `msr version`, `msr settings` (it writes the settings file with the
+  defaults if there is none; `HOME` decides where) and the tests are
+  safe; the tests read the Mac's audio device list, which shows no
+  prompt.
 - Real capture needs the Screen & System Audio Recording and
   Microphone permissions, granted by a person on the Mac. Capture
   behaviour is verified on the owner's Mac (the v1 gate in
-  `backlog.md`); whether CI can capture at all is an open question
-  there.
+  `backlog.md`); capture cannot run in CI, which has no way to grant
+  the permissions [ASSUMED] ([recorder.md](docs/design/recorder.md),
+  "Tests").

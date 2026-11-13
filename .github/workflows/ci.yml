@@ -1,0 +1,134 @@
+# Wiring only: every behaviour lives in scripts/ (docs/design/delivery.md).
+name: CI
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, closed]
+  push:
+    branches: [main]
+    paths-ignore: ["**.md"]
+
+permissions: {}
+
+env:
+  DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
+
+jobs:
+  # Holds no secret and no token: compiles, tests, builds and smoke-tests the
+  # app, and hands the ad hoc signed app on as an archive. Forks and
+  # Dependabot run this job only.
+  test-and-build:
+    if: github.event_name == 'push' || github.event.action != 'closed'
+    runs-on: macos-26
+    permissions:
+      contents: read
+    env:
+      PR_NUMBER: ${{ github.event.pull_request.number }}
+      RELEASE_BUILD: ${{ github.event_name == 'push' && 'true' || '' }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - run: scripts/test
+      - run: scripts/build-app
+      - run: scripts/smoke-test
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          path: build/msr-app.tar
+          archive: false
+          retention-days: 1
+          if-no-files-found: error
+
+  snapshot-release:
+    # Signing job: never compiles, never restores a cache, and never executes
+    # anything that came out of the artifact; its scripts come from its own
+    # checkout.
+    needs: test-and-build
+    if: >-
+      github.event_name == 'pull_request'
+      && github.event.action != 'closed'
+      && github.event.pull_request.head.repo.full_name == github.repository
+      && github.event.pull_request.user.login != 'dependabot[bot]'
+    runs-on: macos-26
+    permissions:
+      contents: write
+    concurrency:
+      group: snapshot-release-${{ github.event.pull_request.number }}
+    env:
+      PR_NUMBER: ${{ github.event.pull_request.number }}
+    steps:
+      # The commit alone: sign-app checks a snapshot's version by its form
+      # and commit, which need no history.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: msr-app.tar
+          path: ${{ runner.temp }}/artifact
+      - run: scripts/unpack-app "$RUNNER_TEMP/artifact/msr-app.tar"
+      - run: scripts/ci-import-signing-certificate
+        env:
+          SIGNING_CERTIFICATE_P12: ${{ secrets.SIGNING_CERTIFICATE_P12 }}
+      - run: scripts/sign-app
+      - run: scripts/publish-snapshot-release
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+  remove-snapshot-release:
+    if: >-
+      github.event_name == 'pull_request'
+      && github.event.action == 'closed'
+      && github.event.pull_request.head.repo.full_name == github.repository
+      && github.event.pull_request.user.login != 'dependabot[bot]'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    concurrency:
+      group: snapshot-release-${{ github.event.pull_request.number }}
+    env:
+      PR_NUMBER: ${{ github.event.pull_request.number }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - run: scripts/remove-snapshot-release
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+  release:
+    # Signing job: never compiles, never restores a cache, and never executes
+    # anything that came out of the artifact; its scripts come from its own
+    # checkout.
+    needs: test-and-build
+    if: github.event_name == 'push'
+    runs-on: macos-26
+    permissions:
+      contents: write
+    concurrency:
+      group: release
+    env:
+      RELEASE_BUILD: "true"
+    steps:
+      # Full history: sign-app checks that a release's N is the number of
+      # commits up to HEAD.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: msr-app.tar
+          path: ${{ runner.temp }}/artifact
+      - run: scripts/unpack-app "$RUNNER_TEMP/artifact/msr-app.tar"
+      - run: scripts/ci-import-signing-certificate
+        env:
+          SIGNING_CERTIFICATE_P12: ${{ secrets.SIGNING_CERTIFICATE_P12 }}
+      - run: scripts/sign-app
+      - run: scripts/publish-release
+        env:
+          GH_TOKEN: ${{ github.token }}
