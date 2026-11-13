@@ -808,8 +808,7 @@ architect's reading.
      stays the word for a person's check at the v1 gate.
   4. The architect's reading of "if cheap", for both helpers: the
      device helper for virtual displays is built, as the design cannot
-     change displays without it and the first experiment needed about
-     200 lines for one; for several audio inputs that can be told
+     change displays without it; for several audio inputs that can be told
      apart, BlackHole's own drivers installed side by side are tried
      first, and a test audio driver of our own is built only if that
      falls short.

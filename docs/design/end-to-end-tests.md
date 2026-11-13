@@ -35,7 +35,8 @@ provoke it and assertions that detect it.
 
 **The recorder under test is the built app, as shipped,** driven
 through `msr record` with a scratch `HOME` and a scratch output folder.
-A run uses the app that `scripts/build-app` builds from the checkout.
+A run uses the app that `scripts/build-app` builds from the checkout:
+built as for shipping, signed ad hoc.
 The recorder has no test mode and no test-only code path.
 
 **A test is a scenario:** a list of timed events while a recording
