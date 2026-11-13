@@ -59,7 +59,8 @@ other file of PR #1 changed. In order, the next architect session:
     the app; with both denied the ready check names both and "Check
     again" raises no new prompt; allowed in System Settings, the
     microphone permission needs a restart of the app and the screen
-    recording permission does not, which the fix lines now say. Still
+    recording permission does not; the fix lines were changed for
+    that. Still
     to do: the snapshot release from Finder with "Open Anyway", the
     second snapshot release installed over the first, the old settings
     file.
