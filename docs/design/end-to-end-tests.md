@@ -112,10 +112,10 @@ was shown and played.
 - **Picture:** the helper shows a full-screen pattern on every display:
   blocks that encode the display's identity, a frame counter and the
   time in milliseconds, large enough to survive scaling and HEVC.
-  Tried (see "Unknowns"): a colour does not come back as it was
-  shown, so the blocks are black and white and are read by brightness;
-  the menu bar of macOS covers the top of a virtual display, so the
-  blocks stay below it.
+  The blocks are black and white and are read by brightness, because
+  HEVC stores colour at a lower resolution than brightness. Tried (see
+  "Unknowns"): the menu bar of macOS covers the top of a virtual
+  display, so the blocks stay below it.
 - **Sound:** a virtual audio input carries a tone and a click once a
   second, played into it by the helper.
 
@@ -371,9 +371,11 @@ this design is built:
   and 10): ScreenCaptureKit listed three displays, the virtual one
   among them at 1920 × 1080; a screenshot of it showed the program's
   full-screen window, with the menu bar of macOS across the top; the
-  window's magenta (sRGB 1, 0, 1) came back as 1.00, 0.25, 1.00. The
-  first of the two stopped there, at a colour check that was too
-  strict. In the second, a stream at 30 frames per second delivered
+  window's magenta (sRGB 1, 0, 1) is in the saved screenshot exactly
+  as shown, 255, 0, 255, tagged sRGB. The program itself printed
+  1.00, 0.25, 1.00 for it: a fault in how the program read the pixel,
+  not in the capture, and the first of the two runs stopped at it. In
+  the second, a stream at 30 frames per second delivered
   150 buffers in 5 s, 63 of
   them complete frames, while the picture changed 50 times; the
   display was gone 0.11 s after the program released it. Not tried:
