@@ -3,8 +3,10 @@
 **Status: proposed, not signed off, nothing built or tried.** The owner
 asked for this document (2026-11-13) after ruling that automated
 end-to-end tests run on the owner's Mac first (D34). It stays on its
-work branch until the owner signs it off; merging it is that sign-off,
-and the same change then records it in the decisions log.
+work branch until the owner signs it off; merging it is that sign-off.
+The same change then records it in the decisions log and removes
+"proposed" here, in [recorder.md](recorder.md) "Tests", in the
+backlog's item and in the glossary.
 
 Every statement about what a tool or macOS does comes from web
 research of 2026-11-13 (sources at the end) and is UNVERIFIED on this
@@ -66,15 +68,17 @@ any scenario. So three kinds of scenario use the same code:
    saw: the recorder's exit status and messages, and the crash marker
    under the scratch `HOME`.
 
-**Each assertion is first seen failing** against a file or folder
+**Each assertion is first seen failing** against a recording folder
 broken on purpose (a frame removed, a track swapped, a file missing
-from the manifest), and those broken samples stay as the assertions'
-own tests in `scripts/test`.
+from the manifest). The driver keeps these as its self-test: it builds
+the broken samples with `ffmpeg` when run, so no media file is
+committed. The self-test is not part of `scripts/test`, which must not
+come to need `ffmpeg`.
 
 **The Mac's own devices do not leak into the result.** The driver
 lists displays and audio inputs before a run and asserts exactly only
-on the virtual ones it adds; for the Mac's own it asserts only that
-their files are readable and listed.
+on the virtual ones it adds; for the Mac's own displays and audio
+inputs it asserts only that their files are readable and listed.
 
 **Started by a person, in that person's session.** A run adds
 displays, covers every display with a pattern and changes the default
@@ -108,7 +112,7 @@ a test audio driver that generates a tone per device; see "Unknowns".
 | **A file is lost or unreadable** | kill the recorder (`kill -9`), also while it finalizes; full disk; output folder made unwritable or its volume removed; sleep; a display or audio input vanishing | every file in the recording folder opens and decodes to its last complete fragment (fragments of 2 s, [recorder.md](recorder.md)); nothing recorded more than one fragment before the event is missing |
 | **Wrong picture** | displays connect and reconnect (a reported macOS fault then delivers another display's picture), mirroring, main display change, many displays at once | the identity decoded from each display file is that file's display; no black stretch; the pattern's counter keeps advancing |
 | **Wrong sound** | audio inputs appear and vanish, default microphone changes, channel count and sample rate change | a virtual audio input's audio file holds the tone, on every track; no silent stretch in it; each guide track is present in every display file |
-| **Wrong timing** | still picture for 60 s, load on the processor, a stalled recorder (`SIGSTOP`, then `SIGCONT`), long random runs | every display file has 30 frames for each second of its length; the time shown in each recorded frame is that frame's time within one frame (a still or late picture is repeated by design, D11, D21, so the counter may repeat but never runs backwards or ahead); the manifest's `framesRepeatedForLateness` matches the repeats seen; the timecode of every file matches its start; the click sits at the frame that shows its time |
+| **Wrong timing** | still picture for 60 s, load on the processor, a stalled recorder (`SIGSTOP`, then `SIGCONT`), long random runs | every display file has 30 frames for each second of its length; the time shown in each recorded frame is that frame's time within one frame (a still or late picture is repeated by design, D11, D21, so the counter may repeat but never runs backwards or ahead); the timecode of every file matches its start; the click sits at the frame that shows its time |
 | **A change handled wrongly** | every display and audio event below | the right file ends and the right one begins; a frame size change leaves under one second without picture (D30); the audio files have no gap across it; a display keeps its number; an unchanged frame size continues the file |
 | **The recording manifest is wrong** | all of them | `recording.json` lists exactly the files in the folder; each event the recorder design defines appears once, in order, at the scenario's time; its state is right after Stop and after a kill |
 | **Resources run out** | a small disk image as output folder, filled during a recording, then given room again; processor and memory pressure; more displays than the Mac has hardware encoder sessions | what was written stays readable; the recorder keeps retrying and continues in new files once there is room (D14); nothing is discarded |
@@ -120,15 +124,16 @@ a test audio driver that generates a tone per device; see "Unknowns".
 | Event | How it is made | Needs |
 |---|---|---|
 | Display connects, disconnects | the helper creates a virtual display through Apple's private `CGVirtualDisplay` interface; ending its process removes it | private interface |
-| Frame size changes, HiDPI | the helper replaces a virtual display by one of another size (a mode switch on a virtual display is reported to leave it unremovable); on a real display, a mode change through the public interface | |
+| Frame size changes, HiDPI | the helper replaces a virtual display by one of another size (a mode switch on a virtual display is reported to leave it unremovable); on one of the Mac's own displays, a mode change through the public interface | |
 | Mirroring, arrangement, main display | the helper, through the public display configuration interface | |
-| Rotation; a real display switched off and on | BetterDisplay's command line | BetterDisplay Pro, a paid licence (the owner: "I have BetterDisplay Pro if it helps we can use it"); scenarios using it are skipped, and say so, where it is absent |
+| Rotation; one of the Mac's own displays switched off and on | BetterDisplay's command line | BetterDisplay Pro, a paid licence (the owner: "I have BetterDisplay Pro if it helps we can use it"); a scenario set of its own, asked for by name, which stops with an error where BetterDisplay is missing |
 | Audio input appears, vanishes, changes its channel count | the helper creates and removes an aggregate device around BlackHole through the public CoreAudio interface | BlackHole installed once (administrator) |
 | Sample rate, input volume | the helper sets them on BlackHole | |
 | Default microphone changes | the helper, through the public CoreAudio interface | |
-| Display sleep, sleep and wake | `pmset` | wake is reported unreliable |
+| Display sleep | `pmset` | |
+| Sleep and wake | `pmset` | wake is reported unreliable, and the Mac may wake locked, which needs the person: a scenario set of its own, asked for by name, with the person present |
 | Kill, stall, full disk, unwritable folder, volume removed, load | `kill`, a small disk image, `chmod`, `memory_pressure` | |
-| A real USB microphone is pulled; the clock, the date or the time zone changes | the helper captures the USB device so the Mac loses it; the system clock is set | administrator; a separate scenario set, never in the default run; the USB capture is unproven on macOS 26 |
+| A real USB microphone is pulled; the clock, the date or the time zone changes | the helper captures the USB device so the Mac loses it; the system clock is set | administrator; a scenario set of its own, asked for by name; the USB capture is unproven on macOS 26 |
 
 ### What these tests cannot do
 
@@ -183,10 +188,13 @@ and decide how a run is started:
   the terminal app ([recorder.md](recorder.md), "Command line"), so the
   terminal app holds Screen Recording and Microphone, and so does
   every program started in it, an agent's shell included. That is a
-  security cost. Proposed: the driver starts the recorder through
-  macOS (`open`, with the arguments for `record`), so that the app
-  holds the permissions and the terminal needs none. Whether that
-  attribution works is an experiment.
+  security cost. Two ways out, neither tried: the driver starts the
+  recorder through macOS (`open`), so that the app holds the
+  permissions, if the driver then still gets what it needs (the
+  recorder's process to signal, its exit status and its messages); or
+  the tests run in a terminal app used for nothing else. The owner
+  chooses once the experiment under "Unknowns" has shown what `open`
+  gives.
 - **Whether they survive a rebuild.** With one signing certificate they
   should (D5), which D5 itself marks unverified until the owner's check
   on PR #1. A build signed ad hoc is reported to lose them with every
@@ -209,12 +217,14 @@ For the recorder PR's design, each UNVERIFIED here:
 
 ## Safeguards for the person's session
 
-- A run records the person's real displays and microphone too. Its
+- A run records the Mac's own displays and audio inputs too. Its
   recording folders live in a scratch folder, are deleted after a run
   that passes, and kept after one that fails, which the driver says
   with the path.
 - Before a run the driver writes the display arrangement, the default
-  microphone and the default output to a state file; it restores them
+  microphone, the default output and, for the scenario set that
+  changes them, the time zone and whether the time is set
+  automatically, to a state file; it restores them
   after the run, after a failure and after Ctrl-C. If the driver
   itself is killed, `restore` as its only argument does the same from
   the state file, and removes every virtual display and aggregate
@@ -284,7 +294,8 @@ this design is built:
   appearing and vanishing; a change of its members arrives as a channel
   count change; it needs no administrator;
 - a recorder started through `open` is attributed to the app, not the
-  terminal;
+  terminal, and the driver still gets its process to signal, its exit
+  status and its messages, also for a second recording in parallel;
 - BetterDisplay's command line returns only when the change is done;
 - a tone played into the loopback device is, or is not, in system
   audio and on the speakers.
