@@ -17,6 +17,8 @@ final class StartModel {
     private(set) var readyCheck: ReadyCheckResult?
     private(set) var isChecking = false
     @ObservationIgnored private var checkTask: Task<Void, Never>?
+    @ObservationIgnored private var refreshTask: Task<Void, Never>?
+    @ObservationIgnored private var gate = RefreshGate()
 
     init(homeFolder: URL) {
         self.homeFolder = homeFolder
@@ -60,11 +62,36 @@ final class StartModel {
         change { $0.outputFolder = Settings.outputFolderSetting(for: folder, homeFolder: homeFolder) }
     }
 
-    /// Back in the app, the person may have granted a permission or plugged
-    /// in a device; a check still running is left to finish.
+    /// Back in the app, the person may have granted a permission; a check
+    /// still running is left to finish.
     func appBecameActive() {
-        guard settingsError == nil, !isChecking else { return }
-        checkAgain()
+        guard !isChecking else { return }
+        refreshSoon()
+    }
+
+    /// A display or an audio input came, went or changed.
+    func devicesChanged() {
+        refreshSoon()
+    }
+
+    func menuOpened() {
+        gate.menuOpened()
+    }
+
+    func menuClosed() {
+        if gate.menuClosed() { refreshSoon() }
+    }
+
+    /// Re-reads the devices and re-runs the ready check shortly, once for a
+    /// burst of changes, and never while a menu of the window is open.
+    private func refreshSoon() {
+        guard settingsError == nil else { return }
+        refreshTask?.cancel()
+        refreshTask = Task {
+            try? await Task.sleep(for: .milliseconds(300))
+            guard !Task.isCancelled, gate.changeArrived() else { return }
+            checkAgain()
+        }
     }
 
     /// Reads the devices for "What will be recorded" and re-runs the ready
@@ -83,6 +110,9 @@ final class StartModel {
         checkTask = Task {
             let facts = await probeReadyCheckFacts(settings: settings, homeFolder: homeFolder)
             guard !Task.isCancelled else { return }
+            // A menu opened meanwhile: nothing changes under it, and the check
+            // that runs when it closes shows the result.
+            guard gate.changeArrived() else { return }
             readyCheck = ReadyCheck.evaluate(facts, settings: settings)
             whatWillBeRecorded = WhatWillBeRecorded(
                 settings: settings, displays: facts.displays, audioInputs: facts.audioInputs,

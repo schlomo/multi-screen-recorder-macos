@@ -1,7 +1,5 @@
 import AppKit
-import AVFoundation
 import CoreGraphics
-import CoreMedia
 import RecorderLogic
 
 /// The connected displays, mirrored ones excluded. Needs no permission.
@@ -25,24 +23,4 @@ public func currentDisplays() throws(DeviceReadError) -> [DisplayInfo] {
             originX: bounds.origin.x,
             originY: bounds.origin.y)
     }
-}
-
-/// The audio inputs, the default one marked. Listing needs no permission.
-public func currentAudioInputs() -> [AudioInputInfo] {
-    let devices = AVCaptureDevice.DiscoverySession(
-        deviceTypes: [.microphone, .external], mediaType: .audio, position: .unspecified
-    ).devices
-    let defaultID = AVCaptureDevice.default(for: .audio)?.uniqueID
-    return devices.map { device in
-        AudioInputInfo(name: device.localizedName,
-                       channelCount: Result { () throws(DeviceReadError) in try channelCount(of: device) },
-                       isDefault: device.uniqueID == defaultID)
-    }
-}
-
-private func channelCount(of device: AVCaptureDevice) throws(DeviceReadError) -> Int {
-    guard let format = CMAudioFormatDescriptionGetStreamBasicDescription(device.activeFormat.formatDescription) else {
-        throw DeviceReadError("the audio input \(device.localizedName) does not report its format")
-    }
-    return Int(format.pointee.mChannelsPerFrame)
 }

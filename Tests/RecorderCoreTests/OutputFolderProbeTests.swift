@@ -94,12 +94,31 @@ import Testing
     }
 }
 
-@Suite struct MicrophoneProbeTests {
-    /// Without a microphone there is nothing to open: the granted permission
-    /// stands, and the ready check's audio item alone reports the missing
-    /// microphone. Opening a real microphone needs the permission and a
-    /// device, so it is checked on a Mac by a person, not here.
-    @Test func noMicrophoneLeavesTheGrantStanding() {
-        #expect(openMicrophone(nil) == .granted)
+@Suite struct AudioInputTests {
+    @Test func onlyDevicesWithInputChannelsAreAudioInputsAndTheDefaultIsMarked() {
+        let readings = [
+            AudioDeviceReading(id: 41, name: "Speakers", inputChannelCount: nil),
+            AudioDeviceReading(id: 42, name: "Desk Microphone", inputChannelCount: .success(1)),
+            AudioDeviceReading(id: 43, name: "Interface", inputChannelCount: .success(2)),
+        ]
+        #expect(audioInputs(from: readings, defaultInput: 43) == [
+            AudioInputInfo(name: "Desk Microphone", channelCount: 1, isDefault: false),
+            AudioInputInfo(name: "Interface", channelCount: 2, isDefault: true),
+        ])
+    }
+
+    @Test func anInputWhoseChannelsCannotBeReadKeepsItsReason() {
+        let error = DeviceReadError("no channels")
+        let readings = [AudioDeviceReading(id: 7, name: "Broken", inputChannelCount: .failure(error))]
+        #expect(audioInputs(from: readings, defaultInput: nil) == [
+            AudioInputInfo(name: "Broken", channelCount: .failure(error), isDefault: false),
+        ])
+    }
+
+    /// Listing needs no permission and no device, so it runs anywhere.
+    @Test func thisMacsAudioInputsAreListedWithAtMostOneDefault() {
+        let inputs = currentAudioInputs()
+        #expect(inputs.filter(\.isDefault).count <= 1)
+        #expect(inputs.allSatisfy { !$0.name.isEmpty })
     }
 }

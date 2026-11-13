@@ -24,6 +24,8 @@ One row per entry, the error text exactly as in the entry.
 |---|---|
 | `package 'multi-screen-recorder-macos' is using Swift tools version 6.4.0 but the installed version is 6.3.3` | [Swift tools version newer than the CI runner's Xcode](#swift-tools-version-newer-than-the-ci-runners-xcode) |
 | `no 'async' operations occur within 'await' expression` | [Swift Argument Parser's async main from top-level code](#swift-argument-parsers-async-main-from-top-level-code) |
+| `Thread 6 Crashed::  Dispatch queue: HALC_ProxyNotification Call Listener Queue` | [The app crashes when a microphone is unplugged](#the-app-crashes-when-a-microphone-is-unplugged) |
+| `-[NSWindow(NSDisplayCycle) _postWindowNeedsLayout]` | [The app crashes when a display changes under its window](#the-app-crashes-when-a-display-changes-under-its-window) |
 
 ## Format
 
@@ -72,3 +74,47 @@ One row per entry, the error text exactly as in the entry.
 - **Verify:** the `test-and-build` job passes.
 - **Observed:** 2026-11-12, runner image `macos-26` 20261102.0473.1,
   Xcode 26.6; open.
+
+## The app crashes when a microphone is unplugged
+
+- **Error:** `Thread 6 Crashed::  Dispatch queue: HALC_ProxyNotification Call Listener Queue`
+- **Symptom:** the default microphone is unplugged while the app's
+  window is open; on the next "Check again" the app ends with
+  `EXC_BAD_ACCESS (SIGSEGV)`. The crashed thread is in `CMIOBaseUnits`
+  below `HALDevice::Teardown()`, the main thread in
+  `-[AVCaptureHALDevice _removePropertyListeners]`.
+- **Why:** the ready check opened an `AVCaptureSession` on the default
+  microphone, started and stopped it, on every check, and listed audio
+  inputs through `AVCaptureDevice`; macOS then crashed while tearing
+  down the vanished device [ASSUMED from the crash report; not
+  reproduced in isolation].
+- **Fix:** the ready check reads the Microphone permission and opens no
+  microphone; audio inputs are read from Core Audio's device list
+  (`Sources/RecorderCore/AudioInputs.swift`).
+- **Verify:** unplug the default microphone with the window open, then
+  "Check again": the app keeps running. UNVERIFIED until the owner has
+  done this with the fixed build.
+- **Observed:** 2026-11-13, macOS 26.7.1, snapshot `0.2.0-pr1+7c9c034`;
+  open. The recorder is designed to capture microphones with an
+  `AVCaptureSession`, so this is tried before the recorder is built.
+
+## The app crashes when a display changes under its window
+
+- **Error:** `-[NSWindow(NSDisplayCycle) _postWindowNeedsLayout]`
+- **Symptom:** a display's mode is changed (HiDPI switched in
+  BetterDisplay) while a popup menu of the app's window is open; the
+  app ends with `EXC_CRASH (SIGABRT)`, the exception raised in
+  `-[NSWindow(NSDisplayCycle) _postWindowNeedsLayout]` during
+  `-[NSWindow layoutIfNeeded]`.
+- **Why:** the window took its size from its SwiftUI content through
+  layout constraints, the content changed as the display did, and
+  AppKit gave up after too many layout passes [ASSUMED from the crash
+  report; not reproduced].
+- **Fix:** the window follows the content's preferred size
+  (`sizingOptions = [.preferredContentSize]`), and the window's content
+  does not change while one of its menus is open (`RefreshGate`).
+- **Verify:** open a popup menu of the window, switch HiDPI in
+  BetterDisplay: the app keeps running. UNVERIFIED until the owner has
+  done this with the fixed build.
+- **Observed:** 2026-11-13, macOS 26.7.1, snapshot `0.2.0-pr1+7c9c034`;
+  open.
