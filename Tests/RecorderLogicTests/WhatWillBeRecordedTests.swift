@@ -91,6 +91,10 @@ import Testing
         #expect(section { $0.requiredRecordingHours = 1 }.total == "Total 2.2 GB/h. 1 hour needs 2.2 GB, 3.1 GB free.")
     }
 
+    @Test func aHugeRequiredRecordingTimeIsNamedWithoutCrashing() {
+        #expect(section { $0.requiredRecordingHours = 1e20 }.total?.contains("1e+20 hours") == true)
+    }
+
     @Test func theOutputFolderIsAsSet() {
         #expect(section { $0.outputFolder = "/Volumes/Data/Recordings" }.outputFolder
             == "Files go to /Volumes/Data/Recordings")

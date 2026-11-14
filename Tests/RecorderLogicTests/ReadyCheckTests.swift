@@ -239,8 +239,16 @@ import Testing
         #expect(item.fix == "choose an output folder on another disk (--output-folder)")
     }
 
-    @Test(arguments: [(1.0, "1 hour"), (2.0, "2 hours"), (1.5, "1.5 hours"), (0.25, "0.25 hours")])
+    @Test(arguments: [(1.0, "1 hour"), (2.0, "2 hours"), (1.5, "1.5 hours"), (0.25, "0.25 hours"), (1e20, "1e+20 hours")])
     func hoursReadNaturally(hours: Double, text: String) {
         #expect(ReadyCheck.hoursText(hours) == text)
+    }
+
+    @Test func aHugeRequiredRecordingTimeIsNamedWithoutCrashing() throws {
+        var settings = Settings.defaults
+        settings.requiredRecordingHours = 1e20
+        let result = ReadyCheck.evaluate(facts(), settings: settings)
+        let item = try #require(result.items.last)
+        #expect(item.title.contains("1e+20 hours"))
     }
 }
