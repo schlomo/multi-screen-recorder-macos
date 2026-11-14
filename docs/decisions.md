@@ -904,10 +904,10 @@ architect's reading.
     input or a quiet room is silent without anything being wrong.
   - The time shown in a recorded frame may lag where the last picture
     is repeated by design (D11, D21): by up to the length of a still
-    picture or a stall the scenario makes, and under load by no more
-    frames than the manifest counts as repeated for lateness, a count
-    checked against the frames whose pattern counter repeats. The click
-    is matched to its frame only where no picture is repeated.
+    picture or a stall the scenario makes, and under load by a bound
+    the recorder design sets, with what picture a late tick carries and
+    how that is checked from outside the recorder. The click is matched
+    to its frame only where no picture is repeated.
   - `SIGTERM` ends a recording as Stop does, finalized and with its
     crash marker removed (`recorder.md`, "Command line"); `kill -9`
     leaves the marker.
