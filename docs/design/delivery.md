@@ -88,10 +88,14 @@ waiting `remove-snapshot-release`
 ([GitHub: control the concurrency of workflows and jobs](https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/control-workflow-concurrency)).
 
 **Release:** releases are signed and published one at a time, each
-waiting in turn (`queue: max` on the `release` job's concurrency group),
-so every push to `main` that changes more than Markdown files gets its
-release, and in the order of the pushes, so the newest is also created
-last and becomes the latest release.
+waiting in turn (`queue: max` on the `release` job's concurrency group,
+up to 100 waiting), so every push to `main` that changes more than
+Markdown files gets its release. They wait in the order their builds
+finish, not the order of the pushes (see "Accepted risks").
+
+`test-and-build` stops after 20 minutes (a run takes about 2), so a
+hanging test fails the job instead of holding a runner for GitHub's
+six hours.
 
 **Versions** (D23) count the commits on `main`, N:
 
@@ -207,6 +211,14 @@ GitHub Actions and Swift packages in use.
     Dependabot get no secret.
   - The smoke-tested bundle and the published one differ in their
     signature only; the published one is checked statically, not run.
+- Two pushes to `main` whose builds finish in the other order are
+  released in that order: the older version is created last and may
+  then be marked the latest release, which the README sends people to
+  (UNVERIFIED: that `gh release create` without `--latest` marks the
+  newest created one). Accepted because one person merges, rarely two
+  within a build's two minutes, and `gh release edit <tag> --latest`
+  fixes it in a minute. Revisit when it happens, or when several
+  people merge.
 
 ## Rejected
 

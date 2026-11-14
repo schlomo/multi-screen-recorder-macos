@@ -57,6 +57,13 @@ import Testing
         #expect(try decode(settings.json) == settings)
     }
 
+    @Test func aVeryLargeNumberIsWrittenAsSwiftWritesItAndReadBack() throws {
+        var settings = Settings.defaults
+        settings.requiredRecordingHours = 1e20
+        #expect(settings.json.contains(#""requiredRecordingHours": 1e+20,"#), "\(settings.json)")
+        #expect(try decode(settings.json) == settings)
+    }
+
     @Test func missingKeysTakeTheirDefault() throws {
         #expect(try decode(#"{"resolution": "720p"}"#) == {
             var settings = Settings.defaults

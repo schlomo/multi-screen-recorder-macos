@@ -27,8 +27,10 @@ Next, waiting for the owner:
   that touches the same code: a refresh queued for the window outlives
   a newer device notice, so after a menu closes the devices are read
   once too early and once more after they settle (the newest result
-  still wins); a refresh number, like the ready check's, fixes it, and
-  only the owner's re-test in the app verifies it. Waits for: the
+  still wins); a refresh number, like the ready check's, fixes it. It
+  has no test yet: the window's refresh gets its tests with the probes'
+  seam in the recorder PR (queued item 2), which then pin it; until
+  then the owner's re-test in the app checks it. Waits for: the
   owner's sign-off, the address the reports go to, and whether this PR
   comes before the steps below or later (the architect read "now in a
   subsequent PR" as the next PR; the owner is asked).
@@ -153,6 +155,9 @@ order, the next architect session:
      tests, and their file access moves off the main thread. With the
      seam, the window's refresh on device changes gets tests (one check
      per burst, nothing applied while a menu is open); it has none yet.
+     One check per burst includes the fix of Copilot's finding on a
+     refresh that outlives a newer device notice ("Next session starts
+     here").
    - From the review of PR #1's crash fixes: `audioInputsToJudge`
      says with a `switch`, not with `try?` and `?? []`, that audio
      inputs that cannot be read do not matter with the audio mode

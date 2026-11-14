@@ -5,6 +5,7 @@ document (2026-11-13) after ruling that automated end-to-end tests run
 on the owner's Mac first (D34), ruled on five of its open questions
 (D35) and merged it, which by the rule this status line stated before
 is the sign-off (D37); two questions stay open ("Open questions").
+Corrected after an automated review (D38).
 
 Every statement about what a tool or macOS does comes from web
 research of 2026-11-13 (sources at the end) and is UNVERIFIED on this
@@ -151,7 +152,7 @@ only if that falls short. See "Unknowns".
 | **A file is lost or unreadable** | kill the recorder (`kill -9`), also while it finalizes; full disk; output folder made unwritable or its volume removed; sleep; a display or audio input vanishing | every file in the recording folder opens and decodes to its last complete fragment (fragments of 2 s, [recorder.md](recorder.md)); nothing recorded more than one fragment before the event is missing |
 | **Wrong picture** | displays connect and reconnect (a macOS fault then delivers another display's picture, seen on the owner's Mac with virtual displays), mirroring, main display change, many displays at once | the identity decoded from each display file is that file's display; no black stretch; the pattern's counter keeps advancing; the colour fields and grey steps come back as shown, within a tolerance, black as black and white as white |
 | **Wrong sound** | audio inputs appear and vanish, default microphone changes, channel count and sample rate change | a virtual audio input's audio file holds the tone, on every track; no silent stretch in it; each guide track is present in every display file |
-| **Wrong timing** | still picture for 60 s, load on the processor, a stalled recorder (`SIGSTOP`, then `SIGCONT`), long random runs | every display file has 30 frames for each second of its length; the time shown in each recorded frame is that frame's time within one frame, except during a still picture or a stall the scenario makes: there the last picture is repeated by design (D11, D21), so the shown time may lag the frame's time by up to the length of that still picture or stall, but never runs backwards or ahead of the frame's time; the timecode of every file matches its start; the click sits at the frame that shows its time |
+| **Wrong timing** | still picture for 60 s, load on the processor, a stalled recorder (`SIGSTOP`, then `SIGCONT`), long random runs | every display file has 30 frames for each second of its length; the time shown in each recorded frame is that frame's time within one frame, except where the last picture is repeated by design (D11, D21): during a still picture or a stall the scenario makes, the shown time may lag by up to the length of that still picture or stall, and under load by no more frames than the recording manifest counts as repeated for lateness ([recorder.md](recorder.md), "How the recorder works"); it never runs backwards or ahead of the frame's time; the timecode of every file matches its start; outside a still picture or a stall, the click sits at the frame that shows its time |
 | **A change handled wrongly** | every display and audio event below | the right file ends and the right one begins; a frame size change leaves under one second without picture (D30); the audio files have no gap across it; a display keeps its number; an unchanged frame size continues the file |
 | **The recording manifest is wrong** | all of them | `recording.json` lists exactly the files in the folder; each event the recorder design defines appears once, in order, at the scenario's time; its state is right after Stop and after a kill |
 | **Resources run out** | a small disk image as output folder, filled during a recording, then given room again; processor and memory pressure; more displays than the Mac has hardware encoder sessions | what was written stays readable; the recorder keeps retrying and continues in new files once there is room (D14); nothing is discarded |
@@ -292,21 +293,24 @@ tried:
   recording folders live in a scratch folder, are deleted after a run
   that passes, and kept after one that fails, which the driver says
   with the path.
-- Before a run the driver writes the display arrangement, the default
-  microphone, the default output, the sample rate and input volume of
-  every BlackHole device, and, for the scenario set that changes them,
-  the time zone, whether the time is set automatically and the time
-  itself, to a state file; it restores them
-  after the run, after a failure and after Ctrl-C. The time is restored
-  first, as the saved time plus the time elapsed since, read from a
-  clock that setting the time does not move; then whether it is set
+- Before a run the driver writes to a state file what the run may
+  change: the display arrangement, mirroring and the main display; the
+  mode and rotation of each of the Mac's own displays; the default
+  microphone and the default output; the sample rate and input volume
+  of every BlackHole device; and, for the scenario set that changes
+  them, the time zone, whether the time is set automatically and the
+  time itself. It restores them after the run, after a failure and
+  after Ctrl-C. If the driver itself is killed, `restore` as its only
+  argument does the same from the state file, and removes every
+  virtual display and aggregate device carrying the tests' name prefix
+  (an aggregate device may outlive the helper that made it).
+- The time is restored first, as the saved time plus the time elapsed
+  since, read from a clock that counts sleep and that setting the time
+  does not move; then the time zone and whether the time is set
   automatically. If the Mac restarted in between, the elapsed time is
-  lost: `restore` then says so and leaves setting the time to the
-  person. If the driver
-  itself is killed, `restore` as its only argument does the same from
-  the state file, and removes every virtual display and aggregate
-  device carrying the tests' name prefix (an aggregate device may
-  outlive the helper that made it).
+  lost: `restore` restores the rest and says that the time is the
+  person's to set, unless it is set automatically again. Untried (see
+  "Unknowns").
 - Virtual displays use a small fixed set of identities: macOS keeps an
   arrangement and a colour profile (owned by root, never removed) per
   identity.
@@ -444,7 +448,10 @@ this design is built:
   tone;
 - BetterDisplay's command line returns only when the change is done;
 - a tone played into the loopback device is, or is not, in system
-  audio and on the speakers.
+  audio and on the speakers;
+- the time can be put back after the clock scenario set: a clock that
+  counts sleep and that setting the time does not move, and setting
+  the time from the driver.
 
 ## Open questions
 
