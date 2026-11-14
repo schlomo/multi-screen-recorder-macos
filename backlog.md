@@ -23,10 +23,15 @@ Next, waiting for the owner:
   feedback channel would supersede D15 in part (feedback goes to
   GitHub Issues) and touch the intake line of `AGENTS.md`. The
   architect also proposes that this PR fixes the crash that came back
-  ("In flight"). Waits for: the owner's sign-off, the address the
-  reports go to, and whether this PR comes before the steps below or
-  later (the architect read "now in a subsequent PR" as the next PR;
-  the owner is asked).
+  ("In flight"), and with it a finding of Copilot's review of PR #1
+  that touches the same code: a refresh queued for the window outlives
+  a newer device notice, so after a menu closes the devices are read
+  once too early and once more after they settle (the newest result
+  still wins); a refresh number, like the ready check's, fixes it, and
+  only the owner's re-test in the app verifies it. Waits for: the
+  owner's sign-off, the address the reports go to, and whether this PR
+  comes before the steps below or later (the architect read "now in a
+  subsequent PR" as the next PR; the owner is asked).
 - Then the steps below; the app icon PR can run beside them.
 
 ### Owner's rulings of 2026-11-13 (D34)
@@ -56,6 +61,13 @@ order, the next architect session:
 
 ## In flight
 
+- **Copilot's review findings** on PRs #1 and #2, fixed in the PR
+  `copilot-review-fixes`, which waits for the owner's review: a crash
+  on a huge required recording time, a snapshot release left behind
+  after a close, releases skipped by quick pushes to `main`, a
+  command-test helper that could hang, and four corrections to the
+  end-to-end test design (merging it signs them off). One finding is
+  proposed for the crash reports PR ("Next session starts here").
 - **Open from PR #1** (merged 2026-11-14), checked on the owner's Mac
   with the snapshot release the owner named: "So I'm checking the PR1
   release snapshot from GH 43ec12f".
@@ -88,9 +100,9 @@ order, the next architect session:
     failed).
   - Each crash gets its entry in `docs/troubleshooting.md` once its fix
     is verified.
-  - The branches `v0-skeleton-and-pipeline` and
-    `end-to-end-tests-design` are still on the remote; deleting them
-    needs the owner's go-ahead.
+  - The branches `v0-skeleton-and-pipeline`,
+    `end-to-end-tests-design` and `bring-end-to-end-design-to-main`
+    are still on the remote; deleting them needs the owner's go-ahead.
 
 ## Queued
 
@@ -263,7 +275,8 @@ order, the next architect session:
 ## Done (recent)
 
 - 2026-11-14: the skeleton and pipeline PR (#1) merged, with D25–D34
-  and D36; the end-to-end test design (PR #2, with D35) agreed (D37).
+  and D36; the end-to-end test design (PR #2, with D35) agreed (D37)
+  and brought to `main` with PR #3.
 - 2026-11-13: the owner's rulings on auto mode, the settings file, the
   default microphone and end-to-end tests (D34).
 - 2026-11-12: v0 design agreed (D17–D24); it settled the former queued
