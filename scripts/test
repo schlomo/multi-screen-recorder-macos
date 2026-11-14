@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+# Compiles the Python scripts, then runs the unit tests. Needs Xcode selected
+# with its licence accepted: the Command Line Tools alone cannot run Swift
+# Testing.
+set -euo pipefail
+
+for tool in swift xcodebuild python3; do
+    command -v "$tool" >/dev/null || { echo "scripts/test: $tool is not on the PATH" >&2; exit 1; }
+done
+if ! xcodebuild -license check >/dev/null; then
+    echo "scripts/test: needs Xcode selected and its licence accepted, see Developer setup in README.md" >&2
+    exit 1
+fi
+
+cd "$(dirname "$0")/.."
+python3 -I -m py_compile scripts/version scripts/unpack-app scripts/sign-app scripts/smoke-test \
+    scripts/publish-snapshot-release
+swift test "$@"

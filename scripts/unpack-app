@@ -1,0 +1,137 @@
+#!/usr/bin/env -S python3 -I
+"""Unpacks the app archive from scripts/build-app (the path given) into an
+empty build/, as data, executing nothing from it.
+
+tarfile's "data" filter refuses absolute paths, links pointing out and
+special files; its destination here is the bundle folder, which this script
+creates, so "out" means out of the bundle. This script checks what the
+filter lacks: a plain tar, every member once, inside the bundle and without
+a `..` component (the build writes none), the bundle's own member a folder,
+and no member written through a symbolic link of the archive.
+"""
+
+import argparse
+import shutil
+import sys
+import tarfile
+from pathlib import Path, PurePosixPath
+
+ME = "scripts/unpack-app"
+MINIMUM_PYTHON = (3, 15)
+if sys.version_info < MINIMUM_PYTHON:
+    sys.exit(f"{ME}: needs Python {'.'.join(map(str, MINIMUM_PYTHON))} or later (the python3 of the macos-26 runner image),"
+             f" not {sys.version.split()[0]}")
+
+BUNDLE = "Multi Screen Recorder.app"
+
+
+class Refused(Exception):
+    pass
+
+
+class ArgumentParser(argparse.ArgumentParser):
+    def error(self, message: str) -> None:
+        self.print_usage(sys.stderr)
+        sys.exit(f"{ME}: {message}")
+
+
+def inside_bundle(name: str) -> PurePosixPath | None:
+    """The member name relative to the bundle, or None when it lies outside."""
+    path = PurePosixPath(name)
+    if path.parts[:1] != (BUNDLE,):
+        return None
+    return PurePosixPath(*path.parts[1:]) if len(path.parts) > 1 else PurePosixPath()
+
+
+def check(members: list[tarfile.TarInfo]) -> None:
+    symbolic_links = {PurePosixPath(member.name) for member in members if member.issym()}
+    seen: set[PurePosixPath] = set()
+    has_bundle = False
+    for member in members:
+        path = PurePosixPath(member.name)
+        if path.is_absolute():
+            raise Refused(f"the member '{member.name}' has an absolute path")
+        if ".." in path.parts:
+            raise Refused(f"the member '{member.name}' has a .. component")
+        if path in seen:
+            raise Refused(f"the member '{member.name}' appears twice")
+        seen.add(path)
+        relative = inside_bundle(member.name)
+        if relative is None:
+            raise Refused(f"the member '{member.name}' lies outside {BUNDLE}")
+        if relative == PurePosixPath():
+            if not member.isdir():
+                raise Refused(f"{BUNDLE} is not a folder in the archive")
+            has_bundle = True
+        if member.islnk() and (inside_bundle(member.linkname) is None or ".." in PurePosixPath(member.linkname).parts):
+            raise Refused(f"the hard link '{member.name}' points outside {BUNDLE} ({member.linkname})")
+        for parent in path.parents:
+            if parent in symbolic_links:
+                raise Refused(f"the member '{member.name}' would be written through the symbolic link '{parent}'")
+    if not has_bundle:
+        raise Refused(f"the archive holds no {BUNDLE} folder")
+
+
+def bundle_filter(member: tarfile.TarInfo, destination: str) -> tarfile.TarInfo | None:
+    """Re-roots a member at the bundle folder, then applies the "data" filter there."""
+    relative = inside_bundle(member.name)
+    assert relative is not None
+    if relative == PurePosixPath():
+        return None
+    changes: dict[str, str] = {"name": str(relative)}
+    if member.islnk():
+        link_target = inside_bundle(member.linkname)
+        assert link_target is not None
+        changes["linkname"] = str(link_target)
+    try:
+        return tarfile.data_filter(member.replace(**changes), destination)
+    except tarfile.AbsolutePathError:
+        raise Refused(f"the member '{member.name}' has an absolute path")
+    except tarfile.OutsideDestinationError:
+        raise Refused(f"the member '{member.name}' lies outside {BUNDLE}")
+    except (tarfile.AbsoluteLinkError, tarfile.LinkOutsideDestinationError):
+        kind = "symbolic link" if member.issym() else "hard link"
+        raise Refused(f"the {kind} '{member.name}' points outside {BUNDLE} ({member.linkname})")
+    except tarfile.SpecialFileError:
+        raise Refused(f"the member '{member.name}' is not a file, folder or link")
+
+
+def unpack(archive_path: Path, build: Path) -> None:
+    if build.is_symlink() or (build.exists() and any(build.iterdir())):
+        raise Refused("build/ is not empty; unpack only into an empty build/")
+    try:
+        archive = tarfile.open(archive_path, mode="r:", errorlevel=2)
+    except tarfile.ReadError as error:
+        raise Refused(f"{archive_path} is not a plain tar archive, as scripts/build-app writes ({error})")
+    with archive:
+        check(archive.getmembers())
+        bundle = build / BUNDLE
+        bundle.mkdir(parents=True)
+        try:
+            archive.extractall(bundle, filter=bundle_filter)
+        except tarfile.ExtractError as error:
+            shutil.rmtree(bundle)
+            raise Refused(f"a member cannot be extracted: {error}")
+        except BaseException:
+            shutil.rmtree(bundle)
+            raise
+    if bundle.is_symlink() or not bundle.is_dir():
+        raise Refused(f"build/{BUNDLE} is not a folder")
+
+
+def main() -> None:
+    parser = ArgumentParser(prog=ME, description="Unpacks the app archive into an empty build/.")
+    parser.add_argument("archive", type=Path, help="the app archive from scripts/build-app")
+    archive_path = parser.parse_args().archive.absolute()
+    build = Path(__file__).resolve().parent.parent / "build"
+    try:
+        unpack(archive_path, build)
+    except Refused as refusal:
+        sys.exit(f"{ME}: {refusal}")
+    except (OSError, KeyError, tarfile.TarError) as error:
+        sys.exit(f"{ME}: cannot unpack {archive_path}: {error}")
+    print(f"build/{BUNDLE}")
+
+
+if __name__ == "__main__":
+    main()

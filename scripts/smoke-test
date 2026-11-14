@@ -1,0 +1,112 @@
+#!/usr/bin/env -S python3 -I
+"""Runs the bundled msr from scripts/build-app with a scratch HOME: only
+commands that need no permission, display or microphone. Each check is a
+command and its expected exit code and output.
+"""
+
+import os
+import plistlib
+import shutil
+import subprocess
+import sys
+import tempfile
+from dataclasses import dataclass
+from pathlib import Path
+from typing import NoReturn
+from xml.parsers.expat import ExpatError
+
+ME = "scripts/smoke-test"
+MINIMUM_PYTHON = (3, 15)
+if sys.version_info < MINIMUM_PYTHON:
+    sys.exit(f"{ME}: needs Python {'.'.join(map(str, MINIMUM_PYTHON))} or later (the python3 of the macos-26 runner image),"
+             f" not {sys.version.split()[0]}")
+
+APP = Path("build/Multi Screen Recorder.app")
+
+
+def stop(message: str) -> NoReturn:
+    sys.exit(f"{ME}: {message}")
+
+
+def bundled_version(info_plist: Path) -> str:
+    """MSRVersion from the bundle's Info.plist, which must be a valid property list with a dictionary at its root."""
+    try:
+        info = plistlib.loads(info_plist.read_bytes())
+    except (OSError, plistlib.InvalidFileException, ExpatError, ValueError) as error:
+        stop(f"cannot read the bundle's Info.plist: {error}")
+    if not isinstance(info, dict):
+        stop("the bundle's Info.plist does not hold a dictionary")
+    if not isinstance(info.get("MSRVersion"), str):
+        stop("the bundle's Info.plist has no MSRVersion")
+    return info["MSRVersion"]
+
+
+@dataclass
+class Checks:
+    home: Path
+    failures: int = 0
+
+    def run(self, program: Path, *arguments: str) -> subprocess.CompletedProcess[str]:
+        return subprocess.run([program, *arguments], env=os.environ | {"HOME": str(self.home)},
+                              stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+
+    def report(self, description: str, passed: bool, failure: str) -> None:
+        if passed:
+            print(f"ok    {description}", flush=True)
+        else:
+            print(f"FAIL  {description}: {failure}", file=sys.stderr)
+            self.failures += 1
+
+    def expect(self, description: str, status: int, text: str, program: Path, *arguments: str) -> None:
+        """The command exits with the status and its output contains the text."""
+        result = self.run(program, *arguments)
+        self.report(description, result.returncode == status and text in result.stdout,
+                    f"exit {result.returncode} (expected {status}), output:\n{result.stdout}")
+
+    def expect_version(self, description: str, program: Path, version: str) -> None:
+        """The program prints exactly this version."""
+        result = self.run(program, "version")
+        printed = result.stdout.removesuffix("\n")
+        self.report(description, result.returncode == 0 and printed == version,
+                    f"exit {result.returncode}, printed '{printed}', expected '{version}'")
+
+
+def main() -> None:
+    if shutil.which("git") is None:
+        stop("git is not on the PATH")
+    os.chdir(Path(__file__).resolve().parent.parent)
+    msr = Path.cwd() / APP / "Contents/MacOS/msr"
+    if not os.access(msr, os.X_OK):
+        stop(f"{msr} does not exist; run scripts/build-app first")
+    version = bundled_version(APP / "Contents/Info.plist")
+    head = subprocess.run(["git", "rev-parse", "--short=7", "HEAD"], check=True,
+                          stdout=subprocess.PIPE, text=True).stdout.strip()
+    expected_version = f"{version} ({head})"
+
+    with tempfile.TemporaryDirectory() as scratch_name:
+        scratch = Path(scratch_name)
+        home = scratch / "home"
+        home.mkdir()
+        settings_file = home / "Library/Application Support/Multi Screen Recorder/settings.json"
+        linked_msr = scratch / "msr"
+        linked_msr.symlink_to(msr)
+        checks = Checks(home)
+
+        checks.expect_version("msr version prints this commit's version", msr, expected_version)
+        checks.expect_version("msr version through a symbolic link prints the same", linked_msr, expected_version)
+        checks.expect("msr settings prints the defaults", 0, '"requiredRecordingHours": 2', msr, "settings")
+        checks.expect("msr settings --save writes a flag", 0, '"resolution": "720p"',
+                      msr, "settings", "--resolution", "720p", "--save")
+        checks.expect("msr settings reads the saved file", 0, '"resolution": "720p"', msr, "settings")
+        settings_file.write_text('{"agc": true}\n')
+        checks.expect("an unusable settings file exits 78 naming the key", 78, '"agc"', msr, "settings")
+        checks.expect_version("msr version reads no settings", msr, expected_version)
+        checks.expect("an unknown flag exits 64", 64, "--bogus", msr, "settings", "--bogus")
+
+    if checks.failures:
+        stop(f"{checks.failures} check(s) failed")
+    print(f"{ME}: all checks passed")
+
+
+if __name__ == "__main__":
+    main()
