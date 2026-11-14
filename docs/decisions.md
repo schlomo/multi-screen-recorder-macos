@@ -774,8 +774,8 @@ architect's reading.
 
 ## D35: End-to-end tests: who holds the permissions, a Swift driver, scripts only in `scripts/` (2026-11-13)
 
-- **Status:** in force for the questions it answers; the design as a
-  whole stays proposed until the owner merges PR #2. Nothing built.
+- **Status:** in force; the design as a whole is agreed in D37.
+  Nothing built.
 - **Context:** The proposed design for end-to-end tests
   (`docs/design/end-to-end-tests.md`) asked the owner seven questions.
   The owner answered five, on 2026-11-13; which items of the v1 gate
@@ -825,9 +825,10 @@ architect's reading.
 - **Status:** in force. Point 1 drops a proof the agreed design had;
   asked "Accept that the ready check reads the microphone permission
   without opening the microphone?", the owner answered "Yes, accept"
-  (2026-11-13). Built in PR #1; the owner's re-test on the Mac is
-  outstanding.
-  (D35 is on the branch of PR #2.)
+  (2026-11-13). Built in PR #1, merged 2026-11-14. The owner's
+  re-test (2026-11-14): the tables follow display and microphone
+  changes; the second crash came back with a popup menu open and HiDPI
+  switched, so point 3 did not stop it (`backlog.md`, "In flight").
 - **Context:** The owner's check of PR #1 on the Mac, 2026-11-13: the
   app crashed on "Check again" after the default microphone was
   unplugged, and crashed after HiDPI was switched in BetterDisplay
@@ -868,3 +869,21 @@ architect's reading.
   the fixes are unverified until the owner's re-test; the troubleshooting
   log gets its entries then.
 - **Evidence:** [PR #1](https://github.com/schlomo/multi-screen-recorder-macos/pull/1).
+
+## D37: The end-to-end test design is agreed (2026-11-14)
+
+- **Status:** in force; nothing built.
+- **Context:** The design for automated end-to-end tests
+  (`docs/design/end-to-end-tests.md`) was proposed in PR #2, with the
+  rule written into it that merging it is the owner's sign-off. The
+  owner merged it on 2026-11-14: "So I merged the PR1 and also PR2
+  with the design". PR #2's base was still the branch of PR #1, so the
+  merge landed there; this change brings it to `main`.
+- **Decision:** The design in `docs/design/end-to-end-tests.md` is
+  agreed as written, with D35's rulings. Its two open questions stay
+  open: which items of the v1 gate the tests replace, and whether the
+  owner's BetterDisplay HiDPI mode works through virtual screens.
+- **Consequences:** The recorder PR's design provides what the design
+  asks of it ("What the recorder design must provide"); the tests are
+  built after or with the recorder.
+- **Evidence:** [PR #2](https://github.com/schlomo/multi-screen-recorder-macos/pull/2).

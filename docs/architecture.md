@@ -47,7 +47,9 @@ The skeleton is built (the app window with the ready check and the
 tables of what will be recorded, the command line without `record`, the
 pipeline); recording is designed, not built yet. The designs:
 [design/recorder.md](design/recorder.md) and
-[design/delivery.md](design/delivery.md).
+[design/delivery.md](design/delivery.md); how the recorder is tested
+end to end on a Mac: [design/end-to-end-tests.md](design/end-to-end-tests.md)
+(D35, D37).
 
 - **Recorder core:** one capture stream and one file writer per
   display, plus the audio sources; it watches displays and audio

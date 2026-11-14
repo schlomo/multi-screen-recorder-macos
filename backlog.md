@@ -3,14 +3,14 @@
 ## Next session starts here
 
 The v0 design is agreed (2026-11-12, D17–D33) and written down in
-`docs/design/recorder.md` and `docs/design/delivery.md`. v0 arrives as
-two PRs (D18).
+`docs/design/recorder.md` and `docs/design/delivery.md`. The skeleton
+and pipeline PR (#1) is merged (2026-11-14), and the end-to-end test
+design is agreed (D37).
 
-The skeleton and pipeline PR (#1) is built, adversarially reviewed
-and publishes a signed snapshot release. Until it is merged, what is
-left is under "In flight": the owner's check on the Mac and the merge.
-Next for an architect session once it is merged: the four steps
-below; the app icon PR can run beside them.
+Next: the crash reports PR under "In flight", which the owner asked
+for before going on; its design waits for the owner's sign-off and an
+email address. It also carries the fix for the crash that came back.
+After it, the steps below; the app icon PR can run beside them.
 
 ### Owner's rulings of 2026-11-13 (D34)
 
@@ -29,67 +29,51 @@ other file of PR #1 changed. In order, the next architect session:
    `settings.json.previous` is written and overwritten, and whether a
    command that only reads rewrites the settings file. The glossary
    gains "auto mode" and "looks like".
-3. Gets the owner's sign-off, or changes, on the proposed design for
-   end-to-end tests (queued item 5, draft PR #2). The owner ruled on
-   five of its questions (D35). Two of its experiments have run: a
-   virtual display is captured on the owner's Mac, and a new stream
-   on a virtual display that came back delivers the other display's
-   picture, which the recorder design must deal with.
+3. Done 2026-11-14: the end-to-end test design is agreed (D37). Two
+   of its experiments have run: a virtual display is captured on the
+   owner's Mac, and a new stream on a virtual display that came back
+   delivers the other display's picture, which the recorder design
+   must deal with.
 4. Briefs the recorder PR (queued item 2) with the first end-to-end
    tests.
 
 ## In flight
 
-- **Skeleton and pipeline PR** (D18), branch `v0-skeleton-and-pipeline`:
-  the Swift package, the app window with the ready check, `msr list`,
-  `check`, `settings` and `version`, the scripts and the pipeline, the
-  README's installation and developer setup.
-  It also carries the decisions made while it was built: the window's
-  tables of what will be recorded (D33), the frame size rule (D30), one
-  audio file per source with guide tracks in the display files (D31,
-  design only), signing in a job of its own (D29), and the scripts with
-  logic in Python (D32).
-  - The developer setup is done on the owner's Mac (2026-11-12): Xcode
-    selected, the signing certificate, the repository secret.
-  - The owner's check on the Mac: install the snapshot release, "Open
-    Anyway", start the app from Finder, grant both permissions; after a
-    further push, install that snapshot release over the first: both
-    permissions are still granted (D5). Also note whether macOS 26
-    re-asks for the screen recording permission after some weeks.
-    Things to look at on the way: a settings file written by an early
-    snapshot has the key `readyCheckHours` and is refused until "Reset
-    to defaults"; the two tables and the total line in the window;
-    whether coming back to the app with screen recording denied makes
-    macOS prompt again (the ready check runs on every activation).
-    Seen so far (2026-11-13, started through `open`): both prompts name
-    the app; with both denied the ready check names both and "Check
-    again" raises no new prompt; allowed in System Settings, the
-    microphone permission needs a restart of the app and the screen
-    recording permission does not; the fix lines were changed for
-    that. Still
-    to do: the second snapshot release installed over the first, the
-    old settings file. The snapshot release from Finder with "Open
-    Anyway" worked, and both permissions stayed over a quit and start.
-    The check also found two crashes and that the window did not
-    follow device changes; all three are changed in this PR (D36), the
-    causes of the crashes are assumed, and the owner's re-test is
-    outstanding:
-    - `EXC_BAD_ACCESS (SIGSEGV)` on the queue
-      `HALC_ProxyNotification Call Listener Queue`, in `CMIOBaseUnits`
-      below `HALDevice::Teardown()`. Re-test: unplug the default
-      microphone with the window open, wait, click "Check again", plug
-      it in again.
-    - `EXC_CRASH (SIGABRT)`, an exception in
-      `-[NSWindow(NSDisplayCycle) _postWindowNeedsLayout]` while a
-      popup menu was tracked. Re-test in both orders: open a popup
-      menu of the window, then switch HiDPI in BetterDisplay; and
-      switch HiDPI, then click a popup menu at once.
-    - Re-test: the tables follow a display plugged in or out, a HiDPI
-      switch and a microphone plugged in or out, without a click; with
-      a popup menu of the window open, and with the folder chooser
-      open, they change only when it closes.
-    Each crash gets its entry in `docs/troubleshooting.md` once its
-    fix is verified.
+- **Crash reports PR**, design not signed off yet. The owner,
+  2026-11-14: "I think some sort of simple crash management would be
+  good now in a subsequent PR as I want to go on now." Earlier
+  (2026-11-13) the owner preferred email to a public GitHub issue
+  ("more private") and called Apple's "send to Apple" dialog useless.
+  The architect's proposal, put to the owner in the session: on the
+  next start after the app ended unexpectedly, a dialog offers to send
+  the macOS crash report and the app's own log by email, composed in
+  the person's mail app, so nothing is sent without them and the app
+  opens no network connection; Apple's dialog stays (removing it needs
+  a crash catcher in the process or a supervising process, deferred).
+  Waits for: the owner's sign-off and the address the reports go to.
+  The architect proposes that this PR also fixes the crash that came
+  back:
+  - Seen 2026-11-14 on the snapshot of PR #1's last commit (43ec12f,
+    the merged state): with the popup "Recording resolution" open,
+    HiDPI switched in BetterDisplay; "The table did update and then it
+    crashed": `EXC_CRASH (SIGABRT)`, an exception in
+    `-[NSWindow(NSDisplayCycle) _postWindowNeedsLayout]` from
+    `-[NSWindow(NSConstraintBasedLayoutInternal) layoutIfNeeded]`,
+    during menu tracking. The window sized by its content's preferred
+    size and the content held while a menu is open (D36 point 3) did
+    not stop it. That the table changed under the open menu speaks
+    against the assumption that menu tracking leaves the main run
+    loop's default mode, or the change came from the display itself;
+    which part of the table changed is not known yet.
+  - Still to report from PR #1's check: the first crash's re-test
+    (unplug the default microphone, "Check again"); whether both
+    permissions were kept when the snapshot was installed over the
+    earlier one (D5); the old settings file; `msr version` through a
+    symbolic link. Each crash gets its entry in
+    `docs/troubleshooting.md` once its fix is verified.
+  - The branches `v0-skeleton-and-pipeline` and
+    `end-to-end-tests-design` are still on the remote; deleting them
+    needs the owner's go-ahead.
 
 ## Queued
 
@@ -196,15 +180,15 @@ other file of PR #1 changed. In order, the next architect session:
    - A snapshot release installed over an earlier one keeps both
      permissions, with the app started from Finder (D5).
 5. **Automated end-to-end tests on the owner's Mac** (D34). The
-   proposed design, not signed off, is
-   [docs/design/end-to-end-tests.md](docs/design/end-to-end-tests.md)
-   (draft PR #2): tests by error class, what the recorder design must
+   agreed design (D37) is
+   [docs/design/end-to-end-tests.md](docs/design/end-to-end-tests.md):
+   tests by error class, what the recorder design must
    provide for them, the experiments that settle its unknowns, and its
    open questions. The owner's rulings on it so far are D35. Nothing
    of it is built; of the experiments, the first two have run. The
    tests are started by a person, never unasked by an agent.
-6. **App icon**, its own PR after PR #1 is merged; until then the app
-   has the default icon. The owner chose the drawing (2026-11-12):
+6. **App icon**, its own PR; until then the app has the default
+   icon. The owner chose the drawing (2026-11-12):
    three displays fanned in depth on a graphite tile, one red record
    dot on the front display; graphite `#1E2330`, cool white `#E9EEF7`,
    red `#FF3B30`, the same three colours for the homepage. Flat vector
@@ -260,6 +244,9 @@ other file of PR #1 changed. In order, the next architect session:
   to.
 
 ## Done (recent)
+
+- 2026-11-14: the skeleton and pipeline PR (#1) merged, with D25–D36;
+  the end-to-end test design agreed (D37).
 
 - 2026-11-13: the owner's rulings on auto mode, the settings file, the
   default microphone and end-to-end tests (D34).

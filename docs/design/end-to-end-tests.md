@@ -1,13 +1,10 @@
 # End-to-end tests
 
-**Status: proposed, not signed off, nothing built.** The owner asked
-for this document (2026-11-13) after ruling that automated end-to-end
-tests run on the owner's Mac first (D34), and has since ruled on five
-of its open questions (D35). It stays on its work branch until the
-owner signs it off; merging it is that sign-off. The same change then
-records the sign-off in the decisions log and removes "proposed" here,
-in [recorder.md](recorder.md) "Tests", in the backlog's item and in
-the glossary.
+**Status: agreed (D37), nothing built.** The owner asked for this
+document (2026-11-13) after ruling that automated end-to-end tests run
+on the owner's Mac first (D34), ruled on five of its open questions
+(D35) and signed it off by merging it (D37); two questions stay open
+("Open questions").
 
 Every statement about what a tool or macOS does comes from web
 research of 2026-11-13 (sources at the end) and is UNVERIFIED on this
@@ -31,7 +28,7 @@ So the tests are organised by **error class**: a kind of thing that
 goes wrong with a recording. For each class there are events that
 provoke it and assertions that detect it.
 
-## The proposed design
+## The design
 
 **The recorder under test is the built app, as shipped,** driven
 through `msr record` with a scratch `HOME` and a scratch output folder.
