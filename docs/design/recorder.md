@@ -156,15 +156,14 @@ read does not count), the output folder, and free disk space in the output folde
   "Check again"; the tables of what will be recorded follow with it.
   Other changes of an audio input, such as its channels, show with the
   next check. A burst of changes gives one check, 0.3 s after the last
-  (*data*). While a menu of the app or a modal panel (the folder
-  chooser) is open or a control is dragged, the window's content does
-  not change by itself; the check's result shows when it closes (that
-  AppKit signals all three the way the app relies on is not observed
-  yet, [ASSUMED] until the owner's re-test). The
-  app crashed in AppKit's window layout, with a menu open, after HiDPI
-  was switched; the cause is one of two candidates [ASSUMED], a change
-  of the content under the menu or the window's sizing by layout
-  constraints, and both are changed. It never
+  (*data*). The check's result is shown only when the main run loop
+  is in its default mode, meant to hold the window's content still
+  while a menu or a modal panel (the folder chooser) is open or a
+  control is dragged. That failed its re-test (2026-11-14): with a
+  popup menu open and HiDPI switched, the table changed and the app
+  crashed in AppKit's window layout, as before the window was sized
+  by its content's preferred size and the result held. The cause is
+  open (`backlog.md`, "In flight"). It never
   runs while a recording is running, activation included (for the
   recorder PR to honour).
 

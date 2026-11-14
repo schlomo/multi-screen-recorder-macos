@@ -825,10 +825,9 @@ architect's reading.
 - **Status:** in force. Point 1 drops a proof the agreed design had;
   asked "Accept that the ready check reads the microphone permission
   without opening the microphone?", the owner answered "Yes, accept"
-  (2026-11-13). Built in PR #1, merged 2026-11-14. The owner's
-  re-test (2026-11-14): the tables follow display and microphone
-  changes; the second crash came back with a popup menu open and HiDPI
-  switched, so point 3 did not stop it (`backlog.md`, "In flight").
+  (2026-11-13). Built in PR #1, merged 2026-11-14. Point 3 failed
+  its re-test on 2026-11-14: the second crash came back (`backlog.md`,
+  "In flight").
 - **Context:** The owner's check of PR #1 on the Mac, 2026-11-13: the
   app crashed on "Check again" after the default microphone was
   unplugged, and crashed after HiDPI was switched in BetterDisplay
@@ -879,8 +878,10 @@ architect's reading.
   owner merged it on 2026-11-14: "So I merged the PR1 and also PR2
   with the design". PR #2's base was still the branch of PR #1, so the
   merge landed there; this change brings it to `main`.
-- **Decision:** The design in `docs/design/end-to-end-tests.md` is
-  agreed as written, with D35's rulings. Its two open questions stay
+- **Decision:** The architect's reading of the merge, by the rule the
+  design's status line stated ("merging it is that sign-off"): the
+  design in `docs/design/end-to-end-tests.md` is agreed as written,
+  with D35's rulings. Its two open questions stay
   open: which items of the v1 gate the tests replace, and whether the
   owner's BetterDisplay HiDPI mode works through virtual screens.
 - **Consequences:** The recorder PR's design provides what the design

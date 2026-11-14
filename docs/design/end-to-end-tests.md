@@ -3,8 +3,8 @@
 **Status: agreed (D37), nothing built.** The owner asked for this
 document (2026-11-13) after ruling that automated end-to-end tests run
 on the owner's Mac first (D34), ruled on five of its open questions
-(D35) and signed it off by merging it (D37); two questions stay open
-("Open questions").
+(D35) and merged it, which by the rule this status line stated is the
+sign-off (D37); two questions stay open ("Open questions").
 
 Every statement about what a tool or macOS does comes from web
 research of 2026-11-13 (sources at the end) and is UNVERIFIED on this

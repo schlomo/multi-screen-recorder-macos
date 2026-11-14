@@ -7,15 +7,31 @@ The v0 design is agreed (2026-11-12, D17–D33) and written down in
 and pipeline PR (#1) is merged (2026-11-14), and the end-to-end test
 design is agreed (D37).
 
-Next: the crash reports PR under "In flight", which the owner asked
-for before going on; its design waits for the owner's sign-off and an
-email address. It also carries the fix for the crash that came back.
-After it, the steps below; the app icon PR can run beside them.
+Next, waiting for the owner:
+
+- **Crash reports.** The owner, 2026-11-14: "I think some sort of
+  simple crash management would be good now in a subsequent PR as I
+  want to go on now." Earlier, 2026-11-13: "maybe we do crash log
+  submission via email instead, more private", and “I think that the
+  "send to apple" dialogue is useless”. The architect's proposal,
+  put to the owner in the session: on the next start after `msr`
+  crashed, a dialog offers to send the macOS crash report and the
+  app's own log by email, composed in the person's mail app, so
+  nothing is sent without them and the app opens no network
+  connection; Apple's dialog stays (removing it needs a crash catcher
+  in the process or a supervising process, deferred). Email as a
+  feedback channel would supersede D15 in part (feedback goes to
+  GitHub Issues) and touch the intake line of `AGENTS.md`. The
+  architect also proposes that this PR fixes the crash that came back
+  ("In flight"). Waits for: the owner's sign-off, the address the
+  reports go to, and whether this PR comes before the steps below or
+  later (the architect read "now in a subsequent PR" as the next PR;
+  the owner is asked).
+- Then the steps below; the app icon PR can run beside them.
 
 ### Owner's rulings of 2026-11-13 (D34)
 
-Recorded in `docs/decisions.md` as D34; nothing of it is built, and no
-other file of PR #1 changed. In order, the next architect session:
+Recorded in `docs/decisions.md` as D34; nothing of it is built. In order, the next architect session:
 
 1. Talks AGC through with the owner: what it does and whether it is on
    in auto mode (open in D34; the owner's meaning: "turning up input
@@ -39,38 +55,35 @@ other file of PR #1 changed. In order, the next architect session:
 
 ## In flight
 
-- **Crash reports PR**, design not signed off yet. The owner,
-  2026-11-14: "I think some sort of simple crash management would be
-  good now in a subsequent PR as I want to go on now." Earlier
-  (2026-11-13) the owner preferred email to a public GitHub issue
-  ("more private") and called Apple's "send to Apple" dialog useless.
-  The architect's proposal, put to the owner in the session: on the
-  next start after the app ended unexpectedly, a dialog offers to send
-  the macOS crash report and the app's own log by email, composed in
-  the person's mail app, so nothing is sent without them and the app
-  opens no network connection; Apple's dialog stays (removing it needs
-  a crash catcher in the process or a supervising process, deferred).
-  Waits for: the owner's sign-off and the address the reports go to.
-  The architect proposes that this PR also fixes the crash that came
-  back:
-  - Seen 2026-11-14 on the snapshot of PR #1's last commit (43ec12f,
-    the merged state): with the popup "Recording resolution" open,
-    HiDPI switched in BetterDisplay; "The table did update and then it
-    crashed": `EXC_CRASH (SIGABRT)`, an exception in
-    `-[NSWindow(NSDisplayCycle) _postWindowNeedsLayout]` from
-    `-[NSWindow(NSConstraintBasedLayoutInternal) layoutIfNeeded]`,
-    during menu tracking. The window sized by its content's preferred
-    size and the content held while a menu is open (D36 point 3) did
-    not stop it. That the table changed under the open menu speaks
-    against the assumption that menu tracking leaves the main run
-    loop's default mode, or the change came from the display itself;
-    which part of the table changed is not known yet.
-  - Still to report from PR #1's check: the first crash's re-test
-    (unplug the default microphone, "Check again"); whether both
-    permissions were kept when the snapshot was installed over the
-    earlier one (D5); the old settings file; `msr version` through a
-    symbolic link. Each crash gets its entry in
-    `docs/troubleshooting.md` once its fix is verified.
+- **Open from PR #1** (merged 2026-11-14), checked on the owner's Mac
+  with the snapshot release the owner named: "So I'm checking the PR1
+  release snapshot from GH 43ec12f".
+  - Seen: "looks good with regard to dynamic updates of the tables
+    when I change screen or mic."
+  - The second crash came back: "I was able to provoke another crash
+    when I opened the resolution drop down and switched HiDPI mode.
+    The table did update and then it crashed". `EXC_CRASH (SIGABRT)`,
+    an exception in `-[NSWindow(NSDisplayCycle) _postWindowNeedsLayout]`
+    from `-[NSWindow(NSConstraintBasedLayoutInternal) layoutIfNeeded]`,
+    during menu tracking. D36 point 3 (the window sized by its
+    content's preferred size, the check's result held while a menu is
+    open) did not stop it. That the table changed with the menu open
+    speaks against the assumption that menu tracking leaves the main
+    run loop's default mode, or the change came from the display
+    itself; which part of the table changed is not known. The other
+    order (switch HiDPI, then click a popup menu at once) was not
+    reported.
+  - Still to report: the first crash's re-test (unplug the default
+    microphone with the window open, wait, "Check again", plug it in
+    again); whether both permissions were kept when the snapshot was
+    installed over the earlier one (D5); a settings file written by an
+    early snapshot, with the key `readyCheckHours`, is refused until
+    "Reset to defaults"; `msr version` through a symbolic link; whether coming
+    back to the app with screen recording denied makes macOS prompt
+    again; whether macOS 26 re-asks for the screen recording
+    permission after some weeks.
+  - Each crash gets its entry in `docs/troubleshooting.md` once its fix
+    is verified.
   - The branches `v0-skeleton-and-pipeline` and
     `end-to-end-tests-design` are still on the remote; deleting them
     needs the owner's go-ahead.
@@ -184,7 +197,7 @@ other file of PR #1 changed. In order, the next architect session:
    [docs/design/end-to-end-tests.md](docs/design/end-to-end-tests.md):
    tests by error class, what the recorder design must
    provide for them, the experiments that settle its unknowns, and its
-   open questions. The owner's rulings on it so far are D35. Nothing
+   open questions. It is agreed with D35's rulings (D37). Nothing
    of it is built; of the experiments, the first two have run. The
    tests are started by a person, never unasked by an agent.
 6. **App icon**, its own PR; until then the app has the default
@@ -245,9 +258,8 @@ other file of PR #1 changed. In order, the next architect session:
 
 ## Done (recent)
 
-- 2026-11-14: the skeleton and pipeline PR (#1) merged, with D25–D36;
-  the end-to-end test design agreed (D37).
-
+- 2026-11-14: the skeleton and pipeline PR (#1) merged, with D25–D34
+  and D36; the end-to-end test design (PR #2, with D35) agreed (D37).
 - 2026-11-13: the owner's rulings on auto mode, the settings file, the
   default microphone and end-to-end tests (D34).
 - 2026-11-12: v0 design agreed (D17–D24); it settled the former queued
