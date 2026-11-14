@@ -123,7 +123,7 @@ read does not count), the output folder, and free disk space in the output folde
   its prompt; a denied one is reported with the System Settings path.
 - The screen recording grant is proven, not just read: the check
   fetches the display list. The Microphone permission is read, and no
-  microphone is opened (D36, waiting for the owner's yes): the app
+  microphone is opened (D36): the app
   crashed inside macOS after the default microphone was unplugged
   (owner's Mac, 2026-11-13), and the capture session an earlier ready
   check opened for a moment on every run is the cause [ASSUMED]. With
@@ -156,15 +156,16 @@ read does not count), the output folder, and free disk space in the output folde
   "Check again"; the tables of what will be recorded follow with it.
   Other changes of an audio input, such as its channels, show with the
   next check. A burst of changes gives one check, 0.3 s after the last
-  (*data*). While a menu of the app or a modal panel (the folder
-  chooser) is open or a control is dragged, the window's content does
-  not change by itself; the check's result shows when it closes (that
-  AppKit signals all three the way the app relies on is not observed
-  yet, [ASSUMED] until the owner's re-test). The
-  app crashed in AppKit's window layout, with a menu open, after HiDPI
-  was switched; the cause is one of two candidates [ASSUMED], a change
-  of the content under the menu or the window's sizing by layout
-  constraints, and both are changed. It never
+  (*data*). The check's result is shown only when the main run loop
+  is in its default mode, meant to hold the window's content still
+  while a menu or a modal panel (the folder chooser) is open or a
+  control is dragged. It did not stop the crash it was meant for: on
+  2026-11-14, with a popup menu opened and HiDPI switched, the table
+  changed and the app crashed in AppKit's window layout, as it had
+  before this and the window's sizing by its content's preferred size
+  were built. That the table changed while the menu was still open is
+  [ASSUMED] from the owner's words. The cause is open (`backlog.md`,
+  "In flight"). It never
   runs while a recording is running, activation included (for the
   recorder PR to honour).
 
@@ -497,9 +498,10 @@ no tar would write them from a file system), `scripts/sign-app` and
 `scripts/smoke-test` runs the built app's `msr` the same way in the
 pipeline.
 Capture itself cannot run in CI, which has
-no way to grant the permissions [ASSUMED]; it is verified on a Mac with
-`scripts/acceptance/`, which drives `msr record` and checks the files
-with `ffprobe`, and by the v1 gate.
+no way to grant the permissions [ASSUMED]; it is verified on a Mac by
+end-to-end tests, which drive `msr record` and examine the recording
+folder, and by the v1 gate. The design of the end-to-end tests is
+[end-to-end-tests.md](end-to-end-tests.md) (D37).
 
 ## Not covered, and rejected
 
@@ -547,7 +549,7 @@ Built (skeleton PR): `msr list`, `msr check`, `msr settings`,
 `msr version`, the settings file, the ready check and the app window
 with it ("What will be recorded", "Check again", Start
 always disabled, "This build cannot record yet."), the About window,
-the code layout above except `scripts/acceptance/`, and the tests of
+the code layout above, and the tests of
 settings, geometry, the disk estimate, the ready check, the output
 folder probe, the audio input listing, "What will be recorded",
 `msr list`, the frame size rule, the version, the exit codes and the scripts. The recorder PR builds the rest:

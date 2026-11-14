@@ -772,12 +772,62 @@ architect's reading.
 - **Evidence:** [PR #1](https://github.com/schlomo/multi-screen-recorder-macos/pull/1)
   (this entry and `backlog.md` only; nothing built).
 
+## D35: End-to-end tests: who holds the permissions, a Swift driver, scripts only in `scripts/` (2026-11-13)
+
+- **Status:** in force; the design as a whole is agreed in D37.
+  Nothing built.
+- **Context:** The proposed design for end-to-end tests
+  (`docs/design/end-to-end-tests.md`) asked the owner seven questions.
+  The owner answered five, on 2026-11-13; which items of the v1 gate
+  the tests replace, and whether the owner's BetterDisplay HiDPI mode
+  works through virtual screens, stay open:
+  1. "test permissions: whoever runs it, if needed the terminal or
+     vscode (my vscode has already)".
+  2. "driver: you decide and optimize for quality and maintainability
+     via AI agents".
+  3. "scripts/* are scripts, not test data or pytest files".
+  4. "own test audio and virtual screen helpers might be useful if
+     cheap to build".
+  5. "test in my session as you need me in any case".
+- **Decision:**
+  1. The app a run is started from holds Screen Recording and
+     Microphone; the driver starts the recorder as its own child
+     process. The architect's reading of the owner's words: the two
+     alternatives the design named, starting the recorder through
+     macOS (`open`, never tried) and a terminal app kept for the
+     tests, are not needed, and the experiment on `open` is not run.
+  2. The architect's decision, left to the architect by the owner: the
+     driver, the device helper and the assertions are Swift, one
+     executable in the package, never in the app bundle, with their
+     logic in a library target under unit tests in `scripts/test`. The
+     reasons are in the design doc, "Why not otherwise".
+  3. The architect's reading: `scripts/` holds scripts only. The tests'
+     code and data live in the package; `scripts/end-to-end-test` is a
+     few lines that build and start them. `scripts/acceptance/`, which
+     `docs/design/recorder.md` named, is dropped; "acceptance test"
+     stays the word for a person's check at the v1 gate.
+  4. The architect's reading of "if cheap", for both helpers: the
+     device helper for virtual displays is built, as the design cannot
+     change displays without it; for several audio inputs that can be told
+     apart, BlackHole's own drivers installed side by side are tried
+     first, and a test audio driver of our own is built only if that
+     falls short.
+  5. A run happens in the person's own session; no second user account.
+- **Consequences:** The app the tests are started from, and every
+  program started in it, an agent's shell included, can record the
+  screen and the microphone. The pipeline compiles and unit-tests the
+  tests' code.
+- **Evidence:** [PR #2](https://github.com/schlomo/multi-screen-recorder-macos/pull/2)
+  (design text only).
+
 ## D36: The ready check opens no microphone, and the window follows device changes (2026-11-13)
 
-- **Status:** points 2 and 3 in force; point 1 built and waiting for
-  the owner's yes, because it drops a proof the agreed design had.
-  Built in PR #1; the owner's re-test on the Mac is outstanding.
-  (D35 is on the branch of PR #2.)
+- **Status:** in force. Point 1 drops a proof the agreed design had;
+  asked "Accept that the ready check reads the microphone permission
+  without opening the microphone?", the owner answered "Yes, accept"
+  (2026-11-13). Built in PR #1, merged 2026-11-14. Point 3 failed
+  its re-test on 2026-11-14: the second crash came back (`backlog.md`,
+  "In flight").
 - **Context:** The owner's check of PR #1 on the Mac, 2026-11-13: the
   app crashed on "Check again" after the default microphone was
   unplugged, and crashed after HiDPI was switched in BetterDisplay
@@ -818,3 +868,23 @@ architect's reading.
   the fixes are unverified until the owner's re-test; the troubleshooting
   log gets its entries then.
 - **Evidence:** [PR #1](https://github.com/schlomo/multi-screen-recorder-macos/pull/1).
+
+## D37: The end-to-end test design is agreed (2026-11-14)
+
+- **Status:** in force; nothing built.
+- **Context:** The design for automated end-to-end tests
+  (`docs/design/end-to-end-tests.md`) was proposed in PR #2, with the
+  rule written into it that merging it is the owner's sign-off. The
+  owner merged it on 2026-11-14: "So I merged the PR1 and also PR2
+  with the design". PR #2's base was still the branch of PR #1, so the
+  merge landed there; this change brings it to `main`.
+- **Decision:** The architect's reading of the merge, by the rule the
+  design's status line stated ("merging it is that sign-off"): the
+  design in `docs/design/end-to-end-tests.md` is agreed as written,
+  with D35's rulings. Its two open questions stay
+  open: which items of the v1 gate the tests replace, and whether the
+  owner's BetterDisplay HiDPI mode works through virtual screens.
+- **Consequences:** The recorder PR's design provides what the design
+  asks of it ("What the recorder design must provide"); the tests are
+  built after or with the recorder.
+- **Evidence:** [PR #2](https://github.com/schlomo/multi-screen-recorder-macos/pull/2).
