@@ -7,13 +7,16 @@ The v0 design is agreed (2026-11-12, D17–D33) and written down in
 and pipeline PR (#1) is merged (2026-11-14), and the end-to-end test
 design is agreed (D37).
 
-The owner's standing instruction, 2026-11-14: "so you mark them as
-ready when you are done and check after 5 mins". The architect marks
-its PRs ready for review once no BLOCKER or SHOULD-FIX is open, which
-makes GitHub request Copilot's review, then reads that review about
-five minutes later and fixes what holds. The write level `AGENTS.md`
-records ("Agent writes": draft PRs) says less; recording it there goes
-through the setup skill.
+The owner, 2026-11-14: "so you mark them as ready when you are done
+and check after 5 mins". It conflicts with the guardrail that an agent
+at most pushes a work branch and opens a draft PR (`AGENTS.md`,
+"Guardrails") and with D8, the write level in force, so it is not
+acted on: raised with the owner, who decides whether the write level
+changes through "Changing a principle" (a decisions entry, the
+guardrail and the setup line "Agent writes"). The architect's reading,
+for that change: "done" means no BLOCKER or SHOULD-FIX is open;
+"check" means reading Copilot's review, which GitHub requests when a
+PR is marked ready, and fixing what holds; "you" means the architect.
 
 Next, waiting for the owner:
 
