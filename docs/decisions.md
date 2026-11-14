@@ -917,6 +917,7 @@ architect's reading.
     mode and rotation. The time is restored first, from the saved time and the
     time elapsed since; how is listed under "Unknowns".
 - **Consequences:** None for anything built; the tests are not built
-  yet.
+  yet. The recorder PR's design gains one item: what picture a late
+  tick carries, and its bound.
 - **Evidence:** [PR #4](https://github.com/schlomo/multi-screen-recorder-macos/pull/4);
   Copilot's review of [PR #2](https://github.com/schlomo/multi-screen-recorder-macos/pull/2).
