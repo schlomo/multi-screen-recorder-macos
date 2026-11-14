@@ -111,6 +111,7 @@ jobs:
       contents: write
     concurrency:
       group: release
+      queue: max
     env:
       RELEASE_BUILD: "true"
     steps:

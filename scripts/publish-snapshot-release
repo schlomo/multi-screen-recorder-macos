@@ -3,7 +3,10 @@
 pre-release tagged pr-<number> with the zip from scripts/sign-app, its
 version read from the bundle, where scripts/build-app wrote it. Only
 while the PR is open and its head is this commit: a run for a superseded
-push or a closed PR publishes nothing and exits 0. gh reads GH_TOKEN itself.
+push publishes nothing and exits 0; a run for a closed PR publishes
+nothing, removes the PR's snapshot release if one is left, and exits 0
+(a run queued after the close can replace the waiting removal job). gh
+reads GH_TOKEN itself.
 """
 
 import json
@@ -48,6 +51,13 @@ def run(*arguments: str) -> str:
         stop(f"{' '.join(arguments[:3])} failed with exit {error.returncode}")
 
 
+def delete_release_if_present(tag: str) -> None:
+    """Deletes the release tagged `tag`, with its tag, if there is one."""
+    releases = json.loads(run("gh", "release", "list", "--limit", "1000", "--json", "tagName"))
+    if tag in (release["tagName"] for release in releases):
+        run("gh", "release", "delete", tag, "--yes", "--cleanup-tag")
+
+
 def main() -> None:
     for tool in ("gh", "git"):
         if shutil.which(tool) is None:
@@ -66,15 +76,15 @@ def main() -> None:
     head = run("git", "rev-parse", "HEAD").strip()
     pr = json.loads(run("gh", "pr", "view", pr_number, "--json", "state,headRefOid"))
     if pr["state"] != "OPEN":
-        print(f"{ME}: PR #{pr_number} is {pr['state']}, not open; publishing nothing", file=sys.stderr)
+        print(f"{ME}: PR #{pr_number} is {pr['state']}, not open; publishing nothing"
+              " and removing its snapshot release if one is left", file=sys.stderr)
+        delete_release_if_present(tag)
         return
     if pr["headRefOid"] != head:
         print(f"{ME}: PR #{pr_number} is now at {pr['headRefOid']}, not {head}; publishing nothing", file=sys.stderr)
         return
 
-    releases = json.loads(run("gh", "release", "list", "--limit", "1000", "--json", "tagName"))
-    if tag in (release["tagName"] for release in releases):
-        run("gh", "release", "delete", tag, "--yes", "--cleanup-tag")
+    delete_release_if_present(tag)
     print(run(
         "gh", "release", "create", tag, str(zip_file),
         "--prerelease",
