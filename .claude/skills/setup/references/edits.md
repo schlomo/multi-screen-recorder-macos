@@ -25,7 +25,10 @@ setup is one seeding change.
   - **Git:** <host and repository>, trunk `<branch>`; <squash merges |
     merge commits | linear trunk without squash>, so a branch catches
     up by <merging the trunk in | rebasing while unshared>.
-  - **Agent writes:** <push work branches and open draft MRs/PRs |
+  - **Agent writes:** <push work branches, open draft MRs/PRs and
+    mark them ready once reviewed, with the standing go-ahead for the
+    host's automated review naming the account that pays |
+    push work branches and open draft MRs/PRs |
     commit locally only | nothing without a per-change instruction>.
   - **Attribution:** <AI-written commits name the model as co-author,
     MR/PR descriptions carry a generated-with line | the chosen

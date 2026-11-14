@@ -139,7 +139,8 @@ architect's reading.
 
 ## D8: Agents push work branches and open draft PRs (2026-11-12)
 
-- **Status:** in force
+- **Status:** in force, extended by D39 (agents also mark their reviewed
+  PRs ready)
 - **Context:** Setup's write-level question; the owner chose the
   default.
 - **Decision:** Agents push their own work branches and open draft PRs;
@@ -888,3 +889,33 @@ architect's reading.
   asks of it ("What the recorder design must provide"); the tests are
   built after or with the recorder.
 - **Evidence:** [PR #2](https://github.com/schlomo/multi-screen-recorder-macos/pull/2).
+
+## D39: Agents mark their reviewed PRs ready (2026-11-14)
+
+- **Status:** in force; extends D8.
+- **Context:** The owner, about the PRs the architect opens: "so you
+  mark them as ready when you are done and check after 5 mins". That
+  went beyond D8 and the work-branch guardrail (an agent at most opens
+  a draft PR), so the architect raised the conflict instead of acting.
+  The owner: "Yes, change it". Shown the proposal by "Changing a
+  principle" (the rule now and after, three situations in this
+  project, the trade-off, that the change is easy to undo, and that
+  every Copilot review may use a premium request of the owner's
+  Copilot plan, UNVERIFIED), the owner answered the check question
+  "OK for me to mark PRs ready, starting a Copilot review each time
+  without asking?" with "Yes, OK".
+- **Decision:** The architect's reading of "when you are done" and
+  "check": agents push work branches, open draft PRs, and mark a PR
+  ready for review once its adversarial review leaves no BLOCKER or
+  SHOULD-FIX open and CI passes. GitHub then requests Copilot's review,
+  as it did on PR #1 and #2. About five minutes later the agent reads
+  it, fixes what holds, each fix delta-reviewed, and tells the owner
+  the PR is ready to merge. Only the owner merges. The Copilot review
+  that marking ready starts has the owner's standing go-ahead, on the
+  owner's GitHub account, the one that pays if it is billed.
+- **Consequences:** "Ready" means the agent's reviews came out clean,
+  not that the owner has looked; the owner saves a click and a round
+  trip per PR. The principle "Work branches" gains this write level
+  and "Live systems need a human's go-ahead" its one standing
+  go-ahead; setup offers the level; `AGENTS.md` records it.
+- **Evidence:** this change.

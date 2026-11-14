@@ -12,7 +12,13 @@ Recorded by the setup skill; re-run it when any of this changes.
 - **Starter:** `928aeb2`, set up 2026-11-12.
 - **Git:** GitHub, `schlomo/multi-screen-recorder-macos`, trunk `main`;
   squash merges, so a branch catches up by merging the trunk in.
-- **Agent writes:** push work branches and open draft PRs.
+- **Agent writes:** push work branches, open draft PRs, and mark a PR
+  ready once its adversarial review leaves no BLOCKER or SHOULD-FIX
+  open and CI passes; GitHub then requests Copilot's review, which
+  the agent reads about five minutes later, fixing what holds before
+  it tells the owner the PR is ready to merge. Standing go-ahead for
+  that review, which may use the owner's Copilot premium requests
+  (UNVERIFIED) (D39).
 - **Attribution:** AI-written commits name the model as co-author, PR
   descriptions carry a generated-with line.
 - **Time zone:** Europe/Berlin, stated with every time shown to people.
@@ -53,14 +59,17 @@ standard (below).
 - Nothing touches a live system without a human's explicit go-ahead,
   every time. Where merging deploys, a merge request is a deploy
   request; a paid run (its own model or per-use API calls) touches
-  the paying account, so its go-ahead names it. [Live systems](docs/principles/ai-working-process.md#live-systems-need-a-humans-go-ahead)
+  the paying account, so its go-ahead names it. The one standing
+  go-ahead: the automated review the host starts when an agent marks
+  an MR/PR ready, where setup recorded that level. [Live systems](docs/principles/ai-working-process.md#live-systems-need-a-humans-go-ahead)
 - Code never obtains, parses or relays a credential; each tool reads
   its own. [Credentials](docs/principles/engineering.md#credentials-are-pure-injection)
 - Test first; never weaken a test; tests and CI gate every change.
   [Test first](docs/principles/engineering.md#test-first)
 - Work happens on a work branch, never directly on the trunk
-  (architect-maintained docs excepted). An agent at most pushes it and
-  opens a draft MR/PR, or less at the write level setup recorded;
+  (architect-maintained docs excepted). An agent at most pushes it,
+  opens a draft MR/PR and, once it is reviewed, marks it ready, or
+  less at the write level setup recorded;
   credentials being present is not consent. A delegated agent uses a
   fresh clone of its own, never a human's working copy or a worktree
   of it. [Work branches](docs/principles/ai-working-process.md#work-branches)
