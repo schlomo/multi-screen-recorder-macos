@@ -159,11 +159,13 @@ read does not count), the output folder, and free disk space in the output folde
   (*data*). The check's result is shown only when the main run loop
   is in its default mode, meant to hold the window's content still
   while a menu or a modal panel (the folder chooser) is open or a
-  control is dragged. That failed its re-test (2026-11-14): with a
-  popup menu open and HiDPI switched, the table changed and the app
-  crashed in AppKit's window layout, as before the window was sized
-  by its content's preferred size and the result held. The cause is
-  open (`backlog.md`, "In flight"). It never
+  control is dragged. It did not stop the crash it was meant for: on
+  2026-11-14, with a popup menu opened and HiDPI switched, the table
+  changed and the app crashed in AppKit's window layout, as it had
+  before this and the window's sizing by its content's preferred size
+  were built. That the table changed while the menu was still open is
+  [ASSUMED] from the owner's words. The cause is open (`backlog.md`,
+  "In flight"). It never
   runs while a recording is running, activation included (for the
   recorder PR to honour).
 

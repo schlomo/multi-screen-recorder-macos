@@ -31,7 +31,8 @@ Next, waiting for the owner:
 
 ### Owner's rulings of 2026-11-13 (D34)
 
-Recorded in `docs/decisions.md` as D34; nothing of it is built. In order, the next architect session:
+Recorded in `docs/decisions.md` as D34; nothing of it is built. In
+order, the next architect session:
 
 1. Talks AGC through with the owner: what it does and whether it is on
    in auto mode (open in D34; the owner's meaning: "turning up input
@@ -81,7 +82,10 @@ Recorded in `docs/decisions.md` as D34; nothing of it is built. In order, the ne
     "Reset to defaults"; `msr version` through a symbolic link; whether coming
     back to the app with screen recording denied makes macOS prompt
     again; whether macOS 26 re-asks for the screen recording
-    permission after some weeks.
+    permission after some weeks; whether the tables stay unchanged
+    while the folder chooser is open or a control is dragged, and
+    change when it closes (the same holding as for menus, which
+    failed).
   - Each crash gets its entry in `docs/troubleshooting.md` once its fix
     is verified.
   - The branches `v0-skeleton-and-pipeline` and
