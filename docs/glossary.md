@@ -151,3 +151,16 @@ The only environment the software runs in (D7).
 
 `multiscreenrecorder.schapiro.org`, served by GitHub Pages from a
 separate branch of this repository (D7).
+
+## End-to-end test
+
+An automated test that runs the built app through a recording on a Mac
+while displays and audio inputs change, and examines the recording
+folder afterwards. Proposed in
+[design/end-to-end-tests.md](design/end-to-end-tests.md). Not an
+acceptance test, which a person carries out for the v1 gate.
+
+## Error class
+
+A kind of thing that goes wrong with a recording, such as a file lost
+or a wrong picture; the end-to-end tests are organised by it.

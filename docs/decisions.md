@@ -772,6 +772,54 @@ architect's reading.
 - **Evidence:** [PR #1](https://github.com/schlomo/multi-screen-recorder-macos/pull/1)
   (this entry and `backlog.md` only; nothing built).
 
+## D35: End-to-end tests: who holds the permissions, a Swift driver, scripts only in `scripts/` (2026-11-13)
+
+- **Status:** in force for the questions it answers; the design as a
+  whole stays proposed until the owner merges PR #2. Nothing built.
+- **Context:** The proposed design for end-to-end tests
+  (`docs/design/end-to-end-tests.md`) asked the owner seven questions.
+  The owner answered five, on 2026-11-13; which items of the v1 gate
+  the tests replace, and whether the owner's BetterDisplay HiDPI mode
+  works through virtual screens, stay open:
+  1. "test permissions: whoever runs it, if needed the terminal or
+     vscode (my vscode has already)".
+  2. "driver: you decide and optimize for quality and maintainability
+     via AI agents".
+  3. "scripts/* are scripts, not test data or pytest files".
+  4. "own test audio and virtual screen helpers might be useful if
+     cheap to build".
+  5. "test in my session as you need me in any case".
+- **Decision:**
+  1. The app a run is started from holds Screen Recording and
+     Microphone; the driver starts the recorder as its own child
+     process. The architect's reading of the owner's words: the two
+     alternatives the design named, starting the recorder through
+     macOS (`open`, never tried) and a terminal app kept for the
+     tests, are not needed, and the experiment on `open` is not run.
+  2. The architect's decision, left to the architect by the owner: the
+     driver, the device helper and the assertions are Swift, one
+     executable in the package, never in the app bundle, with their
+     logic in a library target under unit tests in `scripts/test`. The
+     reasons are in the design doc, "Why not otherwise".
+  3. The architect's reading: `scripts/` holds scripts only. The tests'
+     code and data live in the package; `scripts/end-to-end-test` is a
+     few lines that build and start them. `scripts/acceptance/`, which
+     `docs/design/recorder.md` named, is dropped; "acceptance test"
+     stays the word for a person's check at the v1 gate.
+  4. The architect's reading of "if cheap", for both helpers: the
+     device helper for virtual displays is built, as the design cannot
+     change displays without it; for several audio inputs that can be told
+     apart, BlackHole's own drivers installed side by side are tried
+     first, and a test audio driver of our own is built only if that
+     falls short.
+  5. A run happens in the person's own session; no second user account.
+- **Consequences:** The app the tests are started from, and every
+  program started in it, an agent's shell included, can record the
+  screen and the microphone. The pipeline compiles and unit-tests the
+  tests' code.
+- **Evidence:** [PR #2](https://github.com/schlomo/multi-screen-recorder-macos/pull/2)
+  (design text only).
+
 ## D36: The ready check opens no microphone, and the window follows device changes (2026-11-13)
 
 - **Status:** points 2 and 3 in force; point 1 built and waiting for
