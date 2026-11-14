@@ -871,7 +871,7 @@ architect's reading.
 
 ## D37: The end-to-end test design is agreed (2026-11-14)
 
-- **Status:** in force; nothing built.
+- **Status:** in force, corrected in four points by D38; nothing built.
 - **Context:** The design for automated end-to-end tests
   (`docs/design/end-to-end-tests.md`) was proposed in PR #2, with the
   rule written into it that merging it is the owner's sign-off. The
@@ -891,8 +891,8 @@ architect's reading.
 
 ## D38: Corrections to the end-to-end test design (2026-11-14)
 
-- **Status:** proposed in PR #4; merging PR #4 is the owner's sign-off,
-  by the same rule as D37.
+- **Status:** in force by the merge of PR #4, which is the owner's
+  sign-off by the same rule as D37; nothing built.
 - **Context:** GitHub Copilot reviewed PR #2 after it was merged and
   left five comments on `docs/design/end-to-end-tests.md`. The
   architect checked each against the design and `recorder.md`; all
@@ -905,16 +905,16 @@ architect's reading.
   - The time shown in a recorded frame may lag where the last picture
     is repeated by design (D11, D21): by up to the length of a still
     picture or a stall the scenario makes, and under load by no more
-    frames than the manifest counts as repeated for lateness. The
-    click is matched to its frame only outside a still picture or a
-    stall.
+    frames than the manifest counts as repeated for lateness, a count
+    checked against the frames whose pattern counter repeats. The click
+    is matched to its frame only where no picture is repeated.
   - `SIGTERM` ends a recording as Stop does, finalized and with its
     crash marker removed (`recorder.md`, "Command line"); `kill -9`
     leaves the marker.
   - The state file also holds the time itself, the sample rate and
     input volume of every BlackHole device, mirroring, the main
-    display, and the mode and rotation of each of the Mac's own
-    displays. The time is restored first, from the saved time and the
+    display, and whether each of the Mac's own displays is on, with its
+    mode and rotation. The time is restored first, from the saved time and the
     time elapsed since; how is listed under "Unknowns".
 - **Consequences:** None for anything built; the tests are not built
   yet.

@@ -213,9 +213,10 @@ GitHub Actions and Swift packages in use.
     signature only; the published one is checked statically, not run.
 - Two pushes to `main` whose builds finish in the other order are
   released in that order: the older version is created last and may
-  then be marked the latest release, which the README sends people to
-  (UNVERIFIED: that `gh release create` without `--latest` marks the
-  newest created one). Accepted because one person merges, rarely two
+  then be marked the latest release, which the README sends people to.
+  UNVERIFIED either way: `gh release create --help` gives the default
+  as "automatic based on date and version", which may keep the newer
+  version the latest. Accepted in PR #4 because one person merges, rarely two
   within a build's two minutes, and `gh release edit <tag> --latest`
   fixes it in a minute. Revisit when it happens, or when several
   people merge.
