@@ -9,7 +9,8 @@ struct CommandOutcome {
 }
 
 /// Runs a program with exactly the given environment, so nothing of the
-/// ambient one leaks into what is tested; PATH is passed through.
+/// ambient one leaks into what is tested; PATH is passed through. Output and
+/// errors go to files, so a child filling either cannot block on a full pipe.
 func run(_ program: URL, _ arguments: [String] = [], environment: [String: String] = [:],
          in folder: URL? = nil) throws -> CommandOutcome {
     let process = Process()
@@ -18,18 +19,26 @@ func run(_ program: URL, _ arguments: [String] = [], environment: [String: Strin
     process.environment = environment.merging(
         ["PATH": try #require(ProcessInfo.processInfo.environment["PATH"])]) { given, _ in given }
     if let folder { process.currentDirectoryURL = folder }
-    let output = Pipe()
-    let errors = Pipe()
+    let capture = FileManager.default.temporaryDirectory
+        .appending(path: "run-\(UUID().uuidString)", directoryHint: .isDirectory)
+    try FileManager.default.createDirectory(at: capture, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: capture) }
+    let outputFile = capture.appending(path: "output")
+    let errorsFile = capture.appending(path: "errors")
+    for file in [outputFile, errorsFile] {
+        try #require(FileManager.default.createFile(atPath: file.path(percentEncoded: false), contents: nil))
+    }
+    let output = try FileHandle(forWritingTo: outputFile)
+    let errors = try FileHandle(forWritingTo: errorsFile)
+    defer { try? output.close(); try? errors.close() }
     process.standardOutput = output
     process.standardError = errors
     try process.run()
-    let outputData = output.fileHandleForReading.readDataToEndOfFile()
-    let errorData = errors.fileHandleForReading.readDataToEndOfFile()
     process.waitUntilExit()
     return CommandOutcome(
         status: process.terminationStatus,
-        output: String(decoding: outputData, as: UTF8.self),
-        errors: String(decoding: errorData, as: UTF8.self))
+        output: String(decoding: try Data(contentsOf: outputFile), as: UTF8.self),
+        errors: String(decoding: try Data(contentsOf: errorsFile), as: UTF8.self))
 }
 
 /// The folder `swift build` puts the products in: the one holding the
