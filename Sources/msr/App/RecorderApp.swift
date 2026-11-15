@@ -43,7 +43,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         offerCrashReport(homeFolder: model.homeFolder)
     }
 
-    /// Start: the window closes and the Dock icon shows the elapsed time.
+    /// Start: the window closes; the Dock icon shows "!" when something needs the person.
     private func startRecording() {
         guard let model, model.canStart else { return }
         do {

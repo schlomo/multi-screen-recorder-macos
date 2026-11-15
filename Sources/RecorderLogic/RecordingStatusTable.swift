@@ -4,6 +4,12 @@ import Foundation
 /// its files, the data written and its state, and a line with the elapsed
 /// time, the data, the files and the free space.
 public enum RecordingStatusTable {
+    /// "1:07:00" for 1 hour 7 minutes: h:mm:ss (D47).
+    public static func elapsed(_ seconds: Double) -> String {
+        let whole = Int(seconds)
+        return String(format: "%d:%02d:%02d", whole / 3600, whole / 60 % 60, whole % 60)
+    }
+
     public static let columns = ["Source", "Records at", "Files", "GB written", "State"]
 
     public struct Row: Equatable, Sendable {
@@ -56,12 +62,12 @@ public enum RecordingStatusTable {
         }
     }
 
-    /// "Recording 1:07 · 1.3 GB in 3 files · 120.4 GB free"; "? GB" when
+    /// "Recording 1:07:00 · 1.3 GB in 3 files · 120.4 GB free"; "? GB" when
     /// a file's size cannot be read (`bytesWritten` nil), and without the
     /// free space when it cannot be read.
     public static func line(elapsedSeconds: Double, bytesWritten: Int64?, files: Int, freeBytes: Int64?) -> String {
         let written = bytesWritten.map { DiskEstimate.gigabytes(Double($0)) } ?? "? GB"
-        var line = "Recording \(RecordingStatus.hoursAndMinutes(elapsedSeconds))"
+        var line = "Recording \(elapsed(elapsedSeconds))"
             + " · \(written) in \(files) file\(files == 1 ? "" : "s")"
         if let freeBytes { line += " · \(DiskEstimate.gigabytes(Double(freeBytes))) free" }
         return line

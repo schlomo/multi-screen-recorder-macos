@@ -4,8 +4,7 @@ import RecorderCore
 import RecorderLogic
 
 /// A running recording as the person sees it, in the app and for `msr
-/// record` alike: the Dock icon's badge with the elapsed time, "!" and a
-/// bouncing icon when something needs the person, and the status window
+/// record` alike: the Dock icon's badge "!" and a bouncing icon when something needs the person, and the status window
 /// with the problems (D45, D46). `msr record` also says each event and
 /// problem on standard error.
 @MainActor
@@ -53,8 +52,8 @@ final class RecordingSession: RecorderObserver {
     }
 
     private func updateBadge() {
-        guard let recorder, !isStopping else { return }
-        NSApp.dockTile.badgeLabel = status.badge(elapsedSeconds: recorder.elapsedSeconds)
+        guard recorder != nil, !isStopping else { return }
+        NSApp.dockTile.badgeLabel = status.badge
         if statusWindow.isOpen { refreshStatusWindow() }
     }
 

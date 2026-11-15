@@ -65,13 +65,19 @@ import Testing
         #expect(rows.map(\.files) == [2])
     }
 
+    /// D47: the status window shows the elapsed time as h:mm:ss.
+    @Test(arguments: [(0.0, "0:00:00"), (59.9, "0:00:59"), (65, "0:01:05"), (4020, "1:07:00"), (36_061, "10:01:01")])
+    func theElapsedTimeIsHoursMinutesAndSeconds(seconds: Double, text: String) {
+        #expect(RecordingStatusTable.elapsed(seconds) == text)
+    }
+
     @Test func theLineSaysTimeDataFilesAndFreeSpace() {
         #expect(RecordingStatusTable.line(elapsedSeconds: 4020, bytesWritten: 1_260_000_000, files: 3, freeBytes: 120_400_000_000)
-            == "Recording 1:07 · 1.3 GB in 3 files · 120.4 GB free")
+            == "Recording 1:07:00 · 1.3 GB in 3 files · 120.4 GB free")
         #expect(RecordingStatusTable.line(elapsedSeconds: 5, bytesWritten: 0, files: 1, freeBytes: nil)
-            == "Recording 0:00 · 0.0 GB in 1 file")
+            == "Recording 0:00:05 · 0.0 GB in 1 file")
         // A size that cannot be read: the data written is not undercounted.
         #expect(RecordingStatusTable.line(elapsedSeconds: 5, bytesWritten: nil, files: 2, freeBytes: 1_000_000_000)
-            == "Recording 0:00 · ? GB in 2 files · 1.0 GB free")
+            == "Recording 0:00:05 · ? GB in 2 files · 1.0 GB free")
     }
 }

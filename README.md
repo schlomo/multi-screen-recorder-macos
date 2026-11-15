@@ -81,11 +81,11 @@ when you come back to the app, when a display is plugged in, removed
 or changed, when an audio device is plugged in or removed, when the
 default audio input changes, and on "Check again".
 
-Click Start: the window closes and the Dock icon shows the time
-recorded as `h:mm` ("!" when the disk runs low, a display shows another
-display's picture or something went wrong). Click the Dock icon or quit
-to open the status window: each display with its files, the data
-written and its state, the time, data and free space, and any problems
+Click Start: the window closes; the Dock icon shows a "!" badge when
+the disk runs low, a display shows another display's picture or
+something went wrong. Click the Dock icon or quit to open the status
+window: each display with its files, the data written and its state,
+the time recorded (`h:mm:ss`, every second), data and free space, and any problems
 in red. Stop there finalizes the files, opens the recording folder in
 Finder and quits; Continue keeps recording. The recording folder holds
 a video file per display, a new one each time a display comes back or

@@ -494,8 +494,8 @@ checked, reported or rewritten at the next start (D47).
 
 Total 5.3 GB/h. 2 hours need 10.7 GB, 3.1 GB free.
 
-- **Recording:** the window closes; the Dock icon shows a red badge with
-  the elapsed time as `h:mm` (`0:00`, `0:05`, `1:07`; D46). Low disk space shows as a "!" badge and a
+- **Recording:** the window closes; the Dock icon has no badge while
+  all is well, no timer (D47). Low disk space shows as a "!" badge and a
   bouncing Dock icon; no notification, which would need a third
   permission and is hidden by Focus modes. A recording problem (the
   recording manifest cannot be written, the displays or the free space
@@ -507,8 +507,8 @@ Total 5.3 GB/h. 2 hours need 10.7 GB, 3.1 GB free.
   and the columns Source, "Records at", Files, "GB written" (its display
   files on disk) and State (`recording`, `waiting`, `failed, retrying`,
   `shows another display`, `disk full`, `mirroring`, `disconnected`,
-  `asleep`); under it the line "Recording 1:07 · 1.3 GB in 3 files ·
-  120.4 GB free"; the problems in red, with the command for the log
+  `asleep`); under it the line "Recording 1:07:00 · 1.3 GB in 3 files ·
+  120.4 GB free", the elapsed time as `h:mm:ss` (D47); the problems in red, with the command for the log
   (see "Logging"); and [Stop] [Continue]. It refreshes every second
   while open; Continue closes it. A display file whose size cannot be
   read makes its display's GB written `?`, and the line's data written

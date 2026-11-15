@@ -194,22 +194,18 @@ import Testing
 }
 
 @Suite struct RecordingProblemsTests {
-    @Test(arguments: [(0.0, "0:00"), (59.9, "0:00"), (300, "0:05"), (4020, "1:07"), (36_000, "10:00")])
-    func theBadgeShowsTheElapsedTime(seconds: Double, badge: String) {
-        #expect(RecordingStatus().badge(elapsedSeconds: seconds) == badge)
-    }
-
-    @Test func theBadgeShowsTheElapsedTimeUntilSomethingNeedsThePerson() {
+    /// D47: the badge shows only "!", nothing otherwise.
+    @Test func theBadgeIsEmptyUntilSomethingNeedsThePerson() {
         var status = RecordingStatus()
-        #expect(status.badge(elapsedSeconds: 125) == "0:02")
+        #expect(status.badge == nil)
         status.isLowOnDisk = true
-        #expect(status.badge(elapsedSeconds: 125) == "!")
+        #expect(status.badge == "!")
         status.isLowOnDisk = false
         status.displayShowingAnotherDisplaysPicture = "LG"
-        #expect(status.badge(elapsedSeconds: 125) == "!")
+        #expect(status.badge == "!")
         status.displayShowingAnotherDisplaysPicture = nil
         status.problems.append("Cannot write the recording manifest: full")
-        #expect(status.badge(elapsedSeconds: 125) == "!")
+        #expect(status.badge == "!")
     }
 }
 
