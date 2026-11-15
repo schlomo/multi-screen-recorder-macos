@@ -59,10 +59,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// Stop: finalizes, opens the recording folder in Finder and quits (D45, D46).
     private func stopRecording(openFolder: Bool) async {
         guard let session else { return }
-        _ = await session.stop()
+        let summary = await session.stop()
         self.session = nil
         if openFolder, let folder = session.folder {
             NSWorkspace.shared.open(folder)
+        }
+        if summary?.manifestWritten == false {
+            showAlert("The recording manifest could not be written",
+                      "\(RecordingNames.manifest) in the recording folder does not record the end of the recording.")
         }
     }
 

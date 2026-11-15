@@ -10,7 +10,7 @@ extension RecordingDuration: ExpressibleByArgument {
     }
 }
 
-/// Exit 3: a file not finalized or a display file ended by a failure (D47), or the recording could not start.
+/// Exit 3: a file not finalized or a display file ended by a failure (D47), the final manifest not written, or no start.
 let recordingEndedWithErrorExitCode: Int32 = 3
 
 extension CommandLineInterface {
@@ -90,9 +90,7 @@ final class RecordCommandDelegate: NSObject, NSApplicationDelegate {
         }
         // Without the icon the recording goes on: Ctrl-C still stops it.
         if !NSApp.setActivationPolicy(.regular) {
-            session?.recorder?.tell(
-                "The Dock icon cannot be shown", error: "macOS refused the regular activation policy; stop with Ctrl-C",
-                kind: .dockIconNotShown)
+            session?.recorder?.dockIconNotShown()
         }
         print("Recording into \(session?.folder?.path(percentEncoded: false) ?? "")")
         fflush(stdout)

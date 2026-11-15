@@ -236,26 +236,34 @@ import Testing
     }
 
     @Test func aCleanRecordingEndsWithoutError() {
-        let summary = RecordingSummary(manifest: manifest([.finalized]), recordingFolder: "/r", seconds: 3725)
+        let summary = RecordingSummary(manifest: manifest([.finalized]), recordingFolder: "/r", seconds: 3725, manifestWritten: true)
         #expect(!summary.endedWithError)
         #expect(summary.text == "Recorded 1h02m05s into /r\n  f0.mov  finalized\n")
     }
 
     @Test func aFileNotFinalizedOrAnErrorEventIsAnError() {
-        #expect(RecordingSummary(manifest: manifest([.notFinalized]), recordingFolder: "/r", seconds: 1).endedWithError)
+        #expect(RecordingSummary(manifest: manifest([.notFinalized]), recordingFolder: "/r", seconds: 1, manifestWritten: true).endedWithError)
         var failed = RecordingEvent(at: 65_000_000_000, event: .displayStreamFailed, display: "LG")
-        failed.error = "-3815"
+        failed.error = "-3811"
         let summary = RecordingSummary(
             manifest: manifest([.finalized, .finalized], events: [failed, RecordingEvent(at: 0, event: .sleep)]),
-            recordingFolder: "/r", seconds: 70)
+            recordingFolder: "/r", seconds: 70, manifestWritten: true)
         #expect(summary.endedWithError)
-        #expect(summary.text.hasSuffix("Error at 1m05s: display stream failed, LG (-3815)\n"))
+        #expect(summary.text.hasSuffix("Error at 1m05s: display stream failed, LG (-3811)\n"))
+    }
+
+    /// F3: the final manifest not written is a failure; the file on disk has no `ended`.
+    @Test func aFinalManifestNotWrittenIsAnError() {
+        let summary = RecordingSummary(manifest: manifest([.finalized]), recordingFolder: "/r", seconds: 1, manifestWritten: false)
+        #expect(summary.endedWithError)
+        #expect(summary.text.hasSuffix("The recording manifest could not be written at the end: recording.json has no end.\n"))
+        #expect(!RecordingSummary(manifest: manifest([.finalized]), recordingFolder: "/r", seconds: 1, manifestWritten: true).endedWithError)
     }
 
     @Test func aProblemIsListedWithItsTimeAndIsNoErrorByItself() {
         var told = manifest([.finalized])
         told.problems = [RecordingProblem(at: 65_000_000_000, problem: "The displays cannot be read", error: "denied")]
-        let summary = RecordingSummary(manifest: told, recordingFolder: "/r", seconds: 70)
+        let summary = RecordingSummary(manifest: told, recordingFolder: "/r", seconds: 70, manifestWritten: true)
         #expect(!summary.endedWithError)
         #expect(summary.text.hasSuffix("Problem at 1m05s: The displays cannot be read: denied\n"))
     }
@@ -263,7 +271,7 @@ import Testing
     @Test func aWriterThatFailedIsAnError() {
         var failed = RecordingEvent(at: 0, event: .displayFileWriterFailed, display: "LG")
         failed.error = "cannot write"
-        let summary = RecordingSummary(manifest: manifest([.finalized], events: [failed]), recordingFolder: "/r", seconds: 1)
+        let summary = RecordingSummary(manifest: manifest([.finalized], events: [failed]), recordingFolder: "/r", seconds: 1, manifestWritten: true)
         #expect(summary.endedWithError)
         #expect(summary.text.contains("display file writer failed, LG (cannot write)"))
     }

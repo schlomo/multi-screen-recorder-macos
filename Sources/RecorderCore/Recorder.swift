@@ -40,6 +40,7 @@ public final class Recorder {
     private var captureCount = 0
     private var endReports = CaptureEndReports()
     private var problemsTold = ProblemsTold()
+    private var finalManifestWritten = true
     /// Stops in progress, so Stop waits for every file.
     private var stopping: [Task<Void, Never>] = []
     private var dueTask: Task<Void, Never>?
@@ -101,6 +102,12 @@ public final class Recorder {
     /// Seconds since the recording started, on the shared clock.
     public var elapsedSeconds: Double { Double(context.now()) / 1_000_000_000 }
 
+    /// `msr record` could not show its Dock icon: a problem; the recording goes on.
+    public func dockIconNotShown() {
+        tell("The Dock icon cannot be shown", error: "macOS refused the regular activation policy; stop with Ctrl-C",
+             kind: .dockIconNotShown)
+    }
+
     /// The status window's table and line, read now: each file's size on
     /// disk and the free space in the recording folder.
     public func status() -> (rows: [RecordingStatusTable.Row], line: String) {
@@ -128,11 +135,18 @@ public final class Recorder {
             for action in tracker.stopAll() { perform(action) }
             for task in stopping { await task.value }
             manifest.finalize(ended: Date(), timeZone: context.timeZone)
-            try? writeManifest()
+            do {
+                try writeManifest()
+            } catch {
+                // Told by `writeManifest`; the file on disk keeps no `ended`.
+                finalManifestWritten = false
+            }
             if let activity { ProcessInfo.processInfo.endActivity(activity) }
             activity = nil
         }
-        return RecordingSummary(manifest: manifest, recordingFolder: folder.path(percentEncoded: false), seconds: elapsedSeconds)
+        return RecordingSummary(
+            manifest: manifest, recordingFolder: folder.path(percentEncoded: false), seconds: elapsedSeconds,
+            manifestWritten: finalManifestWritten)
     }
 
     // MARK: Display changes
@@ -353,7 +367,7 @@ public final class Recorder {
     /// A problem for the person and the manifest's `problems`, the manifest
     /// written at once (`ProblemsTold`); one that repeats is told once until
     /// it clears.
-    public func tell(_ problem: String, error: String?, kind: ProblemKind) {
+    private func tell(_ problem: String, error: String?, kind: ProblemKind) {
         let problem = RecordingProblem(at: context.now(), problem: problem, error: error)
         guard case .tell(let writesManifest) = problemsTold.add(problem, kind: kind, to: &manifest) else { return }
         if writesManifest { try? writeManifest() }

@@ -4,15 +4,19 @@ public struct RecordingSummary: Equatable, Sendable {
     public let manifest: RecordingManifest
     public let recordingFolder: String
     public let seconds: Double
+    /// Whether the finalized manifest was written; if not, the file on disk has no `ended`.
+    public let manifestWritten: Bool
 
-    public init(manifest: RecordingManifest, recordingFolder: String, seconds: Double) {
+    public init(manifest: RecordingManifest, recordingFolder: String, seconds: Double, manifestWritten: Bool) {
         self.manifest = manifest
         self.recordingFolder = recordingFolder
         self.seconds = seconds
+        self.manifestWritten = manifestWritten
     }
 
-    /// Ended with an error (exit 3): the manifest's result is `problems` (D47).
-    public var endedWithError: Bool { !manifest.endedWell }
+    /// Ended with an error (exit 3): the manifest's result is `problems`
+    /// (D47), or the finalized manifest could not be written (F3).
+    public var endedWithError: Bool { !manifest.endedWell || !manifestWritten }
 
     private var errors: [RecordingEvent] { manifest.events.filter(\.event.isFailure) }
 
@@ -28,6 +32,9 @@ public struct RecordingSummary: Equatable, Sendable {
         }
         for problem in manifest.problems {
             lines.append("Problem at \(Self.elapsed(seconds: problem.at)): \(problem.text)")
+        }
+        if !manifestWritten {
+            lines.append("The recording manifest could not be written at the end: \(RecordingNames.manifest) has no end.")
         }
         return lines.joined(separator: "\n") + "\n"
     }
