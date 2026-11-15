@@ -70,8 +70,7 @@ package (D35).
    on any. It requires `ffprobe` and `ffmpeg` on the `PATH` up front.
 3. **Assertions,** part of the driver. They read the recording folder,
    as a person would have it afterwards, and what the driver itself
-   saw: the recorder's exit status and messages, and the crash marker
-   under the scratch `HOME`. They read the recording manifest and the
+   saw: the recorder's exit status and messages. They read the recording manifest and the
    files through code of their own and through `ffprobe` and `ffmpeg`,
    never through the recorder's code: a fault shared with the recorder
    would hide itself.
@@ -156,7 +155,7 @@ only if that falls short. See "Unknowns".
 | **A change handled wrongly** | every display and audio event below | the right file ends and the right one begins; a frame size change leaves under one second without picture (D30); the audio files have no gap across it; a display keeps its number; an unchanged frame size continues the file |
 | **The recording manifest is wrong** | all of them | `recording.json` lists exactly the files in the folder; each event the recorder design defines appears once, in order, at the scenario's time; its state is right after Stop and after a kill |
 | **Resources run out** | a small disk image as output folder, filled during a recording, then given room again; processor and memory pressure; more displays than the Mac has hardware encoder sessions | what was written stays readable; the recorder keeps retrying and continues in new files once there is room (D14); nothing is discarded |
-| **The process ends badly** | `kill -9`, `SIGTERM`, a second recording into the same recording folder, a recording into another folder in parallel (D20) | after `kill -9` the crash marker is left and the next start reports the unfinished recording; after `SIGTERM` the recording ends as after Stop, finalized, and its crash marker is removed ([recorder.md](recorder.md), "Command line"); the second recording into the same folder is refused; parallel recordings do not disturb each other |
+| **The process ends badly** | `kill -9`, `SIGTERM`, a second recording into the same recording folder, a recording into another folder in parallel (D20) | after `kill -9` the recording manifest has no `ended` and the files are readable up to the last 2 s (D47); after `SIGTERM` the recording ends as after Stop, finalized ([recorder.md](recorder.md), "Command line"); the second recording into the same folder is refused; parallel recordings do not disturb each other |
 | **Settings and start** | old, damaged and empty settings files; auto mode on and off (D34) | a settings file is never refused; the recording folder holds what the settings ask for |
 
 ### Events

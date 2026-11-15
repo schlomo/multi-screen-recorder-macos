@@ -8,14 +8,14 @@ import ScreenCaptureKit
 /// Everything that touches a file runs off the main thread; reading the
 /// displays needs the main one.
 public struct ReadyCheckProbes: Sendable {
-    public var screenRecording: @Sendable () async -> PermissionProbe
+    public var screenRecording: @Sendable (ScreenRecordingProof) async -> PermissionProbe
     public var microphonePermission: @Sendable () async -> Bool
     public var displays: @MainActor @Sendable () -> Result<[DisplayInfo], DeviceReadError>
     public var audioInputs: @Sendable () -> Result<[AudioInputInfo], DeviceReadError>
     public var outputFolder: @Sendable (URL) -> OutputFolderProbe
 
     public init(
-        screenRecording: @escaping @Sendable () async -> PermissionProbe,
+        screenRecording: @escaping @Sendable (ScreenRecordingProof) async -> PermissionProbe,
         microphonePermission: @escaping @Sendable () async -> Bool,
         displays: @escaping @MainActor @Sendable () -> Result<[DisplayInfo], DeviceReadError>,
         audioInputs: @escaping @Sendable () -> Result<[AudioInputInfo], DeviceReadError>,
@@ -42,19 +42,21 @@ public struct ReadyCheckProbes: Sendable {
 /// when the recording records an audio input.
 @concurrent
 public func probeReadyCheckFacts(
-    settings: Settings, homeFolder: URL, probes: ReadyCheckProbes = .system
+    proof: ScreenRecordingProof, settings: Settings, homeFolder: URL, probes: ReadyCheckProbes = .system
 ) async -> ReadyCheckFacts {
-    let screenRecording = await probes.screenRecording()
+    let screenRecording = await probes.screenRecording(proof)
     let audioInputs = probes.audioInputs()
     let microphoneGranted = ReadyCheck.recordsAudioInput(audioInputs, settings: settings)
         ? await probes.microphonePermission() : nil
     let displays = await probes.displays()
-    return ReadyCheckFacts(
+    let facts = ReadyCheckFacts(
         screenRecording: screenRecording,
         microphoneGranted: microphoneGranted,
         displays: displays,
         audioInputs: audioInputs,
         outputFolder: probes.outputFolder(settings.outputFolderURL(homeFolder: homeFolder)))
+    RecorderLog.detail(DebugLine.facts(facts), category: "ready check")
+    return facts
 }
 
 /// Whether the Screen & System Audio Recording permission is granted, without
@@ -63,14 +65,33 @@ public func screenRecordingIsGranted() -> Bool {
     CGPreflightScreenCaptureAccess()
 }
 
-/// Asks for the permission if needed, then proves the grant by fetching the
-/// display list through ScreenCaptureKit.
-public func probeScreenRecording() async -> PermissionProbe {
+/// How the ready check proves the screen recording permission (D46).
+public enum ScreenRecordingProof: Sendable, Equatable {
+    /// Captures one small frame of one display, so macOS shows every prompt
+    /// of a capture now and not at Start: at the app's start, "Check
+    /// again", `msr check` and `msr record`'s own check.
+    case captureOneFrame
+    /// Fetches the display list: the checks after a change, which show no prompt again.
+    case listDisplays
+}
+
+/// Asks for the permission if needed, then proves the grant through
+/// ScreenCaptureKit as `proof` says.
+public func probeScreenRecording(_ proof: ScreenRecordingProof) async -> PermissionProbe {
     if !CGPreflightScreenCaptureAccess() {
         _ = CGRequestScreenCaptureAccess()
     }
     do {
-        _ = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
+        let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
+        if proof == .captureOneFrame {
+            guard let display = content.displays.first else { return .failed("ScreenCaptureKit lists no display") }
+            let configuration = SCStreamConfiguration()
+            configuration.width = 64
+            configuration.height = 36
+            configuration.showsCursor = false
+            _ = try await SCScreenshotManager.captureSampleBuffer(
+                contentFilter: SCContentFilter(display: display, excludingWindows: []), configuration: configuration)
+        }
         return .granted
     } catch {
         return CGPreflightScreenCaptureAccess() ? .failed(error.localizedDescription) : .notGranted

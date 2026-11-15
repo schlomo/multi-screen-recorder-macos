@@ -29,21 +29,81 @@ import Testing
         #expect(text.contains(#""state" : "recording""#))
         #expect(text.contains(#""settings" : {"#))
         #expect(text.contains(#""audioMode" : "default-microphone""#))
-        let keys = ["app", "events", "files", "settings", "started", "state"].map { text.range(of: "\n  \"\($0)\"")!.lowerBound }
+        #expect(text.contains(#""ended" : null"#))
+        #expect(text.contains(#""result" : null"#))
+        #expect(text.contains(#""problems" : ["#))
+        let keys = ["app", "ended", "events", "files", "problems", "result", "settings", "started", "state"].map { text.range(of: "\n  \"\($0)\"")!.lowerBound }
         #expect(keys == keys.sorted())
         #expect(try RecordingManifest(json: manifest.jsonData()) == manifest)
     }
 
-    @Test func aRecordingWhoseProcessIsGoneIsNotFinalized() {
+    @Test func aFinalizedRecordingHasItsEndAndResult() {
+        var manifest = manifest()
+        manifest.finalize(ended: start + 60, timeZone: berlin)
+        #expect(manifest.state == .finalized)
+        #expect(manifest.ended == "2026-11-12T14:04:05.120+01:00")
+        #expect(manifest.result == .ok)
+    }
+
+    /// D47: the result is ok when every file is finalized and no display
+    /// file was ended by a failure; a problem told alone does not change it.
+    @Test(arguments: [
+        RecordingEvent.Kind.displayStreamFailed, .displayFileWriterFailed, .diskFull, .displayFileWriterFellBehind,
+        .displayShowsAnotherDisplaysPicture,
+    ])
+    func aDisplayFileEndedByAFailureMakesTheResultProblems(failure: RecordingEvent.Kind) {
+        var manifest = manifest()
+        manifest.events.append(RecordingEvent(at: 0, event: failure, display: "A"))
+        manifest.finalize(ended: start + 60, timeZone: berlin)
+        #expect(manifest.result == .problems)
+    }
+
+    @Test func aFileNotFinalizedMakesTheResultProblems() {
         var manifest = manifest()
         manifest.files.append(.init(name: "a.mov", display: "A", displayUUID: "A", frameSize: FrameSize(width: 2, height: 2),
                                     start: 0, timecode: "00:00:00:00"))
-        manifest.files.append(.init(name: "b.mov", display: "A", displayUUID: "A", frameSize: FrameSize(width: 2, height: 2),
-                                    start: 0, timecode: "00:00:00:00"))
-        manifest.files[0].state = .finalized
-        let marked = manifest.markedNotFinalized()
-        #expect(marked.state == .notFinalized)
-        #expect(marked.files.map(\.state) == [.finalized, .notFinalized])
+        manifest.finalize(ended: start + 60, timeZone: berlin)
+        #expect(manifest.result == .problems)
+    }
+
+    @Test func aProblemToldOrAnEventThatIsNoFailureLeavesTheResultOk() {
+        var manifest = manifest()
+        manifest.problems.append(RecordingProblem(at: 2_000_000_000, problem: "The displays cannot be read", error: "denied"))
+        for kind in RecordingEvent.Kind.allCases where !kind.isFailure {
+            manifest.events.append(RecordingEvent(at: 0, event: kind, display: "A"))
+        }
+        manifest.finalize(ended: start + 60, timeZone: berlin)
+        #expect(manifest.result == .ok)
+        #expect(manifest.problems.count == 1)
+    }
+
+    @Test func theFailuresAreTheFiveWaysADisplayFileEndsBadly() {
+        #expect(RecordingEvent.Kind.allCases.filter(\.isFailure) == [
+            .displayStreamFailed, .displayShowsAnotherDisplaysPicture, .displayFileWriterFellBehind, .displayFileWriterFailed, .diskFull,
+        ])
+    }
+
+    @Test func aProblemHasItsTimeAndFullError() throws {
+        let problem = RecordingProblem(at: 1_446_200_400_000, problem: "Display file a.mov", error: "The operation could not be completed")
+        #expect(problem.at == 1446.2)
+        #expect(problem.text == "Display file a.mov: The operation could not be completed")
+        #expect(RecordingProblem(at: 0, problem: "The displays cannot be read", error: nil).text == "The displays cannot be read")
+        let text = String(decoding: try prettyJSON(RecordingProblem(at: 0, problem: "p", error: nil)), as: UTF8.self)
+        #expect(text.contains(#""error" : null"#))
+    }
+
+    @Test func eventsAndProblemsAreWrittenInTheOrderOfTheirTime() throws {
+        var manifest = manifest()
+        manifest.events = [
+            RecordingEvent(at: 5_000_000_000, event: .wake), RecordingEvent(at: 2_000_000_000, event: .sleep),
+            RecordingEvent(at: 2_000_000_000, event: .diskFull, display: "A"),
+        ]
+        manifest.problems = [
+            RecordingProblem(at: 3_000_000_000, problem: "late", error: nil), RecordingProblem(at: 1_000_000_000, problem: "early", error: nil),
+        ]
+        let written = try RecordingManifest(json: manifest.jsonData())
+        #expect(written.events.map(\.event) == [.sleep, .diskFull, .wake])
+        #expect(written.problems.map(\.problem) == ["early", "late"])
     }
 
     @Test func eventTimesAreSecondsToTheMillisecond() {
@@ -82,6 +142,17 @@ import Testing
         for event in events {
             _ = try JSONDecoder().decode(RecordingEvent.self, from: JSONSerialization.data(withJSONObject: event))
         }
+        let problems = try #require(object["problems"] as? [[String: Any]])
+        for problem in problems {
+            let decoded = try JSONDecoder().decode(RecordingProblem.self, from: JSONSerialization.data(withJSONObject: problem))
+            let encoded = try #require(try JSONSerialization.jsonObject(with: prettyJSON(decoded)) as? [String: Any])
+            #expect(Set(encoded.keys) == Set(problem.keys))
+        }
+        let written = try #require(try JSONSerialization.jsonObject(with: manifest().jsonData()) as? [String: Any])
+        #expect(Set(object.keys) == Set(written.keys))
+        // The example is a recording still running: no end and no result yet.
+        #expect(object["ended"] is NSNull)
+        #expect(object["result"] is NSNull)
         let settings = try #require(object["settings"] as? [String: Any])
         #expect(Set(settings.keys) == ["resolution", "audioMode", "systemAudio"])
         #expect(object["started"] as? String == manifest().started)
@@ -123,41 +194,18 @@ import Testing
 }
 
 @Suite struct RecordingProblemsTests {
-    @Test func theBadgeCountsMinutesUntilSomethingNeedsThePerson() {
+    /// D47: the badge shows only "!", nothing otherwise.
+    @Test func theBadgeIsEmptyUntilSomethingNeedsThePerson() {
         var status = RecordingStatus()
-        #expect(status.badge(elapsedSeconds: 125) == "2")
+        #expect(status.badge == nil)
         status.isLowOnDisk = true
-        #expect(status.badge(elapsedSeconds: 125) == "!")
+        #expect(status.badge == "!")
         status.isLowOnDisk = false
         status.displayShowingAnotherDisplaysPicture = "LG"
-        #expect(status.badge(elapsedSeconds: 125) == "!")
+        #expect(status.badge == "!")
         status.displayShowingAnotherDisplaysPicture = nil
         status.problems.append("Cannot write the recording manifest: full")
-        #expect(status.badge(elapsedSeconds: 125) == "!")
-    }
-
-    @Test func theStopQuestionListsTheProblems() {
-        var status = RecordingStatus()
-        #expect(status.stopQuestionDetails == nil)
-        status.problems = ["a", "b"]
-        #expect(status.stopQuestionDetails == "a\n\nb")
-    }
-}
-
-@Suite struct CrashMarkerTests {
-    @Test func aMarkerNamesItsFolderAndIsNamedByItsProcess() throws {
-        let marker = CrashMarker(recordingFolder: "/Users/a/Movies/Multi Screen Recorder/2026-11-12 14.03.05")
-        #expect(try CrashMarker(json: marker.jsonData()) == marker)
-        #expect(CrashMarker.fileName(processID: 4711) == "4711.json")
-        #expect(CrashMarker.processID(fileName: "4711.json") == 4711)
-        #expect(CrashMarker.processID(fileName: "notes.txt") == nil)
-        #expect(CrashMarker.processID(fileName: "x.json") == nil)
-    }
-
-    @Test func theReportIsTheDesignsText() throws {
-        let marker = CrashMarker(recordingFolder: "<folder>")
-        let design = try repositoryFile("docs/design/recorder.md").replacingOccurrences(of: "\n", with: " ")
-        #expect(design.contains("(\"\(marker.report)\")"))
+        #expect(status.badge == "!")
     }
 }
 
@@ -188,26 +236,42 @@ import Testing
     }
 
     @Test func aCleanRecordingEndsWithoutError() {
-        let summary = RecordingSummary(manifest: manifest([.finalized]), recordingFolder: "/r", seconds: 3725)
+        let summary = RecordingSummary(manifest: manifest([.finalized]), recordingFolder: "/r", seconds: 3725, manifestWritten: true)
         #expect(!summary.endedWithError)
         #expect(summary.text == "Recorded 1h02m05s into /r\n  f0.mov  finalized\n")
     }
 
     @Test func aFileNotFinalizedOrAnErrorEventIsAnError() {
-        #expect(RecordingSummary(manifest: manifest([.notFinalized]), recordingFolder: "/r", seconds: 1).endedWithError)
+        #expect(RecordingSummary(manifest: manifest([.notFinalized]), recordingFolder: "/r", seconds: 1, manifestWritten: true).endedWithError)
         var failed = RecordingEvent(at: 65_000_000_000, event: .displayStreamFailed, display: "LG")
-        failed.error = "-3815"
+        failed.error = "-3811"
         let summary = RecordingSummary(
             manifest: manifest([.finalized, .finalized], events: [failed, RecordingEvent(at: 0, event: .sleep)]),
-            recordingFolder: "/r", seconds: 70)
+            recordingFolder: "/r", seconds: 70, manifestWritten: true)
         #expect(summary.endedWithError)
-        #expect(summary.text.hasSuffix("Error at 1m05s: display stream failed, LG (-3815)\n"))
+        #expect(summary.text.hasSuffix("Error at 1m05s: display stream failed, LG (-3811)\n"))
+    }
+
+    /// F3: the final manifest not written is a failure; the file on disk has no `ended`.
+    @Test func aFinalManifestNotWrittenIsAnError() {
+        let summary = RecordingSummary(manifest: manifest([.finalized]), recordingFolder: "/r", seconds: 1, manifestWritten: false)
+        #expect(summary.endedWithError)
+        #expect(summary.text.hasSuffix("The recording manifest could not be written at the end: recording.json has no end.\n"))
+        #expect(!RecordingSummary(manifest: manifest([.finalized]), recordingFolder: "/r", seconds: 1, manifestWritten: true).endedWithError)
+    }
+
+    @Test func aProblemIsListedWithItsTimeAndIsNoErrorByItself() {
+        var told = manifest([.finalized])
+        told.problems = [RecordingProblem(at: 65_000_000_000, problem: "The displays cannot be read", error: "denied")]
+        let summary = RecordingSummary(manifest: told, recordingFolder: "/r", seconds: 70, manifestWritten: true)
+        #expect(!summary.endedWithError)
+        #expect(summary.text.hasSuffix("Problem at 1m05s: The displays cannot be read: denied\n"))
     }
 
     @Test func aWriterThatFailedIsAnError() {
         var failed = RecordingEvent(at: 0, event: .displayFileWriterFailed, display: "LG")
         failed.error = "cannot write"
-        let summary = RecordingSummary(manifest: manifest([.finalized], events: [failed]), recordingFolder: "/r", seconds: 1)
+        let summary = RecordingSummary(manifest: manifest([.finalized], events: [failed]), recordingFolder: "/r", seconds: 1, manifestWritten: true)
         #expect(summary.endedWithError)
         #expect(summary.text.contains("display file writer failed, LG (cannot write)"))
     }

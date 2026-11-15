@@ -119,11 +119,14 @@ extension CommandLineInterface {
 
         @OptionGroup var flags: SettingsFlags
 
+        @Flag(help: "Detail on standard error and at debug level in the unified log.")
+        var debug = false
+
         func run() async throws {
+            if debug { RecorderLog.enableDebug() }
             let settings = try flags.effectiveSettings(from: standardSettingsFile())
             let home = try homeFolderOrExit()
-            for line in CrashMarkers(homeFolder: home).finishLeftBehind() { standardError(line) }
-            let facts = await probeReadyCheckFacts(settings: settings, homeFolder: home)
+            let facts = await probeReadyCheckFacts(proof: .captureOneFrame, settings: settings, homeFolder: home)
             let result = ReadyCheck.evaluate(facts, settings: settings)
             print(WhatWillBeRecorded(settings: settings, facts: facts).text, terminator: "\n")
             print(result.text, terminator: "")

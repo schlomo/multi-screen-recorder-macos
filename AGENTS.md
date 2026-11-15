@@ -258,16 +258,15 @@ hoc, for a local check only).
   an older one); see [delivery.md](docs/design/delivery.md).
 - `msr` without arguments starts the app, and the app, `msr check` and
   `msr record` run the ready check, which requests any never-asked
-  permission, so macOS shows a prompt on the person's screen, and
+  permission and captures one frame of a display, so macOS shows a
+  prompt on the person's screen, and
   creates the output folder if it is missing; `msr record` and Start
   in the app record the screens; `msr list` reads the devices. An agent runs
   none of these on a person's Mac unasked. On start the app also reads
   `~/Library/Logs/DiagnosticReports`, may show the crash report dialog
   and open the browser and Finder, and may write `state.json` and a text
   copy under `~/Library/Application Support/Multi Screen Recorder`
-  (`HOME` decides where); it and `msr check` also mark the recording
-  manifest of each left-behind crash marker there `not finalized` and
-  remove the marker.
+  (`HOME` decides where).
   `msr version`, `msr settings` (it writes the settings file only with
   a settings flag; `HOME` decides where) and the tests are
   safe; the tests read the Mac's audio device list, which shows no

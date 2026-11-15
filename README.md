@@ -34,7 +34,7 @@ audio inputs, runs the ready check, records and manages the settings.
 - **Built not to lose anything.** A check before you start, warnings
   when disk space runs low, files that stay readable after a crash.
 - **One button.** Start the app, approve the last settings, click
-  Start. Click the Dock icon to stop. Everything also works from the
+  Start. Click the Dock icon, then Stop. Everything also works from the
   command line, for scripting.
 - **Nothing leaves your Mac.** The app makes no network connections.
 
@@ -81,13 +81,16 @@ when you come back to the app, when a display is plugged in, removed
 or changed, when an audio device is plugged in or removed, when the
 default audio input changes, and on "Check again".
 
-Click Start: the window closes and the Dock icon counts the minutes
-recorded ("!" when the disk runs low or a display shows another
-display's picture). Click the Dock icon or quit to stop: "Stop
-recording?" finalizes the files, shows the recording folder in Finder
-and quits. The recording folder holds a video file per display, a new
-one each time a display comes back or changes its frame size, and
-`recording.json`, which lists every file and what happened.
+Click Start: the window closes; the Dock icon shows a "!" badge when
+the disk runs low, a display shows another display's picture or
+something went wrong. Click the Dock icon or quit to open the status
+window: each display with its files, the data written and its state,
+the time recorded (`h:mm:ss`, every second), data and free space, and any problems
+in red. Stop there finalizes the files, opens the recording folder in
+Finder and quits; Continue keeps recording. The recording folder holds
+a video file per display, a new one each time a display comes back or
+changes its frame size, and `recording.json`, which lists every file,
+what happened and every problem, and says how the recording ended.
 
 ### Command line
 
@@ -104,8 +107,8 @@ so it shows the app's version and runs with its signature.
 | Command | Does |
 |---|---|
 | `msr list` | Shows displays, audio inputs and system audio |
-| `msr check [flags]` | Prints what will be recorded, then runs the ready check; exits 0 when ready, 1 when not; creates the output folder if it is missing |
-| `msr record [flags] [--duration 1h30m]` | Prints what will be recorded and runs the ready check, then records until Ctrl-C, the duration or Stop in the Dock; shows the app's Dock icon while it records; `--duration` without a suffix is minutes; exits 0, 1 when not ready, 3 when the recording ended with an error or could not start |
+| `msr check [flags] [--debug]` | Prints what will be recorded, then runs the ready check; exits 0 when ready, 1 when not; creates the output folder if it is missing |
+| `msr record [flags] [--duration 1h30m] [--debug]` | Prints what will be recorded and runs the ready check, then records until Ctrl-C, the duration or Stop in the status window (click the Dock icon); shows the app's Dock icon while it records and prints each event on standard error; `--duration` without a suffix is minutes; exits 0 when every file is finalized and no display file was ended by a failure (a problem told alone is listed but still exits 0), 1 when not ready, 3 when a file is not finalized, a display file was ended by a failure, the recording manifest could not be written at the end, or the recording could not start |
 | `msr settings [flags]` | Without flags prints the effective settings as JSON; with a settings flag saves the effective settings into the settings file and prints them, the only way a command writes it |
 | `msr version` | Prints the version and commit |
 
@@ -189,6 +192,15 @@ your next start: your browser opens a new issue (a GitHub account is
 needed) and Finder shows a copy of the crash report as a text file to
 drag into it. Issues are public, and a crash report contains your Mac's
 user name: check it first.
+
+The app and `msr` write what happens during a recording (every event and
+problem) to the macOS unified log; `msr record --debug` and
+`msr check --debug` add detail. To attach the log of the last 2 hours
+to an issue, run in Terminal:
+
+```sh
+log show --last 2h --predicate 'subsystem == "org.schapiro.multiscreenrecorder" and process == "msr"'
+```
 
 ## Origins
 

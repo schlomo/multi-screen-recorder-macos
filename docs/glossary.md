@@ -10,9 +10,9 @@ rather than letting the definition imply it already exists. Built so
 far: auto mode, the recording resolution, audio mode and system audio as
 settings, the ready check, the pipeline for snapshot releases and
 releases, and the display half of the recording core (recording,
-recording folder, recording manifest, crash marker, display file without
-guide tracks, display identity, settle time, display check, tick,
-timecode). Not built yet: audio track, audio file, guide track (B2 of
+recording folder, recording manifest, problem, status window, display
+file without guide tracks, display identity, settle time, display
+check, tick, timecode). Not built yet: audio track, audio file, guide track (B2 of
 the recording core, D45).
 
 ## Multi Screen Recorder
@@ -45,13 +45,27 @@ recording claims it by creating it (D20).
 ## Recording manifest
 
 `recording.json` in the recording folder: the settings, every file with
-its start on the shared clock and its state, and the events (D20).
+its start on the shared clock and its state, the events and the
+problems, and once finalized its end and result (D20, D46).
+
+## Problem
+
+Something that went wrong in a recording and that the person is told:
+the Dock badge's "!", red in the status window, a line on standard
+error in `msr record`, and an entry in the recording manifest's
+`problems` with its time and full error (D46).
+
+## Status window
+
+The small window of a running recording, opened by a click on the Dock
+icon or by Quit, in the app and in `msr record`: what is recorded, the
+data written, the problems, and Stop and Continue (D46).
 
 ## Crash report
 
 The `.ips` file macOS writes when `msr` quits unexpectedly, in
 `~/Library/Logs/DiagnosticReports`; the app offers to report it as a
-GitHub issue (D40). Not the crash marker, which belongs to a recording.
+GitHub issue (D40).
 Its text copy is the `.txt` copy the app makes in `Crash Reports` beside
 the state file, because GitHub refuses `.ips` attachments.
 
@@ -65,12 +79,6 @@ apart from the settings file because the person never edits it (D40).
 
 The end-to-end driver's file of what a run changed, read by `restore`;
 called "state file" in D38.
-
-## Crash marker
-
-The file a recording process keeps while it records, naming its
-recording folder; one left behind by a process that is gone marks a
-recording that was not finalized (D20).
 
 ## Display file
 

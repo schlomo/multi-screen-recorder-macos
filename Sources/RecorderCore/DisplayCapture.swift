@@ -13,6 +13,9 @@ public final class RecordingContext: Sendable {
     public let started: Date
     public let timeZone: TimeZone
     public let timecode: Timecode
+    /// The app and its version, and the start as the recording manifest has them.
+    public let app: String
+    public let startedText: String
     private let state: Mutex<State>
 
     private struct State {
@@ -22,10 +25,12 @@ public final class RecordingContext: Sendable {
         var takenNames: Set<String> = []
     }
 
-    init(folder: URL, started: Date, timeZone: TimeZone, clock: SharedClock) {
+    init(folder: URL, started: Date, timeZone: TimeZone, clock: SharedClock, app: String) {
         self.folder = folder
         self.started = started
         self.timeZone = timeZone
+        self.app = app
+        startedText = RecordingManifest.timestamp(started, timeZone: timeZone)
         timecode = Timecode(start: started, timeZone: timeZone)
         state = Mutex(State(clock: clock))
     }
@@ -119,7 +124,10 @@ public final class DisplayCapture: NSObject, @unchecked Sendable, SCStreamOutput
             let fileName = context.claimFileName(tick: firstTick, number: number, display: name)
             let writer = try DisplayFileWriter(
                 url: context.folder.appending(path: fileName), frameSize: frameSize, firstTick: firstTick,
-                timecode: context.timecode)
+                timecode: context.timecode,
+                metadata: DisplayFileMetadata(
+                    displayUUID: uuid, displayNumber: number, displayName: name, frameSize: frameSize,
+                    recordingStarted: context.startedText, app: context.app))
             return (writer, RecordingManifest.DisplayFile(
                 name: fileName, display: name, displayUUID: uuid, frameSize: frameSize,
                 start: TickGrid.recording.seconds(ofTick: firstTick), timecode: context.timecode.text(ofTick: firstTick)))
@@ -154,9 +162,19 @@ public final class DisplayCapture: NSObject, @unchecked Sendable, SCStreamOutput
                 try stream.addStreamOutput(self, type: .screen, sampleHandlerQueue: queue)
                 try await lifecycle.start(stream)
             } catch {
-                queue.async { self.end(.streamFailed(Self.describe(error))) }
+                queue.async { self.end(Self.streamEnd(for: error)) }
             }
         }
+    }
+
+    /// A stream's error as the end of its capture: ScreenCaptureKit's
+    /// `noCaptureSource` (-3815), the display gone, is no failure (F4).
+    static func streamEnd(for error: any Error) -> DisplayTracker.StreamEnd {
+        let nsError = error as NSError
+        if nsError.domain == SCStreamErrorDomain, nsError.code == SCStreamError.Code.noCaptureSource.rawValue {
+            return .captureSourceGone
+        }
+        return .streamFailed(describe(error))
     }
 
     private struct CaptureError: Error, LocalizedError {
@@ -204,7 +222,7 @@ public final class DisplayCapture: NSObject, @unchecked Sendable, SCStreamOutput
     }
 
     public func stream(_ stream: SCStream, didStopWithError error: any Error) {
-        queue.async { self.end(.streamFailed(Self.describe(error))) }
+        queue.async { self.end(Self.streamEnd(for: error)) }
     }
 
     private func startTicking() {

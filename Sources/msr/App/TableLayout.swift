@@ -20,7 +20,7 @@ enum TableLayout {
         ["8888×8888"],
         ["8888×8888"],
         ["8888×8888", "2 channels", "stereo", "cannot be read"],
-        ["888.8", "not recorded", "unknown", "<0.1"],
+        ["888.8", "<0.1", "?", "0"],
     ]
 
     static let sourceWidth = measuredWidth(longestSourceName, WhatWillBeRecorded.columns[0])

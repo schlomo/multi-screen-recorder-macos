@@ -4,16 +4,17 @@ import RecorderCore
 import RecorderLogic
 
 /// A running recording as the person sees it, in the app and for `msr
-/// record` alike: the Dock icon's badge with the elapsed minutes, "!" and a
-/// bouncing icon when something needs the person, and the question "Stop
-/// recording?" listing the problems (D45). `msr record` also says each on
-/// standard error.
+/// record` alike: the Dock icon's badge "!" and a bouncing icon when
+/// something needs the person, and the status window with the problems
+/// (D45, D46, D47). `msr record` also says each event and
+/// problem on standard error.
 @MainActor
 final class RecordingSession: RecorderObserver {
     private(set) var recorder: Recorder?
     private let tellOnStandardError: Bool
     private var status = RecordingStatus()
     private var badgeTask: Task<Void, Never>?
+    private let statusWindow = StatusWindow()
     /// Stop is in progress: a Dock click or a quit does nothing more.
     private(set) var isStopping = false
 
@@ -37,26 +38,32 @@ final class RecordingSession: RecorderObserver {
     func stop() async -> RecordingSummary? {
         isStopping = true
         badgeTask?.cancel()
+        statusWindow.close()
         guard let recorder else { return nil }
         let summary = await recorder.stop()
         NSApp.dockTile.badgeLabel = nil
         return summary
     }
 
-    /// Asks "Stop recording?", listing the problems; true for Stop.
-    func askToStop() -> Bool {
-        let alert = NSAlert()
-        alert.messageText = "Stop recording?"
-        if let details = status.stopQuestionDetails { alert.informativeText = details }
-        alert.addButton(withTitle: "Stop")
-        alert.addButton(withTitle: "Continue")
-        NSApp.activate()
-        return alert.runModal() == .alertFirstButtonReturn
+    /// Opens the status window; its Stop calls `onStop`.
+    func showStatus(onStop: @escaping () -> Void) {
+        guard !isStopping else { return }
+        refreshStatusWindow()
+        statusWindow.show(onStop: onStop)
     }
 
     private func updateBadge() {
-        guard let recorder, !isStopping else { return }
-        NSApp.dockTile.badgeLabel = status.badge(elapsedSeconds: recorder.elapsedSeconds)
+        guard recorder != nil, !isStopping else { return }
+        NSApp.dockTile.badgeLabel = status.badge
+        if statusWindow.isOpen { refreshStatusWindow() }
+    }
+
+    private func refreshStatusWindow() {
+        guard let recorder else { return }
+        let (rows, line) = recorder.status()
+        statusWindow.model.rows = rows
+        statusWindow.model.line = line
+        statusWindow.model.problems = status.problems
     }
 
     private func needsAttention() {
@@ -78,9 +85,13 @@ final class RecordingSession: RecorderObserver {
         updateBadge()
     }
 
-    func recorder(_ recorder: Recorder, problem: String) {
-        if tellOnStandardError { standardError(problem) }
-        status.problems.append(problem)
+    func recorder(_ recorder: Recorder, eventLine: String) {
+        if tellOnStandardError { standardError(eventLine) }
+    }
+
+    func recorder(_ recorder: Recorder, problem: RecordingProblem) {
+        if tellOnStandardError { standardError(problem.text) }
+        status.problems.append(problem.text)
         needsAttention()
     }
 }
@@ -95,8 +106,8 @@ func quitEndsTheSession(reason: OSType?) -> Bool {
 
 /// What a quit does while a recording runs.
 enum QuitDecision: Equatable {
-    /// Ask "Stop recording?".
-    case ask
+    /// Open the status window, whose Stop ends the recording.
+    case showStatus
     /// Logout, restart or shutdown: finalize, then quit.
     case finalizeWithoutAsking
     /// Logout, restart or shutdown while Stop is in progress: quit once it is done.
@@ -106,7 +117,7 @@ enum QuitDecision: Equatable {
 
     init(isStopping: Bool, endsTheSession: Bool) {
         self = switch (isStopping, endsTheSession) {
-        case (false, false): .ask
+        case (false, false): .showStatus
         case (false, true): .finalizeWithoutAsking
         case (true, true): .waitForTheStop
         case (true, false): .ignore

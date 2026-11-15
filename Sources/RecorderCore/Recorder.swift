@@ -12,16 +12,18 @@ public protocol RecorderObserver: AnyObject {
     /// A display's file ended because it showed another display's picture,
     /// or (nil) no display is in that state any more.
     func recorder(_ recorder: Recorder, displayShowsAnotherDisplaysPicture display: String?)
-    /// Something the recording cannot put into its manifest, such as the manifest itself failing to be written.
-    func recorder(_ recorder: Recorder, problem: String)
+    /// A problem, also listed in the recording manifest's `problems`.
+    func recorder(_ recorder: Recorder, problem: RecordingProblem)
+    /// An event of the recording manifest, as one line (`EventLine`).
+    func recorder(_ recorder: Recorder, eventLine: String)
 }
 
 public struct RecorderStartError: Error, CustomStringConvertible {
     public let description: String
 }
 
-/// One recording: claims its recording folder, keeps its crash marker and
-/// recording manifest, keeps the Mac awake, and follows the displays as
+/// One recording: claims its recording folder, keeps its recording
+/// manifest, keeps the Mac awake, and follows the displays as
 /// they come, go and change, with one display capture per display file.
 /// Needs the AppKit event loop: macOS reports display changes only to a
 /// process running `NSApplication.run()`.
@@ -30,7 +32,6 @@ public final class Recorder {
     public let folder: URL
     private let context: RecordingContext
     private let settings: Settings
-    private let markers: CrashMarkers
     private weak var observer: (any RecorderObserver)?
     private var manifest: RecordingManifest
     private var tracker: DisplayTracker
@@ -38,6 +39,8 @@ public final class Recorder {
     private var captures: [String: (Int, DisplayCapture)] = [:]
     private var captureCount = 0
     private var endReports = CaptureEndReports()
+    private var problemsTold = ProblemsTold()
+    private var finalManifestWritten = true
     /// Stops in progress, so Stop waits for every file.
     private var stopping: [Task<Void, Never>] = []
     private var dueTask: Task<Void, Never>?
@@ -69,18 +72,15 @@ public final class Recorder {
             throw RecorderStartError(description:
                 "Cannot create the recording folder \(folder.path(percentEncoded: false)): \(error.localizedDescription)")
         }
-        context = RecordingContext(folder: folder, started: started, timeZone: timeZone, clock: SharedClock(reading: reading))
+        context = RecordingContext(folder: folder, started: started, timeZone: timeZone, clock: SharedClock(reading: reading), app: app)
         self.settings = settings
-        markers = CrashMarkers(homeFolder: homeFolder)
         self.observer = observer
         manifest = RecordingManifest(app: app, started: started, timeZone: timeZone, settings: settings)
         tracker = DisplayTracker(resolution: settings.effectiveResolution)
         do {
             try writeManifest()
-            try markers.write(recordingFolder: folder)
         } catch {
             // Nothing was recorded: the start leaves nothing behind.
-            try? markers.remove()
             try? FileManager.default.removeItem(at: folder.appending(path: RecordingNames.manifest))
             try? FileManager.default.removeItem(at: folder)
             throw RecorderStartError(description: "Cannot start the recording in \(folder.path(percentEncoded: false)): \(error)")
@@ -102,7 +102,30 @@ public final class Recorder {
     /// Seconds since the recording started, on the shared clock.
     public var elapsedSeconds: Double { Double(context.now()) / 1_000_000_000 }
 
-    /// Ends every display file, finalizes the recording manifest and removes the crash marker.
+    /// `msr record` could not show its Dock icon: a problem; the recording goes on.
+    public func dockIconNotShown() {
+        tell("The Dock icon cannot be shown", error: "macOS refused the regular activation policy; stop with Ctrl-C",
+             kind: .dockIconNotShown)
+    }
+
+    /// The status window's table and line, read now: each file's size on
+    /// disk and the free space in the recording folder.
+    public func status() -> (rows: [RecordingStatusTable.Row], line: String) {
+        let sizes = manifest.files.map { file in
+            (file.name, (try? FileManager.default.attributesOfItem(atPath: folder.appending(path: file.name).path(percentEncoded: false)))?[.size] as? Int64)
+        }
+        let bytes = Dictionary(sizes.compactMap { name, size in size.map { (name, $0) } }, uniquingKeysWith: { $1 })
+        let bytesWritten: Int64? = sizes.contains { $0.1 == nil } ? nil : bytes.values.reduce(0, +)
+        let free = (try? folder.resourceValues(forKeys: [.volumeAvailableCapacityForImportantUsageKey]))?
+            .volumeAvailableCapacityForImportantUsage
+        return (
+            RecordingStatusTable.rows(sources: tracker.sources, files: manifest.files, bytes: bytes),
+            RecordingStatusTable.line(
+                elapsedSeconds: elapsedSeconds, bytesWritten: bytesWritten, files: manifest.files.count,
+                freeBytes: free))
+    }
+
+    /// Ends every display file and finalizes the recording manifest.
     public func stop() async -> RecordingSummary {
         if !isStopped {
             isStopped = true
@@ -111,13 +134,19 @@ public final class Recorder {
             unregisterForChanges()
             for action in tracker.stopAll() { perform(action) }
             for task in stopping { await task.value }
-            manifest.state = .finalized
-            try? writeManifest()
-            do { try markers.remove() } catch { observer?.recorder(self, problem: "Cannot remove the crash marker: \(error)") }
+            manifest.finalize(ended: Date(), timeZone: context.timeZone)
+            do {
+                try writeManifest()
+            } catch {
+                // Told by `writeManifest`; the file on disk keeps no `ended`.
+                finalManifestWritten = false
+            }
             if let activity { ProcessInfo.processInfo.endActivity(activity) }
             activity = nil
         }
-        return RecordingSummary(manifest: manifest, recordingFolder: folder.path(percentEncoded: false), seconds: elapsedSeconds)
+        return RecordingSummary(
+            manifest: manifest, recordingFolder: folder.path(percentEncoded: false), seconds: elapsedSeconds,
+            manifestWritten: finalManifestWritten)
     }
 
     // MARK: Display changes
@@ -159,9 +188,12 @@ public final class Recorder {
 
     private func readDisplays() -> [ConnectedDisplay]? {
         do {
-            return try connectedDisplays()
+            let displays = try connectedDisplays()
+            RecorderLog.detail("displays: \(DebugLine.displays(displays))", category: "recorder")
+            problemsTold.cleared(.displaysNotRead)
+            return displays
         } catch {
-            observer?.recorder(self, problem: "The displays cannot be read: \(error)")
+            tell("The displays cannot be read", error: "\(error)", kind: .displaysNotRead)
             return nil
         }
     }
@@ -187,6 +219,7 @@ public final class Recorder {
         guard !isStopped else { return }
         manifest.events += step.events
         if !step.events.isEmpty { try? writeManifest() }
+        told(step.events)
         for action in step.actions { perform(action) }
         let due = tracker.due(at: context.now())
         if !due.actions.isEmpty || !due.events.isEmpty {
@@ -208,6 +241,8 @@ public final class Recorder {
     }
 
     private func perform(_ action: DisplayTracker.Action) {
+        RecorderLog.detail(
+            DebugLine.action(action, names: captures.mapValues { "Display \($0.1.number) \($0.1.name)" }), category: "recorder")
         switch action {
         case .start(let uuid, let displayID, let frameSize, let number, let name):
             captureCount += 1
@@ -235,6 +270,7 @@ public final class Recorder {
     /// The manifest lists a file from its start; a start reported after
     /// the file's end changes nothing.
     private func fileStarted(_ file: RecordingManifest.DisplayFile, uuid: String) {
+        RecorderLog.detail("file started: \(file.name)", category: "recorder")
         tracker.fileStarted(uuid)
         guard !manifest.files.contains(where: { $0.name == file.name }) else { return }
         manifest.files.append(file)
@@ -243,20 +279,19 @@ public final class Recorder {
 
     /// A display file ended, or a capture without one; its end carries its
     /// entry, so the file is listed even when its start was not reported
-    /// yet. What it tells (`FileEndReport`) is told once per capture, also
-    /// when the capture ended by itself while the recorder stopped it.
+    /// yet. Its event and problem are recorded once per capture, also when
+    /// the capture ended by itself while the recorder stopped it.
     private func fileEnded(_ end: DisplayFileEnd?, captureNumber: Int, display: String, reason: DisplayTracker.StreamEnd?) {
-        if let end {
-            if let index = manifest.files.firstIndex(where: { $0.name == end.file.name }) {
-                manifest.files[index] = end.file
-            } else {
-                manifest.files.append(end.file)
-            }
+        let before = manifest
+        let problem = endReports.record(
+            captureNumber: captureNumber, reason: reason, end: end, display: display, at: context.now(), into: &manifest)
+        if manifest != before { try? writeManifest() }
+        told(Array(manifest.events.dropFirst(before.events.count)))
+        if let problem { told(problem) }
+        // Both end paths may report the same end: said once.
+        if let end, manifest.files != before.files {
+            RecorderLog.detail("file ended: \(end.file.name), \(end.file.state.rawValue)", category: "recorder")
         }
-        let report = endReports.report(captureNumber: captureNumber, reason: reason, end: end, display: display, at: context.now())
-        if let event = report?.event { manifest.events.append(event) }
-        if end != nil || report?.event != nil { try? writeManifest() }
-        if let problem = report?.problem { observer?.recorder(self, problem: problem) }
     }
 
     private func captureEnded(
@@ -280,12 +315,18 @@ public final class Recorder {
         let free: Int64
         do {
             let values = try folder.resourceValues(forKeys: [.volumeAvailableCapacityForImportantUsageKey])
-            guard let bytes = values.volumeAvailableCapacityForImportantUsage else { return }
+            guard let bytes = values.volumeAvailableCapacityForImportantUsage else {
+                tell("The free space in \(folder.path(percentEncoded: false)) cannot be read",
+                     error: "the volume does not report its free space", kind: .freeSpaceNotRead)
+                return
+            }
             free = bytes
         } catch {
-            observer?.recorder(self, problem: "The free space in \(folder.path(percentEncoded: false)) cannot be read: \(error.localizedDescription)")
+            tell("The free space in \(folder.path(percentEncoded: false)) cannot be read", error: error.localizedDescription,
+                 kind: .freeSpaceNotRead)
             return
         }
+        problemsTold.cleared(.freeSpaceNotRead)
         let threshold = lowDiskWarningBytes()
         let isLow = Double(free) < threshold
         if isLow != isLowOnDisk {
@@ -316,9 +357,34 @@ public final class Recorder {
     private func writeManifest() throws {
         do {
             try manifest.jsonData().write(to: folder.appending(path: RecordingNames.manifest), options: .atomic)
+            problemsTold.cleared(.manifestNotWritten)
         } catch {
-            observer?.recorder(self, problem: "Cannot write the recording manifest: \(error.localizedDescription)")
+            tell("Cannot write the recording manifest", error: error.localizedDescription, kind: .manifestNotWritten)
             throw error
+        }
+    }
+
+    /// A problem for the person and the manifest's `problems`, the manifest
+    /// written at once (`ProblemsTold`); one that repeats is told once until
+    /// it clears.
+    private func tell(_ problem: String, error: String?, kind: ProblemKind) {
+        let problem = RecordingProblem(at: context.now(), problem: problem, error: error)
+        guard case .tell(let writesManifest) = problemsTold.add(problem, kind: kind, to: &manifest) else { return }
+        if writesManifest { try? writeManifest() }
+        told(problem)
+    }
+
+    private func told(_ problem: RecordingProblem) {
+        RecorderLog.error("at \(problem.at)s: \(problem.text)", category: "recorder")
+        observer?.recorder(self, problem: problem)
+    }
+
+    /// Events now in the manifest: to the log and the observer.
+    private func told(_ events: [RecordingEvent]) {
+        for event in events {
+            let line = EventLine.text(event, started: context.started, timeZone: context.timeZone)
+            RecorderLog.notice(line, category: "recorder")
+            observer?.recorder(self, eventLine: line)
         }
     }
 }

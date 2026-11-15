@@ -64,7 +64,7 @@ final class StartModel {
         } catch {
             saveError = error.description
         }
-        checkAgain()
+        check(proof: .listDisplays)
     }
 
     func chooseOutputFolder(_ folder: URL) {
@@ -108,12 +108,19 @@ final class StartModel {
             guard !Task.isCancelled else { return }
             whenContentMayChange {
                 guard number == self.refreshNumber, !self.isRecording else { return }
-                self.checkAgain()
+                self.check(proof: .listDisplays)
             }
         }
     }
 
-    /// Reads the devices for "What will be recorded" and re-runs the ready
+    /// "Check again", and the check at the app's start: it captures a
+    /// frame, so macOS's prompts come now, not at Start (D46).
+    func checkAgain() {
+        check(proof: .captureOneFrame)
+    }
+
+    /// The ready check, `proof` as `probeScreenRecording` takes it: reads
+    /// the devices for "What will be recorded" and re-runs the ready
     /// check; once it is done, the section shows what the check found,
     /// the free space included.
     ///
@@ -125,7 +132,7 @@ final class StartModel {
     /// the open menu is not shown by the log, and the owner saw the table
     /// change with the menu open [ASSUMED from the owner's words]. The hold
     /// stays; the window has no popup menu now (D41).
-    func checkAgain() {
+    private func check(proof: ScreenRecordingProof) {
         guard !isRecording else { return }
         whatWillBeRecorded = WhatWillBeRecorded(
             settings: settings, displays: probes.displays(), audioInputs: probes.audioInputs(), outputFolder: nil)
@@ -137,7 +144,7 @@ final class StartModel {
         let probes = probes
         let whenContentMayChange = whenContentMayChange
         Task {
-            let facts = await probeReadyCheckFacts(settings: settings, homeFolder: homeFolder, probes: probes)
+            let facts = await probeReadyCheckFacts(proof: proof, settings: settings, homeFolder: homeFolder, probes: probes)
             whenContentMayChange {
                 // A newer check has replaced this one and shows its own result.
                 guard number == self.checkNumber else { return }

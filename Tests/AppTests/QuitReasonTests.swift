@@ -3,7 +3,7 @@ import Testing
 @testable import msr
 
 /// Logout, restart and shutdown finalize a recording without asking; any
-/// other quit asks "Stop recording?".
+/// other quit opens the status window.
 @Suite struct QuitReasonTests {
     @Test(arguments: [kAELogOut, kAEReallyLogOut, kAEShowRestartDialog, kAEShowShutdownDialog, kAERestart, kAEShutDown])
     func theSessionEndingFinalizesWithoutAsking(reason: OSType) {
@@ -17,8 +17,8 @@ import Testing
 }
 
 @Suite struct QuitDecisionTests {
-    @Test func aQuitDuringARecordingAsksAndALogoutFinalizes() {
-        #expect(QuitDecision(isStopping: false, endsTheSession: false) == .ask)
+    @Test func aQuitDuringARecordingShowsTheStatusAndALogoutFinalizes() {
+        #expect(QuitDecision(isStopping: false, endsTheSession: false) == .showStatus)
         #expect(QuitDecision(isStopping: false, endsTheSession: true) == .finalizeWithoutAsking)
     }
 
@@ -26,5 +26,18 @@ import Testing
     @Test func whileStoppingALogoutWaitsAndAQuitIsIgnored() {
         #expect(QuitDecision(isStopping: true, endsTheSession: true) == .waitForTheStop)
         #expect(QuitDecision(isStopping: true, endsTheSession: false) == .ignore)
+    }
+}
+
+/// `msr record` says at once that it stops; asked again while finalizing,
+/// it says that it goes on and does nothing more.
+@Suite struct StopRequestsTests {
+    @Test func theFirstRequestStopsAndLaterOnesSayItGoesOn() {
+        var requests = StopRequests()
+        #expect(!requests.isStopping)
+        #expect(requests.request() == "Stopping the recording and finalizing the files…")
+        #expect(requests.isStopping)
+        #expect(requests.request() == "Still finalizing the files…")
+        #expect(requests.request() == "Still finalizing the files…")
     }
 }

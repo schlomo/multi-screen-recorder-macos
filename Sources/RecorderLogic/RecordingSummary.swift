@@ -4,19 +4,21 @@ public struct RecordingSummary: Equatable, Sendable {
     public let manifest: RecordingManifest
     public let recordingFolder: String
     public let seconds: Double
+    /// Whether the finalized manifest was written; if not, the file on disk has no `ended`.
+    public let manifestWritten: Bool
 
-    public init(manifest: RecordingManifest, recordingFolder: String, seconds: Double) {
+    public init(manifest: RecordingManifest, recordingFolder: String, seconds: Double, manifestWritten: Bool) {
         self.manifest = manifest
         self.recordingFolder = recordingFolder
         self.seconds = seconds
+        self.manifestWritten = manifestWritten
     }
 
-    /// Ended with an error (exit 3): a file not finalized or an error event.
-    public var endedWithError: Bool {
-        manifest.files.contains { $0.state != .finalized } || !errors.isEmpty
-    }
+    /// Ended with an error (exit 3): the manifest's result is `problems`
+    /// (D47), or the finalized manifest could not be written (F3).
+    public var endedWithError: Bool { !manifest.endedWell || !manifestWritten }
 
-    private var errors: [RecordingEvent] { manifest.events.filter(\.event.isError) }
+    private var errors: [RecordingEvent] { manifest.events.filter(\.event.isFailure) }
 
     public var text: String {
         var lines = ["Recorded \(Self.elapsed(seconds: seconds)) into \(recordingFolder)"]
@@ -27,6 +29,12 @@ public struct RecordingSummary: Equatable, Sendable {
         for event in errors {
             lines.append("Error at \(Self.elapsed(seconds: event.at)): \(event.event.rawValue)"
                 + (event.display.map { ", \($0)" } ?? "") + (event.error.map { " (\($0))" } ?? ""))
+        }
+        for problem in manifest.problems {
+            lines.append("Problem at \(Self.elapsed(seconds: problem.at)): \(problem.text)")
+        }
+        if !manifestWritten {
+            lines.append("The recording manifest could not be written at the end: \(RecordingNames.manifest) has no end.")
         }
         return lines.joined(separator: "\n") + "\n"
     }
