@@ -1183,3 +1183,47 @@ architect's reading.
 - **Evidence:** [design/recorder.md](design/recorder.md), "Settings
   file" and "Command line"; the PR "Settings and auto mode (PR A of the
   recorder)".
+
+## D45: The recording core in two PRs; displays first, with a Dock icon for `msr record` and a check of every frame (2026-11-15)
+
+- **Status:** in force; supersedes D44 in part (the recording core is
+  two PRs, not one). Nothing built yet.
+- **Context:** The architect's design text for the recording core's
+  display half, in the session of 2026-11-15. The owner: "OK, split
+  PRs again"; on `msr record`: "I'm wondering if maybe a dock icon
+  would be good to show in any case, even when run from command line.
+  This would allow a user to quit a recording, even when started from
+  CLI."; "the app should just quit at the end, assuming that typical
+  use is one shot. OK to open finder"; on the wrong-display fault:
+  "we'll need to see when exactly this problem starts hitting us";
+  "would lifting the minimum to MacOS 27 help anyhow? I'm ready to do
+  that."; then to the design text with these changes: "yes, and the
+  per-frame check can be also a per-second or per-X-frames check if it
+  acts as a safeguard? To not overload the system?"
+- **Decision:**
+  1. The recording core comes in two PRs: B1, the displays (`msr
+     record`, Start and Stop, display files with timecode, display
+     changes, the recording manifest, crash markers); B2, the audio
+     (audio files, guide tracks, system audio, the default microphone
+     followed, audio clock drift measured).
+  2. `msr record` shows the app's Dock icon, with its badge and the
+     "Stop recording?" question, like the app.
+  3. After Stop the app reveals the recording folder in Finder and
+     quits.
+  4. Every frame is checked against the display it should show; a
+     frame that shows another display is never written, and a display
+     that keeps delivering another display's picture ends its display
+     file loudly. The architect's reading of the owner's question,
+     given in the session and not objected to: the check stays per
+     frame, as it compares one rectangle with one held in memory and
+     reads no pixels, and checking less often would let a wrong
+     picture into the file.
+  5. The minimum stays macOS 26 (the architect's recommendation,
+     agreed): nothing found depends on macOS 27, and building for it
+     needs Xcode 27, which the pipeline does not have (D28).
+- **Consequences:** Several parallel `msr record` show several Dock
+  icons. A screen showing another display's picture is lost for that
+  display until it reconnects; a fallback through screenshots is
+  deferred (`backlog.md`).
+- **Evidence:** [design/recorder.md](design/recorder.md), "How the
+  recorder works" and "The app".

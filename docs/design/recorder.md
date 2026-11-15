@@ -26,7 +26,7 @@ signature); if that fails it exits 71 (`EX_OSERR`).
 |---|---|---|
 | `msr list` | Shows displays, audio inputs and system audio | 0, 1 when the displays, the audio inputs or an audio input the settings record cannot be read |
 | `msr check [flags]` | Prints "What will be recorded", then runs the ready check and prints each item | 0 ready, 1 not ready |
-| `msr record [flags] [--duration 1h30m]` | Not built yet (the recorder PR). Without flags it does what Start in the window does, with the same settings file; it prints "What will be recorded" at its start, then runs the ready check, records until Ctrl-C, SIGTERM, SIGHUP or the duration, and prints the recording folder at the start and a summary at the end | 0 ok, 1 not ready, 3 ended with an error |
+| `msr record [flags] [--duration 1h30m]` | Not built yet (the recording core: B1 the displays, B2 the audio, D45). Without flags it does what Start in the window does, with the same settings file; it prints "What will be recorded" at its start, then runs the ready check, records until Ctrl-C, SIGTERM, SIGHUP, the duration or Stop in the Dock (below), and prints the recording folder at the start and a summary at the end. While it records, the app's Dock icon shows with its badge, and clicking it or Quit asks "Stop recording?" as in the app (D45) | 0 ok, 1 not ready, 3 ended with an error |
 | `msr settings [flags]` | Without flags prints the effective settings as JSON (show); with any settings flag, `--auto` included, saves the run's effective settings into the settings file and prints them (change). The only command that writes the file; the window also writes it | 0, 1 when it cannot write the file |
 | `msr version` | Prints the version and commit | 0 |
 
@@ -240,7 +240,7 @@ folder, and free disk space in the output folder for
   The probes of the check (permissions, devices, the output folder) can
   be replaced in tests, and the output folder's file access runs off the
   main thread. It never runs while a recording is running, activation
-  included (for the recorder PR to honour).
+  included (B1 of the recording core builds this, D45).
 
 ## Output on disk
 
@@ -281,6 +281,7 @@ every change:
     {
       "name": "2026-11-12 14.03.05 Display 1 - Built-in Retina Display.mov",
       "display": "Built-in Retina Display",
+      "displayUUID": "37D8832A-2D66-02CA-B9F7-8F30A301B230",
       "frameSize": [1670, 1080],
       "start": 0.0,
       "end": 2285.0,
@@ -292,6 +293,7 @@ every change:
     {
       "name": "2026-11-12 14.03.05 Display 2 - LG HDR 4K.mov",
       "display": "LG HDR 4K",
+      "displayUUID": "1E6E43E3-6E7B-4C2A-9F6B-2B0F4C1A9D11",
       "frameSize": [1920, 1080],
       "start": 0.0,
       "end": 1446.2,
@@ -321,6 +323,7 @@ every change:
     {
       "name": "2026-11-12 14.27.41 Display 2 - LG HDR 4K.mov",
       "display": "LG HDR 4K",
+      "displayUUID": "1E6E43E3-6E7B-4C2A-9F6B-2B0F4C1A9D11",
       "frameSize": [1920, 1080],
       "start": 1476.0,
       "end": null,
@@ -332,6 +335,7 @@ every change:
     {
       "name": "2026-11-12 14.41.10 Display 1 - Built-in Retina Display.mov",
       "display": "Built-in Retina Display",
+      "displayUUID": "37D8832A-2D66-02CA-B9F7-8F30A301B230",
       "frameSize": [1662, 1080],
       "start": 2285.0,
       "end": null,
@@ -350,7 +354,15 @@ every change:
 ```
 
 `start`, `end` and `at` are seconds from the recording's start on the
-shared clock. `state` is `recording`, `finalized` or `not finalized`.
+shared clock. A display file's `displayUUID` is its display's identity (see
+"Display identity"). The events: `display connected`, `display
+disconnected`, `display frame size changed`, `display mirroring
+started`, `display mirroring stopped`, `main display changed`,
+`display stream failed`, `display shows another display's picture`,
+`display file writer fell behind`, `disk full`, `sleep`, `wake`, and
+for audio `audio input connected`, `audio input disconnected`, `system
+audio started`, `system audio stopped`; each names its display or audio
+source where it has one. `state` is `recording`, `finalized` or `not finalized`.
 An audio file's `channels` is the number of its mono tracks, or
 `stereo` for system audio.
 
@@ -449,8 +461,13 @@ Total 5.3 GB/h. 2 hours need 10.7 GB, 3.1 GB free.
   bouncing Dock icon; no notification, which would need a third
   permission and is hidden by Focus modes.
 - **Stop:** clicking the Dock icon or Quit asks "Stop recording?"
-  [Stop] [Continue]. Stop finalizes, then reveals the recording folder
-  in Finder. Logout and shutdown finalize without asking.
+  [Stop] [Continue]. Stop finalizes, reveals the recording folder in
+  Finder and quits the app: a recording is typically one shot (D45).
+  Logout and shutdown finalize without asking. While a recording runs,
+  the app does not quit when its last window closes, and the ready
+  check does not run, also not when the app is activated.
+  `msr record` shows the same Dock icon, badge and question; Stop there
+  ends `msr record` as Ctrl-C does (D45).
 - **About:** version, licence, the purpose (the opening paragraph of the
   README, one string in the code), and a link to GitHub Issues that
   opens in the browser (D15, D26). The credit to the former upstream is
@@ -486,9 +503,23 @@ Total 5.3 GB/h. 2 hours need 10.7 GB, 3.1 GB free.
 
 ## How the recorder works
 
-**Shared clock.** Everything runs on the host clock. The recording's
-start t0 is one host time; every timestamp in every file is an offset
-from t0.
+**Shared clock.** Everything runs on one clock that counts sleep
+(`mach_continuous_time`). The recording's start t0 is one instant on
+it; every timestamp in every file and in the manifest is an offset from
+t0. The host clock that frames and audio buffers are stamped with does
+not advance while the Mac sleeps, so a buffer's time is converted by
+the difference of the two clocks, read at the start and again at every
+wake; no file spans a sleep (see "Displays coming and going"), so the
+conversion within a file is exact. A file starting after a wake so
+keeps its place on the timeline and its timecode the time of day.
+
+**Event loop.** The app and `msr record` run the same AppKit event
+loop and show the app's Dock icon (D45): macOS reports display changes
+(`CGDisplayRegisterReconfigurationCallback`) only to a process running
+`NSApplication.run()`, which the experiments of 2026-11-15 showed
+([end-to-end-tests.md](end-to-end-tests.md), "What research found for
+the recorder"). `msr record` stops on its signals through the same
+path as Stop.
 
 **Constant 30 fps (D11, D21).** Per display, a ScreenCaptureKit stream
 delivers complete frames when the screen changes; the newest is kept.
@@ -497,7 +528,15 @@ writes the newest frame captured before it, with exactly the tick's
 timestamp: a frame appears at the first tick after its capture time,
 never early. No tick is ever dropped: when the encoder is not ready, the
 tick is written late with its correct timestamp and counted in
-`framesRepeatedForLateness`.
+`framesRepeatedForLateness`. A tick written late carries the newest
+frame captured before the tick's own time, never one captured while it
+waited, so its picture is right and only its writing is late. At most
+2 s of ticks wait (*data*); a writer further behind ends its display
+file with the event `display file writer fell behind`, and a new
+display file starts, as after a failing stream. The v1 gate's clock
+recording checks this from outside the recorder. A display file starts
+at the first tick after its stream's first frame that passes the
+display check (below).
 
 **Timecode (D21, D31).** Every display file and every audio file
 carries a timecode track: local time of day at 30 fps, non-drop. All
@@ -515,7 +554,9 @@ track; in a display file 64 kbit/s for the guide track "Microphones"
 and 96 kbit/s for the guide track "System audio". Every display is
 recorded in SDR, also one
 in HDR mode, with its colour space tagged so editors show the colours
-unchanged (D24). Apple's `SCRecordingOutput` is not used:
+unchanged (D24): the stream delivers 420v frames, which carry BT.709
+(the experiment of 2026-11-15), and the display file is tagged BT.709
+for primaries, transfer and matrix. Apple's `SCRecordingOutput` is not used:
 it writes a variable frame rate with its own track layout.
 
 **Crash safety (D14, D21).** Files are written in fragments of 2 s
@@ -586,11 +627,58 @@ Bluetooth headset's microphone switches to call quality when recorded,
 and a virtual microphone often carries a copy of other sound, so those
 are recorded only under `all-inputs` or as the default microphone.
 
+**Display identity.** A display is known by the UUID macOS gives it
+(`CGDisplayCreateUUIDFromDisplayID`), never by its display ID, which
+changes when a display comes back, nor by its name, which macOS may
+change ("MSR Test (1)"). A display that comes back with the same UUID
+keeps its number and its name in the file names for the whole
+recording. Whether a real display keeps its UUID after it was
+unplugged is UNVERIFIED (the owner's check on the first build).
+
 **Displays coming and going (D14).** A display that appears gets a
-stream and a display file; one that vanishes has its file finalized. A
+stream and a display file (event `display connected`); one that
+vanishes has its file finalized (event `display disconnected`). A
 stream that fails finalizes its file and is restarted after 1 s,
 backing off to 10 s (*data*), for as long as the display exists. Each
-gap is an event in the manifest.
+gap is an event in the manifest. A display's stream starts, or starts
+again, only once the display has been unchanged for the settle time,
+1 s (*data*): a mode change that macOS reports as a disconnect and a
+reconnect, or modes switched through quickly, so make no burst of
+short display files. When a mode change gives a new frame size, the
+current display file runs on through the settle time, with the picture
+scaled to the old frame size, and then ends; the stream is stopped and
+a new one started at the new frame size, the same path as a reconnect
+(`updateConfiguration` is not used: never tried). The gap is the
+restart only.
+- **Mirroring:** a display that starts mirroring another
+  (`CGDisplayMirrorsDisplay`) ends its display file with the event
+  `display mirroring started` (the display and the one it mirrors);
+  when mirroring stops, a new display file starts with `display
+  mirroring stopped`. The display keeps its number.
+- **Main display:** a change of the main display is the event `main
+  display changed`; the numbers stay.
+- **Sleep and wake:** at sleep every file ends (event `sleep`); at wake
+  (event `wake`) new files start, the displays after the settle time.
+
+**Display check (D45).** Every frame is checked before it is kept: the
+rectangle ScreenCaptureKit attaches to it (`SCStreamFrameInfo.screenRect`)
+must be its display's bounds (`CGDisplayBounds`, held in memory and
+read again when the displays change). It reads no pixels. A frame that
+fails is never written, and its tick repeats the last frame that
+passed. Why: after a display reconnects, ScreenCaptureKit can deliver
+another display's picture on its stream, and a restart does not clear
+it (the experiments of 2026-11-13 and 2026-11-15 with virtual displays,
+[end-to-end-tests.md](end-to-end-tests.md), "What research found for
+the recorder"); a frame then carries the other display's rectangle.
+After 30 failing frames in a row (*data*), not counting those within
+the settle time after a display change, the display file ends with the
+event `display shows another display's picture`, the Dock badge shows
+"!", `msr record` names the display on standard error, and the display
+is tried again only after its next change. Its limit: a frame whose
+rectangle is right can still be black (seen once, cause unknown); the
+check cannot see that. That `screenRect` and `CGDisplayBounds` are
+comparable as they are, in points and the same coordinates, is
+[ASSUMED]; the builder checks it with real frames.
 
 **Disk (D14).** Below the warning threshold: the warning. A writer that
 fails on a full disk ends its file, readable up to the last fragment;
@@ -692,6 +780,13 @@ folder, and by the v1 gate. The design of the end-to-end tests is
   (`backlog.md`).
 - **The command line driving the running app**, so a terminal needs no
   permissions of its own: deferred (`backlog.md`).
+- **Screenshots as a fallback** for a display that shows another
+  display's picture (`SCScreenshotManager`, right in 3 of 3 faulty
+  runs, its cost at 30 frames per second unknown): a second capture
+  path; deferred (`backlog.md`, D45).
+- **Choosing audio inputs one by one** with auto mode off (open in
+  D34): the audio mode `all-inputs` records every input, virtual ones
+  included, which the end-to-end tests use; deferred (`backlog.md`).
 
 ## Open questions
 
@@ -726,9 +821,14 @@ as the looks-like size, the four audio modes (the audio inputs' transport
 types read from Core Audio), the switch "Auto" and the two sliders in the
 window, `--auto` and "What will be recorded" in `msr check`, the ready
 check's probes with a seam and the window's refresh with its tests. It
-captures nothing. The recorder PR (PR B) builds the rest: `msr record`,
-recording, the recording manifest, crash markers, timecode, the Dock
-badge and Stop.
+captures nothing. The recording core builds the rest, in two PRs
+(D45): B1 `msr record`, Start and Stop, the display files with their
+timecode, display changes and the display check, the recording
+manifest, crash markers and the Dock badge; B2 the audio files, the
+guide tracks, system audio and the default microphone followed. Until
+B2, a display file has no guide tracks, and the window and `msr record`
+say under the table "This build records the displays only; audio
+comes with the next version."
 
 Details the design left open, as built and confirmed by the owner
 (D25, D28, D44): a key missing from the settings file takes its default;

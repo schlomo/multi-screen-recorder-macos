@@ -77,7 +77,26 @@ The video file for one display, with its timecode and its guide tracks
 (D31).
 A display that disappears or whose stream fails ends its display file;
 a new one begins when it is back. A display whose frame size changes
-also ends its file, and a new one begins at once (D30).
+also ends its file, and a new one begins after the settle time (D30,
+D45). Sleep, mirroring, a writer too far behind and the display check
+end it too.
+
+## Display identity
+
+What a recording knows a display by: the UUID macOS gives it, never
+its display ID or its name (D45).
+
+## Settle time
+
+How long a display must stay unchanged before its stream starts or
+starts again, so that quick mode changes make no burst of short display
+files (D45).
+
+## Display check
+
+The check of every frame that it shows its own display, by the screen
+rectangle ScreenCaptureKit attaches to it; a frame that fails is never
+written (D45).
 
 ## Frame size
 
