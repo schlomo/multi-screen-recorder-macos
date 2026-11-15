@@ -11,7 +11,7 @@ import Testing
     init() throws {
         scratch = try ScratchFolder("SmokeTestScriptTests")
         checkout = scratch.url.appending(path: "checkout", directoryHint: .isDirectory)
-        for folder in ["scripts", "build/Multi Screen Recorder.app/Contents/MacOS"] {
+        for folder in ["scripts", "build/Multi Screen Recorder.app/Contents/MacOS", "build/Multi Screen Recorder.app/Contents/Resources"] {
             try FileManager.default.createDirectory(
                 at: checkout.appending(path: folder, directoryHint: .isDirectory), withIntermediateDirectories: true)
         }
@@ -20,6 +20,7 @@ import Testing
         try FileManager.default.copyItem(
             at: try buildProducts().appending(path: "msr"),
             to: checkout.appending(path: "build/Multi Screen Recorder.app/Contents/MacOS/msr"))
+        try Data().write(to: checkout.appending(path: "build/Multi Screen Recorder.app/Contents/Resources/AppIcon.icns"))
         try git("init", "--quiet", "--initial-branch=main")
         try git("commit", "--quiet", "--allow-empty", "--message=one")
         head = try git("rev-parse", "--short=7", "HEAD")
@@ -38,14 +39,15 @@ import Testing
         return outcome.output.trimmingCharacters(in: .newlines)
     }
 
-    private func writeInfo(commit: String) throws {
-        let plist: [String: String] = [
+    private func writeInfo(commit: String, iconFile: String? = "AppIcon") throws {
+        var plist: [String: String] = [
             "CFBundleExecutable": "msr",
             "CFBundleIdentifier": "org.schapiro.multiscreenrecorder.test",
             "CFBundlePackageType": "APPL",
             "MSRVersion": "0.9.0-dev+\(commit)",
             "MSRCommit": commit,
         ]
+        plist["CFBundleIconFile"] = iconFile
         try PropertyListSerialization.data(fromPropertyList: plist, format: .xml, options: 0)
             .write(to: checkout.appending(path: "build/Multi Screen Recorder.app/Contents/Info.plist"))
     }
@@ -60,7 +62,28 @@ import Testing
         let outcome = try smokeTest()
         #expect(outcome.status == 0, "\(outcome.errors)")
         #expect(outcome.output.contains("ok    msr version through a symbolic link prints the same"))
+        #expect(outcome.output.contains("ok    the bundle names its icon file and holds it"))
         #expect(outcome.output.contains("all checks passed"))
+    }
+
+    @Test func aBundleWithoutCFBundleIconFileFails() throws {
+        defer { scratch.remove() }
+        try writeInfo(commit: head, iconFile: nil)
+        let outcome = try smokeTest()
+        #expect(outcome.status == 1)
+        #expect(outcome.errors.contains("FAIL  the bundle names its icon file and holds it: CFBundleIconFile is not set"),
+                "\(outcome.errors)")
+    }
+
+    @Test func aBundleWithoutTheIconFileFails() throws {
+        defer { scratch.remove() }
+        try writeInfo(commit: head)
+        try FileManager.default.removeItem(
+            at: checkout.appending(path: "build/Multi Screen Recorder.app/Contents/Resources/AppIcon.icns"))
+        let outcome = try smokeTest()
+        #expect(outcome.status == 1)
+        #expect(outcome.errors.contains("FAIL  the bundle names its icon file and holds it: Contents/Resources/AppIcon.icns is missing"),
+                "\(outcome.errors)")
     }
 
     @Test func aBundleOfAnotherCommitFails() throws {
