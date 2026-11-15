@@ -24,11 +24,13 @@ public enum RecordingStatusTable {
         public var cells: [String] { [source, recordsAt, String(files), gigabytesWritten, state] }
     }
 
-    /// `bytes`: each display file's size on disk, by its name.
+    /// `bytes`: each display file's size on disk, by its name; a file
+    /// without one makes its display's GB written "?".
     public static func rows(sources: [DisplayTracker.Source], files: [RecordingManifest.DisplayFile], bytes: [String: Int64]) -> [Row] {
         sources.map { source in
             let own = files.filter { $0.displayUUID == source.uuid }
-            let written = own.reduce(Int64(0)) { $0 + (bytes[$1.name] ?? 0) }
+            let sizes = own.map { bytes[$0.name] }
+            let written: String = sizes.contains(nil) ? "?" : String(format: "%.1f", Double(sizes.compactMap(\.self).reduce(0, +)) / 1_000_000_000)
             let frameSize: FrameSize? = if case .recording(let size) = source.state { size } else {
                 own.last.map { FrameSize(width: $0.frameSize[0], height: $0.frameSize[1]) }
             }
@@ -36,7 +38,7 @@ public enum RecordingStatusTable {
                 source: source.number.map { "\($0) \(source.name)" } ?? source.name,
                 recordsAt: frameSize.map { "\($0.width)×\($0.height)" } ?? "",
                 files: own.count,
-                gigabytesWritten: String(format: "%.1f", Double(written) / 1_000_000_000),
+                gigabytesWritten: written,
                 state: text(source.state))
         }
     }

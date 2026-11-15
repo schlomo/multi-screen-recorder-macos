@@ -40,6 +40,7 @@ public final class Recorder {
     private var captures: [String: (Int, DisplayCapture)] = [:]
     private var captureCount = 0
     private var endReports = CaptureEndReports()
+    private var problemsTold = ProblemsTold()
     /// Stops in progress, so Stop waits for every file.
     private var stopping: [Task<Void, Never>] = []
     private var dueTask: Task<Void, Never>?
@@ -110,14 +111,14 @@ public final class Recorder {
         var bytes: [String: Int64] = [:]
         for file in manifest.files {
             let path = folder.appending(path: file.name).path(percentEncoded: false)
-            bytes[file.name] = (try? FileManager.default.attributesOfItem(atPath: path)[.size] as? Int64) ?? 0
+            bytes[file.name] = (try? FileManager.default.attributesOfItem(atPath: path))?[.size] as? Int64
         }
         let free = (try? folder.resourceValues(forKeys: [.volumeAvailableCapacityForImportantUsageKey]))?
             .volumeAvailableCapacityForImportantUsage
         return (
             RecordingStatusTable.rows(sources: tracker.sources, files: manifest.files, bytes: bytes),
             RecordingStatusTable.line(
-                elapsedSeconds: elapsedSeconds, bytesWritten: bytes.values.reduce(0, +), files: manifest.files.count,
+                elapsedSeconds: elapsedSeconds, bytesWritten: bytes.values.compactMap(\.self).reduce(0, +), files: manifest.files.count,
                 freeBytes: free))
     }
 
@@ -136,7 +137,7 @@ public final class Recorder {
             do {
                 try markers.remove()
             } catch {
-                tell("Cannot remove the crash marker", error: "\(error)")
+                tell("Cannot remove the crash marker", error: "\(error)", kind: .crashMarkerNotRemoved)
                 manifest.finalize(ended: ended, timeZone: context.timeZone)
                 try? writeManifest()
             }
@@ -187,9 +188,10 @@ public final class Recorder {
         do {
             let displays = try connectedDisplays()
             RecorderLog.detail("displays: \(displays)", category: "recorder")
+            problemsTold.cleared(.displaysNotRead)
             return displays
         } catch {
-            tell("The displays cannot be read", error: "\(error)")
+            tell("The displays cannot be read", error: "\(error)", kind: .displaysNotRead)
             return nil
         }
     }
@@ -310,9 +312,11 @@ public final class Recorder {
             guard let bytes = values.volumeAvailableCapacityForImportantUsage else { return }
             free = bytes
         } catch {
-            tell("The free space in \(folder.path(percentEncoded: false)) cannot be read", error: error.localizedDescription)
+            tell("The free space in \(folder.path(percentEncoded: false)) cannot be read", error: error.localizedDescription,
+                 kind: .freeSpaceNotRead)
             return
         }
+        problemsTold.cleared(.freeSpaceNotRead)
         let threshold = lowDiskWarningBytes()
         let isLow = Double(free) < threshold
         if isLow != isLowOnDisk {
@@ -343,17 +347,20 @@ public final class Recorder {
     private func writeManifest() throws {
         do {
             try manifest.jsonData().write(to: folder.appending(path: RecordingNames.manifest), options: .atomic)
+            problemsTold.cleared(.manifestNotWritten)
         } catch {
-            tell("Cannot write the recording manifest", error: error.localizedDescription)
+            tell("Cannot write the recording manifest", error: error.localizedDescription, kind: .manifestNotWritten)
             throw error
         }
     }
 
-    /// A problem for the person and the manifest's `problems`; the manifest
-    /// is written with the next change.
-    private func tell(_ problem: String, error: String?) {
+    /// A problem for the person and the manifest's `problems`, the manifest
+    /// written at once (`ProblemsTold`); one that repeats is told once until
+    /// it clears.
+    private func tell(_ problem: String, error: String?, kind: ProblemKind) {
         let problem = RecordingProblem(at: context.now(), problem: problem, error: error)
-        manifest.problems.append(problem)
+        guard case .tell(let writesManifest) = problemsTold.add(problem, kind: kind, to: &manifest) else { return }
+        if writesManifest { try? writeManifest() }
         told(problem)
     }
 

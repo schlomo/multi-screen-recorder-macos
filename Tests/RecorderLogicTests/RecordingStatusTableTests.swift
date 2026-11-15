@@ -55,6 +55,16 @@ import Testing
         #expect(rows[1].source == "LG" && rows[1].recordsAt == "" && rows[1].files == 0)
     }
 
+    /// A size that cannot be read is not shown as nothing written.
+    @Test func aFileSizeThatCannotBeReadIsAQuestionMark() {
+        var tracker = DisplayTracker(resolution: .native)
+        _ = tracker.begin([display("A", "Built-in", main: true)], at: 0)
+        let files = [file("a1.mov", uuid: "A", display: "Built-in"), file("a2.mov", uuid: "A", display: "Built-in")]
+        let rows = RecordingStatusTable.rows(sources: tracker.sources, files: files, bytes: ["a1.mov": 1_000_000_000])
+        #expect(rows.map(\.gigabytesWritten) == ["?"])
+        #expect(rows.map(\.files) == [2])
+    }
+
     @Test func theLineSaysTimeDataFilesAndFreeSpace() {
         #expect(RecordingStatusTable.line(elapsedSeconds: 4020, bytesWritten: 1_260_000_000, files: 3, freeBytes: 120_400_000_000)
             == "Recording 1:07 · 1.3 GB in 3 files · 120.4 GB free")
