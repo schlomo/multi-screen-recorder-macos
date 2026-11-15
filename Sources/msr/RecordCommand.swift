@@ -10,7 +10,7 @@ extension RecordingDuration: ExpressibleByArgument {
     }
 }
 
-/// EX 3: the recording ended with an error (a file not finalized, or an error event).
+/// Exit 3: the recording ended with an error (a file not finalized, or an error event) or could not start.
 let recordingEndedWithErrorExitCode: Int32 = 3
 
 extension CommandLineInterface {
@@ -18,11 +18,11 @@ extension CommandLineInterface {
         static let configuration = CommandConfiguration(
             abstract: "Record every display until Ctrl-C, SIGTERM, SIGHUP, the duration or Stop in the Dock.",
             discussion: "Prints what will be recorded, runs the ready check, then records with the app's Dock icon. "
-                + "Exits 0 when the recording ended well, 1 when not ready, 3 when it ended with an error.")
+                + "Exits 0 when the recording ended well, 1 when not ready, 3 when it ended with an error or could not start.")
 
         @OptionGroup var flags: SettingsFlags
 
-        @Option(help: "Stop after this long: hours, minutes and seconds, such as 1h30m, 45m or 90s.")
+        @Option(help: "Stop after this long: hours, minutes and seconds, such as 1h30m, 45m or 90s; a number alone is minutes.")
         var duration: RecordingDuration?
 
         func run() async throws {
@@ -64,7 +64,6 @@ final class RecordCommandDelegate: NSObject, NSApplicationDelegate {
     private let duration: RecordingDuration?
     private var session: RecordingSession?
     private var signalSources: [any DispatchSourceSignal] = []
-    private var isPoweringOff = false
     private var isStopping = false
     private(set) var exitStatus: Int32 = 0
 
@@ -93,11 +92,6 @@ final class RecordCommandDelegate: NSObject, NSApplicationDelegate {
             source.resume()
             signalSources.append(source)
         }
-        _ = NSWorkspace.shared.notificationCenter.addObserver(
-            forName: NSWorkspace.willPowerOffNotification, object: nil, queue: .main
-        ) { [weak self] _ in
-            MainActor.assumeIsolated { self?.isPoweringOff = true }
-        }
         if let duration {
             Task { [weak self] in
                 while let self, !self.isStopping {
@@ -112,13 +106,14 @@ final class RecordCommandDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
-        if session != nil, !isStopping, RecordingSession.askToStop() { stop() }
+        if let session, !isStopping, session.askToStop() { stop() }
         return false
     }
 
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
-        guard let session, !isStopping else { return .terminateNow }
-        if isPoweringOff {
+        guard let session else { return .terminateNow }
+        if isStopping { return .terminateCancel }
+        if quitEndsTheSession(reason: currentQuitReason()) {
             // Logout and shutdown finalize without asking, then let the process end.
             isStopping = true
             Task {
@@ -127,7 +122,7 @@ final class RecordCommandDelegate: NSObject, NSApplicationDelegate {
             }
             return .terminateLater
         }
-        if RecordingSession.askToStop() { stop() }
+        if session.askToStop() { stop() }
         return .terminateCancel
     }
 

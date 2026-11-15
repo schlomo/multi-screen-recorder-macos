@@ -1,18 +1,21 @@
 import AppKit
+import CoreServices
 import RecorderCore
 import RecorderLogic
 
 /// A running recording as the person sees it, in the app and for `msr
-/// record` alike: the Dock icon's badge with the elapsed minutes, "!" for
-/// low disk space or a display showing another display's picture, and the
-/// question "Stop recording?" (D45).
+/// record` alike: the Dock icon's badge with the elapsed minutes, "!" and a
+/// bouncing icon when something needs the person, and the question "Stop
+/// recording?" listing the problems (D45). `msr record` also says each on
+/// standard error.
 @MainActor
 final class RecordingSession: RecorderObserver {
     private(set) var recorder: Recorder?
     private let tellOnStandardError: Bool
-    private var isLowOnDisk = false
-    private var displayShowingAnother: String?
+    private var status = RecordingStatus()
     private var badgeTask: Task<Void, Never>?
+    /// Stop is in progress: a Dock click or a quit does nothing more.
+    private(set) var isStopping = false
 
     /// Starts the recording; `tellOnStandardError` for `msr record`.
     init(settings: Settings, homeFolder: URL, tellOnStandardError: Bool) throws(RecorderStartError) {
@@ -32,6 +35,7 @@ final class RecordingSession: RecorderObserver {
 
     /// Ends the recording; the summary of what it wrote.
     func stop() async -> RecordingSummary? {
+        isStopping = true
         badgeTask?.cancel()
         guard let recorder else { return nil }
         let summary = await recorder.stop()
@@ -39,10 +43,11 @@ final class RecordingSession: RecorderObserver {
         return summary
     }
 
-    /// Asks "Stop recording?"; true for Stop.
-    static func askToStop() -> Bool {
+    /// Asks "Stop recording?", listing the problems; true for Stop.
+    func askToStop() -> Bool {
         let alert = NSAlert()
         alert.messageText = "Stop recording?"
+        if let details = status.stopQuestionDetails { alert.informativeText = details }
         alert.addButton(withTitle: "Stop")
         alert.addButton(withTitle: "Continue")
         NSApp.activate()
@@ -50,19 +55,22 @@ final class RecordingSession: RecorderObserver {
     }
 
     private func updateBadge() {
-        guard let recorder else { return }
-        NSApp.dockTile.badgeLabel = isLowOnDisk || displayShowingAnother != nil
-            ? "!" : String(Int(recorder.elapsedSeconds / 60))
+        guard let recorder, !isStopping else { return }
+        NSApp.dockTile.badgeLabel = status.badge(elapsedSeconds: recorder.elapsedSeconds)
     }
 
-    func recorder(_ recorder: Recorder, lowDiskSpace: Bool) {
-        isLowOnDisk = lowDiskSpace
-        if lowDiskSpace { NSApp.requestUserAttention(.criticalRequest) }
+    private func needsAttention() {
+        NSApp.requestUserAttention(.criticalRequest)
         updateBadge()
     }
 
+    func recorder(_ recorder: Recorder, lowDiskSpace: Bool) {
+        status.isLowOnDisk = lowDiskSpace
+        if lowDiskSpace { needsAttention() } else { updateBadge() }
+    }
+
     func recorder(_ recorder: Recorder, displayShowsAnotherDisplaysPicture display: String?) {
-        displayShowingAnother = display
+        status.displayShowingAnotherDisplaysPicture = display
         if let display, tellOnStandardError {
             standardError("The display \(display) shows another display's picture: its display file ended,"
                 + " and it is recorded again after its next change.")
@@ -71,8 +79,25 @@ final class RecordingSession: RecorderObserver {
     }
 
     func recorder(_ recorder: Recorder, problem: String) {
-        standardError(problem)
+        if tellOnStandardError { standardError(problem) }
+        status.problems.append(problem)
+        needsAttention()
     }
+}
+
+/// Whether a quit comes from logout, restart or shutdown, by the quit Apple
+/// event's reason (`kAEQuitReason`): those finalize without asking.
+func quitEndsTheSession(reason: OSType?) -> Bool {
+    guard let reason else { return false }
+    let endingTheSession = [kAELogOut, kAEReallyLogOut, kAEShowRestartDialog, kAEShowShutdownDialog, kAERestart, kAEShutDown]
+    return endingTheSession.contains { OSType($0) == reason }
+}
+
+/// The reason of the quit Apple event being handled now, if any.
+@MainActor
+func currentQuitReason() -> OSType? {
+    NSAppleEventManager.shared().currentAppleEvent?
+        .attributeDescriptor(forKeyword: AEKeyword(kAEQuitReason))?.enumCodeValue
 }
 
 func standardError(_ line: String) {

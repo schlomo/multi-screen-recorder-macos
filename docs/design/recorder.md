@@ -26,7 +26,7 @@ signature); if that fails it exits 71 (`EX_OSERR`).
 |---|---|---|
 | `msr list` | Shows displays, audio inputs and system audio | 0, 1 when the displays, the audio inputs or an audio input the settings record cannot be read |
 | `msr check [flags]` | Prints "What will be recorded", then runs the ready check and prints each item | 0 ready, 1 not ready |
-| `msr record [flags] [--duration 1h30m]` | Records the displays (B1 of the recording core; the audio comes with B2, D45). Without flags it does what Start in the window does, with the same settings file; it prints "What will be recorded" at its start, then runs the ready check, records until Ctrl-C, SIGTERM, SIGHUP, the duration or Stop in the Dock (below), and prints the recording folder at the start and a summary at the end. While it records, the app's Dock icon shows with its badge, and clicking it or Quit asks "Stop recording?" as in the app (D45) | 0 ok, 1 not ready, 3 ended with an error |
+| `msr record [flags] [--duration 1h30m]` | Records the displays (B1 of the recording core; the audio comes with B2, D45). Without flags it does what Start in the window does, with the same settings file; it prints "What will be recorded" at its start, then runs the ready check, records until Ctrl-C, SIGTERM, SIGHUP, the duration or Stop in the Dock (below), and prints the recording folder at the start and a summary at the end. While it records, the app's Dock icon shows with its badge, and clicking it or Quit asks "Stop recording?" as in the app (D45). `--duration` takes hours, minutes and seconds (`1h30m`, `45m`, `90s`); a number without a suffix is minutes (`90` is 90 minutes) | 0 ok, 1 not ready, 3 ended with an error or could not start |
 | `msr settings [flags]` | Without flags prints the effective settings as JSON (show); with any settings flag, `--auto` included, saves the run's effective settings into the settings file and prints them (change). The only command that writes the file; the window also writes it | 0, 1 when it cannot write the file |
 | `msr version` | Prints the version and commit | 0 |
 
@@ -463,11 +463,16 @@ Total 5.3 GB/h. 2 hours need 10.7 GB, 3.1 GB free.
 - **Recording:** the window closes; the Dock icon shows a red badge with
   the elapsed minutes. Low disk space shows as a "!" badge and a
   bouncing Dock icon; no notification, which would need a third
-  permission and is hidden by Focus modes.
+  permission and is hidden by Focus modes. A recording problem (the
+  recording manifest cannot be written, the displays or the free space
+  cannot be read, a display file's writer fails) shows the same way,
+  and "Stop recording?" lists the problems; `msr record` also names each
+  on standard error.
 - **Stop:** clicking the Dock icon or Quit asks "Stop recording?"
   [Stop] [Continue]. Stop finalizes, reveals the recording folder in
   Finder and quits the app: a recording is typically one shot (D45).
-  Logout and shutdown finalize without asking. While a recording runs,
+  Logout, restart and shutdown finalize without asking, told apart from
+  a Quit by the quit Apple event's reason (`kAEQuitReason`). While a recording runs,
   the app does not quit when its last window closes, and the ready
   check does not run, also not when the app is activated.
   `msr record` shows the same Dock icon, badge and question; Stop there
@@ -527,6 +532,7 @@ path as Stop.
 
 **Constant 30 fps (D11, D21).** Per display, a ScreenCaptureKit stream
 delivers complete frames when the screen changes; the newest is kept.
+The mouse pointer is recorded.
 Tick k is at t0 + k/30 s, computed, never accumulated. Every tick
 writes the newest frame captured before it, with exactly the tick's
 timestamp: a frame appears at the first tick after its capture time,
@@ -540,10 +546,18 @@ file with the event `display file writer fell behind`, and a new
 display file starts, as after a failing stream. The v1 gate's clock
 recording checks this from outside the recorder. A display file starts
 at the first tick after its stream's first frame that passes the
-display check (below).
+display check (below), and never before the stream's own start. When a
+display file ends, the ticks due are written, then those still waiting,
+for at most the late-tick bound (2 s) on a clock that does not count
+sleep, and the file is finalized also when the writer fell behind or
+the wait ran out; what failed is in the manifest.
 
 **Timecode (D21, D31).** Every display file and every audio file
-carries a timecode track: local time of day at 30 fps, non-drop. All
+carries a timecode track: local time of day at 30 fps, non-drop, the
+clock time also on a day with a daylight saving change. A display
+file's timecode track has one sample, at its first tick, as is the
+convention; the writer finishes that track at once, so a display file
+that is never finalized still carries its timecode (tested). All
 files share t0 and the tick grid, so their timecodes agree to the frame
 and an editor can place every file, also a later-starting one, by
 timecode. Unproven until the owner's first real recording: that
@@ -637,11 +651,15 @@ changes when a display comes back, nor by its name, which macOS may
 change ("MSR Test (1)"). A display that comes back with the same UUID
 keeps its number and its name in the file names for the whole
 recording. Whether a real display keeps its UUID after it was
-unplugged is UNVERIFIED (the owner's check on the first build).
+unplugged is UNVERIFIED (the owner's check on the first build). In a
+file name, `/` and `:` in a display's name become `-`, so a name never
+stops a display from recording.
 
 **Displays coming and going (D14).** A display that appears gets a
 stream and a display file (event `display connected`); one that
 vanishes has its file finalized (event `display disconnected`). A
+display that is asleep counts as disconnected; that macOS's display
+change callback fires when a display falls asleep is [ASSUMED]. A
 stream that fails finalizes its file and is restarted after 1 s,
 backing off to 10 s (*data*), for as long as the display exists. Each
 gap is an event in the manifest. A display's stream starts, or starts
@@ -722,7 +740,12 @@ modes and which input each records (every transport type), settings read
 leniently with the line for standard error, flags (`--auto` against
 `--resolution` and `--audio-mode`) and their errors, the text `msr check`
 prints for "What will be recorded", file naming, manifest states,
-crash markers, the version, the state file's content, the choice of
+crash markers, the display tracker (numbers, the settle time, frame
+size changes, mirroring, the main display, back-off, the display check's
+fault, a full disk, sleep and wake), the display check, the shared clock,
+the timecode (also on a daylight saving day and at a second frame rate),
+`--duration`, the summary of `msr record`, the Dock badge and the
+problems of a recording, the version, the state file's content, the choice of
 the crash report to offer, the new-issue link (and that the issue form
 has the fields it fills), the name of a crash report's text copy, and
 the text of the examples in this document, which the tests hold to the
@@ -732,14 +755,20 @@ audio inputs can be read and a listener for their changes registered,
 which needs no permission and shows no prompt, the state file (missing,
 saved, broken), the listing of the crash report folder (a missing one
 is no crash reports, an unreadable one an error), the text copy of a
-crash report, that an action
+crash report, display files written from synthetic frames and read
+back (constant frame rate, timecode, BT.709, fragments, a file never
+finalized), a display file's ticks with a stand-in writer (a failing
+writer, one that fell behind, a slow end), a stream stopped while it
+starts, crash markers in a scratch home, that an action
 waiting for the main run loop's default mode runs only there, the
 classification of Core Audio's transport types, and the ready check's
 probes with stand-ins (the output folder's file access is off the main
 thread). `AppTests` run the start window's model with stand-in probes
 and a stand-in for the hold: one check per burst of device changes,
 nothing applied while a menu is open, a stale queued refresh does
-nothing, choices saved only when changed. `CommandTests` run
+nothing, choices saved only when changed, no ready check while
+recording, Start only when ready, and which quit finalizes without
+asking. `CommandTests` run
 the built `msr` with a scratch `HOME` (`msr settings`, with flags and
 `--auto`, and `msr version`, which prompt for nothing; also through a
 symbolic link into an app bundle), `scripts/version` in scratch git repositories and
@@ -857,16 +886,12 @@ tests]. Live capture is verified on the owner's Mac.
 
 Built in B1 where this document leaves the detail open, provisional and
 for the architect to settle: the encoder's quality target (0.5) and
-ceiling (4 times the estimated rate); `--duration` takes hours, minutes
-and seconds (`1h30m`, `45m`, `90s`); `msr record` prints `Recording
+ceiling (4 times the estimated rate); `msr record` prints `Recording
 into <folder>` at its start and, at its end, how long it recorded, each
 file with its state and each error event; it ends with an error (exit 3)
 when a file is not finalized or an event is `display stream failed`,
 `display shows another display's picture`, `display file writer fell
-behind` or `disk full`, and also when the recording folder cannot be
-claimed; event fields beyond `display`, `from` and `to`: `mirrors` (the
-display mirrored) and `error` (why a stream failed); a failing writer
-other than a full disk is `display stream failed`; `at` is rounded to
+behind`, `display file writer failed` or `disk full`; `at` is rounded to
 the millisecond; a display file whose name is taken (a new file within
 the same second) gets " (2)"; the timecode of tick 0 is t0's time of
 day rounded to the nearest frame; the crash marker holds

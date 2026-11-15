@@ -21,8 +21,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var aboutWindow: NSWindow?
     private var model: StartModel?
     private var session: RecordingSession?
-    /// Logout, restart or shutdown: a recording is finalized without asking.
-    private var isPoweringOff = false
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.mainMenu = makeMainMenu()
@@ -43,11 +41,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             forName: NSApplication.didChangeScreenParametersNotification, object: nil, queue: .main
         ) { _ in
             MainActor.assumeIsolated { model.devicesChanged() }
-        }
-        _ = NSWorkspace.shared.notificationCenter.addObserver(
-            forName: NSWorkspace.willPowerOffNotification, object: nil, queue: .main
-        ) { [weak self] _ in
-            MainActor.assumeIsolated { self?.isPoweringOff = true }
         }
         self.model = model
         startWindow = makeWindow(
@@ -92,8 +85,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
-        guard session != nil else { return true }
-        if RecordingSession.askToStop() {
+        guard let session else { return true }
+        if !session.isStopping, session.askToStop() {
             Task {
                 await stopRecording(revealFolder: true)
                 NSApp.terminate(nil)
@@ -102,10 +95,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         return false
     }
 
+    /// Logout, restart and shutdown finalize without asking; any other quit asks.
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
-        guard session != nil else { return .terminateNow }
-        if !isPoweringOff, !RecordingSession.askToStop() { return .terminateCancel }
-        let reveal = !isPoweringOff
+        guard let session else { return .terminateNow }
+        if session.isStopping { return .terminateCancel }
+        let endsTheSession = quitEndsTheSession(reason: currentQuitReason())
+        if !endsTheSession, !session.askToStop() { return .terminateCancel }
+        let reveal = !endsTheSession
         Task {
             await stopRecording(revealFolder: reveal)
             NSApp.reply(toApplicationShouldTerminate: true)
