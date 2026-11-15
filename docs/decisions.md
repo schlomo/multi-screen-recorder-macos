@@ -1128,7 +1128,9 @@ architect's reading.
   auto mode happens regardless of settings or we use --resolution xx to
   indicate a desired resolution. --auto on or --auto off is overkill,
   we need to KISS."; "I thought we had BT & Virtual which seemed
-  logical to me."; "Native I liked before already"; "yes to A". Later the same day, on a Mac without an audio input: "no
+  logical to me."; "Native I liked before already"; "yes to A". After testing the build: "I think in auto mode the
+  sliders should remain visible but grayed out, now we have too much UI
+  shift". Later the same day, on a Mac without an audio input: "no
   mic should just work of course, in any mode. and system audio is
   still a thing. The slider can remain as is, it should just not
   break".
@@ -1137,7 +1139,8 @@ architect's reading.
   1. Auto mode: the setting `auto`, on by default, records every
      display at Native and the audio mode Wired; the defaults of
      `resolution` (`native`) and `audioMode` (`wired`) are its choices.
-     The window has a switch "Auto" that hides the two sliders.
+     The window has a switch "Auto"; with it on the two sliders stay
+     visible, disabled, showing auto mode's choices.
   2. Native is the "looks like" size (the display's size in points),
      never the size it is drawn at; the boxes fit the looks-like size.
   3. The audio mode is a slider of four steps: None, Default

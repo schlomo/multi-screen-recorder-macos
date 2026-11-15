@@ -54,7 +54,9 @@ It runs on macOS 26 and later, on Apple silicon.
    and confirm.
 4. Grant the two permissions when macOS asks: **Screen & System Audio
    Recording** (for the displays and the system audio) and
-   **Microphone**. Both are in System Settings › Privacy & Security.
+   **Microphone** (asked only when a microphone is recorded: not on a
+   Mac without an audio input, nor with the audio mode None). Both are in
+   System Settings › Privacy & Security.
    A microphone permission allowed there, not in the prompt, counts
    only after you quit the app and start it again; if the screen
    recording permission still shows as missing, do the same.
@@ -70,8 +72,8 @@ table of the displays, with what each looks like, the size it is
 drawn at and the size it records at; a table of the audio inputs and
 system audio, the ones not recorded dimmed; each with the disk space
 it needs per hour, the total and the free space below; the output
-folder), then the switch "Auto" (on, the two sliders are hidden; off,
-they show the recording resolution and the audio mode: None, Default
+folder), then the switch "Auto" (on, the two sliders are grayed out and show Native and Wired; off,
+they are enabled and show the recording resolution and the audio mode: None, Default
 microphone, Wired or All, with a note under it on Bluetooth and virtual
 microphones), system audio, the output folder and the ready check:
 "Ready to record" when every item passes, otherwise each item with a

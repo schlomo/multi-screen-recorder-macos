@@ -133,7 +133,7 @@ and the audio mode is Wired, whatever the two sliders (`resolution`,
 `audioMode`) say; system audio, the output folder and the rest stay as
 set. The sliders' defaults are auto mode's choices, so turning auto mode
 off changes nothing until one is moved. In the window the switch "Auto"
-hides the sliders; on the command line `--auto` forces it for one run
+grays out the sliders, which then show Native and Wired; on the command line `--auto` forces it for one run
 (D34, D44).
 
 ## Audio file

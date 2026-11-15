@@ -75,6 +75,17 @@ import Testing
         #expect(settings.effectiveAudioMode == .none)
     }
 
+    /// The window's disabled sliders show the effective choices, not the saved ones.
+    @Test func withAutoOnTheSlidersShowNativeAndWired() {
+        var settings = chosen
+        settings.auto = true
+        #expect(settings.effectiveResolution.sliderIndex == RecordingResolution.native.sliderIndex)
+        #expect(settings.effectiveAudioMode.sliderIndex == AudioMode.wired.sliderIndex)
+        settings.auto = false
+        #expect(settings.effectiveResolution.sliderIndex == RecordingResolution.p720.sliderIndex)
+        #expect(settings.effectiveAudioMode.sliderIndex == AudioMode.none.sliderIndex)
+    }
+
     @Test func turningAutoOffChangesNothingUntilASliderIsMoved() {
         var settings = Settings.defaults
         let before = (settings.effectiveResolution, settings.effectiveAudioMode)

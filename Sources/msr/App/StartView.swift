@@ -39,36 +39,37 @@ private struct SettingsForm: View {
             }
             Form {
                 Toggle("Auto", isOn: binding(\.auto))
-                if model.settings.auto {
-                    Text("Every display at Native, the audio mode Wired.")
-                        .font(.callout)
-                        .foregroundStyle(.secondary)
-                } else {
-                    LabeledContent("Recording resolution") {
-                        HStack {
-                            Slider(value: resolutionIndex, in: 0...Double(RecordingResolution.smallestFirst.count - 1), step: 1)
-                                .accessibilityLabel("Recording resolution")
-                                .accessibilityValue(model.settings.resolution.label)
-                            Text(model.settings.resolution.label).frame(width: 60, alignment: .leading)
-                                .accessibilityHidden(true)
-                        }
-                    }
-                    LabeledContent("Audio mode") {
-                        VStack(alignment: .leading, spacing: 4) {
-                            HStack {
-                                Slider(value: audioModeIndex, in: 0...Double(AudioMode.allCases.count - 1), step: 1)
-                                    .accessibilityLabel("Audio mode")
-                                    .accessibilityValue(model.settings.audioMode.label)
-                                Text(model.settings.audioMode.label).frame(width: 130, alignment: .leading)
-                                    .accessibilityHidden(true)
-                            }
-                            Text(AudioMode.bluetoothAndVirtualNote)
-                                .font(.callout)
-                                .foregroundStyle(.secondary)
-                                .fixedSize(horizontal: false, vertical: true)
-                        }
+                // Always shown, so that turning Auto on or off shifts nothing; Auto on disables the sliders.
+                Text("Every display at Native, the audio mode Wired.")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .opacity(model.settings.auto ? 1 : 0)
+                LabeledContent("Recording resolution") {
+                    HStack {
+                        Slider(value: resolutionIndex, in: 0...Double(RecordingResolution.smallestFirst.count - 1), step: 1)
+                            .accessibilityLabel("Recording resolution")
+                            .accessibilityValue(model.settings.effectiveResolution.label)
+                        Text(model.settings.effectiveResolution.label).frame(width: 60, alignment: .leading)
+                            .accessibilityHidden(true)
                     }
                 }
+                .disabled(model.settings.auto)
+                LabeledContent("Audio mode") {
+                    VStack(alignment: .leading, spacing: 4) {
+                        HStack {
+                            Slider(value: audioModeIndex, in: 0...Double(AudioMode.allCases.count - 1), step: 1)
+                                .accessibilityLabel("Audio mode")
+                                .accessibilityValue(model.settings.effectiveAudioMode.label)
+                            Text(model.settings.effectiveAudioMode.label).frame(width: 130, alignment: .leading)
+                                .accessibilityHidden(true)
+                        }
+                        Text(AudioMode.bluetoothAndVirtualNote)
+                            .font(.callout)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+                .disabled(model.settings.auto)
                 Toggle("System audio", isOn: binding(\.systemAudio))
                 LabeledContent("Output folder") {
                     HStack {
@@ -84,7 +85,7 @@ private struct SettingsForm: View {
 
     private var resolutionIndex: Binding<Double> {
         Binding(
-            get: { model.settings.resolution.sliderIndex },
+            get: { model.settings.effectiveResolution.sliderIndex },
             set: { position in
                 guard let chosen = model.settings.resolution.choosing(sliderPosition: position) else { return }
                 model.change { $0.resolution = chosen }
@@ -93,7 +94,7 @@ private struct SettingsForm: View {
 
     private var audioModeIndex: Binding<Double> {
         Binding(
-            get: { model.settings.audioMode.sliderIndex },
+            get: { model.settings.effectiveAudioMode.sliderIndex },
             set: { position in
                 guard let chosen = model.settings.audioMode.choosing(sliderPosition: position) else { return }
                 model.change { $0.audioMode = chosen }

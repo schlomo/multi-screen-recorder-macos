@@ -397,9 +397,11 @@ manifest's state to `not finalized` and remove the marker.
     appears only when the displays and every recorded audio input can
     be read. The ready check's items stay as they are.
 
-  Then a switch "Auto", on by default: on, it hides the two sliders and
-  says what auto mode records (every display at Native, the audio mode
-  Wired); off, the sliders appear: the recording resolution (over 720p,
+  Then a switch "Auto", on by default: the two sliders are always shown, so
+  that the switch shifts nothing: on, they are disabled (grayed out) and
+  show auto mode's choices, Native and Wired, not the saved values, and
+  a caption says what auto mode records (every display at Native, the
+  audio mode Wired); off, they are enabled and show the saved values: the recording resolution (over 720p,
   1080p, 1200p, 1440p, 4K, Native, smallest to largest) and the audio
   mode (over None, Default microphone, Wired, All), each with the chosen
   one's name beside it. Under the audio mode slider the window says:
