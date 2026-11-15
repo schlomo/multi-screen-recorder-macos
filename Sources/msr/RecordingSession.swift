@@ -4,7 +4,7 @@ import RecorderCore
 import RecorderLogic
 
 /// A running recording as the person sees it, in the app and for `msr
-/// record` alike: the Dock icon's badge with the elapsed minutes, "!" and a
+/// record` alike: the Dock icon's badge with the elapsed time, "!" and a
 /// bouncing icon when something needs the person, and the question "Stop
 /// recording?" listing the problems (D45). `msr record` also says each on
 /// standard error.

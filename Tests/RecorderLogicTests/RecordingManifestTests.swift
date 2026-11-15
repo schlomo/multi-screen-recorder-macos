@@ -182,9 +182,14 @@ import Testing
 }
 
 @Suite struct RecordingProblemsTests {
-    @Test func theBadgeCountsMinutesUntilSomethingNeedsThePerson() {
+    @Test(arguments: [(0.0, "0:00"), (59.9, "0:00"), (300, "0:05"), (4020, "1:07"), (36_000, "10:00")])
+    func theBadgeShowsTheElapsedTime(seconds: Double, badge: String) {
+        #expect(RecordingStatus().badge(elapsedSeconds: seconds) == badge)
+    }
+
+    @Test func theBadgeShowsTheElapsedTimeUntilSomethingNeedsThePerson() {
         var status = RecordingStatus()
-        #expect(status.badge(elapsedSeconds: 125) == "2")
+        #expect(status.badge(elapsedSeconds: 125) == "0:02")
         status.isLowOnDisk = true
         #expect(status.badge(elapsedSeconds: 125) == "!")
         status.isLowOnDisk = false

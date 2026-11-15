@@ -403,7 +403,7 @@ manifest's state to `not finalized` and remove the marker.
   at" and GB/h, the last for every row and right-aligned. The widths of
   the columns after Source are measured at runtime from the widest
   possible content in the table's font ("8888×8888", "cannot be read",
-  "not recorded" and so on, and the header), never from what is
+  "888.8" and so on, and the header), never from what is
   connected, so no column moves when auto mode, a slider or the devices
   change; Source takes the rest of the window, which is as wide as the
   table, holds "MacBook Pro Microphone (default)" and truncates a longer
@@ -417,12 +417,14 @@ manifest's state to `not finalized` and remove the marker.
     Looks like and Drawn at empty, its number of channels in Records
     at ("1 channel", "2 channels", "cannot be read"), and GB/h (the
     audio file); the last row is "System audio" with "stereo". A source not recorded
-    is dimmed and shows "not recorded": every input with the audio
+    is dimmed and its GB/h is 0 (D46): every input with the audio
     mode `none`; every input but the default one with
     `default-microphone`; with `wired` every input but the default one
     that is not built-in or wired; and the system audio row when it is
     off.
-  - GB/h has one decimal; under 0.05 it shows "<0.1".
+  - GB/h is numbers only (D46), with one decimal; under 0.05 it shows
+    "<0.1", and "?" when the rate cannot be told (an input whose
+    channels cannot be read).
   - The total line: "Total <x> GB/h. <requiredRecordingHours> hours
     need <y> GB, <z> GB free.", without the free part while the free
     space is unknown (the ready check has not finished yet, or its
@@ -433,7 +435,7 @@ manifest's state to `not finalized` and remove the marker.
     rows; if the audio inputs cannot be read, "The audio inputs cannot
     be read: <reason>" stands as a red line above the table too, which
     then has the system audio row only; an audio input whose channels
-    cannot be read shows "cannot be read" in the Records at column (and "unknown" GB/h if it is recorded). The total line
+    cannot be read shows "cannot be read" in the Records at column (and "?" GB/h if it is recorded). The total line
     appears only when the displays and every recorded audio input can
     be read. The ready check's items stay as they are.
 
@@ -473,7 +475,7 @@ manifest's state to `not finalized` and remove the marker.
 Total 5.3 GB/h. 2 hours need 10.7 GB, 3.1 GB free.
 
 - **Recording:** the window closes; the Dock icon shows a red badge with
-  the elapsed minutes. Low disk space shows as a "!" badge and a
+  the elapsed time as `h:mm` (`0:00`, `0:05`, `1:07`; D46). Low disk space shows as a "!" badge and a
   bouncing Dock icon; no notification, which would need a third
   permission and is hidden by Focus modes. A recording problem (the
   recording manifest cannot be written, the displays or the free space
@@ -481,8 +483,8 @@ Total 5.3 GB/h. 2 hours need 10.7 GB, 3.1 GB free.
   and "Stop recording?" lists the problems; `msr record` also names each
   on standard error.
 - **Stop:** clicking the Dock icon or Quit asks "Stop recording?"
-  [Stop] [Continue]. Stop finalizes, reveals the recording folder in
-  Finder and quits the app: a recording is typically one shot (D45).
+  [Stop] [Continue]. Stop finalizes, opens the recording folder itself
+  in Finder (D46) and quits the app: a recording is typically one shot (D45).
   Logout, restart and shutdown finalize without asking, told apart from
   a Quit by the quit Apple event's reason (`kAEQuitReason`); one that
   comes while Stop is in progress waits for it. A failing writer and a

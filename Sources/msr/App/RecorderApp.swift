@@ -52,7 +52,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                   lines.joined(separator: "\n\n"))
     }
 
-    /// Start: the window closes and the Dock icon shows the elapsed minutes.
+    /// Start: the window closes and the Dock icon shows the elapsed time.
     private func startRecording() {
         guard let model, model.canStart else { return }
         do {
@@ -65,13 +65,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         startWindow?.close()
     }
 
-    /// Stop: finalizes, shows the recording folder in Finder and quits (D45).
-    private func stopRecording(revealFolder: Bool) async {
+    /// Stop: finalizes, opens the recording folder in Finder and quits (D45, D46).
+    private func stopRecording(openFolder: Bool) async {
         guard let session else { return }
         _ = await session.stop()
         self.session = nil
-        if revealFolder, let folder = session.folder {
-            NSWorkspace.shared.activateFileViewerSelecting([folder])
+        if openFolder, let folder = session.folder {
+            NSWorkspace.shared.open(folder)
         }
     }
 
@@ -79,7 +79,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         guard let session else { return true }
         if !session.isStopping, session.askToStop() {
             stopping = Task {
-                await stopRecording(revealFolder: true)
+                await stopRecording(openFolder: true)
                 NSApp.terminate(nil)
             }
         }
@@ -105,7 +105,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             fallthrough
         case .finalizeWithoutAsking:
             stopping = Task {
-                await stopRecording(revealFolder: !endsTheSession)
+                await stopRecording(openFolder: !endsTheSession)
                 NSApp.reply(toApplicationShouldTerminate: true)
             }
             return .terminateLater

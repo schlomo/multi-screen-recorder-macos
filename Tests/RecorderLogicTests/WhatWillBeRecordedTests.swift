@@ -79,12 +79,12 @@ import Testing
     @Test func aSourceNotRecordedIsARowWithNotRecordedAndIsDimmed() {
         let rows = section(audioInputs: DesignExample.audioInputs + [AudioInputInfo(
             name: "AirPods", channelCount: 1, isDefault: false, transport: .bluetooth)]).audioRows
-        #expect(rows.last { $0.cells[0] == "AirPods" } == .init(cells: ["AirPods", "", "", "1 channel", "not recorded"], isRecorded: false))
+        #expect(rows.last { $0.cells[0] == "AirPods" } == .init(cells: ["AirPods", "", "", "1 channel", "0"], isRecorded: false))
     }
 
     @Test func anUnreadableRecordedInputIsARowWithUnknown() {
         let rows = section(audioInputs: [Self.unreadable(isDefault: true)]).audioRows
-        #expect(rows.first == .init(cells: ["X (default)", "", "", "cannot be read", "unknown"], isRecorded: true))
+        #expect(rows.first == .init(cells: ["X (default)", "", "", "cannot be read", "?"], isRecorded: true))
     }
 
     @Test func everyRowHasOneCellPerColumn() {
@@ -99,7 +99,7 @@ import Testing
 
     @Test func audioModeNoneRecordsNoInputAndNoMicrophonesGuideTrack() {
         let none = section { $0.audioMode = .none }
-        #expect(none.audio.dropLast().allSatisfy { !$0.isRecorded && $0.gigabytesPerHour == "not recorded" })
+        #expect(none.audio.dropLast().allSatisfy { !$0.isRecorded && $0.gigabytesPerHour == "0" })
         #expect(none.audio.last?.isRecorded == true)
         #expect(none.displays.map(\.gigabytesPerHour) == ["0.9", "1.0"])
     }
@@ -126,7 +126,7 @@ import Testing
         let audio = section({ $0.audioMode = .wired },
                             audioInputs: DesignExample.audioInputs + [Self.airPods, Self.virtualInput]).audio
         #expect(audio.map(\.isRecorded) == [true, true, false, false, true])
-        #expect(audio[2].gigabytesPerHour == "not recorded")
+        #expect(audio[2].gigabytesPerHour == "0")
     }
 
     @Test func allRecordsEveryInput() {
@@ -180,7 +180,7 @@ import Testing
 
     @Test func systemAudioOffIsNotRecorded() {
         #expect(section { $0.systemAudio = false }.audio.last
-            == .init(name: "System audio", channels: "stereo", isRecorded: false, gigabytesPerHour: "not recorded"))
+            == .init(name: "System audio", channels: "stereo", isRecorded: false, gigabytesPerHour: "0"))
     }
 
     @Test(arguments: [nil, OutputFolderProbe.unusable("gone"), .usable(.unreadable("no such volume"))])
@@ -216,7 +216,7 @@ import Testing
     @Test func anUnreadableInputThatIsNotRecordedIsARowAndKeepsTheTotal() {
         let withUnreadable = section(audioInputs: DesignExample.audioInputs + [Self.unreadable(isDefault: false)])
         #expect(withUnreadable.audio[2]
-            == .init(name: "X", channels: "cannot be read", isRecorded: false, gigabytesPerHour: "not recorded"))
+            == .init(name: "X", channels: "cannot be read", isRecorded: false, gigabytesPerHour: "0"))
         #expect(withUnreadable.displays == section().displays)
         #expect(withUnreadable.total == section().total)
     }
@@ -224,7 +224,7 @@ import Testing
     @Test func anUnreadableRecordedInputLeavesTheTotalOut() {
         let broken = section(audioInputs: [Self.unreadable(isDefault: true)])
         #expect(broken.audio.first
-            == .init(name: "X (default)", channels: "cannot be read", isRecorded: true, gigabytesPerHour: "unknown"))
+            == .init(name: "X (default)", channels: "cannot be read", isRecorded: true, gigabytesPerHour: "?"))
         #expect(broken.displays == section().displays)
         #expect(broken.total == nil)
     }

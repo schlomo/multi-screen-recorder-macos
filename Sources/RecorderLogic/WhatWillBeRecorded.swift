@@ -4,7 +4,10 @@
 /// the system audio last, and a total line.
 public struct WhatWillBeRecorded: Equatable, Sendable {
     public static let columns = ["Source", "Looks like", "Drawn at", "Records at", "GB/h"]
-    static let notRecorded = "not recorded"
+    /// GB/h of a source not recorded, shown dimmed.
+    static let notRecorded = "0"
+    /// GB/h of a recorded source whose rate cannot be told.
+    static let unknown = "?"
     static let cannotBeRead = "cannot be read"
 
     public struct Display: Equatable, Sendable {
@@ -98,7 +101,7 @@ public struct WhatWillBeRecorded: Equatable, Sendable {
             outputFolder: facts.outputFolder)
     }
 
-    /// An input whose channels cannot be read says so; its GB/h is unknown if it is recorded.
+    /// An input whose channels cannot be read says so; its GB/h is "?" if it is recorded.
     private static func audio(_ input: AudioInputInfo, settings: Settings) -> Audio {
         let isRecorded = settings.records(input)
         return switch input.channelCount {
@@ -109,7 +112,7 @@ public struct WhatWillBeRecorded: Equatable, Sendable {
                       : notRecorded)
         case .failure:
             Audio(name: input.label, channels: cannotBeRead, isRecorded: isRecorded,
-                  gigabytesPerHour: isRecorded ? "unknown" : notRecorded)
+                  gigabytesPerHour: isRecorded ? unknown : notRecorded)
         }
     }
 
