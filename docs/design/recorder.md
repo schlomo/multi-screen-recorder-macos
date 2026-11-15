@@ -719,7 +719,11 @@ UUID and number: macOS treats it so, and so does the recorder (D46).
 stream and a display file (event `display connected`); one that
 vanishes has its file finalized (event `display disconnected`). A
 display that is asleep counts as disconnected; that macOS's display
-change callback fires when a display falls asleep is [ASSUMED]. A
+change callback fires when a display falls asleep is [ASSUMED]. When
+a display is unplugged, its stream ends first (error -3815), and
+macOS's display-change notice may come seconds later (8 s for the Wacom
+One in the owner's run of 2026-11-15): the display file ends with the
+stream, and the event `display disconnected` comes with the notice. A
 stream that fails finalizes its file and is restarted after 1 s,
 backing off to 10 s (*data*), for as long as the display exists. Each
 gap is an event in the manifest. A display's stream starts, or starts
