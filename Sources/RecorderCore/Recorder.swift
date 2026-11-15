@@ -272,6 +272,7 @@ public final class Recorder {
     private func fileStarted(_ file: RecordingManifest.DisplayFile, uuid: String) {
         RecorderLog.detail("file started: \(file.name)", category: "recorder")
         tracker.fileStarted(uuid)
+        problemsTold.cleared(.displayNotCaptured(uuid))
         guard !manifest.files.contains(where: { $0.name == file.name }) else { return }
         manifest.files.append(file)
         try? writeManifest()
@@ -306,6 +307,10 @@ public final class Recorder {
         let step = tracker.streamEnded(uuid, reason, connected: displays, at: context.now())
         context.update(displays, lastDisplayChange: tracker.lastDisplayChange)
         apply(step)
+        // A display that stays listed but cannot be captured is never left unrecorded silently (N-A).
+        if reason == .captureSourceGone, step.events.contains(where: { $0.event == .displayStreamFailed }) {
+            tell("Display \(display) cannot be captured", error: DisplayTracker.captureSourceGoneAgain, kind: .displayNotCaptured(uuid))
+        }
     }
 
     // MARK: Disk

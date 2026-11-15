@@ -70,6 +70,10 @@ public struct DisplayTracker: Sendable {
         /// When it last appeared, went or changed.
         var changedAt: Int64
         var restartDelay: Duration
+        /// Whether its stream may end once with the capture source gone
+        /// without a failure: until it does, and again after each
+        /// display-change notice for it (N-A).
+        var mayLoseCaptureSource = true
     }
 
     public let resolution: RecordingResolution
@@ -126,6 +130,7 @@ public struct DisplayTracker: Sendable {
         for (uuid, tracked) in displays.sorted(by: { $0.key < $1.key }) where tracked.reading != nil && byUUID[uuid] == nil {
             displays[uuid]?.reading = nil
             displays[uuid]?.changedAt = now
+            displays[uuid]?.mayLoseCaptureSource = true
             lastDisplayChange = now
             if !(tracked.reading?.isMirroring ?? false) {
                 step.events.append(event(.displayDisconnected, uuid, at: now))
@@ -145,6 +150,7 @@ public struct DisplayTracker: Sendable {
             guard previous != display else { continue }
             tracked.reading = display
             tracked.changedAt = now
+            tracked.mayLoseCaptureSource = true
             if tracked.name == nil { tracked.name = display.name }
             displays[display.uuid] = tracked
             lastDisplayChange = now
@@ -238,25 +244,22 @@ public struct DisplayTracker: Sendable {
             displays[uuid]?.phase = .showsAnotherDisplay(since: now)
         case .diskFull:
             displays[uuid]?.phase = .waitingForRoom
-        case .captureSourceGone:
+        case .captureSourceGone where tracked.mayLoseCaptureSource:
             // Ends as a disconnect; `display disconnected` comes with the
             // notice. Still listed after the settle time: a new stream.
             displays[uuid]?.phase = .idle
             displays[uuid]?.changedAt = now
+            displays[uuid]?.mayLoseCaptureSource = false
+        case .captureSourceGone:
+            step.append(streamFailed(
+                uuid, error: Self.captureSourceGoneAgain, isPresent: isPresent, at: now))
         case .writerFellBehind:
             step.events.append(event(.displayFileWriterFellBehind, uuid, at: now))
             scheduleRestart(uuid, at: now)
         case .writerFailed:
             if isPresent { scheduleRestart(uuid, at: now) } else { displays[uuid]?.phase = .idle }
         case .streamFailed(let error):
-            if isPresent {
-                var failed = event(.displayStreamFailed, uuid, at: now)
-                failed.error = error
-                step.events.append(failed)
-                scheduleRestart(uuid, at: now)
-            } else {
-                displays[uuid]?.phase = .idle
-            }
+            step.append(streamFailed(uuid, error: error, isPresent: isPresent, at: now))
         }
         step.append(observe(connected, at: now))
         return step
@@ -326,6 +329,22 @@ public struct DisplayTracker: Sendable {
         tracked.phase = .recording(frameSize: frameSize)
         displays[uuid] = tracked
         return .start(uuid: uuid, displayID: reading.displayID, frameSize: frameSize, number: tracked.number!, name: name)
+    }
+
+    /// The error of a stream that lost its capture source again without a
+    /// display-change notice in between: a failure (N-A).
+    public static let captureSourceGoneAgain =
+        "ScreenCaptureKit lost the display again without a display change (noCaptureSource, -3815)"
+
+    private mutating func streamFailed(_ uuid: String, error: String, isPresent: Bool, at now: Int64) -> Step {
+        guard isPresent else {
+            displays[uuid]?.phase = .idle
+            return Step()
+        }
+        var failed = event(.displayStreamFailed, uuid, at: now)
+        failed.error = error
+        scheduleRestart(uuid, at: now)
+        return Step(events: [failed])
     }
 
     private mutating func scheduleRestart(_ uuid: String, at now: Int64) {

@@ -3,6 +3,9 @@ public enum ProblemKind: Hashable, Sendable {
     case manifestNotWritten
     case displaysNotRead
     case freeSpaceNotRead
+    /// A display, by its UUID, whose stream lost its capture source again
+    /// without a display change; clears when a file of it starts.
+    case displayNotCaptured(String)
     /// `msr record` could not show its Dock icon.
     case dockIconNotShown
 }

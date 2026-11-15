@@ -733,8 +733,12 @@ seconds later (8 s for the Wacom One, observed in the owner's run of
 file ends as on a disconnect, with no `display stream failed` event and
 no back-off; the event `display disconnected` comes with the notice. A
 display still listed one settle time after such a stream end gets a new
-stream, as after any change, without a failure event. Any other stream
-error is a failure: a stream that fails finalizes its file and is restarted after 1 s,
+stream, as after any change, without a failure event. Only the first
+such end is free: if the stream ends with `noCaptureSource` again with
+no display-change notice for that display in between, it is a failure
+(`display stream failed` with its error, back-off, and a problem told),
+so a display that stays listed but cannot be captured never goes
+unrecorded silently. Any other stream error is a failure: a stream that fails finalizes its file and is restarted after 1 s,
 backing off to 10 s (*data*), for as long as the display exists. Each
 gap is an event in the manifest. A display's stream starts, or starts
 again, only once the display has been unchanged for the settle time,
@@ -989,7 +993,7 @@ file with its state, each failure event and each problem; it ends with
 an error (exit 3) when the manifest's `result` is `problems` (D47): a
 file is not finalized or a display file was ended by a failure, and
 when the finalized manifest could not be written (the problem is told,
-the app shows an alert, and the file on disk keeps no `ended`); `at` is rounded to
+the app shows an alert after the person's Stop, never at logout, restart or shutdown, and the file on disk keeps no `ended`); `at` is rounded to
 the millisecond; a display file whose name is taken (a new file within
 the same second) gets " (2)"; the timecode of tick 0 is t0's time of
 day rounded to the nearest frame; after a full disk, new display files
