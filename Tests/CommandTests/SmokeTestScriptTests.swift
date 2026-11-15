@@ -57,7 +57,7 @@ import Testing
             "CFBundleExecutable": "msr",
             "CFBundleIdentifier": "org.schapiro.multiscreenrecorder.test",
             "CFBundlePackageType": "APPL",
-            "MSRVersion": "0.9.0-dev+\(commit)",
+            "MSRVersion": "0.20261115.9-dev+\(commit)",
             "MSRCommit": commit,
         ]
         plist["CFBundleIconFile"] = iconFile

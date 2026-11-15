@@ -72,6 +72,32 @@ struct ScratchFolder {
     func remove() {
         try? FileManager.default.removeItem(at: url)
     }
+
+    /// A stand-in for gpg, as git calls it: signing writes a fake signature to
+    /// stdout and SIG_CREATED to the status fd; verifying prints the status
+    /// lines to stdout and the human lines to stderr, which `log.showSignature`
+    /// puts into the output of `git show`.
+    func installFakeGPG() throws -> URL {
+        let program = url.appending(path: "fake-gpg")
+        let script = """
+            #!/bin/sh
+            for argument in "$@"; do
+                if [ "$argument" = --verify ]; then
+                    echo "[GNUPG:] GOODSIG ABCDEF0123456789 Test"
+                    echo "[GNUPG:] VALIDSIG ABCDEF0123456789 2026-11-15 1 0 4 0 1 10 00 ABCDEF0123456789"
+                    echo "gpg: Signature made Sun Nov 15 12:00:00 2026 UTC" >&2
+                    echo 'gpg: Good signature from "Test"' >&2
+                    exit 0
+                fi
+            done
+            cat > /dev/null
+            echo "[GNUPG:] SIG_CREATED D 1 10 00 1 ABCDEF0123456789" >&2
+            printf -- '-----BEGIN PGP SIGNATURE-----\\n\\nZmFrZQ==\\n-----END PGP SIGNATURE-----\\n'
+            """
+        try script.write(to: program, atomically: true, encoding: .utf8)
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: program.path(percentEncoded: false))
+        return program
+    }
 }
 
 /// An Info.plist the scripts that read the bundle must refuse with a message.
@@ -90,10 +116,10 @@ enum InfoPlistDamage: CaseIterable, Sendable {
         switch self {
         case .truncated:
             let whole = try PropertyListSerialization.data(
-                fromPropertyList: ["MSRVersion": "0.2.0-dev+abcdef0"], format: .xml, options: 0)
+                fromPropertyList: ["MSRVersion": "0.20261115.2-dev+abcdef0"], format: .xml, options: 0)
             try whole.prefix(whole.count / 2).write(to: url)
         case .arrayAtTheRoot:
-            try PropertyListSerialization.data(fromPropertyList: ["0.2.0-dev+abcdef0"], format: .xml, options: 0)
+            try PropertyListSerialization.data(fromPropertyList: ["0.20261115.2-dev+abcdef0"], format: .xml, options: 0)
                 .write(to: url)
         }
     }

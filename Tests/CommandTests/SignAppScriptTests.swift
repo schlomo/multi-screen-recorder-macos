@@ -33,6 +33,7 @@ import Testing
             "HOME": scratch.url.path(percentEncoded: false),
             "GIT_CONFIG_NOSYSTEM": "1",
             "GIT_CONFIG_GLOBAL": "/dev/null",
+            "GIT_COMMITTER_DATE": "2026-11-15T12:00:00+00:00",
             "GIT_AUTHOR_NAME": "Test", "GIT_AUTHOR_EMAIL": "test@example.invalid",
             "GIT_COMMITTER_NAME": "Test", "GIT_COMMITTER_EMAIL": "test@example.invalid",
         ], in: checkout)
@@ -70,44 +71,58 @@ import Testing
     }
 
     @Test(arguments: [
-        ([String: String](), "0.13.0-dev+"),
-        (["PR_NUMBER": "7"], "0.13.0-pr7+"),
+        ([String: String](), "0.20261115.13-dev+", ""),
+        ([String: String](), "0.20261115.13-dev+", ".dirty"),
+        (["PR_NUMBER": "7"], "0.20261115.13-pr7+", ""),
     ])
-    func aMatchingVersionIsSignedAndZipped(environment: [String: String], prefix: String) throws {
+    func aMatchingVersionIsSignedAndZipped(environment: [String: String], prefix: String, suffix: String) throws {
         defer { scratch.remove() }
-        let version = prefix + head
+        let version = prefix + head + suffix
         try writeInfo(version: version)
         let outcome = try signApp(environment)
         #expect(outcome.status == 0, "\(outcome.errors)")
         #expect(zipExists(version))
     }
 
-    /// The checkout has one commit, so a release of it is 0.1.0.
+    /// The checkout has one commit, committed on 2026-11-15, so a release of it is 0.20261115.1.
     @Test func aReleaseHasNoSuffix() throws {
         defer { scratch.remove() }
-        try writeInfo(version: "0.1.0")
+        try writeInfo(version: "0.20261115.1")
         let outcome = try signApp(["RELEASE_BUILD": "true"])
         #expect(outcome.status == 0, "\(outcome.errors)")
-        #expect(zipExists("0.1.0"))
+        #expect(zipExists("0.20261115.1"))
     }
 
     @Test func aReleaseWhoseNumberIsNotTheCommitCountStops() throws {
         defer { scratch.remove() }
-        try writeInfo(version: "0.999.0")
+        try writeInfo(version: "0.20261115.999")
         let outcome = try signApp(["RELEASE_BUILD": "true"])
         #expect(outcome.status == 1)
-        #expect(outcome.errors.contains("does not have the form of a release of HEAD, 0.<N>.0 with N the 1 commits up to HEAD: 0.1.0"),
+        #expect(outcome.errors.contains("does not have the form of a release of HEAD, 0.<DATE>.<N> with N the 1 commits up to HEAD: 0.20261115.1"),
                 "\(outcome.errors)")
         #expect(try isUnsignedByThisRun())
     }
 
+    @Test func aSignedCommitWithShownSignaturesStillGivesTheDate() throws {
+        defer { scratch.remove() }
+        try git("config", "gpg.program", try scratch.installFakeGPG().path(percentEncoded: false))
+        try git("config", "user.signingkey", "ABCDEF")
+        try git("commit", "--quiet", "--allow-empty", "--gpg-sign", "--message=signed")
+        #expect(try git("cat-file", "-p", "HEAD").contains("gpgsig"))
+        let signedHead = try git("rev-parse", "--short=7", "HEAD")
+        try writeInfo(version: "0.20261115.13-dev+\(signedHead)", commit: signedHead)
+        let outcome = try signApp(["GIT_CONFIG_PARAMETERS": "'log.showSignature=true'"])
+        #expect(outcome.status == 0, "\(outcome.errors)")
+        #expect(zipExists("0.20261115.13-dev+\(signedHead)"))
+    }
+
     @Test func theFormIsNamedInWords() throws {
         defer { scratch.remove() }
-        try writeInfo(version: "0.13.0-dev+\(head)")
+        try writeInfo(version: "0.20261115.13-dev+\(head)")
         let outcome = try signApp(["PR_NUMBER": "7"])
         #expect(outcome.status == 1)
         #expect(outcome.errors.contains(
-            "does not have the form of a snapshot of PR #7 at \(head), 0.<N>.0-pr7+\(head) such as 0.13.0-pr7+\(head)"),
+            "does not have the form of a snapshot of PR #7 at \(head), 0.<DATE>.<N>-pr7+\(head) such as 0.20261115.13-pr7+\(head)"),
                 "\(outcome.errors)")
     }
 
@@ -123,14 +138,18 @@ import Testing
     }
 
     @Test(arguments: [
-        ([String: String](), "0.13.0-pr7+HEAD", "does not have the form"),
-        (["PR_NUMBER": "8"], "0.13.0-pr7+HEAD", "does not have the form"),
-        (["PR_NUMBER": "7"], "0.13.0-dev+HEAD", "does not have the form"),
-        (["RELEASE_BUILD": "true"], "0.13.0-dev+HEAD", "does not have the form"),
-        ([String: String](), "0.13.0-dev+abcdef0", "does not have the form"),
-        (["RELEASE_BUILD": "yes"], "0.12.0", "RELEASE_BUILD must be true or unset"),
-        (["RELEASE_BUILD": "true", "PR_NUMBER": "7"], "0.12.0", "exclude each other"),
-        (["PR_NUMBER": "07"], "0.13.0-pr07+HEAD", "PR_NUMBER must be a number"),
+        ([String: String](), "0.20261115.13-pr7+HEAD", "does not have the form"),
+        (["PR_NUMBER": "8"], "0.20261115.13-pr7+HEAD", "does not have the form"),
+        (["PR_NUMBER": "7"], "0.20261115.13-dev+HEAD", "does not have the form"),
+        (["RELEASE_BUILD": "true"], "0.20261115.13-dev+HEAD", "does not have the form"),
+        ([String: String](), "0.20261115.13-dev+abcdef0", "does not have the form"),
+        ([String: String](), "0.13.0-dev+HEAD", "does not have the form"),
+        ([String: String](), "0.20261116.13-dev+HEAD", "does not have the form"),
+        (["PR_NUMBER": "7"], "0.20261115.13-pr7+HEAD.dirty", "does not have the form"),
+        (["RELEASE_BUILD": "true"], "0.20261115.1.dirty", "does not have the form"),
+        (["RELEASE_BUILD": "yes"], "0.20261115.12", "RELEASE_BUILD must be true or unset"),
+        (["RELEASE_BUILD": "true", "PR_NUMBER": "7"], "0.20261115.12", "exclude each other"),
+        (["PR_NUMBER": "07"], "0.20261115.13-pr07+HEAD", "PR_NUMBER must be a number"),
     ])
     func aWrongVersionStopsBeforeSigning(environment: [String: String], version: String, message: String) throws {
         defer { scratch.remove() }
@@ -143,7 +162,7 @@ import Testing
 
     @Test func anotherCommitStopsBeforeSigning() throws {
         defer { scratch.remove() }
-        try writeInfo(version: "0.13.0-dev+abcdef0", commit: "abcdef0")
+        try writeInfo(version: "0.20261115.13-dev+abcdef0", commit: "abcdef0")
         let outcome = try signApp()
         #expect(outcome.status == 1)
         #expect(outcome.errors.contains("the bundle was built from abcdef0, but HEAD is \(head)"))
@@ -152,7 +171,7 @@ import Testing
 
     @Test func anotherIdentifierStopsBeforeSigning() throws {
         defer { scratch.remove() }
-        try writeInfo(version: "0.13.0-dev+\(head)", identifier: "org.example.other")
+        try writeInfo(version: "0.20261115.13-dev+\(head)", identifier: "org.example.other")
         let outcome = try signApp()
         #expect(outcome.status == 1)
         #expect(outcome.errors.contains("identifier is org.example.other"))

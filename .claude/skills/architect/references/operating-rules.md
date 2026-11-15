@@ -62,50 +62,32 @@ verifying agent output are in the principles (linked from
 
 ## Copilot's review
 
-Where `AGENTS.md` records that agents mark the PRs they open ready
-once fully reviewed, and the host has Copilot review drafts (D39 in
-this project), the session that owns the PR does this: the session
-that opened it, briefed the agent that did, or took it over from the
-backlog. A delegated agent reports to that session instead and never
-waits on Copilot itself (its brief's completion discipline). `gh api`
-fills in `{owner}` and `{repo}` from the checkout; `--paginate`
-matters, as the timeline comes 30 events per page. Until a draft PR
-has shown it (backlog), that the ruleset requests the review is
-configured, not observed.
+Copilot's review is an optional extra (D43): a repository ruleset is
+configured to request one review of each draft PR (not observed on PRs
+#6 to #8; whether it fires is the owner's to check), nobody waits for
+it, and its absence never blocks marking a PR ready. The session that
+owns the PR (the one that opened it, briefed the agent that did, or
+took it over from the backlog) does this; a delegated agent reports to
+that session and never waits on Copilot (its brief's completion
+discipline). `gh api` fills in `{owner}` and `{repo}` from the
+checkout; `--paginate` matters, as lists come in pages.
 
-- Within a few minutes of `gh pr create --draft`, run the request
-  check:
-  `gh api --paginate 'repos/{owner}/{repo}/issues/<n>/timeline' --jq '.[] | select(.event=="review_requested" or .event=="ready_for_review") | [.created_at, .event, (.requested_reviewer.login // "")] | @tsv'`
-  A `review_requested` line naming `Copilot` is the request. If there
-  is none, tell the human at once, and say in the description that
-  Copilot did not review the PR; it is then marked ready on the
-  agent's own reviews.
-- Wait with a timed check ("Supervising long-running work"), up to 30
-  minutes, until a Copilot review was submitted after that request;
-  on PR #1 and #2 of this project it took 5 to 7 minutes:
-  `gh api --paginate 'repos/{owner}/{repo}/pulls/<n>/reviews' --jq '.[] | select(.user.login | test("copilot"; "i")) | .submitted_at'`
-  prints a time later than the request's. Past the limit, tell the
-  human and go on as if none was requested.
-- Read all of it: the summary in the `body` of that review, and the
-  inline comments, which only
+- If a Copilot review has arrived by the time the PR is otherwise
+  ready, read all of it: the summary in the `body` of the review, and
+  the inline comments, which only
   `gh api --paginate 'repos/{owner}/{repo}/pulls/<n>/comments'` shows
-  (`gh pr view` does not). Copilot reviews the PR as it is when the
-  review is requested; later commits are not reviewed by Copilot.
+  (`gh pr view` does not). The reviews:
+  `gh api --paginate 'repos/{owner}/{repo}/pulls/<n>/reviews' --jq '.[] | select(.user.login | test("copilot"; "i")) | [.submitted_at, .state]'`.
+  Copilot reviews the PR as it is when the review is requested; later
+  commits are not reviewed by Copilot.
 - Handle each comment like an adversarial review's finding, checked
   against the code: fixed, fixed differently, or dismissed, each with
   its reason in the description. A comment that holds is deferred to
   the backlog only if it is not a BLOCKER or SHOULD-FIX, or with the
   human's yes. The delta reviewer gets Copilot's comments and these
   outcomes along with the fixes.
-- Then, with no BLOCKER or SHOULD-FIX open and the pipeline green:
-  `gh pr ready <n>`. About a minute later, run the request check
-  again: a `review_requested` line naming `Copilot` after the
-  `ready_for_review` line is a new request. Without one, one message
-  tells the human the PR is ready to merge. With one, the
-  description's status line says "Copilot's review pending: do not
-  merge yet" (the one time a ready PR is not yet fully reviewed), that
-  message waits, and the review submitted after that line is waited
-  for, read and handled as above.
-- Whether marking ready starts a review is not known yet; the first
-  draft PR that shows it settles it, and this section is corrected
-  then.
+- With no BLOCKER or SHOULD-FIX open and the pipeline green:
+  `gh pr ready <n>`, whether or not a Copilot review has arrived.
+- A Copilot review that arrives after the PR is ready is handled the
+  same way, in a follow-up if the PR is still open, otherwise noted in
+  the backlog.

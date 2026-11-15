@@ -13,14 +13,16 @@ Recorded by the setup skill; re-run it when any of this changes.
 - **Git:** GitHub, `schlomo/multi-screen-recorder-macos`, trunk `main`;
   squash merges, so a branch catches up by merging the trunk in.
 - **Agent writes:** push work branches and open draft PRs, and mark a
-  PR the agent opened ready once it is fully reviewed (D39): a
-  repository ruleset has Copilot review each draft PR once, and the
-  session that owns the PR handles that review like the
-  adversarial review's findings first. That the ruleset requests the
-  review is configured, not yet observed (UNVERIFIED; backlog).
-  Standing go-ahead for those Copilot reviews, billed as AI credits to
-  the PR's author, the owner's GitHub account. How: the architect
-  skill's `references/operating-rules.md`, "Copilot's review".
+  PR the agent opened ready once it is fully reviewed (D39). Copilot's
+  review is an optional extra (D43): a repository ruleset is configured
+  to request one review of each draft PR (not observed on PRs #6 to #8;
+  whether it fires is the owner's to check), nobody waits for it, and
+  its absence never blocks marking a PR ready; one that has arrived is
+  handled by the session that owns the PR like the adversarial
+  review's findings.
+  Standing go-ahead for those optional Copilot reviews, billed as AI
+  credits to the PR's author, the owner's GitHub account. How: the
+  architect skill's `references/operating-rules.md`, "Copilot's review".
 - **Attribution:** AI-written commits name the model as co-author, PR
   descriptions carry a generated-with line.
 - **Time zone:** Europe/Berlin, stated with every time shown to people.
@@ -30,9 +32,9 @@ Recorded by the setup skill; re-run it when any of this changes.
   then a separate signing job signs and publishes, for every push to a
   PR the PR's snapshot release (a pre-release tagged `pr-<n>`), for a
   push to `main` that changes more than Markdown files a release
-  `v0.<N>.0`; a closed PR's snapshot release is removed. PRs from forks
-  and Dependabot are tested, built and smoke-tested, never signed or
-  published. Signing needs the repository secret
+  `v0.<DATE>.<N>`; a closed PR's snapshot release is removed. PRs from
+  forks and Dependabot are tested, built and smoke-tested, never signed
+  or published. Signing needs the repository secret
   `SIGNING_CERTIFICATE_P12` ([delivery.md](docs/design/delivery.md)).
   Who may register pipelines and edit branch policies: the repository
   owner.

@@ -4,18 +4,18 @@ import Testing
 @Suite struct AppVersionTests {
     @Test func aBundledBuildShowsItsVersionAndCommit() {
         let version = AppVersion(infoDictionary: [
-            AppVersion.versionKey: "0.2.0-pr3+a1b2c3d",
+            AppVersion.versionKey: "0.20261115.2-pr3+a1b2c3d",
             AppVersion.commitKey: "a1b2c3d",
         ])
-        #expect(version.description == "0.2.0-pr3+a1b2c3d (a1b2c3d)")
+        #expect(version.description == "0.20261115.2-pr3+a1b2c3d (a1b2c3d)")
     }
 
     @Test func aReleaseShowsItsCommitToo() {
         let version = AppVersion(infoDictionary: [
-            AppVersion.versionKey: "0.4.0",
+            AppVersion.versionKey: "0.20261115.4",
             AppVersion.commitKey: "a1b2c3d",
         ])
-        #expect(version.description == "0.4.0 (a1b2c3d)")
+        #expect(version.description == "0.20261115.4 (a1b2c3d)")
     }
 
     @Test func aBinaryOutsideABundleSaysSo() {
@@ -25,7 +25,7 @@ import Testing
     }
 
     @Test func aBundleWithoutItsCommitSaysSo() {
-        let version = AppVersion(infoDictionary: [AppVersion.versionKey: "0.4.0"])
-        #expect(version.description == "0.4.0 (commit missing from Info.plist)")
+        let version = AppVersion(infoDictionary: [AppVersion.versionKey: "0.20261115.4"])
+        #expect(version.description == "0.20261115.4 (commit missing from Info.plist)")
     }
 }

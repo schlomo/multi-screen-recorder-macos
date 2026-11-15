@@ -1,9 +1,14 @@
 #!/usr/bin/env -S python3 -I
 """Prints the version of the current checkout. N is the number of commits on
-origin/main:
-  RELEASE_BUILD=true  0.<N>.0                (HEAD must be origin/main)
-  PR_NUMBER=<n>       0.<N+1>.0-pr<n>+<commit>
-  neither             0.<N+1>.0-dev+<commit>
+origin/main, DATE the committer date of HEAD in UTC as YYYYMMDD:
+  RELEASE_BUILD=true  0.<DATE>.<N>                    (HEAD must be origin/main,
+                                                       with no uncommitted changes
+                                                       to tracked files)
+  PR_NUMBER=<n>       0.<DATE>.<N+1>-pr<n>+<commit>
+  neither             0.<DATE>.<N+1>-dev+<commit>
+Uncommitted changes to tracked files append .dirty to a local build,
+0.<DATE>.<N+1>-dev+<commit>.dirty; a release or a snapshot stops on them.
+Untracked files do not count.
 """
 
 import os
@@ -11,6 +16,7 @@ import re
 import shutil
 import subprocess
 import sys
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import NoReturn
 
@@ -35,6 +41,18 @@ def git(*arguments: str, failure: str | None = None) -> str:
     return result.stdout.strip()
 
 
+def commit_date_utc() -> str:
+    """The committer date of HEAD in UTC as YYYYMMDD, independent of locale and time zone."""
+    stamp = git("show", "-s", "--no-show-signature", "--format=%ct", "HEAD", failure="cannot read the commit date of HEAD")
+    if not re.fullmatch(r"[0-9]+", stamp):
+        stop(f"the commit date of HEAD is not a number of seconds: '{stamp}'")
+    return datetime.fromtimestamp(int(stamp), UTC).strftime("%Y%m%d")
+
+
+def has_uncommitted_changes() -> bool:
+    return bool(git("status", "--porcelain", "--untracked-files=no", failure="cannot read the status of the checkout"))
+
+
 def main() -> None:
     if shutil.which("git") is None:
         stop("git is not on the PATH")
@@ -53,14 +71,20 @@ def main() -> None:
                            failure="cannot count the commits on origin/main; fetch it with its full history"))
     commit = git("rev-parse", "--short=7", "HEAD")
 
+    date = commit_date_utc()
+    dirty = has_uncommitted_changes()
+
+    if pr_number and dirty:
+        stop("a snapshot needs a checkout with no uncommitted changes to tracked files")
     if release_build:
         if git("rev-parse", "HEAD") != git("rev-parse", "origin/main"):
             stop(f"a release builds origin/main, but HEAD is {commit}")
-        print(f"0.{main_commits}.0")
-    elif pr_number:
-        print(f"0.{main_commits + 1}.0-pr{pr_number}+{commit}")
-    else:
-        print(f"0.{main_commits + 1}.0-dev+{commit}")
+        if dirty:
+            stop("a release needs a checkout with no uncommitted changes to tracked files")
+        print(f"0.{date}.{main_commits}")
+        return
+    suffix = f"pr{pr_number}" if pr_number else "dev"
+    print(f"0.{date}.{main_commits + 1}-{suffix}+{commit}{'.dirty' if dirty else ''}")
 
 
 if __name__ == "__main__":

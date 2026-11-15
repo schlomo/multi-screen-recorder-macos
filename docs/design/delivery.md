@@ -98,14 +98,20 @@ finish, not the order of the pushes (see "Accepted risks").
 hanging test fails the job instead of holding a runner for GitHub's
 six hours.
 
-**Versions** (D23) count the commits on `main`, N:
+**Versions** (D42) carry the committer date of HEAD in UTC, DATE as
+YYYYMMDD, and the number of commits on `main`, N:
 
 | Build | Version |
 |---|---|
-| Release from `main` | `0.<N>.0`, tag `v0.<N>.0` |
-| Snapshot of PR n | `0.<N+1>.0-pr<n>+<commit>` |
-| Local build | `0.<N+1>.0-dev+<commit>` |
+| Release from `main` | `0.<DATE>.<N>`, tag `v0.<DATE>.<N>` |
+| Snapshot of PR n | `0.<DATE>.<N+1>-pr<n>+<commit>` |
+| Local build | `0.<DATE>.<N+1>-dev+<commit>` |
 
+A local build with uncommitted changes to tracked files gets `.dirty`
+after the commit (`+<commit>.dirty`); untracked files do not count.
+Only a local build can be dirty: a release or a snapshot of such a
+checkout stops in `scripts/version`, and `scripts/sign-app` accepts
+`.dirty` only on a local build.
 N grows with every commit on `main`, including Markdown-only ones that
 publish nothing, so release numbers can skip but never repeat. The
 version is computed once, by `scripts/version` in `scripts/build-app`,
@@ -134,7 +140,7 @@ is checked out (`MSRCommit`), the identifier
 `org.schapiro.multiscreenrecorder`, and a version (`MSRVersion`) of
 the form for this build: with `PR_NUMBER` the snapshot form for exactly
 that PR and commit, with `RELEASE_BUILD=true` the release form
-`0.<N>.0` with N the number of commits up to `HEAD` (the release job
+`0.<DATE>.<N>` with N the number of commits up to `HEAD` (the release job
 checks out the full history for it; the snapshot job needs only the
 commit), otherwise the local form. After signing it stops on any
 miss among: `codesign --verify --deep --strict`; the signed identifier;

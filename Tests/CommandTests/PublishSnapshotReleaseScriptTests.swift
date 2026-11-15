@@ -27,7 +27,7 @@ import Testing
         try git("init", "--quiet", "--initial-branch=main")
         try git("commit", "--quiet", "--allow-empty", "--message=one")
         head = try git("rev-parse", "HEAD")
-        let version = "0.2.0-pr7+\(head.prefix(7))"
+        let version = "0.20261115.2-pr7+\(head.prefix(7))"
         try PropertyListSerialization.data(fromPropertyList: ["MSRVersion": version], format: .xml, options: 0)
             .write(to: contents.appending(path: "Info.plist"))
         try Data("zip".utf8).write(to: checkout.appending(path: "build/Multi Screen Recorder \(version).zip"))
@@ -120,7 +120,7 @@ import Testing
         #expect(outcome.status == 0, "\(outcome.errors)")
         let calls = try ghCalls()
         #expect(calls.count == 3)
-        #expect(calls.last?.hasPrefix("release create pr-7 build/Multi Screen Recorder 0.2.0-pr7+") == true, "\(calls)")
+        #expect(calls.last?.hasPrefix("release create pr-7 build/Multi Screen Recorder 0.20261115.2-pr7+") == true, "\(calls)")
     }
 
     @Test func aMissingPRNumberStops() throws {
