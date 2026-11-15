@@ -81,6 +81,23 @@ import Testing
         return items
     }
 
+    /// The video track's own metadata items: the names on the video stream.
+    private func videoTrackItems(of asset: AVAsset) async throws -> [String: String] {
+        let video = try #require(try await asset.loadTracks(withMediaType: .video).first)
+        var items: [String: String] = [:]
+        for item in try await video.load(.metadata) {
+            guard let key = item.identifier?.rawValue else { continue }
+            items[key] = try await item.load(.stringValue)
+        }
+        return items
+    }
+
+    private let trackNames = [
+        "mdta/com.apple.proapps.reel": "Display 2 - LG HDR 4K",
+        "mdta/com.apple.proapps.cameraName": "Display 2 - LG HDR 4K",
+        "mdta/com.apple.quicktime.title": "Display 2 - LG HDR 4K",
+    ]
+
     @Test func aDisplayFileCarriesItsReelNameAndMetadata() async throws {
         defer { removeScratch() }
         let timecode = Timecode(start: try startDate(), timeZone: berlin)
@@ -99,6 +116,7 @@ import Testing
             "com.apple.proapps.reel": "Display 2 - LG HDR 4K",
             "com.apple.proapps.cameraName": "Display 2 - LG HDR 4K",
         ])
+        #expect(try await videoTrackItems(of: asset) == trackNames)
     }
 
     private func startDate() throws -> Date {
@@ -168,6 +186,7 @@ import Testing
         let items = try await metadataItems(of: asset)
         #expect(items["com.apple.proapps.reel"] == "Display 2 - LG HDR 4K")
         #expect(items["com.apple.proapps.cameraName"] == "Display 2 - LG HDR 4K")
+        #expect(try await videoTrackItems(of: asset) == trackNames)
         withExtendedLifetime(writer) {}
     }
 

@@ -56,16 +56,11 @@ public final class DisplayFileWriter: DisplayFileWriting {
         }
         writer.movieFragmentInterval = CMTime(value: CMTimeValue(RecorderValues.fragmentSeconds), timescale: 1)
         writer.shouldOptimizeForNetworkUse = false
-        writer.metadata = metadata.items.map { key, value in
-            let item = AVMutableMetadataItem()
-            item.keySpace = .quickTimeMetadata
-            item.key = key as NSString
-            item.value = value as NSString
-            return item
-        }
+        writer.metadata = Self.metadataItems(metadata.items)
 
         video = AVAssetWriterInput(mediaType: .video, outputSettings: Self.videoSettings(frameSize, grid: grid))
         video.expectsMediaDataInRealTime = true
+        video.metadata = Self.metadataItems(metadata.trackItems)
         adaptor = AVAssetWriterInputPixelBufferAdaptor(assetWriterInput: video, sourcePixelBufferAttributes: nil)
 
         var format: CMTimeCodeFormatDescription?
@@ -97,6 +92,16 @@ public final class DisplayFileWriter: DisplayFileWriting {
             throw DisplayFileWriterError(writer.error, while: "cannot start writing \(url.lastPathComponent)")
         }
         writer.startSession(atSourceTime: time(ofTick: firstTick))
+    }
+
+    private static func metadataItems(_ items: [(key: String, value: String)]) -> [AVMetadataItem] {
+        items.map { key, value in
+            let item = AVMutableMetadataItem()
+            item.keySpace = .quickTimeMetadata
+            item.key = key as NSString
+            item.value = value as NSString
+            return item
+        }
     }
 
     static func videoSettings(_ frameSize: FrameSize, grid: TickGrid) -> [String: Any] {

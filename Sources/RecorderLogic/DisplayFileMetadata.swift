@@ -30,6 +30,14 @@ public struct DisplayFileMetadata: Equatable, Sendable {
     /// "Display 2 - LG HDR 4K", as in the display file's name.
     public var reelName: String { "Display \(displayNumber) - \(displayName)" }
 
+    public static let titleKey = "com.apple.quicktime.title"
+
+    /// The video track's own items: its reel, camera name and title, each
+    /// the reel name, so the video stream itself carries the display's name.
+    public var trackItems: [(key: String, value: String)] {
+        [(Self.reelKey, reelName), (Self.cameraNameKey, reelName), (Self.titleKey, reelName)]
+    }
+
     /// Each metadata item's full key and value.
     public var items: [(key: String, value: String)] {
         [
