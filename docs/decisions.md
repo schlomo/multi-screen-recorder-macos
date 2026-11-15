@@ -961,19 +961,24 @@ architect's reading.
 - **Decision:** The architect's reading of "when you are done",
   "check" and "you", for every agent at this level: an agent pushes a
   work branch and opens a draft PR; the ruleset has Copilot review it
-  once; the session that opened the PR reads that review and handles
-  each comment like an adversarial review's finding (fixed, fixed
-  differently, or deferred, with its reason); it marks the PR ready
-  once no BLOCKER or SHOULD-FIX is open and CI passes, and tells the
-  owner it is ready to merge. An agent never marks the owner's own
-  draft ready. Only the owner merges. The Copilot reviews the ruleset
-  starts on the agents' PRs have the owner's standing go-ahead, billed
-  to the owner's GitHub account, which authors the PRs, until the owner
-  withdraws it.
+  once; the architect session that owns the PR handles each comment
+  like an adversarial review's finding (fixed, fixed differently or
+  dismissed, with its reason; deferred only if it is not a BLOCKER or
+  SHOULD-FIX, or with the owner's yes); it marks the PR ready once no
+  BLOCKER or SHOULD-FIX is open and CI passes, and tells the owner it
+  is ready to merge, unless marking ready requested another Copilot
+  review. An agent never marks the owner's own draft ready. Only the
+  owner merges. The Copilot reviews the ruleset starts on the agents'
+  PRs have the owner's standing go-ahead, billed to the owner's GitHub
+  account, which authors the PRs, until the owner withdraws it.
 - **Consequences:** "Ready" keeps one meaning, fully reviewed, so the
-  owner can merge at once. Whether marking ready starts a second
-  Copilot review is not known yet. The principles "Work branches" and
-  "Live systems need a human's go-ahead" change, setup offers the
-  option, `AGENTS.md` records it, and the architect skill's operating
-  rules give the commands.
+  owner can merge at once. UNVERIFIED: that the ruleset requests
+  Copilot's review of a new draft is configured, not observed (this PR
+  was opened before the ruleset), and whether marking ready requests
+  another is not known; the first new draft PR shows both (backlog).
+  The principles "Work branches" and "Live systems need a human's
+  go-ahead" change; the latter's paid run now also covers a write that
+  makes a host start an automated review billed per use. Setup offers
+  the option, `AGENTS.md` records it, and the architect skill's
+  operating rules give the commands.
 - **Evidence:** this change.

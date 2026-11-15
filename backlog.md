@@ -7,7 +7,8 @@ The v0 design is agreed (2026-11-12, D17–D33) and written down in
 and pipeline PR (#1) is merged (2026-11-14), and the end-to-end test
 design is agreed (D37). Agents now mark the PRs they open ready once
 fully reviewed, Copilot's review of the draft included (D39,
-`AGENTS.md` "Agent writes").
+`AGENTS.md` "Agent writes"); the first new draft PR checks how the
+ruleset behaves ("In flight").
 
 Next, waiting for the owner:
 
@@ -65,6 +66,14 @@ order, the next architect session:
 
 ## In flight
 
+- **Copilot's review of drafts (D39), not observed yet.** On the first
+  draft PR opened after #5, the architect checks with the commands in
+  the architect skill's operating rules ("Copilot's review") whether
+  the ruleset requests Copilot's review of the draft, and whether
+  marking the PR ready requests another, then corrects that section
+  and `AGENTS.md` ("UNVERIFIED") to what was seen. The ruleset covers
+  every PR, the owner's own and Dependabot's included; who pays for a
+  review of a Dependabot PR is not known; the owner is asked.
 - **Open from PR #1** (merged 2026-11-14), checked on the owner's Mac
   with the snapshot release the owner named: "So I'm checking the PR1
   release snapshot from GH 43ec12f".

@@ -53,8 +53,9 @@ so rather than silently picking a side.
   reviewed, the human's to merge. An agent never marks a human's draft
   ready. The host's automated review can be billed per use, so setup
   records the option only with a go-ahead naming the account that
-  pays ("Live systems need a human's go-ahead"). At every level, credentials that happen to be present
-  are not consent, and neither is a request to "fix it": the level and
+  pays ("Live systems need a human's go-ahead"). At every level,
+  credentials that happen to be present are not consent, and neither
+  is a request to "fix it": the level and
   the brief set what an agent may write, and only a human merges.
   Wherever these principles, the root instruction file, an agent
   definition or a brief say "push" or "the pushed remote", read it at
@@ -157,18 +158,18 @@ the mechanism is verifiable without a live system.
 A **paid run** touches a live system too: the account that pays. A
 paid run is any script, tool or test run that makes its own model
 calls (headless agent sessions, model API calls) or calls another API
-billed per use, and any write that makes a host start a run billed
-per use, such as an automated review; a session's own work, its
-subagents included, is not one. A script bills whatever credential its environment hands it,
+billed per use, and any write that makes a host start an automated
+review billed per use; a session's own work, its subagents included,
+is not one. A script bills whatever credential its environment hands it,
 possibly another project's key, and a login status may not show
 which. So before each paid run, state what it runs, roughly what it
 costs and whether a credential is set in its environment (a presence
 check, never the value), then ask which account pays; the go-ahead
 names that account. The one standing go-ahead is for the automated
-review a host runs on the MRs/PRs an agent opens, where setup recorded
-the option of marking them ready ("Work branches"): setup records it
-once, naming the account and what starts a review, and it holds until
-a human withdraws it.
+review a host runs on the MRs/PRs agents open: setup records it once,
+naming the account and what starts a review, and it holds until a
+human withdraws it. The option of marking MRs/PRs ready ("Work
+branches") needs it.
 
 **A read can still do harm.** A diagnostic read puts load on the
 system it reads, and parallel sessions multiply that load. Before

@@ -15,11 +15,12 @@ Recorded by the setup skill; re-run it when any of this changes.
 - **Agent writes:** push work branches and open draft PRs, and mark a
   PR the agent opened ready once it is fully reviewed (D39): a
   repository ruleset has Copilot review each draft PR once, and the
-  agent reads that review and handles it like the adversarial
-  review's findings first. Standing go-ahead for those Copilot
-  reviews, billed as AI credits to the PR's author, the owner's GitHub
-  account. How: the architect skill's `references/operating-rules.md`,
-  "Copilot's review".
+  architect session that owns the PR handles that review like the
+  adversarial review's findings first. That the ruleset requests the
+  review is configured, not yet observed (UNVERIFIED; backlog).
+  Standing go-ahead for those Copilot reviews, billed as AI credits to
+  the PR's author, the owner's GitHub account. How: the architect
+  skill's `references/operating-rules.md`, "Copilot's review".
 - **Attribution:** AI-written commits name the model as co-author, PR
   descriptions carry a generated-with line.
 - **Time zone:** Europe/Berlin, stated with every time shown to people.
