@@ -16,7 +16,7 @@ public protocol DisplayFileWriting: AnyObject {
 /// its end, state and late frames, and the writer's error, if any.
 public struct DisplayFileEnd: Equatable, Sendable {
     public var file: RecordingManifest.DisplayFile
-    public var error: String?
+    public var error: DisplayFileWriterError?
 }
 
 /// One display file's ticks: frames that passed the display check go in,
@@ -39,7 +39,7 @@ public final class DisplayFileTicker {
     private var writer: (any DisplayFileWriting)?
     private var entry: RecordingManifest.DisplayFile?
     /// The writer's first error, for the manifest and the person.
-    private var writerError: String?
+    private var writerError: DisplayFileWriterError?
 
     /// `captureStart` in nanoseconds from t0: the file's first tick is never before it.
     public init(
@@ -61,7 +61,7 @@ public final class DisplayFileTicker {
             entry = made.entry
             return .fileStarted(made.entry)
         } catch {
-            writerError = error.description
+            writerError = error
             return .ended(error.isDiskFull ? .diskFull : .writerFailed(error.description))
         }
     }
@@ -78,11 +78,9 @@ public final class DisplayFileTicker {
     }
 
     private func failed(_ error: any Error) -> DisplayTracker.StreamEnd {
-        guard let error = error as? DisplayFileWriterError else {
-            writerError = writerError ?? String(describing: error)
-            return .writerFailed(String(describing: error))
-        }
-        writerError = writerError ?? error.description
+        let error = error as? DisplayFileWriterError
+            ?? DisplayFileWriterError(description: String(describing: error), isDiskFull: false)
+        writerError = writerError ?? error
         return error.isDiskFull ? .diskFull : .writerFailed(error.description)
     }
 
@@ -100,7 +98,7 @@ public final class DisplayFileTicker {
             try await writer.finish(lastTick: ticks.lastWrittenTick)
             file.state = .finalized
         } catch {
-            writerError = writerError ?? error.description
+            writerError = writerError ?? error
             file.state = .notFinalized
         }
         file.end = ticks.grid.seconds(ofTick: (ticks.lastWrittenTick ?? writer.firstTick - 1) + 1)
@@ -123,7 +121,8 @@ public final class DisplayFileTicker {
             }
             if left == 0 { return }
             if clock.now >= deadline {
-                writerError = "the writer took none of the last \(left) ticks within \(drainTimeout)"
+                writerError = DisplayFileWriterError(
+                    description: "the writer took none of the last \(left) ticks within \(drainTimeout)", isDiskFull: false)
                 return
             }
             try? await clock.sleep(for: .milliseconds(5))

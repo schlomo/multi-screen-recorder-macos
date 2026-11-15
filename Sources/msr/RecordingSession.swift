@@ -78,9 +78,9 @@ final class RecordingSession: RecorderObserver {
         updateBadge()
     }
 
-    func recorder(_ recorder: Recorder, problem: String) {
-        if tellOnStandardError { standardError(problem) }
-        status.problems.append(problem)
+    func recorder(_ recorder: Recorder, problem: RecordingProblem) {
+        if tellOnStandardError { standardError(problem.text) }
+        status.problems.append(problem.text)
         needsAttention()
     }
 }

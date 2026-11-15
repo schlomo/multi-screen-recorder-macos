@@ -75,13 +75,26 @@ public struct RecordingManifest: Codable, Equatable, Sendable {
         }
     }
 
+    /// How a finalized recording went.
+    public enum Result: String, Codable, Sendable {
+        case ok
+        /// A problem was told, a file is not finalized, or an event is an error.
+        case problems
+    }
+
     public var app: String
     public var state: State
     /// The local start time, ISO 8601 with milliseconds and the offset.
     public var started: String
+    /// The local end time, as `started`; nil until the recording is finalized.
+    public var ended: String?
+    /// Nil until the recording is finalized.
+    public var result: Result?
     public var settings: RecordedSettings
     public var files: [DisplayFile]
     public var events: [RecordingEvent]
+    /// Every problem told to the person.
+    public var problems: [RecordingProblem]
 
     public init(app: String, started: Date, timeZone: TimeZone, settings: Settings) {
         self.app = app
@@ -90,6 +103,46 @@ public struct RecordingManifest: Codable, Equatable, Sendable {
         self.settings = RecordedSettings(settings)
         files = []
         events = []
+        problems = []
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case app, state, started, ended, result, settings, files, events, problems
+    }
+
+    /// `ended` and `result` are written as null until the recording is
+    /// finalized; `events` and `problems` in the order of their time.
+    public func encode(to encoder: any Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(app, forKey: .app)
+        try container.encode(state, forKey: .state)
+        try container.encode(started, forKey: .started)
+        try container.encode(ended, forKey: .ended)
+        try container.encode(result, forKey: .result)
+        try container.encode(settings, forKey: .settings)
+        try container.encode(files, forKey: .files)
+        try container.encode(Self.inTimeOrder(events, at: \.at), forKey: .events)
+        try container.encode(Self.inTimeOrder(problems, at: \.at), forKey: .problems)
+    }
+
+    /// Sorted by time; those at the same time keep their order.
+    private static func inTimeOrder<Item>(_ items: [Item], at time: KeyPath<Item, Double>) -> [Item] {
+        items.enumerated()
+            .sorted { ($0.element[keyPath: time], $0.offset) < ($1.element[keyPath: time], $1.offset) }
+            .map(\.element)
+    }
+
+    /// Whether the recording went wrong: a problem was told, a file is not
+    /// finalized, or an event is an error.
+    public var hasProblems: Bool {
+        !problems.isEmpty || files.contains { $0.state != .finalized } || events.contains(where: \.event.isError)
+    }
+
+    /// The recording ends: its end time and its result.
+    public mutating func finalize(ended date: Date, timeZone: TimeZone) {
+        state = .finalized
+        ended = Self.timestamp(date, timeZone: timeZone)
+        result = hasProblems ? .problems : .ok
     }
 
     /// "2026-11-12T14:03:05.120+01:00".
@@ -178,5 +231,35 @@ public struct RecordingEvent: Codable, Equatable, Sendable {
         at = (Double(nanoseconds) / 1_000_000).rounded() / 1000
         self.event = event
         self.display = display
+    }
+}
+
+/// A problem told to the person (the Dock badge's "!", the status window,
+/// standard error in `msr record`), at its time on the shared clock.
+public struct RecordingProblem: Codable, Equatable, Sendable {
+    /// Seconds from the recording's start, to the millisecond.
+    public var at: Double
+    /// What went wrong, such as "Display file <name>".
+    public var problem: String
+    /// The full error text, nil when the problem says it all.
+    public var error: String?
+
+    public init(at nanoseconds: Int64, problem: String, error: String?) {
+        at = (Double(nanoseconds) / 1_000_000).rounded() / 1000
+        self.problem = problem
+        self.error = error
+    }
+
+    /// The problem as the person reads it.
+    public var text: String { error.map { "\(problem): \($0)" } ?? problem }
+
+    private enum CodingKeys: String, CodingKey { case at, problem, error }
+
+    /// `error` is written as null when there is none.
+    public func encode(to encoder: any Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(at, forKey: .at)
+        try container.encode(problem, forKey: .problem)
+        try container.encode(error, forKey: .error)
     }
 }

@@ -11,10 +11,8 @@ public struct RecordingSummary: Equatable, Sendable {
         self.seconds = seconds
     }
 
-    /// Ended with an error (exit 3): a file not finalized or an error event.
-    public var endedWithError: Bool {
-        manifest.files.contains { $0.state != .finalized } || !errors.isEmpty
-    }
+    /// Ended with an error (exit 3): a problem told, a file not finalized or an error event.
+    public var endedWithError: Bool { manifest.hasProblems }
 
     private var errors: [RecordingEvent] { manifest.events.filter(\.event.isError) }
 
@@ -27,6 +25,9 @@ public struct RecordingSummary: Equatable, Sendable {
         for event in errors {
             lines.append("Error at \(Self.elapsed(seconds: event.at)): \(event.event.rawValue)"
                 + (event.display.map { ", \($0)" } ?? "") + (event.error.map { " (\($0))" } ?? ""))
+        }
+        for problem in manifest.problems {
+            lines.append("Problem at \(Self.elapsed(seconds: problem.at)): \(problem.text)")
         }
         return lines.joined(separator: "\n") + "\n"
     }

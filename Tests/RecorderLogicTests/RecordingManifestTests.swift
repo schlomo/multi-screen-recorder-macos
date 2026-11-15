@@ -29,7 +29,10 @@ import Testing
         #expect(text.contains(#""state" : "recording""#))
         #expect(text.contains(#""settings" : {"#))
         #expect(text.contains(#""audioMode" : "default-microphone""#))
-        let keys = ["app", "events", "files", "settings", "started", "state"].map { text.range(of: "\n  \"\($0)\"")!.lowerBound }
+        #expect(text.contains(#""ended" : null"#))
+        #expect(text.contains(#""result" : null"#))
+        #expect(text.contains(#""problems" : ["#))
+        let keys = ["app", "ended", "events", "files", "problems", "result", "settings", "started", "state"].map { text.range(of: "\n  \"\($0)\"")!.lowerBound }
         #expect(keys == keys.sorted())
         #expect(try RecordingManifest(json: manifest.jsonData()) == manifest)
     }
@@ -44,6 +47,51 @@ import Testing
         let marked = manifest.markedNotFinalized()
         #expect(marked.state == .notFinalized)
         #expect(marked.files.map(\.state) == [.finalized, .notFinalized])
+    }
+
+    @Test func aFinalizedRecordingHasItsEndAndResult() {
+        var manifest = manifest()
+        manifest.finalize(ended: start + 60, timeZone: berlin)
+        #expect(manifest.state == .finalized)
+        #expect(manifest.ended == "2026-11-12T14:04:05.120+01:00")
+        #expect(manifest.result == .ok)
+    }
+
+    @Test func aProblemAFileNotFinalizedOrAnErrorEventMakeTheResultProblems() {
+        var told = manifest()
+        told.problems.append(RecordingProblem(at: 2_000_000_000, problem: "Cannot remove the crash marker", error: "denied"))
+        var notFinalized = manifest()
+        notFinalized.files.append(.init(name: "a.mov", display: "A", displayUUID: "A", frameSize: FrameSize(width: 2, height: 2),
+                                        start: 0, timecode: "00:00:00:00"))
+        var failed = manifest()
+        failed.events.append(RecordingEvent(at: 0, event: .diskFull, display: "A"))
+        for var manifest in [told, notFinalized, failed] {
+            manifest.finalize(ended: start + 60, timeZone: berlin)
+            #expect(manifest.result == .problems)
+        }
+    }
+
+    @Test func aProblemHasItsTimeAndFullError() throws {
+        let problem = RecordingProblem(at: 1_446_200_400_000, problem: "Display file a.mov", error: "The operation could not be completed")
+        #expect(problem.at == 1446.2)
+        #expect(problem.text == "Display file a.mov: The operation could not be completed")
+        #expect(RecordingProblem(at: 0, problem: "The displays cannot be read", error: nil).text == "The displays cannot be read")
+        let text = String(decoding: try prettyJSON(RecordingProblem(at: 0, problem: "p", error: nil)), as: UTF8.self)
+        #expect(text.contains(#""error" : null"#))
+    }
+
+    @Test func eventsAndProblemsAreWrittenInTheOrderOfTheirTime() throws {
+        var manifest = manifest()
+        manifest.events = [
+            RecordingEvent(at: 5_000_000_000, event: .wake), RecordingEvent(at: 2_000_000_000, event: .sleep),
+            RecordingEvent(at: 2_000_000_000, event: .diskFull, display: "A"),
+        ]
+        manifest.problems = [
+            RecordingProblem(at: 3_000_000_000, problem: "late", error: nil), RecordingProblem(at: 1_000_000_000, problem: "early", error: nil),
+        ]
+        let written = try RecordingManifest(json: manifest.jsonData())
+        #expect(written.events.map(\.event) == [.sleep, .diskFull, .wake])
+        #expect(written.problems.map(\.problem) == ["early", "late"])
     }
 
     @Test func eventTimesAreSecondsToTheMillisecond() {
@@ -82,6 +130,17 @@ import Testing
         for event in events {
             _ = try JSONDecoder().decode(RecordingEvent.self, from: JSONSerialization.data(withJSONObject: event))
         }
+        let problems = try #require(object["problems"] as? [[String: Any]])
+        for problem in problems {
+            let decoded = try JSONDecoder().decode(RecordingProblem.self, from: JSONSerialization.data(withJSONObject: problem))
+            let encoded = try #require(try JSONSerialization.jsonObject(with: prettyJSON(decoded)) as? [String: Any])
+            #expect(Set(encoded.keys) == Set(problem.keys))
+        }
+        let written = try #require(try JSONSerialization.jsonObject(with: manifest().jsonData()) as? [String: Any])
+        #expect(Set(object.keys) == Set(written.keys))
+        // The example is a recording still running: no end and no result yet.
+        #expect(object["ended"] is NSNull)
+        #expect(object["result"] is NSNull)
         let settings = try #require(object["settings"] as? [String: Any])
         #expect(Set(settings.keys) == ["resolution", "audioMode", "systemAudio"])
         #expect(object["started"] as? String == manifest().started)
@@ -202,6 +261,14 @@ import Testing
             recordingFolder: "/r", seconds: 70)
         #expect(summary.endedWithError)
         #expect(summary.text.hasSuffix("Error at 1m05s: display stream failed, LG (-3815)\n"))
+    }
+
+    @Test func aProblemIsAnErrorAndListedWithItsTime() {
+        var told = manifest([.finalized])
+        told.problems = [RecordingProblem(at: 65_000_000_000, problem: "Cannot remove the crash marker", error: "denied")]
+        let summary = RecordingSummary(manifest: told, recordingFolder: "/r", seconds: 70)
+        #expect(summary.endedWithError)
+        #expect(summary.text.hasSuffix("Problem at 1m05s: Cannot remove the crash marker: denied\n"))
     }
 
     @Test func aWriterThatFailedIsAnError() {

@@ -72,7 +72,7 @@ import Testing
         writer()?.finishError = DisplayFileWriterError(description: "cannot finalize f.mov: no luck", isDiskFull: false)
         let end = try #require(await ticker.finish(now: grid.time(ofTick: 1), writeWaitingTicks: false))
         #expect(end.file.state == .notFinalized)
-        #expect(end.error == "cannot write f.mov: no luck")
+        #expect(end.error == DisplayFileWriterError(description: "cannot write f.mov: no luck", isDiskFull: false))
     }
 
     @Test func aFullDiskEndsAsDiskFull() {
@@ -80,6 +80,15 @@ import Testing
         _ = ticker.receive(frame, capturedAt: 0)
         writer()?.appendError = DisplayFileWriterError(description: "full", isDiskFull: true)
         #expect(ticker.tick(now: grid.time(ofTick: 1)) == .diskFull)
+    }
+
+    @Test func aFullDiskReachesTheFileEndAsAFullDisk() async throws {
+        let (ticker, writer) = ticker()
+        _ = ticker.receive(frame, capturedAt: 0)
+        writer()?.appendError = DisplayFileWriterError(description: "full", isDiskFull: true)
+        _ = ticker.tick(now: grid.time(ofTick: 1))
+        let end = try #require(await ticker.finish(now: grid.time(ofTick: 1), writeWaitingTicks: false))
+        #expect(end.error?.isDiskFull == true)
     }
 
     @Test func aWriterThatFellBehindIsStillFinalized() async throws {
@@ -101,7 +110,7 @@ import Testing
         let end = try #require(await ticker.finish(now: grid.time(ofTick: 3), writeWaitingTicks: true))
         #expect(writer()?.finishedAt != nil)
         #expect(end.file.state == .finalized)
-        #expect(end.error?.contains("4 ticks") == true)
+        #expect(end.error?.description.contains("4 ticks") == true)
     }
 
     @Test func theTicksDueAtTheEndAreWrittenBeforeTheFileIsFinalized() async throws {

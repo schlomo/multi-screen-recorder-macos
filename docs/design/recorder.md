@@ -276,6 +276,8 @@ every change:
   "app": "Multi Screen Recorder 0.20261115.4 (a1b2c3d)",
   "state": "recording",
   "started": "2026-11-12T14:03:05.120+01:00",
+  "ended": null,
+  "result": null,
   "settings": { "resolution": "1080p", "audioMode": "default-microphone", "systemAudio": true },
   "files": [
     {
@@ -349,6 +351,10 @@ every change:
     { "at": 1446.2, "event": "display disconnected", "display": "LG HDR 4K" },
     { "at": 2285.0, "event": "display frame size changed", "display": "Built-in Retina Display",
       "from": [1670, 1080], "to": [1662, 1080] }
+  ],
+  "problems": [
+    { "at": 600.0, "problem": "The free space in /Users/anna/Movies/Multi Screen Recorder cannot be read",
+      "error": "The file “Multi Screen Recorder” couldn’t be opened." }
   ]
 }
 ```
@@ -367,6 +373,12 @@ Their fields: `at`, `event`, `display`; `from` and `to` (the old and
 the new frame size) for `display frame size changed`; `mirrors` (the
 display mirrored) for `display mirroring started`; `error` (why) for
 `display stream failed` and `display file writer failed`. `state` is `recording`, `finalized` or `not finalized`.
+`ended` is the local end time, as `started`, and `result` is `ok`, or
+`problems` when a problem was told, a file is not finalized or an
+event is an error; both are null until the recording is finalized.
+`problems` lists every problem told to the person, each with `at`,
+`problem` (what went wrong) and `error` (the full error text, or null).
+`events` and `problems` are written in the order of their time.
 An audio file's `channels` is the number of its mono tracks, or
 `stereo` for system audio.
 
@@ -894,8 +906,9 @@ Built in B1 where this document leaves the detail open, provisional and
 for the architect to settle: the encoder's quality target (0.5) and
 ceiling (4 times the estimated rate); `msr record` prints `Recording
 into <folder>` at its start and, at its end, how long it recorded, each
-file with its state and each error event; it ends with an error (exit 3)
-when a file is not finalized or an event is `display stream failed`,
+file with its state, each error event and each problem; it ends with
+an error (exit 3) exactly when the manifest's `result` is `problems`:
+a problem was told, a file is not finalized or an event is `display stream failed`,
 `display shows another display's picture`, `display file writer fell
 behind`, `display file writer failed` or `disk full`; `at` is rounded to
 the millisecond; a display file whose name is taken (a new file within

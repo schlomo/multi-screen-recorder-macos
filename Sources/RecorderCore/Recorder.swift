@@ -12,8 +12,8 @@ public protocol RecorderObserver: AnyObject {
     /// A display's file ended because it showed another display's picture,
     /// or (nil) no display is in that state any more.
     func recorder(_ recorder: Recorder, displayShowsAnotherDisplaysPicture display: String?)
-    /// Something the recording cannot put into its manifest, such as the manifest itself failing to be written.
-    func recorder(_ recorder: Recorder, problem: String)
+    /// A problem, also listed in the recording manifest's `problems`.
+    func recorder(_ recorder: Recorder, problem: RecordingProblem)
 }
 
 public struct RecorderStartError: Error, CustomStringConvertible {
@@ -111,9 +111,16 @@ public final class Recorder {
             unregisterForChanges()
             for action in tracker.stopAll() { perform(action) }
             for task in stopping { await task.value }
-            manifest.state = .finalized
+            let ended = Date()
+            manifest.finalize(ended: ended, timeZone: context.timeZone)
             try? writeManifest()
-            do { try markers.remove() } catch { observer?.recorder(self, problem: "Cannot remove the crash marker: \(error)") }
+            do {
+                try markers.remove()
+            } catch {
+                tell("Cannot remove the crash marker", error: "\(error)")
+                manifest.finalize(ended: ended, timeZone: context.timeZone)
+                try? writeManifest()
+            }
             if let activity { ProcessInfo.processInfo.endActivity(activity) }
             activity = nil
         }
@@ -161,7 +168,7 @@ public final class Recorder {
         do {
             return try connectedDisplays()
         } catch {
-            observer?.recorder(self, problem: "The displays cannot be read: \(error)")
+            tell("The displays cannot be read", error: "\(error)")
             return nil
         }
     }
@@ -243,20 +250,14 @@ public final class Recorder {
 
     /// A display file ended, or a capture without one; its end carries its
     /// entry, so the file is listed even when its start was not reported
-    /// yet. What it tells (`FileEndReport`) is told once per capture, also
-    /// when the capture ended by itself while the recorder stopped it.
+    /// yet. Its event and problem are recorded once per capture, also when
+    /// the capture ended by itself while the recorder stopped it.
     private func fileEnded(_ end: DisplayFileEnd?, captureNumber: Int, display: String, reason: DisplayTracker.StreamEnd?) {
-        if let end {
-            if let index = manifest.files.firstIndex(where: { $0.name == end.file.name }) {
-                manifest.files[index] = end.file
-            } else {
-                manifest.files.append(end.file)
-            }
-        }
-        let report = endReports.report(captureNumber: captureNumber, reason: reason, end: end, display: display, at: context.now())
-        if let event = report?.event { manifest.events.append(event) }
-        if end != nil || report?.event != nil { try? writeManifest() }
-        if let problem = report?.problem { observer?.recorder(self, problem: problem) }
+        let before = manifest
+        let problem = endReports.record(
+            captureNumber: captureNumber, reason: reason, end: end, display: display, at: context.now(), into: &manifest)
+        if manifest != before { try? writeManifest() }
+        if let problem { observer?.recorder(self, problem: problem) }
     }
 
     private func captureEnded(
@@ -283,7 +284,7 @@ public final class Recorder {
             guard let bytes = values.volumeAvailableCapacityForImportantUsage else { return }
             free = bytes
         } catch {
-            observer?.recorder(self, problem: "The free space in \(folder.path(percentEncoded: false)) cannot be read: \(error.localizedDescription)")
+            tell("The free space in \(folder.path(percentEncoded: false)) cannot be read", error: error.localizedDescription)
             return
         }
         let threshold = lowDiskWarningBytes()
@@ -317,9 +318,17 @@ public final class Recorder {
         do {
             try manifest.jsonData().write(to: folder.appending(path: RecordingNames.manifest), options: .atomic)
         } catch {
-            observer?.recorder(self, problem: "Cannot write the recording manifest: \(error.localizedDescription)")
+            tell("Cannot write the recording manifest", error: error.localizedDescription)
             throw error
         }
+    }
+
+    /// A problem for the person and the manifest's `problems`; the manifest
+    /// is written with the next change.
+    private func tell(_ problem: String, error: String?) {
+        let problem = RecordingProblem(at: context.now(), problem: problem, error: error)
+        manifest.problems.append(problem)
+        observer?.recorder(self, problem: problem)
     }
 }
 
