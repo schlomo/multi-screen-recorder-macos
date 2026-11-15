@@ -75,6 +75,14 @@ order, the next architect session:
   ("UNVERIFIED") to what was seen. The ruleset covers
   every PR, the owner's own and Dependabot's included; who pays for a
   review of a Dependabot PR is not known; the owner is asked.
+  - Seen so far, not settling either question: the owner marked #5
+    ready at 13:25:17 Europe/Berlin on 2026-11-15, with the ruleset
+    active (all branches, draft reviews on, new-push reviews off), and
+    merged it 43 s later. No Copilot review was requested, then or
+    after the merge; on #1 and #2, before the ruleset, the request came
+    2 s after marking ready. #5 had been opened as a draft before the
+    ruleset existed, so a draft opened under the ruleset may behave
+    differently.
 - **Open from PR #1** (merged 2026-11-14), checked on the owner's Mac
   with the snapshot release the owner named: "So I'm checking the PR1
   release snapshot from GH 43ec12f".
@@ -107,10 +115,6 @@ order, the next architect session:
     failed).
   - Each crash gets its entry in `docs/troubleshooting.md` once its fix
     is verified.
-  - The merged branches `v0-skeleton-and-pipeline`,
-    `end-to-end-tests-design`, `bring-end-to-end-design-to-main` and
-    `copilot-review-fixes` are still on the remote; deleting them is
-    the owner's (the "Delete branch" button on each merged PR).
 
 ## Queued
 
