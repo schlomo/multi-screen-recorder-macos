@@ -77,8 +77,8 @@ public struct AudioFileDescription: Equatable, Sendable {
 
     public var bitRatePerTrack: Int {
         switch source {
-        case .audioInput: RecorderValues.audioInputTrackBitRate
-        case .systemAudio: RecorderValues.systemAudioTrackBitRate
+        case .audioInput: Encoding.audioInputTrackBitRate
+        case .systemAudio: Encoding.systemAudioTrackBitRate
         }
     }
 
