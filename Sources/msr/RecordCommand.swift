@@ -18,7 +18,7 @@ extension CommandLineInterface {
         static let configuration = CommandConfiguration(
             abstract: "Record every display until Ctrl-C, SIGTERM, SIGHUP, the duration or Stop in the status window.",
             discussion: "Prints what will be recorded, runs the ready check, then records with the app's Dock icon. "
-                + "Exits 0 when the recording ended well, 1 when not ready, 3 when it ended with an error or could not start.")
+                + "Exits 0 when every file is finalized and no display file was ended by a failure, 1 when not ready, 3 otherwise or when it could not start.")
 
         @OptionGroup var flags: SettingsFlags
 

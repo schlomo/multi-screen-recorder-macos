@@ -45,18 +45,42 @@ import Testing
         #expect(manifest.result == .ok)
     }
 
-    @Test func aProblemAFileNotFinalizedOrAnErrorEventMakeTheResultProblems() {
-        var told = manifest()
-        told.problems.append(RecordingProblem(at: 2_000_000_000, problem: "The displays cannot be read", error: "denied"))
-        var notFinalized = manifest()
-        notFinalized.files.append(.init(name: "a.mov", display: "A", displayUUID: "A", frameSize: FrameSize(width: 2, height: 2),
-                                        start: 0, timecode: "00:00:00:00"))
-        var failed = manifest()
-        failed.events.append(RecordingEvent(at: 0, event: .diskFull, display: "A"))
-        for var manifest in [told, notFinalized, failed] {
-            manifest.finalize(ended: start + 60, timeZone: berlin)
-            #expect(manifest.result == .problems)
+    /// D47: the result is ok when every file is finalized and no display
+    /// file was ended by a failure; a problem told alone does not change it.
+    @Test(arguments: [
+        RecordingEvent.Kind.displayStreamFailed, .displayFileWriterFailed, .diskFull, .displayFileWriterFellBehind,
+        .displayShowsAnotherDisplaysPicture,
+    ])
+    func aDisplayFileEndedByAFailureMakesTheResultProblems(failure: RecordingEvent.Kind) {
+        var manifest = manifest()
+        manifest.events.append(RecordingEvent(at: 0, event: failure, display: "A"))
+        manifest.finalize(ended: start + 60, timeZone: berlin)
+        #expect(manifest.result == .problems)
+    }
+
+    @Test func aFileNotFinalizedMakesTheResultProblems() {
+        var manifest = manifest()
+        manifest.files.append(.init(name: "a.mov", display: "A", displayUUID: "A", frameSize: FrameSize(width: 2, height: 2),
+                                    start: 0, timecode: "00:00:00:00"))
+        manifest.finalize(ended: start + 60, timeZone: berlin)
+        #expect(manifest.result == .problems)
+    }
+
+    @Test func aProblemToldOrAnEventThatIsNoFailureLeavesTheResultOk() {
+        var manifest = manifest()
+        manifest.problems.append(RecordingProblem(at: 2_000_000_000, problem: "The displays cannot be read", error: "denied"))
+        for kind in RecordingEvent.Kind.allCases where !kind.isFailure {
+            manifest.events.append(RecordingEvent(at: 0, event: kind, display: "A"))
         }
+        manifest.finalize(ended: start + 60, timeZone: berlin)
+        #expect(manifest.result == .ok)
+        #expect(manifest.problems.count == 1)
+    }
+
+    @Test func theFailuresAreTheFiveWaysADisplayFileEndsBadly() {
+        #expect(RecordingEvent.Kind.allCases.filter(\.isFailure) == [
+            .displayStreamFailed, .displayShowsAnotherDisplaysPicture, .displayFileWriterFellBehind, .displayFileWriterFailed, .diskFull,
+        ])
     }
 
     @Test func aProblemHasItsTimeAndFullError() throws {
@@ -232,11 +256,11 @@ import Testing
         #expect(summary.text.hasSuffix("Error at 1m05s: display stream failed, LG (-3815)\n"))
     }
 
-    @Test func aProblemIsAnErrorAndListedWithItsTime() {
+    @Test func aProblemIsListedWithItsTimeAndIsNoErrorByItself() {
         var told = manifest([.finalized])
         told.problems = [RecordingProblem(at: 65_000_000_000, problem: "The displays cannot be read", error: "denied")]
         let summary = RecordingSummary(manifest: told, recordingFolder: "/r", seconds: 70)
-        #expect(summary.endedWithError)
+        #expect(!summary.endedWithError)
         #expect(summary.text.hasSuffix("Problem at 1m05s: The displays cannot be read: denied\n"))
     }
 

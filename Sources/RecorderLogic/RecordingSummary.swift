@@ -11,10 +11,10 @@ public struct RecordingSummary: Equatable, Sendable {
         self.seconds = seconds
     }
 
-    /// Ended with an error (exit 3): a problem told, a file not finalized or an error event.
-    public var endedWithError: Bool { manifest.hasProblems }
+    /// Ended with an error (exit 3): the manifest's result is `problems` (D47).
+    public var endedWithError: Bool { !manifest.endedWell }
 
-    private var errors: [RecordingEvent] { manifest.events.filter(\.event.isError) }
+    private var errors: [RecordingEvent] { manifest.events.filter(\.event.isFailure) }
 
     public var text: String {
         var lines = ["Recorded \(Self.elapsed(seconds: seconds)) into \(recordingFolder)"]

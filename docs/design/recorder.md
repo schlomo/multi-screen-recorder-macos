@@ -26,7 +26,7 @@ signature); if that fails it exits 71 (`EX_OSERR`).
 |---|---|---|
 | `msr list` | Shows displays, audio inputs and system audio | 0, 1 when the displays, the audio inputs or an audio input the settings record cannot be read |
 | `msr check [flags] [--debug]` | Prints "What will be recorded", then runs the ready check and prints each item; `--debug` adds detail on standard error and in the log | 0 ready, 1 not ready |
-| `msr record [flags] [--duration 1h30m] [--debug]` | Records the displays (B1 of the recording core; the audio comes with B2, D45). Without flags it does what Start in the window does, with the same settings file; it prints "What will be recorded" at its start, then runs the ready check, records until Ctrl-C, SIGTERM, SIGHUP, the duration or Stop in the status window (below), and prints the recording folder at the start and a summary at the end. It runs as a full AppKit app without a Dock icon (the `accessory` activation policy) until the ready check passed and the recording starts, then shows the icon; a run that is not ready shows none, and an icon macOS refuses is a problem, and the recording goes on (Ctrl-C stops it); while it records, the icon shows with its badge, and clicking it or Quit opens the status window as in the app (D45, D46). When it stops, for any reason, it first prints `Stopping the recording and finalizing the files…` on standard error, then finalizes and prints the summary; a Ctrl-C while it finalizes prints `Still finalizing the files…` and does nothing more. It prints every event of the recording manifest as one line on standard error (see "Logging"). `--debug` adds detail on standard error and in the log. `--duration` takes hours, minutes and seconds (`1h30m`, `45m`, `90s`); a number without a suffix is minutes (`90` is 90 minutes) | 0 ok, 1 not ready, 3 ended with an error or could not start |
+| `msr record [flags] [--duration 1h30m] [--debug]` | Records the displays (B1 of the recording core; the audio comes with B2, D45). Without flags it does what Start in the window does, with the same settings file; it prints "What will be recorded" at its start, then runs the ready check, records until Ctrl-C, SIGTERM, SIGHUP, the duration or Stop in the status window (below), and prints the recording folder at the start and a summary at the end. It runs as a full AppKit app without a Dock icon (the `accessory` activation policy) until the ready check passed and the recording starts, then shows the icon; a run that is not ready shows none, and an icon macOS refuses is a problem, and the recording goes on (Ctrl-C stops it); while it records, the icon shows with its badge, and clicking it or Quit opens the status window as in the app (D45, D46). When it stops, for any reason, it first prints `Stopping the recording and finalizing the files…` on standard error, then finalizes and prints the summary; a Ctrl-C while it finalizes prints `Still finalizing the files…` and does nothing more. It prints every event of the recording manifest as one line on standard error (see "Logging"). `--debug` adds detail on standard error and in the log. `--duration` takes hours, minutes and seconds (`1h30m`, `45m`, `90s`); a number without a suffix is minutes (`90` is 90 minutes) | 0 ok (every file finalized, no display file ended by a failure, D47), 1 not ready, 3 when the recording manifest's `result` is `problems` or the recording could not start |
 | `msr settings [flags]` | Without flags prints the effective settings as JSON (show); with any settings flag, `--auto` included, saves the run's effective settings into the settings file and prints them (change). The only command that writes the file; the window also writes it | 0, 1 when it cannot write the file |
 | `msr version` | Prints the version and commit | 0 |
 
@@ -380,10 +380,13 @@ Their fields: `at`, `event`, `display`; `from` and `to` (the old and
 the new frame size) for `display frame size changed`; `mirrors` (the
 display mirrored) for `display mirroring started`; `error` (why) for
 `display stream failed` and `display file writer failed`. `state` is `recording`, `finalized` or `not finalized`.
-`ended` is the local end time, as `started`, and `result` is `ok`, or
-`problems` when a problem was told, a file is not finalized or an
-event is an error; both are null until the recording is finalized.
-`problems` lists every problem told to the person, each with `at`,
+`ended` is the local end time, as `started`, and `result` is `ok` when
+every file is finalized and no display file was ended by a failure
+(`display stream failed`, `display file writer failed`, `disk full`,
+`display file writer fell behind`, `display shows another display's
+picture`), otherwise `problems` (D47); both are null until the
+recording is finalized. `problems` lists every problem told to the
+person, also those that leave `result` `ok`, each with `at`,
 `problem` (what went wrong) and `error` (the full error text, or null).
 `events` and `problems` are written in the order of their time.
 An audio file's `channels` is the number of its mono tracks, or
@@ -967,11 +970,10 @@ Built in B1 where this document leaves the detail open, provisional and
 for the architect to settle: the encoder's quality target (0.5) and
 ceiling (4 times the estimated rate); `msr record` prints `Recording
 into <folder>` at its start and, at its end, how long it recorded, each
-file with its state, each error event and each problem; it ends with
-an error (exit 3) exactly when the manifest's `result` is `problems`:
-a problem was told, a file is not finalized or an event is `display stream failed`,
-`display shows another display's picture`, `display file writer fell
-behind`, `display file writer failed` or `disk full`; `at` is rounded to
+file with its state, each failure event and each problem; it ends with
+an error (exit 3) exactly when the manifest's `result` is `problems`
+(D47): a file is not finalized or a display file was ended by a
+failure; `at` is rounded to
 the millisecond; a display file whose name is taken (a new file within
 the same second) gets " (2)"; the timecode of tick 0 is t0's time of
 day rounded to the nearest frame; after a full disk, new display files

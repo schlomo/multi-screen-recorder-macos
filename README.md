@@ -108,7 +108,7 @@ so it shows the app's version and runs with its signature.
 |---|---|
 | `msr list` | Shows displays, audio inputs and system audio |
 | `msr check [flags] [--debug]` | Prints what will be recorded, then runs the ready check; exits 0 when ready, 1 when not; creates the output folder if it is missing |
-| `msr record [flags] [--duration 1h30m] [--debug]` | Prints what will be recorded and runs the ready check, then records until Ctrl-C, the duration or Stop in the status window (click the Dock icon); shows the app's Dock icon while it records and prints each event on standard error; `--duration` without a suffix is minutes; exits 0, 1 when not ready, 3 when the recording ended with an error or could not start |
+| `msr record [flags] [--duration 1h30m] [--debug]` | Prints what will be recorded and runs the ready check, then records until Ctrl-C, the duration or Stop in the status window (click the Dock icon); shows the app's Dock icon while it records and prints each event on standard error; `--duration` without a suffix is minutes; exits 0 when every file is finalized and no display file was ended by a failure (a problem told alone is listed but still exits 0), 1 when not ready, 3 when a file is not finalized or a display file was ended by a failure, or the recording could not start |
 | `msr settings [flags]` | Without flags prints the effective settings as JSON; with a settings flag saves the effective settings into the settings file and prints them, the only way a command writes it |
 | `msr version` | Prints the version and commit |
 

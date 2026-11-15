@@ -75,10 +75,11 @@ public struct RecordingManifest: Codable, Equatable, Sendable {
         }
     }
 
-    /// How a finalized recording went.
+    /// How a finalized recording went (D47).
     public enum Result: String, Codable, Sendable {
+        /// Every file is finalized and no display file was ended by a failure.
         case ok
-        /// A problem was told, a file is not finalized, or an event is an error.
+        /// A file is not finalized or a display file was ended by a failure.
         case problems
     }
 
@@ -132,17 +133,17 @@ public struct RecordingManifest: Codable, Equatable, Sendable {
             .map(\.element)
     }
 
-    /// Whether the recording went wrong: a problem was told, a file is not
-    /// finalized, or an event is an error.
-    public var hasProblems: Bool {
-        !problems.isEmpty || files.contains { $0.state != .finalized } || events.contains(where: \.event.isError)
+    /// Whether nothing was lost: every file is finalized and no display
+    /// file was ended by a failure. A problem told alone changes nothing (D47).
+    public var endedWell: Bool {
+        files.allSatisfy { $0.state == .finalized } && !events.contains(where: \.event.isFailure)
     }
 
     /// The recording ends: its end time and its result.
     public mutating func finalize(ended date: Date, timeZone: TimeZone) {
         state = .finalized
         ended = Self.timestamp(date, timeZone: timeZone)
-        result = hasProblems ? .problems : .ok
+        result = endedWell ? .ok : .problems
     }
 
     /// "2026-11-12T14:03:05.120+01:00".
@@ -193,8 +194,9 @@ public struct RecordingEvent: Codable, Equatable, Sendable {
         case systemAudioStarted = "system audio started"
         case systemAudioStopped = "system audio stopped"
 
-        /// The events that make `msr record` end with an error.
-        public var isError: Bool {
+        /// The events of a display file ended by a failure, which make the
+        /// result `problems` and `msr record` exit 3 (D47).
+        public var isFailure: Bool {
             switch self {
             case .displayStreamFailed, .displayShowsAnotherDisplaysPicture, .displayFileWriterFellBehind,
                  .displayFileWriterFailed, .diskFull: true
