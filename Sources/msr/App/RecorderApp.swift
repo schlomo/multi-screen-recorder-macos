@@ -5,17 +5,6 @@ import SwiftUI
 
 /// The app: an AppKit application with SwiftUI window content.
 @MainActor
-enum RecorderApp {
-    static func run() {
-        let app = NSApplication.shared
-        let delegate = AppDelegate()
-        app.delegate = delegate
-        app.setActivationPolicy(.regular)
-        withExtendedLifetime(delegate) { app.run() }
-    }
-}
-
-@MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var startWindow: NSWindow?
     private var aboutWindow: NSWindow?

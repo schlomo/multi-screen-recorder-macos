@@ -25,43 +25,16 @@ extension CommandLineInterface {
         @Option(help: "Stop after this long: hours, minutes and seconds, such as 1h30m, 45m or 90s; a number alone is minutes.")
         var duration: RecordingDuration?
 
+        /// Never called: `main` runs `msr record` in the event loop, through `RecordCommandDelegate`.
         func run() async throws {
-            let settings = try flags.effectiveSettings(from: standardSettingsFile())
-            let home = try homeFolderOrExit()
-            let facts = await probeReadyCheckFacts(settings: settings, homeFolder: home)
-            let result = ReadyCheck.evaluate(facts, settings: settings)
-            print(WhatWillBeRecorded(settings: settings, facts: facts).text, terminator: "")
-            print("  \(ProductText.displaysOnly)\n")
-            print(result.text, terminator: "")
-            fflush(stdout)
-            if !result.isReady { throw ExitCode(1) }
-            let status = await MainActor.run {
-                RecordCommandApp.run(settings: settings, homeFolder: home, duration: duration)
-            }
-            if status != 0 { throw ExitCode(status) }
+            preconditionFailure("msr record runs in the event loop")
         }
-    }
-}
-
-/// `msr record` runs the app's event loop with its Dock icon: macOS reports
-/// display changes only under `NSApplication.run()` (D45).
-@MainActor
-enum RecordCommandApp {
-    static func run(settings: Settings, homeFolder: URL, duration: RecordingDuration?) -> Int32 {
-        let app = NSApplication.shared
-        let delegate = RecordCommandDelegate(settings: settings, homeFolder: homeFolder, duration: duration)
-        app.delegate = delegate
-        app.setActivationPolicy(.regular)
-        withExtendedLifetime(delegate) { app.run() }
-        return delegate.exitStatus
     }
 }
 
 @MainActor
 final class RecordCommandDelegate: NSObject, NSApplicationDelegate {
-    private let settings: Settings
-    private let homeFolder: URL
-    private let duration: RecordingDuration?
+    private let record: CommandLineInterface.Record
     private var session: RecordingSession?
     private var signalSources: [any DispatchSourceSignal] = []
     private var isStopping = false
@@ -69,16 +42,41 @@ final class RecordCommandDelegate: NSObject, NSApplicationDelegate {
     private var stopping: Task<Void, Never>?
     private(set) var exitStatus: Int32 = 0
 
-    init(settings: Settings, homeFolder: URL, duration: RecordingDuration?) {
-        self.settings = settings
-        self.homeFolder = homeFolder
-        self.duration = duration
+    init(record: CommandLineInterface.Record) {
+        self.record = record
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.mainMenu = makeRecordMenu()
+        Task { await checkAndStart() }
+    }
+
+    /// Prints what will be recorded and the ready check, then starts, or
+    /// ends with the exit status of a command that ends early.
+    private func checkAndStart() async {
+        let settings: Settings
+        let home: URL
         do {
-            session = try RecordingSession(settings: settings, homeFolder: homeFolder, tellOnStandardError: true)
+            settings = try record.flags.effectiveSettings(from: standardSettingsFile())
+            home = try homeFolderOrExit()
+        } catch {
+            exitStatus = CommandLineInterface.exitCode(for: error).rawValue
+            endEventLoop()
+            return
+        }
+        let facts = await probeReadyCheckFacts(settings: settings, homeFolder: home)
+        let result = ReadyCheck.evaluate(facts, settings: settings)
+        print(WhatWillBeRecorded(settings: settings, facts: facts).text, terminator: "")
+        print("  \(ProductText.displaysOnly)\n")
+        print(result.text, terminator: "")
+        fflush(stdout)
+        guard result.isReady else {
+            exitStatus = 1
+            endEventLoop()
+            return
+        }
+        do {
+            session = try RecordingSession(settings: settings, homeFolder: home, tellOnStandardError: true)
         } catch {
             standardError("Error: \(error)")
             exitStatus = recordingEndedWithErrorExitCode
@@ -94,7 +92,7 @@ final class RecordCommandDelegate: NSObject, NSApplicationDelegate {
             source.resume()
             signalSources.append(source)
         }
-        if let duration {
+        if let duration = record.duration {
             Task { [weak self] in
                 while let self, !self.isStopping {
                     if let recorder = self.session?.recorder, recorder.elapsedSeconds >= Double(duration.seconds) {

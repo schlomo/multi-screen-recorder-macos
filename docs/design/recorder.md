@@ -530,8 +530,12 @@ loop and show the app's Dock icon (D45): macOS reports display changes
 (`CGDisplayRegisterReconfigurationCallback`) only to a process running
 `NSApplication.run()`, which the experiments of 2026-11-15 showed
 ([end-to-end-tests.md](end-to-end-tests.md), "What research found for
-the recorder"). `msr record` stops on its signals through the same
-path as Stop.
+the recorder"). Both start it from `main` itself, at the same
+synchronous point, with `msr record`'s arguments parsed before: an
+event loop started inside a main-queue job, such as after the first
+`await` of an `async` `main`, never drains the main queue again, so no
+task, signal source or display change would reach the recorder.
+`msr record` stops on its signals through the same path as Stop.
 
 **Constant 30 fps (D11, D21).** Per display, a ScreenCaptureKit stream
 delivers complete frames when the screen changes; the newest is kept.
