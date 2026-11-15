@@ -6,8 +6,9 @@ origin/main, DATE the committer date of HEAD in UTC as YYYYMMDD:
                                                        to tracked files)
   PR_NUMBER=<n>       0.<DATE>.<N+1>-pr<n>+<commit>
   neither             0.<DATE>.<N+1>-dev+<commit>
-Uncommitted changes to tracked files append .dirty to the build metadata of a
-PR or local build: 0.<DATE>.<N+1>-dev+<commit>.dirty. Untracked files do not count.
+Uncommitted changes to tracked files append .dirty to a local build,
+0.<DATE>.<N+1>-dev+<commit>.dirty; a release or a snapshot stops on them.
+Untracked files do not count.
 """
 
 import os
@@ -42,8 +43,10 @@ def git(*arguments: str, failure: str | None = None) -> str:
 
 def commit_date_utc() -> str:
     """The committer date of HEAD in UTC as YYYYMMDD, independent of locale and time zone."""
-    timestamp = int(git("show", "-s", "--format=%ct", "HEAD", failure="cannot read the commit date of HEAD"))
-    return datetime.fromtimestamp(timestamp, UTC).strftime("%Y%m%d")
+    stamp = git("show", "-s", "--no-show-signature", "--format=%ct", "HEAD", failure="cannot read the commit date of HEAD")
+    if not re.fullmatch(r"[0-9]+", stamp):
+        stop(f"the commit date of HEAD is not a number of seconds: '{stamp}'")
+    return datetime.fromtimestamp(int(stamp), UTC).strftime("%Y%m%d")
 
 
 def has_uncommitted_changes() -> bool:
@@ -71,6 +74,8 @@ def main() -> None:
     date = commit_date_utc()
     dirty = has_uncommitted_changes()
 
+    if pr_number and dirty:
+        stop("a snapshot needs a checkout with no uncommitted changes to tracked files")
     if release_build:
         if git("rev-parse", "HEAD") != git("rev-parse", "origin/main"):
             stop(f"a release builds origin/main, but HEAD is {commit}")

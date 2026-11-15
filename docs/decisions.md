@@ -1079,12 +1079,11 @@ architect's reading.
   tracked files unchanged), a snapshot of PR n
   `0.<DATE>.<N+1>-pr<n>+<commit>`, a local build
   `0.<DATE>.<N+1>-dev+<commit>`. Uncommitted changes to tracked files
-  append `.dirty` to the build metadata of a snapshot or local build
-  (`+<commit>.dirty`); untracked files do not count. The bundle's short
+  append `.dirty` to a local build (`+<commit>.dirty`) and stop a
+  release and a snapshot; untracked files do not count. The bundle's short
   version is the numeric part. The 0 stays until the owner declares v1.
 - **Consequences:** `0.<DATE>.<N>` sorts above the earlier releases
-  v0.2.0, v0.4.0 and v0.9.0. A signing step never accepts a `.dirty`
-  snapshot. Release numbers still skip when Markdown-only commits land
+  v0.2.0, v0.4.0 and v0.9.0. Only a local build can be dirty. Release numbers still skip when Markdown-only commits land
   on `main`.
 - **Evidence:** [design/delivery.md](design/delivery.md), "Versions".
 

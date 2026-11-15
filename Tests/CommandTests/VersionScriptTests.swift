@@ -132,15 +132,31 @@ import Testing
         #expect(outcome.output == "0.20261115.4-dev+\(try shortHead(of: work))\n")
     }
 
-    @Test(arguments: [[String: String](), ["PR_NUMBER": "7"]])
-    func uncommittedChangesToTrackedFilesMakeABuildDirty(environment: [String: String]) throws {
+    @Test func uncommittedChangesToTrackedFilesMakeALocalBuildDirty() throws {
         defer { scratch.remove() }
         let work = try clone()
         try makeDirty(work)
-        let suffix = environment.isEmpty ? "dev" : "pr7"
-        let outcome = try version(in: work, environment)
+        let outcome = try version(in: work)
         #expect(outcome.status == 0)
-        #expect(outcome.output == "0.20261115.4-\(suffix)+\(try shortHead(of: work)).dirty\n")
+        #expect(outcome.output == "0.20261115.4-dev+\(try shortHead(of: work)).dirty\n")
+    }
+
+    @Test func aSnapshotWithUncommittedChangesStops() throws {
+        defer { scratch.remove() }
+        let work = try clone()
+        try makeDirty(work)
+        let outcome = try version(in: work, ["PR_NUMBER": "8"])
+        #expect(outcome.status == 1)
+        #expect(outcome.output.isEmpty)
+        #expect(outcome.errors.contains("scripts/version: a snapshot needs a checkout with no uncommitted changes to tracked files"))
+    }
+
+    @Test func aConfiguredSignatureDisplayDoesNotBreakTheDate() throws {
+        defer { scratch.remove() }
+        let work = try clone()
+        let outcome = try version(in: work, ["GIT_CONFIG_PARAMETERS": "'log.showSignature=true'"])
+        #expect(outcome.status == 0, "\(outcome.errors)")
+        #expect(outcome.output == "0.20261115.4-dev+\(try shortHead(of: work))\n")
     }
 
     @Test func stagedChangesMakeABuildDirty() throws {

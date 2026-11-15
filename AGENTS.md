@@ -14,8 +14,9 @@ Recorded by the setup skill; re-run it when any of this changes.
   squash merges, so a branch catches up by merging the trunk in.
 - **Agent writes:** push work branches and open draft PRs, and mark a
   PR the agent opened ready once it is fully reviewed (D39). Copilot's
-  review is an optional extra (D43): a repository ruleset asks for one
-  review of each draft PR, nobody waits for it, and its absence never
+  review is an optional extra (D43): a repository ruleset is configured
+  to request one review of each draft PR (not observed on PRs #6 to #8;
+  whether it fires is the owner's to check), nobody waits for it, and its absence never
   blocks marking a PR ready; one that has arrived is handled by the
   session that owns the PR like the adversarial review's findings.
   Standing go-ahead for those optional Copilot reviews, billed as AI
@@ -30,7 +31,7 @@ Recorded by the setup skill; re-run it when any of this changes.
   then a separate signing job signs and publishes, for every push to a
   PR the PR's snapshot release (a pre-release tagged `pr-<n>`), for a
   push to `main` that changes more than Markdown files a release
-  `v0.<N>.0`; a closed PR's snapshot release is removed. PRs from forks
+  `v0.<DATE>.<N>`; a closed PR's snapshot release is removed. PRs from forks
   and Dependabot are tested, built and smoke-tested, never signed or
   published. Signing needs the repository secret
   `SIGNING_CERTIFICATE_P12` ([delivery.md](docs/design/delivery.md)).

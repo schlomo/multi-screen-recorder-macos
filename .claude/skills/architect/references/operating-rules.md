@@ -62,8 +62,9 @@ verifying agent output are in the principles (linked from
 
 ## Copilot's review
 
-Copilot's review is an optional extra (D43): the host's ruleset asks
-for one review of each draft PR, nobody waits for it, and its absence
+Copilot's review is an optional extra (D43): a repository ruleset is
+configured to request one review of each draft PR (not observed on PRs
+#6 to #8; whether it fires is the owner's to check), nobody waits for it, and its absence
 never blocks marking a PR ready. The session that owns the PR (the
 one that opened it, briefed the agent that did, or took it over from
 the backlog) does this; a delegated agent reports to that session and

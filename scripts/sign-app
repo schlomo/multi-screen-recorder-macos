@@ -53,7 +53,10 @@ def run(*arguments: str, failure: str) -> str:
 
 def version_form(release_build: str, pr_number: str, head: str) -> tuple[str, str]:
     """The pattern the version must match, and the same in words."""
-    stamp = run("git", "show", "-s", "--format=%ct", "HEAD", failure="cannot read the commit date of HEAD").strip()
+    stamp = run("git", "show", "-s", "--no-show-signature", "--format=%ct", "HEAD",
+               failure="cannot read the commit date of HEAD").strip()
+    if not re.fullmatch(r"[0-9]+", stamp):
+        stop(f"the commit date of HEAD is not a number of seconds: '{stamp}'")
     date = datetime.fromtimestamp(int(stamp), UTC).strftime("%Y%m%d")
     if pr_number:
         return (rf"0\.{date}\.[1-9][0-9]*-pr{pr_number}\+{head}",
