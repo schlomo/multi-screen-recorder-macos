@@ -25,8 +25,8 @@ signature); if that fails it exits 71 (`EX_OSERR`).
 | Command | Does | Exit code |
 |---|---|---|
 | `msr list` | Shows displays, audio inputs and system audio | 0, 1 when the displays, the audio inputs or an audio input the settings record cannot be read |
-| `msr check [flags]` | Prints "What will be recorded", then runs the ready check and prints each item | 0 ready, 1 not ready |
-| `msr record [flags] [--duration 1h30m]` | Records the displays (B1 of the recording core; the audio comes with B2, D45). Without flags it does what Start in the window does, with the same settings file; it prints "What will be recorded" at its start, then runs the ready check, records until Ctrl-C, SIGTERM, SIGHUP, the duration or Stop in the Dock (below), and prints the recording folder at the start and a summary at the end. While it records, the app's Dock icon shows with its badge, and clicking it or Quit asks "Stop recording?" as in the app (D45). `--duration` takes hours, minutes and seconds (`1h30m`, `45m`, `90s`); a number without a suffix is minutes (`90` is 90 minutes) | 0 ok, 1 not ready, 3 ended with an error or could not start |
+| `msr check [flags] [--debug]` | Prints "What will be recorded", then runs the ready check and prints each item; `--debug` adds detail on standard error and in the log | 0 ready, 1 not ready |
+| `msr record [flags] [--duration 1h30m] [--debug]` | Records the displays (B1 of the recording core; the audio comes with B2, D45). Without flags it does what Start in the window does, with the same settings file; it prints "What will be recorded" at its start, then runs the ready check, records until Ctrl-C, SIGTERM, SIGHUP, the duration or Stop in the status window (below), and prints the recording folder at the start and a summary at the end. While it records, the app's Dock icon shows with its badge, and clicking it or Quit opens the status window as in the app (D45, D46). When it stops, for any reason, it first prints `Stopping the recording and finalizing the files…` on standard error, then finalizes and prints the summary; a Ctrl-C while it finalizes prints `Still finalizing the files…` and does nothing more. Before its ready check it reports the recordings not finalized, as `msr check` does (see "Crash marker"). It prints every event of the recording manifest as one line on standard error (see "Logging"). `--debug` adds detail on standard error and in the log. `--duration` takes hours, minutes and seconds (`1h30m`, `45m`, `90s`); a number without a suffix is minutes (`90` is 90 minutes) | 0 ok, 1 not ready, 3 ended with an error or could not start |
 | `msr settings [flags]` | Without flags prints the effective settings as JSON (show); with any settings flag, `--auto` included, saves the run's effective settings into the settings file and prints them (change). The only command that writes the file; the window also writes it | 0, 1 when it cannot write the file |
 | `msr version` | Prints the version and commit | 0 |
 
@@ -187,8 +187,15 @@ folder, and free disk space in the output folder for
 
 - A permission that was never asked for is requested, so macOS shows
   its prompt; a denied one is reported with the System Settings path.
-- The screen recording grant is proven, not just read: the check
-  fetches the display list. The Microphone permission is read, and no
+- The screen recording grant is proven, not just read, and proven again
+  by every check: at the app's start, on "Check again", in `msr check`
+  and in `msr record`'s own check the check captures one small frame of
+  one display (a ScreenCaptureKit screenshot), so macOS shows every
+  prompt of a capture then and Start really starts (D46); the checks
+  after a change (a device, a settings change, the app becoming active)
+  only fetch the display list. Whether the screenshot brings the prompt
+  the owner saw at Start ("requesting to bypass the system private
+  window picker") is UNVERIFIED until the owner's next run. The Microphone permission is read, and no
   microphone is opened (D36): the app
   crashed inside macOS after the default microphone was unplugged
   (owner's Mac, 2026-11-13), and the capture session an earlier ready
@@ -400,10 +407,14 @@ app); the app itself runs one at a time.
 
 **Crash marker.** While recording, a process keeps
 `~/Library/Application Support/Multi Screen Recorder/active-recordings/<process id>.json`
-naming its recording folder. On the next start, the app and `msr check`
-report each marker whose process is gone ("Recording <folder> was not
-finalized; its files are readable up to the last 2 seconds"), set that
-manifest's state to `not finalized` and remove the marker.
+naming its recording folder. On the next start, the app, `msr check`
+and `msr record` (before its recording starts) report each marker whose
+process is gone ("Recording <folder> was not finalized; its files are
+readable up to the last 2 seconds"), the app in a dialog, the commands
+on standard error, all three also in the unified log at `.notice`; set
+that manifest's state to `not finalized` and remove the marker. A
+manifest written before `ended`, `result` and `problems` existed is
+read as one without them.
 
 ## The app
 
@@ -491,10 +502,18 @@ Total 5.3 GB/h. 2 hours need 10.7 GB, 3.1 GB free.
   permission and is hidden by Focus modes. A recording problem (the
   recording manifest cannot be written, the displays or the free space
   cannot be read, a display file's writer fails) shows the same way,
-  and "Stop recording?" lists the problems; `msr record` also names each
+  and the status window lists it in red; `msr record` also names each
   on standard error.
-- **Stop:** clicking the Dock icon or Quit asks "Stop recording?"
-  [Stop] [Continue]. Stop finalizes, opens the recording folder itself
+- **Status window (D46):** clicking the Dock icon while recording opens
+  a small window, and Quit opens it too: a table with a row per display
+  and the columns Source, "Records at", Files, "GB written" (its display
+  files on disk) and State (`recording`, `waiting`, `failed, retrying`,
+  `shows another display`, `disk full`, `mirroring`, `disconnected`,
+  `asleep`); under it the line "Recording 1:07 · 1.3 GB in 3 files ·
+  120.4 GB free"; the problems in red, with the command for the log
+  (see "Logging"); and [Stop] [Continue]. It refreshes every second
+  while open; Continue closes it.
+- **Stop:** Stop in the status window finalizes, opens the recording folder itself
   in Finder (D46) and quits the app: a recording is typically one shot (D45).
   Logout, restart and shutdown finalize without asking, told apart from
   a Quit by the quit Apple event's reason (`kAEQuitReason`); one that
@@ -503,8 +522,8 @@ Total 5.3 GB/h. 2 hours need 10.7 GB, 3.1 GB free.
   started. While a recording runs,
   the app does not quit when its last window closes, and the ready
   check does not run, also not when the app is activated.
-  `msr record` shows the same Dock icon, badge and question; Stop there
-  ends `msr record` as Ctrl-C does (D45).
+  `msr record` shows the same Dock icon, badge and status window; Stop
+  there ends `msr record` as Ctrl-C does (D45).
 - **About:** version, licence, the purpose (the opening paragraph of the
   README, one string in the code), and a link to GitHub Issues that
   opens in the browser (D15, D26). The credit to the former upstream is
@@ -685,7 +704,9 @@ keeps its number and its name in the file names for the whole
 recording. Whether a real display keeps its UUID after it was
 unplugged is UNVERIFIED (the owner's check on the first build). In a
 file name, `/` and `:` in a display's name become `-`, so a name never
-stops a display from recording.
+stops a display from recording. A display reached through another port
+(a monitor with two USB-C inputs) may be another display, with its own
+UUID and number: macOS treats it so, and so does the recorder (D46).
 
 **Displays coming and going (D14).** A display that appears gets a
 stream and a display file (event `display connected`); one that
@@ -741,6 +762,31 @@ and audio files once there is room. Nothing written is ever deleted.
 
 **Keep awake (D14).** A power assertion against idle system and
 display sleep while recording.
+
+## Logging
+
+No log file of our own (D46). The app and `msr` write every event of
+the recording manifest, every problem and every report of a recording
+not finalized to the macOS unified log, subsystem
+`org.schapiro.multiscreenrecorder`, at `.notice` (problems at
+`.error`), levels macOS keeps on disk, with names (displays, folders)
+public, not redacted. `msr record` also prints each event as one line on
+standard error: the local time, the offset from the recording's start,
+the event and its display, and the details it has, such as
+`22:14:40 +9.2s display connected: Wacom One 13T` or
+`22:15:32 +61.3s display stream failed: LG (-3815)`. `--debug` (for
+`msr record` and `msr check`) adds detail lines (the tracker's actions,
+the displays as read, files started and ended, the ready check's facts)
+on standard error and at `.debug` in the log. The log of the last 2
+hours:
+
+```sh
+log show --last 2h --predicate 'subsystem == "org.schapiro.multiscreenrecorder"'
+```
+
+The crash report form has an optional field for its output, and the
+crash report dialog, the status window (with a problem) and the README
+name the command.
 
 ## Code layout
 
@@ -896,7 +942,7 @@ comes with the next version."
 
 Built (the recording core's displays, B1, D45): `msr record` with
 `--duration`, Start and Stop in the app, the Dock icon, its badge and
-"Stop recording?" also for `msr record`, the app quitting after Stop
+the status window also for `msr record`, the app quitting after Stop
 and not on its last window closing while it records, the ready check
 held while recording, the recording folder claim, crash markers and
 their handling by the app and `msr check`, the recording manifest with

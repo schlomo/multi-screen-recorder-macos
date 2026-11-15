@@ -104,8 +104,8 @@ so it shows the app's version and runs with its signature.
 | Command | Does |
 |---|---|
 | `msr list` | Shows displays, audio inputs and system audio |
-| `msr check [flags]` | Prints what will be recorded, then runs the ready check; exits 0 when ready, 1 when not; creates the output folder if it is missing |
-| `msr record [flags] [--duration 1h30m]` | Prints what will be recorded and runs the ready check, then records until Ctrl-C, the duration or Stop in the Dock; shows the app's Dock icon while it records; `--duration` without a suffix is minutes; exits 0, 1 when not ready, 3 when the recording ended with an error or could not start |
+| `msr check [flags] [--debug]` | Prints what will be recorded, then runs the ready check; exits 0 when ready, 1 when not; creates the output folder if it is missing |
+| `msr record [flags] [--duration 1h30m] [--debug]` | Prints what will be recorded and runs the ready check, then records until Ctrl-C, the duration or Stop in the status window (click the Dock icon); shows the app's Dock icon while it records and prints each event on standard error; `--duration` without a suffix is minutes; exits 0, 1 when not ready, 3 when the recording ended with an error or could not start |
 | `msr settings [flags]` | Without flags prints the effective settings as JSON; with a settings flag saves the effective settings into the settings file and prints them, the only way a command writes it |
 | `msr version` | Prints the version and commit |
 
@@ -189,6 +189,15 @@ your next start: your browser opens a new issue (a GitHub account is
 needed) and Finder shows a copy of the crash report as a text file to
 drag into it. Issues are public, and a crash report contains your Mac's
 user name: check it first.
+
+The app and `msr` write what happens during a recording (every event and
+problem) to the macOS unified log; `msr record --debug` and
+`msr check --debug` add detail. To attach the log of the last 2 hours
+to an issue, run in Terminal:
+
+```sh
+log show --last 2h --predicate 'subsystem == "org.schapiro.multiscreenrecorder"'
+```
 
 ## Origins
 

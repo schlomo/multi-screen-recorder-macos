@@ -1,6 +1,6 @@
 /// What the person is shown of a running recording: the Dock badge shows
-/// the elapsed time until something needs them, and "Stop recording?" lists the
-/// problems (recorder.md, "The app").
+/// the elapsed time until something needs them; the status window lists
+/// the problems (recorder.md, "The app").
 public struct RecordingStatus: Equatable, Sendable {
     public var isLowOnDisk = false
     /// The display whose file ended because it showed another display's picture, until it is tried again.
@@ -25,10 +25,5 @@ public struct RecordingStatus: Equatable, Sendable {
     public static func hoursAndMinutes(_ seconds: Double) -> String {
         let minutes = Int(seconds / 60)
         return "\(minutes / 60):" + (minutes % 60 < 10 ? "0" : "") + "\(minutes % 60)"
-    }
-
-    /// The informative text of "Stop recording?": the problems, nil without any.
-    public var stopQuestionDetails: String? {
-        problems.isEmpty ? nil : problems.joined(separator: "\n\n")
     }
 }

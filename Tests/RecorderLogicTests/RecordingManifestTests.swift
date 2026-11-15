@@ -94,6 +94,14 @@ import Testing
         #expect(written.problems.map(\.problem) == ["early", "late"])
     }
 
+    /// The owner's recordings from before `problems` existed are still
+    /// marked not finalized by their crash markers.
+    @Test func aManifestWithoutProblemsOrEndIsRead() throws {
+        let old = #"{"app":"x","state":"recording","started":"s","settings":{"resolution":"native","audioMode":"wired","systemAudio":true},"files":[],"events":[]}"#
+        let manifest = try RecordingManifest(json: Data(old.utf8))
+        #expect(manifest.problems.isEmpty && manifest.ended == nil && manifest.result == nil)
+    }
+
     @Test func eventTimesAreSecondsToTheMillisecond() {
         #expect(RecordingEvent(at: 1_446_200_400_000, event: .sleep).at == 1446.2)
     }
@@ -198,13 +206,6 @@ import Testing
         status.displayShowingAnotherDisplaysPicture = nil
         status.problems.append("Cannot write the recording manifest: full")
         #expect(status.badge(elapsedSeconds: 125) == "!")
-    }
-
-    @Test func theStopQuestionListsTheProblems() {
-        var status = RecordingStatus()
-        #expect(status.stopQuestionDetails == nil)
-        status.problems = ["a", "b"]
-        #expect(status.stopQuestionDetails == "a\n\nb")
     }
 }
 

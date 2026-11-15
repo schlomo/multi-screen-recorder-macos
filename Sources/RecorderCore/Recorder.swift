@@ -14,6 +14,8 @@ public protocol RecorderObserver: AnyObject {
     func recorder(_ recorder: Recorder, displayShowsAnotherDisplaysPicture display: String?)
     /// A problem, also listed in the recording manifest's `problems`.
     func recorder(_ recorder: Recorder, problem: RecordingProblem)
+    /// An event of the recording manifest, as one line (`EventLine`).
+    func recorder(_ recorder: Recorder, eventLine: String)
 }
 
 public struct RecorderStartError: Error, CustomStringConvertible {
@@ -102,6 +104,23 @@ public final class Recorder {
     /// Seconds since the recording started, on the shared clock.
     public var elapsedSeconds: Double { Double(context.now()) / 1_000_000_000 }
 
+    /// The status window's table and line, read now: each file's size on
+    /// disk and the free space in the recording folder.
+    public func status() -> (rows: [RecordingStatusTable.Row], line: String) {
+        var bytes: [String: Int64] = [:]
+        for file in manifest.files {
+            let path = folder.appending(path: file.name).path(percentEncoded: false)
+            bytes[file.name] = (try? FileManager.default.attributesOfItem(atPath: path)[.size] as? Int64) ?? 0
+        }
+        let free = (try? folder.resourceValues(forKeys: [.volumeAvailableCapacityForImportantUsageKey]))?
+            .volumeAvailableCapacityForImportantUsage
+        return (
+            RecordingStatusTable.rows(sources: tracker.sources, files: manifest.files, bytes: bytes),
+            RecordingStatusTable.line(
+                elapsedSeconds: elapsedSeconds, bytesWritten: bytes.values.reduce(0, +), files: manifest.files.count,
+                freeBytes: free))
+    }
+
     /// Ends every display file, finalizes the recording manifest and removes the crash marker.
     public func stop() async -> RecordingSummary {
         if !isStopped {
@@ -166,7 +185,9 @@ public final class Recorder {
 
     private func readDisplays() -> [ConnectedDisplay]? {
         do {
-            return try connectedDisplays()
+            let displays = try connectedDisplays()
+            RecorderLog.detail("displays: \(displays)", category: "recorder")
+            return displays
         } catch {
             tell("The displays cannot be read", error: "\(error)")
             return nil
@@ -194,6 +215,7 @@ public final class Recorder {
         guard !isStopped else { return }
         manifest.events += step.events
         if !step.events.isEmpty { try? writeManifest() }
+        told(step.events)
         for action in step.actions { perform(action) }
         let due = tracker.due(at: context.now())
         if !due.actions.isEmpty || !due.events.isEmpty {
@@ -215,6 +237,7 @@ public final class Recorder {
     }
 
     private func perform(_ action: DisplayTracker.Action) {
+        RecorderLog.detail("\(action)", category: "recorder")
         switch action {
         case .start(let uuid, let displayID, let frameSize, let number, let name):
             captureCount += 1
@@ -242,6 +265,7 @@ public final class Recorder {
     /// The manifest lists a file from its start; a start reported after
     /// the file's end changes nothing.
     private func fileStarted(_ file: RecordingManifest.DisplayFile, uuid: String) {
+        RecorderLog.detail("file started: \(file.name)", category: "recorder")
         tracker.fileStarted(uuid)
         guard !manifest.files.contains(where: { $0.name == file.name }) else { return }
         manifest.files.append(file)
@@ -257,7 +281,9 @@ public final class Recorder {
         let problem = endReports.record(
             captureNumber: captureNumber, reason: reason, end: end, display: display, at: context.now(), into: &manifest)
         if manifest != before { try? writeManifest() }
-        if let problem { observer?.recorder(self, problem: problem) }
+        told(Array(manifest.events.dropFirst(before.events.count)))
+        if let problem { told(problem) }
+        if let end { RecorderLog.detail("file ended: \(end.file.name), \(end.file.state.rawValue)", category: "recorder") }
     }
 
     private func captureEnded(
@@ -328,7 +354,21 @@ public final class Recorder {
     private func tell(_ problem: String, error: String?) {
         let problem = RecordingProblem(at: context.now(), problem: problem, error: error)
         manifest.problems.append(problem)
+        told(problem)
+    }
+
+    private func told(_ problem: RecordingProblem) {
+        RecorderLog.error("at \(problem.at)s: \(problem.text)", category: "recorder")
         observer?.recorder(self, problem: problem)
+    }
+
+    /// Events now in the manifest: to the log and the observer.
+    private func told(_ events: [RecordingEvent]) {
+        for event in events {
+            let line = EventLine.text(event, started: context.started, timeZone: context.timeZone)
+            RecorderLog.notice(line, category: "recorder")
+            observer?.recorder(self, eventLine: line)
+        }
     }
 }
 

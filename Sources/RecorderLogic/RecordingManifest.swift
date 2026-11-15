@@ -110,6 +110,21 @@ public struct RecordingManifest: Codable, Equatable, Sendable {
         case app, state, started, ended, result, settings, files, events, problems
     }
 
+    /// A manifest written before `ended`, `result` and `problems` existed
+    /// reads as one without them.
+    public init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        app = try container.decode(String.self, forKey: .app)
+        state = try container.decode(State.self, forKey: .state)
+        started = try container.decode(String.self, forKey: .started)
+        ended = try container.decodeIfPresent(String.self, forKey: .ended)
+        result = try container.decodeIfPresent(Result.self, forKey: .result)
+        settings = try container.decode(RecordedSettings.self, forKey: .settings)
+        files = try container.decode([DisplayFile].self, forKey: .files)
+        events = try container.decode([RecordingEvent].self, forKey: .events)
+        problems = try container.decodeIfPresent([RecordingProblem].self, forKey: .problems) ?? []
+    }
+
     /// `ended` and `result` are written as null until the recording is
     /// finalized; `events` and `problems` in the order of their time.
     public func encode(to encoder: any Encoder) throws {

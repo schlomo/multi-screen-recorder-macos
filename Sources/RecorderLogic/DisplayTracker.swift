@@ -326,6 +326,45 @@ public struct DisplayTracker: Sendable {
         displays[uuid]?.restartDelay = min(delay * 2, longestRestartDelay)
     }
 
+    /// Every display the recording has seen, as the status window shows it.
+    public struct Source: Equatable, Sendable {
+        public enum State: Equatable, Sendable {
+            case recording(FrameSize)
+            /// Waits to start: the settle time after a change.
+            case waiting
+            /// Its file ended with an error; it starts again after the back-off.
+            case failedRetrying
+            case showsAnotherDisplay
+            case diskFull
+            case mirroring
+            case disconnected
+            case asleep
+        }
+
+        public var uuid: String
+        public var number: Int?
+        public var name: String
+        public var state: State
+    }
+
+    /// The displays in their numbers' order, those without a number last.
+    public var sources: [Source] {
+        displays.map { uuid, tracked in
+            let state: Source.State = switch tracked.phase {
+            case .recording(let frameSize): .recording(frameSize)
+            case .waitingToRestart: .failedRetrying
+            case .showsAnotherDisplay: .showsAnotherDisplay
+            case .waitingForRoom: .diskFull
+            case .idle where tracked.reading == nil: .disconnected
+            case .idle where tracked.reading?.isMirroring == true: .mirroring
+            case .idle where isAsleep: .asleep
+            case .idle: .waiting
+            }
+            return Source(uuid: uuid, number: tracked.number, name: name(of: uuid) ?? uuid, state: state)
+        }
+        .sorted { ($0.number ?? .max, $0.uuid) < ($1.number ?? .max, $1.uuid) }
+    }
+
     private func name(of uuid: String) -> String? {
         displays[uuid]?.name ?? displays[uuid]?.reading?.name
     }

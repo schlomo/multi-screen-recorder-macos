@@ -11,9 +11,10 @@ import Testing
     /// Counts the ready checks the stand-in probes were run for.
     final class Probed: @unchecked Sendable {
         private let lock = NSLock()
-        private var count = 0
-        var checks: Int { lock.withLock { count } }
-        func ran() { lock.withLock { count += 1 } }
+        private var proofs: [ScreenRecordingProof] = []
+        var checks: Int { lock.withLock { proofs.count } }
+        var proofsRun: [ScreenRecordingProof] { lock.withLock { proofs } }
+        func ran(_ proof: ScreenRecordingProof) { lock.withLock { proofs.append(proof) } }
     }
 
     private static let settleTime = Duration.milliseconds(30)
@@ -50,7 +51,7 @@ import Testing
     private func makeModel(settleTime: Duration = settleTime) -> StartModel {
         let probed = probed
         let probes = ReadyCheckProbes(
-            screenRecording: { probed.ran(); return .granted },
+            screenRecording: { proof in probed.ran(proof); return .granted },
             microphonePermission: { true },
             displays: { .success(DesignExample.displays) },
             audioInputs: { .success(DesignExample.audioInputs) },
@@ -69,6 +70,20 @@ import Testing
     /// Waits until `condition` holds, at most 3 s.
     private func waitUntil(_ condition: () -> Bool) async {
         for _ in 0..<600 where !condition() { try? await Task.sleep(for: .milliseconds(5)) }
+    }
+
+    /// macOS's prompts come when the app starts and at "Check again", never at Start (D46).
+    @Test func theStartAndCheckAgainCaptureAFrameAndDeviceChangesDoNot() async {
+        let model = makeModel()
+        model.load()
+        await waitUntil { model.readyCheck != nil }
+        model.checkAgain()
+        await waitUntil { probed.checks == 2 }
+        model.devicesChanged()
+        await waitUntil { probed.checks == 3 }
+        model.change { $0.systemAudio.toggle() }
+        await waitUntil { probed.checks == 4 }
+        #expect(probed.proofsRun == [.captureOneFrame, .captureOneFrame, .listDisplays, .listDisplays])
     }
 
     @Test func aBurstOfDeviceChangesGivesOneCheck() async {

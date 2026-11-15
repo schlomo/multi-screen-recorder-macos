@@ -30,7 +30,14 @@ public struct CrashMarkers: Sendable {
     /// state becomes `not finalized` and the marker is removed. Returns one
     /// line per marker for the person: the report, or why it could not be
     /// handled (that marker is then left in place).
+    /// Each line also goes to the unified log at `.notice`.
     public func finishLeftBehind(isRunning: (Int32) -> Bool = processIsRunning) -> [String] {
+        let lines = handleLeftBehind(isRunning: isRunning)
+        for line in lines { RecorderLog.notice(line, category: "crash markers") }
+        return lines
+    }
+
+    private func handleLeftBehind(isRunning: (Int32) -> Bool) -> [String] {
         let names: [String]
         do {
             names = try FileManager.default.contentsOfDirectory(atPath: folder.path(percentEncoded: false)).sorted()
