@@ -40,12 +40,25 @@ so rather than silently picking a side.
   one exception ("Docs completeness is part of being done" below).
 - How far an agent writes to the repo is chosen at setup, one of
   three levels: it pushes work branches and opens draft MRs/PRs
-  (recommended); it commits locally only and a human pushes; or it
-  writes nothing to the repo without a per-change instruction. The
-  recommended level lets an agent iterate on real CI results by itself
-  — push, read the pipeline, push a fix — before a human spends review
-  time on it. At every level, credentials that happen to be present
-  are not consent, and neither is a request to "fix it": the level and
+  (recommended), optionally also marking the ones agents opened ready
+  once they are fully reviewed; it commits locally only and a human
+  pushes; or it writes nothing to the repo without a per-change
+  instruction. The recommended level lets an agent iterate on real CI
+  results by itself — push, read the pipeline, push a fix — before a
+  human spends review time on it. With the option, the session that
+  owns an MR/PR an agent opened (it opened it, briefed the agent that
+  did, or took it over) marks it ready once its adversarial review
+  leaves no BLOCKER or SHOULD-FIX open, its pipeline passes, and any
+  automated review the host ran on the draft has been read and handled
+  like the adversarial review's findings. "Ready" keeps one meaning:
+  fully reviewed, the human's to merge; if marking it ready makes the
+  host start an automated review, the MR/PR says not to merge until
+  that review is handled. An agent never marks a human's draft ready.
+  Where the host runs an automated review, it can be billed per use,
+  so setup records the option there only with a go-ahead naming the
+  account that pays ("Live systems need a human's go-ahead"). At every level,
+  credentials that happen to be present are not consent, and neither
+  is a request to "fix it": the level and
   the brief set what an agent may write, and only a human merges.
   Wherever these principles, the root instruction file, an agent
   definition or a brief say "push" or "the pushed remote", read it at
@@ -148,13 +161,18 @@ the mechanism is verifiable without a live system.
 A **paid run** touches a live system too: the account that pays. A
 paid run is any script, tool or test run that makes its own model
 calls (headless agent sessions, model API calls) or calls another API
-billed per use; a session's own work, its subagents included, is not
-one. A script bills whatever credential its environment hands it,
+billed per use, and any write that makes a host start an automated
+review billed per use; a session's own work, its subagents included,
+is not one. A script bills whatever credential its environment hands it,
 possibly another project's key, and a login status may not show
 which. So before each paid run, state what it runs, roughly what it
 costs and whether a credential is set in its environment (a presence
 check, never the value), then ask which account pays; the go-ahead
-names that account.
+names that account. The one standing go-ahead is for the automated
+review a host runs on the MRs/PRs agents open: setup records it once,
+naming the account and what starts a review, and it holds until a
+human withdraws it. Where the host runs such a review, the option of
+marking MRs/PRs ready ("Work branches") needs it.
 
 **A read can still do harm.** A diagnostic read puts load on the
 system it reads, and parallel sessions multiply that load. Before

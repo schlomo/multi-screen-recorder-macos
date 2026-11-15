@@ -130,13 +130,27 @@ This matters most: from now on "the backlog" means this place.
   an architect session keeps there. (b) They commit on their own
   computer only, and a person pushes, those planning notes included.
   (c) They change nothing in the repo unless a person asks for that
-  specific change."
-- **Default:** (a). An agent then sees the real test results of its
-  own change, fixes what fails and pushes again before anyone spends
-  review time; no change reaches the trunk without a person merging
-  it. (b) and (c) give more control at the cost of a person relaying
-  every step. Whatever the level, credentials that happen to be
-  available are never permission.
+  specific change. With (a), optionally: they also mark the merge
+  requests they opened ready for review once fully reviewed, the
+  host's automated review of the draft included."
+- **Also ask** with (a): "Does the host run an automated review on
+  merge requests, what starts one, and which account pays for it?
+  May agents start it without asking each time?" An agent opening a
+  merge request then starts a run that may be billed per use. Only a
+  yes is recorded as the standing go-ahead for those reviews; with a
+  no, each merge request an agent would open needs its own go-ahead,
+  and the option above is not offered. Where the host runs none, no
+  go-ahead is needed and the option is offered as it is.
+- **Default:** (a), without the option. An agent then sees the real
+  test results of its own change, fixes what fails and pushes again
+  before anyone spends review time; no change reaches the trunk
+  without a person merging it. (b) and (c) give more control at the
+  cost of a person relaying every step. The option saves a person a
+  click and a round trip per change, but "ready" then means the
+  agents' reviews and the host's automated review came out clean, not
+  that a person has looked; it needs the standing go-ahead. Whatever
+  the level, credentials that happen to be available are never
+  permission.
 - **Goes to:** `AGENTS.md` "Project setup" (the work-branch guardrail
   already defers to the recorded level).
 

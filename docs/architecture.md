@@ -120,8 +120,9 @@ the signing jobs never compile or run what was built (D29). Scripts
 with logic are Python from the runner image, standard library only
 (D32). Builds
 are signed with one self-signed certificate; Developer ID signing is
-deferred (D5). Agents push work branches and open draft PRs; only the
-owner merges (D8). AI-written commits and PRs say so (D9).
+deferred (D5). Agents push work branches and open draft PRs, handle
+Copilot's review of the draft, and mark a PR ready once fully
+reviewed; only the owner merges (D8, D39). AI-written commits and PRs say so (D9).
 
 ### Work tracking
 
