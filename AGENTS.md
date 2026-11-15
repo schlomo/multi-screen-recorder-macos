@@ -266,7 +266,7 @@ hoc, for a local check only).
   `~/Library/Logs/DiagnosticReports`, may show the crash report dialog
   and open the browser and Finder, and may write `state.json` and a text
   copy under `~/Library/Application Support/Multi Screen Recorder`
-  (`HOME` decides where); it and `msr check` also mark the recording
+  (`HOME` decides where); it, `msr check` and `msr record` also mark the recording
   manifest of each left-behind crash marker there `not finalized` and
   remove the marker.
   `msr version`, `msr settings` (it writes the settings file only with
