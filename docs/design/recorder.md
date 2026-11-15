@@ -357,6 +357,29 @@ Total 2.2 GB/h. 2 hours need 4.3 GB, 3.1 GB free.
   README, one string in the code), and a link to GitHub Issues that
   opens in the browser (D15, D26). The credit to the former upstream is
   in the README.
+- **Crash report offer:** when the app starts, after the window is
+  shown, it looks for the newest crash report of `msr`
+  (`~/Library/Logs/DiagnosticReports/msr-YYYY-MM-DD-HHMMSS.ips`, top
+  level only). If its name is greater than `lastOfferedCrashReport` in
+  the state file (nothing there: any crash report), a dialog "Multi
+  Screen Recorder quit unexpectedly" offers [Report on GitHub] [Not
+  Now], and the name is stored whatever the answer, so a crash is
+  offered once. The state file is
+  `~/Library/Application Support/Multi Screen Recorder/state.json`
+  (`HOME` decides), beside the settings file but apart from it: app
+  state the person never edits, written atomically, never touched by
+  `msr settings` or "Reset to defaults". "Report on GitHub" copies the
+  crash report to `Crash Reports/msr-….txt` in the same folder (GitHub
+  refuses `.ips` files), opens the browser on a new issue of the
+  repository with the form `.github/ISSUE_TEMPLATE/crash-report.yml`,
+  its title, app version and macOS version filled in (the title keeps
+  the `.ips` name), and shows the text copy in Finder for the person
+  to drag into the issue; GitHub takes no file through a link. The app
+  opens no connection itself (D15, D40). A crash report folder or a
+  state file that cannot be read or decoded, a failed copy or write
+  shows an alert "Cannot offer the crash report" with the error, and
+  nothing is offered that start; a browser that cannot be opened shows
+  an alert with the address.
 
 ## How the recorder works
 
@@ -480,11 +503,17 @@ Swift Argument Parser, Apple's own package for command lines.
 (which frame lands on which tick, still periods of 60 s and more, late
 ticks), geometry for every recording resolution and change case,
 settings and flags and their errors, file naming, manifest states,
-crash markers, the version, and the text of the examples in this
-document, which the tests hold to the code. `RecorderCoreTests` test
+crash markers, the version, the state file's content, the choice of
+the crash report to offer, the new-issue link (and that the issue form
+has the fields it fills), the name of a crash report's text copy, and
+the text of the examples in this document, which the tests hold to the
+code. `RecorderCoreTests` test
 the output folder probe against scratch folders, and that this Mac's
 audio inputs can be read and a listener for their changes registered,
-which needs no permission and shows no prompt, and that an action
+which needs no permission and shows no prompt, the state file (missing,
+saved, broken), the listing of the crash report folder (a missing one
+is no crash reports, an unreadable one an error), the text copy of a
+crash report, and that an action
 waiting for the main run loop's default mode runs only there. The
 window's refresh on device changes has no test yet (`backlog.md`,
 recorder PR). `CommandTests` run

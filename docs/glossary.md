@@ -45,6 +45,20 @@ recording claims it by creating it (D20).
 `recording.json` in the recording folder: the settings, every file with
 its start on the shared clock and its state, and the events (D20).
 
+## Crash report
+
+The `.ips` file macOS writes when `msr` quits unexpectedly, in
+`~/Library/Logs/DiagnosticReports`; the app offers to report it as a
+GitHub issue (D40). Not the crash marker, which belongs to a recording.
+Its text copy is the `.txt` copy the app makes in `Crash Reports` beside
+the state file, because GitHub refuses `.ips` attachments.
+
+## State file
+
+`~/Library/Application Support/Multi Screen Recorder/state.json`: what
+the app remembers between starts (the last offered crash report), kept
+apart from the settings file because the person never edits it (D40).
+
 ## Crash marker
 
 The file a recording process keeps while it records, naming its

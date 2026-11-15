@@ -1,0 +1,29 @@
+name: Crash report
+description: Multi Screen Recorder quit unexpectedly
+title: "Crash: "
+body:
+  - type: input
+    id: version
+    attributes:
+      label: App version
+    validations:
+      required: true
+  - type: input
+    id: macos
+    attributes:
+      label: macOS version
+    validations:
+      required: true
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What were you doing when it crashed?
+    validations:
+      required: false
+  - type: textarea
+    id: crash-report
+    attributes:
+      label: Crash report
+      description: "Drag the .txt file that Finder shows into this field. Issues are public: check the file for anything you don't want to share, such as your user name, before you submit."
+    validations:
+      required: true

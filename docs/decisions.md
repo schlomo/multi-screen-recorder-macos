@@ -984,3 +984,33 @@ architect's reading.
   the option, `AGENTS.md` records it, and the architect skill's
   operating rules give the commands.
 - **Evidence:** this change.
+
+## D40: Crash reports through GitHub (2026-11-15)
+
+- **Status:** in force.
+- **Context:** The owner, 2026-11-15, on reporting crashes: "yes, crash
+  report, but quick and easy. I don't want to give my email if we can
+  avoid it. Think about what GH offers, or maybe Google Forms. Problem
+  with forms is that file upload required a Google signin. I'm fine
+  with requiring a Github signin for reporters". Later: "yes, state.json
+  is better. crash report via txt file is better", with the temporary
+  folder as location "deeply weird".
+- **Decision:** On start, the app offers the newest not yet offered
+  crash report of `msr`; the person's yes opens a new GitHub issue form
+  in the browser and shows a text copy of the crash report in Finder
+  (GitHub refuses `.ips` files: "File type .ips not supported"). The
+  copy lives in `~/Library/Application Support/Multi Screen Recorder/Crash Reports/`.
+  The mark of the last offered crash report lives in the state file
+  `state.json` beside the settings file, not in the user defaults and
+  not in the settings: it is testable through `HOME`, readable, and
+  kept apart from the person's settings, which it is not. A crash
+  report folder or state file that cannot be read, a failed copy and a
+  browser that cannot be opened show an alert. No email, no network
+  code in the app (D15).
+- **Consequences:** Reporters need a GitHub account; issues are public,
+  so the dialog warns that the crash report contains the user name.
+  Text copies stay in the folder until the person deletes them. The
+  issue form's rendering and the prefill by field ids are unverified
+  until the first use on GitHub.
+- **Evidence:** this change; [recorder.md](design/recorder.md), "The
+  app".

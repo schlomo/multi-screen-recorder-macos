@@ -155,6 +155,11 @@ fit together is in [docs/design/delivery.md](docs/design/delivery.md).
 
 Please report problems and ideas as
 [GitHub issues](https://github.com/schlomo/multi-screen-recorder-macos/issues).
+If the app quit unexpectedly, it offers to report the crash report on
+your next start: your browser opens a new issue (a GitHub account is
+needed) and Finder shows a copy of the crash report as a text file to
+drag into it. Issues are public, and a crash report contains your Mac's
+user name: check it first.
 
 ## Origins
 

@@ -1,5 +1,6 @@
 import AppKit
 import RecorderCore
+import RecorderLogic
 import SwiftUI
 
 /// The app: an AppKit application with SwiftUI window content.
@@ -46,6 +47,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         startWindow?.makeKeyAndOrderFront(nil)
         NSApp.activate()
         model.load()
+        offerCrashReport(homeFolder: model.homeFolder)
     }
 
     func applicationDidBecomeActive(_ notification: Notification) {
@@ -76,6 +78,45 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         window.styleMask = [.titled, .closable, .miniaturizable]
         window.isReleasedWhenClosed = false
         return window
+    }
+
+    /// Offers the newest crash report of `msr` that was not offered before:
+    /// opens a new GitHub issue in the browser and shows a text copy of the
+    /// crash report in Finder. The app opens no connection itself (D15).
+    private func offerCrashReport(homeFolder: URL) {
+        do {
+            let stateFile = StateFile(homeFolder: homeFolder)
+            var state = try stateFile.load()
+            guard let name = CrashReport.toOffer(
+                fileNames: try crashReportFileNames(homeFolder: homeFolder),
+                lastOffered: state.lastOfferedCrashReport)
+            else { return }
+            state.lastOfferedCrashReport = name
+            try stateFile.save(state)
+            let alert = NSAlert()
+            alert.messageText = "Multi Screen Recorder quit unexpectedly"
+            alert.informativeText = "You can report it on GitHub, which needs a GitHub account. Your browser opens a new issue, and Finder shows a copy of the crash report as a text file for you to drag into it. Issues are public, and a crash report contains your Mac's user name: check it before you attach it."
+            alert.addButton(withTitle: "Report on GitHub")
+            alert.addButton(withTitle: "Not Now")
+            guard alert.runModal() == .alertFirstButtonReturn else { return }
+            let copy = try copyCrashReportAsText(name: name, homeFolder: homeFolder)
+            let issue = CrashReport.issueURL(
+                crashReportName: name, version: runningVersion.description,
+                macOSVersion: ProcessInfo.processInfo.operatingSystemVersionString)
+            NSWorkspace.shared.activateFileViewerSelecting([copy])
+            if !NSWorkspace.shared.open(issue) {
+                showAlert("Cannot open the browser", "Open this address yourself:\n\(issue.absoluteString)")
+            }
+        } catch {
+            showAlert("Cannot offer the crash report", error.localizedDescription)
+        }
+    }
+
+    private func showAlert(_ message: String, _ informative: String) {
+        let alert = NSAlert()
+        alert.messageText = message
+        alert.informativeText = informative
+        alert.runModal()
     }
 
     private func makeMainMenu() -> NSMenu {
