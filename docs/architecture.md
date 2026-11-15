@@ -44,7 +44,7 @@ credited for the reference implementation.
 ## 2. Shape
 
 The skeleton is built (the app window with the ready check and the
-tables of what will be recorded, the command line without `record`, the
+table of what will be recorded, auto mode, the command line without `record`, the
 pipeline); recording is designed, not built yet. The designs:
 [design/recorder.md](design/recorder.md) and
 [design/delivery.md](design/delivery.md); how the recorder is tested
@@ -82,16 +82,21 @@ D28).
   with a portrait display (D11, D25); a display whose frame size
   changes gets a new display file (D30); HEVC in `.mov`, no tick ever
   dropped, a timecode track in every file (D21, D31); always SDR (D24).
-- Audio: none, the default microphone or all inputs, with system audio
-  and AGC as separate switches (D12); one audio file per source, every
+- Audio: none, the default microphone, wired (the default microphone
+  plus every built-in and wired input) or all inputs, with system audio
+  and AGC as separate switches (D12, D44); one audio file per source, every
   input channel its own mono track (D22, D31); each display file
   carries two guide tracks, microphones and system audio, for playback
   and syncing (D31).
-- Agreed and not built yet (D34): auto mode, on by default, records
-  every display at its "looks like" size and all built-in and wired
-  audio inputs plus the default microphone; a recording follows a
-  change of the default microphone; a settings file is read, never
-  refused. What AGC does is open (D34).
+- Built (PR #9, D44): auto mode, on by default, records every display
+  at Native (its "looks like" size; the drawn-at size is never
+  recorded) with the audio mode wired; a Bluetooth or virtual input
+  only under "all inputs" or as the default microphone; a Mac without
+  a microphone records displays and system audio. The settings file is
+  only read, never refused or repaired, and written only by the window
+  and by `msr settings` with flags. Agreed, not built yet: a recording
+  follows a change of the default microphone (D34). What AGC does is
+  open (D34).
 - A recording folder and one recording manifest per recording;
   recordings into different folders may run in parallel (D20).
 - Safeguards: a ready check before Start, low-disk warnings,

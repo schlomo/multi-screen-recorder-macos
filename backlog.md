@@ -2,66 +2,30 @@
 
 ## Next session starts here
 
-The v0 design is agreed (D17–D33). Merged: PR #1 (skeleton and
-pipeline), PR #6 (crash reports through GitHub; the HiDPI crash fixed
-by removing the popup menus, D40, D41), PR #7 (app icon from the SVG),
-PR #8 (versions `0.<YYYYMMDD>.<N>`, D42; Copilot an optional extra,
-D43). Start the next architect session
-fresh with the recorder: the owner, 2026-11-15: "I want to get this PR
-through the door and get the actual recorder done."
+PR #9 merged 2026-11-15: settings and auto mode, the first of the
+recorder's two PRs (D44). Start the next architect session fresh with
+the recording core (queued item 2): its design text first, for the
+owner's sign-off, from the findings of 2026-11-15 in
+`docs/design/end-to-end-tests.md` (the docs PR "Record the virtual
+display and audio drift experiments" brings them; merge it first).
 
-Next:
+How the owner wants changes that show in the window or on the command
+line handled (2026-11-15: "what about working locally and letting me
+test first to speed up?"): as soon as the builder's tests pass, the
+owner gets the local build (`scripts/build-app` in the builder's
+clone) to try, while the review runs alongside; the owner's feedback
+and the review findings go into the same fix commit. Not yet written
+into the architect skill.
 
-1. **Recorder design** (queued item 2): the design text for auto mode,
-   a settings file that is read and never refused, recording at the
-   "looks like" size, the audio slider; signed off by the owner before
-   any brief. Steps 2 and 4 of the D34 list below; AGC (step 1) comes
-   after the recorder: "AGC can also come as an improvement after the
-   recorder" (the owner, 2026-11-15).
-2. In parallel, small: the owner checks the icon of release
-   `v0.20261115.12` (the first with the new versions, marked latest) in
-   the Dock and Finder (whether macOS 26 shows the
-   classic `.icns` without a grey frame).
-
-### Owner's rulings of 2026-11-13 (D34)
-
-Recorded in `docs/decisions.md` as D34; nothing of it is built. In
-order, the next architect session:
-
-1. Talks AGC through with the owner: what it does and whether it is on
-   in auto mode (open in D34; the owner's meaning: "turning up input
-   volume till before it clips and keeping it there"). Facts for that
-   talk: the input volume of a device is one value for all apps, and
-   not every audio input has one that can be set.
-2. Writes the design text for auto mode and for reading a settings
-   file without refusing it, and gets it signed off. It must settle
-   what D34 leaves open: with auto mode off, how audio inputs are
-   chosen and what becomes of the audio mode; when
-   `settings.json.previous` is written and overwritten, and whether a
-   command that only reads rewrites the settings file. The glossary
-   gains "auto mode" and "looks like".
-3. Done 2026-11-14: the end-to-end test design is agreed (D37). Two
-   of its experiments have run: a virtual display is captured on the
-   owner's Mac, and a new stream on a virtual display that came back
-   delivers the other display's picture, which the recorder design
-   must deal with.
-4. Briefs the recorder PR (queued item 2) with the first end-to-end
-   tests.
+Still open from D34: what AGC does and whether it is on in auto mode;
+"AGC can also come as an improvement after the recorder" (the owner,
+2026-11-15).
 
 ## In flight
 
-- **Open from PR #1** (merged 2026-11-14), still to report on the
-  owner's Mac: the first crash's re-test (unplug the default
-  microphone with the window open, wait, "Check again", plug it in
-  again); whether both permissions were kept when the snapshot was
-  installed over the earlier one (D5); a settings file written by an
-  early snapshot, with the key `readyCheckHours`, is refused until
-  "Reset to defaults"; `msr version` through a symbolic link; whether
-  macOS 26 re-asks for the screen recording permission after some
-  weeks; whether the tables stay unchanged while the folder chooser is
-  open or a control is dragged, and change when it closes. The first
-  crash gets its entry in `docs/troubleshooting.md` once its fix is
-  verified.
+- **Docs PR "Record the virtual display and audio drift experiments"**
+  (branch `experiment-findings`): the experiments of 2026-11-15 in
+  `docs/design/end-to-end-tests.md`; review, then the owner merges.
 - **`swiftpm-testing-helper` crashed twice** on the owner's Mac on
   2026-11-14 (21:53 and 22:08, crash reports in
   `~/Library/Logs/DiagnosticReports`), likely during `scripts/test`
@@ -73,73 +37,44 @@ order, the next architect session:
    Swift 6.3 and Python 3.15, the newest on GitHub's generally
    available runner image (D32 for Python), while the owner's Mac has
    Xcode 27.2. Move the pipeline and the Swift tools version up as soon
-   as a runner image with Xcode 27 is generally available.
-2. **Recorder PR** (D18): the recording core, `msr record`, Start and
-   Stop in the app, a display file per display and an audio file per
-   source with guide tracks (D31), a new display file when the frame
-   size changes (D30), timecode in every file (D21, D31), mono tracks
-   per channel (D22), SDR with the colour space tagged (D24). The
-   system audio stream needs a display to
-   attach to and must move when that display disappears.
-   Its brief must cover what the reviews of PR #1 found for it:
-   - This PR also builds auto mode with its setting `auto`, the
-     settings file that is read and never refused, and following a
-     change of the default microphone (D34). Before any brief, the
-     owner signs off the design text for the first two.
-     The first end-to-end tests (item 5) are designed with it.
-   - The open questions in `docs/design/recorder.md` are answered
-     first: the default microphone changing during a recording (ruled:
-     the recording follows it, D34), whether Apple's file writer puts a timecode track
-     into an audio-only file, clock drift between an audio device and
-     the tick grid, two audio inputs with the same name, device names a
+   as a runner image with Xcode 27 is generally available. The gap
+   bit in PR #9: code the local Xcode 27.2 accepted failed to compile
+   on CI's Swift 6.3.
+2. **Recording core (PR B)** (D18, D44): `msr record`, Start and Stop
+   in the app, a display file per display and an audio file per source
+   with guide tracks (D31), a new display file when the frame size
+   changes (D30), timecode in every file (D21, D31), mono tracks per
+   channel (D22), SDR with the colour space tagged (D24), the recording
+   following a change of the default microphone (D34), the first
+   end-to-end tests (item 5). The system audio stream needs a display
+   to attach to and must move when that display disappears. Its design
+   text, signed off before any brief, must cover:
+   - The findings of 2026-11-15 (`docs/design/end-to-end-tests.md`):
+     the wrong-display fault after a reconnect is reproducible with
+     virtual displays and survives every restart tried; each frame's
+     screen rectangle detects it, a screenshot of the display's area
+     still shows the right picture; a display's stable identity is
+     macOS's display UUID (the serial can be 0); a mode change is not a
+     reconnect and a stream configured to the looks-like size keeps
+     running, scaled; the frames are tagged BT.709 in 420v; a process
+     without the AppKit event loop is never told of display changes;
+     two of the owner's four microphones drift 50 and 117 parts per
+     million against the host clock, and macOS does not correct it.
+   - The open questions in `docs/design/recorder.md`: whether Apple's
+     file writer puts a timecode track into an audio-only file, clock
+     drift (above), two audio inputs with the same name, device names a
      file name cannot hold, the gain of the "Microphones" guide mix.
-   - A display needs a stable identity in `DisplayInfo`; the listing has
-     none yet.
-   - What the end-to-end tests need from the recorder design and what
-     research found for it (a macOS fault that delivers another
-     display's picture after a reconnect, seen on the owner's Mac; who holds the
-     permissions when `msr` is started from a terminal): the sections
-     "What the recorder design must provide", "Permissions" and
-     "What research found for the recorder" of
-     `docs/design/end-to-end-tests.md`, unverified unless marked as
-     tried.
+   - What the end-to-end tests need from the recorder design ("What the
+     recorder design must provide" in `docs/design/end-to-end-tests.md`).
    - The app quits when its last window closes; Start closes the
      window, so that must change.
    - Before microphones are captured with an `AVCaptureSession`, an
      experiment shows that unplugging a microphone does not crash the
-     process, during capture and after capture sessions that were
-     opened and closed (the app crashed in PR #1's ready check, which
-     opened one for a moment on every run; D36).
+     process (D36); it needs the owner at the Mac.
+   - Whether the wrong-display fault shows with the Mac's own displays;
+     it needs the owner to unplug and replug one.
    - The ready check does not run while a recording runs, activation
      included.
-   - The ready check probes are free functions: they need a seam for
-     tests, and their file access moves off the main thread. With the
-     seam, the window's refresh on device changes gets tests (one check
-     per burst, nothing applied while a menu is open); it has none yet.
-     One check per burst includes the fix of Copilot's finding on PR #1:
-     a refresh queued for the window outlives a newer device notice, so
-     after a menu closes the devices are read once too early and once
-     more after they settle (the newest result still wins); a refresh
-     number, like the ready check's, fixes it.
-   - Recording happens at the "looks like" size of a display, not at
-     the size it is drawn at: "recording needs to happen at the looks
-     like resolution, not the drawn at one" (the owner, 2026-11-15).
-     The design text says what `native` and the boxes then mean for a
-     HiDPI display.
-   - With auto mode's design: audio in the window becomes a slider from
-     none to all audio inputs (the owner, 2026-11-15: "probably audio
-     should also be a slider from none to all"; kept as radio buttons
-     until "all" exists).
-   - From the review of PR #1's crash fixes: `audioInputsToJudge`
-     says with a `switch`, not with `try?` and `?? []`, that audio
-     inputs that cannot be read do not matter with the audio mode
-     `none`, and its comment says what it returns; the unreachable
-     `case .gone` in `audioInputs(devices:…)` goes.
-   - One way to write JSON: Apple's `JSONEncoder` (sorted keys) for the
-     settings file, the state file and the recording manifest; the
-     hand-written writer in `Settings.swift` goes. The owner,
-     2026-11-15: "who cares about json key order? and why? KISS and DRY
-     are important".
    - A display mode change can arrive as a disconnect and a reconnect;
      short-lived modes need a settle time, or they make many short
      files.
@@ -154,7 +89,7 @@ order, the next architect session:
      message (it stops either way); `scripts/sign-app` says "the 1
      commits".
 3. **Audio after v0** (D12, D18): AGC, in its own PR, with its own
-   design, its column in the window's Audio table and the HDMI test.
+   design, its column in the window's table and the HDMI test.
    What AGC does is open (D34). Recording all audio inputs is no
    longer here: auto mode brings it (D34).
 4. **v1 gate:** acceptance tests on the owner's Mac (M3 Pro, macOS 26):
@@ -282,6 +217,13 @@ order, the next architect session:
 
 ## Done (recent)
 
+- 2026-11-15: PR #9 merged by the owner: settings and auto mode
+  (D44): Native is the looks-like size, four audio modes, a Mac without
+  a microphone records, one table of what will be recorded, the
+  settings file only read and written by the window and `msr settings`
+  with flags. The owner tried local builds during the review.
+  The owner confirmed the icon of `v0.20261115.12` and considers PR
+  #1's open re-checks done through the snapshot releases.
 - 2026-11-15: PR #7 (app icon rendered from the vector drawing, the
   owner's Gemini artwork in `assets/icon/`) and PR #8 (versions
   `0.<YYYYMMDD>.<N>`, D42; Copilot an optional extra, D43) merged by
