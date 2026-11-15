@@ -96,7 +96,7 @@ so it shows the app's version and runs with its signature.
 |---|---|
 | `msr list` | Shows displays, audio inputs and system audio |
 | `msr check [flags]` | Prints what will be recorded, then runs the ready check; exits 0 when ready, 1 when not; creates the output folder if it is missing |
-| `msr settings [flags] [--save]` | Prints the effective settings as JSON; `--save` writes them into the settings file, the only thing that does |
+| `msr settings [flags] [--save]` | Prints the effective settings as JSON; `--save` writes them into the settings file, the only way a command writes it |
 | `msr version` | Prints the version and commit |
 
 Without flags a command uses the settings as they are. Each flag changes

@@ -146,13 +146,17 @@ public enum ReadyCheck {
             return cannotBeRead(error)
         }
         var sources = audioInputs.filter(settings.records).map(\.label)
-        let missingMicrophone = settings.effectiveAudioMode != .none && sources.isEmpty
-        if missingMicrophone { sources.append("no microphone") }
-        if settings.systemAudio { sources.append("system audio") }
+        // A Mac without an audio input is ready in every audio mode: the displays and the system audio are recorded.
+        let noMicrophone = settings.effectiveAudioMode != .none && sources.isEmpty
+        if noMicrophone { sources.append("no microphone") }
+        if settings.systemAudio {
+            sources.append("system audio")
+        } else if noMicrophone {
+            sources.append("no system audio")
+        }
         return ReadyCheckItem(
             title: "Audio: " + (sources.isEmpty ? "none" : sources.joined(separator: ", ")),
-            passed: !missingMicrophone,
-            fix: missingMicrophone ? "connect a microphone, or set the audio mode to none (--audio-mode none)" : nil)
+            passed: true, fix: nil)
     }
 
     private static func outputFolderItem(_ probe: OutputFolderProbe, settings: Settings) -> ReadyCheckItem {

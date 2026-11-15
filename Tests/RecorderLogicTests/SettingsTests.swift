@@ -37,14 +37,14 @@ import Testing
 
     @Test func flagNamesAreTheKeysInKebabCase() {
         #expect(SettingKey.allCases.map(\.flagName) == [
-            "--auto", "--resolution", "--audio-mode", "--system-audio", "--output-folder",
+            "--resolution", "--audio-mode", "--system-audio", "--output-folder",
             "--required-recording-hours", "--low-disk-warning-minutes",
         ])
     }
 
     @Test func theFileHasExactlyTheKeysOfSettingKey() throws {
         let object = try #require(JSONSerialization.jsonObject(with: try Settings.defaults.jsonData()) as? [String: Any])
-        #expect(Set(object.keys) == Set(SettingKey.allCases.map(\.rawValue)))
+        #expect(Set(object.keys) == Set(SettingKey.allCases.map(\.rawValue) + [Settings.autoKey]))
     }
 
     @Test func autoModesChoicesAreTheDefaultsOfTheTwoSliders() {

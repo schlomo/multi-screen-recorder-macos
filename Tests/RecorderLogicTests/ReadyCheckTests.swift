@@ -129,17 +129,34 @@ import Testing
         #expect(!result.items.contains { $0.title.hasPrefix("Free disk space") })
     }
 
-    @Test func noMicrophoneFailsOnlyTheAudioItem() throws {
-        let notDefault = [AudioInputInfo(name: "RØDE Wireless GO II RX", channelCount: 2, isDefault: false)]
-        for inputs in [[], notDefault] {
-            let result = ReadyCheck.evaluate(facts(audioInputs: inputs), settings: .manual)
-            #expect(result.items.filter { !$0.passed } == [
-                ReadyCheckItem(
-                    title: "Audio: no microphone, system audio",
-                    passed: false,
-                    fix: "connect a microphone, or set the audio mode to none (--audio-mode none)"),
-            ])
-        }
+    /// The owner, 2026-11-15: "no mic should just work of course, in any mode.
+    /// and system audio is still a thing."
+    @Test(arguments: AudioMode.allCases)
+    func aMacWithoutAnyAudioInputIsReadyInEveryAudioMode(mode: AudioMode) {
+        var settings = Settings.manual
+        settings.audioMode = mode
+        let result = ReadyCheck.evaluate(facts(audioInputs: []), settings: settings)
+        #expect(result.isReady)
+        let audio = result.items.first { $0.title.hasPrefix("Audio:") }
+        #expect(audio == ReadyCheckItem(
+            title: mode == .none ? "Audio: system audio" : "Audio: no microphone, system audio",
+            passed: true, fix: nil))
+        #expect(result.items.contains { $0.title.hasPrefix("Free disk space") })
+    }
+
+    @Test func withoutAnyAudioInputAndWithoutSystemAudioTheItemSaysSo() {
+        var settings = Settings.manual
+        settings.systemAudio = false
+        let result = ReadyCheck.evaluate(facts(audioInputs: []), settings: settings)
+        #expect(result.isReady)
+        #expect(result.items.contains(ReadyCheckItem(
+            title: "Audio: no microphone, no system audio", passed: true, fix: nil)))
+    }
+
+    @Test func autoModeWithoutAnyAudioInputIsReady() {
+        var settings = Settings.defaults
+        settings.audioMode = .none
+        #expect(ReadyCheck.evaluate(facts(audioInputs: []), settings: settings).isReady)
     }
 
     private static func unreadable(isDefault: Bool) -> AudioInputInfo {
@@ -291,7 +308,7 @@ import Testing
         #expect(audioTitle(mode, [headset]) == "Audio: AirPods (default), system audio")
     }
 
-    @Test func withoutAnyRecordedInputWiredFailsLikeTheDefaultMicrophone() {
+    @Test func withoutAnyRecordedInputTheItemSaysNoMicrophoneAndPasses() {
         #expect(audioTitle(.wired, [Self.airPods]) == "Audio: no microphone, system audio")
     }
 

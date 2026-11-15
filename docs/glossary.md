@@ -118,8 +118,9 @@ but None, whatever it is (D44).
 
 ## Wired
 
-The audio mode Wired records the default microphone plus every built-in
-and wired audio input: built-in, USB, FireWire, PCI, Thunderbolt, HDMI
+The audio mode Wired records the default microphone plus every audio
+input that is built-in or connected by cable (built-in counts as wired):
+built-in, USB, FireWire, PCI, Thunderbolt, HDMI
 and DisplayPort, as Core Audio reports the transport type. Bluetooth,
 Bluetooth LE, virtual, aggregate, AirPlay, Continuity capture, an
 unknown transport and one that cannot be read are not wired. Auto mode's

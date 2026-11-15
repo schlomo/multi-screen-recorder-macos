@@ -44,9 +44,12 @@ final class StartModel {
         settingsFile = SettingsFile.standard(homeFolder: homeFolder)
     }
 
-    /// Reads the settings file, which is never refused (what it ignores is not shown), and checks.
+    /// Reads the settings file, which is never refused; what it ignores goes
+    /// to standard error, as for the commands, and is not shown in the window.
     func load() {
-        settings = settingsFile.load().settings
+        let read = settingsFile.load()
+        if let note = read.note { FileHandle.standardError.write(Data("\(note)\n".utf8)) }
+        settings = read.settings
         checkAgain()
     }
 

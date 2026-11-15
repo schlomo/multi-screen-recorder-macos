@@ -1128,7 +1128,9 @@ architect's reading.
   auto mode happens regardless of settings or we use --resolution xx to
   indicate a desired resolution. --auto on or --auto off is overkill,
   we need to KISS."; "I thought we had BT & Virtual which seemed
-  logical to me."; "Native I liked before already"; "yes to A".
+  logical to me."; "Native I liked before already"; "yes to A". Later the same day, on a Mac without an audio input: "no mic
+  should just work of course, in any mode. and system audio is still a
+  thing. The slider can remain as is, it should just not break".
 - **Decision:** The recorder comes in two PRs: PR A, settings and auto
   mode, captures nothing; PR B is the recording core.
   1. Auto mode: the setting `auto`, on by default, records every
@@ -1148,7 +1150,11 @@ architect's reading.
      the window, no "Reset to defaults". It is written whole, with
      `JSONEncoder`, only when a person saves (a change in the window,
      `msr settings --save`). Exit 78 stays for an unset `HOME` only.
-  5. `msr record` without flags does what Start does; a flag changes
+  5. A Mac with no audio input at all is ready in every audio mode
+     (the architect's reading of the owner's words): the audio item
+     says "no microphone" and passes, the system audio is recorded as
+     usual.
+  6. `msr record` without flags does what Start does; a flag changes
      one run; `--resolution` and `--audio-mode` turn auto mode off for
      the run, `--auto` (no value) forces it, and `--auto` with either
      is a usage error.

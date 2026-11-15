@@ -33,9 +33,9 @@ public enum AudioMode: String, CaseIterable, Sendable, Encodable {
     }
 }
 
-/// A key of the settings file; each has a flag of the same name in kebab case.
+/// A key of the settings file that has a flag with a value, of the same name
+/// in kebab case. `auto` is the plain flag `--auto`, see `Settings.autoKey`.
 public enum SettingKey: String, CaseIterable, Sendable {
-    case auto
     case resolution
     case audioMode
     case systemAudio
@@ -77,6 +77,9 @@ public struct Settings: Equatable, Sendable, Encodable {
         self.requiredRecordingHours = requiredRecordingHours
         self.lowDiskWarningMinutes = lowDiskWarningMinutes
     }
+
+    /// The settings file's key of `auto`, which has no value flag.
+    public static let autoKey = "auto"
 
     /// What auto mode chooses; also the defaults of the two sliders, so
     /// turning auto mode off changes nothing until a slider is moved.
@@ -244,6 +247,14 @@ extension Settings {
         var settings = Settings.defaults
         var ignored: [IgnoredSetting] = []
         for (name, value) in object.sorted(by: { $0.key < $1.key }) {
+            if name == autoKey {
+                if case .bool(let flag) = value {
+                    settings.auto = flag
+                } else {
+                    ignored.append(IgnoredSetting(key: name, reason: "invalid value, expected \(Expected.jsonSwitch)"))
+                }
+                continue
+            }
             guard let key = SettingKey(rawValue: name) else {
                 ignored.append(IgnoredSetting(key: name, reason: "unknown key"))
                 continue
@@ -258,8 +269,6 @@ extension Settings {
     /// Sets the key from its JSON value; what is expected instead when the value is invalid.
     private mutating func set(_ key: SettingKey, fromJSON value: JSONValue) -> String? {
         switch (key, value) {
-        case (.auto, .bool(let flag)): auto = flag
-        case (.auto, _): return Expected.jsonSwitch
         case (.resolution, .string(let text)):
             guard let parsed = RecordingResolution(rawValue: text) else { return Expected.resolution }
             resolution = parsed
@@ -291,9 +300,8 @@ extension Settings {
         try prettyJSON(self)
     }
 
-    /// The settings with command-line flag values applied, keyed by setting;
-    /// `auto` is the plain flag `--auto`. A choice flag (`--resolution`,
-    /// `--audio-mode`) turns auto mode off for the run; `--auto` turns it on
+    /// The settings with command-line flag values applied, keyed by setting.
+    /// A choice flag (`--resolution`, `--audio-mode`) turns auto mode off for the run; `--auto` turns it on
     /// and cannot be combined with a choice flag.
     public func applying(flags: [SettingKey: String], auto forceAuto: Bool = false) throws(SettingsError) -> Settings {
         if forceAuto, let choice = [SettingKey.resolution, .audioMode].first(where: { flags[$0] != nil }) {
@@ -307,8 +315,6 @@ extension Settings {
                 .invalidFlagValue(flag: key.flagName, value: text, expected: expected)
             }
             switch key {
-            case .auto:
-                break
             case .resolution:
                 guard let parsed = RecordingResolution(rawValue: text) else { throw invalid(Expected.resolution) }
                 settings.resolution = parsed

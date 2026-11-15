@@ -27,7 +27,7 @@ signature); if that fails it exits 71 (`EX_OSERR`).
 | `msr list` | Shows displays, audio inputs and system audio | 0, 1 when the displays, the audio inputs or an audio input the settings record cannot be read |
 | `msr check [flags]` | Prints "What will be recorded", then runs the ready check and prints each item | 0 ready, 1 not ready |
 | `msr record [flags] [--duration 1h30m]` | Not built yet (the recorder PR). Without flags it does what Start in the window does, with the same settings file; it prints "What will be recorded" at its start, then runs the ready check, records until Ctrl-C, SIGTERM, SIGHUP or the duration, and prints the recording folder at the start and a summary at the end | 0 ok, 1 not ready, 3 ended with an error |
-| `msr settings [flags] [--save]` | Prints the effective settings as JSON; `--save` writes them into the settings file, the only thing that writes it | 0, 1 when `--save` cannot write the file |
+| `msr settings [flags] [--save]` | Prints the effective settings as JSON; `--save` writes them into the settings file, the only way a command writes it; the window also writes it | 0, 1 when `--save` cannot write the file |
 | `msr version` | Prints the version and commit | 0 |
 
 A usage error (unknown command or flag, invalid value) prints a usage
@@ -76,10 +76,28 @@ size; the drawn-at size is never recorded (D44). It is the one of the
 recording resolution the settings choose: Native with auto mode, the
 default.
 
-`msr check` first prints "What will be recorded", the window's two
-tables and total line from the same code (see "The app"), then one line
-per item of the ready check, `ok` or `FAIL`, a fix under each failure,
-and `Ready.` or `Not ready.` last:
+`msr check` first prints "What will be recorded": the window's two
+tables, the total line and "Files go to <output folder>", from the same
+code (see "The app"; the window's last line, "Recording continues when
+displays or audio sources change.", is not printed), then one line per
+item of the ready check, `ok` or `FAIL`, a fix under each failure, and
+`Ready.` or `Not ready.` last. For the devices of the `msr list` example,
+the defaults and 3.1 GB free:
+
+```
+What will be recorded
+  Display                    Looks like  Drawn at   Records at  GB/h
+  1 Built-in Retina Display  1728×1117   3456×2234  1728×1116   1.0
+  2 LG HDR 4K                3840×2160   3840×2160  3840×2160   4.1
+  Audio                             Channels  GB/h
+  MacBook Pro Microphone (default)  1         0.1
+  RØDE Wireless GO II RX            2         0.1
+  System audio                      stereo    0.1
+  Total 5.3 GB/h. 2 hours need 10.7 GB, 3.1 GB free.
+  Files go to ~/Movies/Multi Screen Recorder
+```
+
+then:
 
 ```
 ok    Screen & System Audio Recording permission
@@ -130,7 +148,7 @@ saves, so a fresh Mac has none and the defaults apply:
   an unknown key and an invalid value are ignored (the key takes its
   default); a file that cannot be read, is no JSON or no JSON object
   gives the defaults. One line on standard error, from every command
-  that reads the settings, names what was ignored: `Settings file:
+  that reads the settings and by the app at its start, names what was ignored: `Settings file:
   ignored agc (unknown key), audioMode (invalid value, expected one of
   none, default-microphone, wired, all-inputs); using defaults for
   those.` Nothing is rewritten on read, no copy of the earlier file is
@@ -152,8 +170,13 @@ the Microphone permission (unless the audio mode, with auto mode the
 audio mode Wired, is `none`), the displays (at least one, each
 readable), the chosen audio sources (each audio input the audio mode
 records readable; another that cannot be read does not count; with an
-audio mode but `none` the default microphone must exist, and the item
-fails with "no microphone" when no input is recorded), the output
+audio mode but `none` the item says "no microphone" when no input is
+recorded, such as on a Mac without any audio input, and passes: no
+microphone works in every audio mode, the displays and the system audio
+are recorded as usual, and the item then reads `Audio: no microphone,
+system audio`, or `Audio: no microphone, no system audio` with system
+audio off; an input that is recorded and whose channels cannot be read
+fails it), the output
 folder, and free disk space in the output folder for
 `requiredRecordingHours`.
 
@@ -166,7 +189,7 @@ folder, and free disk space in the output folder for
   (owner's Mac, 2026-11-13), and the capture session an earlier ready
   check opened for a moment on every run is the cause [ASSUMED]. With
   the permission granted but no microphone connected, the permission
-  item passes and the audio item alone fails, with "no microphone".
+  item and the audio item pass, the latter saying "no microphone".
   The audio inputs are read from Core Audio's device list, which
   creates no capture object; if that list, the default audio input or
   the name of an audio input cannot be read, the audio item fails with
@@ -723,7 +746,8 @@ output folder on another disk".
 
 Decided while building PR A, within D44, for the owner to confirm: `msr check` prints "What
 will be recorded" before the ready check's items, separated by a blank
-line; a settings file that cannot be read as a whole is named "the whole
+line, without the window's line "Recording continues …", and the Mac
+without an audio input is ready; a settings file that cannot be read as a whole is named "the whole
 file" in the line on standard error; an input's transport that cannot be
 read is not wired; `msr settings --save` that cannot write exits 1; the
 window shows a red line when a save fails.

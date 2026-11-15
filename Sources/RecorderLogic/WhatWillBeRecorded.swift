@@ -140,7 +140,7 @@ public struct WhatWillBeRecorded: Equatable, Sendable {
         if let audioError { lines.append("  \(audioError)") }
         lines += Self.table(Self.audioColumns, audio.map { [$0.name, $0.channels, $0.gigabytesPerHour] })
         if let total { lines.append("  \(total)") }
-        lines += ["  \(outputFolder)", "  \(continuity)"]
+        lines.append("  \(outputFolder)")
         return lines.joined(separator: "\n") + "\n"
     }
 

@@ -132,9 +132,12 @@ import Testing
               System audio                      stereo    0.1
               Total 5.3 GB/h. 2 hours need 10.7 GB, 3.1 GB free.
               Files go to ~/Movies/Multi Screen Recorder
-              Recording continues when displays or audio sources change.
 
             """)
+    }
+
+    @Test func theDesignShowsTheTextOfMSRCheck() throws {
+        #expect(try repositoryFile("docs/design/recorder.md").contains("```\n\(defaultSection.text)```\n"))
     }
 
     @Test func theTextShowsErrorsInPlaceOfTheirTables() {

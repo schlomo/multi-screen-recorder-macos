@@ -47,7 +47,7 @@ import Testing
         home = FileManager.default.temporaryDirectory.appending(path: "StartModel-\(UUID().uuidString)", directoryHint: .isDirectory)
     }
 
-    private func makeModel() -> StartModel {
+    private func makeModel(settleTime: Duration = settleTime) -> StartModel {
         let probed = probed
         let probes = ReadyCheckProbes(
             screenRecording: { probed.ran(); return .granted },
@@ -57,7 +57,7 @@ import Testing
             outputFolder: { _ in .usable(.bytes(100_000_000_000)) })
         let menu = menu
         return StartModel(
-            homeFolder: home, probes: probes, settleTime: Self.settleTime,
+            homeFolder: home, probes: probes, settleTime: settleTime,
             whenContentMayChange: { menu.whenContentMayChange($0) })
     }
 
@@ -80,7 +80,7 @@ import Testing
     }
 
     @Test func aBurstSpreadOverSeveralNoticesWithinTheSettleTimeGivesOneCheck() async {
-        let model = makeModel()
+        let model = makeModel(settleTime: .milliseconds(100))
         for _ in 0..<4 {
             model.devicesChanged()
             await wait(0.01)
