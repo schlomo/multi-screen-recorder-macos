@@ -19,6 +19,7 @@ bundle="Multi Screen Recorder.app"
 app="build/$bundle"
 archive="build/msr-app.tar"
 icon_source="assets/icon/app-icon.png"
+[[ -f "$icon_source" ]] || { echo "scripts/build-app: $icon_source is missing" >&2; exit 1; }
 
 swift build -c release
 bin_path="$(swift build -c release --show-bin-path)"
@@ -33,7 +34,6 @@ plutil -replace CFBundleVersion -string "$short_version" "$plist"
 plutil -replace MSRVersion -string "$version" "$plist"
 plutil -replace MSRCommit -string "$commit" "$plist"
 
-[[ -f "$icon_source" ]] || { echo "scripts/build-app: $icon_source is missing" >&2; exit 1; }
 iconset="$(mktemp -d)/AppIcon.iconset"
 trap 'rm -rf "$(dirname "$iconset")"' EXIT
 mkdir "$iconset"

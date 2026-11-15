@@ -19,7 +19,7 @@ The project palette (the owner's choice of 2026-11-12), meant for the homepage a
 | Cool white | `#E9EEF7` |
 | Red | `#FF3B30` |
 
-The SVG's front display uses `#E6EBF7` and its stand `#D5DAE6`, its own colours, not part of the palette.
+The SVG uses its own colours, none of them in the palette: back display `#415070`, middle display `#6E7CA0`, front display `#E6EBF7`, stand `#D5DAE6`. The palette's cool white `#E9EEF7` is not used in the SVG.
 
 ## Regenerating the derived images
 
