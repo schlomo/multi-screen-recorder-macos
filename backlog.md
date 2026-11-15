@@ -220,6 +220,26 @@ Still open from D34: what AGC does and whether it is on in auto mode;
   (D45). Revisit when a runner image with Xcode 27 is generally
   available (queued item 1), or if macOS 27 is shown to fix the
   wrong-display fault.
+- **Frame rates other than 30 fps** (60, or 100 and more). The owner,
+  2026-11-15: "maybe somebody would like to record at 60 or 100 fps, so
+  we shouldn't make it too hard to change that." Kept open in B1: the
+  frame rate is one named value that the tick grid, timecode and
+  encoder derive from, with a test at a second rate; there is no
+  setting. Deferred because D11 and D21 fix 30 fps. A screen shows no
+  more frames than its refresh rate (60 Hz for most external displays,
+  up to 120 Hz for ProMotion), and editors' timecode support above
+  60 fps is unknown. Revisit when someone asks; it then needs its own
+  design (setting, disk estimate, timecode above 60 fps, encoder load).
+- **A short test recording that measures the system load**, like OBS's
+  auto-configuration. The owner, 2026-11-15: "We could also do a 5 sec
+  test recording at full quality without writing the files (or with
+  writing to a temp folder we trash) to "measure" the system load and
+  to show it to the user". The design stays open for it: `msr record`
+  with `--duration` and `--output-folder` already makes such a
+  recording, and the manifest's `framesRepeatedForLateness` shows
+  whether the encoder kept up. Deferred because the v1 gate's one-hour
+  measurement first shows whether load is a problem at all. Revisit
+  when that measurement or a user shows recordings falling behind.
 
 ## Done (recent)
 
