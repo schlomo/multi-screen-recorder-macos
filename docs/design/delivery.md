@@ -30,7 +30,7 @@ when it moves.
 | `scripts/unpack-app` | Unpacks the app archive into an empty `build/` with the `data` filter of Python's `tarfile`, rooted at the bundle folder, which refuses absolute paths, links pointing out of the bundle and special files; before writing anything the script itself refuses an archive that is not a plain tar, a member named twice, a member outside the bundle or with a `..` component (the build writes none), a bundle that is not a folder and a member below a symbolic link of the archive; a member that cannot be extracted stops it, and it removes what it wrote when it stops |
 | `scripts/sign-app` | Checks the bundle's version, commit and identifier, re-signs it, checks the signature, identifier, hardened runtime and entitlements, and zips it into `build/` |
 | `scripts/ci-import-signing-certificate` | CI only: puts the certificate from the secret into a temporary keychain |
-| `scripts/publish-snapshot-release` | Creates or replaces a PR's snapshot release |
+| `scripts/publish-snapshot-release` | Creates or replaces a PR's snapshot release; removes it once the PR is closed |
 | `scripts/remove-snapshot-release` | Removes a closed PR's snapshot release |
 | `scripts/publish-release` | Publishes the release for a merge to `main` |
 
@@ -80,7 +80,22 @@ replaced on every push, titled `Snapshot PR #<n>: <version>`. A
 pre-release rather than a draft, which only collaborators can see and
 which has no stable download link. It is published only while the PR
 is open and its head is the commit built; a run for a superseded push
-or a closed PR publishes nothing and succeeds.
+publishes nothing and succeeds. A run for a closed PR publishes nothing,
+removes the PR's snapshot release if one is left, and succeeds: GitHub
+keeps one job waiting per concurrency group and cancels it when another
+is queued, so a snapshot run queued after the close can replace the
+waiting `remove-snapshot-release`
+([GitHub: control the concurrency of workflows and jobs](https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/control-workflow-concurrency)).
+
+**Release:** releases are signed and published one at a time, each
+waiting in turn (`queue: max` on the `release` job's concurrency group,
+up to 100 waiting), so every push to `main` that changes more than
+Markdown files gets its release. They wait in the order their builds
+finish, not the order of the pushes (see "Accepted risks").
+
+`test-and-build` stops after 20 minutes (a run takes about 2), so a
+hanging test fails the job instead of holding a runner for GitHub's
+six hours.
 
 **Versions** (D23) count the commits on `main`, N:
 
@@ -196,6 +211,15 @@ GitHub Actions and Swift packages in use.
     Dependabot get no secret.
   - The smoke-tested bundle and the published one differ in their
     signature only; the published one is checked statically, not run.
+- Two pushes to `main` whose builds finish in the other order are
+  released in that order: the older version is created last and may
+  then be marked the latest release, which the README sends people to.
+  UNVERIFIED either way: `gh release create --help` gives the default
+  as "automatic based on date and version", which may keep the newer
+  version the latest. Accepted in PR #4 because one person merges, rarely two
+  within a build's two minutes, and `gh release edit <tag> --latest`
+  fixes it in a minute. Revisit when it happens, or when several
+  people merge.
 
 ## Rejected
 

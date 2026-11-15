@@ -207,8 +207,8 @@ extension Settings {
             (.audioMode, jsonString(audioMode.rawValue)),
             (.systemAudio, systemAudio ? "true" : "false"),
             (.outputFolder, jsonString(outputFolder)),
-            (.requiredRecordingHours, jsonNumber(requiredRecordingHours)),
-            (.lowDiskWarningMinutes, jsonNumber(lowDiskWarningMinutes)),
+            (.requiredRecordingHours, numberText(requiredRecordingHours)),
+            (.lowDiskWarningMinutes, numberText(lowDiskWarningMinutes)),
         ].map { "  \(jsonString($0.0.rawValue)): \($0.1)" }
         return "{\n" + lines.joined(separator: ",\n") + "\n}\n"
     }
@@ -265,7 +265,8 @@ private func jsonString(_ text: String) -> String {
     return escaped + "\""
 }
 
-private func jsonNumber(_ number: Double) -> String {
+/// A whole number below 1e15 without a fraction, any other as Swift writes it.
+func numberText(_ number: Double) -> String {
     if number == number.rounded(), abs(number) < 1e15 { return String(Int(number)) }
     return String(number)
 }
