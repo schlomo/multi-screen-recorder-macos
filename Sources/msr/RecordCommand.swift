@@ -65,6 +65,8 @@ final class RecordCommandDelegate: NSObject, NSApplicationDelegate {
     private var session: RecordingSession?
     private var signalSources: [any DispatchSourceSignal] = []
     private var isStopping = false
+    /// Stop in progress, for a logout that comes meanwhile to wait for.
+    private var stopping: Task<Void, Never>?
     private(set) var exitStatus: Int32 = 0
 
     init(settings: Settings, homeFolder: URL, duration: RecordingDuration?) {
@@ -112,25 +114,37 @@ final class RecordCommandDelegate: NSObject, NSApplicationDelegate {
 
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         guard let session else { return .terminateNow }
-        if isStopping { return .terminateCancel }
-        if quitEndsTheSession(reason: currentQuitReason()) {
-            // Logout and shutdown finalize without asking, then let the process end.
-            isStopping = true
+        switch QuitDecision(isStopping: isStopping, endsTheSession: quitEndsTheSession(reason: currentQuitReason())) {
+        case .ignore:
+            return .terminateCancel
+        case .waitForTheStop:
+            let stopping = stopping
             Task {
-                _ = await session.stop()
+                await stopping?.value
                 NSApp.reply(toApplicationShouldTerminate: true)
             }
             return .terminateLater
+        case .finalizeWithoutAsking:
+            // Logout and shutdown finalize without asking, then let the process end.
+            isStopping = true
+            stopping = Task { _ = await session.stop() }
+            let stopping = stopping
+            Task {
+                await stopping?.value
+                NSApp.reply(toApplicationShouldTerminate: true)
+            }
+            return .terminateLater
+        case .ask:
+            if session.askToStop() { stop() }
+            return .terminateCancel
         }
-        if session.askToStop() { stop() }
-        return .terminateCancel
     }
 
     /// Ctrl-C, SIGTERM, SIGHUP, the duration and Stop in the Dock all end here.
     private func stop() {
         guard let session, !isStopping else { return }
         isStopping = true
-        Task {
+        stopping = Task {
             if let summary = await session.stop() {
                 print(summary.text, terminator: "")
                 fflush(stdout)

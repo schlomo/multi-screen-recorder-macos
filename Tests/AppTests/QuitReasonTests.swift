@@ -15,3 +15,16 @@ import Testing
         #expect(!quitEndsTheSession(reason: OSType(kAEQuitApplication)))
     }
 }
+
+@Suite struct QuitDecisionTests {
+    @Test func aQuitDuringARecordingAsksAndALogoutFinalizes() {
+        #expect(QuitDecision(isStopping: false, endsTheSession: false) == .ask)
+        #expect(QuitDecision(isStopping: false, endsTheSession: true) == .finalizeWithoutAsking)
+    }
+
+    /// A logout while Stop is in progress waits for it instead of cancelling the logout.
+    @Test func whileStoppingALogoutWaitsAndAQuitIsIgnored() {
+        #expect(QuitDecision(isStopping: true, endsTheSession: true) == .waitForTheStop)
+        #expect(QuitDecision(isStopping: true, endsTheSession: false) == .ignore)
+    }
+}

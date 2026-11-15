@@ -21,6 +21,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var aboutWindow: NSWindow?
     private var model: StartModel?
     private var session: RecordingSession?
+    /// Stop in progress, for a logout that comes meanwhile to wait for.
+    private var stopping: Task<Void, Never>?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.mainMenu = makeMainMenu()
@@ -87,7 +89,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
         guard let session else { return true }
         if !session.isStopping, session.askToStop() {
-            Task {
+            stopping = Task {
                 await stopRecording(revealFolder: true)
                 NSApp.terminate(nil)
             }
@@ -98,15 +100,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// Logout, restart and shutdown finalize without asking; any other quit asks.
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         guard let session else { return .terminateNow }
-        if session.isStopping { return .terminateCancel }
         let endsTheSession = quitEndsTheSession(reason: currentQuitReason())
-        if !endsTheSession, !session.askToStop() { return .terminateCancel }
-        let reveal = !endsTheSession
-        Task {
-            await stopRecording(revealFolder: reveal)
-            NSApp.reply(toApplicationShouldTerminate: true)
+        switch QuitDecision(isStopping: session.isStopping, endsTheSession: endsTheSession) {
+        case .ignore:
+            return .terminateCancel
+        case .waitForTheStop:
+            let stopping = stopping
+            Task {
+                await stopping?.value
+                NSApp.reply(toApplicationShouldTerminate: true)
+            }
+            return .terminateLater
+        case .ask:
+            guard session.askToStop() else { return .terminateCancel }
+            fallthrough
+        case .finalizeWithoutAsking:
+            stopping = Task {
+                await stopRecording(revealFolder: !endsTheSession)
+                NSApp.reply(toApplicationShouldTerminate: true)
+            }
+            return .terminateLater
         }
-        return .terminateLater
     }
 
     func applicationDidBecomeActive(_ notification: Notification) {

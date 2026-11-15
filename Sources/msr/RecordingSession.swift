@@ -93,6 +93,27 @@ func quitEndsTheSession(reason: OSType?) -> Bool {
     return endingTheSession.contains { OSType($0) == reason }
 }
 
+/// What a quit does while a recording runs.
+enum QuitDecision: Equatable {
+    /// Ask "Stop recording?".
+    case ask
+    /// Logout, restart or shutdown: finalize, then quit.
+    case finalizeWithoutAsking
+    /// Logout, restart or shutdown while Stop is in progress: quit once it is done.
+    case waitForTheStop
+    /// A quit while Stop is in progress: Stop quits anyway.
+    case ignore
+
+    init(isStopping: Bool, endsTheSession: Bool) {
+        self = switch (isStopping, endsTheSession) {
+        case (false, false): .ask
+        case (false, true): .finalizeWithoutAsking
+        case (true, true): .waitForTheStop
+        case (true, false): .ignore
+        }
+    }
+}
+
 /// The reason of the quit Apple event being handled now, if any.
 @MainActor
 func currentQuitReason() -> OSType? {
