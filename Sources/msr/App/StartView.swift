@@ -23,7 +23,7 @@ struct StartView: View {
             }
         }
         .padding(20)
-        .frame(width: 560)
+        .frame(width: TableLayout.windowWidth)
     }
 }
 
@@ -44,6 +44,7 @@ private struct SettingsForm: View {
                     .font(.callout)
                     .foregroundStyle(.secondary)
                     .opacity(model.settings.auto ? 1 : 0)
+                    .accessibilityHidden(!model.settings.auto)
                 LabeledContent("Recording resolution") {
                     HStack {
                         Slider(value: resolutionIndex, in: 0...Double(RecordingResolution.smallestFirst.count - 1), step: 1)
@@ -121,17 +122,12 @@ private struct SettingsForm: View {
 private struct WhatWillBeRecordedView: View {
     let section: WhatWillBeRecorded
 
-    /// Fixed widths, wide enough for the widest content ("6880×2880", "cannot
-    /// be read", "not recorded"), so that no column moves when the settings
-    /// or the devices change.
-    private static let columnWidths: [CGFloat] = [170, 66, 66, 88, 72]
-
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             Text("What will be recorded").font(.headline)
             if let error = section.displaysError { errorLabel(error) }
             if let error = section.audioError { errorLabel(error) }
-            Grid(alignment: .leading, horizontalSpacing: 8, verticalSpacing: 2) {
+            Grid(alignment: .leading, horizontalSpacing: TableLayout.columnSpacing, verticalSpacing: 2) {
                 row(WhatWillBeRecorded.columns).font(.caption).foregroundStyle(.secondary)
                 ForEach(Array(section.displayRows.enumerated()), id: \.offset) { _, displayRow in
                     row(displayRow.cells)
@@ -156,10 +152,18 @@ private struct WhatWillBeRecordedView: View {
     private func row(_ cells: [String]) -> some View {
         GridRow {
             ForEach(Array(cells.enumerated()), id: \.offset) { column, cell in
-                Text(cell)
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-                    .frame(width: Self.columnWidths[column], alignment: column == cells.count - 1 ? .trailing : .leading)
+                if column == 0 {
+                    Text(cell)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                        .help(cell)
+                        .frame(width: TableLayout.sourceWidth, alignment: .leading)
+                } else {
+                    Text(cell)
+                        .lineLimit(1)
+                        .frame(width: TableLayout.fixedColumnWidths[column - 1],
+                               alignment: column == cells.count - 1 ? .trailing : .leading)
+                }
             }
         }
     }

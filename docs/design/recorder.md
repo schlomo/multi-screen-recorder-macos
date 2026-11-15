@@ -372,9 +372,14 @@ manifest's state to `not finalized` and remove the marker.
   recorded", built from the settings and the devices connected now and
   refreshed whenever the ready check runs (D33): one table and a
   total line. The columns are Source, "Looks like", "Drawn at", "Records
-  at" and GB/h, the last for every row and right-aligned. The column
-  widths are fixed, wide enough for the widest content, so no column
-  moves when auto mode, a slider or the devices change.
+  at" and GB/h, the last for every row and right-aligned. The widths of
+  the columns after Source are measured at runtime from the widest
+  possible content in the table's font ("8888×8888", "cannot be read",
+  "not recorded" and so on, and the header), never from what is
+  connected, so no column moves when auto mode, a slider or the devices
+  change; Source takes the rest of the window, which is as wide as the
+  table, holds "MacBook Pro Microphone (default)" and truncates a longer
+  name in the middle (the full name is its tooltip).
   - Display rows first: the number and name, "Looks like" (the size in
     points), "Drawn at" (the pixel size, shown also where both are
     equal), "Records at" (the frame size) and GB/h (the display file,

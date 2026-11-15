@@ -158,12 +158,12 @@ public struct WhatWillBeRecorded: Equatable, Sendable {
         let widths = Self.columns.indices.map { column in ([Self.columns] + rows).map { $0[column].count }.max() ?? 0 }
         func line(_ cells: [String]) -> String {
             let last = cells.count - 1
-            let padded = cells.indices.map { column in
+            let columns = cells.indices.map { column in
                 column == last
                     ? String(repeating: " ", count: widths[column] - cells[column].count) + cells[column]
                     : padded(cells[column], widths[column])
             }
-            return "  " + padded.joined(separator: "  ")
+            return "  " + columns.joined(separator: "  ")
         }
         lines.append(line(Self.columns))
         lines += displayRows.map { line($0.cells) }
