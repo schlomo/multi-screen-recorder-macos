@@ -160,7 +160,7 @@ import Testing
         #expect(try git("cat-file", "-p", "HEAD", in: work).contains("gpgsig"))
         let outcome = try version(in: work, ["GIT_CONFIG_PARAMETERS": "'log.showSignature=true'"])
         #expect(outcome.status == 0, "\(outcome.errors)")
-        #expect(outcome.output == "0.20261115.5-dev+\(try shortHead(of: work))\n")
+        #expect(outcome.output == "0.20261115.4-dev+\(try shortHead(of: work))\n")
     }
 
     @Test func stagedChangesMakeABuildDirty() throws {
