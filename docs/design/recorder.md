@@ -359,10 +359,14 @@ shared clock. A display file's `displayUUID` is its display's identity (see
 disconnected`, `display frame size changed`, `display mirroring
 started`, `display mirroring stopped`, `main display changed`,
 `display stream failed`, `display shows another display's picture`,
-`display file writer fell behind`, `disk full`, `sleep`, `wake`, and
-for audio `audio input connected`, `audio input disconnected`, `system
-audio started`, `system audio stopped`; each names its display or audio
-source where it has one. `state` is `recording`, `finalized` or `not finalized`.
+`display file writer fell behind`, `display file writer failed`, `disk
+full`, `sleep`, `wake`, and for audio `audio input connected`, `audio
+input disconnected`, `system audio started`, `system audio stopped`;
+each names its display or audio source where it has one (`display`).
+Their fields: `at`, `event`, `display`; `from` and `to` (the old and
+the new frame size) for `display frame size changed`; `mirrors` (the
+display mirrored) for `display mirroring started`; `error` (why) for
+`display stream failed` and `display file writer failed`. `state` is `recording`, `finalized` or `not finalized`.
 An audio file's `channels` is the number of its mono tracks, or
 `stereo` for system audio.
 

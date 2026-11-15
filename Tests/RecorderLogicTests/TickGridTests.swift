@@ -90,6 +90,17 @@ import Testing
         #expect(ticks.advance(to: ticks.grid.time(ofTick: bound)) { _, _ in false } == .writerFellBehind)
     }
 
+    @Test func theFirstTickIsNeverBeforeTheCapturesStart() {
+        let grid = TickGrid.recording
+        var ticks = TickLoop<String>(notBefore: grid.time(ofTick: 10) + 1)
+        // A frame stamped before the capture started, as a stream's first frame can be.
+        ticks.receive("early", capturedAt: grid.time(ofTick: 3))
+        #expect(ticks.firstTick == 11)
+        var written: [Int64] = []
+        _ = ticks.advance(to: grid.time(ofTick: 12)) { tick, _ in written.append(tick); return true }
+        #expect(written == [11, 12])
+    }
+
     @Test func noTickIsWrittenBeforeTheFirstFrame() {
         var ticks = loop()
         var calls = 0
@@ -160,6 +171,14 @@ import Testing
         #expect(timecode.text(ofTick: Int64(rate - 1)) == "14:03:05:\(rate - 1)")
         #expect(timecode.text(ofTick: Int64(rate)) == "14:03:06:00")
         #expect(timecode.frame(ofTick: 1) == timecode.frame(ofTick: 0) + 1)
+    }
+
+    /// 2026-10-25 in Berlin: 03:00 CEST becomes 02:00 CET, so the day has 25 hours.
+    @Test func onTheDaylightSavingChangeTheTimecodeIsTheClockTime() throws {
+        let timecode = Timecode(start: try date("2026-10-25T10:00:00.000Z"), timeZone: berlin)
+        #expect(timecode.text(ofTick: 0) == "11:00:00:00")
+        let spring = Timecode(start: try date("2026-03-29T10:00:00.000Z"), timeZone: berlin)
+        #expect(spring.text(ofTick: 0) == "12:00:00:00")
     }
 
     @Test func midnightStartsOver() throws {

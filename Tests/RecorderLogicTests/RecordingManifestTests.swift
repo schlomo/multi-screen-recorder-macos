@@ -103,6 +103,12 @@ import Testing
 @Suite struct RecordingNamesTests {
     private let utc = TimeZone(identifier: "UTC")!
 
+    /// A name never stops a display from recording: `/` and `:` become `-`.
+    @Test func charactersAFileNameCannotHoldBecomeDashes() {
+        let name = RecordingNames.displayFile(start: Date(timeIntervalSince1970: 0), timeZone: utc, number: 3, display: "Dell U2720Q/2: left")
+        #expect(name == "1970-01-01 00.00.00 Display 3 - Dell U2720Q-2- left.mov")
+    }
+
     @Test func aTakenNameGetsANumber() {
         let start = Date(timeIntervalSince1970: 0)
         let name = RecordingNames.displayFile(start: start, timeZone: utc, number: 2, display: "LG HDR 4K")
@@ -113,6 +119,28 @@ import Testing
             start: start, timeZone: utc, number: 2, display: "LG HDR 4K",
             taken: [name, "1970-01-01 00.00.00 Display 2 - LG HDR 4K (2).mov"])
             == "1970-01-01 00.00.00 Display 2 - LG HDR 4K (3).mov")
+    }
+}
+
+@Suite struct RecordingProblemsTests {
+    @Test func theBadgeCountsMinutesUntilSomethingNeedsThePerson() {
+        var status = RecordingStatus()
+        #expect(status.badge(elapsedSeconds: 125) == "2")
+        status.isLowOnDisk = true
+        #expect(status.badge(elapsedSeconds: 125) == "!")
+        status.isLowOnDisk = false
+        status.displayShowingAnotherDisplaysPicture = "LG"
+        #expect(status.badge(elapsedSeconds: 125) == "!")
+        status.displayShowingAnotherDisplaysPicture = nil
+        status.problems.append("Cannot write the recording manifest: full")
+        #expect(status.badge(elapsedSeconds: 125) == "!")
+    }
+
+    @Test func theStopQuestionListsTheProblems() {
+        var status = RecordingStatus()
+        #expect(status.stopQuestionDetails == nil)
+        status.problems = ["a", "b"]
+        #expect(status.stopQuestionDetails == "a\n\nb")
     }
 }
 
@@ -134,12 +162,12 @@ import Testing
 }
 
 @Suite struct RecordingDurationTests {
-    @Test(arguments: [("1h30m", 5400), ("45m", 2700), ("90s", 90), ("2h", 7200), ("1h0m5s", 3605)])
+    @Test(arguments: [("1h30m", 5400), ("45m", 2700), ("90s", 90), ("2h", 7200), ("1h0m5s", 3605), ("90", 5400), ("5", 300)])
     func hoursMinutesAndSeconds(text: String, seconds: Int) {
         #expect(RecordingDuration(text)?.seconds == seconds)
     }
 
-    @Test(arguments: ["", "0m", "1.5h", "30", "m", "1m1h", "-1h", "1h 30m"])
+    @Test(arguments: ["", "0m", "0", "1.5h", "1.5", "m", "1m1h", "-1h", "-5", "1h 30m"])
     func anythingElseIsInvalid(text: String) {
         #expect(RecordingDuration(text) == nil)
     }
@@ -174,5 +202,13 @@ import Testing
             recordingFolder: "/r", seconds: 70)
         #expect(summary.endedWithError)
         #expect(summary.text.hasSuffix("Error at 1m05s: display stream failed, LG (-3815)\n"))
+    }
+
+    @Test func aWriterThatFailedIsAnError() {
+        var failed = RecordingEvent(at: 0, event: .displayFileWriterFailed, display: "LG")
+        failed.error = "cannot write"
+        let summary = RecordingSummary(manifest: manifest([.finalized], events: [failed]), recordingFolder: "/r", seconds: 1)
+        #expect(summary.endedWithError)
+        #expect(summary.text.contains("display file writer failed, LG (cannot write)"))
     }
 }

@@ -237,7 +237,12 @@ public struct DisplayTracker: Sendable {
         case .writerFellBehind:
             step.events.append(event(.displayFileWriterFellBehind, uuid, at: now))
             scheduleRestart(uuid, at: now)
-        case .streamFailed(let error), .writerFailed(let error):
+        case .writerFailed(let error):
+            var failed = event(.displayFileWriterFailed, uuid, at: now)
+            failed.error = error
+            step.events.append(failed)
+            if isPresent { scheduleRestart(uuid, at: now) } else { displays[uuid]?.phase = .idle }
+        case .streamFailed(let error):
             if isPresent {
                 var failed = event(.displayStreamFailed, uuid, at: now)
                 failed.error = error

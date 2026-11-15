@@ -66,9 +66,13 @@ public struct TickLoop<Frame> {
     private var frames: [(time: Int64, frame: Frame)] = []
     private var waiting: [(tick: Int64, frame: Frame, isLate: Bool)] = []
 
-    public init(grid: TickGrid = .recording, lateTickBound: Int = RecorderValues.lateTickBound) {
+    /// The capture's start: the file's first tick is never before it.
+    public let notBefore: Int64
+
+    public init(grid: TickGrid = .recording, lateTickBound: Int = RecorderValues.lateTickBound, notBefore: Int64 = 0) {
         self.grid = grid
         self.lateTickBound = lateTickBound
+        self.notBefore = notBefore
     }
 
     public var waitingTicks: Int { waiting.count }
@@ -79,7 +83,7 @@ public struct TickLoop<Frame> {
     public mutating func receive(_ frame: Frame, capturedAt time: Int64) {
         if let newest = frames.last, time < newest.time { return }
         if firstTick == nil {
-            let tick = grid.firstTick(atOrAfter: time)
+            let tick = grid.firstTick(atOrAfter: max(time, notBefore))
             firstTick = tick
             nextTick = tick
         }

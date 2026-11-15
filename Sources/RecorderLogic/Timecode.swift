@@ -11,8 +11,10 @@ public struct Timecode: Equatable, Sendable {
     public init(start: Date, timeZone: TimeZone, framesPerSecond: Int = RecorderValues.framesPerSecond) {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = timeZone
-        let midnight = calendar.startOfDay(for: start)
-        let secondsOfDay = start.timeIntervalSince(midnight)
+        // The clock time, also on a day with a daylight saving change.
+        let parts = calendar.dateComponents([.hour, .minute, .second, .nanosecond], from: start)
+        let secondsOfDay = Double((parts.hour ?? 0) * 3600 + (parts.minute ?? 0) * 60 + (parts.second ?? 0))
+            + Double(parts.nanosecond ?? 0) / 1_000_000_000
         self.framesPerSecond = framesPerSecond
         frameAtStart = Int64((secondsOfDay * Double(framesPerSecond)).rounded()) % Self.framesPerDay(framesPerSecond)
     }

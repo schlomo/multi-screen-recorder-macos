@@ -185,6 +185,15 @@ import Testing
         #expect(!displays.showsAnotherDisplaysPicture)
     }
 
+    @Test func aFailingWriterHasItsOwnEventAndStartsANewFileAfterTheBackOff() {
+        var displays = tracker()
+        _ = displays.begin([Self.builtIn], at: 0)
+        let step = displays.streamEnded(Self.builtIn.uuid, .writerFailed("cannot write"), connected: [Self.builtIn], at: second)
+        #expect(step.events.map(\.event) == [.displayFileWriterFailed])
+        #expect(step.events.first?.error == "cannot write")
+        #expect(displays.nextDueTime() == 2 * second)
+    }
+
     @Test func aWriterThatFellBehindStartsANewFileAsAfterAFailingStream() {
         var displays = tracker()
         _ = displays.begin([Self.builtIn], at: 0)

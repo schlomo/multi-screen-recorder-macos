@@ -23,7 +23,7 @@ public enum RecordingNames {
     public static func displayFile(
         start: Date, timeZone: TimeZone, number: Int, display: String, taken: Set<String> = []
     ) -> String {
-        let base = "\(timeStamp(start, timeZone: timeZone)) Display \(number) - \(display)"
+        let base = "\(timeStamp(start, timeZone: timeZone)) Display \(number) - \(fileNamePart(display))"
         var name = "\(base).mov"
         var copy = 2
         while taken.contains(name) {
@@ -34,4 +34,11 @@ public enum RecordingNames {
     }
 
     public static let manifest = "recording.json"
+
+    /// A device name as part of a file name: `/` and `:`, which a file name
+    /// cannot hold or Finder shows as the other, become `-`, so a name never
+    /// stops a display from recording.
+    public static func fileNamePart(_ name: String) -> String {
+        name.replacing(/[\/:]/, with: "-")
+    }
 }

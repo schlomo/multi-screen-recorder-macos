@@ -142,6 +142,7 @@ public struct RecordingEvent: Codable, Equatable, Sendable {
         case displayStreamFailed = "display stream failed"
         case displayShowsAnotherDisplaysPicture = "display shows another display's picture"
         case displayFileWriterFellBehind = "display file writer fell behind"
+        case displayFileWriterFailed = "display file writer failed"
         case diskFull = "disk full"
         case sleep
         case wake
@@ -153,7 +154,8 @@ public struct RecordingEvent: Codable, Equatable, Sendable {
         /// The events that make `msr record` end with an error.
         public var isError: Bool {
             switch self {
-            case .displayStreamFailed, .displayShowsAnotherDisplaysPicture, .displayFileWriterFellBehind, .diskFull: true
+            case .displayStreamFailed, .displayShowsAnotherDisplaysPicture, .displayFileWriterFellBehind,
+                 .displayFileWriterFailed, .diskFull: true
             default: false
             }
         }
@@ -169,7 +171,7 @@ public struct RecordingEvent: Codable, Equatable, Sendable {
     public var to: [Int]?
     /// For `display mirroring started`: the display it mirrors.
     public var mirrors: String?
-    /// For `display stream failed`: why.
+    /// For `display stream failed` and `display file writer failed`: why.
     public var error: String?
 
     public init(at nanoseconds: Int64, event: Kind, display: String? = nil) {
