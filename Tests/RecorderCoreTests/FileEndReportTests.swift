@@ -58,7 +58,7 @@ private func failedEvent(at seconds: Double, error: String) -> RecordingEvent {
     }
 
     @Test func aCleanEndIsNothingToTell() {
-        let report = FileEndReport(reason: .streamFailed("-3815"), end: fileEnd(nil), display: "LG", at: 13 * second)
+        let report = FileEndReport(reason: .streamFailed("-3811"), end: fileEnd(nil), display: "LG", at: 13 * second)
         #expect(report.event == nil)
         #expect(report.problem == nil)
     }

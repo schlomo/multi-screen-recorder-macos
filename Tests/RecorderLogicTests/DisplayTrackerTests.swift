@@ -142,9 +142,9 @@ import Testing
         var restarts: [Int64] = []
         var now: Int64 = 0
         for _ in 0..<6 {
-            let failed = displays.streamEnded(Self.builtIn.uuid, .streamFailed("-3815"), connected: [Self.builtIn], at: now)
+            let failed = displays.streamEnded(Self.builtIn.uuid, .streamFailed("-3811"), connected: [Self.builtIn], at: now)
             #expect(failed.events.map(\.event) == [.displayStreamFailed])
-            #expect(failed.events.first?.error == "-3815")
+            #expect(failed.events.first?.error == "-3811")
             let due = displays.nextDueTime()!
             #expect(displays.due(at: due - 1).actions.isEmpty)
             #expect(starts(displays.due(at: due)) == [Self.builtIn.uuid])
@@ -153,14 +153,14 @@ import Testing
         }
         #expect(restarts == [1, 2, 4, 8, 10, 10])
         displays.fileStarted(Self.builtIn.uuid)
-        _ = displays.streamEnded(Self.builtIn.uuid, .streamFailed("-3815"), connected: [Self.builtIn], at: now)
+        _ = displays.streamEnded(Self.builtIn.uuid, .streamFailed("-3811"), connected: [Self.builtIn], at: now)
         #expect(displays.nextDueTime() == now + second)
     }
 
     @Test func aStreamThatFailsBecauseItsDisplayWentIsADisconnection() {
         var displays = tracker()
         _ = displays.begin([Self.builtIn, Self.lg], at: 0)
-        let step = displays.streamEnded(Self.lg.uuid, .streamFailed("-3815"), connected: [Self.builtIn], at: second)
+        let step = displays.streamEnded(Self.lg.uuid, .streamFailed("-3811"), connected: [Self.builtIn], at: second)
         #expect(step.events.map(\.event) == [.displayDisconnected])
         #expect(step.actions.isEmpty)
         #expect(displays.nextDueTime() == nil)
@@ -183,6 +183,31 @@ import Testing
         _ = displays.observe([builtIn, moved], at: 300 * second)
         #expect(starts(displays.due(at: 301 * second)) == [Self.lg.uuid])
         #expect(!displays.showsAnotherDisplaysPicture)
+    }
+
+    /// An unplug: the stream ends because its display is gone, seconds
+    /// before macOS's notice. No failure and no back-off; the notice brings
+    /// `display disconnected` (F4).
+    @Test func aStreamWhoseDisplayIsGoneEndsAsADisconnectWithoutAFailure() {
+        var displays = tracker()
+        _ = displays.begin([Self.builtIn, Self.lg], at: 0)
+        let ended = displays.streamEnded(Self.lg.uuid, .captureSourceGone, connected: [Self.builtIn, Self.lg], at: 10 * second)
+        #expect(ended.events.isEmpty && ended.actions.isEmpty)
+        #expect(displays.due(at: 10 * second + displays.settleTime.nanoseconds / 2).actions.isEmpty)
+        let notice = displays.observe([Self.builtIn], at: 18 * second)
+        #expect(notice.events.map(\.event) == [.displayDisconnected])
+        #expect(notice.actions.isEmpty)
+        #expect(displays.due(at: 30 * second).actions.isEmpty)
+    }
+
+    /// Still listed one settle time after its stream ended: a new stream, as after any change.
+    @Test func aStreamWhoseDisplayIsGoneButStillListedStartsAgainAfterTheSettleTime() {
+        var displays = tracker()
+        _ = displays.begin([Self.builtIn, Self.lg], at: 0)
+        _ = displays.streamEnded(Self.lg.uuid, .captureSourceGone, connected: [Self.builtIn, Self.lg], at: 10 * second)
+        let due = displays.due(at: 10 * second + displays.settleTime.nanoseconds)
+        #expect(starts(due) == [Self.lg.uuid])
+        #expect(due.events.isEmpty)
     }
 
     @Test func aFailingWriterStartsANewFileAfterTheBackOff() {

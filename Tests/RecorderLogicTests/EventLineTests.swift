@@ -15,8 +15,8 @@ import Testing
     @Test func anEventWithoutADisplayAndWithAnError() {
         #expect(EventLine.text(RecordingEvent(at: 0, event: .sleep), started: start, timeZone: berlin) == "22:14:31 +0.0s sleep")
         var failed = RecordingEvent(at: 61_300_000_000, event: .displayStreamFailed, display: "LG")
-        failed.error = "-3815"
-        #expect(EventLine.text(failed, started: start, timeZone: berlin) == "22:15:32 +61.3s display stream failed: LG (-3815)")
+        failed.error = "-3811"
+        #expect(EventLine.text(failed, started: start, timeZone: berlin) == "22:15:32 +61.3s display stream failed: LG (-3811)")
     }
 
     @Test func aFrameSizeChangeAndAMirrorSayWhat() {

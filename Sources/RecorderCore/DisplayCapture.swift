@@ -162,9 +162,19 @@ public final class DisplayCapture: NSObject, @unchecked Sendable, SCStreamOutput
                 try stream.addStreamOutput(self, type: .screen, sampleHandlerQueue: queue)
                 try await lifecycle.start(stream)
             } catch {
-                queue.async { self.end(.streamFailed(Self.describe(error))) }
+                queue.async { self.end(Self.streamEnd(for: error)) }
             }
         }
+    }
+
+    /// A stream's error as the end of its capture: ScreenCaptureKit's
+    /// `noCaptureSource` (-3815), the display gone, is no failure (F4).
+    static func streamEnd(for error: any Error) -> DisplayTracker.StreamEnd {
+        let nsError = error as NSError
+        if nsError.domain == SCStreamErrorDomain, nsError.code == SCStreamError.Code.noCaptureSource.rawValue {
+            return .captureSourceGone
+        }
+        return .streamFailed(describe(error))
     }
 
     private struct CaptureError: Error, LocalizedError {
@@ -212,7 +222,7 @@ public final class DisplayCapture: NSObject, @unchecked Sendable, SCStreamOutput
     }
 
     public func stream(_ stream: SCStream, didStopWithError error: any Error) {
-        queue.async { self.end(.streamFailed(Self.describe(error))) }
+        queue.async { self.end(Self.streamEnd(for: error)) }
     }
 
     private func startTicking() {

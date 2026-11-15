@@ -15,7 +15,7 @@ struct FileEndReport: Equatable {
         let reasonError: String? = switch reason {
         case .writerFailed(let error): error
         case .diskFull: "the disk is full"
-        case .streamFailed, .writerFellBehind, .showsAnotherDisplay, nil: nil
+        case .streamFailed, .captureSourceGone, .writerFellBehind, .showsAnotherDisplay, nil: nil
         }
         let fileError = end?.error
         guard let error = fileError?.description ?? reasonError else { return }

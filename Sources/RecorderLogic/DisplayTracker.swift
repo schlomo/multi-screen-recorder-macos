@@ -27,6 +27,9 @@ public struct DisplayTracker: Sendable {
     /// Why a stream ended by itself; the recorder reports it.
     public enum StreamEnd: Equatable, Sendable {
         case streamFailed(String)
+        /// The display the stream captured is gone, as on an unplug, often
+        /// seconds before macOS's display-change notice: no failure (F4).
+        case captureSourceGone
         case writerFailed(String)
         case writerFellBehind
         case diskFull
@@ -235,6 +238,11 @@ public struct DisplayTracker: Sendable {
             displays[uuid]?.phase = .showsAnotherDisplay(since: now)
         case .diskFull:
             displays[uuid]?.phase = .waitingForRoom
+        case .captureSourceGone:
+            // Ends as a disconnect; `display disconnected` comes with the
+            // notice. Still listed after the settle time: a new stream.
+            displays[uuid]?.phase = .idle
+            displays[uuid]?.changedAt = now
         case .writerFellBehind:
             step.events.append(event(.displayFileWriterFellBehind, uuid, at: now))
             scheduleRestart(uuid, at: now)
