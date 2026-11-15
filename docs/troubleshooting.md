@@ -93,8 +93,8 @@ One row per entry, the error text exactly as in the entry.
   the loop runs in the popup menu is [ASSUMED] from these (the log
   records only windows past the limit); its trigger the backing scale
   change [ASSUMED]; an AppKit or SwiftUI bug [CONJECTURE] (D41).
-- **Fix:** no popup menus in the start window: the audio mode is radio
-  buttons and the recording resolution a slider (D41).
+- **Fix:** no popup menus in the start window: the audio mode and the
+  recording resolution are sliders (D41, D44).
 - **Verify:** switch a display's HiDPI mode with the start window open;
   the app keeps running. The owner tried on 2026-11-15 ("I couldn't
   provoke the crash"), which is evidence, not proof.

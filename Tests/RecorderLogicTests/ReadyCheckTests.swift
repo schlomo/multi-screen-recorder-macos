@@ -31,9 +31,9 @@ import Testing
         ok    Screen & System Audio Recording permission
         ok    Microphone permission
         ok    Displays: 2
-        ok    Audio: MacBook Pro Microphone (default), system audio
+        ok    Audio: MacBook Pro Microphone (default), RØDE Wireless GO II RX, system audio
         ok    Output folder: ~/Movies/Multi Screen Recorder
-        FAIL  Free disk space: 3.1 GB in ~/Movies/Multi Screen Recorder, 4.3 GB needed for 2 hours
+        FAIL  Free disk space: 3.1 GB in ~/Movies/Multi Screen Recorder, 10.7 GB needed for 2 hours
               Fix: free up space, or lower --required-recording-hours
         Not ready.
 
@@ -53,14 +53,14 @@ import Testing
     }
 
     @Test func allGoodIsReady() {
-        let result = ReadyCheck.evaluate(facts(), settings: .defaults)
+        let result = ReadyCheck.evaluate(facts(), settings: .manual)
         #expect(result.isReady)
         #expect(result.items.allSatisfy { $0.passed })
         #expect(result.text.hasSuffix("\nReady.\n"))
     }
 
     @Test func audioModeNoneSkipsTheMicrophone() {
-        var settings = Settings.defaults
+        var settings = Settings.manual
         settings.audioMode = .none
         let result = ReadyCheck.evaluate(
             facts(microphoneGranted: nil, audioInputs: []), settings: settings)
@@ -75,7 +75,7 @@ import Testing
     }
 
     @Test func audioModeNoneNeedsNoReadableAudioInputs() {
-        var settings = Settings.defaults
+        var settings = Settings.manual
         settings.audioMode = .none
         let result = ReadyCheck.evaluate(
             facts(microphoneGranted: nil, audioInputs: [Self.unreadable(isDefault: true)]), settings: settings)
@@ -84,7 +84,7 @@ import Testing
     }
 
     @Test func noAudioAtAllSaysNone() {
-        var settings = Settings.defaults
+        var settings = Settings.manual
         settings.audioMode = .none
         settings.systemAudio = false
         let result = ReadyCheck.evaluate(facts(microphoneGranted: nil), settings: settings)
@@ -92,7 +92,7 @@ import Testing
     }
 
     @Test func aMissingScreenPermissionNamesTheSettingsPath() throws {
-        let result = ReadyCheck.evaluate(facts(screenRecording: .notGranted), settings: .defaults)
+        let result = ReadyCheck.evaluate(facts(screenRecording: .notGranted), settings: .manual)
         let item = try #require(result.items.first)
         #expect(item.passed == false)
         #expect(item.fix == "allow it in System Settings › Privacy & Security › Screen & System Audio Recording. "
@@ -102,7 +102,7 @@ import Testing
     }
 
     @Test func aMissingMicrophonePermissionNamesTheSettingsPath() throws {
-        let result = ReadyCheck.evaluate(facts(microphoneGranted: false), settings: .defaults)
+        let result = ReadyCheck.evaluate(facts(microphoneGranted: false), settings: .manual)
         let item = try #require(result.items.first { $0.title == "Microphone permission" })
         #expect(item.passed == false)
         #expect(item.fix == "allow it in System Settings › Privacy & Security › Microphone, "
@@ -111,7 +111,7 @@ import Testing
     }
 
     @Test func noDisplayFails() throws {
-        let result = ReadyCheck.evaluate(facts(displays: .success([])), settings: .defaults)
+        let result = ReadyCheck.evaluate(facts(displays: .success([])), settings: .manual)
         let item = try #require(result.items.first { $0.title.hasPrefix("Displays") })
         #expect(item == ReadyCheckItem(title: "Displays: 0", passed: false, fix: "connect a display"))
     }
@@ -119,7 +119,7 @@ import Testing
     @Test func unreadableDisplaysFailOnceWithTheReason() {
         let result = ReadyCheck.evaluate(
             facts(displays: .failure(DeviceReadError("the display DELL U2720Q does not report its display mode"))),
-            settings: .defaults)
+            settings: .manual)
         #expect(result.items.filter { !$0.passed } == [
             ReadyCheckItem(
                 title: "Displays: cannot be read (the display DELL U2720Q does not report its display mode)",
@@ -129,17 +129,57 @@ import Testing
         #expect(!result.items.contains { $0.title.hasPrefix("Free disk space") })
     }
 
-    @Test func noMicrophoneFailsOnlyTheAudioItem() throws {
-        let notDefault = [AudioInputInfo(name: "RØDE Wireless GO II RX", channelCount: 2, isDefault: false)]
-        for inputs in [[], notDefault] {
-            let result = ReadyCheck.evaluate(facts(audioInputs: inputs), settings: .defaults)
-            #expect(result.items.filter { !$0.passed } == [
-                ReadyCheckItem(
-                    title: "Audio: no microphone, system audio",
-                    passed: false,
-                    fix: "connect a microphone, or set the audio mode to none (--audio-mode none)"),
-            ])
-        }
+    /// The owner, 2026-11-15: "no mic should just work of course, in any mode.
+    /// and system audio is still a thing."
+    @Test(arguments: AudioMode.allCases)
+    func aMacWithoutAnyAudioInputIsReadyInEveryAudioMode(mode: AudioMode) {
+        var settings = Settings.manual
+        settings.audioMode = mode
+        let result = ReadyCheck.evaluate(facts(audioInputs: []), settings: settings)
+        #expect(result.isReady)
+        let audio = result.items.first { $0.title.hasPrefix("Audio:") }
+        #expect(audio == ReadyCheckItem(
+            title: mode == .none ? "Audio: system audio" : "Audio: no microphone, system audio",
+            passed: true, fix: nil))
+        #expect(result.items.contains { $0.title.hasPrefix("Free disk space") })
+    }
+
+    /// No input recorded: the Microphone permission is no part of the check.
+    @Test(arguments: AudioMode.allCases)
+    func withoutAnyAudioInputThereIsNoMicrophonePermissionItem(mode: AudioMode) {
+        var settings = Settings.manual
+        settings.audioMode = mode
+        let result = ReadyCheck.evaluate(facts(microphoneGranted: nil, audioInputs: []), settings: settings)
+        #expect(result.isReady)
+        #expect(!result.items.contains { $0.title == "Microphone permission" })
+    }
+
+    @Test func aRecordedInputWithoutThePermissionFails() {
+        let result = ReadyCheck.evaluate(facts(microphoneGranted: false), settings: .manual)
+        #expect(result.items.contains { $0.title == "Microphone permission" && !$0.passed })
+        #expect(!result.isReady)
+    }
+
+    @Test func aPresentButNotRecordedInputNeedsNoPermission() {
+        let notDefault = [AudioInputInfo(name: "USB", channelCount: 1, isDefault: false, transport: .usb)]
+        let result = ReadyCheck.evaluate(facts(microphoneGranted: nil, audioInputs: notDefault), settings: .manual)
+        #expect(result.isReady)
+        #expect(!result.items.contains { $0.title == "Microphone permission" })
+    }
+
+    @Test func withoutAnyAudioInputAndWithoutSystemAudioTheItemSaysSo() {
+        var settings = Settings.manual
+        settings.systemAudio = false
+        let result = ReadyCheck.evaluate(facts(audioInputs: []), settings: settings)
+        #expect(result.isReady)
+        #expect(result.items.contains(ReadyCheckItem(
+            title: "Audio: no microphone, no system audio", passed: true, fix: nil)))
+    }
+
+    @Test func autoModeWithoutAnyAudioInputIsReady() {
+        var settings = Settings.defaults
+        settings.audioMode = .none
+        #expect(ReadyCheck.evaluate(facts(audioInputs: []), settings: settings).isReady)
     }
 
     private static func unreadable(isDefault: Bool) -> AudioInputInfo {
@@ -149,13 +189,13 @@ import Testing
 
     @Test func anUnreadableInputThatIsNotRecordedPasses() {
         let result = ReadyCheck.evaluate(
-            facts(audioInputs: Self.builtInMicrophoneOnly + [Self.unreadable(isDefault: false)]), settings: .defaults)
+            facts(audioInputs: Self.builtInMicrophoneOnly + [Self.unreadable(isDefault: false)]), settings: .manual)
         #expect(result.isReady)
         #expect(result.items.contains { $0.title.hasPrefix("Free disk space") })
     }
 
     @Test func anUnreadableRecordedInputFailsOnceWithTheReason() {
-        let result = ReadyCheck.evaluate(facts(audioInputs: [Self.unreadable(isDefault: true)]), settings: .defaults)
+        let result = ReadyCheck.evaluate(facts(audioInputs: [Self.unreadable(isDefault: true)]), settings: .manual)
         #expect(result.items.filter { !$0.passed } == [
             ReadyCheckItem(
                 title: "Audio: cannot be read (the audio input X does not report its format)",
@@ -168,7 +208,7 @@ import Testing
     private static let unreadableList = DeviceReadError("the list of audio devices cannot be read (Core Audio error 560947818)")
 
     @Test func anUnreadableListOfAudioInputsFailsOnceWithTheReason() {
-        let result = ReadyCheck.evaluate(facts(audioInputsError: Self.unreadableList), settings: .defaults)
+        let result = ReadyCheck.evaluate(facts(audioInputsError: Self.unreadableList), settings: .manual)
         #expect(result.items.filter { !$0.passed } == [
             ReadyCheckItem(
                 title: "Audio: cannot be read (the list of audio devices cannot be read (Core Audio error 560947818))",
@@ -179,7 +219,7 @@ import Testing
     }
 
     @Test func audioModeNoneNeedsNoReadableListOfAudioInputs() {
-        var settings = Settings.defaults
+        var settings = Settings.manual
         settings.audioMode = .none
         let result = ReadyCheck.evaluate(
             facts(microphoneGranted: nil, audioInputsError: Self.unreadableList), settings: settings)
@@ -188,7 +228,7 @@ import Testing
     }
 
     @Test func theDiskEstimateCountsTheAudioFilesAndGuideTracks() throws {
-        var settings = Settings.defaults
+        var settings = Settings.manual
         settings.requiredRecordingHours = 1
         let twoChannels = [AudioInputInfo(name: "RØDE Wireless GO II RX", channelCount: 2, isDefault: true)]
         let result = ReadyCheck.evaluate(facts(audioInputs: twoChannels), settings: settings)
@@ -198,7 +238,7 @@ import Testing
     }
 
     @Test func diskEstimateUsesTheRecordingResolution() throws {
-        var settings = Settings.defaults
+        var settings = Settings.manual
         settings.resolution = .p720
         settings.requiredRecordingHours = 1
         let result = ReadyCheck.evaluate(facts(), settings: settings)
@@ -207,7 +247,7 @@ import Testing
     }
 
     @Test func theOutputFolderComesBeforeTheFreeDiskSpace() {
-        let titles = ReadyCheck.evaluate(facts(), settings: .defaults).items.map(\.title)
+        let titles = ReadyCheck.evaluate(facts(), settings: .manual).items.map(\.title)
         #expect(titles.suffix(2) == [
             "Output folder: ~/Movies/Multi Screen Recorder",
             "Free disk space: 100.0 GB in ~/Movies/Multi Screen Recorder, 4.6 GB needed for 2 hours",
@@ -215,7 +255,7 @@ import Testing
     }
 
     @Test func anUnusableOutputFolderFailsOnceWithItsPathAndReason() {
-        var settings = Settings.defaults
+        var settings = Settings.manual
         settings.outputFolder = "/Volumes/Gone/Recordings"
         let result = ReadyCheck.evaluate(
             facts(outputFolder: .unusable("You don’t have permission to save the file “Recordings” in the folder “Gone”.")),
@@ -232,7 +272,7 @@ import Testing
     }
 
     @Test func unreadableFreeSpaceFails() throws {
-        let result = ReadyCheck.evaluate(facts(outputFolder: .usable(.unreadable("no such volume"))), settings: .defaults)
+        let result = ReadyCheck.evaluate(facts(outputFolder: .usable(.unreadable("no such volume"))), settings: .manual)
         let item = try #require(result.items.last)
         #expect(item.passed == false)
         #expect(item.title == "Free disk space: unknown in ~/Movies/Multi Screen Recorder (no such volume)")
@@ -245,10 +285,70 @@ import Testing
     }
 
     @Test func aHugeRequiredRecordingTimeIsNamedWithoutCrashing() throws {
-        var settings = Settings.defaults
+        var settings = Settings.manual
         settings.requiredRecordingHours = 1e20
         let result = ReadyCheck.evaluate(facts(), settings: settings)
         let item = try #require(result.items.last)
         #expect(item.title.contains("1e+20 hours"))
+    }
+
+    private func audioTitle(_ mode: AudioMode, _ inputs: [AudioInputInfo], auto: Bool = false) -> String? {
+        var settings = Settings.manual
+        settings.audioMode = mode
+        settings.auto = auto
+        return ReadyCheck.evaluate(facts(audioInputs: inputs), settings: settings).items
+            .first { $0.title.hasPrefix("Audio:") }?.title
+    }
+
+    private static let airPods = AudioInputInfo(name: "AirPods", channelCount: 1, isDefault: false, transport: .bluetooth)
+
+    @Test func theAudioItemNamesEveryRecordedInputOfTheAudioMode() {
+        let inputs = DesignExample.audioInputs + [Self.airPods]
+        #expect(audioTitle(.defaultMicrophone, inputs) == "Audio: MacBook Pro Microphone (default), system audio")
+        #expect(audioTitle(.wired, inputs)
+            == "Audio: MacBook Pro Microphone (default), RØDE Wireless GO II RX, system audio")
+        #expect(audioTitle(.allInputs, inputs)
+            == "Audio: MacBook Pro Microphone (default), RØDE Wireless GO II RX, AirPods, system audio")
+        #expect(audioTitle(.none, inputs) == "Audio: system audio")
+    }
+
+    @Test func autoModeChecksWhatWiredRecordsWhateverTheSlidersSay() {
+        #expect(audioTitle(.none, DesignExample.audioInputs, auto: true)
+            == "Audio: MacBook Pro Microphone (default), RØDE Wireless GO II RX, system audio")
+    }
+
+    @Test func autoModeNeedsTheMicrophonePermission() {
+        var settings = Settings.manual
+        settings.audioMode = .none
+        settings.auto = true
+        let result = ReadyCheck.evaluate(facts(microphoneGranted: false), settings: settings)
+        #expect(result.items.contains { $0.title == "Microphone permission" && !$0.passed })
+    }
+
+    @Test(arguments: [AudioMode.defaultMicrophone, .wired, .allInputs])
+    func aBluetoothDefaultMicrophoneIsEnoughInEveryModeBut(none mode: AudioMode) {
+        let headset = AudioInputInfo(name: "AirPods", channelCount: 1, isDefault: true, transport: .bluetooth)
+        #expect(audioTitle(mode, [headset]) == "Audio: AirPods (default), system audio")
+    }
+
+    @Test func withoutAnyRecordedInputTheItemSaysNoMicrophoneAndPasses() {
+        #expect(audioTitle(.wired, [Self.airPods]) == "Audio: no microphone, system audio")
+    }
+
+    @Test func inputsToJudgeAreNoneWithTheAudioModeNoneWhetherTheyCanBeReadOrNot() {
+        var none = Settings.manual
+        none.audioMode = .none
+        #expect(audioInputsToJudge(.success(DesignExample.audioInputs), settings: none) == .success([]))
+        #expect(audioInputsToJudge(.failure(DeviceReadError("no list")), settings: none) == .success([]))
+    }
+
+    @Test(arguments: [AudioMode.defaultMicrophone, .wired, .allInputs])
+    func otherAudioModesJudgeTheInputsAsTheyAre(mode: AudioMode) {
+        var settings = Settings.manual
+        settings.audioMode = mode
+        #expect(audioInputsToJudge(.success(DesignExample.audioInputs), settings: settings)
+            == .success(DesignExample.audioInputs))
+        #expect(audioInputsToJudge(.failure(DeviceReadError("no list")), settings: settings)
+            == .failure(DeviceReadError("no list")))
     }
 }

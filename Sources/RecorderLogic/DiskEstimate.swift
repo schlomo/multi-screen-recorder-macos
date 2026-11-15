@@ -21,7 +21,8 @@ public enum DiskEstimate {
     /// when the channels of an audio input it records cannot be read.
     public static func bytesPerHour(settings: Settings, displays: [DisplayInfo], audioInputs: [AudioInputInfo]) -> Double? {
         let displayFiles = displays.map {
-            displayFileBytesPerHour(frameSize: settings.resolution.frameSize(forDisplay: $0.pixelSize), settings: settings)
+            displayFileBytesPerHour(
+                frameSize: settings.effectiveResolution.frameSize(forLooksLike: $0.pointSize), settings: settings)
         }
         var audioInputFiles: [Double] = []
         for input in audioInputs where settings.records(input) {

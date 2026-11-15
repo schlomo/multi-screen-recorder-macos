@@ -14,9 +14,14 @@ import Testing
 
     @Test func itRoundTrips() throws {
         let state = AppState(lastOfferedCrashReport: "msr-2026-11-14-212425.ips")
-        #expect(try AppState(json: state.json) == state)
-        #expect(String(decoding: state.json, as: UTF8.self) == #"{\#n  "lastOfferedCrashReport": "msr-2026-11-14-212425.ips"\#n}\#n"#)
-        #expect(String(decoding: AppState.empty.json, as: UTF8.self) == "{\n}\n")
+        #expect(try AppState(json: state.jsonData()) == state)
+        #expect(String(decoding: try state.jsonData(), as: UTF8.self)
+            == #"{\#n  "lastOfferedCrashReport" : "msr-2026-11-14-212425.ips"\#n}\#n"#)
+        #expect(try AppState(json: AppState.empty.jsonData()) == .empty)
+    }
+
+    @Test func theStateFileIsWrittenLikeTheSettingsFile() throws {
+        #expect(String(decoding: try AppState.empty.jsonData(), as: UTF8.self) == "{\n\n}\n")
     }
 
     @Test func aCrashReportIsOfferedOnceOnceItIsMarked() {

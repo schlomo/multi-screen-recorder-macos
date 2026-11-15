@@ -1,10 +1,9 @@
 /// The window's section "What will be recorded", from the settings, the
 /// devices connected now and the free space in the output folder, as data
-/// the view renders: a table of displays, a table of audio sources and a
-/// total line.
+/// the view renders: one table, the display rows then the audio rows with
+/// the system audio last, and a total line.
 public struct WhatWillBeRecorded: Equatable, Sendable {
-    public static let displayColumns = ["Display", "Looks like", "Drawn at", "Records at", "GB/h"]
-    public static let audioColumns = ["Audio", "Channels", "GB/h"]
+    public static let columns = ["Source", "Looks like", "Drawn at", "Records at", "GB/h"]
     static let notRecorded = "not recorded"
     static let cannotBeRead = "cannot be read"
 
@@ -17,9 +16,16 @@ public struct WhatWillBeRecorded: Equatable, Sendable {
         public var gigabytesPerHour: String
     }
 
+    /// One row of the table: a cell per column. A source not recorded is shown dimmed.
+    public struct Row: Equatable, Sendable {
+        public var cells: [String]
+        public var isRecorded: Bool
+    }
+
     /// An audio input, or the system audio as the last row.
     public struct Audio: Equatable, Sendable {
         public var name: String
+        /// "1 channel", "2 channels", "stereo" or "cannot be read": the Records at cell.
         public var channels: String
         /// A source not recorded is shown dimmed.
         public var isRecorded: Bool
@@ -85,12 +91,19 @@ public struct WhatWillBeRecorded: Equatable, Sendable {
                 ? DiskEstimate.gigabytesPerHour(DiskEstimate.systemAudioFileBytesPerHour) : Self.notRecorded))
     }
 
+    /// What the ready check's probes found, as the window and `msr check` show it.
+    public init(settings: Settings, facts: ReadyCheckFacts) {
+        self.init(
+            settings: settings, displays: facts.displays, audioInputs: facts.audioInputs,
+            outputFolder: facts.outputFolder)
+    }
+
     /// An input whose channels cannot be read says so; its GB/h is unknown if it is recorded.
     private static func audio(_ input: AudioInputInfo, settings: Settings) -> Audio {
         let isRecorded = settings.records(input)
         return switch input.channelCount {
         case .success(let count):
-            Audio(name: input.label, channels: String(count), isRecorded: isRecorded,
+            Audio(name: input.label, channels: count == 1 ? "1 channel" : "\(count) channels", isRecorded: isRecorded,
                   gigabytesPerHour: isRecorded
                       ? DiskEstimate.gigabytesPerHour(DiskEstimate.audioInputFileBytesPerHour(channelCount: count))
                       : notRecorded)
@@ -101,7 +114,7 @@ public struct WhatWillBeRecorded: Equatable, Sendable {
     }
 
     private static func display(_ numbered: NumberedDisplay, settings: Settings) -> Display {
-        let frameSize = settings.resolution.frameSize(forDisplay: numbered.display.pixelSize)
+        let frameSize = settings.effectiveResolution.frameSize(forLooksLike: numbered.display.pointSize)
         return Display(
             number: numbered.number, name: numbered.display.name,
             looksLike: "\(numbered.display.pointSize)", drawnAt: "\(numbered.display.pixelSize)",
@@ -117,5 +130,47 @@ public struct WhatWillBeRecorded: Equatable, Sendable {
             + " \(DiskEstimate.gigabytes(bytesPerHour * hours))"
         let free = if case .usable(.bytes(let bytes)) = outputFolder { ", \(DiskEstimate.gigabytes(Double(bytes))) free" } else { "" }
         return "Total \(DiskEstimate.gigabytesPerHour(bytesPerHour)) GB/h. \(needed)\(free)."
+    }
+
+    /// The display rows of the table; none when the displays cannot be read.
+    public var displayRows: [Row] {
+        displays.map {
+            Row(cells: ["\($0.number) \($0.name)", $0.looksLike, $0.drawnAt, $0.recordsAt, $0.gigabytesPerHour],
+                isRecorded: true)
+        }
+    }
+
+    /// The audio rows of the table, the system audio last: no Looks like and Drawn at.
+    public var audioRows: [Row] {
+        audio.map {
+            Row(cells: [$0.name, "", "", $0.channels, $0.gigabytesPerHour], isRecorded: $0.isRecorded)
+        }
+    }
+
+    /// The text `msr check` prints: the window's one table and total line,
+    /// its columns aligned and the GB/h column on the right. An error that
+    /// stands for rows is a line above the table.
+    public var text: String {
+        var lines = ["What will be recorded"]
+        if let displaysError { lines.append("  \(displaysError)") }
+        if let audioError { lines.append("  \(audioError)") }
+        let rows = (displayRows + audioRows).map(\.cells)
+        let widths = Self.columns.indices.map { column in ([Self.columns] + rows).map { $0[column].count }.max() ?? 0 }
+        func line(_ cells: [String]) -> String {
+            let last = cells.count - 1
+            let columns = cells.indices.map { column in
+                column == last
+                    ? String(repeating: " ", count: widths[column] - cells[column].count) + cells[column]
+                    : padded(cells[column], widths[column])
+            }
+            return "  " + columns.joined(separator: "  ")
+        }
+        lines.append(line(Self.columns))
+        lines += displayRows.map { line($0.cells) }
+        if !displayRows.isEmpty { lines.append("  " + String(repeating: "─", count: widths.reduce(0, +) + 2 * (widths.count - 1))) }
+        lines += audioRows.map { line($0.cells) }
+        if let total { lines.append("  \(total)") }
+        lines.append("  \(outputFolder)")
+        return lines.joined(separator: "\n") + "\n"
     }
 }

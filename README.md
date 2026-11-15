@@ -16,14 +16,21 @@ manages the settings.
   video file. Plugging in a projector, removing it, or switching
   mirroring does not stop the recording.
 - **Every audio source in its own file.** No audio, the default
-  microphone, or all audio inputs, plus the system audio if you want it.
+  microphone, the wired audio inputs, or all audio inputs, plus the
+  system audio if you want it.
   Each source gets an audio file of its own, each channel its own
   track; every display file also carries two guide tracks, the
   microphones and the system audio, for playback and for syncing by
   waveform with a separate recording.
 - **Edit-ready video.** A constant 30 frames per second, with a fixed
   frame size per file and a recording resolution you choose (Native,
-  4K, 1440p, 1200p, 1080p or 720p), only ever scaled down.
+  4K, 1440p, 1200p, 1080p or 720p), only ever scaled down. Native is the
+  size macOS shows as "looks like" for the display, not the size it is
+  drawn at.
+- **Auto mode.** On by default: every display at Native and the wired
+  audio inputs plus the default microphone, so you get a recording that
+  is safe to sort out in the editor, at the expense of disk space.
+  Switch it off to choose the resolution and the audio mode yourself.
 - **Built not to lose anything.** A check before you start, warnings
   when disk space runs low, files that stay readable after a crash.
 - **One button.** Start the app, approve the last settings, click
@@ -47,7 +54,9 @@ It runs on macOS 26 and later, on Apple silicon.
    and confirm.
 4. Grant the two permissions when macOS asks: **Screen & System Audio
    Recording** (for the displays and the system audio) and
-   **Microphone**. Both are in System Settings › Privacy & Security.
+   **Microphone** (asked only when a microphone is recorded: not on a
+   Mac without an audio input, nor with the audio mode None). Both are in
+   System Settings › Privacy & Security.
    A microphone permission allowed there, not in the prompt, counts
    only after you quit the app and start it again; if the screen
    recording permission still shows as missing, do the same.
@@ -58,13 +67,14 @@ confirmed yet.
 
 ## Usage
 
-Start the app from Finder: its window shows what will be recorded (a
-table of the displays, with what each looks like, the size it is
-drawn at and the size it records at; a table of the audio inputs and
-system audio, the ones not recorded dimmed; each with the disk space
-it needs per hour, the total and the free space below; the output
-folder), then the recording resolution (a slider), the audio mode
-(radio buttons), system audio, the output folder and the ready check:
+Start the app from Finder: its window shows what will be recorded (one
+table: the displays, with what each looks like, the size it is drawn at
+and the size it records at, then the audio inputs and system audio, the
+ones not recorded dimmed; each row with the disk space it needs per
+hour; the total and the free space below; the output folder), then the switch "Auto" (on, the two sliders are grayed out and show Native and Wired; off,
+they are enabled and show the recording resolution and the audio mode: None, Default
+microphone, Wired or All, with a note under it on Bluetooth and virtual
+microphones), system audio, the output folder and the ready check:
 "Ready to record" when every item passes, otherwise each item with a
 fix for each failing one. Every change is saved at once; the ready check runs again after each change,
 when you come back to the app, when a display is plugged in, removed
@@ -86,23 +96,30 @@ so it shows the app's version and runs with its signature.
 | Command | Does |
 |---|---|
 | `msr list` | Shows displays, audio inputs and system audio |
-| `msr check [flags]` | Runs the ready check; exits 0 when ready, 1 when not; creates the output folder if it is missing |
-| `msr settings [flags] [--save]` | Prints the effective settings as JSON; `--save` writes the flags into the settings file |
+| `msr check [flags]` | Prints what will be recorded, then runs the ready check; exits 0 when ready, 1 when not; creates the output folder if it is missing |
+| `msr settings [flags]` | Without flags prints the effective settings as JSON; with a settings flag saves the effective settings into the settings file and prints them, the only way a command writes it |
 | `msr version` | Prints the version and commit |
 
-Each flag overrides a setting for this run only: `--resolution`
-(`native`, `4k`, `1440p`, `1200p`, `1080p`, `720p`), `--audio-mode`
-(`none`, `default-microphone`), `--system-audio` (`on`, `off`),
-`--output-folder`, `--required-recording-hours`, `--low-disk-warning-minutes`.
-A usage error exits 64. The settings live in
-`~/Library/Application Support/Multi Screen Recorder/settings.json`; an
-unknown key or invalid value there stops every command that reads the
-settings (all but `msr version`) with an error naming the key, exit
-78, and the app offers "Reset to defaults".
+Without flags a command uses the settings as they are. Each flag changes
+a setting for this run only: `--auto` (no value: auto mode, whatever the
+settings say), `--resolution` (`native`, `4k`, `1440p`, `1200p`, `1080p`,
+`720p`), `--audio-mode` (`none`, `default-microphone`, `wired`,
+`all-inputs`), `--system-audio` (`on`, `off`), `--output-folder`,
+`--required-recording-hours`, `--low-disk-warning-minutes`.
+`--resolution` and `--audio-mode` turn auto mode off for the run; `--auto`
+together with either is a usage error. A usage error exits 64; an unset
+`HOME` exits 78. The settings live in
+`~/Library/Application Support/Multi Screen Recorder/settings.json`,
+which nothing writes until you change a choice in the window or run
+`msr settings` with a flag. Nothing refuses the file: what is unknown or
+invalid in it is ignored, named on standard error, and the defaults
+apply for it.
 
 ```sh
 msr check --audio-mode none --required-recording-hours 4
-msr settings --resolution 1440p --save
+msr settings                     # shows the settings
+msr settings --resolution 1440p  # saves it, and turns auto mode off
+msr settings --auto              # saves auto mode
 ```
 
 Started from a terminal, macOS attributes the two permissions to the

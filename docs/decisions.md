@@ -309,8 +309,10 @@ architect's reading.
 
 - **Status:** in force; superseded in part by D31 (the audio file for a
   late audio source is no longer a feature of its own: every audio
-  source has its own audio file) and by D34 (recording all audio
-  inputs is no longer a feature after v0: auto mode brings it)
+  source has its own audio file), by D34 (recording all audio
+  inputs is no longer a feature after v0: auto mode brings it) and by
+  D44 (v0 comes in three PRs: the recorder is split into settings and
+  auto mode, and the recording core)
 - **Context:** Whether one self-signed certificate keeps the
   permissions across updates (D5) decides whether the delivery model
   works at all, and is cheapest to learn before the recorder exists.
@@ -505,7 +507,7 @@ architect's reading.
 - **Status:** superseded in part by D29 (point 5: the key imported
   "only after compilation" in the same job) and by D34 (point 7: a
   settings file that cannot be used no longer stops with exit status
-  78)
+  78); point 3 superseded in part by D44 (point 5)
 - **Context:** The architect put seven recommendations from the
   adversarial review of PR #1 to the owner, who answered "Accept all
   seven".
@@ -705,10 +707,9 @@ architect's reading.
 
 ## D34: Auto mode, a settings file that is never refused, and the owner's other rulings of 2026-11-13 (2026-11-13)
 
-- **Status:** in force; not built yet. `docs/design/recorder.md`, the
-  glossary, the README and the code still describe PR #1 as built and
-  follow in the change that builds this; `docs/architecture.md` names
-  this entry as agreed and not built.
+- **Status:** in force; superseded in part by D44 (point 3: no
+  rewrite on read, no `settings.json.previous`, nothing named in the
+  window); points 3 and 4 are built (D44), the rest is not built yet.
 - **Context:** The owner, on 2026-11-13:
   1. "default microphone should do what it says and follow changes".
   2. "why json config, why not defaults write?", then "keep JSON and
@@ -1110,3 +1111,75 @@ architect's reading.
   state. D39's rest stands: agents mark their fully reviewed PRs ready.
 - **Evidence:** [PR #6](https://github.com/schlomo/multi-screen-recorder-macos/pull/6),
   the architect skill's `references/operating-rules.md`, "Copilot's review".
+
+## D44: Settings and auto mode: Native is the looks-like size, four audio modes, the settings file only read (2026-11-15)
+
+- **Status:** in force; supersedes D34 in part (point 3: no rewrite on
+  read, no `settings.json.previous`, nothing named in the window) and
+  D18 in part (v0 in three PRs: the recorder split into settings and
+  auto mode, and the recording core).
+- **Context:** The owner, 2026-11-15: "OK to go with 2 PRs if it
+  helps."; "audio slider yes, and the BT special handling needs to be
+  explained below it."; "I don't understand why the settings file
+  handling is such a big feature, nobody will deal with that manually
+  IMHO. KISS & YAGNI!"; "msr record without extra args does what the
+  GUI does without change. msr record --foo --bar changes something for
+  that one run only. so either we say record --auto to make sure that
+  auto mode happens regardless of settings or we use --resolution xx to
+  indicate a desired resolution. --auto on or --auto off is overkill,
+  we need to KISS."; "I thought we had BT & Virtual which seemed
+  logical to me."; "Native I liked before already"; "yes to A". After testing the
+  build: "I think in auto mode the sliders should remain visible but
+  grayed out, now we have too much UI shift"; then "looks much better
+  with grayed sliders, especially as they show what happens. now we need
+  to stop the tables from jumping around and build a consolidated table.
+  last column is GB/h for all." and "plain settings yes, --save is not
+  needed. its like show or change as logic.". Later the same day, on a Mac without an audio input: "no
+  mic should just work of course, in any mode. and system audio is
+  still a thing. The slider can remain as is, it should just not
+  break".
+- **Decision:** The recorder comes in two PRs: PR A, settings and auto
+  mode, captures nothing; PR B is the recording core.
+  1. Auto mode: the setting `auto`, on by default, records every
+     display at Native and the audio mode Wired; the defaults of
+     `resolution` (`native`) and `audioMode` (`wired`) are its choices.
+     The window has a switch "Auto"; with it on the two sliders stay
+     visible, disabled, showing auto mode's choices.
+  2. Native is the "looks like" size (the display's size in points),
+     never the size it is drawn at; the boxes fit the looks-like size.
+  3. The audio mode is a slider of four steps: None, Default
+     microphone, Wired (the default microphone plus every built-in and
+     wired input), All; a note under it explains Bluetooth and virtual
+     microphones. The four steps are the architect's reading of "BT &
+     Virtual", confirmed by the owner's "yes to A".
+  4. The settings file is only read: what is missing, unknown or
+     invalid takes its default or is ignored, one line on standard
+     error names it, nothing is rewritten, no `.previous`, nothing in
+     the window, no "Reset to defaults". It is written whole, with
+     `JSONEncoder`, only when a person saves (a change in the window,
+     `msr settings` with a flag). Exit 78 stays for an unset `HOME`
+     only.
+  5. A Mac with no audio input at all is ready in every audio mode
+     (the architect's reading of the owner's words): the audio item
+     says "no microphone" and passes, the system audio is recorded as
+     usual. When the settings record no audio input (none present, or
+     none recorded under the mode), the ready check has no Microphone
+     permission item and does not ask for or read the permission.
+  6. "What will be recorded" is one table (Source, Looks like, Drawn
+     at, Records at, GB/h; the display rows, a divider, the audio rows)
+     with fixed column widths; `msr check` prints the same table.
+  7. `msr settings` shows or changes: without flags it prints the
+     effective settings, with a settings flag it saves the run's
+     effective settings and prints them; `--save` is removed (a usage
+     error). Only `msr settings` writes the file besides the window.
+  8. `msr record` without flags does what Start does; a flag changes
+     one run; `--resolution` and `--audio-mode` turn auto mode off for
+     the run, `--auto` (no value) forces it, and `--auto` with either
+     is a usage error.
+- **Consequences:** A person who edits the file by hand sees a wrong
+  value only on standard error; the window shows what is used.
+  Recordings made before this PR's settings are unaffected (nothing
+  records yet).
+- **Evidence:** [design/recorder.md](design/recorder.md), "Settings
+  file" and "Command line"; the PR "Settings and auto mode (PR A of the
+  recorder)".

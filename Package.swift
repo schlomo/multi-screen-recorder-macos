@@ -43,6 +43,11 @@ let package = Package(
             swiftSettings: strictSettings
         ),
         .testTarget(
+            name: "AppTests",
+            dependencies: ["msr", "RecorderCore", "RecorderLogic"],
+            swiftSettings: strictSettings
+        ),
+        .testTarget(
             name: "CommandTests",
             dependencies: ["msr"],
             swiftSettings: strictSettings

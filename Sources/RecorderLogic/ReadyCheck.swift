@@ -23,8 +23,8 @@ public enum OutputFolderProbe: Equatable, Sendable {
 /// What the probes found on this Mac, for the ready check to judge.
 public struct ReadyCheckFacts: Sendable {
     public var screenRecording: PermissionProbe
-    /// Whether the Microphone permission is granted; nil when the audio mode
-    /// needs no microphone, so it was not asked.
+    /// Whether the Microphone permission is granted; nil when the recording
+    /// records no audio input, so it was not asked.
     public var microphoneGranted: Bool?
     public var displays: Result<[DisplayInfo], DeviceReadError>
     public var audioInputs: Result<[AudioInputInfo], DeviceReadError>
@@ -82,12 +82,22 @@ public enum ReadyCheck {
     static let restartNote = "quit Multi Screen Recorder and start it again. "
     static let terminalNote = "If it was started from a terminal, then the terminal app needs the permission."
 
+    /// Whether a recording with these settings records at least one audio
+    /// input that could be listed. Without one, such as on a Mac with no
+    /// audio input, the Microphone permission is no part of the check.
+    public static func recordsAudioInput(
+        _ audioInputs: Result<[AudioInputInfo], DeviceReadError>, settings: Settings
+    ) -> Bool {
+        guard case .success(let inputs) = audioInputs else { return false }
+        return inputs.contains(where: settings.records)
+    }
+
     /// One item per cause: a free disk space item appears only when the
     /// displays and the audio inputs a recording records could be read and
     /// the output folder is usable.
     public static func evaluate(_ facts: ReadyCheckFacts, settings: Settings) -> ReadyCheckResult {
         var items = [screenRecordingItem(facts.screenRecording)]
-        if settings.audioMode != .none {
+        if recordsAudioInput(facts.audioInputs, settings: settings) {
             items.append(microphoneItem(granted: facts.microphoneGranted ?? false))
         }
         items.append(displaysItem(facts.displays))
@@ -145,21 +155,18 @@ public enum ReadyCheck {
         if case .failure(let error) = unreadableRecordedInputs(audioInputs, settings: settings).first?.channelCount {
             return cannotBeRead(error)
         }
-        var sources: [String] = []
-        var missingMicrophone = false
-        if settings.audioMode == .defaultMicrophone {
-            if let defaultMicrophone = audioInputs.first(where: settings.records) {
-                sources.append(defaultMicrophone.label)
-            } else {
-                sources.append("no microphone")
-                missingMicrophone = true
-            }
+        var sources = audioInputs.filter(settings.records).map(\.label)
+        // A Mac without an audio input is ready in every audio mode: the displays and the system audio are recorded.
+        let noMicrophone = settings.effectiveAudioMode != .none && sources.isEmpty
+        if noMicrophone { sources.append("no microphone") }
+        if settings.systemAudio {
+            sources.append("system audio")
+        } else if noMicrophone {
+            sources.append("no system audio")
         }
-        if settings.systemAudio { sources.append("system audio") }
         return ReadyCheckItem(
             title: "Audio: " + (sources.isEmpty ? "none" : sources.joined(separator: ", ")),
-            passed: !missingMicrophone,
-            fix: missingMicrophone ? "connect a microphone, or set the audio mode to none (--audio-mode none)" : nil)
+            passed: true, fix: nil)
     }
 
     private static func outputFolderItem(_ probe: OutputFolderProbe, settings: Settings) -> ReadyCheckItem {
@@ -192,6 +199,12 @@ public enum ReadyCheck {
     }
 
     static func hoursText(_ hours: Double) -> String {
-        return hours == 1 ? "1 hour" : "\(numberText(hours)) hours"
+        hours == 1 ? "1 hour" : "\(numberText(hours)) hours"
+    }
+
+    /// A whole number below 1e15 without a fraction, any other as Swift writes it.
+    private static func numberText(_ number: Double) -> String {
+        if number == number.rounded(), abs(number) < 1e15 { return String(Int(number)) }
+        return String(number)
     }
 }

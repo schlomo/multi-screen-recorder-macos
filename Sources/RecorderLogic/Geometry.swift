@@ -1,4 +1,5 @@
-/// A width and height: in pixels, or in points for what a display looks like.
+/// A width and height: in points for what a display looks like, or in pixels
+/// for what it is drawn at.
 public struct FrameSize: Equatable, Hashable, Sendable, CustomStringConvertible {
     public var width: Int
     public var height: Int
@@ -17,8 +18,9 @@ public struct FrameSize: Equatable, Hashable, Sendable, CustomStringConvertible 
     public var description: String { "\(width)×\(height)" }
 }
 
-/// The maximum box a display's picture is shrunk to fit.
-public enum RecordingResolution: String, CaseIterable, Sendable {
+/// The maximum box a display's looks-like size is shrunk to fit.
+public enum RecordingResolution: String, CaseIterable, Sendable, Encodable {
+    /// The size macOS shows as "looks like": no box.
     case native
     case uhd4k = "4k"
     case p1440 = "1440p"
@@ -32,17 +34,15 @@ public enum RecordingResolution: String, CaseIterable, Sendable {
         allCases.filter { $0.box != nil }.sorted { $0.box!.height < $1.box!.height } + [.native]
 
     /// The position of this resolution on the slider, which runs over `smallestFirst`.
-    public var sliderIndex: Double { Double(Self.smallestFirst.firstIndex(of: self)!) }
+    public var sliderIndex: Double { indexOnSlider(of: self, in: Self.smallestFirst) }
 
     /// The resolution the slider's `position` selects (rounded, kept in range),
     /// or nil when that is this resolution: nothing to change, save or check.
     public func choosing(sliderPosition position: Double) -> RecordingResolution? {
-        let index = min(max(Int(position.rounded()), 0), Self.smallestFirst.count - 1)
-        let chosen = Self.smallestFirst[index]
-        return chosen == self ? nil : chosen
+        sliderChoice(at: position, in: Self.smallestFirst, current: self)
     }
 
-    /// The box, or nil for native, which keeps the display's own size.
+    /// The box, or nil for native, which keeps the looks-like size.
     public var box: FrameSize? {
         switch self {
         case .native: nil
@@ -63,19 +63,20 @@ public enum RecordingResolution: String, CaseIterable, Sendable {
         }
     }
 
-    /// The frame size of a display file: the display's pixel size shrunk into
-    /// the box, turned upright for a portrait display, with its proportions
-    /// kept, never enlarged, each side rounded down to an even number.
-    public func frameSize(forDisplay display: FrameSize) -> FrameSize {
-        let fitted = box.map { fit(display, into: display.isPortrait ? $0.rotated : $0) } ?? display
+    /// The frame size of a display file: the display's looks-like size shrunk
+    /// into the box, turned upright for a portrait display, with its
+    /// proportions kept, never enlarged, each side rounded down to an even
+    /// number. The size the display is drawn at is never recorded.
+    public func frameSize(forLooksLike looksLike: FrameSize) -> FrameSize {
+        let fitted = box.map { fit(looksLike, into: looksLike.isPortrait ? $0.rotated : $0) } ?? looksLike
         return FrameSize(width: roundedDownToEven(fitted.width), height: roundedDownToEven(fitted.height))
     }
 
-    /// Whether a display's file continues when its pixel size changes: only
-    /// while the frame size stays the same; otherwise the file ends
+    /// Whether a display's file continues when its looks-like size changes:
+    /// only while the frame size stays the same; otherwise the file ends
     /// and a new one starts at the new frame size (D30).
-    public func displayFileContinues(from oldPixelSize: FrameSize, to newPixelSize: FrameSize) -> Bool {
-        frameSize(forDisplay: oldPixelSize) == frameSize(forDisplay: newPixelSize)
+    public func displayFileContinues(from oldLooksLike: FrameSize, to newLooksLike: FrameSize) -> Bool {
+        frameSize(forLooksLike: oldLooksLike) == frameSize(forLooksLike: newLooksLike)
     }
 }
 

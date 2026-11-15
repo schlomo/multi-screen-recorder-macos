@@ -265,8 +265,8 @@ hoc, for a local check only).
   and open the browser and Finder, and may write `state.json` and a text
   copy under `~/Library/Application Support/Multi Screen Recorder`
   (`HOME` decides where).
-  `msr version`, `msr settings` (it writes the settings file with the
-  defaults if there is none; `HOME` decides where) and the tests are
+  `msr version`, `msr settings` (it writes the settings file only with
+  a settings flag; `HOME` decides where) and the tests are
   safe; the tests read the Mac's audio device list, which shows no
   prompt.
 - Real capture needs the Screen & System Audio Recording and

@@ -8,19 +8,22 @@ struct CommandLineInterface: AsyncParsableCommand {
         commandName: "msr",
         abstract: "Multi Screen Recorder: records every display and audio source.",
         discussion: """
-            Without arguments, msr starts the app. A settings file that cannot be used, \
-            or an unset HOME, makes every command that reads the settings exit 78.
+            Without arguments, msr starts the app. A settings flag changes the settings for that one run; only `msr settings` saves them. \
+            An unset HOME makes every command that reads the settings exit 78.
             """,
         subcommands: [List.self, Check.self, SettingsCommand.self, Version.self]
     )
 }
 
-/// One flag per settings key, overriding it for this run only.
+/// One flag per settings key, changing it for this run; `msr settings` saves the result.
 struct SettingsFlags: ParsableArguments {
-    @Option(help: "Recording resolution: native, 4k, 1440p, 1200p, 1080p or 720p.")
+    @Flag(help: "Auto mode for this run, whatever the settings file says: every display at Native, the audio mode Wired. Not with --resolution or --audio-mode.")
+    var auto = false
+
+    @Option(help: "Recording resolution: native, 4k, 1440p, 1200p, 1080p or 720p. Turns auto mode off for this run.")
     var resolution: String?
 
-    @Option(help: "Audio mode: none or default-microphone.")
+    @Option(help: "Audio mode: none, default-microphone, wired or all-inputs. Turns auto mode off for this run.")
     var audioMode: String?
 
     @Option(help: "System audio: on or off.")
@@ -34,6 +37,9 @@ struct SettingsFlags: ParsableArguments {
 
     @Option(help: "The low disk space warning threshold, in minutes.")
     var lowDiskWarningMinutes: String?
+
+    /// Whether any settings flag, `--auto` included, is given.
+    var isGiven: Bool { auto || !values.isEmpty }
 
     var values: [SettingKey: String] {
         let pairs: [(SettingKey, String?)] = [
@@ -49,41 +55,41 @@ struct SettingsFlags: ParsableArguments {
 
     func validate() throws {
         do {
-            _ = try Settings.defaults.applying(flags: values)
+            _ = try Settings.defaults.applying(flags: values, auto: auto)
         } catch {
             throw ValidationError(error.description)
         }
     }
 
-    /// The settings file with these flags applied.
+    /// The settings file with these flags applied; what the file had ignored goes to standard error.
     func effectiveSettings(from file: SettingsFile) throws -> Settings {
-        try readingSettings { try file.load().applying(flags: values) }
+        try loadSettings(from: file).applying(flags: values, auto: auto)
     }
 }
 
-/// EX_CONFIG from sysexits: the settings cannot be used. Exit 1 stays
-/// "not ready" for `msr check`.
-let unusableSettingsExitCode = ExitCode(78)
+/// EX_CONFIG from sysexits: an unset HOME, so the settings file cannot be
+/// found. Exit 1 stays "not ready" for `msr check`.
+let unsetHomeExitCode = ExitCode(78)
 
-/// Runs a step that reads or writes the settings; a settings file that cannot
-/// be used, or an unset HOME, prints its error and exits 78.
-func readingSettings<Value>(_ step: () throws -> Value) throws -> Value {
+/// The home folder from `HOME`; unset, it prints its error and exits 78.
+func homeFolderOrExit() throws -> URL {
     do {
-        return try step()
-    } catch let error as SettingsFileError {
-        try stopForUnusableSettings(error)
+        return try homeFolder()
     } catch let error as MissingHomeFolderError {
-        try stopForUnusableSettings(error)
+        FileHandle.standardError.write(Data("Error: \(error)\n".utf8))
+        throw unsetHomeExitCode
     }
 }
 
-private func stopForUnusableSettings(_ error: some Error & CustomStringConvertible) throws -> Never {
-    FileHandle.standardError.write(Data("Error: \(error)\n".utf8))
-    throw unusableSettingsExitCode
+/// What the settings file gives, never refused; what it ignored is named on standard error.
+func loadSettings(from file: SettingsFile) -> Settings {
+    let read = file.load()
+    if let note = read.note { FileHandle.standardError.write(Data("\(note)\n".utf8)) }
+    return read.settings
 }
 
 private func standardSettingsFile() throws -> SettingsFile {
-    try readingSettings { SettingsFile.standard(homeFolder: try homeFolder()) }
+    SettingsFile.standard(homeFolder: try homeFolderOrExit())
 }
 
 extension CommandLineInterface {
@@ -93,12 +99,12 @@ extension CommandLineInterface {
 
         func run() async throws {
             let file = try standardSettingsFile()
-            let settings = try readingSettings { try file.load() }
+            let settings = loadSettings(from: file)
             let displays = try await currentDisplays()
             let audioInputs = try currentAudioInputs()
             print(renderList(
                 displays: numberDisplays(displays),
-                resolution: settings.resolution,
+                resolution: settings.effectiveResolution,
                 audioInputs: audioInputs,
                 systemAudioAvailable: screenRecordingIsGranted()
             ), terminator: "")
@@ -109,14 +115,16 @@ extension CommandLineInterface {
     struct Check: AsyncParsableCommand {
         static let configuration = CommandConfiguration(
             abstract: "Run the ready check and print each item.",
-            discussion: "Exits 0 when ready, 1 when not, 78 when the settings cannot be used.")
+            discussion: "Prints what will be recorded, then the ready check. Exits 0 when ready, 1 when not, 78 when HOME is unset.")
 
         @OptionGroup var flags: SettingsFlags
 
         func run() async throws {
             let settings = try flags.effectiveSettings(from: standardSettingsFile())
-            let home = try readingSettings { try homeFolder() }
-            let result = await runReadyCheck(settings: settings, homeFolder: home)
+            let home = try homeFolderOrExit()
+            let facts = await probeReadyCheckFacts(settings: settings, homeFolder: home)
+            let result = ReadyCheck.evaluate(facts, settings: settings)
+            print(WhatWillBeRecorded(settings: settings, facts: facts).text, terminator: "\n")
             print(result.text, terminator: "")
             if !result.isReady { throw ExitCode(1) }
         }
@@ -125,18 +133,17 @@ extension CommandLineInterface {
     struct SettingsCommand: AsyncParsableCommand {
         static let configuration = CommandConfiguration(
             commandName: "settings",
-            abstract: "Print the effective settings as JSON.")
+            abstract: "Show the effective settings as JSON, or change them.",
+            discussion: "Without flags it prints the settings. With any settings flag it saves the run's effective settings "
+                + "into the settings file and prints them; the only command that writes the file.")
 
         @OptionGroup var flags: SettingsFlags
-
-        @Flag(help: "Write the flags into the settings file.")
-        var save = false
 
         func run() async throws {
             let file = try standardSettingsFile()
             let settings = try flags.effectiveSettings(from: file)
-            if save { try readingSettings { try file.save(settings) } }
-            print(settings.json, terminator: "")
+            if flags.isGiven { try file.save(settings) }
+            print(String(decoding: try settings.jsonData(), as: UTF8.self), terminator: "")
         }
     }
 

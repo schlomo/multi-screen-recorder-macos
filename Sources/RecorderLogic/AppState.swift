@@ -25,10 +25,8 @@ public struct AppState: Codable, Equatable, Sendable {
         return state
     }
 
-    /// The state file's content, laid out like the settings file's.
-    public var json: Data {
-        guard let lastOfferedCrashReport else { return Data("{\n}\n".utf8) }
-        let line = "  \(jsonString(CodingKeys.lastOfferedCrashReport.rawValue)): \(jsonString(lastOfferedCrashReport))"
-        return Data("{\n\(line)\n}\n".utf8)
+    /// The state file's content, written like the settings file.
+    public func jsonData() throws -> Data {
+        try prettyJSON(self)
     }
 }
