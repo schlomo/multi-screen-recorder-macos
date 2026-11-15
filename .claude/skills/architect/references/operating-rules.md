@@ -64,13 +64,13 @@ verifying agent output are in the principles (linked from
 
 Copilot's review is an optional extra (D43): a repository ruleset is
 configured to request one review of each draft PR (not observed on PRs
-#6 to #8; whether it fires is the owner's to check), nobody waits for it, and its absence
-never blocks marking a PR ready. The session that owns the PR (the
-one that opened it, briefed the agent that did, or took it over from
-the backlog) does this; a delegated agent reports to that session and
-never waits on Copilot (its brief's completion discipline). `gh api`
-fills in `{owner}` and `{repo}` from the checkout; `--paginate`
-matters, as lists come in pages.
+#6 to #8; whether it fires is the owner's to check), nobody waits for
+it, and its absence never blocks marking a PR ready. The session that
+owns the PR (the one that opened it, briefed the agent that did, or
+took it over from the backlog) does this; a delegated agent reports to
+that session and never waits on Copilot (its brief's completion
+discipline). `gh api` fills in `{owner}` and `{repo}` from the
+checkout; `--paginate` matters, as lists come in pages.
 
 - If a Copilot review has arrived by the time the PR is otherwise
   ready, read all of it: the summary in the `body` of the review, and

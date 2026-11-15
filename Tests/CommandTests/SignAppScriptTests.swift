@@ -103,6 +103,19 @@ import Testing
         #expect(try isUnsignedByThisRun())
     }
 
+    @Test func aSignedCommitWithShownSignaturesStillGivesTheDate() throws {
+        defer { scratch.remove() }
+        try git("config", "gpg.program", try scratch.installFakeGPG().path(percentEncoded: false))
+        try git("config", "user.signingkey", "ABCDEF")
+        try git("commit", "--quiet", "--allow-empty", "--gpg-sign", "--message=signed")
+        #expect(try git("cat-file", "-p", "HEAD").contains("gpgsig"))
+        let signedHead = try git("rev-parse", "--short=7", "HEAD")
+        try writeInfo(version: "0.20261115.13-dev+\(signedHead)", commit: signedHead)
+        let outcome = try signApp(["GIT_CONFIG_PARAMETERS": "'log.showSignature=true'"])
+        #expect(outcome.status == 0, "\(outcome.errors)")
+        #expect(zipExists("0.20261115.13-dev+\(signedHead)"))
+    }
+
     @Test func theFormIsNamedInWords() throws {
         defer { scratch.remove() }
         try writeInfo(version: "0.20261115.13-dev+\(head)")
