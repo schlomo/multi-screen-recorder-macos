@@ -175,7 +175,7 @@ public final class Recorder {
     private func readDisplays() -> [ConnectedDisplay]? {
         do {
             let displays = try connectedDisplays()
-            RecorderLog.detail("displays: \(displays)", category: "recorder")
+            RecorderLog.detail("displays: \(DebugLine.displays(displays))", category: "recorder")
             problemsTold.cleared(.displaysNotRead)
             return displays
         } catch {
@@ -227,7 +227,8 @@ public final class Recorder {
     }
 
     private func perform(_ action: DisplayTracker.Action) {
-        RecorderLog.detail("\(action)", category: "recorder")
+        RecorderLog.detail(
+            DebugLine.action(action, names: captures.mapValues { "Display \($0.1.number) \($0.1.name)" }), category: "recorder")
         switch action {
         case .start(let uuid, let displayID, let frameSize, let number, let name):
             captureCount += 1
@@ -273,7 +274,10 @@ public final class Recorder {
         if manifest != before { try? writeManifest() }
         told(Array(manifest.events.dropFirst(before.events.count)))
         if let problem { told(problem) }
-        if let end { RecorderLog.detail("file ended: \(end.file.name), \(end.file.state.rawValue)", category: "recorder") }
+        // Both end paths may report the same end: said once.
+        if let end, manifest.files != before.files {
+            RecorderLog.detail("file ended: \(end.file.name), \(end.file.state.rawValue)", category: "recorder")
+        }
     }
 
     private func captureEnded(

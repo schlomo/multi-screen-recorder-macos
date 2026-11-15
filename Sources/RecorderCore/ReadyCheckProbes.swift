@@ -55,7 +55,7 @@ public func probeReadyCheckFacts(
         displays: displays,
         audioInputs: audioInputs,
         outputFolder: probes.outputFolder(settings.outputFolderURL(homeFolder: homeFolder)))
-    RecorderLog.detail("ready check facts: \(facts)", category: "ready check")
+    RecorderLog.detail(DebugLine.facts(facts), category: "ready check")
     return facts
 }
 
