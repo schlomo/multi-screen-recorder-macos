@@ -160,7 +160,8 @@ grays out the sliders, which then show Native and Wired; on the command line `--
 The file for one audio source, beside the display files: a recorded
 audio input's audio tracks, one per channel, or the system audio's one
 audio track, with its timecode. It starts when the source appears and
-ends when it disappears, never padded with silence (D31).
+ends when it disappears or its channel count changes, which starts a new
+one; never padded with silence (D31).
 
 ## Guide track
 

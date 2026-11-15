@@ -208,6 +208,27 @@ import Testing
         #expect(try buildContents().isEmpty)
     }
 
+    /// The bundle is unpacked on a case-insensitive file system, where
+    /// names differing only in case are the same file.
+    @Test func aMemberWrittenThroughASymbolicLinkSpelledInAnotherCaseStops() throws {
+        defer { scratch.remove() }
+        let outcome = try unpack(try handWritten([
+            ("\(Self.bundle)/Contents/resources", .symbolicLink(to: "MacOS")),
+            ("\(Self.bundle)/Contents/Resources/planted", .file("planted")),
+        ]))
+        #expect(outcome.status == 1)
+        #expect(outcome.errors.contains("through the symbolic link"), "\(outcome.errors)")
+        #expect(try buildContents().isEmpty)
+    }
+
+    @Test func aMemberNamedTwiceInAnotherCaseStops() throws {
+        defer { scratch.remove() }
+        let outcome = try unpack(try handWritten([("\(Self.bundle)/Contents/MacOS/MSR", .file("other"))]))
+        #expect(outcome.status == 1)
+        #expect(outcome.errors.contains("appears twice"), "\(outcome.errors)")
+        #expect(try buildContents().isEmpty)
+    }
+
     @Test func aCompressedArchiveStops() throws {
         defer { scratch.remove() }
         let outcome = try unpack(try archive(Self.bundle, compressed: true))
