@@ -70,5 +70,8 @@ import Testing
             == "Recording 1:07 · 1.3 GB in 3 files · 120.4 GB free")
         #expect(RecordingStatusTable.line(elapsedSeconds: 5, bytesWritten: 0, files: 1, freeBytes: nil)
             == "Recording 0:00 · 0.0 GB in 1 file")
+        // A size that cannot be read: the data written is not undercounted.
+        #expect(RecordingStatusTable.line(elapsedSeconds: 5, bytesWritten: nil, files: 2, freeBytes: 1_000_000_000)
+            == "Recording 0:00 · ? GB in 2 files · 1.0 GB free")
     }
 }

@@ -108,17 +108,17 @@ public final class Recorder {
     /// The status window's table and line, read now: each file's size on
     /// disk and the free space in the recording folder.
     public func status() -> (rows: [RecordingStatusTable.Row], line: String) {
-        var bytes: [String: Int64] = [:]
-        for file in manifest.files {
-            let path = folder.appending(path: file.name).path(percentEncoded: false)
-            bytes[file.name] = (try? FileManager.default.attributesOfItem(atPath: path))?[.size] as? Int64
+        let sizes = manifest.files.map { file in
+            (file.name, (try? FileManager.default.attributesOfItem(atPath: folder.appending(path: file.name).path(percentEncoded: false)))?[.size] as? Int64)
         }
+        let bytes = Dictionary(sizes.compactMap { name, size in size.map { (name, $0) } }, uniquingKeysWith: { $1 })
+        let bytesWritten: Int64? = sizes.contains { $0.1 == nil } ? nil : bytes.values.reduce(0, +)
         let free = (try? folder.resourceValues(forKeys: [.volumeAvailableCapacityForImportantUsageKey]))?
             .volumeAvailableCapacityForImportantUsage
         return (
             RecordingStatusTable.rows(sources: tracker.sources, files: manifest.files, bytes: bytes),
             RecordingStatusTable.line(
-                elapsedSeconds: elapsedSeconds, bytesWritten: bytes.values.compactMap(\.self).reduce(0, +), files: manifest.files.count,
+                elapsedSeconds: elapsedSeconds, bytesWritten: bytesWritten, files: manifest.files.count,
                 freeBytes: free))
     }
 
@@ -309,7 +309,11 @@ public final class Recorder {
         let free: Int64
         do {
             let values = try folder.resourceValues(forKeys: [.volumeAvailableCapacityForImportantUsageKey])
-            guard let bytes = values.volumeAvailableCapacityForImportantUsage else { return }
+            guard let bytes = values.volumeAvailableCapacityForImportantUsage else {
+                tell("The free space in \(folder.path(percentEncoded: false)) cannot be read",
+                     error: "the volume does not report its free space", kind: .freeSpaceNotRead)
+                return
+            }
             free = bytes
         } catch {
             tell("The free space in \(folder.path(percentEncoded: false)) cannot be read", error: error.localizedDescription,
@@ -357,7 +361,7 @@ public final class Recorder {
     /// A problem for the person and the manifest's `problems`, the manifest
     /// written at once (`ProblemsTold`); one that repeats is told once until
     /// it clears.
-    private func tell(_ problem: String, error: String?, kind: ProblemKind) {
+    public func tell(_ problem: String, error: String?, kind: ProblemKind) {
         let problem = RecordingProblem(at: context.now(), problem: problem, error: error)
         guard case .tell(let writesManifest) = problemsTold.add(problem, kind: kind, to: &manifest) else { return }
         if writesManifest { try? writeManifest() }

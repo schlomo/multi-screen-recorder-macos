@@ -81,7 +81,6 @@ final class RecordCommandDelegate: NSObject, NSApplicationDelegate {
             endEventLoop()
             return
         }
-        NSApp.setActivationPolicy(.regular)
         do {
             session = try RecordingSession(settings: settings, homeFolder: home, tellOnStandardError: true)
         } catch {
@@ -89,6 +88,12 @@ final class RecordCommandDelegate: NSObject, NSApplicationDelegate {
             exitStatus = recordingEndedWithErrorExitCode
             endEventLoop()
             return
+        }
+        // Without the icon the recording goes on: Ctrl-C still stops it.
+        if !NSApp.setActivationPolicy(.regular) {
+            session?.recorder?.tell(
+                "The Dock icon cannot be shown", error: "macOS refused the regular activation policy; stop with Ctrl-C",
+                kind: .dockIconNotShown)
         }
         print("Recording into \(session?.folder?.path(percentEncoded: false) ?? "")")
         fflush(stdout)

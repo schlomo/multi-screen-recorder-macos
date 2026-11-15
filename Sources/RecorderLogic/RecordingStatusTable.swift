@@ -56,11 +56,13 @@ public enum RecordingStatusTable {
         }
     }
 
-    /// "Recording 1:07 · 1.3 GB in 3 files · 120.4 GB free"; without the
+    /// "Recording 1:07 · 1.3 GB in 3 files · 120.4 GB free"; "? GB" when
+    /// a file's size cannot be read (`bytesWritten` nil), and without the
     /// free space when it cannot be read.
-    public static func line(elapsedSeconds: Double, bytesWritten: Int64, files: Int, freeBytes: Int64?) -> String {
+    public static func line(elapsedSeconds: Double, bytesWritten: Int64?, files: Int, freeBytes: Int64?) -> String {
+        let written = bytesWritten.map { DiskEstimate.gigabytes(Double($0)) } ?? "? GB"
         var line = "Recording \(RecordingStatus.hoursAndMinutes(elapsedSeconds))"
-            + " · \(DiskEstimate.gigabytes(Double(bytesWritten))) in \(files) file\(files == 1 ? "" : "s")"
+            + " · \(written) in \(files) file\(files == 1 ? "" : "s")"
         if let freeBytes { line += " · \(DiskEstimate.gigabytes(Double(freeBytes))) free" }
         return line
     }

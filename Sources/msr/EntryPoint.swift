@@ -14,8 +14,8 @@ enum EntryPoint {
             EventLoop.run(delegate, activationPolicy: .regular)
         case .record(let record):
             let delegate = RecordCommandDelegate(record: record)
-            // Its Dock icon shows once the recording starts.
-            EventLoop.run(delegate, activationPolicy: .prohibited)
+            // A full AppKit app without a Dock icon; the icon shows once the recording starts.
+            EventLoop.run(delegate, activationPolicy: .accessory)
             exit(delegate.exitStatus)
         case .command(let command):
             runWithoutEventLoop(command)
