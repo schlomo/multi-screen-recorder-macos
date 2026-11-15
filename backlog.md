@@ -2,20 +2,19 @@
 
 ## Next session starts here
 
-The recording core is split in two PRs (D45). B1, the displays, is
-signed off and being built on `recording-core-video` (design commit
-`b8801c7`). Next: review B1 and hand the owner the local build to try
-alongside the review (owner unplugs displays: does a real display keep
-its UUID, and does the wrong-display fault show with the Mac's own
-displays). Then B2's design text, for the owner's sign-off.
+PR #11 (B1, the displays) merged 2026-11-15. B2 is next and carries
+B1's follow-ups (the owner: "B2 PR needs to carry what was missed here
+together with the audio stuff"). The owner asked agents to run tests
+on the Mac themselves (D48, recorded with B2). After B2: the first
+slice of the end-to-end tests, which lets agents test display changes
+without the owner (virtual displays).
 
 How the owner wants changes that show in the window or on the command
 line handled (2026-11-15: "what about working locally and letting me
 test first to speed up?"): as soon as the builder's tests pass, the
-owner gets the local build (`scripts/build-app` in the builder's
-clone) to try, while the review runs alongside; the owner's feedback
-and the review findings go into the same fix commit. Not yet written
-into the architect skill.
+owner gets the local build or snapshot release to try, while the
+review runs alongside; the owner's feedback and the review findings go
+into the same fix round. Not yet written into the architect skill.
 
 Still open from D34: what AGC does and whether it is on in auto mode;
 "AGC can also come as an improvement after the recorder" (the owner,
@@ -23,13 +22,11 @@ Still open from D34: what AGC does and whether it is on in auto mode;
 
 ## In flight
 
-- **Recording core B1, the displays** (D45, branch
-  `recording-core-video`): a builder builds it from the design in
-  `docs/design/recorder.md`; draft PR to come.
-- **`swiftpm-testing-helper` crashed twice** on the owner's Mac on
-  2026-11-14 (21:53 and 22:08, crash reports in
-  `~/Library/Logs/DiagnosticReports`), likely during `scripts/test`
-  runs. Not looked at yet; a test run that crashes must fail loudly.
+- **Recording core B2, the audio, with B1's follow-ups** (branch
+  `recording-core-audio`): phase 1 built (new files only, unreviewed:
+  the audio file writer, the proof that an audio-only file carries
+  timecode, gaps, drift measure, the "Microphones" mix, names); phase 2
+  wires it in. See queued item 2.
 
 ## Queued
 
@@ -40,38 +37,30 @@ Still open from D34: what AGC does and whether it is on in auto mode;
    as a runner image with Xcode 27 is generally available. The gap
    bit in PR #9: code the local Xcode 27.2 accepted failed to compile
    on CI's Swift 6.3.
-2. **Recording core B2, the audio** (D45; B1 is in flight): audio
-   files per source with guide tracks in the display files (D31),
-   timecode in every audio file (D21, D31), mono tracks per channel
-   (D22), system audio on a small stream of the main display, moved to
-   the new main display when it disappears, the recording following a
-   change of the default microphone (D34). Its design text, signed off
-   before any brief, must cover:
-   - Audio clock drift: two of the owner's microphones drift 50 and
-     117 ppm against the host clock (`docs/design/end-to-end-tests.md`).
-     The architect's recommendation, not yet decided: B2 places audio
-     by sample count and records each file's measured drift in the
-     manifest; the correction gets its own PR after an experiment with
-     macOS's own drift compensation (a private aggregate device with
-     the built-in microphone as clock). Why the Logitech BRIO does not
-     drift is a conjecture (its clock follows the Mac's over USB); it
-     does not change the design.
-   - The open questions in `docs/design/recorder.md`: whether Apple's
-     file writer puts a timecode track into an audio-only file (the
-     builder proves it with a written file first), two audio inputs
-     with the same name, device names a file name cannot hold, the gain
-     of the "Microphones" guide mix (the architect's proposals:
-     " (2)" and the Core Audio UID in the manifest; `/` and `:` become
-     `-`; the sum divided by √n, clamped).
-   - Before microphones are captured with an `AVCaptureSession`, an
-     experiment shows that unplugging a microphone does not crash the
-     process (D36); B2's first local build is that experiment, with the
-     owner at the Mac.
-   - What the end-to-end tests need of the audio ("What the recorder
-     design must provide" in `docs/design/end-to-end-tests.md`): the
-     event for the default microphone changing; with auto mode off the
-     tests use `all-inputs` (D45's design, choosing inputs one by one
-     is deferred).
+2. **Recording core B2, the audio, and B1's follow-ups** (D45, D46,
+   D47; the design signed off 2026-11-15 in the session, to be written
+   into `docs/design/recorder.md` with its decisions entry):
+   - Audio: an audio file per recorded audio source, one mono track per
+     channel, system audio one stereo track from a small ScreenCaptureKit
+     stream on the main display, guide tracks "Microphones" (sum / √n,
+     clamped) and "System audio" in every display file, the default
+     microphone followed, placement by sample count from a tick, drift
+     measured as `clockDriftPpm` per audio file (corrected in a later
+     PR), a gap detected above 32 ms and filled up to 1 s, a new file
+     beyond (D46 point 7), names with `/` and `:` as `-` and " (2)" for
+     a duplicate, the reel name and metadata as for display files.
+   - Settled by experiment on 2026-11-15: `AVAssetWriter` writes
+     timecode into an audio-only fragmented `.mov`; unplugging a
+     microphone recorded by an `AVCaptureSession` does not crash (D36):
+     the session stops with -11808, and a replug needs a new session.
+   - B1's follow-ups: a second lost capture source without a display
+     change is a failure (the review's N-A); the "manifest could not
+     be written" alert only after the person's Stop; the display's name
+     on the video track itself; CPU of our process in the status
+     window, the summary and the manifest (the owner, 2026-11-15),
+     naming that encoding and capture run in macOS's own processes;
+     `SliderSteps.swift:9` converts without a guard (side finding of
+     2026-11-15).
 3. **Audio after v0** (D12, D18): AGC, in its own PR, with its own
    design, its column in the window's table and the HDMI test.
    What AGC does is open (D34). Recording all audio inputs is no
@@ -101,7 +90,13 @@ Still open from D34: what AGC does and whether it is on in auto mode;
    - DaVinci Resolve 21.1 on a 30 fps timeline: plays at 30 fps, places
      display files and audio files by timecode (unproven for an
      audio-only file, D31), and Auto Align Clips by waveform matches a
-     microphone's audio file to a separate recording.
+     microphone's audio file to a separate recording. Seen on
+     2026-11-15 for display files: Resolve and Kdenlive place them by
+     timecode; Resolve shows the reel name with Project Settings,
+     Conform Options, "Embedding in source clip file", and Camera #
+     from `com.apple.proapps.cameraName` without it.
+   - A recording through a daylight-saving change keeps one timeline
+     (the owner's idea, 2026-11-15).
    - Other players: the files open in QuickTime Player and, checked
      once by the owner, in Kdenlive; how Kdenlive places the files
      decides whether the joining command below is needed.
@@ -119,8 +114,8 @@ Still open from D34: what AGC does and whether it is on in auto mode;
    of it is built; of its experiments, those on virtual displays and
    the audio drift have run (2026-11-13, 2026-11-15); the audio ones
    (aggregate device, BlackHole drivers, a tone in system audio),
-   BetterDisplay's command line and the clock have not. The
-   tests are started by a person, never unasked by an agent.
+   BetterDisplay's command line and the clock have not. Agents may now
+   run them on the owner's Mac (D48, with B2).
 6. **App icon, what is left** after PR #7 (classic `.icns` rendered
    from `assets/icon/app-icon.svg`): the macOS 26 layered icon format
    from the SVG's layers, if a plain package build can compile it; a
@@ -241,7 +236,24 @@ Still open from D34: what AGC does and whether it is on in auto mode;
   measurement first shows whether load is a problem at all. Revisit
   when that measurement or a user shows recordings falling behind.
 
+- **A recording across midnight.** The timecode starts over at
+  `00:00:00:00`, so an editor places a file started after midnight
+  before the earlier ones. Deferred because recordings across midnight
+  are rare. Revisit when one is needed; options then are a timecode
+  continuing past 24 h where editors accept it, or the manifest's
+  offsets.
+- **An `msr log` command** that runs the `log show` command for the
+  person. Deferred because the command is in the crash report form and
+  the README (D46). Revisit when people struggle with it.
+
 ## Done (recent)
+
+- 2026-11-15: PR #11 merged by the owner: B1, the displays (D45, D46,
+  D47). The owner's runs: reconnects, frame size changes, the lid,
+  Ctrl-C and the status window from `msr record`; Resolve and Kdenlive
+  align the display files by timecode. The test crashes of 2026-11-14
+  were the first failing run of a test-first change and need no fix;
+  a crashing test fails `scripts/test` (checked 2026-11-15).
 
 - 2026-11-15: PR #10 merged by the owner: the virtual display and
   audio drift experiments. The owner signed off the recording core's
