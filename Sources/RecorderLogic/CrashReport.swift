@@ -16,7 +16,7 @@ public enum CrashReport {
     public static let versionField = "version"
     public static let macOSField = "macos"
     /// The unified log of the last 2 hours, for the form's optional field "log" (D46).
-    public static let logCommand = #"log show --last 2h --predicate 'subsystem == "org.schapiro.multiscreenrecorder"'"#
+    public static let logCommand = #"log show --last 2h --predicate 'subsystem == "org.schapiro.multiscreenrecorder" and process == "msr"'"#
     /// The informative text of the crash report dialog.
     public static let dialogText = "You can report it on GitHub, which needs a GitHub account. Your browser opens a new issue, and Finder shows a copy of the crash report as a text file for you to drag into it. Issues are public, and a crash report contains your Mac's user name: check it before you attach it.\n\nThe log of the last 2 hours helps too; in Terminal:\n\(logCommand)"
 

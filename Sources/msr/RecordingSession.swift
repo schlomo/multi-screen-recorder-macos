@@ -4,8 +4,9 @@ import RecorderCore
 import RecorderLogic
 
 /// A running recording as the person sees it, in the app and for `msr
-/// record` alike: the Dock icon's badge "!" and a bouncing icon when something needs the person, and the status window
-/// with the problems (D45, D46). `msr record` also says each event and
+/// record` alike: the Dock icon's badge "!" and a bouncing icon when
+/// something needs the person, and the status window with the problems
+/// (D45, D46, D47). `msr record` also says each event and
 /// problem on standard error.
 @MainActor
 final class RecordingSession: RecorderObserver {

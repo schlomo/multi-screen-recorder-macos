@@ -784,10 +784,11 @@ the event and its display, and the details it has, such as
 `msr record` and `msr check`) adds detail lines (the tracker's actions,
 the displays as read, files started and ended, the ready check's facts)
 on standard error and at `.debug` in the log. The log of the last 2
-hours:
+hours, of the app and `msr` only (the tests log under the same
+subsystem on a developer's Mac):
 
 ```sh
-log show --last 2h --predicate 'subsystem == "org.schapiro.multiscreenrecorder"'
+log show --last 2h --predicate 'subsystem == "org.schapiro.multiscreenrecorder" and process == "msr"'
 ```
 
 The crash report form has an optional field for its output, and the

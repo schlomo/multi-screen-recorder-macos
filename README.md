@@ -199,7 +199,7 @@ problem) to the macOS unified log; `msr record --debug` and
 to an issue, run in Terminal:
 
 ```sh
-log show --last 2h --predicate 'subsystem == "org.schapiro.multiscreenrecorder"'
+log show --last 2h --predicate 'subsystem == "org.schapiro.multiscreenrecorder" and process == "msr"'
 ```
 
 ## Origins
