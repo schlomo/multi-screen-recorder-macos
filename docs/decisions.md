@@ -1011,6 +1011,7 @@ architect's reading.
   so the dialog warns that the crash report contains the user name.
   Text copies stay in the folder until the person deletes them. The
   issue form's rendering and the prefill by field ids are unverified
-  until the first use on GitHub.
+  until the first use on GitHub. The end-to-end design's former "state
+  file" (D38) is called "restore file" there; D38 keeps the old word.
 - **Evidence:** this change; [recorder.md](design/recorder.md), "The
   app".

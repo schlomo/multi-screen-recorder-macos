@@ -20,8 +20,14 @@ public struct StateFile: Sendable {
     /// A missing file means nothing is remembered yet; one that cannot be read or decoded is an error.
     public func load() throws(StateFileError) -> AppState {
         guard FileManager.default.fileExists(atPath: url.path(percentEncoded: false)) else { return .empty }
-        do { return try AppState(json: try Data(contentsOf: url)) } catch {
+        let data: Data
+        do { data = try Data(contentsOf: url) } catch {
+            throw StateFileError(fileURL: url, problem: error.localizedDescription)
+        }
+        do { return try AppState(json: data) } catch let error as DecodingError {
             throw StateFileError(fileURL: url, problem: String(describing: error))
+        } catch {
+            throw StateFileError(fileURL: url, problem: error.localizedDescription)
         }
     }
 
@@ -30,7 +36,7 @@ public struct StateFile: Sendable {
             try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
             try state.json.write(to: url, options: .atomic)
         } catch {
-            throw StateFileError(fileURL: url, problem: String(describing: error))
+            throw StateFileError(fileURL: url, problem: error.localizedDescription)
         }
     }
 }

@@ -260,8 +260,9 @@ hoc, for a local check only).
   folder if it is missing; `msr list` reads the devices. An agent runs
   none of these on a person's Mac unasked. On start the app also reads
   `~/Library/Logs/DiagnosticReports`, may show the crash report dialog
-  and open the browser and Finder, and writes `state.json` (`HOME`
-  decides where).
+  and open the browser and Finder, and may write `state.json` and a text
+  copy under `~/Library/Application Support/Multi Screen Recorder`
+  (`HOME` decides where).
   `msr version`, `msr settings` (it writes the settings file with the
   defaults if there is none; `HOME` decides where) and the tests are
   safe; the tests read the Mac's audio device list, which shows no

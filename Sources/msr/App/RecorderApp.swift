@@ -99,7 +99,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             alert.addButton(withTitle: "Report on GitHub")
             alert.addButton(withTitle: "Not Now")
             guard alert.runModal() == .alertFirstButtonReturn else { return }
-            let copy = try makeTextCopy(of: name, homeFolder: homeFolder)
+            let copy: URL
+            do { copy = try makeTextCopy(of: name, homeFolder: homeFolder) } catch {
+                showAlert("Cannot copy the crash report", error.localizedDescription)
+                return
+            }
             let issue = CrashReport.issueURL(
                 crashReportName: name, version: runningVersion.description,
                 macOSVersion: ProcessInfo.processInfo.operatingSystemVersionString)

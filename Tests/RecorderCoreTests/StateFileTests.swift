@@ -37,9 +37,19 @@ import RecorderLogic
         let file = StateFile(homeFolder: home)
         try FileManager.default.createDirectory(at: file.url.deletingLastPathComponent(), withIntermediateDirectories: true)
         try Data("not json".utf8).write(to: file.url)
-        #expect {
-            try file.load()
-        } throws: { ($0 as? StateFileError)?.description.contains("state.json") == true }
-        do { _ = try file.load() } catch { #expect(error.localizedDescription.contains("state.json")) }
+        let error = #expect(throws: StateFileError.self) { try file.load() }
+        #expect(error?.localizedDescription.contains("state.json") == true)
+    }
+
+    @Test func aFailedWriteIsAReadableError() throws {
+        let home = try scratchHome()
+        defer { try? FileManager.default.removeItem(at: home) }
+        let file = StateFile(homeFolder: home)
+        // A plain file where the Library folder must be, so the folder cannot be created.
+        try Data().write(to: home.appending(path: "Library"))
+        let error = #expect(throws: StateFileError.self) { try file.save(.empty) }
+        let message = error?.localizedDescription ?? ""
+        #expect(message.contains("state.json"))
+        #expect(!message.contains("Error Domain="))
     }
 }

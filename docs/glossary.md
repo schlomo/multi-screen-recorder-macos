@@ -59,6 +59,11 @@ the state file, because GitHub refuses `.ips` attachments.
 the app remembers between starts (the last offered crash report), kept
 apart from the settings file because the person never edits it (D40).
 
+## Restore file
+
+The end-to-end driver's file of what a run changed, read by `restore`;
+called "state file" in D38.
+
 ## Crash marker
 
 The file a recording process keeps while it records, naming its

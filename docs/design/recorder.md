@@ -364,8 +364,10 @@ Total 2.2 GB/h. 2 hours need 4.3 GB, 3.1 GB free.
   the state file (nothing there: any crash report), a dialog "Multi
   Screen Recorder quit unexpectedly" offers [Report on GitHub] [Not
   Now], and the name is stored whatever the answer, so a crash is
-  offered once; a crash dated before the last offered one (the clock was
-  set back) is not offered. The state file is
+  offered once; a crash whose name sorts before the last offered one is
+  not offered (causes: the clock was set back, the daylight-saving
+  fall-back hour, a time-zone change; the names carry local time
+  [ASSUMED]). The state file is
   `~/Library/Application Support/Multi Screen Recorder/state.json`
   (`HOME` decides), beside the settings file but apart from it: app
   state the person never edits, written atomically, never touched by
@@ -377,10 +379,11 @@ Total 2.2 GB/h. 2 hours need 4.3 GB, 3.1 GB free.
   the `.ips` name), and shows the text copy in Finder for the person
   to drag into the issue; GitHub takes no file through a link. The app
   opens no connection itself (D15, D40). A crash report folder or a
-  state file that cannot be read or decoded, a failed copy or write
+  state file that cannot be read or decoded, or a failed write
   shows an alert "Cannot offer the crash report" with the error, and
-  nothing is offered that start (for a failed copy the dialog was
-  already answered, and the alert says the copy failed); a browser that cannot be opened shows
+  nothing is offered that start; a failed text copy (the dialog was
+  already answered) shows "Cannot copy the crash report" with the
+  error; a browser that cannot be opened shows
   an alert with the address.
 
 ## How the recorder works
