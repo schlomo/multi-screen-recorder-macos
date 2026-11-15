@@ -8,11 +8,12 @@ no reusing a defined term for a second meaning (see
 Where a concept is designed but not yet implemented, say so explicitly
 rather than letting the definition imply it already exists. Built so
 far: auto mode, the recording resolution, audio mode and system audio as
-settings, the ready check, and the pipeline for snapshot releases and
-releases.
-Nothing a recording produces exists yet (recording, recording folder,
-recording manifest, crash marker, display file, tick, timecode, audio
-track, audio file, guide track).
+settings, the ready check, the pipeline for snapshot releases and
+releases, and the display half of the recording core (recording,
+recording folder, recording manifest, crash marker, display file without
+guide tracks, display identity, settle time, display check, tick,
+timecode). Not built yet: audio track, audio file, guide track (B2 of
+the recording core, D45).
 
 ## Multi Screen Recorder
 

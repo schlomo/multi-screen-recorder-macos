@@ -26,7 +26,7 @@ signature); if that fails it exits 71 (`EX_OSERR`).
 |---|---|---|
 | `msr list` | Shows displays, audio inputs and system audio | 0, 1 when the displays, the audio inputs or an audio input the settings record cannot be read |
 | `msr check [flags]` | Prints "What will be recorded", then runs the ready check and prints each item | 0 ready, 1 not ready |
-| `msr record [flags] [--duration 1h30m]` | Not built yet (the recording core: B1 the displays, B2 the audio, D45). Without flags it does what Start in the window does, with the same settings file; it prints "What will be recorded" at its start, then runs the ready check, records until Ctrl-C, SIGTERM, SIGHUP, the duration or Stop in the Dock (below), and prints the recording folder at the start and a summary at the end. While it records, the app's Dock icon shows with its badge, and clicking it or Quit asks "Stop recording?" as in the app (D45) | 0 ok, 1 not ready, 3 ended with an error |
+| `msr record [flags] [--duration 1h30m]` | Records the displays (B1 of the recording core; the audio comes with B2, D45). Without flags it does what Start in the window does, with the same settings file; it prints "What will be recorded" at its start, then runs the ready check, records until Ctrl-C, SIGTERM, SIGHUP, the duration or Stop in the Dock (below), and prints the recording folder at the start and a summary at the end. While it records, the app's Dock icon shows with its badge, and clicking it or Quit asks "Stop recording?" as in the app (D45) | 0 ok, 1 not ready, 3 ended with an error |
 | `msr settings [flags]` | Without flags prints the effective settings as JSON (show); with any settings flag, `--auto` included, saves the run's effective settings into the settings file and prints them (change). The only command that writes the file; the window also writes it | 0, 1 when it cannot write the file |
 | `msr version` | Prints the version and commit | 0 |
 
@@ -240,7 +240,7 @@ folder, and free disk space in the output folder for
   The probes of the check (permissions, devices, the output folder) can
   be replaced in tests, and the output folder's file access runs off the
   main thread. It never runs while a recording is running, activation
-  included (B1 of the recording core builds this, D45).
+  included (D45).
 
 ## Output on disk
 
@@ -829,6 +829,50 @@ guide tracks, system audio and the default microphone followed. Until
 B2, a display file has no guide tracks, and the window and `msr record`
 say under the table "This build records the displays only; audio
 comes with the next version."
+
+Built (the recording core's displays, B1, D45): `msr record` with
+`--duration`, Start and Stop in the app, the Dock icon, its badge and
+"Stop recording?" also for `msr record`, the app quitting after Stop
+and not on its last window closing while it records, the ready check
+held while recording, the recording folder claim, crash markers and
+their handling by the app and `msr check`, the recording manifest with
+its display files and events, the shared clock, the tick grid with late
+ticks, display files (HEVC, fragments of 2 s, the timecode track,
+BT.709), the frame size, display identity by UUID, the settle time,
+displays coming and going, failing streams with back-off, mirroring, the
+main display, sleep and wake, the display check, a full disk and the
+free space check, and keep awake. The frame rate is one value
+(*data*); the tick grid, the timecode, the keyframe interval, the
+late-tick bound (2 s) and the display check's limit (1 s of frames)
+derive from it. Tested without a screen: the logic by unit tests, and
+display files written from synthetic frames and read back (a constant
+frame rate, the timecode, BT.709, a file never finalized readable up to
+its last fragment). A finalized display file is a regular movie:
+Apple's writer joins the fragments when it finalizes [KNOWN, the
+tests]. Live capture is verified on the owner's Mac.
+
+Built in B1 where this document leaves the detail open, provisional and
+for the architect to settle: the encoder's quality target (0.5) and
+ceiling (4 times the estimated rate); `--duration` takes hours, minutes
+and seconds (`1h30m`, `45m`, `90s`); `msr record` prints `Recording
+into <folder>` at its start and, at its end, how long it recorded, each
+file with its state and each error event; it ends with an error (exit 3)
+when a file is not finalized or an event is `display stream failed`,
+`display shows another display's picture`, `display file writer fell
+behind` or `disk full`, and also when the recording folder cannot be
+claimed; event fields beyond `display`, `from` and `to`: `mirrors` (the
+display mirrored) and `error` (why a stream failed); a failing writer
+other than a full disk is `display stream failed`; `at` is rounded to
+the millisecond; a display file whose name is taken (a new file within
+the same second) gets " (2)"; the timecode of tick 0 is t0's time of
+day rounded to the nearest frame; the crash marker holds
+`recordingFolder`, its report goes to standard error in `msr check` and
+into an alert in the app, and a manifest marked `not finalized` also
+marks its files still `recording`; after a full disk, new display files
+start once the free space is above the low disk warning threshold;
+low disk space bounces the Dock icon until the app is activated; a
+frame's rectangle passes the display check within 0.5 points of its
+display's bounds.
 
 Details the design left open, as built and confirmed by the owner
 (D25, D28, D44): a key missing from the settings file takes its default;

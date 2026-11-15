@@ -185,6 +185,39 @@ import Testing
         #expect(model.saveError?.contains("cannot be written") == true)
         #expect(model.settings.systemAudio == false)
     }
+    // MARK: While recording (D45)
+
+    @Test func whileRecordingNoDeviceChangeOrActivationRunsTheReadyCheck() async {
+        let model = makeModel()
+        model.checkAgain()
+        await waitUntil { model.readyCheck != nil }
+        let before = probed.checks
+        model.recordingStarted()
+        model.devicesChanged()
+        model.appBecameActive()
+        model.checkAgain()
+        await wait(Self.settled)
+        #expect(probed.checks == before)
+        #expect(model.isRecording)
+    }
+
+    @Test func aRefreshQueuedBeforeTheStartDoesNothingOnceRecording() async {
+        let model = makeModel()
+        model.devicesChanged()
+        model.recordingStarted()
+        await wait(Self.settled)
+        #expect(probed.checks == 0)
+    }
+
+    @Test func startIsPossibleOnlyWhenTheReadyCheckPasses() async {
+        let model = makeModel()
+        #expect(!model.canStart)
+        model.checkAgain()
+        await waitUntil { model.readyCheck != nil }
+        #expect(model.canStart)
+        model.recordingStarted()
+        #expect(!model.canStart)
+    }
 }
 
 /// The displays and audio inputs of the examples in docs/design/recorder.md.

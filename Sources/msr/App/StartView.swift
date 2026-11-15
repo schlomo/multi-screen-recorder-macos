@@ -4,6 +4,7 @@ import SwiftUI
 
 struct StartView: View {
     let model: StartModel
+    let start: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -13,14 +14,9 @@ struct StartView: View {
             Divider()
             ReadyCheckView(result: model.readyCheck, isChecking: model.isChecking) { model.checkAgain() }
             Divider()
-            VStack(alignment: .leading, spacing: 4) {
-                Button("Start") {}
-                    .keyboardShortcut(.defaultAction)
-                    .disabled(true)
-                Text("This build cannot record yet.")
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-            }
+            Button("Start", action: start)
+                .keyboardShortcut(.defaultAction)
+                .disabled(!model.canStart)
         }
         .padding(20)
         .frame(width: TableLayout.windowWidth)
@@ -140,6 +136,7 @@ private struct WhatWillBeRecordedView: View {
             if let total = section.total { Text(total) }
             Text(section.outputFolder)
             Text(section.continuity).foregroundStyle(.secondary)
+            Text(ProductText.displaysOnly).foregroundStyle(.secondary)
         }
     }
 

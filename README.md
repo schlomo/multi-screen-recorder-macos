@@ -5,10 +5,10 @@ A reliable multi-source screen and audio recorder for macOS. It
 captures every display and audio source, never loses a recording, and
 keeps going when screens, resolutions or audio sources change.
 
-**Status:** in development. Builds can be installed, but they cannot
-record yet: the app shows its settings and the ready check, and the
-command line lists displays and audio inputs, runs the ready check and
-manages the settings.
+**Status:** in development. Builds record the displays only; audio
+comes with the next version. The app shows its settings and the ready
+check and records with Start, and the command line lists displays and
+audio inputs, runs the ready check, records and manages the settings.
 
 ## What it does
 
@@ -81,6 +81,14 @@ when you come back to the app, when a display is plugged in, removed
 or changed, when an audio device is plugged in or removed, when the
 default audio input changes, and on "Check again".
 
+Click Start: the window closes and the Dock icon counts the minutes
+recorded ("!" when the disk runs low or a display shows another
+display's picture). Click the Dock icon or quit to stop: "Stop
+recording?" finalizes the files, shows the recording folder in Finder
+and quits. The recording folder holds a video file per display, a new
+one each time a display comes back or changes its frame size, and
+`recording.json`, which lists every file and what happened.
+
 ### Command line
 
 The app's own executable is the command line. Link it into a folder on
@@ -97,6 +105,7 @@ so it shows the app's version and runs with its signature.
 |---|---|
 | `msr list` | Shows displays, audio inputs and system audio |
 | `msr check [flags]` | Prints what will be recorded, then runs the ready check; exits 0 when ready, 1 when not; creates the output folder if it is missing |
+| `msr record [flags] [--duration 1h30m]` | Prints what will be recorded and runs the ready check, then records until Ctrl-C, the duration or Stop in the Dock; shows the app's Dock icon while it records; exits 0, 1 when not ready, 3 when the recording ended with an error |
 | `msr settings [flags]` | Without flags prints the effective settings as JSON; with a settings flag saves the effective settings into the settings file and prints them, the only way a command writes it |
 | `msr version` | Prints the version and commit |
 
@@ -117,6 +126,7 @@ apply for it.
 
 ```sh
 msr check --audio-mode none --required-recording-hours 4
+msr record --resolution 1080p --duration 45m
 msr settings                     # shows the settings
 msr settings --resolution 1440p  # saves it, and turns auto mode off
 msr settings --auto              # saves auto mode
@@ -124,7 +134,8 @@ msr settings --auto              # saves auto mode
 
 Started from a terminal, macOS attributes the two permissions to the
 terminal app (Terminal, iTerm and so on), not to Multi Screen Recorder:
-grant them to the terminal app for `msr check` to pass there.
+grant them to the terminal app for `msr check` to pass and `msr record`
+to record there.
 
 ## Developer setup
 

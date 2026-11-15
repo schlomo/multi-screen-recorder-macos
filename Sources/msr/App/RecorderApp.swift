@@ -20,6 +20,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var startWindow: NSWindow?
     private var aboutWindow: NSWindow?
     private var model: StartModel?
+    private var session: RecordingSession?
+    /// Logout, restart or shutdown: a recording is finalized without asking.
+    private var isPoweringOff = false
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.mainMenu = makeMainMenu()
@@ -41,21 +44,82 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         ) { _ in
             MainActor.assumeIsolated { model.devicesChanged() }
         }
+        _ = NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.willPowerOffNotification, object: nil, queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated { self?.isPoweringOff = true }
+        }
         self.model = model
-        startWindow = makeWindow(title: "Multi Screen Recorder", content: StartView(model: model))
+        startWindow = makeWindow(
+            title: "Multi Screen Recorder", content: StartView(model: model) { [weak self] in self?.startRecording() })
         startWindow?.center()
         startWindow?.makeKeyAndOrderFront(nil)
         NSApp.activate()
         model.load()
+        reportRecordingsNotFinalized(homeFolder: model.homeFolder)
         offerCrashReport(homeFolder: model.homeFolder)
+    }
+
+    /// Each recording whose process is gone without finalizing it.
+    private func reportRecordingsNotFinalized(homeFolder: URL) {
+        let lines = CrashMarkers(homeFolder: homeFolder).finishLeftBehind()
+        guard !lines.isEmpty else { return }
+        showAlert(lines.count == 1 ? "A recording was not finalized" : "Recordings were not finalized",
+                  lines.joined(separator: "\n\n"))
+    }
+
+    /// Start: the window closes and the Dock icon shows the elapsed minutes.
+    private func startRecording() {
+        guard let model, model.canStart else { return }
+        do {
+            session = try RecordingSession(settings: model.settings, homeFolder: model.homeFolder, tellOnStandardError: false)
+        } catch {
+            showAlert("Cannot start the recording", error.description)
+            return
+        }
+        model.recordingStarted()
+        startWindow?.close()
+    }
+
+    /// Stop: finalizes, shows the recording folder in Finder and quits (D45).
+    private func stopRecording(revealFolder: Bool) async {
+        guard let session else { return }
+        _ = await session.stop()
+        self.session = nil
+        if revealFolder, let folder = session.folder {
+            NSWorkspace.shared.activateFileViewerSelecting([folder])
+        }
+    }
+
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        guard session != nil else { return true }
+        if RecordingSession.askToStop() {
+            Task {
+                await stopRecording(revealFolder: true)
+                NSApp.terminate(nil)
+            }
+        }
+        return false
+    }
+
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        guard session != nil else { return .terminateNow }
+        if !isPoweringOff, !RecordingSession.askToStop() { return .terminateCancel }
+        let reveal = !isPoweringOff
+        Task {
+            await stopRecording(revealFolder: reveal)
+            NSApp.reply(toApplicationShouldTerminate: true)
+        }
+        return .terminateLater
     }
 
     func applicationDidBecomeActive(_ notification: Notification) {
         model?.appBecameActive()
     }
 
+    /// While a recording runs, closing the last window does not quit the app.
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
-        true
+        session == nil
     }
 
     @objc func showAbout(_ sender: Any?) {
