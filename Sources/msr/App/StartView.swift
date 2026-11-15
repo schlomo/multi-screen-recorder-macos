@@ -56,6 +56,8 @@ private struct SettingsForm: View {
             LabeledContent("Recording resolution") {
                 HStack {
                     Slider(value: resolutionIndex, in: 0...Double(RecordingResolution.smallestFirst.count - 1), step: 1)
+                        .accessibilityLabel("Recording resolution")
+                        .accessibilityValue(model.settings.resolution.label)
                     Text(model.settings.resolution.label).frame(width: 60, alignment: .leading)
                 }
             }
@@ -75,12 +77,13 @@ private struct SettingsForm: View {
         }
     }
 
-    /// The slider's position: the index of the resolution in `smallestFirst`.
     private var resolutionIndex: Binding<Double> {
-        let order = RecordingResolution.smallestFirst
-        return Binding(
-            get: { Double(order.firstIndex(of: model.settings.resolution)!) },
-            set: { index in model.change { $0.resolution = order[Int(index.rounded())] } })
+        Binding(
+            get: { model.settings.resolution.sliderIndex },
+            set: { position in
+                guard let chosen = model.settings.resolution.choosing(sliderPosition: position) else { return }
+                model.change { $0.resolution = chosen }
+            })
     }
 
     private func binding<Value>(_ keyPath: WritableKeyPath<RecorderLogic.Settings, Value>) -> Binding<Value> {

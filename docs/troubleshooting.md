@@ -24,6 +24,8 @@ One row per entry, the error text exactly as in the entry.
 |---|---|
 | `package 'multi-screen-recorder-macos' is using Swift tools version 6.4.0 but the installed version is 6.3.3` | [Swift tools version newer than the CI runner's Xcode](#swift-tools-version-newer-than-the-ci-runners-xcode) |
 | `no 'async' operations occur within 'await' expression` | [Swift Argument Parser's async main from top-level code](#swift-argument-parsers-async-main-from-top-level-code) |
+| `The window has been marked as needing another Layout Window pass, but it has already had more Layout Window passes than there are views in the window.` | [Layout loop in a popup menu window after a HiDPI switch](#layout-loop-in-a-popup-menu-window-after-a-hidpi-switch) |
+| `Screen & System Audio Recording` prompt returns on every click of the window | [Screen recording prompt comes back with an ad hoc signed build](#screen-recording-prompt-comes-back-with-an-ad-hoc-signed-build) |
 
 ## Format
 
@@ -72,3 +74,45 @@ One row per entry, the error text exactly as in the entry.
 - **Verify:** the `test-and-build` job passes.
 - **Observed:** 2026-11-12, runner image `macos-26` 20261102.0473.1,
   Xcode 26.6; open.
+
+## Layout loop in a popup menu window after a HiDPI switch
+
+- **Error:** `NSGenericException`: "The window has been marked as needing
+  another Layout Window pass, but it has already had more Layout Window
+  passes than there are views in the window." naming an
+  `<NSPopupMenuWindow …>`, preceded by "-layoutSubtreeIfNeeded for
+  <NSTableRowView …> has continued for 300 iterations".
+- **Symptom:** the app quits (`EXC_CRASH (SIGABRT)`) 1 to 7 s after a
+  display's HiDPI (backing scale) mode was switched, with a popup menu
+  of the start window open or opened. The `.ips` crash report does not
+  carry the text; read it with
+  `log show --predicate 'process == "msr"'`.
+- **Why:** a layout loop in AppKit's popup menu window [KNOWN, unified
+  log]; its trigger the backing scale change [ASSUMED]; an AppKit or
+  SwiftUI bug [CONJECTURE] (D41).
+- **Fix:** no popup menus in the start window: the audio mode is radio
+  buttons and the recording resolution a slider (D41).
+- **Verify:** switch a display's HiDPI mode with the start window open;
+  the app keeps running. The owner tried on 2026-11-15 ("I couldn't
+  provoke the crash"), which is evidence, not proof.
+- **Observed:** 2026-11-14 and 2026-11-15, macOS 26 on the owner's
+  Mac; open.
+
+## Screen recording prompt comes back with an ad hoc signed build
+
+- **Error:** none; the macOS prompt for the Screen & System Audio
+  Recording permission appears again each time the window is clicked
+  after it was denied.
+- **Symptom:** seen on 2026-11-15 with a build signed ad hoc
+  (`scripts/build-app`, also an unchanged `main`), not with the release
+  signed by the project certificate.
+- **Why:** [ASSUMED] an ad hoc signature gives the app no stable
+  identity, so macOS does not remember the answer.
+- **Fix:** sign the local build with the project certificate in the
+  person's keychain:
+  `SIGNING_IDENTITY="<certificate name>" scripts/sign-app`.
+  `security find-identity -p codesigning` lists it; `-v` hides it
+  because it is self-signed.
+- **Verify:** click the window again after denying the permission; no
+  second prompt.
+- **Observed:** 2026-11-15, ad hoc build of `main`; open.

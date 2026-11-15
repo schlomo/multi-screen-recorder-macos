@@ -103,10 +103,12 @@ final class StartModel {
     ///
     /// The result is shown when the main run loop is in its default mode, so
     /// the window's content does not change by itself under an open menu, a
-    /// dragged control or a modal panel. The hold works but was not the
-    /// crash's cause: that was a layout loop in a popup menu's own window
-    /// after a display's backing scale changed, avoided by having no popup
-    /// menu in the window (D41).
+    /// dragged control or a modal panel. The crash's exception was
+    /// thrown in a popup menu's own window, not in the start window's layout
+    /// [KNOWN, unified log]; whether this hold kept the content still under
+    /// the open menu is not shown by the log, and the owner saw the table
+    /// change with the menu open [ASSUMED from the owner's words]. The hold
+    /// stays; the window has no popup menu now (D41).
     func checkAgain() {
         whatWillBeRecorded = WhatWillBeRecorded(
             settings: settings,

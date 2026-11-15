@@ -828,9 +828,9 @@ architect's reading.
   without opening the microphone?", the owner answered "Yes, accept"
   (2026-11-13). Built in PR #1, merged 2026-11-14. Point 3 failed
   its re-test on 2026-11-14: the second crash came back (`backlog.md`,
-  "In flight") Point 3's stated
-  cause of the second crash (the window's sizing, or a change of its
-  content under a menu) is refuted, see D41.
+  "In flight"). The exception of that crash was thrown in a popup
+  menu's own window, so the window's sizing is not where it threw; see
+  D41.
 - **Context:** The owner's check of PR #1 on the Mac, 2026-11-13: the
   app crashed on "Check again" after the default microphone was
   unplugged, and crashed after HiDPI was switched in BetterDisplay
@@ -1031,17 +1031,26 @@ architect's reading.
   (from BetterDisplay's menu bar menu), not the start window. The
   owner, 2026-11-15: "yes, radio buttons for audio and slider for
   resulution is good".
-- **Decision:** The start window has no popup menu: the audio mode is a
-  radio group and the recording resolution a discrete slider (720p,
+- **Decision:** The start window has no popup menu: the audio mode is
+  radio buttons and the recording resolution a discrete slider (720p,
   1080p, 1200p, 1440p, 4K, Native, smallest to largest, the chosen
   one's name beside it). The window's sizing by its content's preferred
   size and the hold of the check's result while a menu is open stay.
   The cause: a layout loop in AppKit's popup menu window [KNOWN,
   unified log]; its trigger the change of the display's backing scale
   [ASSUMED]; that it is a bug in AppKit or SwiftUI [CONJECTURE].
-- **Consequences:** The two candidate causes of D36's point 3 are
-  refuted; the hold worked and is kept as harmless. A popup menu added
-  to the window later would meet the same loop. That the fix works is
-  unverified until the owner's re-test (HiDPI switch, window open).
+- **Consequences:** The exception was thrown in the popup menu's own
+  window, not in the start window's layout [KNOWN, unified log], so
+  the window's sizing is not where it threw; a content change under
+  the menu as a trigger is not refuted. Whether the hold kept the
+  content still under the open menu is not shown by the log, and the
+  owner saw the table change with the menu open [ASSUMED from the
+  owner's words]. The hold stays. A popup menu added to the window
+  later would meet the same loop. AppKit menus are still reachable
+  from the app (the menu bar menus, the folder chooser's popup
+  buttons, the context menu of the selectable settings-error text);
+  whether they meet the same loop after a backing-scale change is
+  [CONJECTURE], untested. That the fix works is unverified until the
+  owner's re-test (HiDPI switch, window open).
 - **Evidence:** this change; [recorder.md](design/recorder.md), "Ready
   check" and "The app".
