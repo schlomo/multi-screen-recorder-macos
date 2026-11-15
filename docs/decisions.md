@@ -923,32 +923,57 @@ architect's reading.
 - **Evidence:** [PR #4](https://github.com/schlomo/multi-screen-recorder-macos/pull/4);
   Copilot's review of [PR #2](https://github.com/schlomo/multi-screen-recorder-macos/pull/2).
 
-## D39: Agents mark their reviewed PRs ready (2026-11-14)
+## D39: Agents mark their reviewed PRs ready, after Copilot reviews the draft (2026-11-15)
 
 - **Status:** in force; extends D8.
-- **Context:** The owner, about the PRs the architect opens: "so you
-  mark them as ready when you are done and check after 5 mins". That
-  went beyond D8 and the work-branch guardrail (an agent at most opens
-  a draft PR), so the architect raised the conflict instead of acting.
-  The owner: "Yes, change it". Shown the proposal by "Changing a
-  principle" (the rule now and after, three situations in this
-  project, the trade-off, that the change is easy to undo, and that
-  every Copilot review may use a premium request of the owner's
-  Copilot plan, UNVERIFIED), the owner answered the check question
-  "OK for me to mark PRs ready, starting a Copilot review each time
-  without asking?" with "Yes, OK".
-- **Decision:** The architect's reading of "when you are done" and
-  "check": agents push work branches, open draft PRs, and mark a PR
-  ready for review once its adversarial review leaves no BLOCKER or
-  SHOULD-FIX open and CI passes. GitHub then requests Copilot's review,
-  as it did on PR #1 and #2. About five minutes later the agent reads
-  it, fixes what holds, each fix delta-reviewed, and tells the owner
-  the PR is ready to merge. Only the owner merges. The Copilot review
-  that marking ready starts has the owner's standing go-ahead, on the
-  owner's GitHub account, the one that pays if it is billed.
-- **Consequences:** "Ready" means the agent's reviews came out clean,
-  not that the owner has looked; the owner saves a click and a round
-  trip per PR. The principle "Work branches" gains this write level
-  and "Live systems need a human's go-ahead" its one standing
-  go-ahead; setup offers the level; `AGENTS.md` records it.
+- **Context:** The owner's words, in order, in the architect session
+  of 2026-11-14 and 2026-11-15:
+  - About the PRs the architect opens: "so you mark them as ready when
+    you are done and check after 5 mins". That went beyond D8 and the
+    work-branch guardrail (an agent at most opens a draft PR), so the
+    architect raised the conflict instead of acting.
+  - To "Change the guardrail so I can mark reviewed PRs ready?":
+    "Yes, change it".
+  - Shown a proposal by "Changing a principle" for the write level
+    (the rule now and after, three situations in this project, the
+    trade-off, that it is easy to undo, and that each Copilot review
+    may be billed to the owner's Copilot plan), to the check question
+    "OK for me to mark PRs ready, starting a Copilot review each time
+    without asking?": "Yes, OK".
+  - The adversarial review of that version found that the proposal
+    had not shown the second rule it changes, "Live systems need a
+    human's go-ahead", and that marking a PR ready before Copilot's
+    review left a window in which a merge skips it. The architect then
+    showed the live-systems rule now (a go-ahead every time) and after
+    (one standing go-ahead for the Copilot reviews of the agents' PRs,
+    on the owner's account, until withdrawn), and two designs: A,
+    Copilot reviews the draft and the agent marks the PR ready after
+    handling it; B, the agent marks it ready first and the description
+    says not to merge until Copilot's review is handled.
+  - The owner then set up a repository ruleset and asked how to cover
+    all PRs. The architect recommended including all branches, keeping
+    "Review draft pull requests" and turning off "Review new pushes",
+    because GitHub bills each review as AI credits to the PR's author
+    (its documentation gives averages of $0.25 to $10 per review). The
+    owner: "A, and I updated the settings". The ruleset, read through
+    GitHub's API on 2026-11-15: all branches, draft reviews on,
+    new-push reviews off.
+- **Decision:** The architect's reading of "when you are done",
+  "check" and "you", for every agent at this level: an agent pushes a
+  work branch and opens a draft PR; the ruleset has Copilot review it
+  once; the session that opened the PR reads that review and handles
+  each comment like an adversarial review's finding (fixed, fixed
+  differently, or deferred, with its reason); it marks the PR ready
+  once no BLOCKER or SHOULD-FIX is open and CI passes, and tells the
+  owner it is ready to merge. An agent never marks the owner's own
+  draft ready. Only the owner merges. The Copilot reviews the ruleset
+  starts on the agents' PRs have the owner's standing go-ahead, billed
+  to the owner's GitHub account, which authors the PRs, until the owner
+  withdraws it.
+- **Consequences:** "Ready" keeps one meaning, fully reviewed, so the
+  owner can merge at once. Whether marking ready starts a second
+  Copilot review is not known yet. The principles "Work branches" and
+  "Live systems need a human's go-ahead" change, setup offers the
+  option, `AGENTS.md` records it, and the architect skill's operating
+  rules give the commands.
 - **Evidence:** this change.

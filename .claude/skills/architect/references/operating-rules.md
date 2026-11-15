@@ -59,3 +59,37 @@ verifying agent output are in the principles (linked from
 - A pipeline failure is diagnosed from the job's own log, not a
   summary. Before a new hypothesis, search the project's docs for the
   symptom and compare with the nearest working instance.
+
+## Copilot's review
+
+Where `AGENTS.md` records that agents mark the PRs they open ready
+once fully reviewed, and the host has Copilot review drafts (D39 in
+this project), the session that opened the PR does this; a delegated
+agent reports instead, and never waits on Copilot itself (its brief's
+completion discipline). `gh api` fills in `{owner}` and `{repo}` from
+the checkout.
+
+- Within a few minutes of `gh pr create --draft`, check that the review
+  was requested:
+  `gh api 'repos/{owner}/{repo}/issues/<n>/timeline' --jq '.[] | select(.event=="review_requested") | .requested_reviewer.login'`
+  shows `Copilot`. If it does not, tell the human at once, and say in
+  the description that Copilot did not review the PR; it is then
+  marked ready on the agent's own reviews.
+- Wait with a timed check ("Supervising long-running work"), up to 30
+  minutes; on PR #1 and #2 of this project it took 5 to 7 minutes:
+  `gh api 'repos/{owner}/{repo}/pulls/<n>/reviews' --jq '.[] | select(.user.login | test("copilot"; "i")) | .submitted_at'`.
+  Past the limit, tell the human and go on as if none was requested.
+- Read all of it: the summary in the `body` of that review, and the
+  inline comments, which only
+  `gh api 'repos/{owner}/{repo}/pulls/<n>/comments'` shows
+  (`gh pr view` does not).
+- Handle each comment like an adversarial review's finding, checked
+  against the code: fixed, fixed differently, or deferred to the
+  backlog, each with its reason in the description. The fixes get the
+  delta review like any.
+- Then, with no BLOCKER or SHOULD-FIX open and the pipeline green:
+  `gh pr ready <n>`, and one message tells the human the PR is ready to
+  merge.
+- Whether marking ready starts a second review is not known yet. If
+  one arrives, read it the same way; what holds then goes into a
+  follow-up PR, as the human may have merged already.

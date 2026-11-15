@@ -5,18 +5,9 @@
 The v0 design is agreed (2026-11-12, D17–D33) and written down in
 `docs/design/recorder.md` and `docs/design/delivery.md`. The skeleton
 and pipeline PR (#1) is merged (2026-11-14), and the end-to-end test
-design is agreed (D37).
-
-The owner, 2026-11-14: "so you mark them as ready when you are done
-and check after 5 mins". It conflicts with the guardrail that an agent
-at most pushes a work branch and opens a draft PR (`AGENTS.md`,
-"Guardrails") and with D8, the write level in force, so it is not
-acted on: raised with the owner, who decides whether the write level
-changes through "Changing a principle" (a decisions entry, the
-guardrail and the setup line "Agent writes"). The architect's reading,
-for that change: "done" means no BLOCKER or SHOULD-FIX is open;
-"check" means reading Copilot's review, which GitHub requests when a
-PR is marked ready, and fixing what holds; "you" means the architect.
+design is agreed (D37). Agents now mark the PRs they open ready once
+fully reviewed, Copilot's review of the draft included (D39,
+`AGENTS.md` "Agent writes").
 
 Next, waiting for the owner:
 
@@ -74,13 +65,6 @@ order, the next architect session:
 
 ## In flight
 
-- **Copilot's review findings** on PRs #1 and #2, fixed in the PR
-  `copilot-review-fixes`, which waits for the owner's review: a crash
-  on a huge required recording time, a snapshot release left behind
-  after a close, releases skipped by quick pushes to `main`, a
-  command-test helper that could hang, and four corrections to the
-  end-to-end test design (merging it signs them off). One finding is
-  proposed for the crash reports PR ("Next session starts here").
 - **Open from PR #1** (merged 2026-11-14), checked on the owner's Mac
   with the snapshot release the owner named: "So I'm checking the PR1
   release snapshot from GH 43ec12f".
@@ -113,9 +97,10 @@ order, the next architect session:
     failed).
   - Each crash gets its entry in `docs/troubleshooting.md` once its fix
     is verified.
-  - The branches `v0-skeleton-and-pipeline`,
-    `end-to-end-tests-design` and `bring-end-to-end-design-to-main`
-    are still on the remote; deleting them needs the owner's go-ahead.
+  - The merged branches `v0-skeleton-and-pipeline`,
+    `end-to-end-tests-design`, `bring-end-to-end-design-to-main` and
+    `copilot-review-fixes` are still on the remote; deleting them is
+    the owner's (the "Delete branch" button on each merged PR).
 
 ## Queued
 
@@ -290,6 +275,9 @@ order, the next architect session:
 
 ## Done (recent)
 
+- 2026-11-15: Copilot's review findings on #1 and #2 fixed (PR #4,
+  with D38), one deferred to the crash reports PR; agents mark the PRs
+  they open ready after Copilot reviews the draft (PR #5, D39).
 - 2026-11-14: the skeleton and pipeline PR (#1) merged, with D25–D34
   and D36; the end-to-end test design (PR #2, with D35) agreed (D37)
   and brought to `main` with PR #3.

@@ -39,22 +39,21 @@ so rather than silently picking a side.
   — never directly on the trunk. The architect-maintained docs are the
   one exception ("Docs completeness is part of being done" below).
 - How far an agent writes to the repo is chosen at setup, one of
-  four levels: it pushes work branches, opens draft MRs/PRs and marks
-  them ready once reviewed; it pushes work branches and opens draft
-  MRs/PRs (recommended); it commits locally only and a human pushes;
-  or it writes nothing to the repo without a per-change instruction.
-  The recommended level lets an agent iterate on real CI results by
-  itself — push, read the pipeline, push a fix — before a human
-  spends review time on it. The level above it also lets the agent
-  mark its MR/PR ready once its adversarial review leaves no BLOCKER
-  or SHOULD-FIX open and its pipeline passes; where the host then
-  requests an automated review, the agent reads it, fixes what holds
-  (each fix delta-reviewed) and then tells the human the change is
-  ready to merge. "Ready" then means the agent's reviews came out
-  clean, not that a human has looked. The automated review can be a
-  paid run, so setup records that level only with a go-ahead naming
-  the account that pays ("Live systems need a human's go-ahead").
-  At every level, credentials that happen to be present
+  three levels: it pushes work branches and opens draft MRs/PRs
+  (recommended), optionally also marking the ones it opened ready
+  once they are fully reviewed; it commits locally only and a human
+  pushes; or it writes nothing to the repo without a per-change
+  instruction. The recommended level lets an agent iterate on real CI
+  results by itself — push, read the pipeline, push a fix — before a
+  human spends review time on it. With the option, the agent marks an
+  MR/PR it opened ready once its adversarial review leaves no BLOCKER
+  or SHOULD-FIX open, its pipeline passes, and any automated review
+  the host ran on the draft has been read and handled like the
+  adversarial review's findings. "Ready" keeps one meaning: fully
+  reviewed, the human's to merge. An agent never marks a human's draft
+  ready. The host's automated review can be billed per use, so setup
+  records the option only with a go-ahead naming the account that
+  pays ("Live systems need a human's go-ahead"). At every level, credentials that happen to be present
   are not consent, and neither is a request to "fix it": the level and
   the brief set what an agent may write, and only a human merges.
   Wherever these principles, the root instruction file, an agent
@@ -158,16 +157,18 @@ the mechanism is verifiable without a live system.
 A **paid run** touches a live system too: the account that pays. A
 paid run is any script, tool or test run that makes its own model
 calls (headless agent sessions, model API calls) or calls another API
-billed per use; a session's own work, its subagents included, is not
-one. A script bills whatever credential its environment hands it,
+billed per use, and any write that makes a host start a run billed
+per use, such as an automated review; a session's own work, its
+subagents included, is not one. A script bills whatever credential its environment hands it,
 possibly another project's key, and a login status may not show
 which. So before each paid run, state what it runs, roughly what it
 costs and whether a credential is set in its environment (a presence
 check, never the value), then ask which account pays; the go-ahead
-names that account. The one standing go-ahead is the automated review
-a host starts when an agent marks an MR/PR ready, at the write level
-that allows it ("Work branches"): setup records it once, naming the
-account, and it holds until the level changes.
+names that account. The one standing go-ahead is for the automated
+review a host runs on the MRs/PRs an agent opens, where setup recorded
+the option of marking them ready ("Work branches"): setup records it
+once, naming the account and what starts a review, and it holds until
+a human withdraws it.
 
 **A read can still do harm.** A diagnostic read puts load on the
 system it reads, and parallel sessions multiply that load. Before

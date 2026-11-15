@@ -125,10 +125,9 @@ the trade-off.
 7. **Organization constraints**: rules the project must follow (data
    protection, approved vendors or hosting, security policies,
    budget, licenses).
-8. **How far agents write to the repo**: push branches, open draft
-   MRs/PRs and mark them ready once reviewed; push branches and open
-   draft MRs/PRs; commit locally only; or nothing without a
-   per-change instruction.
+8. **How far agents write to the repo**: push branches and open draft
+   MRs/PRs (optionally also marking them ready once fully reviewed),
+   commit locally only, or nothing without a per-change instruction.
 9. **Commit attribution**: whether AI-written commits and MRs/PRs say
    so.
 10. **Time zone** for times shown to people.
