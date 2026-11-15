@@ -12,32 +12,14 @@ ruleset behaves ("In flight").
 
 Next, waiting for the owner:
 
-- **Crash reports.** The owner, 2026-11-14: "I think some sort of
-  simple crash management would be good now in a subsequent PR as I
-  want to go on now." Earlier, 2026-11-13: "maybe we do crash log
-  submission via email instead, more private", and “I think that the
-  "send to apple" dialogue is useless”. The architect's proposal,
-  put to the owner in the session: on the next start after `msr`
-  crashed, a dialog offers to send the macOS crash report and the
-  app's own log by email, composed in the person's mail app, so
-  nothing is sent without them and the app opens no network
-  connection; Apple's dialog stays (removing it needs a crash catcher
-  in the process or a supervising process, deferred). Email as a
-  feedback channel would supersede D15 in part (feedback goes to
-  GitHub Issues) and touch the intake line of `AGENTS.md`. The
-  architect also proposes that this PR fixes the crash that came back
-  ("In flight"), and with it a finding of Copilot's review of PR #1
-  that touches the same code: a refresh queued for the window outlives
-  a newer device notice, so after a menu closes the devices are read
-  once too early and once more after they settle (the newest result
-  still wins); a refresh number, like the ready check's, fixes it. It
-  has no test yet: the window's refresh gets its tests with the probes'
-  seam in the recorder PR (queued item 2), which then pin it; until
-  then the owner's re-test in the app checks it. Waits for: the
-  owner's sign-off, the address the reports go to, and whether this PR
-  comes before the steps below or later (the architect read "now in a
-  subsequent PR" as the next PR; the owner is asked).
-- Then the steps below; the app icon PR can run beside them.
+- **The crash reports and HiDPI crash PR #6** ("In flight"), opened
+  as a draft on 2026-11-15 at 15:48 Europe/Berlin after the owner's
+  go-ahead: CI, Copilot's review (the first observation of D39's
+  ruleset), then ready for the owner to merge.
+- Then the steps below; the app icon PR can run beside them. AGC comes
+  after the recorder: "AGC can also come as an improvement after the
+  recorder" (the owner, 2026-11-15), so step 1 below no longer blocks
+  step 2.
 
 ### Owner's rulings of 2026-11-13 (D34)
 
@@ -83,38 +65,41 @@ order, the next architect session:
     2 s after marking ready. #5 had been opened as a draft before the
     ruleset existed, so a draft opened under the ruleset may behave
     differently.
-- **Open from PR #1** (merged 2026-11-14), checked on the owner's Mac
-  with the snapshot release the owner named: "So I'm checking the PR1
-  release snapshot from GH 43ec12f".
-  - Seen: "looks good with regard to dynamic updates of the tables
-    when I change screen or mic."
-  - The second crash came back: "I was able to provoke another crash
-    when I opened the resolution drop down and switched HiDPI mode.
-    The table did update and then it crashed". `EXC_CRASH (SIGABRT)`,
-    an exception in `-[NSWindow(NSDisplayCycle) _postWindowNeedsLayout]`
-    from `-[NSWindow(NSConstraintBasedLayoutInternal) layoutIfNeeded]`,
-    during menu tracking. D36 point 3 (the window sized by its
-    content's preferred size, the check's result held while a menu is
-    open) did not stop it. That the table changed with the menu open
-    speaks against the assumption that menu tracking leaves the main
-    run loop's default mode, or the change came from the display
-    itself; which part of the table changed is not known. The other
-    order (switch HiDPI, then click a popup menu at once) was not
-    reported.
-  - Still to report: the first crash's re-test (unplug the default
-    microphone with the window open, wait, "Check again", plug it in
-    again); whether both permissions were kept when the snapshot was
-    installed over the earlier one (D5); a settings file written by an
-    early snapshot, with the key `readyCheckHours`, is refused until
-    "Reset to defaults"; `msr version` through a symbolic link; whether coming
-    back to the app with screen recording denied makes macOS prompt
-    again; whether macOS 26 re-asks for the screen recording
-    permission after some weeks; whether the tables stay unchanged
-    while the folder chooser is open or a control is dragged, and
-    change when it closes (the same holding as for menus, which
-    failed).
-  - Each crash gets its entry in `docs/troubleshooting.md` once its fix
-    is verified.
+- **Crash reports through GitHub, and the HiDPI crash** (D40, D41),
+  draft PR #6, branch `crash-reports-through-github`. Reviewed
+  adversarially, every fix delta-reviewed. Checked by the owner with a local build signed
+  with the project certificate: the crash report dialog, browser,
+  Finder and the `.txt` attachment work; the slider "is a huge UX
+  improvement"; "I couldn't provoke the crash" (evidence, not proof:
+  the crash is intermittent).
+  - The crash was a layout loop in AppKit's popup menu window after a
+    display's backing scale changed, not the start window (D41, from
+    macOS's unified log); whether the hold kept the table still under
+    the open menu the log does not show. The fix removes the popup
+    menus: a slider for the recording resolution,
+    radio buttons for the audio mode.
+  - The repeated screen recording prompt was a build signed ad hoc
+    (seen 2026-11-15 with `main` built ad hoc; the signed `0.4.0` does
+    not repeat it); its entry is in `docs/troubleshooting.md` with #6.
+  - The tick marks of the slider are macOS's standard ones; the owner:
+    "the ticks need to be more visible, ideally on the slider itself
+    (or is this a default UI element - then keep)". Kept.
+- **Open from PR #1** (merged 2026-11-14), still to report on the
+  owner's Mac: the first crash's re-test (unplug the default
+  microphone with the window open, wait, "Check again", plug it in
+  again); whether both permissions were kept when the snapshot was
+  installed over the earlier one (D5); a settings file written by an
+  early snapshot, with the key `readyCheckHours`, is refused until
+  "Reset to defaults"; `msr version` through a symbolic link; whether
+  macOS 26 re-asks for the screen recording permission after some
+  weeks; whether the tables stay unchanged while the folder chooser is
+  open or a control is dragged, and change when it closes. The first
+  crash gets its entry in `docs/troubleshooting.md` once its fix is
+  verified.
+- **`swiftpm-testing-helper` crashed twice** on the owner's Mac on
+  2026-11-14 (21:53 and 22:08, crash reports in
+  `~/Library/Logs/DiagnosticReports`), likely during `scripts/test`
+  runs. Not looked at yet; a test run that crashes must fail loudly.
 
 ## Queued
 
@@ -165,9 +150,20 @@ order, the next architect session:
      tests, and their file access moves off the main thread. With the
      seam, the window's refresh on device changes gets tests (one check
      per burst, nothing applied while a menu is open); it has none yet.
-     One check per burst includes the fix of Copilot's finding on a
-     refresh that outlives a newer device notice ("Next session starts
-     here").
+     One check per burst includes the fix of Copilot's finding on PR #1:
+     a refresh queued for the window outlives a newer device notice, so
+     after a menu closes the devices are read once too early and once
+     more after they settle (the newest result still wins); a refresh
+     number, like the ready check's, fixes it.
+   - Recording happens at the "looks like" size of a display, not at
+     the size it is drawn at: "recording needs to happen at the looks
+     like resolution, not the drawn at one" (the owner, 2026-11-15).
+     The design text says what `native` and the boxes then mean for a
+     HiDPI display.
+   - With auto mode's design: audio in the window becomes a slider from
+     none to all audio inputs (the owner, 2026-11-15: "probably audio
+     should also be a slider from none to all"; kept as radio buttons
+     until "all" exists).
    - From the review of PR #1's crash fixes: `audioInputsToJudge`
      says with a `switch`, not with `try?` and `?? []`, that audio
      inputs that cannot be read do not matter with the audio mode
