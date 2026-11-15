@@ -11,6 +11,9 @@ public struct FrameSize: Equatable, Hashable, Sendable, CustomStringConvertible 
 
     public var pixelCount: Int { width * height }
 
+    /// 1080p, the frame size the video's bit rate is given for.
+    public static let fullHD = FrameSize(width: 1920, height: 1080)
+
     var isPortrait: Bool { height > width }
 
     var rotated: FrameSize { FrameSize(width: height, height: width) }

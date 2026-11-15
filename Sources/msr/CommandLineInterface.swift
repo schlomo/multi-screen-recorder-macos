@@ -11,7 +11,7 @@ struct CommandLineInterface: AsyncParsableCommand {
             Without arguments, msr starts the app. A settings flag changes the settings for that one run; only `msr settings` saves them. \
             An unset HOME makes every command that reads the settings exit 78.
             """,
-        subcommands: [List.self, Check.self, SettingsCommand.self, Version.self]
+        subcommands: [List.self, Check.self, Record.self, SettingsCommand.self, Version.self]
     )
 }
 
@@ -88,7 +88,7 @@ func loadSettings(from file: SettingsFile) -> Settings {
     return read.settings
 }
 
-private func standardSettingsFile() throws -> SettingsFile {
+func standardSettingsFile() throws -> SettingsFile {
     SettingsFile.standard(homeFolder: try homeFolderOrExit())
 }
 
@@ -119,10 +119,14 @@ extension CommandLineInterface {
 
         @OptionGroup var flags: SettingsFlags
 
+        @Flag(help: "Detail on standard error and at debug level in the unified log.")
+        var debug = false
+
         func run() async throws {
+            if debug { RecorderLog.enableDebug() }
             let settings = try flags.effectiveSettings(from: standardSettingsFile())
             let home = try homeFolderOrExit()
-            let facts = await probeReadyCheckFacts(settings: settings, homeFolder: home)
+            let facts = await probeReadyCheckFacts(proof: .captureOneFrame, settings: settings, homeFolder: home)
             let result = ReadyCheck.evaluate(facts, settings: settings)
             print(WhatWillBeRecorded(settings: settings, facts: facts).text, terminator: "\n")
             print(result.text, terminator: "")

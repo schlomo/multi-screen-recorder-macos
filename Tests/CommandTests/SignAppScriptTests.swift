@@ -98,7 +98,7 @@ import Testing
         try writeInfo(version: "0.20261115.999")
         let outcome = try signApp(["RELEASE_BUILD": "true"])
         #expect(outcome.status == 1)
-        #expect(outcome.errors.contains("does not have the form of a release of HEAD, 0.<DATE>.<N> with N the 1 commits up to HEAD: 0.20261115.1"),
+        #expect(outcome.errors.contains("does not have the form of a release of HEAD, 0.<DATE>.<N> with N the number of commits up to HEAD (1): 0.20261115.1"),
                 "\(outcome.errors)")
         #expect(try isUnsignedByThisRun())
     }

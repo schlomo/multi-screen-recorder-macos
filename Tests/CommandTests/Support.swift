@@ -104,10 +104,12 @@ struct ScratchFolder {
 enum InfoPlistDamage: CaseIterable, Sendable {
     case truncated
     case arrayAtTheRoot
+    /// Python's plistlib fails on it with an AttributeError, not a ValueError.
+    case malformedDate
 
     var message: String {
         switch self {
-        case .truncated: "cannot read the bundle's Info.plist"
+        case .truncated, .malformedDate: "cannot read the bundle's Info.plist"
         case .arrayAtTheRoot: "the bundle's Info.plist does not hold a dictionary"
         }
     }
@@ -121,6 +123,12 @@ enum InfoPlistDamage: CaseIterable, Sendable {
         case .arrayAtTheRoot:
             try PropertyListSerialization.data(fromPropertyList: ["0.20261115.2-dev+abcdef0"], format: .xml, options: 0)
                 .write(to: url)
+        case .malformedDate:
+            try Data("""
+                <?xml version="1.0" encoding="UTF-8"?>
+                <plist version="1.0"><dict><key>MSRVersion</key><string>0.20261115.2-dev+abcdef0</string>
+                <key>built</key><date>not a date</date></dict></plist>
+                """.utf8).write(to: url)
         }
     }
 }

@@ -22,6 +22,8 @@ final class StartModel {
     private(set) var whatWillBeRecorded: WhatWillBeRecorded?
     private(set) var readyCheck: ReadyCheckResult?
     private(set) var isChecking = false
+    /// From Start on: the ready check never runs while a recording runs (D45).
+    private(set) var isRecording = false
     /// Counts the ready checks started, so only the newest shows its result.
     @ObservationIgnored private var checkNumber = 0
     /// Counts the device changes noticed, so a refresh queued for the window
@@ -62,7 +64,7 @@ final class StartModel {
         } catch {
             saveError = error.description
         }
-        checkAgain()
+        check(proof: .listDisplays)
     }
 
     func chooseOutputFolder(_ folder: URL) {
@@ -72,14 +74,25 @@ final class StartModel {
     /// Back in the app, the person may have granted a permission; a check
     /// still running is left to finish.
     func appBecameActive() {
-        guard !isChecking else { return }
+        guard !isChecking, !isRecording else { return }
         refreshSoon()
     }
 
     /// A display came, went or changed, an audio device came or went, or the
     /// default audio input changed.
     func devicesChanged() {
+        guard !isRecording else { return }
         refreshSoon()
+    }
+
+    /// Start is possible when the newest ready check passed.
+    var canStart: Bool { !isRecording && !isChecking && readyCheck?.isReady == true }
+
+    /// The recording started: no ready check runs any more, also no queued one.
+    func recordingStarted() {
+        isRecording = true
+        refreshTask?.cancel()
+        refreshTask = nil
     }
 
     /// Re-reads the devices and re-runs the ready check once the devices
@@ -94,13 +107,20 @@ final class StartModel {
             try? await Task.sleep(for: settleTime)
             guard !Task.isCancelled else { return }
             whenContentMayChange {
-                guard number == self.refreshNumber else { return }
-                self.checkAgain()
+                guard number == self.refreshNumber, !self.isRecording else { return }
+                self.check(proof: .listDisplays)
             }
         }
     }
 
-    /// Reads the devices for "What will be recorded" and re-runs the ready
+    /// "Check again", and the check at the app's start: it captures a
+    /// frame, so macOS's prompts come now, not at Start (D46).
+    func checkAgain() {
+        check(proof: .captureOneFrame)
+    }
+
+    /// The ready check, `proof` as `probeScreenRecording` takes it: reads
+    /// the devices for "What will be recorded" and re-runs the ready
     /// check; once it is done, the section shows what the check found,
     /// the free space included.
     ///
@@ -112,7 +132,8 @@ final class StartModel {
     /// the open menu is not shown by the log, and the owner saw the table
     /// change with the menu open [ASSUMED from the owner's words]. The hold
     /// stays; the window has no popup menu now (D41).
-    func checkAgain() {
+    private func check(proof: ScreenRecordingProof) {
+        guard !isRecording else { return }
         whatWillBeRecorded = WhatWillBeRecorded(
             settings: settings, displays: probes.displays(), audioInputs: probes.audioInputs(), outputFolder: nil)
         checkNumber += 1
@@ -123,7 +144,7 @@ final class StartModel {
         let probes = probes
         let whenContentMayChange = whenContentMayChange
         Task {
-            let facts = await probeReadyCheckFacts(settings: settings, homeFolder: homeFolder, probes: probes)
+            let facts = await probeReadyCheckFacts(proof: proof, settings: settings, homeFolder: homeFolder, probes: probes)
             whenContentMayChange {
                 // A newer check has replaced this one and shows its own result.
                 guard number == self.checkNumber else { return }

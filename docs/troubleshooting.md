@@ -51,9 +51,11 @@ One row per entry, the error text exactly as in the entry.
   synchronous `ParsableCommand.main` overload over the async one of
   `AsyncParsableCommand`, so the `await` covers nothing [KNOWN:
   observed with Swift 6.4 and swift-argument-parser 1.8.2].
-- **Fix:** no `main.swift`; an `@main` type with
-  `static func main() async` that calls
-  `await CommandLineInterface.main(nil)` (`Sources/msr/EntryPoint.swift`).
+- **Fix:** no `main.swift`; an `@main` type. Since PR #11 its
+  `static func main()` is synchronous: it parses with
+  `CommandLineInterface.parseAsRoot` and runs a command other than
+  `msr record` in a task under `dispatchMain()`, so the AppKit event
+  loop starts outside any main-queue job (`Sources/msr/EntryPoint.swift`).
 - **Verify:** `swift build` passes, and `msr settings --bogus` exits 64.
 - **Observed:** 2026-11-12, Swift 6.4 (Xcode 27.2), swift-argument-parser
   1.8.2; open.

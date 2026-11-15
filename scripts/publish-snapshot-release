@@ -34,7 +34,7 @@ def bundled_version(info_plist: Path) -> str:
     """MSRVersion from the bundle's Info.plist, which must be a valid property list with a dictionary at its root."""
     try:
         info = plistlib.loads(info_plist.read_bytes())
-    except (OSError, plistlib.InvalidFileException, ExpatError, ValueError) as error:
+    except (OSError, plistlib.InvalidFileException, ExpatError, ValueError, AttributeError) as error:
         stop(f"cannot read the bundle's Info.plist: {error}")
     if not isinstance(info, dict):
         stop("the bundle's Info.plist does not hold a dictionary")

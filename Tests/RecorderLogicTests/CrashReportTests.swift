@@ -65,6 +65,16 @@ import Testing
         _ = try repositoryFile(".github/ISSUE_TEMPLATE/\(CrashReport.template)")
     }
 
+    /// The form, the README and the crash report dialog name the same command for the log (D46).
+    @Test func theLogCommandIsInTheFormAndTheReadme() throws {
+        #expect(CrashReport.logCommand == #"log show --last 2h --predicate 'subsystem == "org.schapiro.multiscreenrecorder" and process == "msr"'"#)
+        let form = try repositoryFile(".github/ISSUE_TEMPLATE/crash-report.yml")
+        #expect(form.contains("\n    id: log\n"))
+        #expect(form.contains(CrashReport.logCommand))
+        #expect(try repositoryFile("README.md").contains(CrashReport.logCommand))
+        #expect(CrashReport.dialogText.contains(CrashReport.logCommand))
+    }
+
     @Test func aPlusInAValueIsPercentEncoded() {
         let url = CrashReport.issueURL(crashReportName: newer, version: "1+2", macOSVersion: "x")
         #expect(url.absoluteString.contains("version=1%2B2"))

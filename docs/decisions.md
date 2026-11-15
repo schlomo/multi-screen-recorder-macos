@@ -347,7 +347,7 @@ architect's reading.
 
 ## D20: Recording folder, recording manifest, parallel recordings (2026-11-12)
 
-- **Status:** in force
+- **Status:** in force; superseded in part by D47 (no crash markers)
 - **Context:** On two recorders at once the owner ruled: "should
   prevent multiple invoications on same folder, nice if we can support
   multiple parallel recordings that don't conflict".
@@ -1183,3 +1183,143 @@ architect's reading.
 - **Evidence:** [design/recorder.md](design/recorder.md), "Settings
   file" and "Command line"; the PR "Settings and auto mode (PR A of the
   recorder)".
+
+## D45: The recording core in two PRs; displays first, with a Dock icon for `msr record` and a check of every frame (2026-11-15)
+
+- **Status:** in force; supersedes D44 in part (the recording core is
+  two PRs, not one). Nothing built yet.
+- **Context:** The architect's design text for the recording core's
+  display half, in the session of 2026-11-15. The owner: "OK, split
+  PRs again"; on `msr record`: "I'm wondering if maybe a dock icon
+  would be good to show in any case, even when run from command line.
+  This would allow a user to quit a recording, even when started from
+  CLI."; "the app should just quit at the end, assuming that typical
+  use is one shot. OK to open finder"; on the wrong-display fault:
+  "we'll need to see when exactly this problem starts hitting us";
+  "would lifting the minimum to MacOS 27 help anyhow? I'm ready to do
+  that."; then to the design text with these changes: "yes, and the
+  per-frame check can be also a per-second or per-X-frames check if it
+  acts as a safeguard? To not overload the system?"
+- **Decision:**
+  1. The recording core comes in two PRs: B1, the displays (`msr
+     record`, Start and Stop, display files with timecode, display
+     changes, the recording manifest, crash markers); B2, the audio
+     (audio files, guide tracks, system audio, the default microphone
+     followed, audio clock drift measured).
+  2. `msr record` shows the app's Dock icon, with its badge and the
+     "Stop recording?" question, like the app.
+  3. After Stop the app reveals the recording folder in Finder and
+     quits.
+  4. Every frame is checked against the display it should show; a
+     frame that shows another display is never written, and a display
+     that keeps delivering another display's picture ends its display
+     file loudly. The architect's reading of the owner's question,
+     given in the session and not objected to: the check stays per
+     frame, as it compares one rectangle with one held in memory and
+     reads no pixels, and checking less often would let a wrong
+     picture into the file.
+  5. The minimum stays macOS 26 (the architect's recommendation,
+     agreed): nothing found depends on macOS 27, and building for it
+     needs Xcode 27, which the pipeline does not have (D28).
+- **Consequences:** Several parallel `msr record` show several Dock
+  icons. A screen showing another display's picture is lost for that
+  display until it reconnects; a fallback through screenshots is
+  deferred (`backlog.md`).
+- **Evidence:** [design/recorder.md](design/recorder.md), "How the
+  recorder works" and "The app".
+
+## D46: The owner's rulings from trying B1 (2026-11-15)
+
+- **Status:** in force; refines D45 and, for B2, D31; superseded in
+  part by D47 (point 12: the badge shows no time). Being built in
+  PR #11 (B1), point 7 in B2.
+- **Context:** The owner tried the snapshot release of PR #11 on
+  2026-11-15 and wrote: "duration without suffix is minutes"; "yes,
+  mouse is part of screen"; on the architect's logging proposal
+  "logging as you suggest, but we need to think about logs for crash
+  reporting"; "the GB/h column is too wide to accomodate the useless
+  text, shorten to just numbers and not recording is simply 0"; "the
+  extra permission popup came only when I started the recording, can
+  we do that earlier so that start really means start?"; "the stop
+  dialogue should also show what it is doing, e.g showing the table and
+  how much data and files have been written so far, that way it serves
+  as status info BTW"; "at the end of the recording it opened the
+  recording folder, but not the folder it created for the specific
+  recording, which would be better"; "the json needs to have not only
+  started but also ended and a clear status (OK, failure ...) and also
+  show detailled errors if there are any."; on the Wacom One with two
+  USB-C ports seen as two displays: "Treating both USB-C ports as
+  different screen is \"works as designed\" for me as MacOS also treats
+  them differently."; "display name as reel - I think we should also
+  store the UUID in another metadata tag and not only the reel name.
+  the more metadata we write the better"; on gaps in an audio input:
+  "for short gaps we fill and for longer gaps we start fresh, but that
+  needs probably data from experience."
+- **Decision:**
+  1. `--duration` without a unit is minutes.
+  2. The mouse pointer is recorded.
+  3. Logging (the architect's proposal, agreed): `msr record` prints
+     every manifest event on standard error; the app and `msr` write to
+     the unified log at a level macOS keeps on disk, names not
+     redacted; `--debug` adds detail; no log file of our own. The crash
+     report form names the `log show` command and takes its output.
+  4. GB/h shows numbers only; a source not recorded shows 0, dimmed.
+  5. The ready check proves the screen recording permission with a
+     capture of one frame, so macOS's prompts come before Start.
+  6. Clicking the Dock icon while recording opens a status window (the
+     architect's form): the table with each source's files, GB written
+     and state, a line with the elapsed time, the data written and the
+     free space, the problems, and Stop and Continue. It replaces the
+     "Stop recording?" question.
+  7. B2: a gap in an audio input up to a threshold (*data*, the
+     architect's starting value 1 s) is filled with silence of its
+     exact length; a longer one ends the audio file and starts a new
+     one. Every gap is an event with its length, to calibrate the
+     threshold. Refines D31's "never padded with silence".
+  8. At the end the recording folder itself opens in Finder.
+  9. The recording manifest gets `ended`, `result` (`ok` or
+     `problems`) and `problems` (each with its time and full error).
+  10. Every file carries metadata: the source as its reel name in the
+      timecode track, and its display UUID, display number and name,
+      frame size, the recording's start and the app version as metadata
+      items (the architect's reading of "the more metadata we write the
+      better").
+  11. A display reached through another port may be another display:
+      works as designed.
+  12. The Dock badge shows the elapsed time as `h:mm` (the architect's
+      call; the owner asked what the number meant).
+- **Consequences:** The ready check opens a capture, briefly, at every
+  start and "Check again". Whether Resolve's "detect clips from same
+  camera" reads the reel name is UNVERIFIED until the owner's next run.
+- **Evidence:** [design/recorder.md](design/recorder.md); PR #11.
+
+## D47: No crash markers; exit 0 when nothing was lost; no timer on the Dock icon (2026-11-15)
+
+- **Status:** in force; supersedes D20 in part (the crash marker) and
+  D46 in part (point 12, the badge's `h:mm`). Being built in PR #11.
+- **Context:** The owner, after the second run of PR #11's build:
+  "What exactly is this secret marker file? Also, how long will it take
+  for the app to check all old recordings? Maybe we don't need this at
+  all, YAGNI & AI overengineering?", then "remove the marker stuff";
+  "I think if the end result is OK then exit should be 0, transient
+  problems can then be ignored"; "the recording timer in the dock and
+  status window should show seconds and not only minutes, or drop the
+  timer from the dock icon."
+- **Decision:**
+  1. No crash markers: nothing is kept while recording, and nothing is
+     checked, reported or rewritten at the next start. A recording
+     manifest without `ended` belongs to a recording that is running
+     or did not finish.
+  2. The architect's reading of "the end result is OK": `result` is
+     `ok` and `msr record` exits 0 when every file is finalized and no
+     display file was ended by a failure (its stream or writer failed,
+     the disk was full, the writer fell behind, the display showed
+     another display's picture). Otherwise `result` is `problems` and
+     the exit is 3. Every problem is still listed in `problems`.
+  3. The Dock badge shows only "!"; the status window shows the elapsed
+     time as `h:mm:ss`.
+- **Consequences:** A recording cut short by a crash or a power loss is
+  told to no one at the next start; its files stay readable up to the
+  last 2 s, and a crash of `msr` is still offered as a crash report
+  (D40).
+- **Evidence:** [design/recorder.md](design/recorder.md); PR #11.

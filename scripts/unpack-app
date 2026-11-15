@@ -7,7 +7,8 @@ special files; its destination here is the bundle folder, which this script
 creates, so "out" means out of the bundle. This script checks what the
 filter lacks: a plain tar, every member once, inside the bundle and without
 a `..` component (the build writes none), the bundle's own member a folder,
-and no member written through a symbolic link of the archive.
+and no member written through a symbolic link of the archive. Names are
+compared without regard to case, as the Mac's file system does by default.
 """
 
 import argparse
@@ -43,8 +44,13 @@ def inside_bundle(name: str) -> PurePosixPath | None:
     return PurePosixPath(*path.parts[1:]) if len(path.parts) > 1 else PurePosixPath()
 
 
+def folded(path: PurePosixPath) -> PurePosixPath:
+    """The path as a case-insensitive file system compares it."""
+    return PurePosixPath(str(path).casefold())
+
+
 def check(members: list[tarfile.TarInfo]) -> None:
-    symbolic_links = {PurePosixPath(member.name) for member in members if member.issym()}
+    symbolic_links = {folded(PurePosixPath(member.name)) for member in members if member.issym()}
     seen: set[PurePosixPath] = set()
     has_bundle = False
     for member in members:
@@ -53,9 +59,9 @@ def check(members: list[tarfile.TarInfo]) -> None:
             raise Refused(f"the member '{member.name}' has an absolute path")
         if ".." in path.parts:
             raise Refused(f"the member '{member.name}' has a .. component")
-        if path in seen:
+        if folded(path) in seen:
             raise Refused(f"the member '{member.name}' appears twice")
-        seen.add(path)
+        seen.add(folded(path))
         relative = inside_bundle(member.name)
         if relative is None:
             raise Refused(f"the member '{member.name}' lies outside {BUNDLE}")
@@ -66,7 +72,7 @@ def check(members: list[tarfile.TarInfo]) -> None:
         if member.islnk() and (inside_bundle(member.linkname) is None or ".." in PurePosixPath(member.linkname).parts):
             raise Refused(f"the hard link '{member.name}' points outside {BUNDLE} ({member.linkname})")
         for parent in path.parents:
-            if parent in symbolic_links:
+            if folded(parent) in symbolic_links:
                 raise Refused(f"the member '{member.name}' would be written through the symbolic link '{parent}'")
     if not has_bundle:
         raise Refused(f"the archive holds no {BUNDLE} folder")

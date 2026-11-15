@@ -5,21 +5,13 @@ import SwiftUI
 
 /// The app: an AppKit application with SwiftUI window content.
 @MainActor
-enum RecorderApp {
-    static func run() {
-        let app = NSApplication.shared
-        let delegate = AppDelegate()
-        app.delegate = delegate
-        app.setActivationPolicy(.regular)
-        withExtendedLifetime(delegate) { app.run() }
-    }
-}
-
-@MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var startWindow: NSWindow?
     private var aboutWindow: NSWindow?
     private var model: StartModel?
+    private var session: RecordingSession?
+    /// Stop in progress, for a logout that comes meanwhile to wait for.
+    private var stopping: Task<Void, Never>?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.mainMenu = makeMainMenu()
@@ -42,7 +34,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             MainActor.assumeIsolated { model.devicesChanged() }
         }
         self.model = model
-        startWindow = makeWindow(title: "Multi Screen Recorder", content: StartView(model: model))
+        startWindow = makeWindow(
+            title: "Multi Screen Recorder", content: StartView(model: model) { [weak self] in self?.startRecording() })
         startWindow?.center()
         startWindow?.makeKeyAndOrderFront(nil)
         NSApp.activate()
@@ -50,12 +43,80 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         offerCrashReport(homeFolder: model.homeFolder)
     }
 
+    /// Start: the window closes; the Dock icon shows "!" when something needs the person.
+    private func startRecording() {
+        guard let model, model.canStart else { return }
+        do {
+            session = try RecordingSession(settings: model.settings, homeFolder: model.homeFolder, tellOnStandardError: false)
+        } catch {
+            showAlert("Cannot start the recording", error.description)
+            return
+        }
+        model.recordingStarted()
+        startWindow?.close()
+    }
+
+    /// Stop: finalizes, opens the recording folder in Finder and quits (D45, D46).
+    private func stopRecording(openFolder: Bool) async {
+        guard let session else { return }
+        let summary = await session.stop()
+        self.session = nil
+        if openFolder, let folder = session.folder {
+            NSWorkspace.shared.open(folder)
+        }
+        if summary?.manifestWritten == false {
+            showAlert("The recording manifest could not be written",
+                      "\(RecordingNames.manifest) in the recording folder does not record the end of the recording.")
+        }
+    }
+
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        guard let session else { return true }
+        session.showStatus { [weak self] in self?.stopAndQuit() }
+        return false
+    }
+
+    /// Stop in the status window: finalizes, opens the recording folder and quits.
+    private func stopAndQuit() {
+        stopping = Task {
+            await stopRecording(openFolder: true)
+            NSApp.terminate(nil)
+        }
+    }
+
+    /// Logout, restart and shutdown finalize without asking; any other quit
+    /// opens the status window.
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        guard let session else { return .terminateNow }
+        switch QuitDecision(isStopping: session.isStopping, endsTheSession: quitEndsTheSession(reason: currentQuitReason())) {
+        case .ignore:
+            return .terminateCancel
+        case .waitForTheStop:
+            let stopping = stopping
+            Task {
+                await stopping?.value
+                NSApp.reply(toApplicationShouldTerminate: true)
+            }
+            return .terminateLater
+        case .showStatus:
+            session.showStatus { [weak self] in self?.stopAndQuit() }
+            return .terminateCancel
+        case .finalizeWithoutAsking:
+            stopping = Task {
+                await stopRecording(openFolder: false)
+                NSApp.reply(toApplicationShouldTerminate: true)
+            }
+            return .terminateLater
+        }
+    }
+
     func applicationDidBecomeActive(_ notification: Notification) {
         model?.appBecameActive()
     }
 
+    /// While a recording runs, closing the last window does not quit the app.
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
-        true
+        session == nil
     }
 
     @objc func showAbout(_ sender: Any?) {
@@ -95,7 +156,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             try stateFile.save(state.offering(name))
             let alert = NSAlert()
             alert.messageText = "Multi Screen Recorder quit unexpectedly"
-            alert.informativeText = "You can report it on GitHub, which needs a GitHub account. Your browser opens a new issue, and Finder shows a copy of the crash report as a text file for you to drag into it. Issues are public, and a crash report contains your Mac's user name: check it before you attach it."
+            alert.informativeText = CrashReport.dialogText
             alert.addButton(withTitle: "Report on GitHub")
             alert.addButton(withTitle: "Not Now")
             guard alert.runModal() == .alertFirstButtonReturn else { return }

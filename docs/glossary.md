@@ -8,11 +8,12 @@ no reusing a defined term for a second meaning (see
 Where a concept is designed but not yet implemented, say so explicitly
 rather than letting the definition imply it already exists. Built so
 far: auto mode, the recording resolution, audio mode and system audio as
-settings, the ready check, and the pipeline for snapshot releases and
-releases.
-Nothing a recording produces exists yet (recording, recording folder,
-recording manifest, crash marker, display file, tick, timecode, audio
-track, audio file, guide track).
+settings, the ready check, the pipeline for snapshot releases and
+releases, and the display half of the recording core (recording,
+recording folder, recording manifest, problem, status window, display
+file without guide tracks, display identity, settle time, display
+check, tick, timecode). Not built yet: audio track, audio file, guide track (B2 of
+the recording core, D45).
 
 ## Multi Screen Recorder
 
@@ -44,13 +45,27 @@ recording claims it by creating it (D20).
 ## Recording manifest
 
 `recording.json` in the recording folder: the settings, every file with
-its start on the shared clock and its state, and the events (D20).
+its start on the shared clock and its state, the events and the
+problems, and once finalized its end and result (D20, D46).
+
+## Problem
+
+Something that went wrong in a recording and that the person is told:
+the Dock badge's "!", red in the status window, a line on standard
+error in `msr record`, and an entry in the recording manifest's
+`problems` with its time and full error (D46).
+
+## Status window
+
+The small window of a running recording, opened by a click on the Dock
+icon or by Quit, in the app and in `msr record`: what is recorded, the
+data written, the problems, and Stop and Continue (D46).
 
 ## Crash report
 
 The `.ips` file macOS writes when `msr` quits unexpectedly, in
 `~/Library/Logs/DiagnosticReports`; the app offers to report it as a
-GitHub issue (D40). Not the crash marker, which belongs to a recording.
+GitHub issue (D40).
 Its text copy is the `.txt` copy the app makes in `Crash Reports` beside
 the state file, because GitHub refuses `.ips` attachments.
 
@@ -65,19 +80,32 @@ apart from the settings file because the person never edits it (D40).
 The end-to-end driver's file of what a run changed, read by `restore`;
 called "state file" in D38.
 
-## Crash marker
-
-The file a recording process keeps while it records, naming its
-recording folder; one left behind by a process that is gone marks a
-recording that was not finalized (D20).
-
 ## Display file
 
 The video file for one display, with its timecode and its guide tracks
 (D31).
 A display that disappears or whose stream fails ends its display file;
 a new one begins when it is back. A display whose frame size changes
-also ends its file, and a new one begins at once (D30).
+also ends its file, and a new one begins after the settle time (D30,
+D45). Sleep, mirroring, a writer too far behind and the display check
+end it too.
+
+## Display identity
+
+What a recording knows a display by: the UUID macOS gives it, never
+its display ID or its name (D45).
+
+## Settle time
+
+How long a display must stay unchanged before its stream starts or
+starts again, so that quick mode changes make no burst of short display
+files (D45).
+
+## Display check
+
+The check of every frame that it shows its own display, by the screen
+rectangle ScreenCaptureKit attaches to it; a frame that fails is never
+written (D45).
 
 ## Frame size
 
@@ -141,7 +169,8 @@ grays out the sliders, which then show Native and Wired; on the command line `--
 The file for one audio source, beside the display files: a recorded
 audio input's audio tracks, one per channel, or the system audio's one
 audio track, with its timecode. It starts when the source appears and
-ends when it disappears, never padded with silence (D31).
+ends when it disappears or its channel count changes, which starts a new
+one; never padded with silence (D31).
 
 ## Guide track
 
