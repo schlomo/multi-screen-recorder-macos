@@ -703,8 +703,8 @@ folder, and by the v1 gate. The design of the end-to-end tests is
 - Whether `AVAssetWriter` writes a timecode track into an audio-only
   fragmented `.mov`.
 - How drift between an audio device's clock and the tick grid is
-  handled over hours. The drift is measured: 117 ppm, 0.42 s after an
-  hour, and `AVCaptureSession`'s timestamps do not correct it ([end-to-end-tests.md](end-to-end-tests.md),
+  handled over hours. The drift is measured: up to 117 ppm (the Razer
+  Seiren V3 Mini: 0.42 s slow after an hour; one of five inputs), and `AVCaptureSession`'s timestamps do not correct it ([end-to-end-tests.md](end-to-end-tests.md),
   "What research found for the recorder"); the design stays open.
 - Two audio inputs with the same name.
 - Characters in a device name that a file name cannot hold.

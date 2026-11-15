@@ -271,12 +271,14 @@ tried:
   holds the fault: a fresh process, a new serial number, a new fetch of
   the shareable content and the other workarounds tried did not clear
   it, and a screenshot through the display filter was wrong too.
-  `SCStreamFrameInfo.screenRect` is a one-directional sign: a frame
-  whose `screenRect` differed from `CGDisplayBounds` of the display
-  always carried the other display's picture (11 of 11), while a
-  matching `screenRect` once came with a black frame that was not yet
-  painted (`fault-run3-3cycles.log`, line 5), so a match does not
-  prove the picture right. A screenshot with
+  `SCStreamFrameInfo.screenRect` is a one-directional sign: in every
+  reconnect that showed the other display's picture (11 of 11, one
+  frame sampled per check) the frame's `screenRect` was the other
+  display's rectangle, and with a filter that includes A's window the
+  frame was transparent, at the other display's rectangle; but once a
+  frame with a matching `screenRect` was black (cause not known,
+  perhaps not yet painted), so a match does not prove the picture
+  right. The run logs of 2026-11-15 are not kept. A screenshot with
   `SCScreenshotManager.captureImage(in:)` of the display's bounds
   was right in 3 of 3 faulty runs; as a recording path it is
   UNVERIFIED (its cost at 30 frames per second is not known). So the
@@ -330,7 +332,7 @@ tried:
   `NSApplication.shared` with `CFRunLoopRun`, and fired under
   `NSApplication.shared.run()`; polling `CGGetActiveDisplayList` saw a
   new display after 0.11 to 0.16 s and `SCShareableContent` after 0.17
-  to 0.23 s. So `msr record` must poll or run the AppKit loop.
+  to 0.23 s. So `msr record` would need to poll or run the AppKit loop.
 - **A mode change is not a reconnect, and the frames keep the configured size.**
   Tried (2026-11-15, HiDPI in two runs, 1x in one; see "Unknowns"): a
   mode switch during a stream gave no error, the display ID stayed, and
@@ -355,8 +357,9 @@ tried:
   (virtual) -0.0046 s. All five ran at 48000 Hz. The rate was steady
   over the hour. The buffers' presentation timestamps follow the
   sample count (the timestamp minus the samples stays constant; the
-  constant of about 11 ms is the first buffer's duration, an artefact
-  of the probe, which leaves the first buffer out of the count), so
+  constant of about 11 ms is the first buffer's duration, which follows
+  from the probe's code, which leaves the first buffer out of the
+  count, not from a measurement), so
   `AVCaptureSession` does not correct the drift in the timestamps it
   delivers. Whether Core Audio's own path corrects it was not measured.
   Hence two inputs
@@ -562,12 +565,12 @@ this design is built:
   Polling `CGGetActiveDisplayList` saw a new display 0.11 to 0.16 s
   after the helper started and `SCShareableContent` 0.17 to 0.23 s;
   the display was gone after 0.02 to 0.18 s and 0.17 to 0.74 s
-  respectively. The mean of an `SCShareableContent` fetch was 110 to 300 ms per run; single fetches took up to 731 ms (`listen-nsapp-run.log`, line 25).
+  respectively. The mean of an `SCShareableContent` fetch was 110 to 300 ms per run; single fetches took up to 731 ms.
   `CGDisplayRegisterReconfigurationCallback` never fired under
   `CFRunLoopRun` (two runs), `dispatchMain` (two runs) or
   `NSApplication.shared` with `CFRunLoopRun` (one run); it fired under
   `NSApplication.shared.run()` on the main thread (one run). So
-  `msr record` must poll or run the AppKit loop;
+  `msr record` would need to poll or run the AppKit loop;
 - two virtual displays, one reconnects: does the wrong-display fault
   show on this Mac. **Tried, and it does** (2026-11-13, one run by the
   owner, from an app that holds Screen Recording). Display A showed
@@ -602,10 +605,11 @@ this design is built:
   with `CGDisplayBounds` of A gave A's picture in 3 of 3 faulty runs
   (BGRA 0, 0, 255, 255); its cost at 30 frames per second is
   UNVERIFIED. What shows it: `SCStreamFrameInfo.screenRect` was the
-  other display's rectangle in every frame that carried the other
-  display's picture (11 of 11); a matching `screenRect` once came with
-  a black frame that was not yet painted
-  (`fault-run3-3cycles.log`, line 5). Not tried: the Mac's own displays (BetterDisplay can
+  other display's rectangle in every reconnect that showed the other
+  display's picture (11 of 11, one frame sampled per check), and with
+  a filter that includes A's window the frame was transparent, at the
+  other display's rectangle; once a frame with a matching `screenRect`
+  was black (cause not known, perhaps not yet painted). Not tried: the Mac's own displays (BetterDisplay can
   switch one off and on), three or more displays, a mode switch on B,
   the cause;
 - an aggregate device created and removed is seen as an audio input
