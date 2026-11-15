@@ -5,7 +5,7 @@ import Testing
     private let fullHD = FrameSize(width: 1920, height: 1080)
 
     private func settings(_ edit: (inout Settings) -> Void = { _ in }) -> Settings {
-        var settings = Settings.defaults
+        var settings = Settings.manual
         edit(&settings)
         return settings
     }

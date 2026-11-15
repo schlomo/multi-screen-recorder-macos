@@ -87,7 +87,7 @@ public enum ReadyCheck {
     /// the output folder is usable.
     public static func evaluate(_ facts: ReadyCheckFacts, settings: Settings) -> ReadyCheckResult {
         var items = [screenRecordingItem(facts.screenRecording)]
-        if settings.audioMode != .none {
+        if settings.effectiveAudioMode != .none {
             items.append(microphoneItem(granted: facts.microphoneGranted ?? false))
         }
         items.append(displaysItem(facts.displays))
@@ -145,16 +145,9 @@ public enum ReadyCheck {
         if case .failure(let error) = unreadableRecordedInputs(audioInputs, settings: settings).first?.channelCount {
             return cannotBeRead(error)
         }
-        var sources: [String] = []
-        var missingMicrophone = false
-        if settings.audioMode == .defaultMicrophone {
-            if let defaultMicrophone = audioInputs.first(where: settings.records) {
-                sources.append(defaultMicrophone.label)
-            } else {
-                sources.append("no microphone")
-                missingMicrophone = true
-            }
-        }
+        var sources = audioInputs.filter(settings.records).map(\.label)
+        let missingMicrophone = settings.effectiveAudioMode != .none && sources.isEmpty
+        if missingMicrophone { sources.append("no microphone") }
         if settings.systemAudio { sources.append("system audio") }
         return ReadyCheckItem(
             title: "Audio: " + (sources.isEmpty ? "none" : sources.joined(separator: ", ")),
@@ -192,6 +185,12 @@ public enum ReadyCheck {
     }
 
     static func hoursText(_ hours: Double) -> String {
-        return hours == 1 ? "1 hour" : "\(numberText(hours)) hours"
+        hours == 1 ? "1 hour" : "\(numberText(hours)) hours"
+    }
+
+    /// A whole number below 1e15 without a fraction, any other as Swift writes it.
+    private static func numberText(_ number: Double) -> String {
+        if number == number.rounded(), abs(number) < 1e15 { return String(Int(number)) }
+        return String(number)
     }
 }

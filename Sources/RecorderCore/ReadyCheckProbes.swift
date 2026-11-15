@@ -4,23 +4,55 @@ import Foundation
 import RecorderLogic
 import ScreenCaptureKit
 
-/// Runs the ready check's probes on this Mac. A permission that was never
-/// asked for is requested, so macOS shows its prompt; a missing output folder
-/// is created.
-@MainActor
-public func probeReadyCheckFacts(settings: Settings, homeFolder: URL) async -> ReadyCheckFacts {
-    ReadyCheckFacts(
-        screenRecording: await probeScreenRecording(),
-        microphoneGranted: settings.audioMode == .none ? nil : await probeMicrophonePermission(),
-        displays: Result { () throws(DeviceReadError) in try currentDisplays() },
-        audioInputs: Result { () throws(DeviceReadError) in try currentAudioInputs() },
-        outputFolder: probeOutputFolder(settings.outputFolderURL(homeFolder: homeFolder)))
+/// The probes of the ready check, so a test can stand in for this Mac.
+/// Everything that touches a file runs off the main thread; reading the
+/// displays needs the main one.
+public struct ReadyCheckProbes: Sendable {
+    public var screenRecording: @Sendable () async -> PermissionProbe
+    public var microphonePermission: @Sendable () async -> Bool
+    public var displays: @MainActor @Sendable () -> Result<[DisplayInfo], DeviceReadError>
+    public var audioInputs: @Sendable () -> Result<[AudioInputInfo], DeviceReadError>
+    public var outputFolder: @Sendable (URL) -> OutputFolderProbe
+
+    public init(
+        screenRecording: @escaping @Sendable () async -> PermissionProbe,
+        microphonePermission: @escaping @Sendable () async -> Bool,
+        displays: @escaping @MainActor @Sendable () -> Result<[DisplayInfo], DeviceReadError>,
+        audioInputs: @escaping @Sendable () -> Result<[AudioInputInfo], DeviceReadError>,
+        outputFolder: @escaping @Sendable (URL) -> OutputFolderProbe
+    ) {
+        self.screenRecording = screenRecording
+        self.microphonePermission = microphonePermission
+        self.displays = displays
+        self.audioInputs = audioInputs
+        self.outputFolder = outputFolder
+    }
+
+    /// This Mac. A permission that was never asked for is requested, so macOS
+    /// shows its prompt; a missing output folder is created.
+    public static let system = ReadyCheckProbes(
+        screenRecording: probeScreenRecording,
+        microphonePermission: probeMicrophonePermission,
+        displays: { Result { () throws(DeviceReadError) in try currentDisplays() } },
+        audioInputs: { Result { () throws(DeviceReadError) in try currentAudioInputs() } },
+        outputFolder: probeOutputFolder)
 }
 
-/// Probes this Mac, as `probeReadyCheckFacts`, and judges what it found.
-@MainActor
-public func runReadyCheck(settings: Settings, homeFolder: URL) async -> ReadyCheckResult {
-    ReadyCheck.evaluate(await probeReadyCheckFacts(settings: settings, homeFolder: homeFolder), settings: settings)
+/// Runs the ready check's probes. The microphone permission is asked only
+/// when the audio mode records a microphone.
+@concurrent
+public func probeReadyCheckFacts(
+    settings: Settings, homeFolder: URL, probes: ReadyCheckProbes = .system
+) async -> ReadyCheckFacts {
+    let screenRecording = await probes.screenRecording()
+    let microphoneGranted = settings.effectiveAudioMode == .none ? nil : await probes.microphonePermission()
+    let displays = await probes.displays()
+    return ReadyCheckFacts(
+        screenRecording: screenRecording,
+        microphoneGranted: microphoneGranted,
+        displays: displays,
+        audioInputs: probes.audioInputs(),
+        outputFolder: probes.outputFolder(settings.outputFolderURL(homeFolder: homeFolder)))
 }
 
 /// Whether the Screen & System Audio Recording permission is granted, without

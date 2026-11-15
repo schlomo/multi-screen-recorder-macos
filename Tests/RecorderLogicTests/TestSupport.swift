@@ -9,7 +9,7 @@ enum DesignExample {
     ]
     static let audioInputs = [
         AudioInputInfo(name: "MacBook Pro Microphone", channelCount: 1, isDefault: true),
-        AudioInputInfo(name: "RØDE Wireless GO II RX", channelCount: 2, isDefault: false),
+        AudioInputInfo(name: "RØDE Wireless GO II RX", channelCount: 2, isDefault: false, transport: .usb),
     ]
 }
 
@@ -17,4 +17,16 @@ enum DesignExample {
 func repositoryFile(_ path: String) throws -> String {
     let root = URL(filePath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
     return try String(contentsOf: root.appending(path: path), encoding: .utf8)
+}
+
+extension Settings {
+    /// Fixed choices for tests that need a known resolution and audio mode:
+    /// auto mode off, 1080p and the default microphone.
+    static var manual: Settings {
+        var settings = Settings.defaults
+        settings.auto = false
+        settings.resolution = .p1080
+        settings.audioMode = .defaultMicrophone
+        return settings
+    }
 }

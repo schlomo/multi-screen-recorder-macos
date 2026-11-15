@@ -10,36 +10,44 @@ import RecorderLogic
 final class StartModel {
     let homeFolder: URL
     private let settingsFile: SettingsFile
+    @ObservationIgnored private let probes: ReadyCheckProbes
+    @ObservationIgnored private let settleTime: Duration
+    /// Runs an action once the window's content may change; in the app, when
+    /// the main run loop is in its default mode.
+    @ObservationIgnored private let whenContentMayChange: @MainActor (@escaping @MainActor () -> Void) -> Void
 
     private(set) var settings = Settings.defaults
-    private(set) var settingsError: String?
+    /// Set when the settings could not be saved; the choices still apply to this session.
+    private(set) var saveError: String?
     private(set) var whatWillBeRecorded: WhatWillBeRecorded?
     private(set) var readyCheck: ReadyCheckResult?
     private(set) var isChecking = false
     /// Counts the ready checks started, so only the newest shows its result.
     @ObservationIgnored private var checkNumber = 0
+    /// Counts the device changes noticed, so a refresh queued for the window
+    /// that a newer notice has overtaken does nothing.
+    @ObservationIgnored private var refreshNumber = 0
     @ObservationIgnored private var refreshTask: Task<Void, Never>?
-    /// A refresh waits for the main run loop's default mode; a further one is not queued.
-    @ObservationIgnored private var refreshIsWaiting = false
 
     /// How long the devices get to settle before they are read again: one
     /// change of a display or an audio device arrives as a burst of notices.
     static let deviceChangeSettleTime = Duration.milliseconds(300)
 
-    init(homeFolder: URL) {
+    init(
+        homeFolder: URL, probes: ReadyCheckProbes = .system, settleTime: Duration = deviceChangeSettleTime,
+        whenContentMayChange: @escaping @MainActor (@escaping @MainActor () -> Void) -> Void = whenMainRunLoopIsInDefaultMode
+    ) {
         self.homeFolder = homeFolder
+        self.probes = probes
+        self.settleTime = settleTime
+        self.whenContentMayChange = whenContentMayChange
         settingsFile = SettingsFile.standard(homeFolder: homeFolder)
     }
 
+    /// Reads the settings file, which is never refused (what it ignores is not shown), and checks.
     func load() {
-        do {
-            settings = try settingsFile.load()
-            settingsError = nil
-            checkAgain()
-        } catch {
-            settingsError = error.description
-            readyCheck = nil
-        }
+        settings = settingsFile.load().settings
+        checkAgain()
     }
 
     /// Changes a setting, saves the settings file and re-runs the ready check.
@@ -47,21 +55,11 @@ final class StartModel {
         edit(&settings)
         do {
             try settingsFile.save(settings)
+            saveError = nil
         } catch {
-            settingsError = error.description
-            return
+            saveError = error.description
         }
         checkAgain()
-    }
-
-    func resetToDefaults() {
-        do {
-            try settingsFile.save(.defaults)
-        } catch {
-            settingsError = error.description
-            return
-        }
-        load()
     }
 
     func chooseOutputFolder(_ folder: URL) {
@@ -82,16 +80,18 @@ final class StartModel {
     }
 
     /// Re-reads the devices and re-runs the ready check once the devices
-    /// have settled, once for a burst of changes.
+    /// have settled, once for a burst of changes. A refresh waits for the
+    /// main run loop's default mode; one that a newer notice has overtaken
+    /// by then does nothing.
     private func refreshSoon() {
-        guard settingsError == nil else { return }
+        refreshNumber += 1
+        let number = refreshNumber
         refreshTask?.cancel()
         refreshTask = Task {
-            try? await Task.sleep(for: Self.deviceChangeSettleTime)
-            guard !Task.isCancelled, !refreshIsWaiting else { return }
-            refreshIsWaiting = true
-            whenMainRunLoopIsInDefaultMode {
-                self.refreshIsWaiting = false
+            try? await Task.sleep(for: settleTime)
+            guard !Task.isCancelled else { return }
+            whenContentMayChange {
+                guard number == self.refreshNumber else { return }
                 self.checkAgain()
             }
         }
@@ -111,24 +111,21 @@ final class StartModel {
     /// stays; the window has no popup menu now (D41).
     func checkAgain() {
         whatWillBeRecorded = WhatWillBeRecorded(
-            settings: settings,
-            displays: Result { () throws(DeviceReadError) in try currentDisplays() },
-            audioInputs: Result { () throws(DeviceReadError) in try currentAudioInputs() },
-            outputFolder: nil)
+            settings: settings, displays: probes.displays(), audioInputs: probes.audioInputs(), outputFolder: nil)
         checkNumber += 1
         isChecking = true
         let number = checkNumber
         let settings = settings
         let homeFolder = homeFolder
+        let probes = probes
+        let whenContentMayChange = whenContentMayChange
         Task {
-            let facts = await probeReadyCheckFacts(settings: settings, homeFolder: homeFolder)
-            whenMainRunLoopIsInDefaultMode {
+            let facts = await probeReadyCheckFacts(settings: settings, homeFolder: homeFolder, probes: probes)
+            whenContentMayChange {
                 // A newer check has replaced this one and shows its own result.
                 guard number == self.checkNumber else { return }
                 self.readyCheck = ReadyCheck.evaluate(facts, settings: settings)
-                self.whatWillBeRecorded = WhatWillBeRecorded(
-                    settings: settings, displays: facts.displays, audioInputs: facts.audioInputs,
-                    outputFolder: facts.outputFolder)
+                self.whatWillBeRecorded = WhatWillBeRecorded(settings: settings, facts: facts)
                 self.isChecking = false
             }
         }

@@ -37,6 +37,6 @@ public enum GuideTrack: Equatable, Sendable {
     /// The guide tracks a display file has follow from the settings alone: a
     /// source that is missing is silence in its guide track.
     public static func tracks(for settings: Settings) -> [GuideTrack] {
-        (settings.audioMode == .none ? [] : [.microphones]) + (settings.systemAudio ? [.systemAudio] : [])
+        (settings.effectiveAudioMode == .none ? [] : [.microphones]) + (settings.systemAudio ? [.systemAudio] : [])
     }
 }

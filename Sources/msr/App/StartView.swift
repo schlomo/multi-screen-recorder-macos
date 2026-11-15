@@ -7,15 +7,11 @@ struct StartView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            if let error = model.settingsError {
-                SettingsErrorView(message: error) { model.resetToDefaults() }
-            } else {
-                if let section = model.whatWillBeRecorded { WhatWillBeRecordedView(section: section) }
-                Divider()
-                SettingsForm(model: model)
-                Divider()
-                ReadyCheckView(result: model.readyCheck, isChecking: model.isChecking) { model.checkAgain() }
-            }
+            if let section = model.whatWillBeRecorded { WhatWillBeRecordedView(section: section) }
+            Divider()
+            SettingsForm(model: model)
+            Divider()
+            ReadyCheckView(result: model.readyCheck, isChecking: model.isChecking) { model.checkAgain() }
             Divider()
             VStack(alignment: .leading, spacing: 4) {
                 Button("Start") {}
@@ -31,48 +27,56 @@ struct StartView: View {
     }
 }
 
-private struct SettingsErrorView: View {
-    let message: String
-    let reset: () -> Void
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Label("The settings file cannot be used", systemImage: "exclamationmark.triangle.fill")
-                .foregroundStyle(.red)
-                .font(.headline)
-            Text(message)
-                .textSelection(.enabled)
-                .fixedSize(horizontal: false, vertical: true)
-            Button("Reset to defaults", action: reset)
-        }
-    }
-}
-
 private struct SettingsForm: View {
     let model: StartModel
 
     var body: some View {
-        Form {
-            LabeledContent("Recording resolution") {
-                HStack {
-                    Slider(value: resolutionIndex, in: 0...Double(RecordingResolution.smallestFirst.count - 1), step: 1)
-                        .accessibilityLabel("Recording resolution")
-                        .accessibilityValue(model.settings.resolution.label)
-                    Text(model.settings.resolution.label).frame(width: 60, alignment: .leading)
-                        .accessibilityHidden(true)
+        VStack(alignment: .leading, spacing: 8) {
+            if let error = model.saveError {
+                Label(error, systemImage: "exclamationmark.triangle.fill")
+                    .foregroundStyle(.red)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Form {
+                Toggle("Auto", isOn: binding(\.auto))
+                if model.settings.auto {
+                    Text("Every display at Native, the audio mode Wired.")
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                } else {
+                    LabeledContent("Recording resolution") {
+                        HStack {
+                            Slider(value: resolutionIndex, in: 0...Double(RecordingResolution.smallestFirst.count - 1), step: 1)
+                                .accessibilityLabel("Recording resolution")
+                                .accessibilityValue(model.settings.resolution.label)
+                            Text(model.settings.resolution.label).frame(width: 60, alignment: .leading)
+                                .accessibilityHidden(true)
+                        }
+                    }
+                    LabeledContent("Audio mode") {
+                        VStack(alignment: .leading, spacing: 4) {
+                            HStack {
+                                Slider(value: audioModeIndex, in: 0...Double(AudioMode.allCases.count - 1), step: 1)
+                                    .accessibilityLabel("Audio mode")
+                                    .accessibilityValue(model.settings.audioMode.label)
+                                Text(model.settings.audioMode.label).frame(width: 130, alignment: .leading)
+                                    .accessibilityHidden(true)
+                            }
+                            Text(AudioMode.bluetoothAndVirtualNote)
+                                .font(.callout)
+                                .foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
                 }
-            }
-            Picker("Audio mode", selection: binding(\.audioMode)) {
-                ForEach(AudioMode.allCases, id: \.self) { Text($0.label) }
-            }
-            .pickerStyle(.radioGroup)
-            Toggle("System audio", isOn: binding(\.systemAudio))
-            LabeledContent("Output folder") {
-                HStack {
-                    Text(model.settings.outputFolder)
-                        .lineLimit(1)
-                        .truncationMode(.middle)
-                    Button("Choose…", action: chooseOutputFolder)
+                Toggle("System audio", isOn: binding(\.systemAudio))
+                LabeledContent("Output folder") {
+                    HStack {
+                        Text(model.settings.outputFolder)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                        Button("Choose…", action: chooseOutputFolder)
+                    }
                 }
             }
         }
@@ -84,6 +88,15 @@ private struct SettingsForm: View {
             set: { position in
                 guard let chosen = model.settings.resolution.choosing(sliderPosition: position) else { return }
                 model.change { $0.resolution = chosen }
+            })
+    }
+
+    private var audioModeIndex: Binding<Double> {
+        Binding(
+            get: { model.settings.audioMode.sliderIndex },
+            set: { position in
+                guard let chosen = model.settings.audioMode.choosing(sliderPosition: position) else { return }
+                model.change { $0.audioMode = chosen }
             })
     }
 
@@ -218,15 +231,6 @@ private struct ReadyCheckItemRow: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
-        }
-    }
-}
-
-extension AudioMode {
-    var label: String {
-        switch self {
-        case .none: "None"
-        case .defaultMicrophone: "Default microphone"
         }
     }
 }

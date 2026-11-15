@@ -56,15 +56,19 @@ public struct AudioInputInfo: Equatable, Sendable {
     /// The number of channels, or why it cannot be read; each input is read by itself.
     public var channelCount: Result<Int, DeviceReadError>
     public var isDefault: Bool
+    public var transport: AudioTransport
 
-    public init(name: String, channelCount: Result<Int, DeviceReadError>, isDefault: Bool) {
+    public init(
+        name: String, channelCount: Result<Int, DeviceReadError>, isDefault: Bool, transport: AudioTransport = .builtIn
+    ) {
         self.name = name
         self.channelCount = channelCount
         self.isDefault = isDefault
+        self.transport = transport
     }
 
-    public init(name: String, channelCount: Int, isDefault: Bool) {
-        self.init(name: name, channelCount: .success(channelCount), isDefault: isDefault)
+    public init(name: String, channelCount: Int, isDefault: Bool, transport: AudioTransport = .builtIn) {
+        self.init(name: name, channelCount: .success(channelCount), isDefault: isDefault, transport: transport)
     }
 
     /// "MacBook Pro Microphone (default)" or just the name.
@@ -87,13 +91,16 @@ public func unreadableRecordedInputs(_ audioInputs: [AudioInputInfo], settings: 
     }
 }
 
-/// The audio inputs a recording with these settings is judged by: none when
-/// it records no audio input, so audio inputs that cannot be read do not
-/// matter then.
+/// The audio inputs a recording with these settings is judged by: with the
+/// audio mode none, an empty list, whether or not the audio inputs can be
+/// read, as none of them is recorded; otherwise `audioInputs` as they are.
 public func audioInputsToJudge(
     _ audioInputs: Result<[AudioInputInfo], DeviceReadError>, settings: Settings
 ) -> Result<[AudioInputInfo], DeviceReadError> {
-    settings.audioMode == .none ? .success((try? audioInputs.get()) ?? []) : audioInputs
+    switch settings.effectiveAudioMode {
+    case .none: .success([])
+    case .defaultMicrophone, .wired, .allInputs: audioInputs
+    }
 }
 
 /// The text `msr list` prints.
@@ -113,7 +120,7 @@ public func renderList(
         let nameWidth = displays.map(\.display.name.count).max() ?? 0
         let sizeWidth = sizes.map(\.count).max() ?? 0
         for (index, numbered) in displays.enumerated() {
-            let frame = resolution.frameSize(forDisplay: numbered.display.pixelSize)
+            let frame = resolution.frameSize(forLooksLike: numbered.display.pointSize)
             lines.append(
                 "  " + padded(numbers[index], numberWidth)
                     + "  " + padded(numbered.display.name, nameWidth)
@@ -136,6 +143,6 @@ public func renderList(
     return lines.joined(separator: "\n") + "\n"
 }
 
-private func padded(_ text: String, _ width: Int) -> String {
+func padded(_ text: String, _ width: Int) -> String {
     text + String(repeating: " ", count: max(0, width - text.count))
 }

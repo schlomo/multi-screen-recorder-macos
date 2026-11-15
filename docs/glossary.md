@@ -7,8 +7,9 @@ no reusing a defined term for a second meaning (see
 
 Where a concept is designed but not yet implemented, say so explicitly
 rather than letting the definition imply it already exists. Built so
-far: the recording resolution, audio mode and system audio as settings,
-the ready check, and the pipeline for snapshot releases and releases.
+far: auto mode, the recording resolution, audio mode and system audio as
+settings, the ready check, and the pipeline for snapshot releases and
+releases.
 Nothing a recording produces exists yet (recording, recording folder,
 recording manifest, crash marker, display file, tick, timecode, audio
 track, audio file, guide track).
@@ -80,9 +81,9 @@ also ends its file, and a new one begins at once (D30).
 
 ## Frame size
 
-The size a display file is recorded at: the display's pixel size fitted
-into the recording resolution box, each side rounded down to an even
-number (D11, D25, D30).
+The size a display file is recorded at: the display's looks-like size
+fitted into the recording resolution box, each side rounded down to an
+even number (D11, D25, D30, D44).
 
 ## Tick
 
@@ -110,8 +111,29 @@ What the Mac plays. A separate switch, independent of the audio mode.
 
 ## Audio mode
 
-Which audio inputs are recorded: none, the default microphone, or all
-audio inputs.
+Which audio inputs are recorded, a slider of four steps: None (`none`),
+Default microphone (`default-microphone`), Wired (`wired`) and All
+(`all-inputs`). The default microphone is recorded in every audio mode
+but None, whatever it is (D44).
+
+## Wired
+
+The audio mode Wired records the default microphone plus every built-in
+and wired audio input: built-in, USB, FireWire, PCI, Thunderbolt, HDMI
+and DisplayPort, as Core Audio reports the transport type. Bluetooth,
+Bluetooth LE, virtual, aggregate, AirPlay, Continuity capture, an
+unknown transport and one that cannot be read are not wired. Auto mode's
+audio mode, and the default (D44).
+
+## Auto mode
+
+The setting `auto`, on by default: every display is recorded at Native
+and the audio mode is Wired, whatever the two sliders (`resolution`,
+`audioMode`) say; system audio, the output folder and the rest stay as
+set. The sliders' defaults are auto mode's choices, so turning auto mode
+off changes nothing until one is moved. In the window the switch "Auto"
+hides the sliders; on the command line `--auto` forces it for one run
+(D34, D44).
 
 ## Audio file
 
@@ -130,9 +152,24 @@ silence in its guide track (D31).
 
 ## Recording resolution
 
-The maximum box a display's picture is shrunk to fit: Native, 4K,
-1440p, 1200p, 1080p or 720p, turned upright for a portrait display. It
-never enlarges the picture (D11, D25).
+The maximum box a display's looks-like size is shrunk to fit: 4K,
+1440p, 1200p, 1080p or 720p, turned upright for a portrait display, or
+Native, which has no box. It never enlarges the picture (D11, D25, D44).
+
+## Native
+
+The recording resolution without a box: the size macOS shows as "looks
+like" for the display, never the size it is drawn at (D44).
+
+## Looks like
+
+macOS's word for a display's size in points, as in System Settings ›
+Displays; a column of the tables. What Native records (D44).
+
+## Drawn at
+
+The display's size in pixels, which a HiDPI mode makes larger than its
+looks-like size; a column of the tables. Never recorded (D44).
 
 ## Ready check
 

@@ -34,7 +34,7 @@ public struct StateFile: Sendable {
     public func save(_ state: AppState) throws(StateFileError) {
         do {
             try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
-            try state.json.write(to: url, options: .atomic)
+            try state.jsonData().write(to: url, options: .atomic)
         } catch {
             throw StateFileError(fileURL: url, problem: error.localizedDescription)
         }

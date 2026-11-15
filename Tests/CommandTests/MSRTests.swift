@@ -21,25 +21,129 @@ import Testing
     }
 
     private func msr(_ arguments: String..., home: String? = nil) throws -> CommandOutcome {
+        try msr(arguments, home: home)
+    }
+
+    private func msr(_ arguments: [String], home: String? = nil) throws -> CommandOutcome {
         try run(try buildProducts().appending(path: "msr"), arguments,
                 environment: ["HOME": home ?? self.home.url.path(percentEncoded: false)])
     }
 
-    @Test func settingsPrintsTheDefaultsAndWritesThem() throws {
+    private var settingsFileExists: Bool {
+        FileManager.default.fileExists(atPath: settingsFile.path(percentEncoded: false))
+    }
+
+    private func savedSettings() throws -> [String: Any] {
+        try #require(JSONSerialization.jsonObject(with: Data(contentsOf: settingsFile)) as? [String: Any])
+    }
+
+    @Test func settingsPrintsTheDefaultsAndWritesNothing() throws {
         defer { home.remove() }
         let outcome = try msr("settings")
         #expect(outcome.status == 0)
-        #expect(outcome.output.contains(#""requiredRecordingHours": 2"#))
-        #expect(try String(contentsOf: settingsFile, encoding: .utf8) == outcome.output)
+        #expect(outcome.output.contains(#""requiredRecordingHours" : 2"#))
+        #expect(outcome.output.contains(#""auto" : true"#))
+        #expect(outcome.output.contains(#""resolution" : "native""#))
+        #expect(outcome.output.contains(#""audioMode" : "wired""#))
+        #expect(outcome.errors.isEmpty)
+        #expect(!settingsFileExists)
     }
 
-    @Test func anUnusableSettingsFileExits78NamingTheKey() throws {
+    @Test func saveWritesTheEffectiveSettingsWhole() throws {
         defer { home.remove() }
-        try writeSettings(#"{"agc": true}"#)
+        let outcome = try msr("settings", "--system-audio", "off", "--save")
+        #expect(outcome.status == 0)
+        #expect(try String(contentsOf: settingsFile, encoding: .utf8) == outcome.output)
+        #expect(try savedSettings()["systemAudio"] as? Bool == false)
+    }
+
+    @Test func aResolutionSavedWithSaveTurnsAutoOff() throws {
+        defer { home.remove() }
+        #expect(try msr("settings", "--resolution", "1080p", "--save").status == 0)
+        let saved = try savedSettings()
+        #expect(saved["resolution"] as? String == "1080p")
+        #expect(saved["auto"] as? Bool == false)
+    }
+
+    @Test func anAudioModeSavedWithSaveTurnsAutoOff() throws {
+        defer { home.remove() }
+        #expect(try msr("settings", "--audio-mode", "all-inputs", "--save").status == 0)
+        let saved = try savedSettings()
+        #expect(saved["audioMode"] as? String == "all-inputs")
+        #expect(saved["auto"] as? Bool == false)
+    }
+
+    @Test func autoSavedWithSaveTurnsAutoOn() throws {
+        defer { home.remove() }
+        try writeSettings(#"{"auto": false, "resolution": "720p"}"#)
+        #expect(try msr("settings", "--auto", "--save").status == 0)
+        let saved = try savedSettings()
+        #expect(saved["auto"] as? Bool == true)
+        #expect(saved["resolution"] as? String == "720p")
+    }
+
+    @Test func autoOverridesAFileWithAutoOffForTheRunOnly() throws {
+        defer { home.remove() }
+        let content = #"{"auto": false}"#
+        try writeSettings(content)
+        #expect(try msr("settings", "--auto").output.contains(#""auto" : true"#))
+        #expect(try String(contentsOf: settingsFile, encoding: .utf8) == content)
+    }
+
+    @Test(arguments: [["--resolution", "720p"], ["--audio-mode", "none"]])
+    func autoWithAChoiceFlagIsAUsageError(choice: [String]) throws {
+        defer { home.remove() }
+        let outcome = try msr(["settings", "--auto"] + choice)
+        #expect(outcome.status == 64)
+        #expect(outcome.errors.contains("--auto cannot be combined with \(choice[0])"))
+        #expect(!settingsFileExists)
+    }
+
+    @Test func aSettingsFileWithAnUnknownKeyIsNeverRefused() throws {
+        defer { home.remove() }
+        try writeSettings(#"{"agc": true, "resolution": "720p"}"#)
         let outcome = try msr("settings")
-        #expect(outcome.status == 78)
-        #expect(outcome.errors.contains(#"unknown key "agc""#))
-        #expect(outcome.errors.contains(settingsFile.path(percentEncoded: false)))
+        #expect(outcome.status == 0)
+        #expect(outcome.errors == "Settings file: ignored agc (unknown key); using defaults for those.\n")
+        #expect(outcome.output.contains(#""resolution" : "720p""#))
+    }
+
+    @Test func aBrokenSettingsFileGivesTheDefaultsAndIsLeftAsItIs() throws {
+        defer { home.remove() }
+        try writeSettings("garbage")
+        let outcome = try msr("settings")
+        #expect(outcome.status == 0)
+        #expect(outcome.errors == "Settings file: ignored the whole file (not valid JSON); using defaults for those.\n")
+        #expect(outcome.output.contains(#""auto" : true"#))
+        #expect(try String(contentsOf: settingsFile, encoding: .utf8) == "garbage")
+    }
+
+    @Test func aSettingsFileWithAnInvalidValueIsNeverRefused() throws {
+        defer { home.remove() }
+        try writeSettings(#"{"audioMode": "loud"}"#)
+        let outcome = try msr("settings")
+        #expect(outcome.status == 0)
+        #expect(outcome.errors.contains("ignored audioMode (invalid value, expected one of none, default-microphone, wired, all-inputs)"))
+        #expect(outcome.output.contains(#""audioMode" : "wired""#))
+    }
+
+    @Test func aFileOfBeforeAutoModeIsReadWithoutAWord() throws {
+        defer { home.remove() }
+        try writeSettings(#"{"resolution": "native", "audioMode": "default-microphone"}"#)
+        let outcome = try msr("settings")
+        #expect(outcome.status == 0)
+        #expect(outcome.errors.isEmpty)
+        #expect(outcome.output.contains(#""audioMode" : "default-microphone""#))
+    }
+
+    @Test func aSaveThatCannotBeWrittenExits1NamingTheFile() throws {
+        defer { home.remove() }
+        // A plain file where the Library folder must be.
+        try Data().write(to: home.url.appending(path: "Library"))
+        let outcome = try msr("settings", "--save")
+        #expect(outcome.status == 1)
+        #expect(outcome.errors.contains("settings.json"))
+        #expect(outcome.errors.contains("cannot be written"))
     }
 
     @Test func anUnsetHomeExits78() throws {
@@ -54,6 +158,7 @@ import Testing
         try writeSettings(#"{"agc": true}"#)
         let outcome = try msr("version")
         #expect(outcome.status == 0)
+        #expect(outcome.errors.isEmpty)
         #expect(outcome.output == "development build (not bundled)\n")
     }
 

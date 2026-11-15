@@ -15,38 +15,53 @@ enum InputChannels: Equatable {
 public func currentAudioInputs() throws(DeviceReadError) -> [AudioInputInfo] {
     try audioInputs(
         devices: try audioDeviceIDs(), inputChannels: inputChannels, name: audioDeviceName,
+        transport: { audioTransport(coreAudioValue: audioDeviceTransportType($0)) },
         defaultInput: defaultInputDeviceID)
 }
 
 /// A device without input channels is asked nothing more, so it cannot fail
 /// the listing; one whose channels cannot be read is listed with the reason,
 /// as it may be an audio input. `name` gives nil for a device that
-/// disappeared. Without an audio input the default is not asked for: what
+/// disappeared; `transport` says how an input is connected. Without an audio input the default is not asked for: what
 /// Core Audio answers then has not been observed.
 func audioInputs(
     devices: [AudioObjectID],
     inputChannels: (AudioObjectID) -> InputChannels,
     name: (AudioObjectID) throws(DeviceReadError) -> String?,
+    transport: (AudioObjectID) -> AudioTransport,
     defaultInput: () throws(DeviceReadError) -> AudioObjectID
 ) throws(DeviceReadError) -> [AudioInputInfo] {
     var inputs: [(id: AudioObjectID, name: String, channelCount: Result<Int, DeviceReadError>)] = []
     for id in devices {
-        let channels = inputChannels(id)
-        if channels == .gone || channels == .count(0) { continue }
-        guard let name = try name(id) else { continue }
-        switch channels {
-        case .count(let count):
-            inputs.append((id, name, .success(count)))
-        case .unreadable(let reason):
-            inputs.append((id, name, .failure(
-                DeviceReadError("the audio device \(name) does not report its channels (\(reason))"))))
-        case .gone:
-            continue
+        var count = 0
+        var unreadableReason: String?
+        switch inputChannels(id) {
+        case .gone, .count(0): continue
+        case .count(let channels): count = channels
+        case .unreadable(let reason): unreadableReason = reason
         }
+        guard let name = try name(id) else { continue }
+        let channelCount: Result<Int, DeviceReadError> = unreadableReason.map {
+            .failure(DeviceReadError("the audio device \(name) does not report its channels (\($0))"))
+        } ?? .success(count)
+        inputs.append((id, name, channelCount))
     }
     guard !inputs.isEmpty else { return [] }
     let defaultID = try defaultInput()
-    return inputs.map { AudioInputInfo(name: $0.name, channelCount: $0.channelCount, isDefault: $0.id == defaultID) }
+    return inputs.map {
+        AudioInputInfo(
+            name: $0.name, channelCount: $0.channelCount, isDefault: $0.id == defaultID, transport: transport($0.id))
+    }
+}
+
+/// The transport type of a device, as Core Audio's four-character code;
+/// nil when it cannot be read.
+private func audioDeviceTransportType(_ id: AudioObjectID) -> UInt32? {
+    var address = address(kAudioDevicePropertyTransportType)
+    var value: UInt32 = 0
+    var size = UInt32(MemoryLayout<UInt32>.size)
+    let status = AudioObjectGetPropertyData(id, &address, 0, nil, &size, &value)
+    return status == noErr ? value : nil
 }
 
 /// Calls `changed` on the main actor whenever an audio device comes or goes
@@ -125,4 +140,27 @@ private func audioDeviceName(_ id: AudioObjectID) throws(DeviceReadError) -> Str
         throw DeviceReadError("the audio device \(id) does not report its name (Core Audio error \(status))")
     }
     return name.takeRetainedValue() as String
+}
+
+/// The transport of a Core Audio transport type; nil, a type that could not
+/// be read, is unreadable and any type not named here unknown.
+func audioTransport(coreAudioValue value: UInt32?) -> AudioTransport {
+    guard let value else { return .unreadable }
+    return switch value {
+    case kAudioDeviceTransportTypeBuiltIn: .builtIn
+    case kAudioDeviceTransportTypeUSB: .usb
+    case kAudioDeviceTransportTypeFireWire: .fireWire
+    case kAudioDeviceTransportTypePCI: .pci
+    case kAudioDeviceTransportTypeThunderbolt: .thunderbolt
+    case kAudioDeviceTransportTypeHDMI: .hdmi
+    case kAudioDeviceTransportTypeDisplayPort: .displayPort
+    case kAudioDeviceTransportTypeBluetooth: .bluetooth
+    case kAudioDeviceTransportTypeBluetoothLE: .bluetoothLE
+    case kAudioDeviceTransportTypeVirtual: .virtual
+    case kAudioDeviceTransportTypeAggregate, kAudioDeviceTransportTypeAutoAggregate: .aggregate
+    case kAudioDeviceTransportTypeAirPlay: .airPlay
+    case kAudioDeviceTransportTypeContinuityCaptureWired, kAudioDeviceTransportTypeContinuityCaptureWireless:
+        .continuityCapture
+    default: .unknown
+    }
 }

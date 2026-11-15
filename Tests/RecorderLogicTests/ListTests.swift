@@ -34,8 +34,8 @@ import Testing
 @Suite struct ListRenderingTests {
     static let designExample = """
         Displays
-          1  Built-in Retina Display   looks like 1728×1117, drawn at 3456×2234  records at 1670×1080
-          2  LG HDR 4K                 3840×2160                                 records at 1920×1080
+          1  Built-in Retina Display   looks like 1728×1117, drawn at 3456×2234  records at 1728×1116
+          2  LG HDR 4K                 3840×2160                                 records at 3840×2160
         Audio inputs
           MacBook Pro Microphone (default), 1 channel
           RØDE Wireless GO II RX, 2 channels
@@ -45,7 +45,7 @@ import Testing
 
     @Test func rendersExactlyAsTheDesign() {
         let rendered = renderList(
-            displays: numberDisplays(DesignExample.displays), resolution: .p1080,
+            displays: numberDisplays(DesignExample.displays), resolution: Settings.defaults.effectiveResolution,
             audioInputs: DesignExample.audioInputs, systemAudioAvailable: true)
         #expect(rendered == Self.designExample)
     }
@@ -59,9 +59,9 @@ import Testing
     @Test func onlyARecordedInputThatCannotBeReadCounts() {
         let unreadable = AudioInputInfo(name: "X", channelCount: .failure(DeviceReadError("no format")), isDefault: false)
         let unreadableDefault = AudioInputInfo(name: "Y", channelCount: .failure(DeviceReadError("no format")), isDefault: true)
-        #expect(unreadableRecordedInputs([unreadable], settings: .defaults).isEmpty)
-        #expect(unreadableRecordedInputs([unreadable, unreadableDefault], settings: .defaults) == [unreadableDefault])
-        var none = Settings.defaults
+        #expect(unreadableRecordedInputs([unreadable], settings: .manual).isEmpty)
+        #expect(unreadableRecordedInputs([unreadable, unreadableDefault], settings: .manual) == [unreadableDefault])
+        var none = Settings.manual
         none.audioMode = .none
         #expect(unreadableRecordedInputs([unreadableDefault], settings: none).isEmpty)
     }
@@ -80,7 +80,7 @@ import Testing
             .sizeText == "looks like 3440×1440, drawn at 6880×2880")
     }
 
-    @Test func theOwnersHiDPIDisplaysRecordAtTheirPixelSize() {
+    @Test func theOwnersHiDPIDisplaysRecordAtTheirLooksLikeSize() {
         let displays = numberDisplays([
             DisplayInfo(name: "DELL P3421W", pixelSize: FrameSize(width: 6880, height: 2880),
                         pointSize: FrameSize(width: 3440, height: 1440), isMain: true, originX: 0, originY: 0),
@@ -91,6 +91,11 @@ import Testing
             .split(separator: "\n")
         #expect(lines[1] == "  1  DELL P3421W     looks like 3440×1440, drawn at 6880×2880  records at 1920×802")
         #expect(lines[2] == "  2  Wacom One 13T   looks like 1920×1080, drawn at 3840×2160  records at 1920×1080")
+        let native = renderList(displays: displays, resolution: .native, audioInputs: [], systemAudioAvailable: true)
+            .split(separator: "\n")
+        #expect(lines.count == native.count)
+        #expect(native[1].hasSuffix("records at 3440×1440"))
+        #expect(native[2].hasSuffix("records at 1920×1080"))
     }
 
     @Test func rendersEmptySectionsAndUnavailableSystemAudio() {

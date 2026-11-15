@@ -85,6 +85,13 @@ public struct WhatWillBeRecorded: Equatable, Sendable {
                 ? DiskEstimate.gigabytesPerHour(DiskEstimate.systemAudioFileBytesPerHour) : Self.notRecorded))
     }
 
+    /// What the ready check's probes found, as the window and `msr check` show it.
+    public init(settings: Settings, facts: ReadyCheckFacts) {
+        self.init(
+            settings: settings, displays: facts.displays, audioInputs: facts.audioInputs,
+            outputFolder: facts.outputFolder)
+    }
+
     /// An input whose channels cannot be read says so; its GB/h is unknown if it is recorded.
     private static func audio(_ input: AudioInputInfo, settings: Settings) -> Audio {
         let isRecorded = settings.records(input)
@@ -101,7 +108,7 @@ public struct WhatWillBeRecorded: Equatable, Sendable {
     }
 
     private static func display(_ numbered: NumberedDisplay, settings: Settings) -> Display {
-        let frameSize = settings.resolution.frameSize(forDisplay: numbered.display.pixelSize)
+        let frameSize = settings.effectiveResolution.frameSize(forLooksLike: numbered.display.pointSize)
         return Display(
             number: numbered.number, name: numbered.display.name,
             looksLike: "\(numbered.display.pointSize)", drawnAt: "\(numbered.display.pixelSize)",
@@ -117,5 +124,36 @@ public struct WhatWillBeRecorded: Equatable, Sendable {
             + " \(DiskEstimate.gigabytes(bytesPerHour * hours))"
         let free = if case .usable(.bytes(let bytes)) = outputFolder { ", \(DiskEstimate.gigabytes(Double(bytes))) free" } else { "" }
         return "Total \(DiskEstimate.gigabytesPerHour(bytesPerHour)) GB/h. \(needed)\(free)."
+    }
+
+    /// The text `msr check` prints: the window's two tables and total line,
+    /// each table with its columns aligned.
+    public var text: String {
+        var lines = ["What will be recorded"]
+        if let displaysError {
+            lines.append("  \(displaysError)")
+        } else {
+            lines += Self.table(Self.displayColumns, displays.map {
+                ["\($0.number) \($0.name)", $0.looksLike, $0.drawnAt, $0.recordsAt, $0.gigabytesPerHour]
+            })
+        }
+        if let audioError { lines.append("  \(audioError)") }
+        lines += Self.table(Self.audioColumns, audio.map { [$0.name, $0.channels, $0.gigabytesPerHour] })
+        if let total { lines.append("  \(total)") }
+        lines += ["  \(outputFolder)", "  \(continuity)"]
+        return lines.joined(separator: "\n") + "\n"
+    }
+
+    private static func table(_ columns: [String], _ rows: [[String]]) -> [String] {
+        let widths = columns.indices.map { column in ([columns] + rows).map { $0[column].count }.max() ?? 0 }
+        return ([columns] + rows).map { row in
+            "  " + zip(row, widths).map { padded($0, $1) }.joined(separator: "  ").trimmingTrailingSpaces()
+        }
+    }
+}
+
+extension String {
+    fileprivate func trimmingTrailingSpaces() -> String {
+        String(reversed().drop { $0 == " " }.reversed())
     }
 }
