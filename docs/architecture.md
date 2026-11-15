@@ -82,6 +82,12 @@ D28).
   with a portrait display (D11, D25); a display whose frame size
   changes gets a new display file (D30); HEVC in `.mov`, no tick ever
   dropped, a timecode track in every file (D21, D31); always SDR (D24).
+- Displays (agreed, being built as B1, D45): a display is known by its
+  UUID; a stream starts only after a settle time; every frame is
+  checked against its display and a display showing another display's
+  picture ends its file loudly; every file ends at sleep, on a clock
+  that counts sleep. `msr record` shows the app's Dock icon and can be
+  stopped there; the app quits after Stop. The audio follows in B2.
 - Audio: none, the default microphone, wired (the default microphone
   plus every built-in and wired input) or all inputs, with system audio
   and AGC as separate switches (D12, D44); one audio file per source, every
