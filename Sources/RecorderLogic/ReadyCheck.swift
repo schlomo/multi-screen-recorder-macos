@@ -192,7 +192,6 @@ public enum ReadyCheck {
     }
 
     static func hoursText(_ hours: Double) -> String {
-        let number = hours == hours.rounded() ? String(Int(hours)) : String(hours)
-        return hours == 1 ? "1 hour" : "\(number) hours"
+        return hours == 1 ? "1 hour" : "\(numberText(hours)) hours"
     }
 }

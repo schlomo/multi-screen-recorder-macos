@@ -3,8 +3,8 @@ import Testing
 
 /// Runs scripts/publish-snapshot-release in a scratch checkout with one commit,
 /// a bundle and its zip, against a stub `gh` first on the PATH: it answers
-/// `gh pr view` with the given pull request, `gh release list` with no
-/// releases, and logs every call, so no network is involved.
+/// `gh pr view` with the given pull request, `gh release list` with the given
+/// release tags (none by default), and logs every call, so no network is involved.
 @Suite struct PublishSnapshotReleaseScriptTests {
     private let scratch: ScratchFolder
     private let checkout: URL
@@ -46,8 +46,12 @@ import Testing
         return outcome.output.trimmingCharacters(in: .newlines)
     }
 
-    /// Installs the stub `gh`, answering `gh pr view` with this pull request.
-    private func stubGH(state: String, headRefOid: String) throws {
+    /// Installs the stub `gh`, answering `gh pr view` with this pull request
+    /// and `gh release list` with these release tags.
+    private func stubGH(state: String, headRefOid: String, releaseTags: [String] = []) throws {
+        let releases = "[" + releaseTags.map { #"{"tagName": "\#($0)"}"# }.joined(separator: ", ") + "]"
+        let releaseList = scratch.url.appending(path: "releases.json")
+        try Data(releases.utf8).write(to: releaseList)
         let pullRequest = scratch.url.appending(path: "pr.json")
         try Data(#"{"state": "\#(state)", "headRefOid": "\#(headRefOid)"}"#.utf8).write(to: pullRequest)
         let gh = bin.appending(path: "gh")
@@ -56,7 +60,7 @@ import Testing
             echo "$*" >> '\(ghLog.path(percentEncoded: false))'
             case "$1 $2" in
                 "pr view") cat '\(pullRequest.path(percentEncoded: false))' ;;
-                "release list") echo '[]' ;;
+                "release list") cat '\(releaseList.path(percentEncoded: false))' ;;
             esac
 
             """.utf8).write(to: gh)
@@ -80,8 +84,23 @@ import Testing
         try stubGH(state: "MERGED", headRefOid: head)
         let outcome = try publish()
         #expect(outcome.status == 0, "\(outcome.errors)")
-        #expect(outcome.errors.contains("PR #7 is MERGED, not open; publishing nothing"))
-        #expect(try ghCalls() == ["pr view 7 --json state,headRefOid"])
+        #expect(outcome.errors.contains(
+            "PR #7 is MERGED, not open; publishing nothing and removing its snapshot release if one is left"))
+        #expect(try ghCalls() == ["pr view 7 --json state,headRefOid", "release list --limit 1000 --json tagName"])
+    }
+
+    @Test func aClosedPRLosesItsSnapshotRelease() throws {
+        defer { scratch.remove() }
+        try stubGH(state: "CLOSED", headRefOid: head, releaseTags: ["pr-6", "pr-7"])
+        let outcome = try publish()
+        #expect(outcome.status == 0, "\(outcome.errors)")
+        #expect(outcome.errors.contains(
+            "PR #7 is CLOSED, not open; publishing nothing and removing its snapshot release if one is left"))
+        #expect(try ghCalls() == [
+            "pr view 7 --json state,headRefOid",
+            "release list --limit 1000 --json tagName",
+            "release delete pr-7 --yes --cleanup-tag",
+        ])
     }
 
     @Test func aPRNowAtAnotherCommitPublishesNothing() throws {

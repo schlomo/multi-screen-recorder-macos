@@ -872,7 +872,7 @@ architect's reading.
 
 ## D37: The end-to-end test design is agreed (2026-11-14)
 
-- **Status:** in force; nothing built.
+- **Status:** in force, corrected in four points by D38; nothing built.
 - **Context:** The design for automated end-to-end tests
   (`docs/design/end-to-end-tests.md`) was proposed in PR #2, with the
   rule written into it that merging it is the owner's sign-off. The
@@ -889,6 +889,39 @@ architect's reading.
   asks of it ("What the recorder design must provide"); the tests are
   built after or with the recorder.
 - **Evidence:** [PR #2](https://github.com/schlomo/multi-screen-recorder-macos/pull/2).
+
+## D38: Corrections to the end-to-end test design (2026-11-14)
+
+- **Status:** in force by the merge of PR #4, which is the owner's
+  sign-off by the same rule as D37; nothing built.
+- **Context:** GitHub Copilot reviewed PR #2 after it was merged and
+  left five comments on `docs/design/end-to-end-tests.md`. The
+  architect checked each against the design and `recorder.md`; all
+  five are right. An adversarial review of the corrections found two
+  more passages of the same kind.
+- **Decision:** The agreed design (D37) changes in these points:
+  - The Mac's own microphone is asserted only as readable and listed,
+    like all of the Mac's own devices, not as "not silent": a muted
+    input or a quiet room is silent without anything being wrong.
+  - The time shown in a recorded frame may lag where the last picture
+    is repeated by design (D11, D21): by up to the length of a still
+    picture or a stall the scenario makes, and under load by a bound
+    the recorder design sets, with what picture a late tick carries and
+    how that is checked from outside the recorder. The click is matched
+    to its frame only where no picture is repeated.
+  - `SIGTERM` ends a recording as Stop does, finalized and with its
+    crash marker removed (`recorder.md`, "Command line"); `kill -9`
+    leaves the marker.
+  - The state file also holds the time itself, the sample rate and
+    input volume of every BlackHole device, mirroring, the main
+    display, and whether each of the Mac's own displays is on, with its
+    mode and rotation. The time is restored first, from the saved time and the
+    time elapsed since; how is listed under "Unknowns".
+- **Consequences:** None for anything built; the tests are not built
+  yet. The recorder PR's design gains one item: what picture a late
+  tick carries, and its bound.
+- **Evidence:** [PR #4](https://github.com/schlomo/multi-screen-recorder-macos/pull/4);
+  Copilot's review of [PR #2](https://github.com/schlomo/multi-screen-recorder-macos/pull/2).
 
 ## D39: Agents mark their reviewed PRs ready (2026-11-14)
 
