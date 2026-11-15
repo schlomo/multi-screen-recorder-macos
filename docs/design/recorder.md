@@ -203,7 +203,7 @@ every change:
 
 ```json
 {
-  "app": "Multi Screen Recorder 0.4.0 (a1b2c3d)",
+  "app": "Multi Screen Recorder 0.20261115.4 (a1b2c3d)",
   "state": "recording",
   "started": "2026-11-12T14:03:05.120+01:00",
   "settings": { "resolution": "1080p", "audioMode": "default-microphone", "systemAudio": true },
@@ -600,7 +600,7 @@ Details the design left open, as built and confirmed by the owner
 output folder must start with `/` or `~`; the two number settings must
 be greater than 0; a settings file that cannot be used makes every
 command that reads the settings exit 78. `msr version` prints the full
-version string and the commit, such as `0.2.0-dev+a1b2c3d (a1b2c3d)`,
+version string and the commit, such as `0.20261115.2-dev+a1b2c3d (a1b2c3d)`,
 from the bundle's Info.plist keys `MSRVersion` and `MSRCommit`;
 outside a bundle it prints `development build (not bundled)`. The
 settings file is found through `HOME`. The disk estimate follows its

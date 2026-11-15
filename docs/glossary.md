@@ -155,7 +155,7 @@ is merged (D4).
 ## Release
 
 The GitHub release published by each merge to `main`, except a merge
-that changes only Markdown files, which publishes nothing (D4, D23).
+that changes only Markdown files, which publishes nothing (D4, D23, D42).
 
 ## v1
 

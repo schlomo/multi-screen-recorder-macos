@@ -38,7 +38,7 @@ import Testing
     }
 
     @Test func theIssueURLCarriesTheFormFields() throws {
-        let url = CrashReport.issueURL(crashReportName: newer, version: "0.4.0 (a1b2c3d)", macOSVersion: "Version 26.1 (Build 25B78)")
+        let url = CrashReport.issueURL(crashReportName: newer, version: "0.20261115.4 (a1b2c3d)", macOSVersion: "Version 26.1 (Build 25B78)")
         let components = try #require(URLComponents(url: url, resolvingAgainstBaseURL: false))
         #expect(components.scheme == "https")
         #expect(components.host == "github.com")
@@ -47,7 +47,7 @@ import Testing
         #expect(query == [
             "template": "crash-report.yml",
             "title": "Crash: \(newer)",
-            "version": "0.4.0 (a1b2c3d)",
+            "version": "0.20261115.4 (a1b2c3d)",
             "macos": "Version 26.1 (Build 25B78)",
         ])
     }

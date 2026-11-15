@@ -18,7 +18,7 @@ import Testing
             "CFBundleExecutable": "msr",
             "CFBundleIdentifier": "org.schapiro.multiscreenrecorder.test",
             "CFBundlePackageType": "APPL",
-            "MSRVersion": "0.9.0-dev+abcdef0",
+            "MSRVersion": "0.20261115.9-dev+abcdef0",
             "MSRCommit": "abcdef0",
         ]
         try PropertyListSerialization.data(fromPropertyList: plist, format: .xml, options: 0)
@@ -33,7 +33,7 @@ import Testing
         defer { scratch.remove() }
         let outcome = try version(of: bundledMSR)
         #expect(outcome.status == 0)
-        #expect(outcome.output == "0.9.0-dev+abcdef0 (abcdef0)\n")
+        #expect(outcome.output == "0.20261115.9-dev+abcdef0 (abcdef0)\n")
     }
 
     @Test func aLinkToTheBundledMSRShowsTheSameVersion() throws {
@@ -44,6 +44,6 @@ import Testing
         try FileManager.default.createSymbolicLink(at: link, withDestinationURL: bundledMSR)
         let outcome = try version(of: link)
         #expect(outcome.status == 0)
-        #expect(outcome.output == "0.9.0-dev+abcdef0 (abcdef0)\n")
+        #expect(outcome.output == "0.20261115.9-dev+abcdef0 (abcdef0)\n")
     }
 }

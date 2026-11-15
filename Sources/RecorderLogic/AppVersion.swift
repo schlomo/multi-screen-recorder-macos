@@ -4,7 +4,7 @@ public struct AppVersion: Equatable, Sendable, CustomStringConvertible {
     public static let versionKey = "MSRVersion"
     public static let commitKey = "MSRCommit"
 
-    /// The full version string, such as `0.3.0-pr2+a1b2c3d`; nil outside a bundle.
+    /// The full version string, such as `0.20261115.3-pr2+a1b2c3d`; nil outside a bundle.
     public let version: String?
     public let commit: String?
 

@@ -97,14 +97,19 @@ finish, not the order of the pushes (see "Accepted risks").
 hanging test fails the job instead of holding a runner for GitHub's
 six hours.
 
-**Versions** (D23) count the commits on `main`, N:
+**Versions** (D42) carry the committer date of HEAD in UTC, DATE as
+YYYYMMDD, and the number of commits on `main`, N:
 
 | Build | Version |
 |---|---|
-| Release from `main` | `0.<N>.0`, tag `v0.<N>.0` |
-| Snapshot of PR n | `0.<N+1>.0-pr<n>+<commit>` |
-| Local build | `0.<N+1>.0-dev+<commit>` |
+| Release from `main` | `0.<DATE>.<N>`, tag `v0.<DATE>.<N>` |
+| Snapshot of PR n | `0.<DATE>.<N+1>-pr<n>+<commit>` |
+| Local build | `0.<DATE>.<N+1>-dev+<commit>` |
 
+A snapshot or local build with uncommitted changes to tracked files
+gets `.dirty` after the commit (`+<commit>.dirty`); untracked files do
+not count, and a release of such a checkout stops. `scripts/sign-app`
+accepts `.dirty` only on a local build, so a snapshot is never dirty.
 N grows with every commit on `main`, including Markdown-only ones that
 publish nothing, so release numbers can skip but never repeat. The
 version is computed once, by `scripts/version` in `scripts/build-app`,

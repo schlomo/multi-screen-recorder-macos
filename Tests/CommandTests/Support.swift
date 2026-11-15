@@ -90,10 +90,10 @@ enum InfoPlistDamage: CaseIterable, Sendable {
         switch self {
         case .truncated:
             let whole = try PropertyListSerialization.data(
-                fromPropertyList: ["MSRVersion": "0.2.0-dev+abcdef0"], format: .xml, options: 0)
+                fromPropertyList: ["MSRVersion": "0.20261115.2-dev+abcdef0"], format: .xml, options: 0)
             try whole.prefix(whole.count / 2).write(to: url)
         case .arrayAtTheRoot:
-            try PropertyListSerialization.data(fromPropertyList: ["0.2.0-dev+abcdef0"], format: .xml, options: 0)
+            try PropertyListSerialization.data(fromPropertyList: ["0.20261115.2-dev+abcdef0"], format: .xml, options: 0)
                 .write(to: url)
         }
     }

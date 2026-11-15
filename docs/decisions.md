@@ -398,7 +398,7 @@ architect's reading.
 ## D23: Pipeline: pre-release per PR, versions count commits, the build never sees the secret (2026-11-12)
 
 - **Status:** superseded in part by D29 (which script signs, and in
-  which job)
+  which job), and in part by D42 (the version scheme)
 - **Context:** D4 left the version format and the kind of snapshot
   release open. The owner agreed to the proposals, to "use filters" so
   that documentation pushed to `main` publishes nothing, and to
@@ -927,7 +927,8 @@ architect's reading.
 
 ## D39: Agents mark their reviewed PRs ready, after Copilot reviews the draft (2026-11-15)
 
-- **Status:** in force; extends D8.
+- **Status:** in force; extends D8; superseded in part by D43 (Copilot's
+  review is an optional extra)
 - **Context:** The owner's words, in order, in the architect session
   of 2026-11-14 and 2026-11-15:
   - About the PRs the architect opens: "so you mark them as ready when
@@ -1062,3 +1063,50 @@ architect's reading.
   [ASSUMED: two crashes seen, reproduction rate unknown].
 - **Evidence:** this change; [recorder.md](design/recorder.md), "Ready
   check" and "The app".
+
+## D42: Versions by date and commit count (2026-11-15)
+
+- **Status:** in force; supersedes D23's version part.
+- **Context:** The owner, 2026-11-15: "we went from 0.4.0 to 0.9.0.
+  what would increase the patch? maybe rethink the version scheme? I'd
+  actually prefer X.<date>.<rev count> or something like this, we can
+  keep X=0 for now"; to the architect's proposal: "yes, to the version
+  proposal. It needs to add -dev to non-clean git checkout builds or
+  something else. UTC date is fine".
+- **Decision:** With N the commits on `origin/main` and DATE the
+  committer date of HEAD in UTC as YYYYMMDD: a release is
+  `0.<DATE>.<N>` (tag `v0.<DATE>.<N>`; HEAD must be `origin/main` and
+  tracked files unchanged), a snapshot of PR n
+  `0.<DATE>.<N+1>-pr<n>+<commit>`, a local build
+  `0.<DATE>.<N+1>-dev+<commit>`. Uncommitted changes to tracked files
+  append `.dirty` to the build metadata of a snapshot or local build
+  (`+<commit>.dirty`); untracked files do not count. The bundle's short
+  version is the numeric part. The 0 stays until the owner declares v1.
+- **Consequences:** `0.<DATE>.<N>` sorts above the earlier releases
+  v0.2.0, v0.4.0 and v0.9.0. A signing step never accepts a `.dirty`
+  snapshot. Release numbers still skip when Markdown-only commits land
+  on `main`.
+- **Evidence:** [design/delivery.md](design/delivery.md), "Versions".
+
+## D43: Copilot's review is an optional extra (2026-11-15)
+
+- **Status:** in force; supersedes D39 in part (the wait for Copilot's
+  review of the draft and the check that it was requested).
+- **Context:** The owner, 2026-11-15: "I have copilot free as OSS
+  developer so my limits are very low. treat Copilot as optional goodie
+  only." and "yes, draft PRs should trigger a copilot review, but not
+  subsequent pushes". Observed on PR #6 (opened as a draft under the
+  ruleset 15:48 Europe/Berlin, marked ready 15:54): no Copilot review
+  was requested, neither for the draft nor on marking ready.
+- **Decision:** Copilot's review is an optional extra; nobody waits for
+  it and its absence never blocks marking a PR ready. A review that has
+  arrived by the time the PR is otherwise ready is read in full by the
+  session that owns the PR and handled like an adversarial review's
+  finding; one that arrives later is handled the same way in a
+  follow-up if the PR is still open, otherwise noted in the backlog.
+  The ruleset stays (drafts reviewed, pushes not), and the standing
+  go-ahead for those reviews stays, as an optional extra.
+- **Consequences:** No request check, no wait and no "do not merge yet"
+  state. D39's rest stands: agents mark their fully reviewed PRs ready.
+- **Evidence:** [PR #6](https://github.com/schlomo/multi-screen-recorder-macos/pull/6),
+  the architect skill's `references/operating-rules.md`, "Copilot's review".

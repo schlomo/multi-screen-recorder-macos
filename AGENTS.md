@@ -13,14 +13,14 @@ Recorded by the setup skill; re-run it when any of this changes.
 - **Git:** GitHub, `schlomo/multi-screen-recorder-macos`, trunk `main`;
   squash merges, so a branch catches up by merging the trunk in.
 - **Agent writes:** push work branches and open draft PRs, and mark a
-  PR the agent opened ready once it is fully reviewed (D39): a
-  repository ruleset has Copilot review each draft PR once, and the
-  session that owns the PR handles that review like the
-  adversarial review's findings first. That the ruleset requests the
-  review is configured, not yet observed (UNVERIFIED; backlog).
-  Standing go-ahead for those Copilot reviews, billed as AI credits to
-  the PR's author, the owner's GitHub account. How: the architect
-  skill's `references/operating-rules.md`, "Copilot's review".
+  PR the agent opened ready once it is fully reviewed (D39). Copilot's
+  review is an optional extra (D43): a repository ruleset asks for one
+  review of each draft PR, nobody waits for it, and its absence never
+  blocks marking a PR ready; one that has arrived is handled by the
+  session that owns the PR like the adversarial review's findings.
+  Standing go-ahead for those optional Copilot reviews, billed as AI
+  credits to the PR's author, the owner's GitHub account. How: the
+  architect skill's `references/operating-rules.md`, "Copilot's review".
 - **Attribution:** AI-written commits name the model as co-author, PR
   descriptions carry a generated-with line.
 - **Time zone:** Europe/Berlin, stated with every time shown to people.
