@@ -126,7 +126,6 @@ extension CommandLineInterface {
             if debug { RecorderLog.enableDebug() }
             let settings = try flags.effectiveSettings(from: standardSettingsFile())
             let home = try homeFolderOrExit()
-            for line in CrashMarkers(homeFolder: home).finishLeftBehind() { standardError(line) }
             let facts = await probeReadyCheckFacts(proof: .captureOneFrame, settings: settings, homeFolder: home)
             let result = ReadyCheck.evaluate(facts, settings: settings)
             print(WhatWillBeRecorded(settings: settings, facts: facts).text, terminator: "\n")

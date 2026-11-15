@@ -3,7 +3,6 @@ public enum ProblemKind: Hashable, Sendable {
     case manifestNotWritten
     case displaysNotRead
     case freeSpaceNotRead
-    case crashMarkerNotRemoved
     /// `msr record` could not show its Dock icon.
     case dockIconNotShown
 }

@@ -37,18 +37,6 @@ import Testing
         #expect(try RecordingManifest(json: manifest.jsonData()) == manifest)
     }
 
-    @Test func aRecordingWhoseProcessIsGoneIsNotFinalized() {
-        var manifest = manifest()
-        manifest.files.append(.init(name: "a.mov", display: "A", displayUUID: "A", frameSize: FrameSize(width: 2, height: 2),
-                                    start: 0, timecode: "00:00:00:00"))
-        manifest.files.append(.init(name: "b.mov", display: "A", displayUUID: "A", frameSize: FrameSize(width: 2, height: 2),
-                                    start: 0, timecode: "00:00:00:00"))
-        manifest.files[0].state = .finalized
-        let marked = manifest.markedNotFinalized()
-        #expect(marked.state == .notFinalized)
-        #expect(marked.files.map(\.state) == [.finalized, .notFinalized])
-    }
-
     @Test func aFinalizedRecordingHasItsEndAndResult() {
         var manifest = manifest()
         manifest.finalize(ended: start + 60, timeZone: berlin)
@@ -59,7 +47,7 @@ import Testing
 
     @Test func aProblemAFileNotFinalizedOrAnErrorEventMakeTheResultProblems() {
         var told = manifest()
-        told.problems.append(RecordingProblem(at: 2_000_000_000, problem: "Cannot remove the crash marker", error: "denied"))
+        told.problems.append(RecordingProblem(at: 2_000_000_000, problem: "The displays cannot be read", error: "denied"))
         var notFinalized = manifest()
         notFinalized.files.append(.init(name: "a.mov", display: "A", displayUUID: "A", frameSize: FrameSize(width: 2, height: 2),
                                         start: 0, timecode: "00:00:00:00"))
@@ -92,14 +80,6 @@ import Testing
         let written = try RecordingManifest(json: manifest.jsonData())
         #expect(written.events.map(\.event) == [.sleep, .diskFull, .wake])
         #expect(written.problems.map(\.problem) == ["early", "late"])
-    }
-
-    /// The owner's recordings from before `problems` existed are still
-    /// marked not finalized by their crash markers.
-    @Test func aManifestWithoutProblemsOrEndIsRead() throws {
-        let old = #"{"app":"x","state":"recording","started":"s","settings":{"resolution":"native","audioMode":"wired","systemAudio":true},"files":[],"events":[]}"#
-        let manifest = try RecordingManifest(json: Data(old.utf8))
-        #expect(manifest.problems.isEmpty && manifest.ended == nil && manifest.result == nil)
     }
 
     @Test func eventTimesAreSecondsToTheMillisecond() {
@@ -209,23 +189,6 @@ import Testing
     }
 }
 
-@Suite struct CrashMarkerTests {
-    @Test func aMarkerNamesItsFolderAndIsNamedByItsProcess() throws {
-        let marker = CrashMarker(recordingFolder: "/Users/a/Movies/Multi Screen Recorder/2026-11-12 14.03.05")
-        #expect(try CrashMarker(json: marker.jsonData()) == marker)
-        #expect(CrashMarker.fileName(processID: 4711) == "4711.json")
-        #expect(CrashMarker.processID(fileName: "4711.json") == 4711)
-        #expect(CrashMarker.processID(fileName: "notes.txt") == nil)
-        #expect(CrashMarker.processID(fileName: "x.json") == nil)
-    }
-
-    @Test func theReportIsTheDesignsText() throws {
-        let marker = CrashMarker(recordingFolder: "<folder>")
-        let design = try repositoryFile("docs/design/recorder.md").replacingOccurrences(of: "\n", with: " ")
-        #expect(design.contains("(\"\(marker.report)\")"))
-    }
-}
-
 @Suite struct RecordingDurationTests {
     @Test(arguments: [("1h30m", 5400), ("45m", 2700), ("90s", 90), ("2h", 7200), ("1h0m5s", 3605), ("90", 5400), ("5", 300)])
     func hoursMinutesAndSeconds(text: String, seconds: Int) {
@@ -271,10 +234,10 @@ import Testing
 
     @Test func aProblemIsAnErrorAndListedWithItsTime() {
         var told = manifest([.finalized])
-        told.problems = [RecordingProblem(at: 65_000_000_000, problem: "Cannot remove the crash marker", error: "denied")]
+        told.problems = [RecordingProblem(at: 65_000_000_000, problem: "The displays cannot be read", error: "denied")]
         let summary = RecordingSummary(manifest: told, recordingFolder: "/r", seconds: 70)
         #expect(summary.endedWithError)
-        #expect(summary.text.hasSuffix("Problem at 1m05s: Cannot remove the crash marker: denied\n"))
+        #expect(summary.text.hasSuffix("Problem at 1m05s: The displays cannot be read: denied\n"))
     }
 
     @Test func aWriterThatFailedIsAnError() {

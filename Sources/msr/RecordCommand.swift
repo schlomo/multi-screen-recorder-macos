@@ -69,7 +69,6 @@ final class RecordCommandDelegate: NSObject, NSApplicationDelegate {
             endEventLoop()
             return
         }
-        for line in CrashMarkers(homeFolder: home).finishLeftBehind() { standardError(line) }
         let facts = await probeReadyCheckFacts(proof: .captureOneFrame, settings: settings, homeFolder: home)
         let result = ReadyCheck.evaluate(facts, settings: settings)
         print(WhatWillBeRecorded(settings: settings, facts: facts).text, terminator: "")

@@ -110,21 +110,6 @@ public struct RecordingManifest: Codable, Equatable, Sendable {
         case app, state, started, ended, result, settings, files, events, problems
     }
 
-    /// A manifest written before `ended`, `result` and `problems` existed
-    /// reads as one without them.
-    public init(from decoder: any Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        app = try container.decode(String.self, forKey: .app)
-        state = try container.decode(State.self, forKey: .state)
-        started = try container.decode(String.self, forKey: .started)
-        ended = try container.decodeIfPresent(String.self, forKey: .ended)
-        result = try container.decodeIfPresent(Result.self, forKey: .result)
-        settings = try container.decode(RecordedSettings.self, forKey: .settings)
-        files = try container.decode([DisplayFile].self, forKey: .files)
-        events = try container.decode([RecordingEvent].self, forKey: .events)
-        problems = try container.decodeIfPresent([RecordingProblem].self, forKey: .problems) ?? []
-    }
-
     /// `ended` and `result` are written as null until the recording is
     /// finalized; `events` and `problems` in the order of their time.
     public func encode(to encoder: any Encoder) throws {
@@ -174,17 +159,6 @@ public struct RecordingManifest: Codable, Equatable, Sendable {
         return String(format: "%04d-%02d-%02dT%02d:%02d:%02d.%03d%@%02d:%02d",
                       parts.year ?? 0, parts.month ?? 0, parts.day ?? 0, parts.hour ?? 0, parts.minute ?? 0,
                       parts.second ?? 0, fraction, sign, hours, minutes)
-    }
-
-    /// What the manifest says of a recording whose process is gone: it and
-    /// every file still being written are not finalized.
-    public func markedNotFinalized() -> RecordingManifest {
-        var manifest = self
-        if manifest.state == .recording { manifest.state = .notFinalized }
-        for index in manifest.files.indices where manifest.files[index].state == .recording {
-            manifest.files[index].state = .notFinalized
-        }
-        return manifest
     }
 
     public func jsonData() throws -> Data {

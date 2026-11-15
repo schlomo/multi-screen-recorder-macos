@@ -22,8 +22,8 @@ public struct RecorderStartError: Error, CustomStringConvertible {
     public let description: String
 }
 
-/// One recording: claims its recording folder, keeps its crash marker and
-/// recording manifest, keeps the Mac awake, and follows the displays as
+/// One recording: claims its recording folder, keeps its recording
+/// manifest, keeps the Mac awake, and follows the displays as
 /// they come, go and change, with one display capture per display file.
 /// Needs the AppKit event loop: macOS reports display changes only to a
 /// process running `NSApplication.run()`.
@@ -32,7 +32,6 @@ public final class Recorder {
     public let folder: URL
     private let context: RecordingContext
     private let settings: Settings
-    private let markers: CrashMarkers
     private weak var observer: (any RecorderObserver)?
     private var manifest: RecordingManifest
     private var tracker: DisplayTracker
@@ -74,16 +73,13 @@ public final class Recorder {
         }
         context = RecordingContext(folder: folder, started: started, timeZone: timeZone, clock: SharedClock(reading: reading), app: app)
         self.settings = settings
-        markers = CrashMarkers(homeFolder: homeFolder)
         self.observer = observer
         manifest = RecordingManifest(app: app, started: started, timeZone: timeZone, settings: settings)
         tracker = DisplayTracker(resolution: settings.effectiveResolution)
         do {
             try writeManifest()
-            try markers.write(recordingFolder: folder)
         } catch {
             // Nothing was recorded: the start leaves nothing behind.
-            try? markers.remove()
             try? FileManager.default.removeItem(at: folder.appending(path: RecordingNames.manifest))
             try? FileManager.default.removeItem(at: folder)
             throw RecorderStartError(description: "Cannot start the recording in \(folder.path(percentEncoded: false)): \(error)")
@@ -122,7 +118,7 @@ public final class Recorder {
                 freeBytes: free))
     }
 
-    /// Ends every display file, finalizes the recording manifest and removes the crash marker.
+    /// Ends every display file and finalizes the recording manifest.
     public func stop() async -> RecordingSummary {
         if !isStopped {
             isStopped = true
@@ -131,16 +127,8 @@ public final class Recorder {
             unregisterForChanges()
             for action in tracker.stopAll() { perform(action) }
             for task in stopping { await task.value }
-            let ended = Date()
-            manifest.finalize(ended: ended, timeZone: context.timeZone)
+            manifest.finalize(ended: Date(), timeZone: context.timeZone)
             try? writeManifest()
-            do {
-                try markers.remove()
-            } catch {
-                tell("Cannot remove the crash marker", error: "\(error)", kind: .crashMarkerNotRemoved)
-                manifest.finalize(ended: ended, timeZone: context.timeZone)
-                try? writeManifest()
-            }
             if let activity { ProcessInfo.processInfo.endActivity(activity) }
             activity = nil
         }

@@ -40,16 +40,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         startWindow?.makeKeyAndOrderFront(nil)
         NSApp.activate()
         model.load()
-        reportRecordingsNotFinalized(homeFolder: model.homeFolder)
         offerCrashReport(homeFolder: model.homeFolder)
-    }
-
-    /// Each recording whose process is gone without finalizing it.
-    private func reportRecordingsNotFinalized(homeFolder: URL) {
-        let lines = CrashMarkers(homeFolder: homeFolder).finishLeftBehind()
-        guard !lines.isEmpty else { return }
-        showAlert(lines.count == 1 ? "A recording was not finalized" : "Recordings were not finalized",
-                  lines.joined(separator: "\n\n"))
     }
 
     /// Start: the window closes and the Dock icon shows the elapsed time.

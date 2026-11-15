@@ -26,7 +26,7 @@ signature); if that fails it exits 71 (`EX_OSERR`).
 |---|---|---|
 | `msr list` | Shows displays, audio inputs and system audio | 0, 1 when the displays, the audio inputs or an audio input the settings record cannot be read |
 | `msr check [flags] [--debug]` | Prints "What will be recorded", then runs the ready check and prints each item; `--debug` adds detail on standard error and in the log | 0 ready, 1 not ready |
-| `msr record [flags] [--duration 1h30m] [--debug]` | Records the displays (B1 of the recording core; the audio comes with B2, D45). Without flags it does what Start in the window does, with the same settings file; it prints "What will be recorded" at its start, then runs the ready check, records until Ctrl-C, SIGTERM, SIGHUP, the duration or Stop in the status window (below), and prints the recording folder at the start and a summary at the end. It runs as a full AppKit app without a Dock icon (the `accessory` activation policy) until the ready check passed and the recording starts, then shows the icon; a run that is not ready shows none, and an icon macOS refuses is a problem, and the recording goes on (Ctrl-C stops it); while it records, the icon shows with its badge, and clicking it or Quit opens the status window as in the app (D45, D46). When it stops, for any reason, it first prints `Stopping the recording and finalizing the files…` on standard error, then finalizes and prints the summary; a Ctrl-C while it finalizes prints `Still finalizing the files…` and does nothing more. Before its ready check it reports the recordings not finalized, as `msr check` does (see "Crash marker"). It prints every event of the recording manifest as one line on standard error (see "Logging"). `--debug` adds detail on standard error and in the log. `--duration` takes hours, minutes and seconds (`1h30m`, `45m`, `90s`); a number without a suffix is minutes (`90` is 90 minutes) | 0 ok, 1 not ready, 3 ended with an error or could not start |
+| `msr record [flags] [--duration 1h30m] [--debug]` | Records the displays (B1 of the recording core; the audio comes with B2, D45). Without flags it does what Start in the window does, with the same settings file; it prints "What will be recorded" at its start, then runs the ready check, records until Ctrl-C, SIGTERM, SIGHUP, the duration or Stop in the status window (below), and prints the recording folder at the start and a summary at the end. It runs as a full AppKit app without a Dock icon (the `accessory` activation policy) until the ready check passed and the recording starts, then shows the icon; a run that is not ready shows none, and an icon macOS refuses is a problem, and the recording goes on (Ctrl-C stops it); while it records, the icon shows with its badge, and clicking it or Quit opens the status window as in the app (D45, D46). When it stops, for any reason, it first prints `Stopping the recording and finalizing the files…` on standard error, then finalizes and prints the summary; a Ctrl-C while it finalizes prints `Still finalizing the files…` and does nothing more. It prints every event of the recording manifest as one line on standard error (see "Logging"). `--debug` adds detail on standard error and in the log. `--duration` takes hours, minutes and seconds (`1h30m`, `45m`, `90s`); a number without a suffix is minutes (`90` is 90 minutes) | 0 ok, 1 not ready, 3 ended with an error or could not start |
 | `msr settings [flags]` | Without flags prints the effective settings as JSON (show); with any settings flag, `--auto` included, saves the run's effective settings into the settings file and prints them (change). The only command that writes the file; the window also writes it | 0, 1 when it cannot write the file |
 | `msr version` | Prints the version and commit | 0 |
 
@@ -405,16 +405,11 @@ creating it and refuses if it already exists. Recordings into different
 folders may run side by side (several `msr record`, or one beside the
 app); the app itself runs one at a time.
 
-**Crash marker.** While recording, a process keeps
-`~/Library/Application Support/Multi Screen Recorder/active-recordings/<process id>.json`
-naming its recording folder. On the next start, the app, `msr check`
-and `msr record` (before its recording starts) report each marker whose
-process is gone ("Recording <folder> was not finalized; its files are
-readable up to the last 2 seconds"), the app in a dialog, the commands
-on standard error, all three also in the unified log at `.notice`; set
-that manifest's state to `not finalized` and remove the marker. A
-manifest written before `ended`, `result` and `problems` existed is
-read as one without them.
+**A recording that did not finish.** A recording manifest without
+`ended` belongs to a recording that is running or did not finish, such
+as after a crash or a power loss; its files are readable up to the last
+2 seconds. Nothing is kept while recording to find it, and nothing is
+checked, reported or rewritten at the next start (D47).
 
 ## The app
 
@@ -775,8 +770,7 @@ display sleep while recording.
 ## Logging
 
 No log file of our own (D46). The app and `msr` write every event of
-the recording manifest, every problem and every report of a recording
-not finalized to the macOS unified log, subsystem
+the recording manifest and every problem to the macOS unified log, subsystem
 `org.schapiro.multiscreenrecorder`, at `.notice` (problems at
 `.error`), levels macOS keeps on disk, with names (displays, folders)
 public, not redacted. `msr record` also prints each event as one line on
@@ -827,7 +821,7 @@ modes and which input each records (every transport type), settings read
 leniently with the line for standard error, flags (`--auto` against
 `--resolution` and `--audio-mode`) and their errors, the text `msr check`
 prints for "What will be recorded", file naming, manifest states,
-crash markers, the display tracker (numbers, the settle time, frame
+the display tracker (numbers, the settle time, frame
 size changes, mirroring, the main display, back-off, the display check's
 fault, a full disk, sleep and wake), the display check, the shared clock,
 the timecode (also on a daylight saving day and at a second frame rate),
@@ -846,7 +840,7 @@ crash report, display files written from synthetic frames and read
 back (constant frame rate, timecode, BT.709, fragments, a file never
 finalized), a display file's ticks with a stand-in writer (a failing
 writer, one that fell behind, a slow end), a stream stopped while it
-starts, crash markers in a scratch home, that an action
+starts, that an action
 waiting for the main run loop's default mode runs only there, the
 classification of Core Audio's transport types, and the ready check's
 probes with stand-ins (the output folder's file access is off the main
@@ -943,7 +937,7 @@ check's probes with a seam and the window's refresh with its tests. It
 captures nothing. The recording core builds the rest, in two PRs
 (D45): B1 `msr record`, Start and Stop, the display files with their
 timecode, display changes and the display check, the recording
-manifest, crash markers and the Dock badge; B2 the audio files, the
+manifest and the Dock badge; B2 the audio files, the
 guide tracks, system audio and the default microphone followed. Until
 B2, a display file has no guide tracks, and the window and `msr record`
 say under the table "This build records the displays only; audio
@@ -953,8 +947,7 @@ Built (the recording core's displays, B1, D45): `msr record` with
 `--duration`, Start and Stop in the app, the Dock icon, its badge and
 the status window also for `msr record`, the app quitting after Stop
 and not on its last window closing while it records, the ready check
-held while recording, the recording folder claim, crash markers and
-their handling by the app and `msr check`, the recording manifest with
+held while recording, the recording folder claim, the recording manifest with
 its display files and events, the shared clock, the tick grid with late
 ticks, display files (HEVC, fragments of 2 s, the timecode track,
 BT.709), the frame size, display identity by UUID, the settle time,
@@ -981,10 +974,7 @@ a problem was told, a file is not finalized or an event is `display stream faile
 behind`, `display file writer failed` or `disk full`; `at` is rounded to
 the millisecond; a display file whose name is taken (a new file within
 the same second) gets " (2)"; the timecode of tick 0 is t0's time of
-day rounded to the nearest frame; the crash marker holds
-`recordingFolder`, its report goes to standard error in `msr check` and
-into an alert in the app, and a manifest marked `not finalized` also
-marks its files still `recording`; after a full disk, new display files
+day rounded to the nearest frame; after a full disk, new display files
 start once the free space is above the low disk warning threshold;
 low disk space bounces the Dock icon until the app is activated; a
 frame's rectangle passes the display check within 0.5 points of its
