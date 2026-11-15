@@ -26,7 +26,7 @@ signature); if that fails it exits 71 (`EX_OSERR`).
 |---|---|---|
 | `msr list` | Shows displays, audio inputs and system audio | 0, 1 when the displays, the audio inputs or an audio input the settings record cannot be read |
 | `msr check [flags] [--debug]` | Prints "What will be recorded", then runs the ready check and prints each item; `--debug` adds detail on standard error and in the log | 0 ready, 1 not ready |
-| `msr record [flags] [--duration 1h30m] [--debug]` | Records the displays (B1 of the recording core; the audio comes with B2, D45). Without flags it does what Start in the window does, with the same settings file; it prints "What will be recorded" at its start, then runs the ready check, records until Ctrl-C, SIGTERM, SIGHUP, the duration or Stop in the status window (below), and prints the recording folder at the start and a summary at the end. It runs as a full AppKit app without a Dock icon (the `accessory` activation policy) until the ready check passed and the recording starts, then shows the icon; a run that is not ready shows none, and an icon macOS refuses is a problem, and the recording goes on (Ctrl-C stops it); while it records, the icon shows with its badge, and clicking it or Quit opens the status window as in the app (D45, D46). When it stops, for any reason, it first prints `Stopping the recording and finalizing the files…` on standard error, then finalizes and prints the summary; a Ctrl-C while it finalizes prints `Still finalizing the files…` and does nothing more. It prints every event of the recording manifest as one line on standard error (see "Logging"). `--debug` adds detail on standard error and in the log. `--duration` takes hours, minutes and seconds (`1h30m`, `45m`, `90s`); a number without a suffix is minutes (`90` is 90 minutes) | 0 ok (every file finalized, no display file ended by a failure, D47), 1 not ready, 3 when the recording manifest's `result` is `problems` or the recording could not start |
+| `msr record [flags] [--duration 1h30m] [--debug]` | Records the displays (B1 of the recording core; the audio comes with B2, D45). Without flags it does what Start in the window does, with the same settings file; it prints "What will be recorded" at its start, then runs the ready check, records until Ctrl-C, SIGTERM, SIGHUP, the duration or Stop in the status window (below), and prints the recording folder at the start and a summary at the end. It runs as a full AppKit app without a Dock icon (the `accessory` activation policy) until the ready check passed and the recording starts, then shows the icon; a run that is not ready shows none, and an icon macOS refuses is a problem, and the recording goes on (Ctrl-C stops it); while it records, the icon shows with its badge, and clicking it or Quit opens the status window as in the app (D45, D46). When it stops, for any reason, it first prints `Stopping the recording and finalizing the files…` on standard error, then finalizes and prints the summary; a Ctrl-C while it finalizes prints `Still finalizing the files…` and does nothing more. It prints every event of the recording manifest as one line on standard error (see "Logging"). `--debug` adds detail on standard error and in the log. `--duration` takes hours, minutes and seconds (`1h30m`, `45m`, `90s`); a number without a suffix is minutes (`90` is 90 minutes) | 0 ok (every file finalized, no display file ended by a failure, D47), 1 not ready, 3 when the recording manifest's `result` is `problems`, the finalized manifest could not be written, or the recording could not start |
 | `msr settings [flags]` | Without flags prints the effective settings as JSON (show); with any settings flag, `--auto` included, saves the run's effective settings into the settings file and prints them (change). The only command that writes the file; the window also writes it | 0, 1 when it cannot write the file |
 | `msr version` | Prints the version and commit | 0 |
 
@@ -379,7 +379,9 @@ each names its display or audio source where it has one (`display`).
 Their fields: `at`, `event`, `display`; `from` and `to` (the old and
 the new frame size) for `display frame size changed`; `mirrors` (the
 display mirrored) for `display mirroring started`; `error` (why) for
-`display stream failed` and `display file writer failed`. `state` is `recording`, `finalized` or `not finalized`.
+`display stream failed` and `display file writer failed`. The
+manifest's `state` is `recording` or `finalized`; a file's `state` is
+`recording`, `finalized` or `not finalized`.
 `ended` is the local end time, as `started`, and `result` is `ok` when
 every file is finalized and no display file was ended by a failure
 (`display stream failed`, `display file writer failed`, `disk full`,
@@ -724,11 +726,15 @@ stream and a display file (event `display connected`); one that
 vanishes has its file finalized (event `display disconnected`). A
 display that is asleep counts as disconnected; that macOS's display
 change callback fires when a display falls asleep is [ASSUMED]. When
-a display is unplugged, its stream ends first (error -3815), and
-macOS's display-change notice may come seconds later (8 s for the Wacom
-One in the owner's run of 2026-11-15): the display file ends with the
-stream, and the event `display disconnected` comes with the notice. A
-stream that fails finalizes its file and is restarted after 1 s,
+a display is unplugged, its stream ends first, with ScreenCaptureKit's
+`noCaptureSource` (-3815), and macOS's display-change notice may come
+seconds later (8 s for the Wacom One, observed in the owner's run of
+2026-11-15, `--debug` log). That stream end is no failure: the display
+file ends as on a disconnect, with no `display stream failed` event and
+no back-off; the event `display disconnected` comes with the notice. A
+display still listed one settle time after such a stream end gets a new
+stream, as after any change, without a failure event. Any other stream
+error is a failure: a stream that fails finalizes its file and is restarted after 1 s,
 backing off to 10 s (*data*), for as long as the display exists. Each
 gap is an event in the manifest. A display's stream starts, or starts
 again, only once the display has been unchanged for the settle time,
@@ -788,7 +794,7 @@ public, not redacted. `msr record` also prints each event as one line on
 standard error: the local time, the offset from the recording's start,
 the event and its display, and the details it has, such as
 `22:14:40 +9.2s display connected: Wacom One 13T` or
-`22:15:32 +61.3s display stream failed: LG (-3815)`. `--debug` (for
+`22:15:32 +61.3s display stream failed: LG (-3811)`. `--debug` (for
 `msr record` and `msr check`) adds detail lines (the tracker's actions,
 the displays as read, files started and ended, the ready check's facts)
 on standard error and at `.debug` in the log. The log of the last 2
@@ -980,9 +986,10 @@ for the architect to settle: the encoder's quality target (0.5) and
 ceiling (4 times the estimated rate); `msr record` prints `Recording
 into <folder>` at its start and, at its end, how long it recorded, each
 file with its state, each failure event and each problem; it ends with
-an error (exit 3) exactly when the manifest's `result` is `problems`
-(D47): a file is not finalized or a display file was ended by a
-failure; `at` is rounded to
+an error (exit 3) when the manifest's `result` is `problems` (D47): a
+file is not finalized or a display file was ended by a failure, and
+when the finalized manifest could not be written (the problem is told,
+the app shows an alert, and the file on disk keeps no `ended`); `at` is rounded to
 the millisecond; a display file whose name is taken (a new file within
 the same second) gets " (2)"; the timecode of tick 0 is t0's time of
 day rounded to the nearest frame; after a full disk, new display files
