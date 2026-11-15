@@ -95,10 +95,11 @@ lists displays and audio inputs before a run and asserts exactly only
 on the virtual ones it adds; for the Mac's own displays and audio
 inputs it asserts only that their files are readable and listed.
 
-**Started by a person, in that person's own session** (D35). A run adds
+**Run in a person's own session** (D35). A run adds
 displays, covers every display with a pattern and changes the default
-microphone: the Mac cannot be used meanwhile. An agent never starts
-one unasked (`AGENTS.md`, "Facts that bite"). Not part of
+microphone: the Mac cannot be used meanwhile. On the owner's Mac an
+agent may start one to test the roadmap's work (D48); elsewhere never
+unasked (`AGENTS.md`, "Facts that bite"). Not part of
 `scripts/test`, not part of the pipeline.
 
 ### Known content

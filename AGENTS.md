@@ -261,8 +261,11 @@ hoc, for a local check only).
   permission and captures one frame of a display, so macOS shows a
   prompt on the person's screen, and
   creates the output folder if it is missing; `msr record` and Start
-  in the app record the screens; `msr list` reads the devices. An agent runs
-  none of these on a person's Mac unasked. On start the app also reads
+  in the app record the screens; `msr list` reads the devices. An agent
+  runs these on the owner's Mac only to test the roadmap's work, into its
+  own scratch folder (`--output-folder`), deleting the recordings once
+  checked and never changing settings or permissions (D48); on anyone
+  else's Mac, never unasked. On start the app also reads
   `~/Library/Logs/DiagnosticReports`, may show the crash report dialog
   and open the browser and Finder, and may write `state.json` and a text
   copy under `~/Library/Application Support/Multi Screen Recorder`

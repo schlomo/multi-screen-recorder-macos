@@ -1323,3 +1323,50 @@ architect's reading.
   last 2 s, and a crash of `msr` is still offered as a crash report
   (D40).
 - **Evidence:** [design/recorder.md](design/recorder.md); PR #11.
+
+## D48: Agents run the recorder on the owner's Mac for tests (2026-11-15)
+
+- **Status:** in force; supersedes in part the rule that an agent runs
+  `msr record`, `msr check`, `msr list` and the app on a person's Mac
+  only when asked (`AGENTS.md`, "Facts that bite") and D37's "started
+  by a person" for the end-to-end tests.
+- **Context:** The owner, after merging PR #11: "keep going and try to
+  run more tests yourself without me to keep working on our roadmap".
+- **Decision:** The architect's reading: agents may run the built `msr`
+  (`record`, `check`, `list`) and the app on the owner's Mac to test
+  the roadmap's work, without asking each time. A run writes into the
+  agent's own scratch folder (`--output-folder`), never into the
+  owner's recordings, and the recordings are deleted once checked, as
+  they hold whatever the owner's screens show. An agent never changes
+  macOS settings or permissions; a run stopped by a permission prompt
+  is reported, not worked around.
+- **Consequences:** Capture is tested without the owner; display
+  changes need the end-to-end tests' virtual displays (`backlog.md`).
+- **Evidence:** the PR "Recording core B2".
+
+## D49: The recording core's audio (B2) (2026-11-15)
+
+- **Status:** in force. Built in the PR "Recording core B2".
+- **Context:** The architect's design text for B2, in the session of
+  2026-11-15. The owner: "B2 and then analyze drift - fine", "yes, each
+  channel = mono track", "with that B2 is good for me"; on gaps D46
+  point 7.
+- **Decision:** One audio file per recorded audio source, one mono
+  track per channel, system audio one stereo track from a small
+  ScreenCaptureKit stream on the main display that moves to the new
+  main display when its display goes; guide tracks "Microphones" (the
+  sum of the recorded channels divided by √n, clamped) and "System
+  audio" in every display file; the default microphone followed (D34);
+  an audio file placed by sample count from a tick; the clock drift
+  measured per audio file as `clockDriftPpm` and corrected in a later
+  PR; a gap detected above 32 ms (one buffer is about 10.7 ms) and
+  handled by D46 point 7; `/` and `:` in a device name become `-`, a
+  duplicate name gets " (2)"; every audio file carries the reel name
+  and metadata items as a display file does. The architect's calls in
+  it: the gain of the guide mix, the names, the 32 ms.
+- **Consequences:** Until the drift is corrected, an audio input with
+  its own clock drifts against the display files (up to 0.42 s an hour
+  measured).
+- **Evidence:** [design/recorder.md](design/recorder.md), "Audio"; the
+  experiments of 2026-11-15 in
+  [design/end-to-end-tests.md](design/end-to-end-tests.md).
