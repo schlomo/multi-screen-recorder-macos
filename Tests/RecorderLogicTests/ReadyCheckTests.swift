@@ -144,6 +144,29 @@ import Testing
         #expect(result.items.contains { $0.title.hasPrefix("Free disk space") })
     }
 
+    /// No input recorded: the Microphone permission is no part of the check.
+    @Test(arguments: AudioMode.allCases)
+    func withoutAnyAudioInputThereIsNoMicrophonePermissionItem(mode: AudioMode) {
+        var settings = Settings.manual
+        settings.audioMode = mode
+        let result = ReadyCheck.evaluate(facts(microphoneGranted: nil, audioInputs: []), settings: settings)
+        #expect(result.isReady)
+        #expect(!result.items.contains { $0.title == "Microphone permission" })
+    }
+
+    @Test func aRecordedInputWithoutThePermissionFails() {
+        let result = ReadyCheck.evaluate(facts(microphoneGranted: false), settings: .manual)
+        #expect(result.items.contains { $0.title == "Microphone permission" && !$0.passed })
+        #expect(!result.isReady)
+    }
+
+    @Test func aPresentButNotRecordedInputNeedsNoPermission() {
+        let notDefault = [AudioInputInfo(name: "USB", channelCount: 1, isDefault: false, transport: .usb)]
+        let result = ReadyCheck.evaluate(facts(microphoneGranted: nil, audioInputs: notDefault), settings: .manual)
+        #expect(result.isReady)
+        #expect(!result.items.contains { $0.title == "Microphone permission" })
+    }
+
     @Test func withoutAnyAudioInputAndWithoutSystemAudioTheItemSaysSo() {
         var settings = Settings.manual
         settings.systemAudio = false

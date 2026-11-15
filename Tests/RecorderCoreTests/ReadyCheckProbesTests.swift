@@ -26,13 +26,14 @@ import Testing
     private func probes(
         _ calls: Calls, screenRecording: PermissionProbe = .granted,
         displays: Result<[DisplayInfo], DeviceReadError> = .success([]),
+        audioInputs: [AudioInputInfo] = [AudioInputInfo(name: "Microphone", channelCount: 1, isDefault: true)],
         outputFolder: OutputFolderProbe = .usable(.bytes(5))
     ) -> ReadyCheckProbes {
         ReadyCheckProbes(
             screenRecording: { calls.record("screenRecording"); return screenRecording },
             microphonePermission: { calls.record("microphonePermission"); return true },
             displays: { calls.record("displays"); return displays },
-            audioInputs: { calls.record("audioInputs"); return .success([]) },
+            audioInputs: { calls.record("audioInputs"); return .success(audioInputs) },
             outputFolder: { folder in
                 calls.record("outputFolder \(folder.path(percentEncoded: false))")
                 return outputFolder
@@ -50,7 +51,7 @@ import Testing
         #expect(facts.screenRecording == .notGranted)
         #expect(facts.microphoneGranted == true)
         #expect(facts.displays == .failure(DeviceReadError("none")))
-        #expect(facts.audioInputs == .success([]))
+        #expect(facts.audioInputs == .success([AudioInputInfo(name: "Microphone", channelCount: 1, isDefault: true)]))
         #expect(facts.outputFolder == .unusable("read-only"))
     }
 
@@ -76,6 +77,36 @@ import Testing
         let calls = Calls()
         let facts = await probeReadyCheckFacts(settings: settings, homeFolder: home, probes: probes(calls))
         #expect(facts.microphoneGranted == true)
+    }
+
+    /// The owner, 2026-11-15: "no mic should just work of course, in any mode."
+    @Test(arguments: AudioMode.allCases)
+    func withoutAnyAudioInputTheMicrophonePermissionIsNeitherAskedNorRead(mode: AudioMode) async {
+        var settings = Settings.defaults
+        settings.auto = false
+        settings.audioMode = mode
+        let calls = Calls()
+        let facts = await probeReadyCheckFacts(settings: settings, homeFolder: home, probes: probes(calls, audioInputs: []))
+        #expect(facts.microphoneGranted == nil)
+        #expect(!calls.names.contains("microphonePermission"))
+    }
+
+    @Test func noInputIsRecordedSoThePermissionIsNotAsked() async {
+        var settings = Settings.defaults
+        settings.auto = false
+        settings.audioMode = .defaultMicrophone
+        let calls = Calls()
+        let notDefault = [AudioInputInfo(name: "USB", channelCount: 1, isDefault: false, transport: .usb)]
+        let facts = await probeReadyCheckFacts(settings: settings, homeFolder: home, probes: probes(calls, audioInputs: notDefault))
+        #expect(facts.microphoneGranted == nil)
+        #expect(!calls.names.contains("microphonePermission"))
+    }
+
+    @Test func aRecordedInputAsksForThePermission() async {
+        let calls = Calls()
+        let facts = await probeReadyCheckFacts(settings: .defaults, homeFolder: home, probes: probes(calls))
+        #expect(facts.microphoneGranted == true)
+        #expect(calls.names.contains("microphonePermission"))
     }
 
     @Test func fileAccessIsOffTheMainThreadAndTheDisplaysAreOnIt() async {

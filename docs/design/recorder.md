@@ -166,8 +166,10 @@ saves, so a fresh Mac has none and the defaults apply:
 ## Ready check
 
 Items, in this order: the Screen & System Audio Recording permission,
-the Microphone permission (unless the audio mode, with auto mode the
-audio mode Wired, is `none`), the displays (at least one, each
+the Microphone permission (only when the recording records at least one
+audio input: with no audio input present, or none recorded under the
+audio mode, the item is left out and the permission is neither asked
+nor read), the displays (at least one, each
 readable), the chosen audio sources (each audio input the audio mode
 records readable; another that cannot be read does not count; with an
 audio mode but `none` the item says "no microphone" when no input is
@@ -188,8 +190,8 @@ folder, and free disk space in the output folder for
   crashed inside macOS after the default microphone was unplugged
   (owner's Mac, 2026-11-13), and the capture session an earlier ready
   check opened for a moment on every run is the cause [ASSUMED]. With
-  the permission granted but no microphone connected, the permission
-  item and the audio item pass, the latter saying "no microphone".
+  no microphone connected, the permission item is left out and the audio
+  item passes, saying "no microphone", whatever the permission.
   The audio inputs are read from Core Audio's device list, which
   creates no capture object; if that list, the default audio input or
   the name of an audio input cannot be read, the audio item fails with
@@ -744,10 +746,13 @@ input cannot be read. The app does not start, with the reason in an
 alert, when it cannot register for changes of the audio devices. When the free space cannot be read, the fix says "choose an
 output folder on another disk".
 
-Decided while building PR A, within D44, for the owner to confirm: `msr check` prints "What
-will be recorded" before the ready check's items, separated by a blank
-line, without the window's line "Recording continues …", and the Mac
-without an audio input is ready; a settings file that cannot be read as a whole is named "the whole
-file" in the line on standard error; an input's transport that cannot be
-read is not wired; `msr settings --save` that cannot write exits 1; the
-window shows a red line when a save fails.
+The owner ruled that a Mac without an audio input is ready in every
+audio mode (D44, point 5).
+
+Decided while building PR A, within D44, for the owner to confirm:
+`msr check` prints "What will be recorded" before the ready check's
+items, separated by a blank line, without the window's line "Recording
+continues …"; a settings file that cannot be read as a whole is named
+"the whole file" in the line on standard error; an input's transport
+that cannot be read is not wired; `msr settings --save` that cannot
+write exits 1; the window shows a red line when a save fails.

@@ -23,8 +23,8 @@ public enum OutputFolderProbe: Equatable, Sendable {
 /// What the probes found on this Mac, for the ready check to judge.
 public struct ReadyCheckFacts: Sendable {
     public var screenRecording: PermissionProbe
-    /// Whether the Microphone permission is granted; nil when the audio mode
-    /// needs no microphone, so it was not asked.
+    /// Whether the Microphone permission is granted; nil when the recording
+    /// records no audio input, so it was not asked.
     public var microphoneGranted: Bool?
     public var displays: Result<[DisplayInfo], DeviceReadError>
     public var audioInputs: Result<[AudioInputInfo], DeviceReadError>
@@ -82,12 +82,22 @@ public enum ReadyCheck {
     static let restartNote = "quit Multi Screen Recorder and start it again. "
     static let terminalNote = "If it was started from a terminal, then the terminal app needs the permission."
 
+    /// Whether a recording with these settings records at least one audio
+    /// input that could be listed. Without one, such as on a Mac with no
+    /// audio input, the Microphone permission is no part of the check.
+    public static func recordsAudioInput(
+        _ audioInputs: Result<[AudioInputInfo], DeviceReadError>, settings: Settings
+    ) -> Bool {
+        guard case .success(let inputs) = audioInputs else { return false }
+        return inputs.contains(where: settings.records)
+    }
+
     /// One item per cause: a free disk space item appears only when the
     /// displays and the audio inputs a recording records could be read and
     /// the output folder is usable.
     public static func evaluate(_ facts: ReadyCheckFacts, settings: Settings) -> ReadyCheckResult {
         var items = [screenRecordingItem(facts.screenRecording)]
-        if settings.effectiveAudioMode != .none {
+        if recordsAudioInput(facts.audioInputs, settings: settings) {
             items.append(microphoneItem(granted: facts.microphoneGranted ?? false))
         }
         items.append(displaysItem(facts.displays))
