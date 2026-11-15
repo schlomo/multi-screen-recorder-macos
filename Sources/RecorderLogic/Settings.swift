@@ -249,7 +249,8 @@ extension Settings {
     }
 }
 
-private func jsonString(_ text: String) -> String {
+/// `text` as a JSON string literal, quoted and escaped.
+func jsonString(_ text: String) -> String {
     var escaped = "\""
     for scalar in text.unicodeScalars {
         switch scalar {

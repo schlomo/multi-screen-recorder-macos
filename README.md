@@ -62,10 +62,10 @@ table of the displays, with what each looks like, the size it is
 drawn at and the size it records at; a table of the audio inputs and
 system audio, the ones not recorded dimmed; each with the disk space
 it needs per hour, the total and the free space below; the output
-folder), then the recording resolution, the audio mode, system audio,
-the output folder and the ready check: "Ready to record" when every item
-passes, otherwise each item with a fix for each failing one. Every
-change is saved at once; the ready check runs again after each change,
+folder), then the recording resolution (a slider), the audio mode
+(radio buttons), system audio, the output folder and the ready check:
+"Ready to record" when every item passes, otherwise each item with a
+fix for each failing one. Every change is saved at once; the ready check runs again after each change,
 when you come back to the app, when a display is plugged in, removed
 or changed, when an audio device is plugged in or removed, when the
 default audio input changes, and on "Check again".
@@ -155,6 +155,11 @@ fit together is in [docs/design/delivery.md](docs/design/delivery.md).
 
 Please report problems and ideas as
 [GitHub issues](https://github.com/schlomo/multi-screen-recorder-macos/issues).
+If the app quit unexpectedly, it offers to report the crash report on
+your next start: your browser opens a new issue (a GitHub account is
+needed) and Finder shows a copy of the crash report as a text file to
+drag into it. Issues are public, and a crash report contains your Mac's
+user name: check it first.
 
 ## Origins
 

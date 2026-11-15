@@ -828,7 +828,9 @@ architect's reading.
   without opening the microphone?", the owner answered "Yes, accept"
   (2026-11-13). Built in PR #1, merged 2026-11-14. Point 3 failed
   its re-test on 2026-11-14: the second crash came back (`backlog.md`,
-  "In flight").
+  "In flight"). The exception of that crash was thrown in a popup
+  menu's own window, so the window's sizing is not where it threw; see
+  D41.
 - **Context:** The owner's check of PR #1 on the Mac, 2026-11-13: the
   app crashed on "Check again" after the default microphone was
   unplugged, and crashed after HiDPI was switched in BetterDisplay
@@ -984,3 +986,79 @@ architect's reading.
   the option, `AGENTS.md` records it, and the architect skill's
   operating rules give the commands.
 - **Evidence:** this change.
+
+## D40: Crash reports through GitHub (2026-11-15)
+
+- **Status:** in force.
+- **Context:** The owner, 2026-11-15, on reporting crashes: "yes, crash
+  report, but quick and easy. I don't want to give my email if we can
+  avoid it. Think about what GH offers, or maybe Google Forms. Problem
+  with forms is that file upload required a Google signin. I'm fine
+  with requiring a Github signin for reporters". Later: "yes, state.json
+  is better. crash report via txt file is better", with the temporary
+  folder as location "deeply weird".
+- **Decision:** On start, the app offers the newest not yet offered
+  crash report of `msr`; the person's yes opens a new GitHub issue form
+  in the browser and shows a text copy of the crash report in Finder
+  (GitHub refuses `.ips` files: "File type .ips not supported"). The
+  copy lives in `~/Library/Application Support/Multi Screen Recorder/Crash Reports/`.
+  The mark of the last offered crash report lives in the state file
+  `state.json` beside the settings file, not in the user defaults and
+  not in the settings: it is testable through `HOME`, readable, and
+  kept apart from the person's settings, which it is not. A crash
+  report folder or state file that cannot be read, a failed copy and a
+  browser that cannot be opened show an alert. No email, no network
+  code in the app (D15).
+- **Consequences:** Reporters need a GitHub account; issues are public,
+  so the dialog warns that the crash report contains the user name.
+  Text copies stay in the folder until the person deletes them. The
+  issue form's rendering and the prefill by field ids are unverified
+  until the first use on GitHub. The end-to-end design's former "state
+  file" (D38) is called "restore file" there; D38 keeps the old word.
+- **Evidence:** this change; [recorder.md](design/recorder.md), "The
+  app".
+
+## D41: No popup menus in the start window (2026-11-15)
+
+- **Status:** in force; narrows the cause D36's point 3 stated.
+- **Context:** An analyst read macOS's unified log for the crash of
+  2026-11-14: `NSGenericException`, "The window has been marked as
+  needing another Layout Window pass, but it has already had more
+  Layout Window passes than there are views in the window.
+  <NSPopupMenuWindow …>", preceded by "-layoutSubtreeIfNeeded for
+  <NSTableRowView …> has continued for 300 iterations". The popup menu
+  was opened 1 to 7 s after a HiDPI switch (from BetterDisplay's menu
+  bar menu). Three facts are KNOWN: the exception names the popup menu
+  window; the app's code has no table view (the start window's tables
+  are SwiftUI `Grid`s); the only window the log records past the
+  layout limit is that popup window (5 "Marking window" lines, all
+  that address) [KNOWN, unified log and code]. That the loop, and so
+  the looping `NSTableRowView`, runs in the popup menu is [ASSUMED]
+  from those three facts: the log records only windows past the limit,
+  so a window under it would not appear. The owner, 2026-11-15: "yes, radio buttons for audio and slider for
+  resulution is good".
+- **Decision:** The start window has no popup menu: the audio mode is
+  radio buttons and the recording resolution a discrete slider (720p,
+  1080p, 1200p, 1440p, 4K, Native, smallest to largest, the chosen
+  one's name beside it). The window's sizing by its content's preferred
+  size and the hold of the check's result while a menu is open stay.
+  The cause: a layout loop in AppKit's popup menu window [ASSUMED,
+  see Context]; its trigger the change of the display's backing scale
+  [ASSUMED]; that it is a bug in AppKit or SwiftUI [CONJECTURE].
+- **Consequences:** The exception names the popup menu's own window,
+  not the start window [KNOWN, unified log], so the window's sizing is
+  not where it threw; a content change under
+  the menu as a trigger is not refuted. Whether the hold kept the
+  content still under the open menu is not shown by the log, and the
+  owner saw the table change with the menu open [ASSUMED from the
+  owner's words]. The hold stays. A popup menu added to the window
+  later would meet the same loop [ASSUMED]. AppKit menus are still
+  reachable from the app (the menu bar menus, the folder chooser's
+  popup buttons, the context menu of the selectable settings-error
+  text); whether they meet the same loop after a backing-scale change
+  is [CONJECTURE], untested. The owner's re-test of 2026-11-15 with a
+  build of this change: "otherwise looking good and I couldn't provoke
+  the crash"; evidence, not proof, as the crash is intermittent
+  [ASSUMED: two crashes seen, reproduction rate unknown].
+- **Evidence:** this change; [recorder.md](design/recorder.md), "Ready
+  check" and "The app".

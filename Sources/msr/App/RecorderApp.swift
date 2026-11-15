@@ -1,5 +1,6 @@
 import AppKit
 import RecorderCore
+import RecorderLogic
 import SwiftUI
 
 /// The app: an AppKit application with SwiftUI window content.
@@ -46,6 +47,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         startWindow?.makeKeyAndOrderFront(nil)
         NSApp.activate()
         model.load()
+        offerCrashReport(homeFolder: model.homeFolder)
     }
 
     func applicationDidBecomeActive(_ notification: Notification) {
@@ -65,10 +67,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func makeWindow(title: String, content: some View) -> NSWindow {
-        // The window takes its size from the content's preferred size. The app
-        // was ended by an exception in AppKit's window layout after a display's
-        // mode was switched; sizing the window by layout constraints is one of
-        // two candidates for the cause [ASSUMED], see `StartModel.checkAgain`.
+        // The window takes its size from the content's preferred size. The
+        // crash after a display's HiDPI switch was a layout loop in a popup
+        // menu's own window, not in this one; the start window has no popup
+        // menu (D41), see `StartModel.checkAgain`.
         let hosting = NSHostingController(rootView: content)
         hosting.sizingOptions = [.preferredContentSize]
         let window = NSWindow(contentViewController: hosting)
@@ -76,6 +78,49 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         window.styleMask = [.titled, .closable, .miniaturizable]
         window.isReleasedWhenClosed = false
         return window
+    }
+
+    /// Offers the newest crash report of `msr` that was not offered before:
+    /// opens a new GitHub issue in the browser and shows a text copy of the
+    /// crash report in Finder. The app opens no connection itself (D15).
+    private func offerCrashReport(homeFolder: URL) {
+        do {
+            let stateFile = StateFile(homeFolder: homeFolder)
+            let state = try stateFile.load()
+            guard let name = CrashReport.toOffer(
+                fileNames: try crashReportFileNames(homeFolder: homeFolder),
+                lastOffered: state.lastOfferedCrashReport)
+            else { return }
+            // Marked before the dialog, so a crash while it is open, or a quit, never offers it twice.
+            try stateFile.save(state.offering(name))
+            let alert = NSAlert()
+            alert.messageText = "Multi Screen Recorder quit unexpectedly"
+            alert.informativeText = "You can report it on GitHub, which needs a GitHub account. Your browser opens a new issue, and Finder shows a copy of the crash report as a text file for you to drag into it. Issues are public, and a crash report contains your Mac's user name: check it before you attach it."
+            alert.addButton(withTitle: "Report on GitHub")
+            alert.addButton(withTitle: "Not Now")
+            guard alert.runModal() == .alertFirstButtonReturn else { return }
+            let copy: URL
+            do { copy = try makeTextCopy(of: name, homeFolder: homeFolder) } catch {
+                showAlert("Cannot copy the crash report", error.localizedDescription)
+                return
+            }
+            let issue = CrashReport.issueURL(
+                crashReportName: name, version: runningVersion.description,
+                macOSVersion: ProcessInfo.processInfo.operatingSystemVersionString)
+            NSWorkspace.shared.activateFileViewerSelecting([copy])
+            if !NSWorkspace.shared.open(issue) {
+                showAlert("Cannot open the browser", "Open this address yourself:\n\(issue.absoluteString)")
+            }
+        } catch {
+            showAlert("Cannot offer the crash report", error.localizedDescription)
+        }
+    }
+
+    private func showAlert(_ message: String, _ informative: String) {
+        let alert = NSAlert()
+        alert.messageText = message
+        alert.informativeText = informative
+        alert.runModal()
     }
 
     private func makeMainMenu() -> NSMenu {

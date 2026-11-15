@@ -26,6 +26,22 @@ public enum RecordingResolution: String, CaseIterable, Sendable {
     case p1080 = "1080p"
     case p720 = "720p"
 
+    /// Every resolution from the smallest box to the largest, native last:
+    /// the order of the start window's slider.
+    public static let smallestFirst: [RecordingResolution] =
+        allCases.filter { $0.box != nil }.sorted { $0.box!.height < $1.box!.height } + [.native]
+
+    /// The position of this resolution on the slider, which runs over `smallestFirst`.
+    public var sliderIndex: Double { Double(Self.smallestFirst.firstIndex(of: self)!) }
+
+    /// The resolution the slider's `position` selects (rounded, kept in range),
+    /// or nil when that is this resolution: nothing to change, save or check.
+    public func choosing(sliderPosition position: Double) -> RecordingResolution? {
+        let index = min(max(Int(position.rounded()), 0), Self.smallestFirst.count - 1)
+        let chosen = Self.smallestFirst[index]
+        return chosen == self ? nil : chosen
+    }
+
     /// The box, or nil for native, which keeps the display's own size.
     public var box: FrameSize? {
         switch self {
