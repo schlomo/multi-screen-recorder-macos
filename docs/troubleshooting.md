@@ -25,7 +25,7 @@ One row per entry, the error text exactly as in the entry.
 | `package 'multi-screen-recorder-macos' is using Swift tools version 6.4.0 but the installed version is 6.3.3` | [Swift tools version newer than the CI runner's Xcode](#swift-tools-version-newer-than-the-ci-runners-xcode) |
 | `no 'async' operations occur within 'await' expression` | [Swift Argument Parser's async main from top-level code](#swift-argument-parsers-async-main-from-top-level-code) |
 | `The window has been marked as needing another Layout Window pass, but it has already had more Layout Window passes than there are views in the window.` | [Layout loop in a popup menu window after a HiDPI switch](#layout-loop-in-a-popup-menu-window-after-a-hidpi-switch) |
-| `Screen & System Audio Recording` prompt returns on every click of the window | [Screen recording prompt comes back with an ad hoc signed build](#screen-recording-prompt-comes-back-with-an-ad-hoc-signed-build) |
+| The prompt for the Screen & System Audio Recording permission comes back each time the window is clicked | [Screen recording prompt comes back with an ad hoc signed build](#screen-recording-prompt-comes-back-with-an-ad-hoc-signed-build) |
 
 ## Format
 
@@ -100,19 +100,22 @@ One row per entry, the error text exactly as in the entry.
 
 ## Screen recording prompt comes back with an ad hoc signed build
 
-- **Error:** none; the macOS prompt for the Screen & System Audio
-  Recording permission appears again each time the window is clicked
-  after it was denied.
+- **Error:** none; the prompt for the Screen & System Audio Recording
+  permission appears again each time the window is clicked after it was
+  denied.
 - **Symptom:** seen on 2026-11-15 with a build signed ad hoc
   (`scripts/build-app`, also an unchanged `main`), not with the release
-  signed by the project certificate.
+  signed by the project certificate (the signed release 0.4.0 did not
+  repeat the prompt: the owner's observation of 2026-11-15).
 - **Why:** [ASSUMED] an ad hoc signature gives the app no stable
   identity, so macOS does not remember the answer.
-- **Fix:** sign the local build with the project certificate in the
-  person's keychain:
-  `SIGNING_IDENTITY="<certificate name>" scripts/sign-app`.
-  `security find-identity -p codesigning` lists it; `-v` hides it
-  because it is self-signed.
+- **Fix:** after `scripts/build-app`, run `scripts/sign-app`: its
+  default identity matches the project certificate in the person's
+  keychain ([delivery.md](design/delivery.md)). Another certificate
+  name goes in `SIGNING_IDENTITY="<certificate name>"`.
+  `security find-identity -p codesigning` lists the certificate;
+  with `-v` it was not listed on 2026-11-15 (observed: self-signed,
+  `CSSMERR_TP_NOT_TRUSTED`).
 - **Verify:** click the window again after denying the permission; no
   second prompt.
 - **Observed:** 2026-11-15, ad hoc build of `main`; open.

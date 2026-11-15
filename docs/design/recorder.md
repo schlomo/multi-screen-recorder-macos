@@ -169,9 +169,8 @@ read does not count), the output folder, and free disk space in the output folde
   owner saw the table change with the menu open [ASSUMED from the
   owner's words]. The hold stays. The start window has no popup menu:
   the audio mode is radio buttons and the recording resolution a
-  slider (D41). It never
-  runs while a recording is running, activation included (for the
-  recorder PR to honour).
+  slider (D41). It never runs while a recording is running, activation
+  included (for the recorder PR to honour).
 
 ## Output on disk
 

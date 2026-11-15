@@ -1020,7 +1020,7 @@ architect's reading.
 
 ## D41: No popup menus in the start window (2026-11-15)
 
-- **Status:** in force; corrects the cause D36's point 3 stated.
+- **Status:** in force; narrows the cause D36's point 3 stated.
 - **Context:** An analyst read macOS's unified log for the crash of
   2026-11-14: `NSGenericException`, "The window has been marked as
   needing another Layout Window pass, but it has already had more
@@ -1028,7 +1028,12 @@ architect's reading.
   <NSPopupMenuWindow …>", preceded by "-layoutSubtreeIfNeeded for
   <NSTableRowView …> has continued for 300 iterations". The window that
   loops is the popup menu's own, opened 1 to 7 s after a HiDPI switch
-  (from BetterDisplay's menu bar menu), not the start window. The
+  (from BetterDisplay's menu bar menu), not the start window: the
+  start window has no table view (its tables are SwiftUI `Grid`s), and
+  the only window the log marks for layout is the popup menu window
+  the exception names (5 "Marking window" lines, all that address), so
+  the looping `NSTableRowView` is the menu's [KNOWN, unified log and
+  code]. The
   owner, 2026-11-15: "yes, radio buttons for audio and slider for
   resulution is good".
 - **Decision:** The start window has no popup menu: the audio mode is
@@ -1046,11 +1051,12 @@ architect's reading.
   content still under the open menu is not shown by the log, and the
   owner saw the table change with the menu open [ASSUMED from the
   owner's words]. The hold stays. A popup menu added to the window
-  later would meet the same loop. AppKit menus are still reachable
+  later would meet the same loop [ASSUMED]. AppKit menus are still reachable
   from the app (the menu bar menus, the folder chooser's popup
   buttons, the context menu of the selectable settings-error text);
   whether they meet the same loop after a backing-scale change is
-  [CONJECTURE], untested. That the fix works is unverified until the
-  owner's re-test (HiDPI switch, window open).
+  [CONJECTURE], untested. The owner's re-test of 2026-11-15 with a
+  build of this change: "otherwise looking good and I couldn't provoke
+  the crash"; evidence, not proof, as the crash is intermittent.
 - **Evidence:** this change; [recorder.md](design/recorder.md), "Ready
   check" and "The app".

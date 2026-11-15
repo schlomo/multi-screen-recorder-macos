@@ -62,9 +62,9 @@ table of the displays, with what each looks like, the size it is
 drawn at and the size it records at; a table of the audio inputs and
 system audio, the ones not recorded dimmed; each with the disk space
 it needs per hour, the total and the free space below; the output
-folder), then the recording resolution (a slider), the audio mode (radio
-buttons), system audio, the output folder and the ready check: "Ready to record" when every item
-passes, otherwise each item with a fix for each failing one. Every
+folder), then the recording resolution (a slider), the audio mode
+(radio buttons), system audio, the output folder and the ready check:
+"Ready to record" when every item passes, otherwise each item with a fix for each failing one. Every
 change is saved at once; the ready check runs again after each change,
 when you come back to the app, when a display is plugged in, removed
 or changed, when an audio device is plugged in or removed, when the

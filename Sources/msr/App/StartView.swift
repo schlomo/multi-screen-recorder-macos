@@ -59,6 +59,7 @@ private struct SettingsForm: View {
                         .accessibilityLabel("Recording resolution")
                         .accessibilityValue(model.settings.resolution.label)
                     Text(model.settings.resolution.label).frame(width: 60, alignment: .leading)
+                        .accessibilityHidden(true)
                 }
             }
             Picker("Audio mode", selection: binding(\.audioMode)) {
