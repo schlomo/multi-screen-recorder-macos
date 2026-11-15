@@ -508,7 +508,7 @@ Swift Argument Parser, Apple's own package for command lines.
 
 `scripts/test` runs the unit tests of `RecorderLogic`: the tick grid
 (which frame lands on which tick, still periods of 60 s and more, late
-ticks), geometry for every recording resolution and change case,
+ticks), geometry for every recording resolution (and their slider order) and change case,
 settings and flags and their errors, file naming, manifest states,
 crash markers, the version, the state file's content, the choice of
 the crash report to offer, the new-issue link (and that the issue form
