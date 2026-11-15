@@ -51,15 +51,18 @@ Still open from D34: what AGC does and whether it is on in auto mode;
    text, signed off before any brief, must cover:
    - The findings of 2026-11-15 (`docs/design/end-to-end-tests.md`):
      the wrong-display fault after a reconnect is reproducible with
-     virtual displays and survives every restart tried; each frame's
-     screen rectangle detects it, a screenshot of the display's area
-     still shows the right picture; a display's stable identity is
-     macOS's display UUID (the serial can be 0); a mode change is not a
-     reconnect and a stream configured to the looks-like size keeps
-     running, scaled; the frames are tagged BT.709 in 420v; a process
-     without the AppKit event loop is never told of display changes;
-     two of the owner's four microphones drift 50 and 117 parts per
-     million against the host clock, and macOS does not correct it.
+     virtual displays and survived every restart tried; a frame whose
+     screen rectangle was not its display's always carried the other
+     display's picture, and a screenshot of the display's area still
+     showed the right one; macOS's display UUID is the candidate for a
+     display's stable identity (the serial can be 0); a mode change is
+     not a reconnect, and a stream configured to the looks-like size
+     keeps running at that size, scaled, so a new frame size needs the
+     stream reconfigured or restarted (not tried); the frames in 420v
+     are tagged BT.709; a process without the AppKit event loop was
+     never told of display changes; two of the owner's four
+     microphones drift 50 and 117 parts per million against the host
+     clock, and an `AVCaptureSession`'s timestamps do not correct it.
    - The open questions in `docs/design/recorder.md`: whether Apple's
      file writer puts a timecode track into an audio-only file, clock
      drift (above), two audio inputs with the same name, device names a
@@ -129,7 +132,10 @@ Still open from D34: what AGC does and whether it is on in auto mode;
    tests by error class, what the recorder design must
    provide for them, the experiments that settle its unknowns, and its
    open questions. It is agreed with D35's rulings (D37). Nothing
-   of it is built; of the experiments, the first two have run. The
+   of it is built; of its experiments, those on virtual displays and
+   the audio drift have run (2026-11-13, 2026-11-15); the audio ones
+   (aggregate device, BlackHole drivers, a tone in system audio),
+   BetterDisplay's command line and the clock have not. The
    tests are started by a person, never unasked by an agent.
 6. **App icon, what is left** after PR #7 (classic `.icns` rendered
    from `assets/icon/app-icon.svg`): the macOS 26 layered icon format
