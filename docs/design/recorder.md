@@ -472,7 +472,10 @@ Total 5.3 GB/h. 2 hours need 10.7 GB, 3.1 GB free.
   [Stop] [Continue]. Stop finalizes, reveals the recording folder in
   Finder and quits the app: a recording is typically one shot (D45).
   Logout, restart and shutdown finalize without asking, told apart from
-  a Quit by the quit Apple event's reason (`kAEQuitReason`). While a recording runs,
+  a Quit by the quit Apple event's reason (`kAEQuitReason`); one that
+  comes while Stop is in progress waits for it. A failing writer and a
+  full disk are a recording problem also when no display file had
+  started. While a recording runs,
   the app does not quit when its last window closes, and the ready
   check does not run, also not when the app is activated.
   `msr record` shows the same Dock icon, badge and question; Stop there
@@ -835,7 +838,6 @@ folder, and by the v1 gate. The design of the end-to-end tests is
   Seiren V3 Mini: 0.42 s slow after an hour; one of five inputs), and `AVCaptureSession`'s timestamps do not correct it ([end-to-end-tests.md](end-to-end-tests.md),
   "What research found for the recorder"); the design stays open.
 - Two audio inputs with the same name.
-- Characters in a device name that a file name cannot hold.
 - The gain of the guide track "Microphones".
 
 ## Build state
