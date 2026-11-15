@@ -10,7 +10,7 @@ extension RecordingDuration: ExpressibleByArgument {
     }
 }
 
-/// Exit 3: the recording ended with an error (a file not finalized, or an error event) or could not start.
+/// Exit 3: a file not finalized or a display file ended by a failure (D47), or the recording could not start.
 let recordingEndedWithErrorExitCode: Int32 = 3
 
 extension CommandLineInterface {
