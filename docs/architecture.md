@@ -114,15 +114,16 @@ v0 arrives as two PRs, the skeleton and pipeline before the recorder
 installable snapshot release, every merge to `main` publishes a GitHub
 release, versions count from the git history and stay 0.x until v1
 (D4); a snapshot release is a pre-release per PR, a release is
-`v0.<commits on main>.0` (D23). Building and signing run in separate
+`v0.<YYYYMMDD>.<commits on main>`, the date of its commit in UTC (D23,
+D42). Building and signing run in separate
 jobs: the job that compiles, tests and smoke-tests holds no secret, and
 the signing jobs never compile or run what was built (D29). Scripts
 with logic are Python from the runner image, standard library only
 (D32). Builds
 are signed with one self-signed certificate; Developer ID signing is
-deferred (D5). Agents push work branches and open draft PRs, handle
-Copilot's review of the draft, and mark a PR ready once fully
-reviewed; only the owner merges (D8, D39). AI-written commits and PRs say so (D9).
+deferred (D5). Agents push work branches and open draft PRs, and mark a PR ready
+once fully reviewed, handling a Copilot review only if one has
+arrived (an optional extra, D43); only the owner merges (D8, D39). AI-written commits and PRs say so (D9).
 
 ### Work tracking
 

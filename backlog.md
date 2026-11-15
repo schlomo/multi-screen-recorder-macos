@@ -2,9 +2,11 @@
 
 ## Next session starts here
 
-The v0 design is agreed (D17–D33), PR #1 (skeleton and pipeline) and
-PR #6 (crash reports through GitHub, the HiDPI crash fixed by removing
-the popup menus, D40, D41) are merged. Start the next architect session
+The v0 design is agreed (D17–D33). Merged: PR #1 (skeleton and
+pipeline), PR #6 (crash reports through GitHub; the HiDPI crash fixed
+by removing the popup menus, D40, D41), PR #7 (app icon from the SVG),
+PR #8 (versions `0.<YYYYMMDD>.<N>`, D42; Copilot an optional extra,
+D43). Start the next architect session
 fresh with the recorder: the owner, 2026-11-15: "I want to get this PR
 through the door and get the actual recorder done."
 
@@ -16,8 +18,10 @@ Next:
    any brief. Steps 2 and 4 of the D34 list below; AGC (step 1) comes
    after the recorder: "AGC can also come as an improvement after the
    recorder" (the owner, 2026-11-15).
-2. In parallel ("In flight"): the app icon PR, and the PR for the
-   version scheme and Copilot as an optional extra.
+2. In parallel, small: the owner checks the icon of release
+   `v0.20261115.12` (the first with the new versions, marked latest) in
+   the Dock and Finder (whether macOS 26 shows the
+   classic `.icns` without a grey frame).
 
 ### Owner's rulings of 2026-11-13 (D34)
 
@@ -46,28 +50,6 @@ order, the next architect session:
 
 ## In flight
 
-- **Copilot is an optional extra** (ruling 2026-11-15, supersedes D39
-  in part): "I have copilot free as OSS developer so my limits are
-  very low. treat Copilot as optional goodie only." and "yes, draft
-  PRs should trigger a copilot review, but not subsequent pushes".
-  Observed on PR #6 (opened as a draft under the ruleset on 2026-11-15
-  at 15:48 Europe/Berlin, marked ready at 15:54): no Copilot review was
-  requested, neither for the draft nor on marking ready. To do in the
-  version scheme PR: the decision entry, the architect skill's
-  operating rules ("Copilot's review": agents never wait for it) and
-  `AGENTS.md` "Agent writes". Whether the ruleset's settings request
-  reviews of drafts is the owner's to check; not pursued further.
-- **Version scheme** (supersedes D23 in part): the owner, 2026-11-15:
-  "we went from 0.4.0 to 0.9.0. what would increase the patch? maybe
-  rethink the version scheme? I'd actually prefer X.<date>.<rev
-  count> or something like this, we can keep X=0 for now". The
-  architect's proposal is with the owner; built in its own PR with the
-  Copilot change above once signed off.
-- **App icon PR** (queued item 6): being built on branch `app-icon`
-  from the owner's flat Gemini drawing; the fancy one goes to the
-  README and the homepage; the source images and the earlier vector
-  redraw go to `assets/icon/`. The owner's go-ahead: "yes, I agree with
-  your icon suggestion and parallel execution of the PRs".
 - **Open from PR #1** (merged 2026-11-14), still to report on the
   owner's Mac: the first crash's re-test (unplug the default
   microphone with the window open, wait, "Check again", plug it in
@@ -214,15 +196,12 @@ order, the next architect session:
    open questions. It is agreed with D35's rulings (D37). Nothing
    of it is built; of the experiments, the first two have run. The
    tests are started by a person, never unasked by an agent.
-6. **App icon**, its own PR; until then the app has the default
-   icon. The owner chose the drawing (2026-11-12):
-   three displays fanned in depth on a graphite tile, one red record
-   dot on the front display; graphite `#1E2330`, cool white `#E9EEF7`,
-   red `#FF3B30`, the same three colours for the homepage. Flat vector
-   master in layers (tile, displays, dot) for the macOS 26 icon format,
-   a classic `.icns` if a plain package build cannot compile that
-   format, and a small-size drawing with two displays and a larger dot
-   below 32 px.
+6. **App icon, what is left** after PR #7 (classic `.icns` rendered
+   from `assets/icon/app-icon.svg`): the macOS 26 layered icon format
+   from the SVG's layers, if a plain package build can compile it; a
+   simplified drawing below 32 px (two displays and a larger dot), from
+   the owner's choice of 2026-11-12. Revisit when the owner finds the
+   Dock or Finder icon lacking.
 7. **Homepage** (D7): the branch name and how changes reach it
    (architect); the DNS entry for `multiscreenrecorder.schapiro.org`
    (owner).
@@ -242,7 +221,7 @@ order, the next architect session:
 - **A table of renamed settings keys**, so that a renamed key keeps
   its value. Deferred because nothing is released yet; an old key is
   dropped and named (D34). Revisit before the first
-  change to a settings key after a release `v0.<N>.0` that people use.
+  change to a settings key after a release `v0.<YYYYMMDD>.<N>` that people use.
 - **End-to-end tests in the pipeline or in a virtual machine.**
   Research on 2026-11-13: other projects grant the screen recording
   permission on GitHub's hosted macOS runners by writing into the
@@ -303,6 +282,10 @@ order, the next architect session:
 
 ## Done (recent)
 
+- 2026-11-15: PR #7 (app icon rendered from the vector drawing, the
+  owner's Gemini artwork in `assets/icon/`) and PR #8 (versions
+  `0.<YYYYMMDD>.<N>`, D42; Copilot an optional extra, D43) merged by
+  the owner; branches deleted.
 - 2026-11-15: PR #6 merged by the owner: crash reports through GitHub
   (D40) and the HiDPI crash fixed by removing the start window's popup
   menus (D41); checked by the owner ("I couldn't provoke the crash").
