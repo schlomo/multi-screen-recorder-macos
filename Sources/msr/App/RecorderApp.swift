@@ -64,7 +64,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if openFolder, let folder = session.folder {
             NSWorkspace.shared.open(folder)
         }
-        if summary?.manifestWritten == false {
+        // Only after the person's Stop: at logout, restart and shutdown the
+        // problem goes to the unified log and the problem list only (N-B).
+        if openFolder, summary?.manifestWritten == false {
             showAlert("The recording manifest could not be written",
                       "\(RecordingNames.manifest) in the recording folder does not record the end of the recording.")
         }
