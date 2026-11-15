@@ -67,10 +67,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func makeWindow(title: String, content: some View) -> NSWindow {
-        // The window takes its size from the content's preferred size. The app
-        // was ended by an exception in AppKit's window layout after a display's
-        // mode was switched; sizing the window by layout constraints is one of
-        // two candidates for the cause [ASSUMED], see `StartModel.checkAgain`.
+        // The window takes its size from the content's preferred size. The
+        // crash after a display's HiDPI switch was a layout loop in a popup
+        // menu's own window, not in this one; the start window has no popup
+        // menu (D41), see `StartModel.checkAgain`.
         let hosting = NSHostingController(rootView: content)
         hosting.sizingOptions = [.preferredContentSize]
         let window = NSWindow(contentViewController: hosting)

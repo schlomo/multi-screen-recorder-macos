@@ -159,13 +159,14 @@ read does not count), the output folder, and free disk space in the output folde
   (*data*). The check's result is shown only when the main run loop
   is in its default mode, meant to hold the window's content still
   while a menu or a modal panel (the folder chooser) is open or a
-  control is dragged. It did not stop the crash it was meant for: on
-  2026-11-14, with a popup menu opened and HiDPI switched, the table
-  changed and the app crashed in AppKit's window layout, as it had
-  before this and the window's sizing by its content's preferred size
-  were built. That the table changed while the menu was still open is
-  [ASSUMED] from the owner's words. The cause is open (`backlog.md`,
-  "In flight"). It never
+  control is dragged. It was not the cause of the crash it was first
+  meant for: the app crashed on 2026-11-14 with an exception
+  ("The window has been marked as needing another Layout Window pass,
+  but it has already had more Layout Window passes than there are views
+  in the window") in a layout loop of a popup menu's own window, opened
+  1 to 7 s after a display's backing scale (HiDPI) was switched [KNOWN,
+  unified log]. The start window therefore has no popup menu: the audio
+  mode is a radio group and the recording resolution a slider (D41). It never
   runs while a recording is running, activation included (for the
   recorder PR to honour).
 
@@ -325,8 +326,9 @@ manifest's state to `not finalized` and remove the marker.
     appears only when the displays and every recorded audio input can
     be read. The ready check's items stay as they are.
 
-  Then the recording resolution, audio mode, system audio and output
-  folder; the ready check, with "Check again"; and Start. All green,
+  Then the recording resolution (a slider over 720p, 1080p, 1200p,
+  1440p, 4K, Native, smallest to largest, the chosen one's name beside
+  it), audio mode (radio buttons), system audio and output folder; the ready check, with "Check again"; and Start. All green,
   the ready check is one line, "Ready to record", that expands on click
   to its items; any red item shows every item, with the fix under each
   red one. Start is disabled while the ready check fails. For the

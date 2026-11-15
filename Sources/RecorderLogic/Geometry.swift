@@ -26,6 +26,11 @@ public enum RecordingResolution: String, CaseIterable, Sendable {
     case p1080 = "1080p"
     case p720 = "720p"
 
+    /// Every resolution from the smallest box to the largest, native last:
+    /// the order of the start window's slider.
+    public static let smallestFirst: [RecordingResolution] =
+        allCases.filter { $0.box != nil }.sorted { $0.box!.height < $1.box!.height } + [.native]
+
     /// The box, or nil for native, which keeps the display's own size.
     public var box: FrameSize? {
         switch self {

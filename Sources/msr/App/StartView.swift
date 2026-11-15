@@ -53,12 +53,16 @@ private struct SettingsForm: View {
 
     var body: some View {
         Form {
-            Picker("Recording resolution", selection: binding(\.resolution)) {
-                ForEach(RecordingResolution.allCases, id: \.self) { Text($0.label) }
+            LabeledContent("Recording resolution") {
+                HStack {
+                    Slider(value: resolutionIndex, in: 0...Double(RecordingResolution.smallestFirst.count - 1), step: 1)
+                    Text(model.settings.resolution.label).frame(width: 60, alignment: .leading)
+                }
             }
             Picker("Audio mode", selection: binding(\.audioMode)) {
                 ForEach(AudioMode.allCases, id: \.self) { Text($0.label) }
             }
+            .pickerStyle(.radioGroup)
             Toggle("System audio", isOn: binding(\.systemAudio))
             LabeledContent("Output folder") {
                 HStack {
@@ -69,6 +73,14 @@ private struct SettingsForm: View {
                 }
             }
         }
+    }
+
+    /// The slider's position: the index of the resolution in `smallestFirst`.
+    private var resolutionIndex: Binding<Double> {
+        let order = RecordingResolution.smallestFirst
+        return Binding(
+            get: { Double(order.firstIndex(of: model.settings.resolution)!) },
+            set: { index in model.change { $0.resolution = order[Int(index.rounded())] } })
     }
 
     private func binding<Value>(_ keyPath: WritableKeyPath<RecorderLogic.Settings, Value>) -> Binding<Value> {

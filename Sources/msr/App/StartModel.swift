@@ -103,10 +103,10 @@ final class StartModel {
     ///
     /// The result is shown when the main run loop is in its default mode, so
     /// the window's content does not change by itself under an open menu, a
-    /// dragged control or a modal panel. The app was ended by an exception in
-    /// AppKit's window layout after a display's mode was switched, with a
-    /// menu open; a change of the content under the menu is one of two
-    /// candidates for the cause [ASSUMED], the window's sizing the other.
+    /// dragged control or a modal panel. The hold works but was not the
+    /// crash's cause: that was a layout loop in a popup menu's own window
+    /// after a display's backing scale changed, avoided by having no popup
+    /// menu in the window (D41).
     func checkAgain() {
         whatWillBeRecorded = WhatWillBeRecorded(
             settings: settings,

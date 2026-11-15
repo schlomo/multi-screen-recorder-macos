@@ -828,7 +828,9 @@ architect's reading.
   without opening the microphone?", the owner answered "Yes, accept"
   (2026-11-13). Built in PR #1, merged 2026-11-14. Point 3 failed
   its re-test on 2026-11-14: the second crash came back (`backlog.md`,
-  "In flight").
+  "In flight") Point 3's stated
+  cause of the second crash (the window's sizing, or a change of its
+  content under a menu) is refuted, see D41.
 - **Context:** The owner's check of PR #1 on the Mac, 2026-11-13: the
   app crashed on "Check again" after the default microphone was
   unplugged, and crashed after HiDPI was switched in BetterDisplay
@@ -1015,3 +1017,31 @@ architect's reading.
   file" (D38) is called "restore file" there; D38 keeps the old word.
 - **Evidence:** this change; [recorder.md](design/recorder.md), "The
   app".
+
+## D41: No popup menus in the start window (2026-11-15)
+
+- **Status:** in force; corrects the cause D36's point 3 stated.
+- **Context:** An analyst read macOS's unified log for the crash of
+  2026-11-14: `NSGenericException`, "The window has been marked as
+  needing another Layout Window pass, but it has already had more
+  Layout Window passes than there are views in the window.
+  <NSPopupMenuWindow …>", preceded by "-layoutSubtreeIfNeeded for
+  <NSTableRowView …> has continued for 300 iterations". The window that
+  loops is the popup menu's own, opened 1 to 7 s after a HiDPI switch
+  (from BetterDisplay's menu bar menu), not the start window. The
+  owner, 2026-11-15: "yes, radio buttons for audio and slider for
+  resulution is good".
+- **Decision:** The start window has no popup menu: the audio mode is a
+  radio group and the recording resolution a discrete slider (720p,
+  1080p, 1200p, 1440p, 4K, Native, smallest to largest, the chosen
+  one's name beside it). The window's sizing by its content's preferred
+  size and the hold of the check's result while a menu is open stay.
+  The cause: a layout loop in AppKit's popup menu window [KNOWN,
+  unified log]; its trigger the change of the display's backing scale
+  [ASSUMED]; that it is a bug in AppKit or SwiftUI [CONJECTURE].
+- **Consequences:** The two candidate causes of D36's point 3 are
+  refuted; the hold worked and is kept as harmless. A popup menu added
+  to the window later would meet the same loop. That the fix works is
+  unverified until the owner's re-test (HiDPI switch, window open).
+- **Evidence:** this change; [recorder.md](design/recorder.md), "Ready
+  check" and "The app".
