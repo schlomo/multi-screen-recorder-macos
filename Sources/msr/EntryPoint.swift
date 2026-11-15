@@ -11,10 +11,11 @@ enum EntryPoint {
         switch EntryRoute(arguments: Array(CommandLine.arguments.dropFirst())) {
         case .app:
             let delegate = AppDelegate()
-            EventLoop.run(delegate)
+            EventLoop.run(delegate, activationPolicy: .regular)
         case .record(let record):
             let delegate = RecordCommandDelegate(record: record)
-            EventLoop.run(delegate)
+            // Its Dock icon shows once the recording starts.
+            EventLoop.run(delegate, activationPolicy: .prohibited)
             exit(delegate.exitStatus)
         case .command(let command):
             runWithoutEventLoop(command)
@@ -70,10 +71,10 @@ enum EntryRoute {
 /// main queue, so no task, signal source or display callback would run.
 @MainActor
 enum EventLoop {
-    static func run(_ delegate: some NSApplicationDelegate) {
+    static func run(_ delegate: some NSApplicationDelegate, activationPolicy: NSApplication.ActivationPolicy) {
         let app = NSApplication.shared
         app.delegate = delegate
-        app.setActivationPolicy(.regular)
+        app.setActivationPolicy(activationPolicy)
         withExtendedLifetime(delegate) { app.run() }
     }
 }

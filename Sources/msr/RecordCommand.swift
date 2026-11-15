@@ -81,6 +81,7 @@ final class RecordCommandDelegate: NSObject, NSApplicationDelegate {
             endEventLoop()
             return
         }
+        NSApp.setActivationPolicy(.regular)
         do {
             session = try RecordingSession(settings: settings, homeFolder: home, tellOnStandardError: true)
         } catch {

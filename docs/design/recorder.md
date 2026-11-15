@@ -26,7 +26,7 @@ signature); if that fails it exits 71 (`EX_OSERR`).
 |---|---|---|
 | `msr list` | Shows displays, audio inputs and system audio | 0, 1 when the displays, the audio inputs or an audio input the settings record cannot be read |
 | `msr check [flags] [--debug]` | Prints "What will be recorded", then runs the ready check and prints each item; `--debug` adds detail on standard error and in the log | 0 ready, 1 not ready |
-| `msr record [flags] [--duration 1h30m] [--debug]` | Records the displays (B1 of the recording core; the audio comes with B2, D45). Without flags it does what Start in the window does, with the same settings file; it prints "What will be recorded" at its start, then runs the ready check, records until Ctrl-C, SIGTERM, SIGHUP, the duration or Stop in the status window (below), and prints the recording folder at the start and a summary at the end. While it records, the app's Dock icon shows with its badge, and clicking it or Quit opens the status window as in the app (D45, D46). When it stops, for any reason, it first prints `Stopping the recording and finalizing the files…` on standard error, then finalizes and prints the summary; a Ctrl-C while it finalizes prints `Still finalizing the files…` and does nothing more. Before its ready check it reports the recordings not finalized, as `msr check` does (see "Crash marker"). It prints every event of the recording manifest as one line on standard error (see "Logging"). `--debug` adds detail on standard error and in the log. `--duration` takes hours, minutes and seconds (`1h30m`, `45m`, `90s`); a number without a suffix is minutes (`90` is 90 minutes) | 0 ok, 1 not ready, 3 ended with an error or could not start |
+| `msr record [flags] [--duration 1h30m] [--debug]` | Records the displays (B1 of the recording core; the audio comes with B2, D45). Without flags it does what Start in the window does, with the same settings file; it prints "What will be recorded" at its start, then runs the ready check, records until Ctrl-C, SIGTERM, SIGHUP, the duration or Stop in the status window (below), and prints the recording folder at the start and a summary at the end. Its Dock icon shows only once the ready check passed and the recording starts, not on a run that is not ready; while it records, the icon shows with its badge, and clicking it or Quit opens the status window as in the app (D45, D46). When it stops, for any reason, it first prints `Stopping the recording and finalizing the files…` on standard error, then finalizes and prints the summary; a Ctrl-C while it finalizes prints `Still finalizing the files…` and does nothing more. Before its ready check it reports the recordings not finalized, as `msr check` does (see "Crash marker"). It prints every event of the recording manifest as one line on standard error (see "Logging"). `--debug` adds detail on standard error and in the log. `--duration` takes hours, minutes and seconds (`1h30m`, `45m`, `90s`); a number without a suffix is minutes (`90` is 90 minutes) | 0 ok, 1 not ready, 3 ended with an error or could not start |
 | `msr settings [flags]` | Without flags prints the effective settings as JSON (show); with any settings flag, `--auto` included, saves the run's effective settings into the settings file and prints them (change). The only command that writes the file; the window also writes it | 0, 1 when it cannot write the file |
 | `msr version` | Prints the version and commit | 0 |
 
@@ -512,7 +512,13 @@ Total 5.3 GB/h. 2 hours need 10.7 GB, 3.1 GB free.
   `asleep`); under it the line "Recording 1:07 · 1.3 GB in 3 files ·
   120.4 GB free"; the problems in red, with the command for the log
   (see "Logging"); and [Stop] [Continue]. It refreshes every second
-  while open; Continue closes it.
+  while open; Continue closes it. A display file whose size cannot be
+  read makes its display's GB written `?`. A problem goes into the
+  recording manifest, which is written at once (unless writing it is
+  the problem); one that repeats, such as the free space that cannot be
+  read on every check, is told once (one manifest entry, one red line,
+  one line on standard error, one bounce) until it clears, and again if
+  it comes back.
 - **Stop:** Stop in the status window finalizes, opens the recording folder itself
   in Finder (D46) and quits the app: a recording is typically one shot (D45).
   Logout, restart and shutdown finalize without asking, told apart from
