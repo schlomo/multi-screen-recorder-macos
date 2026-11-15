@@ -258,7 +258,8 @@ hoc, for a local check only).
   an older one); see [delivery.md](docs/design/delivery.md).
 - `msr` without arguments starts the app, and the app, `msr check` and
   `msr record` run the ready check, which requests any never-asked
-  permission, so macOS shows a prompt on the person's screen, and
+  permission and captures one frame of a display, so macOS shows a
+  prompt on the person's screen, and
   creates the output folder if it is missing; `msr record` and Start
   in the app record the screens; `msr list` reads the devices. An agent runs
   none of these on a person's Mac unasked. On start the app also reads
