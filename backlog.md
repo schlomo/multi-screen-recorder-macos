@@ -204,7 +204,6 @@ Still open from D34: what AGC does and whether it is on in auto mode;
   needs no permissions of its own (D19). Revisit when the owner scripts
   recordings from a terminal they don't want to grant screen recording
   to.
-
 - **Screenshots as a fallback for the wrong-display fault**
   (`SCScreenshotManager`, right in 3 of 3 faulty runs). Deferred
   because it is a second capture path of unknown cost at 30 fps, and
@@ -227,7 +226,6 @@ Still open from D34: what AGC does and whether it is on in auto mode;
 - 2026-11-15: PR #10 merged by the owner: the virtual display and
   audio drift experiments. The owner signed off the recording core's
   display half (B1) and split the core in two PRs (D45).
-
 - 2026-11-15: PR #9 merged by the owner: settings and auto mode
   (D44): Native is the looks-like size, four audio modes, a Mac without
   a microphone records, one table of what will be recorded, the
