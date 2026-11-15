@@ -1026,37 +1026,39 @@ architect's reading.
   needing another Layout Window pass, but it has already had more
   Layout Window passes than there are views in the window.
   <NSPopupMenuWindow …>", preceded by "-layoutSubtreeIfNeeded for
-  <NSTableRowView …> has continued for 300 iterations". The window that
-  loops is the popup menu's own, opened 1 to 7 s after a HiDPI switch
-  (from BetterDisplay's menu bar menu), not the start window: the
-  start window has no table view (its tables are SwiftUI `Grid`s), and
-  the only window the log marks for layout is the popup menu window
-  the exception names (5 "Marking window" lines, all that address), so
-  the looping `NSTableRowView` is the menu's [KNOWN, unified log and
-  code]. The
-  owner, 2026-11-15: "yes, radio buttons for audio and slider for
+  <NSTableRowView …> has continued for 300 iterations". The popup menu
+  was opened 1 to 7 s after a HiDPI switch (from BetterDisplay's menu
+  bar menu). Three facts are KNOWN: the exception names the popup menu
+  window; the app's code has no table view (the start window's tables
+  are SwiftUI `Grid`s); the only window the log records past the
+  layout limit is that popup window (5 "Marking window" lines, all
+  that address) [KNOWN, unified log and code]. That the loop, and so
+  the looping `NSTableRowView`, runs in the popup menu is [ASSUMED]
+  from those three facts: the log records only windows past the limit,
+  so a window under it would not appear. The owner, 2026-11-15: "yes, radio buttons for audio and slider for
   resulution is good".
 - **Decision:** The start window has no popup menu: the audio mode is
   radio buttons and the recording resolution a discrete slider (720p,
   1080p, 1200p, 1440p, 4K, Native, smallest to largest, the chosen
   one's name beside it). The window's sizing by its content's preferred
   size and the hold of the check's result while a menu is open stay.
-  The cause: a layout loop in AppKit's popup menu window [KNOWN,
-  unified log]; its trigger the change of the display's backing scale
+  The cause: a layout loop in AppKit's popup menu window [ASSUMED,
+  see Context]; its trigger the change of the display's backing scale
   [ASSUMED]; that it is a bug in AppKit or SwiftUI [CONJECTURE].
-- **Consequences:** The exception was thrown in the popup menu's own
-  window, not in the start window's layout [KNOWN, unified log], so
-  the window's sizing is not where it threw; a content change under
+- **Consequences:** The exception names the popup menu's own window,
+  not the start window [KNOWN, unified log], so the window's sizing is
+  not where it threw; a content change under
   the menu as a trigger is not refuted. Whether the hold kept the
   content still under the open menu is not shown by the log, and the
   owner saw the table change with the menu open [ASSUMED from the
   owner's words]. The hold stays. A popup menu added to the window
-  later would meet the same loop [ASSUMED]. AppKit menus are still reachable
-  from the app (the menu bar menus, the folder chooser's popup
-  buttons, the context menu of the selectable settings-error text);
-  whether they meet the same loop after a backing-scale change is
-  [CONJECTURE], untested. The owner's re-test of 2026-11-15 with a
+  later would meet the same loop [ASSUMED]. AppKit menus are still
+  reachable from the app (the menu bar menus, the folder chooser's
+  popup buttons, the context menu of the selectable settings-error
+  text); whether they meet the same loop after a backing-scale change
+  is [CONJECTURE], untested. The owner's re-test of 2026-11-15 with a
   build of this change: "otherwise looking good and I couldn't provoke
-  the crash"; evidence, not proof, as the crash is intermittent.
+  the crash"; evidence, not proof, as the crash is intermittent
+  [ASSUMED: two crashes seen, reproduction rate unknown].
 - **Evidence:** this change; [recorder.md](design/recorder.md), "Ready
   check" and "The app".

@@ -25,7 +25,7 @@ One row per entry, the error text exactly as in the entry.
 | `package 'multi-screen-recorder-macos' is using Swift tools version 6.4.0 but the installed version is 6.3.3` | [Swift tools version newer than the CI runner's Xcode](#swift-tools-version-newer-than-the-ci-runners-xcode) |
 | `no 'async' operations occur within 'await' expression` | [Swift Argument Parser's async main from top-level code](#swift-argument-parsers-async-main-from-top-level-code) |
 | `The window has been marked as needing another Layout Window pass, but it has already had more Layout Window passes than there are views in the window.` | [Layout loop in a popup menu window after a HiDPI switch](#layout-loop-in-a-popup-menu-window-after-a-hidpi-switch) |
-| The prompt for the Screen & System Audio Recording permission comes back each time the window is clicked | [Screen recording prompt comes back with an ad hoc signed build](#screen-recording-prompt-comes-back-with-an-ad-hoc-signed-build) |
+| The prompt for the Screen & System Audio Recording permission comes back each time the window is clicked (symptom, no error text) | [Screen recording prompt comes back with an ad hoc signed build](#screen-recording-prompt-comes-back-with-an-ad-hoc-signed-build) |
 
 ## Format
 
@@ -87,9 +87,12 @@ One row per entry, the error text exactly as in the entry.
   of the start window open or opened. The `.ips` crash report does not
   carry the text; read it with
   `log show --predicate 'process == "msr"'`.
-- **Why:** a layout loop in AppKit's popup menu window [KNOWN, unified
-  log]; its trigger the backing scale change [ASSUMED]; an AppKit or
-  SwiftUI bug [CONJECTURE] (D41).
+- **Why:** known: the exception names the popup menu window, the app's
+  code has no table view, and the only window the log records past the
+  layout limit is that popup window [KNOWN, unified log and code]; that
+  the loop runs in the popup menu is [ASSUMED] from these (the log
+  records only windows past the limit); its trigger the backing scale
+  change [ASSUMED]; an AppKit or SwiftUI bug [CONJECTURE] (D41).
 - **Fix:** no popup menus in the start window: the audio mode is radio
   buttons and the recording resolution a slider (D41).
 - **Verify:** switch a display's HiDPI mode with the start window open;
@@ -117,5 +120,7 @@ One row per entry, the error text exactly as in the entry.
   with `-v` it was not listed on 2026-11-15 (observed: self-signed,
   `CSSMERR_TP_NOT_TRUSTED`).
 - **Verify:** click the window again after denying the permission; no
-  second prompt.
+  second prompt. Fix verified: not yet; the signed release `0.4.0` not
+  repeating the prompt is the contrast case, observed by the owner on
+  2026-11-15.
 - **Observed:** 2026-11-15, ad hoc build of `main`; open.
