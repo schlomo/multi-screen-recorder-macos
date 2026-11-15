@@ -382,6 +382,17 @@ event is an error; both are null until the recording is finalized.
 An audio file's `channels` is the number of its mono tracks, or
 `stereo` for system audio.
 
+**Metadata in every display file (D46).** The timecode track names the
+source as its reel name (the source reference name of its format
+description), `Display <n> - <name>`, the display's name unchanged; it
+is written with the track, so a file never finalized keeps it. QuickTime
+metadata items, all text, under `org.schapiro.multiscreenrecorder.`:
+`displayUUID`, `displayNumber`, `displayName`, `frameSize`
+(`1920x1080`), `recordingStarted` (as the manifest's `started`) and
+`app` (as the manifest's `app`), and the app also under the standard
+`com.apple.quicktime.software`. Whether DaVinci Resolve's "detect clips
+from same camera" reads the reel name is UNVERIFIED (D46).
+
 **Parallel recordings.** A recording claims its recording folder by
 creating it and refuses if it already exists. Recordings into different
 folders may run side by side (several `msr record`, or one beside the

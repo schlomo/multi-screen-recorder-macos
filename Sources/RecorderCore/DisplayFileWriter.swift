@@ -26,7 +26,7 @@ public struct DisplayFileWriterError: Error, Equatable, CustomStringConvertible 
 
 /// A display file: HEVC 8-bit in a fragmented `.mov`, a keyframe and a
 /// fragment every 2 s, tagged BT.709, with a timecode track of one sample
-/// (D21, D24, D31). Every frame carries exactly its tick's time on the shared clock.
+/// carrying the reel name, and metadata items (D21, D24, D31, D46). Every frame carries exactly its tick's time on the shared clock.
 /// Not thread-safe: one queue uses it.
 public final class DisplayFileWriter: DisplayFileWriting {
     public let url: URL
@@ -40,7 +40,10 @@ public final class DisplayFileWriter: DisplayFileWriting {
     private let timecodeFormat: CMTimeCodeFormatDescription
     private var wroteTimecode = false
 
-    public init(url: URL, frameSize: FrameSize, firstTick: Int64, timecode: Timecode, grid: TickGrid = .recording) throws(DisplayFileWriterError) {
+    public init(
+        url: URL, frameSize: FrameSize, firstTick: Int64, timecode: Timecode, metadata: DisplayFileMetadata,
+        grid: TickGrid = .recording
+    ) throws(DisplayFileWriterError) {
         precondition(timecode.framesPerSecond == grid.framesPerSecond, "the timecode counts the tick grid's frames")
         self.url = url
         self.firstTick = firstTick
@@ -53,6 +56,13 @@ public final class DisplayFileWriter: DisplayFileWriting {
         }
         writer.movieFragmentInterval = CMTime(value: CMTimeValue(RecorderValues.fragmentSeconds), timescale: 1)
         writer.shouldOptimizeForNetworkUse = false
+        writer.metadata = metadata.items.map { key, value in
+            let item = AVMutableMetadataItem()
+            item.keySpace = .quickTimeMetadata
+            item.key = key as NSString
+            item.value = value as NSString
+            return item
+        }
 
         video = AVAssetWriterInput(mediaType: .video, outputSettings: Self.videoSettings(frameSize, grid: grid))
         video.expectsMediaDataInRealTime = true
@@ -62,7 +72,13 @@ public final class DisplayFileWriter: DisplayFileWriting {
         let status = CMTimeCodeFormatDescriptionCreate(
             allocator: nil, timeCodeFormatType: kCMTimeCodeFormatType_TimeCode32,
             frameDuration: CMTime(value: 1, timescale: CMTimeScale(grid.framesPerSecond)),
-            frameQuanta: UInt32(grid.framesPerSecond), flags: kCMTimeCodeFlag_24HourMax, extensions: nil,
+            frameQuanta: UInt32(grid.framesPerSecond), flags: kCMTimeCodeFlag_24HourMax,
+            extensions: [
+                kCMTimeCodeFormatDescriptionExtension_SourceReferenceName: [
+                    kCMTimeCodeFormatDescriptionKey_Value: metadata.reelName,
+                    kCMTimeCodeFormatDescriptionKey_LangCode: 0,
+                ] as CFDictionary,
+            ] as CFDictionary,
             formatDescriptionOut: &format)
         guard status == noErr, let format else {
             throw DisplayFileWriterError(nil, while: "cannot describe the timecode track (error \(status))")

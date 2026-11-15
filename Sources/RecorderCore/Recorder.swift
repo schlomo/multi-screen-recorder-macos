@@ -69,7 +69,7 @@ public final class Recorder {
             throw RecorderStartError(description:
                 "Cannot create the recording folder \(folder.path(percentEncoded: false)): \(error.localizedDescription)")
         }
-        context = RecordingContext(folder: folder, started: started, timeZone: timeZone, clock: SharedClock(reading: reading))
+        context = RecordingContext(folder: folder, started: started, timeZone: timeZone, clock: SharedClock(reading: reading), app: app)
         self.settings = settings
         markers = CrashMarkers(homeFolder: homeFolder)
         self.observer = observer

@@ -46,7 +46,8 @@ import Testing
     private func write(rate: Int, firstTick: Int64, seconds: Int, timecode: Timecode, finish: Bool = true) async throws -> (URL, DisplayFileWriter) {
         let url = scratch.appending(path: "Display 1 - Test \(rate).mov")
         let writer = try DisplayFileWriter(
-            url: url, frameSize: frameSize, firstTick: firstTick, timecode: timecode, grid: TickGrid(framesPerSecond: rate))
+            url: url, frameSize: frameSize, firstTick: firstTick, timecode: timecode, metadata: metadata,
+            grid: TickGrid(framesPerSecond: rate))
         let frames = try (0..<4).map { try frame(brightness: UInt8(40 + 50 * $0)) }
         let lastTick = firstTick + Int64(seconds * rate) - 1
         for tick in firstTick...lastTick {
@@ -56,6 +57,46 @@ import Testing
         }
         if finish { try await writer.finish(lastTick: lastTick) }
         return (url, writer)
+    }
+
+    private let metadata = DisplayFileMetadata(
+        displayUUID: "1E6E43E3-6E7B-4C2A-9F6B-2B0F4C1A9D11", displayNumber: 2, displayName: "LG HDR 4K",
+        frameSize: FrameSize(width: 320, height: 180), recordingStarted: "2026-11-12T14:03:05.120+01:00",
+        app: "Multi Screen Recorder 0.20261115.4 (a1b2c3d)")
+
+    /// The reel name: the timecode track's source reference name.
+    private func reelName(of asset: AVAsset) async throws -> String? {
+        let track = try #require(try await asset.loadTracks(withMediaType: .timecode).first)
+        let format = try #require(try await track.load(.formatDescriptions).first)
+        let name = CMFormatDescriptionGetExtension(format, extensionKey: kCMTimeCodeFormatDescriptionExtension_SourceReferenceName)
+        return (name as? [String: Any])?[kCMTimeCodeFormatDescriptionKey_Value as String] as? String
+    }
+
+    private func metadataItems(of asset: AVAsset) async throws -> [String: String] {
+        var items: [String: String] = [:]
+        for item in try await asset.loadMetadata(for: .quickTimeMetadata) {
+            guard let key = item.key as? String else { continue }
+            items[key] = try await item.load(.stringValue)
+        }
+        return items
+    }
+
+    @Test func aDisplayFileCarriesItsReelNameAndMetadata() async throws {
+        defer { removeScratch() }
+        let timecode = Timecode(start: try startDate(), timeZone: berlin)
+        let (url, _) = try await write(rate: RecorderValues.framesPerSecond, firstTick: 0, seconds: 1, timecode: timecode)
+        let asset = AVURLAsset(url: url)
+        #expect(try await reelName(of: asset) == "Display 2 - LG HDR 4K")
+        let items = try await metadataItems(of: asset)
+        #expect(items == [
+            "org.schapiro.multiscreenrecorder.displayUUID": "1E6E43E3-6E7B-4C2A-9F6B-2B0F4C1A9D11",
+            "org.schapiro.multiscreenrecorder.displayNumber": "2",
+            "org.schapiro.multiscreenrecorder.displayName": "LG HDR 4K",
+            "org.schapiro.multiscreenrecorder.frameSize": "320x180",
+            "org.schapiro.multiscreenrecorder.recordingStarted": "2026-11-12T14:03:05.120+01:00",
+            "org.schapiro.multiscreenrecorder.app": "Multi Screen Recorder 0.20261115.4 (a1b2c3d)",
+            "com.apple.quicktime.software": "Multi Screen Recorder 0.20261115.4 (a1b2c3d)",
+        ])
     }
 
     private func startDate() throws -> Date {
@@ -121,6 +162,7 @@ import Testing
         // The one timecode sample of the file is in it before the file is finalized.
         let timecodeTrack = try #require(try await asset.loadTracks(withMediaType: .timecode).first)
         #expect(try readFirstTimecodeFrame(of: timecodeTrack, asset: asset) == Int32(timecode.frame(ofTick: 0)))
+        #expect(try await reelName(of: asset) == "Display 2 - LG HDR 4K")
         withExtendedLifetime(writer) {}
     }
 

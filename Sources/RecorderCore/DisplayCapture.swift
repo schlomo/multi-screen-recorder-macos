@@ -13,6 +13,9 @@ public final class RecordingContext: Sendable {
     public let started: Date
     public let timeZone: TimeZone
     public let timecode: Timecode
+    /// The app and its version, and the start as the recording manifest has them.
+    public let app: String
+    public let startedText: String
     private let state: Mutex<State>
 
     private struct State {
@@ -22,10 +25,12 @@ public final class RecordingContext: Sendable {
         var takenNames: Set<String> = []
     }
 
-    init(folder: URL, started: Date, timeZone: TimeZone, clock: SharedClock) {
+    init(folder: URL, started: Date, timeZone: TimeZone, clock: SharedClock, app: String) {
         self.folder = folder
         self.started = started
         self.timeZone = timeZone
+        self.app = app
+        startedText = RecordingManifest.timestamp(started, timeZone: timeZone)
         timecode = Timecode(start: started, timeZone: timeZone)
         state = Mutex(State(clock: clock))
     }
@@ -119,7 +124,10 @@ public final class DisplayCapture: NSObject, @unchecked Sendable, SCStreamOutput
             let fileName = context.claimFileName(tick: firstTick, number: number, display: name)
             let writer = try DisplayFileWriter(
                 url: context.folder.appending(path: fileName), frameSize: frameSize, firstTick: firstTick,
-                timecode: context.timecode)
+                timecode: context.timecode,
+                metadata: DisplayFileMetadata(
+                    displayUUID: uuid, displayNumber: number, displayName: name, frameSize: frameSize,
+                    recordingStarted: context.startedText, app: context.app))
             return (writer, RecordingManifest.DisplayFile(
                 name: fileName, display: name, displayUUID: uuid, frameSize: frameSize,
                 start: TickGrid.recording.seconds(ofTick: firstTick), timecode: context.timecode.text(ofTick: firstTick)))
