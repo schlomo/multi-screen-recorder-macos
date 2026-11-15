@@ -20,10 +20,23 @@ import Testing
         try FileManager.default.copyItem(
             at: try buildProducts().appending(path: "msr"),
             to: checkout.appending(path: "build/Multi Screen Recorder.app/Contents/MacOS/msr"))
-        try Data().write(to: checkout.appending(path: "build/Multi Screen Recorder.app/Contents/Resources/AppIcon.icns"))
+        try makeIcon(at: checkout.appending(path: "build/Multi Screen Recorder.app/Contents/Resources/AppIcon.icns"))
         try git("init", "--quiet", "--initial-branch=main")
         try git("commit", "--quiet", "--allow-empty", "--message=one")
         head = try git("rev-parse", "--short=7", "HEAD")
+    }
+
+    /// A real `.icns` holding the committed icon at 1024 px, as iconutil makes it.
+    private func makeIcon(at icns: URL) throws {
+        let iconset = scratch.url.appending(path: "AppIcon.iconset", directoryHint: .isDirectory)
+        try FileManager.default.createDirectory(at: iconset, withIntermediateDirectories: true)
+        try FileManager.default.copyItem(
+            at: repositoryRoot.appending(path: "assets/icon/app-icon.png"),
+            to: iconset.appending(path: "icon_512x512@2x.png"))
+        let outcome = try run(URL(filePath: "/usr/bin/env"),
+                              ["iconutil", "-c", "icns", iconset.path(percentEncoded: false), "-o", icns.path(percentEncoded: false)],
+                              environment: [:], in: scratch.url)
+        try #require(outcome.status == 0, "iconutil failed: \(outcome.errors)")
     }
 
     @discardableResult
@@ -72,6 +85,16 @@ import Testing
         let outcome = try smokeTest()
         #expect(outcome.status == 1)
         #expect(outcome.errors.contains("FAIL  the bundle names its icon file and holds it: CFBundleIconFile is not set"),
+                "\(outcome.errors)")
+    }
+
+    @Test func anEmptyIconFileFails() throws {
+        defer { scratch.remove() }
+        try writeInfo(commit: head)
+        try Data().write(to: checkout.appending(path: "build/Multi Screen Recorder.app/Contents/Resources/AppIcon.icns"))
+        let outcome = try smokeTest()
+        #expect(outcome.status == 1)
+        #expect(outcome.errors.contains("FAIL  the bundle names its icon file and holds it: Contents/Resources/AppIcon.icns is not a 1024 px icon"),
                 "\(outcome.errors)")
     }
 

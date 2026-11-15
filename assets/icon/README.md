@@ -1,18 +1,17 @@
-# App icon sources
-
-Source assets for the app icon and the project's images.
+# App icon and artwork
 
 | File | What it is |
 |---|---|
 | `app-icon.svg` | The app icon source: a vector drawing, 300 units wide, layers tile, displays (back, middle, front with stand) and dot; the viewBox is widened to 372.82 units so the tile is 824 px of a 1024 px canvas, the margin of the macOS icon grid |
 | `app-icon.png` | 1024 x 1024 PNG with alpha, derived from `app-icon.svg`; committed, because CI does not render it. `scripts/build-app` builds `AppIcon.icns` from it |
-| `msr-icon-sizes.svg` | Reference sheet of the drawing at several sizes |
-| `app-icon-fancy.jpeg` | Glossy 2048 x 2048 artwork from Gemini (Nano Banana); the image for the root `README.md` and the homepage |
-| `app-icon-flat.jpeg` | The flat 2048 x 2048 Gemini artwork, same composition as the SVG; kept for reference |
+| `app-icon-fancy.jpeg` | Artwork: glossy 2048 x 2048 image from Gemini (Nano Banana), for the root `README.md` and later the homepage |
+| `app-icon-fancy-256.jpeg` | 256 px rendition of the fancy artwork, derived, which the root `README.md` shows |
+| `app-icon-flat.jpeg` | Artwork: the flat 2048 x 2048 Gemini image, the same composition as the SVG; kept for reference |
+| `msr-icon-sizes.svg` | A snapshot of the drawing at five sizes; it is not kept in step with `app-icon.svg` |
 
 ## Colours
 
-Also for the homepage.
+The project palette (the owner's choice of 2026-11-12), meant for the homepage as well.
 
 | Name | Value |
 |---|---|
@@ -20,7 +19,14 @@ Also for the homepage.
 | Cool white | `#E9EEF7` |
 | Red | `#FF3B30` |
 
-## Regenerating `app-icon.png`
+The SVG's front display uses `#E6EBF7` and its stand `#D5DAE6`, its own colours, not part of the palette.
 
-After changing `app-icon.svg`, run `scripts/render-app-icon` (needs
-`rsvg-convert` from librsvg, `brew install librsvg`) and commit the PNG.
+## Regenerating the derived images
+
+Run `scripts/render-app-icon` (needs `rsvg-convert` from librsvg,
+`brew install librsvg`; `sips` is part of macOS) after editing
+`app-icon.svg` or `app-icon-fancy.jpeg`, and commit both derived images.
+
+Known limitation: CI cannot re-render the SVG (no `rsvg-convert` on the
+runner), so nothing checks that `app-icon.png` still matches
+`app-icon.svg`; `scripts/build-app` uses the committed PNG as it is.

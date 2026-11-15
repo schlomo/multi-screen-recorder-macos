@@ -500,6 +500,7 @@ Tests/RecorderLogicTests/ Swift Testing, as all tests
 Tests/RecorderCoreTests/  the adapters that need no device or permission
 Tests/CommandTests/       msr and the scripts in scripts/, run as commands
 Resources/                Info.plist, entitlements
+assets/icon/              the app icon (SVG source, derived PNG) and artwork; see its README.md
 scripts/                  see delivery.md
 ```
 

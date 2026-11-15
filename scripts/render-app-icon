@@ -1,12 +1,17 @@
 #!/usr/bin/env bash
-# Renders assets/icon/app-icon.png (1024 x 1024, transparent outside the tile)
-# from assets/icon/app-icon.svg. The PNG is derived and committed; run this
-# after changing the SVG. CI does not render, it builds the .icns from the
-# committed PNG (scripts/build-app).
+# Renders the derived images in assets/icon/: app-icon.png (1024 x 1024,
+# transparent outside the tile) from app-icon.svg, and the 256 px
+# app-icon-fancy-256.jpeg for the README from app-icon-fancy.jpeg. They are
+# committed; run this after changing either source. CI does not render, it
+# builds the .icns from the committed PNG (scripts/build-app).
 set -euo pipefail
 
-command -v rsvg-convert >/dev/null || { echo "scripts/render-app-icon: rsvg-convert (librsvg) is not on the PATH" >&2; exit 1; }
+for tool in rsvg-convert sips; do
+    command -v "$tool" >/dev/null || { echo "scripts/render-app-icon: $tool is not on the PATH" >&2; exit 1; }
+done
 
 cd "$(dirname "$0")/.."
 rsvg-convert --width 1024 --height 1024 assets/icon/app-icon.svg --output assets/icon/app-icon.png
+sips -Z 256 assets/icon/app-icon-fancy.jpeg --out assets/icon/app-icon-fancy-256.jpeg >/dev/null
 echo assets/icon/app-icon.png
+echo assets/icon/app-icon-fancy-256.jpeg

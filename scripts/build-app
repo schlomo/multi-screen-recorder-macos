@@ -33,6 +33,7 @@ plutil -replace CFBundleVersion -string "$short_version" "$plist"
 plutil -replace MSRVersion -string "$version" "$plist"
 plutil -replace MSRCommit -string "$commit" "$plist"
 
+[[ -f "$icon_source" ]] || { echo "scripts/build-app: $icon_source is missing" >&2; exit 1; }
 iconset="$(mktemp -d)/AppIcon.iconset"
 trap 'rm -rf "$(dirname "$iconset")"' EXIT
 mkdir "$iconset"
@@ -40,6 +41,9 @@ for size in 16 32 128 256 512; do
     sips -z "$size" "$size" "$icon_source" --out "$iconset/icon_${size}x${size}.png" >/dev/null
     sips -z "$((size * 2))" "$((size * 2))" "$icon_source" --out "$iconset/icon_${size}x${size}@2x.png" >/dev/null
 done
+expected_files=10
+[[ "$(find "$iconset" -name 'icon_*.png' | wc -l)" -eq "$expected_files" ]] \
+    || { echo "scripts/build-app: the iconset does not hold exactly $expected_files icon files" >&2; exit 1; }
 iconutil -c icns "$iconset" -o "$app/Contents/Resources/AppIcon.icns"
 
 codesign --force --options runtime --timestamp=none \

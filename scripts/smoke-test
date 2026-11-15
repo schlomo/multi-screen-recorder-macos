@@ -50,8 +50,12 @@ def icon_problem(info: dict, resources: Path) -> str | None:
     icon_name = info.get("CFBundleIconFile")
     if not isinstance(icon_name, str) or not icon_name:
         return "CFBundleIconFile is not set"
-    if not (resources / f"{icon_name}.icns").is_file():
+    icon = resources / f"{icon_name}.icns"
+    if not icon.is_file():
         return f"Contents/Resources/{icon_name}.icns is missing"
+    width = subprocess.run(["sips", "-g", "pixelWidth", icon], stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True)
+    if not width.stdout.rstrip().endswith("pixelWidth: 1024"):
+        return f"Contents/Resources/{icon_name}.icns is not a 1024 px icon"
     return None
 
 
@@ -86,8 +90,9 @@ class Checks:
 
 
 def main() -> None:
-    if shutil.which("git") is None:
-        stop("git is not on the PATH")
+    for tool in ("git", "sips"):
+        if shutil.which(tool) is None:
+            stop(f"{tool} is not on the PATH")
     os.chdir(Path(__file__).resolve().parent.parent)
     msr = Path.cwd() / APP / "Contents/MacOS/msr"
     if not os.access(msr, os.X_OK):
