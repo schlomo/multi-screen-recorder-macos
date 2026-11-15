@@ -37,6 +37,7 @@ public final class Recorder {
     /// The running capture of each display, with its number among all captures of the recording.
     private var captures: [String: (Int, DisplayCapture)] = [:]
     private var captureCount = 0
+    private var endReports = CaptureEndReports()
     /// Stops in progress, so Stop waits for every file.
     private var stopping: [Task<Void, Never>] = []
     private var dueTask: Task<Void, Never>?
@@ -217,16 +218,16 @@ public final class Recorder {
                     Task { @MainActor in self?.fileStarted(file, uuid: uuid) }
                 },
                 onEnded: { [weak self] reason, file in
-                    Task { @MainActor in self?.captureEnded(uuid: uuid, captureNumber: captureNumber, reason: reason, file: file) }
+                    Task { @MainActor in self?.captureEnded(uuid: uuid, captureNumber: captureNumber, display: name, reason: reason, file: file) }
                 })
             captures[uuid] = (captureNumber, capture)
             capture.start()
             if tracker.showsAnotherDisplaysPicture == false { observer?.recorder(self, displayShowsAnotherDisplaysPicture: nil) }
         case .stop(let uuid, _):
-            guard let (_, capture) = captures.removeValue(forKey: uuid) else { return }
+            guard let (captureNumber, capture) = captures.removeValue(forKey: uuid) else { return }
             stopping.append(Task { [weak self] in
                 let file = await capture.stop()
-                self?.fileEnded(file, uuid: uuid, errorHasItsEvent: false)
+                self?.fileEnded(file, captureNumber: captureNumber, display: capture.name, reason: nil)
             })
         }
     }
@@ -240,34 +241,29 @@ public final class Recorder {
         try? writeManifest()
     }
 
-    /// A display file ended; its end carries its entry, so it is listed
-    /// even when its start was not reported yet. A writer's error is the
-    /// event `display file writer failed`, unless the end's reason already
-    /// is one, and a problem for the person.
-    private func fileEnded(_ end: DisplayFileEnd?, uuid: String, errorHasItsEvent: Bool) {
-        guard let end else { return }
-        if let index = manifest.files.firstIndex(where: { $0.name == end.file.name }) {
-            manifest.files[index] = end.file
-        } else {
-            manifest.files.append(end.file)
-        }
-        if let error = end.error {
-            if !errorHasItsEvent {
-                var failed = RecordingEvent(at: context.now(), event: .displayFileWriterFailed, display: end.file.display)
-                failed.error = error
-                manifest.events.append(failed)
+    /// A display file ended, or a capture without one; its end carries its
+    /// entry, so the file is listed even when its start was not reported
+    /// yet. What it tells (`FileEndReport`) is told once per capture, also
+    /// when the capture ended by itself while the recorder stopped it.
+    private func fileEnded(_ end: DisplayFileEnd?, captureNumber: Int, display: String, reason: DisplayTracker.StreamEnd?) {
+        if let end {
+            if let index = manifest.files.firstIndex(where: { $0.name == end.file.name }) {
+                manifest.files[index] = end.file
+            } else {
+                manifest.files.append(end.file)
             }
-            observer?.recorder(self, problem: "Display file \(end.file.name): \(error)")
         }
-        try? writeManifest()
+        if let report = endReports.report(captureNumber: captureNumber, reason: reason, end: end, display: display) {
+            if let event = report.event { manifest.events.append(event) }
+            if let problem = report.problem { observer?.recorder(self, problem: problem) }
+        }
+        if end != nil { try? writeManifest() }
     }
 
-    private func captureEnded(uuid: String, captureNumber: Int, reason: DisplayTracker.StreamEnd, file: DisplayFileEnd?) {
-        let errorHasItsEvent: Bool = switch reason {
-        case .writerFailed, .diskFull: true
-        case .streamFailed, .writerFellBehind, .showsAnotherDisplay: false
-        }
-        fileEnded(file, uuid: uuid, errorHasItsEvent: errorHasItsEvent)
+    private func captureEnded(
+        uuid: String, captureNumber: Int, display: String, reason: DisplayTracker.StreamEnd, file: DisplayFileEnd?
+    ) {
+        fileEnded(file, captureNumber: captureNumber, display: display, reason: reason)
         // One the recorder already stopped, or replaced, changes nothing more.
         guard !isStopped, let (current, capture) = captures[uuid], current == captureNumber else { return }
         captures[uuid] = nil
