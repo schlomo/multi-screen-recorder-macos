@@ -127,10 +127,8 @@ final class RecordCommandDelegate: NSObject, NSApplicationDelegate {
         case .finalizeWithoutAsking:
             // Logout and shutdown finalize without asking, then let the process end.
             isStopping = true
-            stopping = Task { _ = await session.stop() }
-            let stopping = stopping
-            Task {
-                await stopping?.value
+            stopping = Task {
+                _ = await session.stop()
                 NSApp.reply(toApplicationShouldTerminate: true)
             }
             return .terminateLater
