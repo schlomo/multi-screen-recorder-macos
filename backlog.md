@@ -2,24 +2,22 @@
 
 ## Next session starts here
 
-The v0 design is agreed (2026-11-12, D17–D33) and written down in
-`docs/design/recorder.md` and `docs/design/delivery.md`. The skeleton
-and pipeline PR (#1) is merged (2026-11-14), and the end-to-end test
-design is agreed (D37). Agents now mark the PRs they open ready once
-fully reviewed, Copilot's review of the draft included (D39,
-`AGENTS.md` "Agent writes"); the first new draft PR checks how the
-ruleset behaves ("In flight").
+The v0 design is agreed (D17–D33), PR #1 (skeleton and pipeline) and
+PR #6 (crash reports through GitHub, the HiDPI crash fixed by removing
+the popup menus, D40, D41) are merged. Start the next architect session
+fresh with the recorder: the owner, 2026-11-15: "I want to get this PR
+through the door and get the actual recorder done."
 
-Next, waiting for the owner:
+Next:
 
-- **The crash reports and HiDPI crash PR #6** ("In flight"), opened
-  as a draft on 2026-11-15 at 15:48 Europe/Berlin after the owner's
-  go-ahead: CI, Copilot's review (the first observation of D39's
-  ruleset), then ready for the owner to merge.
-- Then the steps below; the app icon PR can run beside them. AGC comes
-  after the recorder: "AGC can also come as an improvement after the
-  recorder" (the owner, 2026-11-15), so step 1 below no longer blocks
-  step 2.
+1. **Recorder design** (queued item 2): the design text for auto mode,
+   a settings file that is read and never refused, recording at the
+   "looks like" size, the audio slider; signed off by the owner before
+   any brief. Steps 2 and 4 of the D34 list below; AGC (step 1) comes
+   after the recorder: "AGC can also come as an improvement after the
+   recorder" (the owner, 2026-11-15).
+2. In parallel ("In flight"): the app icon PR, and the PR for the
+   version scheme and Copilot as an optional extra.
 
 ### Owner's rulings of 2026-11-13 (D34)
 
@@ -48,42 +46,28 @@ order, the next architect session:
 
 ## In flight
 
-- **Copilot's review of drafts (D39), not observed yet.** On the first
-  draft PR opened after #5, the session that owns it reports what the
-  commands in the architect skill's operating rules ("Copilot's
-  review") show: whether the ruleset requests Copilot's review of the
-  draft, and whether marking the PR ready requests another. The
-  architect then corrects that section and `AGENTS.md`
-  ("UNVERIFIED") to what was seen. The ruleset covers
-  every PR, the owner's own and Dependabot's included; who pays for a
-  review of a Dependabot PR is not known; the owner is asked.
-  - Seen so far, not settling either question: the owner marked #5
-    ready at 13:25:17 Europe/Berlin on 2026-11-15, with the ruleset
-    active (all branches, draft reviews on, new-push reviews off), and
-    merged it 43 s later. No Copilot review was requested, then or
-    after the merge; on #1 and #2, before the ruleset, the request came
-    2 s after marking ready. #5 had been opened as a draft before the
-    ruleset existed, so a draft opened under the ruleset may behave
-    differently.
-- **Crash reports through GitHub, and the HiDPI crash** (D40, D41),
-  draft PR #6, branch `crash-reports-through-github`. Reviewed
-  adversarially, every fix delta-reviewed. Checked by the owner with a local build signed
-  with the project certificate: the crash report dialog, browser,
-  Finder and the `.txt` attachment work; the slider "is a huge UX
-  improvement"; "I couldn't provoke the crash" (evidence, not proof:
-  the crash is intermittent).
-  - The crash was a layout loop in AppKit's popup menu window after a
-    display's backing scale changed, not the start window (D41, from
-    macOS's unified log); whether the hold kept the table still under
-    the open menu the log does not show. The fix removes the popup
-    menus: a slider for the recording resolution,
-    radio buttons for the audio mode.
-  - The repeated screen recording prompt was a build signed ad hoc
-    (seen 2026-11-15 with `main` built ad hoc; the signed `0.4.0` does
-    not repeat it); its entry is in `docs/troubleshooting.md` with #6.
-  - The tick marks of the slider are macOS's standard ones; the owner:
-    "the ticks need to be more visible, ideally on the slider itself
-    (or is this a default UI element - then keep)". Kept.
+- **Copilot is an optional extra** (ruling 2026-11-15, supersedes D39
+  in part): "I have copilot free as OSS developer so my limits are
+  very low. treat Copilot as optional goodie only." and "yes, draft
+  PRs should trigger a copilot review, but not subsequent pushes".
+  Observed on PR #6 (opened as a draft under the ruleset on 2026-11-15
+  at 15:48 Europe/Berlin, marked ready at 15:54): no Copilot review was
+  requested, neither for the draft nor on marking ready. To do in the
+  version scheme PR: the decision entry, the architect skill's
+  operating rules ("Copilot's review": agents never wait for it) and
+  `AGENTS.md` "Agent writes". Whether the ruleset's settings request
+  reviews of drafts is the owner's to check; not pursued further.
+- **Version scheme** (supersedes D23 in part): the owner, 2026-11-15:
+  "we went from 0.4.0 to 0.9.0. what would increase the patch? maybe
+  rethink the version scheme? I'd actually prefer X.<date>.<rev
+  count> or something like this, we can keep X=0 for now". The
+  architect's proposal is with the owner; built in its own PR with the
+  Copilot change above once signed off.
+- **App icon PR** (queued item 6): being built on branch `app-icon`
+  from the owner's flat Gemini drawing; the fancy one goes to the
+  README and the homepage; the source images and the earlier vector
+  redraw go to `assets/icon/`. The owner's go-ahead: "yes, I agree with
+  your icon suggestion and parallel execution of the PRs".
 - **Open from PR #1** (merged 2026-11-14), still to report on the
   owner's Mac: the first crash's re-test (unplug the default
   microphone with the window open, wait, "Check again", plug it in
@@ -169,8 +153,11 @@ order, the next architect session:
      inputs that cannot be read do not matter with the audio mode
      `none`, and its comment says what it returns; the unreachable
      `case .gone` in `audioInputs(devices:…)` goes.
-   - The recording manifest is written with `Codable`, not with the
-     settings file's hand-written JSON writer.
+   - One way to write JSON: Apple's `JSONEncoder` (sorted keys) for the
+     settings file, the state file and the recording manifest; the
+     hand-written writer in `Settings.swift` goes. The owner,
+     2026-11-15: "who cares about json key order? and why? KISS and DRY
+     are important".
    - A display mode change can arrive as a disconnect and a reconnect;
      short-lived modes need a settle time, or they make many short
      files.
@@ -316,6 +303,10 @@ order, the next architect session:
 
 ## Done (recent)
 
+- 2026-11-15: PR #6 merged by the owner: crash reports through GitHub
+  (D40) and the HiDPI crash fixed by removing the start window's popup
+  menus (D41); checked by the owner ("I couldn't provoke the crash").
+  The branch is deleted.
 - 2026-11-15: Copilot's review findings on #1 and #2 fixed (PR #4,
   with D38), one deferred to the crash reports PR; agents mark the PRs
   they open ready after Copilot reviews the draft (PR #5, D39).
