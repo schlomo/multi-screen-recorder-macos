@@ -96,6 +96,8 @@ import Testing
             "org.schapiro.multiscreenrecorder.recordingStarted": "2026-11-12T14:03:05.120+01:00",
             "org.schapiro.multiscreenrecorder.app": "Multi Screen Recorder 0.20261115.4 (a1b2c3d)",
             "com.apple.quicktime.software": "Multi Screen Recorder 0.20261115.4 (a1b2c3d)",
+            "com.apple.proapps.reel": "Display 2 - LG HDR 4K",
+            "com.apple.proapps.cameraName": "Display 2 - LG HDR 4K",
         ])
     }
 
@@ -163,6 +165,9 @@ import Testing
         let timecodeTrack = try #require(try await asset.loadTracks(withMediaType: .timecode).first)
         #expect(try readFirstTimecodeFrame(of: timecodeTrack, asset: asset) == Int32(timecode.frame(ofTick: 0)))
         #expect(try await reelName(of: asset) == "Display 2 - LG HDR 4K")
+        let items = try await metadataItems(of: asset)
+        #expect(items["com.apple.proapps.reel"] == "Display 2 - LG HDR 4K")
+        #expect(items["com.apple.proapps.cameraName"] == "Display 2 - LG HDR 4K")
         withExtendedLifetime(writer) {}
     }
 

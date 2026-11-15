@@ -13,8 +13,9 @@ import Testing
 
     @Test func everyItemIsUnderTheAppsKeysAndTheAppAlsoAsSoftware() {
         let keys = metadata.items.map(\.key)
-        #expect(keys.dropLast().allSatisfy { $0.hasPrefix("org.schapiro.multiscreenrecorder.") })
-        #expect(metadata.items.last! == ("com.apple.quicktime.software", "Multi Screen Recorder 1"))
+        #expect(keys.dropLast(3).allSatisfy { $0.hasPrefix("org.schapiro.multiscreenrecorder.") })
+        #expect(metadata.items.suffix(3).map(\.key) == ["com.apple.quicktime.software", "com.apple.proapps.reel", "com.apple.proapps.cameraName"])
+        #expect(metadata.items.suffix(3).map(\.value) == ["Multi Screen Recorder 1", "Display 2 - LG HDR 4K", "Display 2 - LG HDR 4K"])
         #expect(metadata.items.first { $0.key.hasSuffix(".frameSize") }?.value == "1920x1080")
     }
 }

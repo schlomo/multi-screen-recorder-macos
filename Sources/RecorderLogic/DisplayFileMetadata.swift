@@ -1,9 +1,13 @@
 /// What a display file says about itself (D46): its reel name, in the
 /// timecode track, and metadata items under `keyPrefix`, the app also
-/// under the standard QuickTime software key.
+/// under the standard QuickTime software key, the reel name also under the
+/// pro apps keys for the reel and the camera name.
 public struct DisplayFileMetadata: Equatable, Sendable {
     public static let keyPrefix = "org.schapiro.multiscreenrecorder."
     public static let softwareKey = "com.apple.quicktime.software"
+    /// Pro apps keys that may hold the reel name and the camera [CONJECTURE: DaVinci Resolve reads them].
+    public static let reelKey = "com.apple.proapps.reel"
+    public static let cameraNameKey = "com.apple.proapps.cameraName"
 
     public var displayUUID: String
     public var displayNumber: Int
@@ -35,6 +39,6 @@ public struct DisplayFileMetadata: Equatable, Sendable {
             ("frameSize", "\(frameSize.width)x\(frameSize.height)"),
             ("recordingStarted", recordingStarted),
             ("app", app),
-        ].map { (Self.keyPrefix + $0.0, $0.1) } + [(Self.softwareKey, app)]
+        ].map { (Self.keyPrefix + $0.0, $0.1) } + [(Self.softwareKey, app), (Self.reelKey, reelName), (Self.cameraNameKey, reelName)]
     }
 }

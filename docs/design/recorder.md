@@ -400,8 +400,12 @@ metadata items, all text, under `org.schapiro.multiscreenrecorder.`:
 `displayUUID`, `displayNumber`, `displayName`, `frameSize`
 (`1920x1080`), `recordingStarted` (as the manifest's `started`) and
 `app` (as the manifest's `app`), and the app also under the standard
-`com.apple.quicktime.software`. Whether DaVinci Resolve's "detect clips
-from same camera" reads the reel name is UNVERIFIED (D46).
+`com.apple.quicktime.software`; the reel name also under
+`com.apple.proapps.reel` and `com.apple.proapps.cameraName`, which
+DaVinci Resolve may map to Reel Name or Camera # [CONJECTURE]. All
+items, like the reel name, are in a file never finalized too. Whether
+DaVinci Resolve's "detect clips from same camera" reads any of them is
+UNVERIFIED (D46).
 
 **Parallel recordings.** A recording claims its recording folder by
 creating it and refuses if it already exists. Recordings into different
