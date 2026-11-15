@@ -177,9 +177,14 @@ import Testing
         #expect(before <= machNow && machNow <= after)
     }
 
+    /// The continuous clock counts everything the host clock counts and the
+    /// sleeps; read later, it is never behind. (`readClocks` reads the host
+    /// clock second, so its two values can differ the other way by the gap
+    /// between the reads.)
     @Test func theContinuousClockIsNeverBehindTheHostClock() {
-        let reading = readClocks()
-        #expect(reading.continuous >= reading.host)
+        let host = nanoseconds(machTicks: mach_absolute_time())
+        let continuous = continuousNow()
+        #expect(continuous >= host)
     }
 }
 
