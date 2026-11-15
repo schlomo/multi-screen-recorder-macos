@@ -1291,3 +1291,34 @@ architect's reading.
   start and "Check again". Whether Resolve's "detect clips from same
   camera" reads the reel name is UNVERIFIED until the owner's next run.
 - **Evidence:** [design/recorder.md](design/recorder.md); PR #11.
+
+## D47: No crash markers; exit 0 when nothing was lost; no timer on the Dock icon (2026-11-15)
+
+- **Status:** in force; supersedes D20 in part (the crash marker) and
+  D46 in part (point 12, the badge's `h:mm`). Being built in PR #11.
+- **Context:** The owner, after the second run of PR #11's build:
+  "What exactly is this secret marker file? Also, how long will it take
+  for the app to check all old recordings? Maybe we don't need this at
+  all, YAGNI & AI overengineering?", then "remove the marker stuff";
+  "I think if the end result is OK then exit should be 0, transient
+  problems can then be ignored"; "the recording timer in the dock and
+  status window should show seconds and not only minutes, or drop the
+  timer from the dock icon."
+- **Decision:**
+  1. No crash markers: nothing is kept while recording, and nothing is
+     checked, reported or rewritten at the next start. A recording
+     manifest without `ended` belongs to a recording that is running
+     or did not finish.
+  2. The architect's reading of "the end result is OK": `result` is
+     `ok` and `msr record` exits 0 when every file is finalized and no
+     display file was ended by a failure (its stream or writer failed,
+     the disk was full, the writer fell behind, the display showed
+     another display's picture). Otherwise `result` is `problems` and
+     the exit is 3. Every problem is still listed in `problems`.
+  3. The Dock badge shows only "!"; the status window shows the elapsed
+     time as `h:mm:ss`.
+- **Consequences:** A recording cut short by a crash or a power loss is
+  told to no one at the next start; its files stay readable up to the
+  last 2 s, and a crash of `msr` is still offered as a crash report
+  (D40).
+- **Evidence:** [design/recorder.md](design/recorder.md); PR #11.
