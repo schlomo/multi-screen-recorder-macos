@@ -12,6 +12,26 @@ public enum Encoding {
     public static let microphonesGuideTrackBitRate = 64_000
     /// The guide track "System audio", stereo.
     public static let systemAudioGuideTrackBitRate = 96_000
+    /// A keyframe every this many seconds of video.
+    public static let keyframeIntervalSeconds = 2
+    public static let keyframeIntervalFrames = keyframeIntervalSeconds * RecorderValues.framesPerSecond
+    /// The encoder's quality target, 0 to 1: video is quality-targeted
+    /// variable bit rate with a ceiling. A starting point, not designed.
+    public static let videoQuality = 0.5
+    /// The ceiling as a multiple of the estimated average rate of the frame
+    /// size (`videoBytesPerHourAt1080p` scaled by pixel count). A starting
+    /// point, not designed.
+    public static let videoCeilingFactor = 4.0
+
+    /// The bit rate the disk estimate counts for video of this frame size.
+    public static func videoBytesPerHour(frameSize: FrameSize) -> Double {
+        Double(frameSize.pixelCount) / Double(FrameSize.fullHD.pixelCount) * videoBytesPerHourAt1080p
+    }
+
+    /// The ceiling of the video's bit rate, in bytes per second.
+    public static func videoCeilingBytesPerSecond(frameSize: FrameSize) -> Int {
+        Int(videoBytesPerHour(frameSize: frameSize) / 3600 * videoCeilingFactor)
+    }
 }
 
 /// A guide track: a track in every display file for playback and waveform

@@ -4,10 +4,8 @@ import Foundation
 /// file is its video plus its guide tracks, an audio file its tracks, all at
 /// the rates in `Encoding`.
 public enum DiskEstimate {
-    private static let pixelsAt1080p = Double(FrameSize(width: 1920, height: 1080).pixelCount)
-
     public static func displayFileBytesPerHour(frameSize: FrameSize, settings: Settings) -> Double {
-        let video = Double(frameSize.pixelCount) / pixelsAt1080p * Encoding.videoBytesPerHourAt1080p
+        let video = Encoding.videoBytesPerHour(frameSize: frameSize)
         return video + bytesPerHour(bitRate: GuideTrack.tracks(for: settings).map(\.bitRate).reduce(0, +))
     }
 
