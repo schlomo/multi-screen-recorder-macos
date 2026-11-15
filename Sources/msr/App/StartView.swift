@@ -23,7 +23,7 @@ struct StartView: View {
             }
         }
         .padding(20)
-        .frame(width: 520)
+        .frame(width: 560)
     }
 }
 
@@ -121,41 +121,24 @@ private struct SettingsForm: View {
 private struct WhatWillBeRecordedView: View {
     let section: WhatWillBeRecorded
 
+    /// Fixed widths, wide enough for the widest content ("6880×2880", "cannot
+    /// be read", "not recorded"), so that no column moves when the settings
+    /// or the devices change.
+    private static let columnWidths: [CGFloat] = [170, 66, 66, 88, 72]
+
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             Text("What will be recorded").font(.headline)
-            if let error = section.displaysError {
-                Label(error, systemImage: "exclamationmark.triangle.fill")
-                    .foregroundStyle(.red)
-                    .fixedSize(horizontal: false, vertical: true)
-            } else {
-                Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 2) {
-                    header(WhatWillBeRecorded.displayColumns)
-                    ForEach(section.displays, id: \.number) { display in
-                        GridRow {
-                            Text("\(display.number)  \(display.name)")
-                            Text(display.looksLike)
-                            Text(display.drawnAt)
-                            Text(display.recordsAt)
-                            Text(display.gigabytesPerHour).gridColumnAlignment(.trailing)
-                        }
-                    }
+            if let error = section.displaysError { errorLabel(error) }
+            if let error = section.audioError { errorLabel(error) }
+            Grid(alignment: .leading, horizontalSpacing: 8, verticalSpacing: 2) {
+                row(WhatWillBeRecorded.columns).font(.caption).foregroundStyle(.secondary)
+                ForEach(Array(section.displayRows.enumerated()), id: \.offset) { _, displayRow in
+                    row(displayRow.cells)
                 }
-            }
-            if let error = section.audioError {
-                Label(error, systemImage: "exclamationmark.triangle.fill")
-                    .foregroundStyle(.red)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 2) {
-                header(WhatWillBeRecorded.audioColumns)
-                ForEach(Array(section.audio.enumerated()), id: \.offset) { _, source in
-                    GridRow {
-                        Text(source.name)
-                        Text(source.channels)
-                        Text(source.gigabytesPerHour).gridColumnAlignment(.trailing)
-                    }
-                    .foregroundStyle(source.isRecorded ? .primary : .tertiary)
+                if !section.displayRows.isEmpty { Divider() }
+                ForEach(Array(section.audioRows.enumerated()), id: \.offset) { _, audioRow in
+                    row(audioRow.cells).foregroundStyle(audioRow.isRecorded ? .primary : .tertiary)
                 }
             }
             if let total = section.total { Text(total) }
@@ -164,12 +147,21 @@ private struct WhatWillBeRecordedView: View {
         }
     }
 
-    private func header(_ columns: [String]) -> some View {
+    private func errorLabel(_ message: String) -> some View {
+        Label(message, systemImage: "exclamationmark.triangle.fill")
+            .foregroundStyle(.red)
+            .fixedSize(horizontal: false, vertical: true)
+    }
+
+    private func row(_ cells: [String]) -> some View {
         GridRow {
-            ForEach(columns, id: \.self) { Text($0) }
+            ForEach(Array(cells.enumerated()), id: \.offset) { column, cell in
+                Text(cell)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                    .frame(width: Self.columnWidths[column], alignment: column == cells.count - 1 ? .trailing : .leading)
+            }
         }
-        .font(.caption)
-        .foregroundStyle(.secondary)
     }
 }
 

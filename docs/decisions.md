@@ -1128,9 +1128,13 @@ architect's reading.
   auto mode happens regardless of settings or we use --resolution xx to
   indicate a desired resolution. --auto on or --auto off is overkill,
   we need to KISS."; "I thought we had BT & Virtual which seemed
-  logical to me."; "Native I liked before already"; "yes to A". After testing the build: "I think in auto mode the
-  sliders should remain visible but grayed out, now we have too much UI
-  shift". Later the same day, on a Mac without an audio input: "no
+  logical to me."; "Native I liked before already"; "yes to A". After testing the
+  build: "I think in auto mode the sliders should remain visible but
+  grayed out, now we have too much UI shift"; then "looks much better
+  with grayed sliders, especially as they show what happens. now we need
+  to stop the tables from jumping around and build a consolidated table.
+  last column is GB/h for all." and "plain settings yes, --save is not
+  needed. its like show or change as logic.". Later the same day, on a Mac without an audio input: "no
   mic should just work of course, in any mode. and system audio is
   still a thing. The slider can remain as is, it should just not
   break".
@@ -1153,14 +1157,22 @@ architect's reading.
      error names it, nothing is rewritten, no `.previous`, nothing in
      the window, no "Reset to defaults". It is written whole, with
      `JSONEncoder`, only when a person saves (a change in the window,
-     `msr settings --save`). Exit 78 stays for an unset `HOME` only.
+     `msr settings` with a flag). Exit 78 stays for an unset `HOME`
+     only.
   5. A Mac with no audio input at all is ready in every audio mode
      (the architect's reading of the owner's words): the audio item
      says "no microphone" and passes, the system audio is recorded as
      usual. When the settings record no audio input (none present, or
      none recorded under the mode), the ready check has no Microphone
      permission item and does not ask for or read the permission.
-  6. `msr record` without flags does what Start does; a flag changes
+  6. "What will be recorded" is one table (Source, Looks like, Drawn
+     at, Records at, GB/h; the display rows, a divider, the audio rows)
+     with fixed column widths; `msr check` prints the same table.
+  7. `msr settings` shows or changes: without flags it prints the
+     effective settings, with a settings flag it saves the run's
+     effective settings and prints them; `--save` is removed (a usage
+     error). Only `msr settings` writes the file besides the window.
+  8. `msr record` without flags does what Start does; a flag changes
      one run; `--resolution` and `--audio-mode` turn auto mode off for
      the run, `--auto` (no value) forces it, and `--auto` with either
      is a usage error.

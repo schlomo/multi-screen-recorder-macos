@@ -119,8 +119,8 @@ def main() -> None:
         checks.expect_version("msr version through a symbolic link prints the same", linked_msr, expected_version)
         checks.expect("msr settings prints the defaults", 0, '"requiredRecordingHours" : 2', msr, "settings")
         checks.report("msr settings writes no settings file", not settings_file.exists(), "the file exists")
-        checks.expect("msr settings --save writes a flag", 0, '"resolution" : "720p"',
-                      msr, "settings", "--resolution", "720p", "--save")
+        checks.expect("msr settings with a flag saves it", 0, '"resolution" : "720p"',
+                      msr, "settings", "--resolution", "720p")
         checks.expect("msr settings reads the saved file", 0, '"resolution" : "720p"', msr, "settings")
         settings_file.write_text('{"agc": true}\n')
         checks.expect("a settings file with an unknown key is never refused", 0, '"auto" : true', msr, "settings")

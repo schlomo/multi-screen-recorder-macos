@@ -165,12 +165,12 @@ like" for the display, never the size it is drawn at (D44).
 ## Looks like
 
 macOS's word for a display's size in points, as in System Settings ›
-Displays; a column of the tables. What Native records (D44).
+Displays; a column of the table. What Native records (D44).
 
 ## Drawn at
 
 The display's size in pixels, which a HiDPI mode makes larger than its
-looks-like size; a column of the tables. Never recorded (D44).
+looks-like size; a column of the table. Never recorded (D44).
 
 ## Ready check
 

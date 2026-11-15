@@ -8,14 +8,14 @@ struct CommandLineInterface: AsyncParsableCommand {
         commandName: "msr",
         abstract: "Multi Screen Recorder: records every display and audio source.",
         discussion: """
-            Without arguments, msr starts the app. A flag changes the settings for that one run only. \
+            Without arguments, msr starts the app. A settings flag changes the settings for that one run; only `msr settings` saves them. \
             An unset HOME makes every command that reads the settings exit 78.
             """,
         subcommands: [List.self, Check.self, SettingsCommand.self, Version.self]
     )
 }
 
-/// One flag per settings key, overriding it for this run only.
+/// One flag per settings key, changing it for this run; `msr settings` saves the result.
 struct SettingsFlags: ParsableArguments {
     @Flag(help: "Auto mode for this run, whatever the settings file says: every display at Native, the audio mode Wired. Not with --resolution or --audio-mode.")
     var auto = false
@@ -37,6 +37,9 @@ struct SettingsFlags: ParsableArguments {
 
     @Option(help: "The low disk space warning threshold, in minutes.")
     var lowDiskWarningMinutes: String?
+
+    /// Whether any settings flag, `--auto` included, is given.
+    var isGiven: Bool { auto || !values.isEmpty }
 
     var values: [SettingKey: String] {
         let pairs: [(SettingKey, String?)] = [
@@ -130,17 +133,16 @@ extension CommandLineInterface {
     struct SettingsCommand: AsyncParsableCommand {
         static let configuration = CommandConfiguration(
             commandName: "settings",
-            abstract: "Print the effective settings as JSON.")
+            abstract: "Show the effective settings as JSON, or change them.",
+            discussion: "Without flags it prints the settings. With any settings flag it saves the run's effective settings "
+                + "into the settings file and prints them; the only command that writes the file.")
 
         @OptionGroup var flags: SettingsFlags
-
-        @Flag(help: "Write these effective settings into the settings file; the only way a command writes it.")
-        var save = false
 
         func run() async throws {
             let file = try standardSettingsFile()
             let settings = try flags.effectiveSettings(from: file)
-            if save { try file.save(settings) }
+            if flags.isGiven { try file.save(settings) }
             print(String(decoding: try settings.jsonData(), as: UTF8.self), terminator: "")
         }
     }

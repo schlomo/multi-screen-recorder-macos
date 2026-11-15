@@ -27,7 +27,7 @@ signature); if that fails it exits 71 (`EX_OSERR`).
 | `msr list` | Shows displays, audio inputs and system audio | 0, 1 when the displays, the audio inputs or an audio input the settings record cannot be read |
 | `msr check [flags]` | Prints "What will be recorded", then runs the ready check and prints each item | 0 ready, 1 not ready |
 | `msr record [flags] [--duration 1h30m]` | Not built yet (the recorder PR). Without flags it does what Start in the window does, with the same settings file; it prints "What will be recorded" at its start, then runs the ready check, records until Ctrl-C, SIGTERM, SIGHUP or the duration, and prints the recording folder at the start and a summary at the end | 0 ok, 1 not ready, 3 ended with an error |
-| `msr settings [flags] [--save]` | Prints the effective settings as JSON; `--save` writes them into the settings file, the only way a command writes it; the window also writes it | 0, 1 when `--save` cannot write the file |
+| `msr settings [flags]` | Without flags prints the effective settings as JSON (show); with any settings flag, `--auto` included, saves the run's effective settings into the settings file and prints them (change). The only command that writes the file; the window also writes it | 0, 1 when it cannot write the file |
 | `msr version` | Prints the version and commit | 0 |
 
 A usage error (unknown command or flag, invalid value) prints a usage
@@ -37,8 +37,10 @@ command that reads the settings (all but `msr version`) exits 78
 file is never refused (see "Settings file"), so `msr check` exiting 1
 means only "not ready".
 
-Each flag is a settings key in kebab case and changes it for this run
-only; a command without flags uses the settings file as it is (D44):
+Each flag is a settings key in kebab case and changes it for this run;
+a command without flags uses the settings file as it is. The flags are
+the same for `msr settings`, `msr check` and `msr record`; only `msr
+settings` saves them (D44):
 
 | Flag | Values |
 |---|---|
@@ -52,9 +54,10 @@ only; a command without flags uses the settings file as it is (D44):
 
 `--resolution` and `--audio-mode` set a choice and so turn auto mode
 off for the run; `--auto` together with either is a usage error (exit
-64). `msr settings --resolution 1080p --save` writes `resolution:
-1080p` and `auto: false`, `msr settings --auto --save` writes `auto:
-true`: `--save` writes the run's effective settings.
+64). `msr settings --resolution 1080p` writes `resolution: 1080p` and
+`auto: false`, `msr settings --auto` writes `auto: true`: `msr settings`
+with a flag writes the run's effective settings. There is no `--save`
+(a usage error, exit 64): `msr settings` shows or changes.
 
 `msr list` prints:
 
@@ -76,8 +79,8 @@ size; the drawn-at size is never recorded (D44). It is the one of the
 recording resolution the settings choose: Native with auto mode, the
 default.
 
-`msr check` first prints "What will be recorded": the window's two
-tables, the total line and "Files go to <output folder>", from the same
+`msr check` first prints "What will be recorded": the window's one
+table, the total line and "Files go to <output folder>", from the same
 code (see "The app"; the window's last line, "Recording continues when
 displays or audio sources change.", is not printed), then one line per
 item of the ready check, `ok` or `FAIL`, a fix under each failure, and
@@ -86,13 +89,13 @@ the defaults and 3.1 GB free:
 
 ```
 What will be recorded
-  Display                    Looks like  Drawn at   Records at  GB/h
-  1 Built-in Retina Display  1728×1117   3456×2234  1728×1116   1.0
-  2 LG HDR 4K                3840×2160   3840×2160  3840×2160   4.1
-  Audio                             Channels  GB/h
-  MacBook Pro Microphone (default)  1         0.1
-  RØDE Wireless GO II RX            2         0.1
-  System audio                      stereo    0.1
+  Source                            Looks like  Drawn at   Records at  GB/h
+  1 Built-in Retina Display         1728×1117   3456×2234  1728×1116    1.0
+  2 LG HDR 4K                       3840×2160   3840×2160  3840×2160    4.1
+  ─────────────────────────────────────────────────────────────────────────
+  MacBook Pro Microphone (default)                         1 channel    0.1
+  RØDE Wireless GO II RX                                   2 channels   0.1
+  System audio                                             stereo       0.1
   Total 5.3 GB/h. 2 hours need 10.7 GB, 3.1 GB free.
   Files go to ~/Movies/Multi Screen Recorder
 ```
@@ -156,11 +159,11 @@ saves, so a fresh Mac has none and the defaults apply:
   mode (`resolution: native`, `audioMode: default-microphone`) stays
   valid.
 - **Written only when a person saves:** a choice changed in the window,
-  or `msr settings --save`. The file is written whole, in its current
+  or `msr settings` with a flag. The file is written whole, in its current
   form, with Apple's `JSONEncoder` (sorted keys, pretty printed); the
   state file and the recording manifest are written the same way. A
-  write that fails is an error naming the file (exit 1 for `msr settings
-  --save`; a red line in the window, the choice applies for the session).
+  write that fails is an error naming the file (exit 1 for `msr settings`
+  with a flag; a red line in the window, the choice applies for the session).
 - Exit status 78 stays for an unset `HOME` only.
 
 ## Ready check
@@ -206,7 +209,7 @@ folder, and free disk space in the output folder for
   its tracks' bit rates. The item compares the total of every file the
   recording would write, for `requiredRecordingHours`, with the free
   space. For the devices of the `msr list` example at the defaults that
-  is 5.3 GB per hour, 10.7 GB for 2 hours (the tables in "The app" show
+  is 5.3 GB per hour, 10.7 GB for 2 hours (the table in "The app" shows
   each file).
 - One cause, one red item: when the output folder fails, or the
   displays, the audio inputs or an audio input the recording records
@@ -216,7 +219,7 @@ folder, and free disk space in the output folder for
   active again (unless a check is still running), when a display
   comes, goes or changes, when an audio device comes or goes, when the
   default audio input changes, after every settings change, and on
-  "Check again"; the tables of what will be recorded follow with it.
+  "Check again"; the table of what will be recorded follows with it.
   Other changes of an audio input, such as its channels, show with the
   next check. A burst of changes gives one check, 0.3 s after the last
   (*data*); a refresh queued for the window that a newer notice has
@@ -367,15 +370,20 @@ manifest's state to `not finalized` and remove the marker.
 
 - **Start:** a small window. At the top, a section "What will be
   recorded", built from the settings and the devices connected now and
-  refreshed whenever the ready check runs (D33): two tables and a
-  total line.
-  - Displays: the number and name, "Looks like" (the size in points),
-    "Drawn at" (the pixel size, shown also where both are equal),
-    "Records at" (the frame size) and GB/h (the display file, its
-    guide tracks included).
-  - Audio: one row per audio input (its name, the default one marked
-    "(default)", and its number of channels), then one row "System
-    audio" (stereo), with GB/h (the audio file). A source not recorded
+  refreshed whenever the ready check runs (D33): one table and a
+  total line. The columns are Source, "Looks like", "Drawn at", "Records
+  at" and GB/h, the last for every row and right-aligned. The column
+  widths are fixed, wide enough for the widest content, so no column
+  moves when auto mode, a slider or the devices change.
+  - Display rows first: the number and name, "Looks like" (the size in
+    points), "Drawn at" (the pixel size, shown also where both are
+    equal), "Records at" (the frame size) and GB/h (the display file,
+    its guide tracks included).
+  - A thin divider, no second header, then the audio rows: the name of
+    each audio input (the default one marked "(default)") in Source,
+    Looks like and Drawn at empty, its number of channels in Records
+    at ("1 channel", "2 channels", "cannot be read"), and GB/h (the
+    audio file); the last row is "System audio" with "stereo". A source not recorded
     is dimmed and shows "not recorded": every input with the audio
     mode `none`; every input but the default one with
     `default-microphone`; with `wired` every input but the default one
@@ -388,12 +396,11 @@ manifest's state to `not finalized` and remove the marker.
     output folder item failed).
   - Below, the output folder and "Recording continues when displays or
     audio sources change." If the displays cannot be read, that error
-    stands in place of the Displays table; if the audio inputs cannot
-    be read, "The audio inputs cannot be read: <reason>" stands above
-    the Audio table, which then has the system audio row only; an audio
-    input whose
-    channels cannot be read shows "cannot be read" in the Channels
-    column (and "unknown" GB/h if it is recorded). The total line
+    stands as a red line above the table, which then has no display
+    rows; if the audio inputs cannot be read, "The audio inputs cannot
+    be read: <reason>" stands as a red line above the table too, which
+    then has the system audio row only; an audio input whose channels
+    cannot be read shows "cannot be read" in the Records at column (and "unknown" GB/h if it is recorded). The total line
     appears only when the displays and every recorded audio input can
     be read. The ready check's items stay as they are.
 
@@ -413,7 +420,7 @@ manifest's state to `not finalized` and remove the marker.
   and Start. A change of a choice is saved at once; if the settings file
   cannot be written, a red line says so. The window has no "Reset to
   defaults": a settings file is never refused.
-  The two tables and the total line are the same data that `msr check`
+  The table and the total line are the same data that `msr check`
   prints as text.
    All green,
   the ready check is one line, "Ready to record", that expands on click
@@ -422,16 +429,13 @@ manifest's state to `not finalized` and remove the marker.
   devices of the `msr list` example, the defaults and the free space
   of the `msr check` example, the section shows:
 
-| Display | Looks like | Drawn at | Records at | GB/h |
+| Source | Looks like | Drawn at | Records at | GB/h |
 |---|---|---|---|---|
 | 1 Built-in Retina Display | 1728×1117 | 3456×2234 | 1728×1116 | 1.0 |
 | 2 LG HDR 4K | 3840×2160 | 3840×2160 | 3840×2160 | 4.1 |
-
-| Audio | Channels | GB/h |
-|---|---|---|
-| MacBook Pro Microphone (default) | 1 | 0.1 |
-| RØDE Wireless GO II RX | 2 | 0.1 |
-| System audio | stereo | 0.1 |
+| MacBook Pro Microphone (default) |  |  | 1 channel | 0.1 |
+| RØDE Wireless GO II RX |  |  | 2 channels | 0.1 |
+| System audio |  |  | stereo | 0.1 |
 
 Total 5.3 GB/h. 2 hours need 10.7 GB, 3.1 GB free.
 
@@ -639,7 +643,7 @@ thread). `AppTests` run the start window's model with stand-in probes
 and a stand-in for the hold: one check per burst of device changes,
 nothing applied while a menu is open, a stale queued refresh does
 nothing, choices saved only when changed. `CommandTests` run
-the built `msr` with a scratch `HOME` (`msr settings`, with `--save` and
+the built `msr` with a scratch `HOME` (`msr settings`, with flags and
 `--auto`, and `msr version`, which prompt for nothing; also through a
 symbolic link into an app bundle), `scripts/version` in scratch git repositories and
 `scripts/unpack-app` on scratch archives (some written byte by byte, as
@@ -756,5 +760,5 @@ Decided while building PR A, within D44, for the owner to confirm:
 items, separated by a blank line, without the window's line "Recording
 continues …"; a settings file that cannot be read as a whole is named
 "the whole file" in the line on standard error; an input's transport
-that cannot be read is not wired; `msr settings --save` that cannot
+that cannot be read is not wired; `msr settings` with a flag that cannot
 write exits 1; the window shows a red line when a save fails.

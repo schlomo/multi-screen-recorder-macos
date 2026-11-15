@@ -67,12 +67,11 @@ confirmed yet.
 
 ## Usage
 
-Start the app from Finder: its window shows what will be recorded (a
-table of the displays, with what each looks like, the size it is
-drawn at and the size it records at; a table of the audio inputs and
-system audio, the ones not recorded dimmed; each with the disk space
-it needs per hour, the total and the free space below; the output
-folder), then the switch "Auto" (on, the two sliders are grayed out and show Native and Wired; off,
+Start the app from Finder: its window shows what will be recorded (one
+table: the displays, with what each looks like, the size it is drawn at
+and the size it records at, then the audio inputs and system audio, the
+ones not recorded dimmed; each row with the disk space it needs per
+hour; the total and the free space below; the output folder), then the switch "Auto" (on, the two sliders are grayed out and show Native and Wired; off,
 they are enabled and show the recording resolution and the audio mode: None, Default
 microphone, Wired or All, with a note under it on Bluetooth and virtual
 microphones), system audio, the output folder and the ready check:
@@ -98,7 +97,7 @@ so it shows the app's version and runs with its signature.
 |---|---|
 | `msr list` | Shows displays, audio inputs and system audio |
 | `msr check [flags]` | Prints what will be recorded, then runs the ready check; exits 0 when ready, 1 when not; creates the output folder if it is missing |
-| `msr settings [flags] [--save]` | Prints the effective settings as JSON; `--save` writes them into the settings file, the only way a command writes it |
+| `msr settings [flags]` | Without flags prints the effective settings as JSON; with a settings flag saves the effective settings into the settings file and prints them, the only way a command writes it |
 | `msr version` | Prints the version and commit |
 
 Without flags a command uses the settings as they are. Each flag changes
@@ -112,14 +111,15 @@ together with either is a usage error. A usage error exits 64; an unset
 `HOME` exits 78. The settings live in
 `~/Library/Application Support/Multi Screen Recorder/settings.json`,
 which nothing writes until you change a choice in the window or run
-`msr settings --save`. Nothing refuses the file: what is unknown or
+`msr settings` with a flag. Nothing refuses the file: what is unknown or
 invalid in it is ignored, named on standard error, and the defaults
 apply for it.
 
 ```sh
 msr check --audio-mode none --required-recording-hours 4
-msr settings --resolution 1440p --save   # also turns auto mode off
-msr settings --auto --save
+msr settings                     # shows the settings
+msr settings --resolution 1440p  # saves it, and turns auto mode off
+msr settings --auto              # saves auto mode
 ```
 
 Started from a terminal, macOS attributes the two permissions to the

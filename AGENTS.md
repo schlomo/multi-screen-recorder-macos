@@ -266,7 +266,7 @@ hoc, for a local check only).
   copy under `~/Library/Application Support/Multi Screen Recorder`
   (`HOME` decides where).
   `msr version`, `msr settings` (it writes the settings file only with
-  `--save`; `HOME` decides where) and the tests are
+  a settings flag; `HOME` decides where) and the tests are
   safe; the tests read the Mac's audio device list, which shows no
   prompt.
 - Real capture needs the Screen & System Audio Recording and

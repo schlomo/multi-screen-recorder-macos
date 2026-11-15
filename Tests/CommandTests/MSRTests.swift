@@ -49,45 +49,52 @@ import Testing
         #expect(!settingsFileExists)
     }
 
-    @Test func saveWritesTheEffectiveSettingsWhole() throws {
+    @Test func aFlagSavesTheEffectiveSettingsWholeAndPrintsThem() throws {
         defer { home.remove() }
-        let outcome = try msr("settings", "--system-audio", "off", "--save")
+        let outcome = try msr("settings", "--system-audio", "off")
         #expect(outcome.status == 0)
         #expect(try String(contentsOf: settingsFile, encoding: .utf8) == outcome.output)
         #expect(try savedSettings()["systemAudio"] as? Bool == false)
     }
 
-    @Test func aResolutionSavedWithSaveTurnsAutoOff() throws {
+    @Test func aResolutionFlagSavesAndTurnsAutoOff() throws {
         defer { home.remove() }
-        #expect(try msr("settings", "--resolution", "1080p", "--save").status == 0)
+        #expect(try msr("settings", "--resolution", "1080p").status == 0)
         let saved = try savedSettings()
         #expect(saved["resolution"] as? String == "1080p")
         #expect(saved["auto"] as? Bool == false)
     }
 
-    @Test func anAudioModeSavedWithSaveTurnsAutoOff() throws {
+    @Test func anAudioModeFlagSavesAndTurnsAutoOff() throws {
         defer { home.remove() }
-        #expect(try msr("settings", "--audio-mode", "all-inputs", "--save").status == 0)
+        #expect(try msr("settings", "--audio-mode", "all-inputs").status == 0)
         let saved = try savedSettings()
         #expect(saved["audioMode"] as? String == "all-inputs")
         #expect(saved["auto"] as? Bool == false)
     }
 
-    @Test func autoSavedWithSaveTurnsAutoOn() throws {
+    @Test func theAutoFlagSavesAutoOn() throws {
         defer { home.remove() }
         try writeSettings(#"{"auto": false, "resolution": "720p"}"#)
-        #expect(try msr("settings", "--auto", "--save").status == 0)
+        #expect(try msr("settings", "--auto").status == 0)
         let saved = try savedSettings()
         #expect(saved["auto"] as? Bool == true)
         #expect(saved["resolution"] as? String == "720p")
     }
 
-    @Test func autoOverridesAFileWithAutoOffForTheRunOnly() throws {
+    @Test func plainSettingsOnlyShowsAndLeavesTheFileAsItIs() throws {
         defer { home.remove() }
         let content = #"{"auto": false}"#
         try writeSettings(content)
-        #expect(try msr("settings", "--auto").output.contains(#""auto" : true"#))
+        #expect(try msr("settings").output.contains(#""auto" : false"#))
         #expect(try String(contentsOf: settingsFile, encoding: .utf8) == content)
+    }
+
+    @Test func saveIsNoLongerAFlag() throws {
+        defer { home.remove() }
+        #expect(try msr("settings", "--save").status == 64)
+        #expect(try msr("settings", "--resolution", "720p", "--save").status == 64)
+        #expect(!settingsFileExists)
     }
 
     @Test(arguments: [["--resolution", "720p"], ["--audio-mode", "none"]])
@@ -136,11 +143,11 @@ import Testing
         #expect(outcome.output.contains(#""audioMode" : "default-microphone""#))
     }
 
-    @Test func aSaveThatCannotBeWrittenExits1NamingTheFile() throws {
+    @Test func aChangeThatCannotBeWrittenExits1NamingTheFile() throws {
         defer { home.remove() }
         // A plain file where the Library folder must be.
         try Data().write(to: home.url.appending(path: "Library"))
-        let outcome = try msr("settings", "--save")
+        let outcome = try msr("settings", "--system-audio", "off")
         #expect(outcome.status == 1)
         #expect(outcome.errors.contains("settings.json"))
         #expect(outcome.errors.contains("cannot be written"))
