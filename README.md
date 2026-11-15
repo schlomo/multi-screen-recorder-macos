@@ -1,6 +1,5 @@
-<img src="assets/icon/app-icon-fancy.jpeg" alt="Multi Screen Recorder app icon" width="128" align="right">
-
 # Multi Screen Recorder
+<img src="assets/icon/app-icon-fancy.jpeg" alt="Multi Screen Recorder app icon" width="128" align="right">
 
 A reliable multi-source screen and audio recorder for macOS. It
 captures every display and audio source, never loses a recording, and
