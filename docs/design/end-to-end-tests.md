@@ -271,19 +271,23 @@ tried:
   holds the fault: a fresh process, a new serial number, a new fetch of
   the shareable content and the other workarounds tried did not clear
   it, and a screenshot through the display filter was wrong too.
-  `SCStreamFrameInfo.screenRect` detects it on every frame: it equals
-  `CGDisplayBounds` of the display exactly when the picture is right
-  (no counterexample in 13 runs). A screenshot with
+  `SCStreamFrameInfo.screenRect` is a one-directional sign: a frame
+  whose `screenRect` differed from `CGDisplayBounds` of the display
+  always carried the other display's picture (11 of 11), while a
+  matching `screenRect` once came with a black frame that was not yet
+  painted (`fault-run3-3cycles.log`, line 5), so a match does not
+  prove the picture right. A screenshot with
   `SCScreenshotManager.captureImage(in:)` of the display's bounds
   was right in 3 of 3 faulty runs; as a recording path it is
   UNVERIFIED (its cost at 30 frames per second is not known). So the
-  recorder must compare `screenRect` with `CGDisplayBounds` on every
-  frame, act only after several mismatched frames in a row (what
-  debounce a mode change needs is UNVERIFIED), never write a
-  mismatched frame as that display, and, since restarting does not
-  help, fail that display loudly or fall back to the screenshot. For
-  these tests: create the reconnecting display first to trigger the
-  fault, last to avoid it. Not tried: whether this happens with the
+  recorder needs a check per frame that never writes a mismatched
+  frame as that display, and, since restarting does not help, a way
+  to fail that display loudly. Proposals for the recording core's
+  design, untested: compare `screenRect` with `CGDisplayBounds` on
+  every frame, act after several mismatched frames in a row (what
+  debounce a mode change needs is UNVERIFIED), fall back to the
+  screenshot. For these tests: create the reconnecting display first
+  to trigger the fault, last to avoid it. Not tried: whether this happens with the
   Mac's own displays or only with virtual ones, and three or more
   displays.
   Whether the owner's BetterDisplay HiDPI mode works through virtual
@@ -297,18 +301,19 @@ tried:
 - **A screenshot's colour space had no name** in that run (see
   "Unknowns"). The recorder design names the colour space it tags
   (D24), so it must find out what ScreenCaptureKit delivers. Tried
-  (2026-11-15, one run): the frames carry the display's ICC profile
-  without a name in every format; BGRA has no primaries, transfer or
+  (2026-11-15, one run): the frames carry a colour space attachment
+  without a name, whose ICC description is the display's name, and no
+  ICC profile key, in every format; BGRA has no primaries, transfer or
   matrix keys, while 420v and 420f are BT.709 in all three. So the
-  recorder cannot read a colour space's name from the frames, and for
-  BGRA it must set the tag itself. Not tried: `colorSpaceName` and
+  recorder cannot read a colour space's name from the frames; for BGRA
+  the frames carry no primaries, transfer or matrix to read either. Not tried: `colorSpaceName` and
   `colorMatrix`.
 - **macOS's display ID is not a display's identity.** Tried (see
   "Unknowns"): the same virtual display got a new display ID each time
   it was created. A display that comes back during a recording may
   so have another display ID; the recorder's stable identity for a
   display (`backlog.md`, recorder PR) cannot be the display ID alone.
-  Tried again (2026-11-15, about 30 creations): the UUID from
+  Tried again (2026-11-15, 55 creations in the logs): the UUID from
   `CGDisplayCreateUUIDFromDisplayID` stayed the same across
   reconnects, processes and runs for the same vendor, product and
   serial number, and changed with a new serial number; the name did
@@ -326,17 +331,19 @@ tried:
   `NSApplication.shared.run()`; polling `CGGetActiveDisplayList` saw a
   new display after 0.11 to 0.16 s and `SCShareableContent` after 0.17
   to 0.23 s. So `msr record` must poll or run the AppKit loop.
-- **A mode change is not a reconnect, and the frame size stays.**
+- **A mode change is not a reconnect, and the frames keep the configured size.**
   Tried (2026-11-15, HiDPI in two runs, 1x in one; see "Unknowns"): a
   mode switch during a stream gave no error, the display ID stayed, and
   with a configured size of 1920 × 1080 the frames stayed that size
   with the content scaled and `screenRect` following the new bounds;
-  a 4:3 mode came pillarboxed. The recorder must tell a mode change
-  from a reconnect by the display ID and the callback's flags, and
-  take a new `screenRect` as no fault. Not tried: a mode switch while
-  the wrong display's picture is shown.
+  a 4:3 mode came pillarboxed. The running stream kept delivering the
+  configured size, so a display file at the new size needs the stream
+  reconfigured or restarted. A mode change can be told from a
+  reconnect by the display ID and the callback's flags. Not tried:
+  `updateConfiguration` or a restart to the new size, and a mode
+  switch while the wrong display's picture is shown.
 - **The audio clock of an audio input drifts against the host clock,
-  and macOS does not correct it.** Tried (2026-11-15, one run of one
+  and `AVCaptureSession` does not correct it.** Tried (2026-11-15, one run of one
   hour, macOS 26.7.1): one `AVCaptureSession` for each of five audio
   inputs started together, the audio discarded, the samples of each
   counted and compared with the host clock from the first buffer on
@@ -347,12 +354,18 @@ tried:
   +0.0097 s, MacBook Pro Microphone 0.0000 s and BlackHole 2ch
   (virtual) -0.0046 s. All five ran at 48000 Hz. The rate was steady
   over the hour. The buffers' presentation timestamps follow the
-  sample count (the timestamp minus the samples stays constant, about
-  11 ms), so macOS does not correct the drift. Hence two inputs
+  sample count (the timestamp minus the samples stays constant; the
+  constant of about 11 ms is the first buffer's duration, an artefact
+  of the probe, which leaves the first buffer out of the count), so
+  `AVCaptureSession` does not correct the drift in the timestamps it
+  delivers. Whether Core Audio's own path corrects it was not measured.
+  Hence two inputs
   recorded for an hour drift apart by up to 0.6 s, and an audio file
   that is placed by its sample count alone is that much off the
-  display files. The recorder must place each audio input on the host
-  clock; resampling is the obvious way. Not tried: a run of several
+  display files. A recorder
+  that places each audio input on the host clock needs a correction;
+  resampling is the obvious one (a proposal for the recording core's
+  design, untested). Not tried: a run of several
   hours, other audio inputs, a run under load or with the Mac asleep,
   a Bluetooth input, and any correction.
 - **A plain executable no longer appears in the Screen Recording list**
@@ -502,16 +515,16 @@ this design is built:
   the main display and gone after each run; the Mac's own displays
   kept their display IDs, bounds and modes; one hung probe was killed,
   no process was left and no prompt showed. macOS may remember the
-  arrangement and name for the serial numbers 101, 102, 301, 401 and
-  501 (UNVERIFIED). A virtual display's identity, its looks-like size
+  arrangement and name for the serial numbers 101, 102, 111, 121, 301, 401
+  and 501 (UNVERIFIED). A virtual display's identity, its looks-like size
   and mode changes, its colour space and how to list it without
   AppKit are in the items below. Not tried: three or more displays;
-- the identity of a display. **Tried** (2026-11-15, about 30
-  creations; the Mac's own displays were only read, twice). With the
+- the identity of a display. **Tried** (2026-11-15, 55 creations
+  in the logs; the Mac's own displays were only read, twice). With the
   same vendor, product and serial number,
   `CGDisplayCreateUUIDFromDisplayID` gave the same UUID across
   reconnects, processes and runs; with a new serial number, a new
-  UUID. The display ID was new every time (17 to 72). The name was not
+  UUID. The display ID was new every time (18 to 72). The name was not
   stable: "MSR Test", then "MSR Test (1)", then "(2)". Two virtual
   displays with the same vendor, product and serial number cannot
   exist at once (the initialiser returns nil). The Mac's own displays:
@@ -537,9 +550,10 @@ this design is built:
   tried: a mode switch on the display that shows the wrong picture
   (the next item);
 - the colour space of the frames. **Tried** (2026-11-15, one run; the
-  virtual display and both of the Mac's own displays). Every format
-  carried the display's ICC profile, with no name and the display's
-  name as its description. BGRA carried no primaries, transfer or
+  virtual display and both of the Mac's own displays). The ICC profile
+  key was absent (`ICC=nil`) in every format; the frames carried a
+  `CGColorSpace` attachment with no name, whose ICC description was the
+  display's name. BGRA carried no primaries, transfer or
   matrix keys; 420v and 420f carried BT.709 primaries, transfer and
   matrix. Red read back as BGRA 0, 0, 255, 255; 420v Y/Cb/Cr 63, 102,
   240; 420f 54, 99, 255 (what BT.709 gives for 255, 0, 0). Not tried:
@@ -548,7 +562,7 @@ this design is built:
   Polling `CGGetActiveDisplayList` saw a new display 0.11 to 0.16 s
   after the helper started and `SCShareableContent` 0.17 to 0.23 s;
   the display was gone after 0.02 to 0.18 s and 0.17 to 0.74 s
-  respectively. One `SCShareableContent` fetch took 110 to 300 ms.
+  respectively. The mean of an `SCShareableContent` fetch was 110 to 300 ms per run; single fetches took up to 731 ms (`listen-nsapp-run.log`, line 25).
   `CGDisplayRegisterReconfigurationCallback` never fired under
   `CFRunLoopRun` (two runs), `dispatchMain` (two runs) or
   `NSApplication.shared` with `CFRunLoopRun` (one run); it fired under
@@ -587,10 +601,11 @@ this design is built:
   B then showed A's picture). What works: `SCScreenshotManager.captureImage(in:)`
   with `CGDisplayBounds` of A gave A's picture in 3 of 3 faulty runs
   (BGRA 0, 0, 255, 255); its cost at 30 frames per second is
-  UNVERIFIED. What detects it: `SCStreamFrameInfo.screenRect` equals
-  `CGDisplayBounds` of the display exactly when the picture is right,
-  and is the other display's rectangle when it is wrong; no
-  counterexample in 13 runs. Not tried: the Mac's own displays (BetterDisplay can
+  UNVERIFIED. What shows it: `SCStreamFrameInfo.screenRect` was the
+  other display's rectangle in every frame that carried the other
+  display's picture (11 of 11); a matching `screenRect` once came with
+  a black frame that was not yet painted
+  (`fault-run3-3cycles.log`, line 5). Not tried: the Mac's own displays (BetterDisplay can
   switch one off and on), three or more displays, a mode switch on B,
   the cause;
 - an aggregate device created and removed is seen as an audio input
