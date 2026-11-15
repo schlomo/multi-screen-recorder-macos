@@ -347,7 +347,7 @@ architect's reading.
 
 ## D20: Recording folder, recording manifest, parallel recordings (2026-11-12)
 
-- **Status:** in force
+- **Status:** in force; superseded in part by D47 (no crash markers)
 - **Context:** On two recorders at once the owner ruled: "should
   prevent multiple invoications on same folder, nice if we can support
   multiple parallel recordings that don't conflict".
@@ -1230,7 +1230,8 @@ architect's reading.
 
 ## D46: The owner's rulings from trying B1 (2026-11-15)
 
-- **Status:** in force; refines D45 and, for B2, D31. Being built in
+- **Status:** in force; refines D45 and, for B2, D31; superseded in
+  part by D47 (point 12: the badge shows no time). Being built in
   PR #11 (B1), point 7 in B2.
 - **Context:** The owner tried the snapshot release of PR #11 on
   2026-11-15 and wrote: "duration without suffix is minutes"; "yes,
