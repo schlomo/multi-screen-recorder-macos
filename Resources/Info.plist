@@ -9,6 +9,8 @@
 	<string>Multi Screen Recorder</string>
 	<key>CFBundleExecutable</key>
 	<string>msr</string>
+	<key>CFBundleIconFile</key>
+	<string>AppIcon</string>
 	<key>CFBundleIdentifier</key>
 	<string>org.schapiro.multiscreenrecorder</string>
 	<key>CFBundleInfoDictionaryVersion</key>

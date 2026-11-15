@@ -28,17 +28,35 @@ def stop(message: str) -> NoReturn:
     sys.exit(f"{ME}: {message}")
 
 
-def bundled_version(info_plist: Path) -> str:
-    """MSRVersion from the bundle's Info.plist, which must be a valid property list with a dictionary at its root."""
+def bundle_info(info_plist: Path) -> dict:
+    """The bundle's Info.plist, which must be a valid property list with a dictionary at its root."""
     try:
         info = plistlib.loads(info_plist.read_bytes())
     except (OSError, plistlib.InvalidFileException, ExpatError, ValueError) as error:
         stop(f"cannot read the bundle's Info.plist: {error}")
     if not isinstance(info, dict):
         stop("the bundle's Info.plist does not hold a dictionary")
+    return info
+
+
+def bundled_version(info: dict) -> str:
     if not isinstance(info.get("MSRVersion"), str):
         stop("the bundle's Info.plist has no MSRVersion")
     return info["MSRVersion"]
+
+
+def icon_problem(info: dict, resources: Path) -> str | None:
+    """Why the bundle does not name and hold its icon file, or None when it does."""
+    icon_name = info.get("CFBundleIconFile")
+    if not isinstance(icon_name, str) or not icon_name:
+        return "CFBundleIconFile is not set"
+    icon = resources / f"{icon_name}.icns"
+    if not icon.is_file():
+        return f"Contents/Resources/{icon_name}.icns is missing"
+    width = subprocess.run(["sips", "-g", "pixelWidth", icon], stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True)
+    if not width.stdout.rstrip().endswith("pixelWidth: 1024"):
+        return f"Contents/Resources/{icon_name}.icns is not a 1024 px icon"
+    return None
 
 
 @dataclass
@@ -72,13 +90,15 @@ class Checks:
 
 
 def main() -> None:
-    if shutil.which("git") is None:
-        stop("git is not on the PATH")
+    for tool in ("git", "sips"):
+        if shutil.which(tool) is None:
+            stop(f"{tool} is not on the PATH")
     os.chdir(Path(__file__).resolve().parent.parent)
     msr = Path.cwd() / APP / "Contents/MacOS/msr"
     if not os.access(msr, os.X_OK):
         stop(f"{msr} does not exist; run scripts/build-app first")
-    version = bundled_version(APP / "Contents/Info.plist")
+    info = bundle_info(APP / "Contents/Info.plist")
+    version = bundled_version(info)
     head = subprocess.run(["git", "rev-parse", "--short=7", "HEAD"], check=True,
                           stdout=subprocess.PIPE, text=True).stdout.strip()
     expected_version = f"{version} ({head})"
@@ -91,6 +111,9 @@ def main() -> None:
         linked_msr = scratch / "msr"
         linked_msr.symlink_to(msr)
         checks = Checks(home)
+
+        problem = icon_problem(info, APP / "Contents/Resources")
+        checks.report("the bundle names its icon file and holds it", problem is None, problem or "")
 
         checks.expect_version("msr version prints this commit's version", msr, expected_version)
         checks.expect_version("msr version through a symbolic link prints the same", linked_msr, expected_version)
