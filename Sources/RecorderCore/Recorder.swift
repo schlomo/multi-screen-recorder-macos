@@ -253,11 +253,10 @@ public final class Recorder {
                 manifest.files.append(end.file)
             }
         }
-        if let report = endReports.report(captureNumber: captureNumber, reason: reason, end: end, display: display) {
-            if let event = report.event { manifest.events.append(event) }
-            if let problem = report.problem { observer?.recorder(self, problem: problem) }
-        }
-        if end != nil { try? writeManifest() }
+        let report = endReports.report(captureNumber: captureNumber, reason: reason, end: end, display: display, at: context.now())
+        if let event = report?.event { manifest.events.append(event) }
+        if end != nil || report?.event != nil { try? writeManifest() }
+        if let problem = report?.problem { observer?.recorder(self, problem: problem) }
     }
 
     private func captureEnded(

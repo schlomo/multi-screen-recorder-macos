@@ -185,12 +185,12 @@ import Testing
         #expect(!displays.showsAnotherDisplaysPicture)
     }
 
-    @Test func aFailingWriterHasItsOwnEventAndStartsANewFileAfterTheBackOff() {
+    @Test func aFailingWriterStartsANewFileAfterTheBackOff() {
         var displays = tracker()
         _ = displays.begin([Self.builtIn], at: 0)
         let step = displays.streamEnded(Self.builtIn.uuid, .writerFailed("cannot write"), connected: [Self.builtIn], at: second)
-        #expect(step.events.map(\.event) == [.displayFileWriterFailed])
-        #expect(step.events.first?.error == "cannot write")
+        // The recorder writes its event, once per capture end (FileEndReport).
+        #expect(step.events.isEmpty)
         #expect(displays.nextDueTime() == 2 * second)
     }
 
@@ -206,7 +206,8 @@ import Testing
         var displays = tracker()
         _ = displays.begin([Self.builtIn], at: 0)
         let step = displays.streamEnded(Self.builtIn.uuid, .diskFull, connected: [Self.builtIn], at: second)
-        #expect(step.events.map(\.event) == [.diskFull])
+        // The recorder writes its event, once per capture end (FileEndReport).
+        #expect(step.events.isEmpty)
         #expect(displays.isWaitingForRoom)
         #expect(displays.due(at: 60 * second).actions.isEmpty)
         displays.roomAgain()

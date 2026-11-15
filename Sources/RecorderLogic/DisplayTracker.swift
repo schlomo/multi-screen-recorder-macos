@@ -223,6 +223,8 @@ public struct DisplayTracker: Sendable {
     }
 
     /// A stream ended by itself; `connected` is the displays as read now.
+    /// A failing writer and a full disk have their event from the recorder,
+    /// once per capture end, also when the tracker no longer follows it.
     public mutating func streamEnded(_ uuid: String, _ end: StreamEnd, connected: [ConnectedDisplay], at now: Int64) -> Step {
         guard let tracked = displays[uuid], case .recording = tracked.phase else { return Step() }
         var step = Step()
@@ -232,15 +234,11 @@ public struct DisplayTracker: Sendable {
             step.events.append(event(.displayShowsAnotherDisplaysPicture, uuid, at: now))
             displays[uuid]?.phase = .showsAnotherDisplay(since: now)
         case .diskFull:
-            step.events.append(event(.diskFull, uuid, at: now))
             displays[uuid]?.phase = .waitingForRoom
         case .writerFellBehind:
             step.events.append(event(.displayFileWriterFellBehind, uuid, at: now))
             scheduleRestart(uuid, at: now)
-        case .writerFailed(let error):
-            var failed = event(.displayFileWriterFailed, uuid, at: now)
-            failed.error = error
-            step.events.append(failed)
+        case .writerFailed:
             if isPresent { scheduleRestart(uuid, at: now) } else { displays[uuid]?.phase = .idle }
         case .streamFailed(let error):
             if isPresent {
