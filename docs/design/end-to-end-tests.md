@@ -298,7 +298,7 @@ tried:
   recording folders live in a scratch folder, are deleted after a run
   that passes, and kept after one that fails, which the driver says
   with the path.
-- Before a run the driver writes to a state file what the run may
+- Before a run the driver writes to a restore file what the run may
   change: the display arrangement, mirroring and the main display;
   whether each of the Mac's own displays is on, with its mode and
   rotation; the default
@@ -307,7 +307,7 @@ tried:
   them, the time zone, whether the time is set automatically and the
   time itself. It restores them after the run, after a failure and
   after Ctrl-C. If the driver itself is killed, `restore` as its only
-  argument does the same from the state file, and removes every
+  argument does the same from the restore file, and removes every
   virtual display and aggregate device carrying the tests' name prefix
   (an aggregate device may outlive the helper that made it).
 - The time is restored first, as the saved time plus the time elapsed

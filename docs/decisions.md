@@ -912,7 +912,7 @@ architect's reading.
   - `SIGTERM` ends a recording as Stop does, finalized and with its
     crash marker removed (`recorder.md`, "Command line"); `kill -9`
     leaves the marker.
-  - The state file also holds the time itself, the sample rate and
+  - The restore file also holds the time itself, the sample rate and
     input volume of every BlackHole device, mirroring, the main
     display, and whether each of the Mac's own displays is on, with its
     mode and rotation. The time is restored first, from the saved time and the

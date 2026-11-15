@@ -13,7 +13,7 @@ public func crashReportTextCopyFolder(homeFolder: URL) -> URL {
 
 /// Copies the crash report `name` to `<base name>.txt` in the text copy
 /// folder, replacing a copy of the same name, and returns the copy.
-public func copyCrashReportAsText(name: String, homeFolder: URL) throws -> URL {
+public func makeTextCopy(of name: String, homeFolder: URL) throws -> URL {
     let copyFolder = crashReportTextCopyFolder(homeFolder: homeFolder)
     try FileManager.default.createDirectory(at: copyFolder, withIntermediateDirectories: true)
     let copy = copyFolder.appending(path: CrashReport.textCopyName(crashReportName: name))

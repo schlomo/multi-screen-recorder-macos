@@ -249,7 +249,7 @@ extension Settings {
     }
 }
 
-private func jsonString(_ text: String) -> String {
+func jsonString(_ text: String) -> String {
     var escaped = "\""
     for scalar in text.unicodeScalars {
         switch scalar {

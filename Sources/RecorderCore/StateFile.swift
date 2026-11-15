@@ -1,11 +1,12 @@
 import Foundation
 import RecorderLogic
 
-public struct StateFileError: Error, CustomStringConvertible {
+public struct StateFileError: LocalizedError, CustomStringConvertible {
     public let fileURL: URL
     public let problem: String
 
     public var description: String { "State file \(fileURL.path(percentEncoded: false)): \(problem)" }
+    public var errorDescription: String? { description }
 }
 
 /// The state file, next to the settings file; `HOME` decides where.
@@ -20,7 +21,7 @@ public struct StateFile: Sendable {
     public func load() throws(StateFileError) -> AppState {
         guard FileManager.default.fileExists(atPath: url.path(percentEncoded: false)) else { return .empty }
         do { return try AppState(json: try Data(contentsOf: url)) } catch {
-            throw StateFileError(fileURL: url, problem: error.localizedDescription)
+            throw StateFileError(fileURL: url, problem: String(describing: error))
         }
     }
 
@@ -29,7 +30,7 @@ public struct StateFile: Sendable {
             try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
             try state.json.write(to: url, options: .atomic)
         } catch {
-            throw StateFileError(fileURL: url, problem: error.localizedDescription)
+            throw StateFileError(fileURL: url, problem: String(describing: error))
         }
     }
 }

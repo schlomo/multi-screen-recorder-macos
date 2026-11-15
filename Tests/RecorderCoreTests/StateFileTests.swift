@@ -40,5 +40,6 @@ import RecorderLogic
         #expect {
             try file.load()
         } throws: { ($0 as? StateFileError)?.description.contains("state.json") == true }
+        do { _ = try file.load() } catch { #expect(error.localizedDescription.contains("state.json")) }
     }
 }

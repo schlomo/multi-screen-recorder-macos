@@ -86,20 +86,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func offerCrashReport(homeFolder: URL) {
         do {
             let stateFile = StateFile(homeFolder: homeFolder)
-            var state = try stateFile.load()
+            let state = try stateFile.load()
             guard let name = CrashReport.toOffer(
                 fileNames: try crashReportFileNames(homeFolder: homeFolder),
                 lastOffered: state.lastOfferedCrashReport)
             else { return }
-            state.lastOfferedCrashReport = name
-            try stateFile.save(state)
+            // Marked before the dialog, so a crash while it is open, or a quit, never offers it twice.
+            try stateFile.save(state.offering(name))
             let alert = NSAlert()
             alert.messageText = "Multi Screen Recorder quit unexpectedly"
             alert.informativeText = "You can report it on GitHub, which needs a GitHub account. Your browser opens a new issue, and Finder shows a copy of the crash report as a text file for you to drag into it. Issues are public, and a crash report contains your Mac's user name: check it before you attach it."
             alert.addButton(withTitle: "Report on GitHub")
             alert.addButton(withTitle: "Not Now")
             guard alert.runModal() == .alertFirstButtonReturn else { return }
-            let copy = try copyCrashReportAsText(name: name, homeFolder: homeFolder)
+            let copy = try makeTextCopy(of: name, homeFolder: homeFolder)
             let issue = CrashReport.issueURL(
                 crashReportName: name, version: runningVersion.description,
                 macOSVersion: ProcessInfo.processInfo.operatingSystemVersionString)

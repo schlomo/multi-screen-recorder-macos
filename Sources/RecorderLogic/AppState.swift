@@ -16,9 +16,14 @@ public struct AppState: Codable, Equatable, Sendable {
         self = try JSONDecoder().decode(AppState.self, from: json)
     }
 
+    /// The state with `crashReportName` marked as offered.
+    public func offering(_ crashReportName: String) -> AppState {
+        AppState(lastOfferedCrashReport: crashReportName)
+    }
+
+    /// The state file's content, laid out like the settings file's.
     public var json: Data {
-        let encoder = JSONEncoder()
-        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-        return try! encoder.encode(self)
+        let lines = [lastOfferedCrashReport.map { "  \(jsonString("lastOfferedCrashReport")): \(jsonString($0))" }].compactMap { $0 }
+        return Data(("{\n" + lines.joined(separator: ",\n") + (lines.isEmpty ? "" : "\n") + "}\n").utf8)
     }
 }

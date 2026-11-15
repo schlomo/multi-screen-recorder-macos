@@ -23,6 +23,16 @@ import Testing
         #expect(CrashReport.toOffer(fileNames: others + [older], lastOffered: nil) == older)
     }
 
+    @Test func onlyTheExactNameShapeCounts() {
+        let odd = ["msr-2026-11-14-212425.hang.ips", "msr-2026-11-14-212425.ips.bak", "msr-2026-11-14-2124.ips",
+                   "msr-2026-11-14-212425-1.ips", "msr-.ips", "msr-2026-11-14-212425.IPS"]
+        #expect(CrashReport.toOffer(fileNames: odd, lastOffered: nil) == nil)
+    }
+
+    @Test func aCrashDatedBeforeTheLastOfferedOneIsNotOffered() {
+        #expect(CrashReport.toOffer(fileNames: [older], lastOffered: newer) == nil)
+    }
+
     @Test func noReportsOfferNothing() {
         #expect(CrashReport.toOffer(fileNames: [], lastOffered: nil) == nil)
     }
@@ -53,6 +63,11 @@ import Testing
         #expect(form.contains("\n    id: \(CrashReport.versionField)\n"))
         #expect(form.contains("\n    id: \(CrashReport.macOSField)\n"))
         _ = try repositoryFile(".github/ISSUE_TEMPLATE/\(CrashReport.template)")
+    }
+
+    @Test func aPlusInAValueIsPercentEncoded() {
+        let url = CrashReport.issueURL(crashReportName: newer, version: "1+2", macOSVersion: "x")
+        #expect(url.absoluteString.contains("version=1%2B2"))
     }
 
     @Test func theTextCopyKeepsTheBaseName() {
