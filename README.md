@@ -34,7 +34,7 @@ audio inputs, runs the ready check, records and manages the settings.
 - **Built not to lose anything.** A check before you start, warnings
   when disk space runs low, files that stay readable after a crash.
 - **One button.** Start the app, approve the last settings, click
-  Start. Click the Dock icon to stop. Everything also works from the
+  Start. Click the Dock icon, then Stop. Everything also works from the
   command line, for scripting.
 - **Nothing leaves your Mac.** The app makes no network connections.
 
@@ -81,13 +81,16 @@ when you come back to the app, when a display is plugged in, removed
 or changed, when an audio device is plugged in or removed, when the
 default audio input changes, and on "Check again".
 
-Click Start: the window closes and the Dock icon counts the minutes
-recorded ("!" when the disk runs low or a display shows another
-display's picture). Click the Dock icon or quit to stop: "Stop
-recording?" finalizes the files, shows the recording folder in Finder
-and quits. The recording folder holds a video file per display, a new
-one each time a display comes back or changes its frame size, and
-`recording.json`, which lists every file and what happened.
+Click Start: the window closes and the Dock icon shows the time
+recorded as `h:mm` ("!" when the disk runs low, a display shows another
+display's picture or something went wrong). Click the Dock icon or quit
+to open the status window: each display with its files, the data
+written and its state, the time, data and free space, and any problems
+in red. Stop there finalizes the files, opens the recording folder in
+Finder and quits; Continue keeps recording. The recording folder holds
+a video file per display, a new one each time a display comes back or
+changes its frame size, and `recording.json`, which lists every file,
+what happened and every problem, and says how the recording ended.
 
 ### Command line
 
