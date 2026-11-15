@@ -65,18 +65,12 @@ public final class RecordingContext: Sendable {
     }
 }
 
-/// How a display file ended, for the recording manifest.
-public struct DisplayFileEnd: Sendable {
-    public var name: String
-    public var end: Double
-    public var finalized: Bool
-    public var framesRepeatedForLateness: Int
-}
+extension SCStream: CaptureStream {}
 
 /// One display's stream and its display file: frames pass the display
-/// check, ticks choose the newest frame, the writer writes them. A capture
-/// has at most one display file; a new file needs a new capture. Everything
-/// runs on its own queue.
+/// check and go to the display file's ticker. A capture has at most one
+/// display file; a new file needs a new capture. Everything runs on its own
+/// queue until the capture ends.
 public final class DisplayCapture: NSObject, @unchecked Sendable, SCStreamOutput, SCStreamDelegate {
     public let uuid: String
     public let number: Int
@@ -86,6 +80,7 @@ public final class DisplayCapture: NSObject, @unchecked Sendable, SCStreamOutput
     private let context: RecordingContext
     private let queue: DispatchQueue
     private let grid = TickGrid.recording
+    private let lifecycle = StreamLifecycle()
 
     /// The file started; reports its manifest entry.
     private let onFileStarted: @Sendable (RecordingManifest.DisplayFile) -> Void
@@ -95,9 +90,7 @@ public final class DisplayCapture: NSObject, @unchecked Sendable, SCStreamOutput
     // Confined to `queue`.
     private var stream: SCStream?
     private var check = DisplayCheck()
-    private var ticks = TickLoop<CVPixelBuffer>()
-    private var writer: DisplayFileWriter?
-    private var fileName: String?
+    private var ticker: DisplayFileTicker?
     private var timer: DispatchSourceTimer?
     /// No frame and no tick is taken any more.
     private var isEnding = false
@@ -121,6 +114,16 @@ public final class DisplayCapture: NSObject, @unchecked Sendable, SCStreamOutput
         queue = DispatchQueue(label: "msr.display.\(number)", qos: .userInteractive)
         super.init()
         queue.setSpecific(key: Self.queueKey, value: ObjectIdentifier(self).hashValue)
+        let started = context.now()
+        ticker = DisplayFileTicker(captureStart: started) { [context, uuid, number, name, frameSize] firstTick throws(DisplayFileWriterError) in
+            let fileName = context.claimFileName(tick: firstTick, number: number, display: name)
+            let writer = try DisplayFileWriter(
+                url: context.folder.appending(path: fileName), frameSize: frameSize, firstTick: firstTick,
+                timecode: context.timecode)
+            return (writer, RecordingManifest.DisplayFile(
+                name: fileName, display: name, displayUUID: uuid, frameSize: frameSize,
+                start: TickGrid.recording.seconds(ofTick: firstTick), timecode: context.timecode.text(ofTick: firstTick)))
+        }
     }
 
     /// Starts the stream; its failure ends the capture as a failing stream.
@@ -137,13 +140,19 @@ public final class DisplayCapture: NSObject, @unchecked Sendable, SCStreamOutput
                 configuration.pixelFormat = kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange
                 configuration.minimumFrameInterval = CMTime(value: 1, timescale: CMTimeScale(grid.framesPerSecond))
                 configuration.queueDepth = 8
+                // The mouse pointer is recorded.
                 configuration.showsCursor = true
                 configuration.scalesToFit = true
                 let stream = SCStream(filter: SCContentFilter(display: display, excludingWindows: []),
                                       configuration: configuration, delegate: self)
+                let stillWanted = queue.sync { () -> Bool in
+                    guard !isEnding else { return false }
+                    self.stream = stream
+                    return true
+                }
+                guard stillWanted else { return }
                 try stream.addStreamOutput(self, type: .screen, sampleHandlerQueue: queue)
-                queue.sync { self.stream = stream }
-                try await stream.startCapture()
+                try await lifecycle.start(stream)
             } catch {
                 queue.async { self.end(.streamFailed(Self.describe(error))) }
             }
@@ -163,7 +172,7 @@ public final class DisplayCapture: NSObject, @unchecked Sendable, SCStreamOutput
     // MARK: Frames
 
     public func stream(_ stream: SCStream, didOutputSampleBuffer sampleBuffer: CMSampleBuffer, of type: SCStreamOutputType) {
-        guard type == .screen, !isEnding, sampleBuffer.isValid,
+        guard type == .screen, !isEnding, let ticker, sampleBuffer.isValid,
               let attachments = (CMSampleBufferGetSampleAttachmentsArray(sampleBuffer, createIfNecessary: false)
                 as? [[SCStreamFrameInfo: Any]])?.first,
               let statusValue = attachments[.status] as? Int, SCFrameStatus(rawValue: statusValue) == .complete,
@@ -180,8 +189,13 @@ public final class DisplayCapture: NSObject, @unchecked Sendable, SCStreamOutput
         switch check.judge(frameRect: ScreenRect(screenRect), displayBounds: bounds, capturedAt: capturedAt,
                            lastDisplayChange: lastChange) {
         case .passes:
-            ticks.receive(pixelBuffer, capturedAt: capturedAt)
-            if writer == nil { startFile() }
+            switch ticker.receive(pixelBuffer, capturedAt: capturedAt) {
+            case .none: break
+            case .fileStarted(let entry):
+                onFileStarted(entry)
+                startTicking()
+            case .ended(let reason): end(reason)
+            }
         case .fails:
             break
         case .showsAnotherDisplay:
@@ -193,23 +207,7 @@ public final class DisplayCapture: NSObject, @unchecked Sendable, SCStreamOutput
         queue.async { self.end(.streamFailed(Self.describe(error))) }
     }
 
-    // MARK: The display file
-
-    private func startFile() {
-        guard let firstTick = ticks.firstTick else { return }
-        let name = context.claimFileName(tick: firstTick, number: number, display: self.name)
-        do {
-            writer = try DisplayFileWriter(
-                url: context.folder.appending(path: name), frameSize: frameSize, firstTick: firstTick,
-                timecode: context.timecode)
-        } catch {
-            end(error.isDiskFull ? .diskFull : .writerFailed(error.description))
-            return
-        }
-        fileName = name
-        onFileStarted(RecordingManifest.DisplayFile(
-            name: name, display: self.name, displayUUID: uuid, frameSize: frameSize,
-            start: grid.seconds(ofTick: firstTick), timecode: context.timecode.text(ofTick: firstTick)))
+    private func startTicking() {
         let timer = DispatchSource.makeTimerSource(flags: .strict, queue: queue)
         let interval = DispatchTimeInterval.nanoseconds(Int(grid.time(ofTick: 1)))
         timer.schedule(deadline: .now(), repeating: interval, leeway: .milliseconds(1))
@@ -219,15 +217,8 @@ public final class DisplayCapture: NSObject, @unchecked Sendable, SCStreamOutput
     }
 
     private func tick() {
-        guard !isEnding, let writer else { return }
-        do {
-            let outcome = try ticks.advance(to: context.now()) { tick, frame in try writer.append(frame, tick: tick) }
-            if outcome == .writerFellBehind { end(.writerFellBehind) }
-        } catch let error as DisplayFileWriterError {
-            end(error.isDiskFull ? .diskFull : .writerFailed(error.description))
-        } catch {
-            end(.writerFailed(Self.describe(error)))
-        }
+        guard !isEnding, let ticker else { return }
+        if let reason = ticker.tick(now: context.now()) { end(reason) }
     }
 
     // MARK: Ending
@@ -260,36 +251,17 @@ public final class DisplayCapture: NSObject, @unchecked Sendable, SCStreamOutput
         return DispatchQueue.getSpecific(key: Self.queueKey) == ObjectIdentifier(self).hashValue ? begin() : queue.sync(execute: begin)
     }
 
+    /// Stops the stream, finalizes the file and lets go of the stream, the
+    /// writer and the frames it held.
     private func finish(writeWaitingTicks: Bool) async -> DisplayFileEnd? {
-        let stream = queue.sync { self.stream }
-        try? await stream?.stopCapture()
-        guard let (writer, fileName) = queue.sync(execute: { () -> (DisplayFileWriter, String)? in
-            guard let writer = self.writer, let fileName = self.fileName else { return nil }
-            return (writer, fileName)
-        }) else { return nil }
-        var finalized = writeWaitingTicks ? await drain(writer) : false
-        let (lastTick, late) = queue.sync { (ticks.lastWrittenTick, ticks.framesRepeatedForLateness) }
-        if finalized {
-            do { try await writer.finish(lastTick: lastTick) } catch { finalized = false }
+        await lifecycle.stop()
+        let (stream, ticker) = queue.sync { (self.stream, self.ticker) }
+        if let stream { try? stream.removeStreamOutput(self, type: .screen) }
+        let file = await ticker?.finish(now: context.now(), writeWaitingTicks: writeWaitingTicks)
+        queue.sync {
+            self.stream = nil
+            self.ticker = nil
         }
-        return DisplayFileEnd(
-            name: fileName, end: grid.seconds(ofTick: (lastTick ?? writer.firstTick - 1) + 1), finalized: finalized,
-            framesRepeatedForLateness: late)
-    }
-
-    /// Writes the ticks still waiting, giving the writer up to the late-tick bound's time.
-    private func drain(_ writer: DisplayFileWriter) async -> Bool {
-        let deadline = ContinuousClock.now + .seconds(RecorderValues.lateTickBoundSeconds)
-        while ContinuousClock.now < deadline {
-            let left: Int
-            do {
-                left = try queue.sync { try ticks.drain { tick, frame in try writer.append(frame, tick: tick) } }
-            } catch {
-                return false
-            }
-            if left == 0 { return true }
-            try? await Task.sleep(for: .milliseconds(5))
-        }
-        return false
+        return file
     }
 }

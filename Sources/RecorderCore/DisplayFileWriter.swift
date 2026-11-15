@@ -3,10 +3,15 @@ import CoreMedia
 import RecorderLogic
 import VideoToolbox
 
-public struct DisplayFileWriterError: Error, CustomStringConvertible {
+public struct DisplayFileWriterError: Error, Equatable, CustomStringConvertible {
     public let description: String
     /// The disk is full: the file ends, readable up to its last fragment.
     public let isDiskFull: Bool
+
+    public init(description: String, isDiskFull: Bool) {
+        self.description = description
+        self.isDiskFull = isDiskFull
+    }
 
     init(_ error: (any Error)?, while doing: String) {
         if let error {
@@ -20,10 +25,10 @@ public struct DisplayFileWriterError: Error, CustomStringConvertible {
 }
 
 /// A display file: HEVC 8-bit in a fragmented `.mov`, a keyframe and a
-/// fragment every 2 s, tagged BT.709, with a timecode track (D21, D24,
-/// D31). Every frame carries exactly its tick's time on the shared clock.
+/// fragment every 2 s, tagged BT.709, with a timecode track of one sample
+/// (D21, D24, D31). Every frame carries exactly its tick's time on the shared clock.
 /// Not thread-safe: one queue uses it.
-public final class DisplayFileWriter {
+public final class DisplayFileWriter: DisplayFileWriting {
     public let url: URL
     public let firstTick: Int64
     private let grid: TickGrid
@@ -33,6 +38,7 @@ public final class DisplayFileWriter {
     private let adaptor: AVAssetWriterInputPixelBufferAdaptor
     private let timecodeTrack: AVAssetWriterInput
     private let timecodeFormat: CMTimeCodeFormatDescription
+    private var wroteTimecode = false
 
     public init(url: URL, frameSize: FrameSize, firstTick: Int64, timecode: Timecode, grid: TickGrid = .recording) throws(DisplayFileWriterError) {
         precondition(timecode.framesPerSecond == grid.framesPerSecond, "the timecode counts the tick grid's frames")
@@ -106,16 +112,21 @@ public final class DisplayFileWriter {
     }
 
     /// Whether the writer takes another frame now.
-    public var isReady: Bool { video.isReadyForMoreMediaData && timecodeTrack.isReadyForMoreMediaData }
+    public var isReady: Bool { video.isReadyForMoreMediaData && (wroteTimecode || timecodeTrack.isReadyForMoreMediaData) }
 
     /// Writes a tick's frame with exactly the tick's time and its timecode;
     /// false when the writer is not ready, so the tick waits.
     public func append(_ pixelBuffer: CVPixelBuffer, tick: Int64) throws(DisplayFileWriterError) -> Bool {
         try checkStatus()
         guard isReady else { return false }
-        let timecodeSample = try timecodeSample(tick: tick)
-        guard adaptor.append(pixelBuffer, withPresentationTime: time(ofTick: tick)),
-              timecodeTrack.append(timecodeSample)
+        if !wroteTimecode {
+            wroteTimecode = true
+            guard timecodeTrack.append(try timecodeSample(tick: tick)) else {
+                throw DisplayFileWriterError(writer.error, while: "cannot write \(url.lastPathComponent)")
+            }
+            timecodeTrack.markAsFinished()
+        }
+        guard adaptor.append(pixelBuffer, withPresentationTime: time(ofTick: tick))
         else {
             throw DisplayFileWriterError(writer.error, while: "cannot write \(url.lastPathComponent)")
         }
@@ -128,8 +139,10 @@ public final class DisplayFileWriter {
         }
     }
 
-    /// One timecode sample per tick, so the track covers the file up to its
-    /// last fragment also when the file is not finalized.
+    /// The file's one timecode sample, at its first tick, as is the
+    /// convention; the timecode track is then finished, so the writer can
+    /// write the fragments without waiting for it, and a file that is not
+    /// finalized still carries the timecode.
     private func timecodeSample(tick: Int64) throws(DisplayFileWriterError) -> CMSampleBuffer {
         var frame = Int32(truncatingIfNeeded: timecode.frame(ofTick: tick)).bigEndian
         var block: CMBlockBuffer?
@@ -161,7 +174,6 @@ public final class DisplayFileWriter {
         try checkStatus()
         if let lastTick { writer.endSession(atSourceTime: time(ofTick: lastTick + 1)) }
         video.markAsFinished()
-        timecodeTrack.markAsFinished()
         await writer.finishWriting()
         if writer.status != .completed {
             throw DisplayFileWriterError(writer.error, while: "cannot finalize \(url.lastPathComponent)")

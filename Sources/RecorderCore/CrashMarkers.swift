@@ -49,6 +49,11 @@ public struct CrashMarkers: Sendable {
                     .appending(path: RecordingNames.manifest)
                 if FileManager.default.fileExists(atPath: manifestURL.path(percentEncoded: false)) {
                     let manifest = try RecordingManifest(json: Data(contentsOf: manifestURL))
+                    if manifest.state == .finalized {
+                        // Gone after it finalized, before it removed its marker: nothing to report.
+                        try FileManager.default.removeItem(at: markerURL)
+                        continue
+                    }
                     try manifest.markedNotFinalized().jsonData().write(to: manifestURL, options: .atomic)
                 }
                 try FileManager.default.removeItem(at: markerURL)

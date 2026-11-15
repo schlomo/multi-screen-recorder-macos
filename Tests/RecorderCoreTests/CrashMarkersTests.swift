@@ -40,6 +40,20 @@ import Testing
         #expect(untouched.state == .recording)
     }
 
+    @Test func aMarkerWhoseRecordingWasFinalizedIsRemovedSilently() throws {
+        defer { try? FileManager.default.removeItem(at: home) }
+        let markers = CrashMarkers(homeFolder: home)
+        let folder = try recording("finalized")
+        let manifestURL = folder.appending(path: RecordingNames.manifest)
+        var manifest = try RecordingManifest(json: Data(contentsOf: manifestURL))
+        manifest.state = .finalized
+        try manifest.jsonData().write(to: manifestURL)
+        try markers.write(recordingFolder: folder, processID: 100)
+        #expect(markers.finishLeftBehind { _ in false }.isEmpty)
+        #expect(!FileManager.default.fileExists(atPath: markers.url(processID: 100).path(percentEncoded: false)))
+        #expect(try RecordingManifest(json: Data(contentsOf: manifestURL)) == manifest)
+    }
+
     @Test func noMarkerFolderIsNoMarkers() {
         #expect(CrashMarkers(homeFolder: home).finishLeftBehind().isEmpty)
     }

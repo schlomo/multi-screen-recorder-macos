@@ -49,6 +49,12 @@ public final class Recorder {
 
     /// Starts a recording into a new recording folder in the settings' output folder.
     public init(settings: Settings, homeFolder: URL, app: String, observer: any RecorderObserver) throws(RecorderStartError) {
+        let displays: [ConnectedDisplay]
+        do {
+            displays = try connectedDisplays()
+        } catch {
+            throw RecorderStartError(description: "The displays cannot be read: \(error)")
+        }
         let reading = readClocks()
         let started = Date()
         let timeZone = TimeZone.current
@@ -72,13 +78,11 @@ public final class Recorder {
             try writeManifest()
             try markers.write(recordingFolder: folder)
         } catch {
+            // Nothing was recorded: the start leaves nothing behind.
+            try? markers.remove()
+            try? FileManager.default.removeItem(at: folder.appending(path: RecordingNames.manifest))
+            try? FileManager.default.removeItem(at: folder)
             throw RecorderStartError(description: "Cannot start the recording in \(folder.path(percentEncoded: false)): \(error)")
-        }
-        let displays: [ConnectedDisplay]
-        do {
-            displays = try connectedDisplays()
-        } catch {
-            throw RecorderStartError(description: "The displays cannot be read: \(error)")
         }
         activity = ProcessInfo.processInfo.beginActivity(
             options: [.idleSystemSleepDisabled, .idleDisplaySleepDisabled, .userInitiated],
@@ -222,28 +226,49 @@ public final class Recorder {
             guard let (_, capture) = captures.removeValue(forKey: uuid) else { return }
             stopping.append(Task { [weak self] in
                 let file = await capture.stop()
-                self?.fileEnded(file)
+                self?.fileEnded(file, uuid: uuid, errorHasItsEvent: false)
             })
         }
     }
 
+    /// The manifest lists a file from its start; a start reported after
+    /// the file's end changes nothing.
     private func fileStarted(_ file: RecordingManifest.DisplayFile, uuid: String) {
         tracker.fileStarted(uuid)
+        guard !manifest.files.contains(where: { $0.name == file.name }) else { return }
         manifest.files.append(file)
         try? writeManifest()
     }
 
-    private func fileEnded(_ file: DisplayFileEnd?) {
-        guard let file, let index = manifest.files.firstIndex(where: { $0.name == file.name }) else { return }
-        manifest.files[index].end = file.end
-        manifest.files[index].state = file.finalized ? .finalized : .notFinalized
-        manifest.files[index].framesRepeatedForLateness = file.framesRepeatedForLateness
+    /// A display file ended; its end carries its entry, so it is listed
+    /// even when its start was not reported yet. A writer's error is the
+    /// event `display file writer failed`, unless the end's reason already
+    /// is one, and a problem for the person.
+    private func fileEnded(_ end: DisplayFileEnd?, uuid: String, errorHasItsEvent: Bool) {
+        guard let end else { return }
+        if let index = manifest.files.firstIndex(where: { $0.name == end.file.name }) {
+            manifest.files[index] = end.file
+        } else {
+            manifest.files.append(end.file)
+        }
+        if let error = end.error {
+            if !errorHasItsEvent {
+                var failed = RecordingEvent(at: context.now(), event: .displayFileWriterFailed, display: end.file.display)
+                failed.error = error
+                manifest.events.append(failed)
+            }
+            observer?.recorder(self, problem: "Display file \(end.file.name): \(error)")
+        }
         try? writeManifest()
     }
 
-    /// A capture ended by itself; one the recorder already stopped, or replaced, changes nothing more.
     private func captureEnded(uuid: String, captureNumber: Int, reason: DisplayTracker.StreamEnd, file: DisplayFileEnd?) {
-        fileEnded(file)
+        let errorHasItsEvent: Bool = switch reason {
+        case .writerFailed, .diskFull: true
+        case .streamFailed, .writerFellBehind, .showsAnotherDisplay: false
+        }
+        fileEnded(file, uuid: uuid, errorHasItsEvent: errorHasItsEvent)
+        // One the recorder already stopped, or replaced, changes nothing more.
         guard !isStopped, let (current, capture) = captures[uuid], current == captureNumber else { return }
         captures[uuid] = nil
         if reason == .showsAnotherDisplay { observer?.recorder(self, displayShowsAnotherDisplaysPicture: capture.name) }

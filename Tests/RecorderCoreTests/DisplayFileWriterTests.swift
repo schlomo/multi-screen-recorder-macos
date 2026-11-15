@@ -104,8 +104,8 @@ import Testing
         defer { removeScratch() }
         let rate = RecorderValues.framesPerSecond
         // The writer is kept, never finished: the process "crashed".
-        let (url, writer) = try await write(rate: rate, firstTick: 0, seconds: 9, timecode: Timecode(start: try startDate(), timeZone: berlin),
-                                  finish: false)
+        let timecode = Timecode(start: try startDate(), timeZone: berlin)
+        let (url, writer) = try await write(rate: rate, firstTick: 0, seconds: 9, timecode: timecode, finish: false)
         try await Task.sleep(for: .milliseconds(500))
         let copy = scratch.appending(path: "after a crash.mov")
         try FileManager.default.copyItem(at: url, to: copy)
@@ -118,7 +118,9 @@ import Testing
         let times = try readTimes(of: video, asset: asset)
         let lost = 9 - Double(times.count) / Double(rate)
         #expect(lost <= Double(RecorderValues.fragmentSeconds), "\(times.count) frames of \(9 * rate)")
-        #expect(try await asset.loadTracks(withMediaType: .timecode).count == 1)
+        // The one timecode sample of the file is in it before the file is finalized.
+        let timecodeTrack = try #require(try await asset.loadTracks(withMediaType: .timecode).first)
+        #expect(try readFirstTimecodeFrame(of: timecodeTrack, asset: asset) == Int32(timecode.frame(ofTick: 0)))
         withExtendedLifetime(writer) {}
     }
 
