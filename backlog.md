@@ -67,11 +67,12 @@ order, the next architect session:
 ## In flight
 
 - **Copilot's review of drafts (D39), not observed yet.** On the first
-  draft PR opened after #5, the architect checks with the commands in
-  the architect skill's operating rules ("Copilot's review") whether
-  the ruleset requests Copilot's review of the draft, and whether
-  marking the PR ready requests another, then corrects that section
-  and `AGENTS.md` ("UNVERIFIED") to what was seen. The ruleset covers
+  draft PR opened after #5, the session that owns it reports what the
+  commands in the architect skill's operating rules ("Copilot's
+  review") show: whether the ruleset requests Copilot's review of the
+  draft, and whether marking the PR ready requests another. The
+  architect then corrects that section and `AGENTS.md`
+  ("UNVERIFIED") to what was seen. The ruleset covers
   every PR, the owner's own and Dependabot's included; who pays for a
   review of a Dependabot PR is not known; the owner is asked.
 - **Open from PR #1** (merged 2026-11-14), checked on the owner's Mac

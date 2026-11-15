@@ -967,8 +967,7 @@ architect's reading.
   dismissed, with its reason; deferred only if it is not a BLOCKER or
   SHOULD-FIX, or with the owner's yes); it marks the PR ready once no
   BLOCKER or SHOULD-FIX is open and CI passes, and tells the owner it
-  is ready to merge, unless marking ready requested another Copilot
-  review. An agent never marks the owner's own draft ready. Only the
+  is ready to merge, unless marking ready requested a Copilot review. An agent never marks the owner's own draft ready. Only the
   owner merges. The Copilot reviews the ruleset starts on the agents'
   PRs have the owner's standing go-ahead, billed to the owner's GitHub
   account, which authors the PRs, until the owner withdraws it.

@@ -52,11 +52,11 @@ so rather than silently picking a side.
   automated review the host ran on the draft has been read and handled
   like the adversarial review's findings. "Ready" keeps one meaning:
   fully reviewed, the human's to merge; if marking it ready makes the
-  host start another automated review, the MR/PR says not to merge
-  until that review is handled. An agent never marks a human's draft
-  ready. The host's automated review can be billed per use, so setup
-  records the option only with a go-ahead naming the account that
-  pays ("Live systems need a human's go-ahead"). At every level,
+  host start an automated review, the MR/PR says not to merge until
+  that review is handled. An agent never marks a human's draft ready.
+  Where the host runs an automated review, it can be billed per use,
+  so setup records the option there only with a go-ahead naming the
+  account that pays ("Live systems need a human's go-ahead"). At every level,
   credentials that happen to be present are not consent, and neither
   is a request to "fix it": the level and
   the brief set what an agent may write, and only a human merges.
@@ -171,8 +171,8 @@ check, never the value), then ask which account pays; the go-ahead
 names that account. The one standing go-ahead is for the automated
 review a host runs on the MRs/PRs agents open: setup records it once,
 naming the account and what starts a review, and it holds until a
-human withdraws it. The option of marking MRs/PRs ready ("Work
-branches") needs it.
+human withdraws it. Where the host runs such a review, the option of
+marking MRs/PRs ready ("Work branches") needs it.
 
 **A read can still do harm.** A diagnostic read puts load on the
 system it reads, and parallel sessions multiply that load. Before

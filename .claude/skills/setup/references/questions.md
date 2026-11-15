@@ -139,7 +139,8 @@ This matters most: from now on "the backlog" means this place.
   merge request then starts a run that may be billed per use. Only a
   yes is recorded as the standing go-ahead for those reviews; with a
   no, each merge request an agent would open needs its own go-ahead,
-  and the option above is not offered.
+  and the option above is not offered. Where the host runs none, no
+  go-ahead is needed and the option is offered as it is.
 - **Default:** (a), without the option. An agent then sees the real
   test results of its own change, fixes what fails and pushes again
   before anyone spends review time; no change reaches the trunk
