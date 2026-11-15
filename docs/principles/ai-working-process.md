@@ -40,17 +40,20 @@ so rather than silently picking a side.
   one exception ("Docs completeness is part of being done" below).
 - How far an agent writes to the repo is chosen at setup, one of
   three levels: it pushes work branches and opens draft MRs/PRs
-  (recommended), optionally also marking the ones it opened ready
+  (recommended), optionally also marking the ones agents opened ready
   once they are fully reviewed; it commits locally only and a human
   pushes; or it writes nothing to the repo without a per-change
   instruction. The recommended level lets an agent iterate on real CI
   results by itself — push, read the pipeline, push a fix — before a
-  human spends review time on it. With the option, the agent marks an
-  MR/PR it opened ready once its adversarial review leaves no BLOCKER
-  or SHOULD-FIX open, its pipeline passes, and any automated review
-  the host ran on the draft has been read and handled like the
-  adversarial review's findings. "Ready" keeps one meaning: fully
-  reviewed, the human's to merge. An agent never marks a human's draft
+  human spends review time on it. With the option, the session that
+  owns an MR/PR an agent opened (it opened it, briefed the agent that
+  did, or took it over) marks it ready once its adversarial review
+  leaves no BLOCKER or SHOULD-FIX open, its pipeline passes, and any
+  automated review the host ran on the draft has been read and handled
+  like the adversarial review's findings. "Ready" keeps one meaning:
+  fully reviewed, the human's to merge; if marking it ready makes the
+  host start another automated review, the MR/PR says not to merge
+  until that review is handled. An agent never marks a human's draft
   ready. The host's automated review can be billed per use, so setup
   records the option only with a go-ahead naming the account that
   pays ("Live systems need a human's go-ahead"). At every level,

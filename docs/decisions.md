@@ -959,9 +959,10 @@ architect's reading.
     GitHub's API on 2026-11-15: all branches, draft reviews on,
     new-push reviews off.
 - **Decision:** The architect's reading of "when you are done",
-  "check" and "you", for every agent at this level: an agent pushes a
-  work branch and opens a draft PR; the ruleset has Copilot review it
-  once; the architect session that owns the PR handles each comment
+  "check" and "you", for every session at this level: an agent pushes
+  a work branch and opens a draft PR; the ruleset has Copilot review
+  it once; the session that owns the PR (it opened it, briefed the
+  agent that did, or took it over from the backlog) handles each comment
   like an adversarial review's finding (fixed, fixed differently or
   dismissed, with its reason; deferred only if it is not a BLOCKER or
   SHOULD-FIX, or with the owner's yes); it marks the PR ready once no
@@ -972,7 +973,9 @@ architect's reading.
   PRs have the owner's standing go-ahead, billed to the owner's GitHub
   account, which authors the PRs, until the owner withdraws it.
 - **Consequences:** "Ready" keeps one meaning, fully reviewed, so the
-  owner can merge at once. UNVERIFIED: that the ruleset requests
+  owner can merge at once; the one exception, a review that marking
+  ready requested, is named in the PR's status line ("do not merge
+  yet") until it is handled. UNVERIFIED: that the ruleset requests
   Copilot's review of a new draft is configured, not observed (this PR
   was opened before the ruleset), and whether marking ready requests
   another is not known; the first new draft PR shows both (backlog).

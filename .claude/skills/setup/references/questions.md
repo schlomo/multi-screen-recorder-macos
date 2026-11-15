@@ -134,10 +134,12 @@ This matters most: from now on "the backlog" means this place.
   requests they opened ready for review once fully reviewed, the
   host's automated review of the draft included."
 - **Also ask** with (a): "Does the host run an automated review on
-  merge requests, what starts one, and which account pays for it?"
-  An agent opening a merge request then starts a run that may be
-  billed per use; the answer is recorded as the standing go-ahead
-  for those reviews.
+  merge requests, what starts one, and which account pays for it?
+  May agents start it without asking each time?" An agent opening a
+  merge request then starts a run that may be billed per use. Only a
+  yes is recorded as the standing go-ahead for those reviews; with a
+  no, each merge request an agent would open needs its own go-ahead,
+  and the option above is not offered.
 - **Default:** (a), without the option. An agent then sees the real
   test results of its own change, fixes what fails and pushes again
   before anyone spends review time; no change reaches the trunk

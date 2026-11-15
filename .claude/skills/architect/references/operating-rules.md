@@ -64,29 +64,33 @@ verifying agent output are in the principles (linked from
 
 Where `AGENTS.md` records that agents mark the PRs they open ready
 once fully reviewed, and the host has Copilot review drafts (D39 in
-this project), the architect session that owns the PR (it opened the
-PR, or briefed the agent that did) does this. A delegated agent
-reports instead and never waits on Copilot itself (its brief's
-completion discipline). `gh api` fills in `{owner}` and `{repo}` from
-the checkout; `--paginate` matters, as the timeline comes 30 events
-per page. Until a draft PR has shown it (backlog), that the ruleset
-requests the review is configured, not observed.
+this project), the session that owns the PR does this: the session
+that opened it, briefed the agent that did, or took it over from the
+backlog. A delegated agent reports to that session instead and never
+waits on Copilot itself (its brief's completion discipline). `gh api`
+fills in `{owner}` and `{repo}` from the checkout; `--paginate`
+matters, as the timeline comes 30 events per page. Until a draft PR
+has shown it (backlog), that the ruleset requests the review is
+configured, not observed.
 
-- Within a few minutes of `gh pr create --draft`, check that the review
-  was requested:
-  `gh api --paginate 'repos/{owner}/{repo}/issues/<n>/timeline' --jq '.[] | select(.event=="review_requested") | .requested_reviewer.login'`
-  shows `Copilot`. If it does not, tell the human at once, and say in
-  the description that Copilot did not review the PR; it is then
-  marked ready on the agent's own reviews.
+- Within a few minutes of `gh pr create --draft`, run the request
+  check:
+  `gh api --paginate 'repos/{owner}/{repo}/issues/<n>/timeline' --jq '.[] | select(.event=="review_requested" or .event=="ready_for_review") | [.created_at, .event, (.requested_reviewer.login // "")] | @tsv'`
+  A `review_requested` line naming `Copilot` is the request. If there
+  is none, tell the human at once, and say in the description that
+  Copilot did not review the PR; it is then marked ready on the
+  agent's own reviews.
 - Wait with a timed check ("Supervising long-running work"), up to 30
-  minutes; on PR #1 and #2 of this project it took 5 to 7 minutes:
-  `gh api --paginate 'repos/{owner}/{repo}/pulls/<n>/reviews' --jq '.[] | select(.user.login | test("copilot"; "i")) | .submitted_at'`.
-  Past the limit, tell the human and go on as if none was requested.
+  minutes, until a Copilot review was submitted after that request;
+  on PR #1 and #2 of this project it took 5 to 7 minutes:
+  `gh api --paginate 'repos/{owner}/{repo}/pulls/<n>/reviews' --jq '.[] | select(.user.login | test("copilot"; "i")) | .submitted_at'`
+  prints a time later than the request's. Past the limit, tell the
+  human and go on as if none was requested.
 - Read all of it: the summary in the `body` of that review, and the
   inline comments, which only
   `gh api --paginate 'repos/{owner}/{repo}/pulls/<n>/comments'` shows
-  (`gh pr view` does not). Copilot reviews the draft as first pushed;
-  later commits get the delta review only.
+  (`gh pr view` does not). Copilot reviews the PR as it is when the
+  review is requested; later commits are not reviewed by Copilot.
 - Handle each comment like an adversarial review's finding, checked
   against the code: fixed, fixed differently, or dismissed, each with
   its reason in the description. A comment that holds is deferred to
@@ -95,10 +99,13 @@ requests the review is configured, not observed.
   outcomes along with the fixes.
 - Then, with no BLOCKER or SHOULD-FIX open and the pipeline green:
   `gh pr ready <n>`. About a minute later, run the request check
-  again. If it shows no further `Copilot` line, one message tells the
-  human the PR is ready to merge. If it does, the description's status
-  line says "Copilot's review pending: do not merge yet", that message
-  waits, and the review is read and handled as above.
+  again: a `review_requested` line naming `Copilot` after the
+  `ready_for_review` line is a new request. Without one, one message
+  tells the human the PR is ready to merge. With one, the
+  description's status line says "Copilot's review pending: do not
+  merge yet" (the one time a ready PR is not yet fully reviewed), that
+  message waits, and the review submitted after that line is waited
+  for, read and handled as above.
 - Whether marking ready starts a review is not known yet; the first
   draft PR that shows it settles it, and this section is corrected
   then.

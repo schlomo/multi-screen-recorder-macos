@@ -15,7 +15,7 @@ Recorded by the setup skill; re-run it when any of this changes.
 - **Agent writes:** push work branches and open draft PRs, and mark a
   PR the agent opened ready once it is fully reviewed (D39): a
   repository ruleset has Copilot review each draft PR once, and the
-  architect session that owns the PR handles that review like the
+  session that owns the PR handles that review like the
   adversarial review's findings first. That the ruleset requests the
   review is configured, not yet observed (UNVERIFIED; backlog).
   Standing go-ahead for those Copilot reviews, billed as AI credits to
