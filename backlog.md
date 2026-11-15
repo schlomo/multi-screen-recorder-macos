@@ -271,6 +271,37 @@ order, the next architect session:
   enough for starters". Revisit when those tests exist and running
   them by hand becomes the bottleneck; first step then is a throwaway
   workflow that records ten seconds on a hosted runner.
+  - The owner's angle, 2026-11-15: "why won't it help to run them in a
+    VM end-end where you can also deal with the approvals via remote
+    control? you'd still use the virtual screens etc. to test the
+    recorder, but control it from the outside end-end." Kept deferred
+    on the same day ("Keep deferred").
+  - The architect's assessment, given in the session: a VM on the
+    owner's Mac, as a second tier beside the Mac, not instead of it.
+    It would leave the Mac usable during a run, start each run from a
+    copy of an image with the permissions granted, and, with the
+    host's mouse and keyboard reaching the guest as hardware input
+    [ASSUMED], make testable what the design leaves out: the
+    permission prompts of a first start, a permission taken away
+    during a recording, the monthly "continue to allow" prompt, and a
+    locked screen (unlocked with the VM's own password). It cannot
+    replace the Mac for the encoder and timing: the guest is reported
+    to have no hardware HEVC encoder, which the recorder uses (D21).
+  - First step on revival: a test of about an hour on the owner's Mac
+    (downloads a macOS image of tens of GB; Tart's licence terms to
+    check, or UTM) answering three questions: does a `CGVirtualDisplay`
+    display appear in a macOS 26 guest and can ScreenCaptureKit
+    capture it; does the guest list a hardware HEVC encoder; does a
+    click sent from the host press "Allow" on the Screen Recording
+    prompt.
+  - Not decided, the architect's recommendation: let the end-to-end
+    driver run the recorder through a remote command from the start,
+    with running it locally as a special case, so a VM tier costs
+    little later. That changes the signed-off design (D37), so it
+    needs the owner's sign-off as text.
+  - Revive also when the Mac being unusable during runs, or the
+    permission and locked-screen cases left untested, become the
+    bottleneck.
 - **A snapshot release left behind** by a PR closed with a merge
   conflict (GitHub may not run the removal then; inferred from its
   documentation, never seen). Deferred because the leftover is deleted
