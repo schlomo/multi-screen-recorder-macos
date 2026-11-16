@@ -115,7 +115,9 @@ checkout stops in `scripts/version`, and `scripts/sign-app` accepts
 N grows with every commit on `main`, including Markdown-only ones that
 publish nothing, so release numbers can skip but never repeat. The
 version is computed once, by `scripts/version` in `scripts/build-app`,
-and written into the bundle's `Info.plist` (`MSRVersion`, `MSRCommit`);
+and written into the bundle's `Info.plist` (`MSRVersion`, `MSRCommit`,
+and `MSRBuildDate`, the commit's date in UTC that the banner of
+`msr check` and `msr record` shows);
 every later script reads it from there as data, so a push to `main`
 between the build job and the signing job cannot change it. The
 bundle's short version is the numeric part; `msr version` and the About

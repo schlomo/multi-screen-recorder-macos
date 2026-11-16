@@ -198,8 +198,8 @@ public struct WhatWillBeRecorded: Equatable, Sendable {
             }
             return "  " + columns.joined(separator: "  ")
         }
-        lines.append(line(Self.columns))
         let rule = "  " + String(repeating: "─", count: widths.reduce(0, +) + 2 * (widths.count - 1))
+        lines += [line(Self.columns), rule]
         lines += screenRows.map { line($0.cells) }
         if !screenRows.isEmpty { lines.append(rule) }
         lines += audioRows.map { line($0.cells) }

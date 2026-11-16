@@ -15,6 +15,8 @@ cd "$(dirname "$0")/.."
 version="$(scripts/version)"
 short_version="${version%%[-+]*}"
 commit="$(git rev-parse --short=7 HEAD)"
+# The commit date in UTC, as the version's date: a rebuild of a commit gives the same banner.
+build_date="$(TZ=UTC git show -s --no-show-signature --date=format-local:%Y-%m-%d --format=%cd HEAD)"
 bundle="Multi Screen Recorder.app"
 app="build/$bundle"
 archive="build/msr-app.tar"
@@ -33,6 +35,7 @@ plutil -replace CFBundleShortVersionString -string "$short_version" "$plist"
 plutil -replace CFBundleVersion -string "$short_version" "$plist"
 plutil -replace MSRVersion -string "$version" "$plist"
 plutil -replace MSRCommit -string "$commit" "$plist"
+plutil -replace MSRBuildDate -string "$build_date" "$plist"
 
 iconset="$(mktemp -d)/AppIcon.iconset"
 trap 'rm -rf "$(dirname "$iconset")"' EXIT

@@ -79,8 +79,12 @@ size; the drawn-at size is never recorded (D44). It is the one of the
 recording resolution the settings choose: Native with auto mode, the
 default.
 
-`msr check` first prints "What will be recorded": the window's one
-table with its total row, the line of what the required recording
+`msr check` first prints a banner, the name with the version as
+`msr version` shows it and the build date, such as `Multi Screen
+Recorder 0.20261116.42 (9dc9443), built 2026-11-16`, then the
+homepage's address and an empty line (`msr record` prints the same
+banner first). Then it prints "What will be recorded": the window's one
+table with its header row and total row, the line of what the required recording
 hours need, and "Files go to <output folder>", from the same
 code (see "The app"; the window's last line, "Recording continues when
 screens or audio sources change.", is not printed), then one line per
@@ -91,6 +95,7 @@ the defaults and 3.1 GB free:
 ```
 What will be recorded
   Source                                      Looks like  Drawn at   Records at  GB/h max
+  ───────────────────────────────────────────────────────────────────────────────────────
   Screen 1 - Built-in Retina Display          1728×1117   3456×2234  1728×1116        1.0
   Screen 2 - LG HDR 4K                        3840×2160   3840×2160  3840×2160        4.1
   ───────────────────────────────────────────────────────────────────────────────────────
@@ -1271,6 +1276,9 @@ must be greater than 0 (an invalid one is ignored, see "Settings file").
 version string and the commit, such as `0.20261115.2-dev+a1b2c3d (a1b2c3d)`,
 from the bundle's Info.plist keys `MSRVersion` and `MSRCommit`;
 outside a bundle it prints `development build (not bundled)`. The
+banner's build date is the key `MSRBuildDate`, the commit's date in
+UTC, so a rebuild of the same commit gives the same banner; without
+it the banner leaves the date out. The
 settings file is found through `HOME`. The disk estimate follows its
 rule, file by file (10.7 GB in the `msr check` example above). The
 recording resolution box turns with a portrait screen (1080×1920 for a

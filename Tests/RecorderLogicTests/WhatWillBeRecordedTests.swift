@@ -205,6 +205,7 @@ import Testing
         #expect(defaultSection.text == """
             What will be recorded
               Source                                      Looks like  Drawn at   Records at  GB/h max
+              ───────────────────────────────────────────────────────────────────────────────────────
               Screen 1 - Built-in Retina Display          1728×1117   3456×2234  1728×1116        1.0
               Screen 2 - LG HDR 4K                        3840×2160   3840×2160  3840×2160        4.1
               ───────────────────────────────────────────────────────────────────────────────────────

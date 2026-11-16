@@ -128,6 +128,7 @@ extension CommandLineInterface {
             let home = try homeFolderOrExit()
             let facts = await probeReadyCheckFacts(proof: .captureOneFrame, settings: settings, homeFolder: home)
             let result = ReadyCheck.evaluate(facts, settings: settings)
+            print(runningVersion.banner, terminator: "")
             print(WhatWillBeRecorded(settings: settings, facts: facts).text, terminator: "\n")
             print(result.text, terminator: "")
             if !result.isReady { throw ExitCode(1) }
