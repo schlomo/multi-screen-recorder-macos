@@ -100,17 +100,10 @@ confirmed yet.
 
 Then send the person who asked you to test:
 
-- the output of `msr version` and `msr list`, run in Terminal by the
-  app's full path as below. `msr list` only reads your screens and
-  audio inputs and records nothing; its "System audio" line says
-  whether Terminal has the Screen & System Audio Recording permission,
-  not whether the app has it.
-
-  ```sh
-  "/Applications/Multi Screen Recorder.app/Contents/MacOS/msr" version
-  "/Applications/Multi Screen Recorder.app/Contents/MacOS/msr" list
-  ```
-
+- a screenshot of the app's window before you click Start: it shows
+  the version, your screens and audio inputs and the ready check.
+  Press Shift-Command-4, then Space, then click the window;
+  the screenshot lands on your desktop;
 - `recording.json` from the recording folder of every recording you
   made, the ones that went fine too: it shows how far each audio input
   drifted and everything that happened. The recording folders are in
@@ -122,7 +115,7 @@ Then send the person who asked you to test:
   missing screen.
 
 Please don't send the recordings themselves: they show whatever was
-on your screens. The output of `msr list` names your screens and audio
+on your screens. The window's screenshot names your screens and audio
 inputs. `recording.json` holds what the
 [problem report form](https://github.com/schlomo/multi-screen-recorder-macos/issues/new?template=problem-report.yml)
 lists: the names of your screens and audio inputs and the identifiers
