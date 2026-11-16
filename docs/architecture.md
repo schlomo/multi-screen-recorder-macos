@@ -45,8 +45,8 @@ credited for the reference implementation.
 
 The skeleton is built (the app window with the ready check and the
 table of what will be recorded, auto mode, the command line without `record`, the
-pipeline), and so is recording the displays (PR #11); recording the
-audio is in review (PR #12). The designs:
+pipeline), and so is recording the displays (PR #11) and the audio
+(PR #12). The designs:
 [design/recorder.md](design/recorder.md) and
 [design/delivery.md](design/delivery.md); how the recorder is tested
 end to end on a Mac: [design/end-to-end-tests.md](design/end-to-end-tests.md)
@@ -90,7 +90,12 @@ D28).
   that counts sleep. `msr record` shows the app's Dock icon and can be
   stopped there through the status window; the app quits after Stop.
   A recording's `result` is `ok` unless part of it was lost; no crash
-  markers (D47). The audio follows in B2.
+  markers (D47).
+- Audio (built in PR #12, D49 to D52): one audio file per audio source,
+  each with a timecode track; gaps over 32 ms filled up to 1 s, a new
+  file beyond; clock drift measured per file, not yet corrected; the
+  "Microphones" guide mixes each input as mono at unity gain through a
+  soft limiter (D52); guide tracks end with the video (D51).
 - Audio: none, the default microphone, wired (the default microphone
   plus every built-in and wired input) or all inputs, with system audio
   and AGC as separate switches (D12, D44); one audio file per source, every
@@ -103,8 +108,8 @@ D28).
   only under "all inputs" or as the default microphone; a Mac without
   a microphone records displays and system audio. The settings file is
   only read, never refused or repaired, and written only by the window
-  and by `msr settings` with flags. Agreed, not built yet: a recording
-  follows a change of the default microphone (D34). What AGC does is
+  and by `msr settings` with flags. A recording follows a change of
+  the default microphone (D34, built in PR #12). What AGC does is
   open (D34).
 - A recording folder and one recording manifest per recording;
   recordings into different folders may run in parallel (D20).

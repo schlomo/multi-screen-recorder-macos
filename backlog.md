@@ -2,15 +2,16 @@
 
 ## Next session starts here
 
-PR #12 (B2, the audio, with B1's follow-ups) is ready for review
-(2026-11-16, head `12f846a`); the owner checks the new "Microphones"
-mix (D52) and the guide-track ends live before merging. Then, in this
-order (the architect's sequencing, 2026-11-16): queued item 2, the
-end-to-end tests in CI and on the owner's Mac; item 3, the
-simplification; item 4, drift correction. Agents may run `msr record`
-on the owner's Mac (D48; the owner's go-ahead in the session,
-2026-11-16), and BetterDisplay's command line with the owner's virtual
-screen "Virtual 16:9".
+PR #12 (B2, the audio) merged 2026-11-16; release `v0.20261116.33`.
+The owner's goal now (2026-11-16): "I'd like to come to a working app
+I can share with friendly testers ASAP and then keep optimizing". The
+architect's order: queued item 1, the first tester release (its design
+waits for the owner's sign-off and the signing question); then item 3,
+the end-to-end tests; item 4, the simplification; item 7, auto-recovery
+from disturbances; item 6, CPU; item 5, drift correction. Agents may
+run `msr record` on the owner's Mac (D48; the owner's go-ahead in the
+session, 2026-11-16), and BetterDisplay's command line with the
+owner's virtual screen "Virtual 16:9".
 
 How the owner wants changes that show in the window or on the command
 line handled (2026-11-15: "what about working locally and letting me
@@ -25,49 +26,38 @@ Still open from D34: what AGC does and whether it is on in auto mode;
 
 ## In flight
 
-- **Recording core B2, the audio, with B1's follow-ups**, PR #12
-  (branch `recording-core-audio`, D49 to D52): built, reviewed
-  (adversarial and four delta reviews), ready. Verified live on build
-  `7ad0b6b` (2026-11-16): capture from 4 inputs and system audio,
-  default-microphone changes, a microphone unplugged and replugged,
-  display and main-display changes, the system-audio guide equal to its
-  file, timecode in Resolve, one hour with `result: ok` and no late
-  frame. On build `12f846a` (the owner, 2026-11-16): the D52 mix keeps
-  each voice at its own level, guide tracks as long as the video, debug
-  lines carry their time.
-  - **Open, found on `12f846a`:** in the owner's app recording
-    (`2026-11-16 12.24.51`), the DELL's file writer fell behind twice,
-    within about 3 s after the Wacom changed USB-C port and the built-in
-    display came and went: its files end at 33.0 and 68.6 s and the next
-    start at 38.0 and 75.3 s, so the main display lost 5 and 7 s.
-    Not seen with a virtual screen on the same build, nor in the
-    owner's Wacom replugs on `7ad0b6b`. The recorder gives a writer 2 s
-    before it ends the file. To settle with a `--debug` run during a
-    Wacom port change: whether it is the hardware encoder stalling
-    through macOS's display and USB reconfiguration, and whether a
-    longer allowance (frames held, not dropped) keeps the file.
-    Not reproduced by the lid alone (`12.50.45`) or the Wacom port
-    change alone (`12.41.06`) from `msr record`. The owner
-    (2026-11-16): "if after a few seconds the recording is again good
-    then I'd accept that. Main goal is auto-recovery after changes and
-    continuing the recording instead of giving up". The recording did
-    recover by itself, so this does not hold up B2; shortening such
-    gaps belongs to the USB resilience analysis (running).
-  - Guide tracks end with about 0.3 s of zeros at Stop although the
-    microphones recorded sound then (`2026-11-16 12.29.59`): the audio
-    sources stop at the same moment as the display files' last mix.
-    Stop the audio sources after the display files' last mix.
+Nothing.
 
 ## Queued
 
-1. **Toolchain catch-up** (D28): the pipeline builds with Xcode 26.6,
+1. **First tester release** (the owner, 2026-11-16: "I'd like to come
+   to a working app I can share with friendly testers ASAP and then keep
+   optimizing"). One small PR; the design waits for the owner's sign-off
+   as text:
+   - Fixes: a recording with `result: problems` but `problems: []`
+     (`2026-11-16 12.24.51`, against D47); the guide tracks' 0.3 s of
+     zeros at Stop (Done, PR #12's leftovers); the writer's allowance
+     before a display file ends raised from 2 s to about 6 s
+     (`RecorderValues.lateTickBoundSeconds`, data only; item 7).
+   - The window part of item 13: the version and a link, Cancel, the
+     table, the folder as a link, MB below 1 GB, the GB/h estimate
+     calibrated against the measured 1.7 GB/h.
+   - A tester guide in the README: download, install, "Open Anyway",
+     the two permissions, known limits (CPU, drift, USB disturbances),
+     and how to report: a GitHub Issue form asking for `msr version`,
+     the recording's `recording.json` and what happened.
+   - Open, the owner's: signing for testers. Recommended: keep the
+     self-signed certificate (D5), testers click "Open Anyway" once;
+     Developer ID (99 USD a year, Apple's notarization) when testers
+     beyond friends come.
+2. **Toolchain catch-up** (D28): the pipeline builds with Xcode 26.6,
    Swift 6.3 and Python 3.15, the newest on GitHub's generally
    available runner image (D32 for Python), while the owner's Mac has
    Xcode 27.2. Move the pipeline and the Swift tools version up as soon
    as a runner image with Xcode 27 is generally available. The gap
    bit in PR #9: code the local Xcode 27.2 accepted failed to compile
    on CI's Swift 6.3.
-2. **End-to-end tests in CI and on the owner's Mac** (the owner signed
+3. **End-to-end tests in CI and on the owner's Mac** (the owner signed
    off the design as text on 2026-11-16: "Yes to both CI questions and
    plan for that"; its decisions entry, replacing D37's "out of the
    pipeline", comes with the PR). An experiment on 2026-11-16 (three
@@ -101,7 +91,7 @@ Still open from D34: what AGC does and whether it is on in auto mode;
    - Not covered anywhere: real USB re-enumeration, the lid, Bluetooth,
      power loss. A VM on the owner's Mac (Tart, not Parallels) only if
      needed later; it has no hardware encoder.
-3. **Simplification** (the Fable review of 2026-11-15; the owner: yes
+4. **Simplification** (the Fable review of 2026-11-15; the owner: yes
    to all four questions, 2026-11-16): `unpack-app` uses the standard
    library's `filter="data"`; the run-loop hold goes; `recording.json`
    leaves out null keys; `end-to-end-tests.md` stays. Findings: one
@@ -118,7 +108,7 @@ Still open from D34: what AGC does and whether it is on in auto mode;
    a drain error labelled as a writer timeout in `guideTracksCut`; no
    test for a gap after real data in a guide track's last mix; an
    unlocked test flag in `DisplayFileTickerTests`.
-4. **Drift correction** (D49 measured it, the correction was left for
+5. **Drift correction** (D49 measured it, the correction was left for
    later): needed. The one-hour run of 2026-11-16 measured the Razer at
    −116 ppm (its file 0.42 s short after an hour, about 70 ms after
    10 minutes against the video) and the CalDigit at +50 ppm; system
@@ -127,7 +117,7 @@ Still open from D34: what AGC does and whether it is on in auto mode;
    itself (first and latest buffer arrival) mostly measures arrival
    jitter on short files; a least-squares slope, null under about
    30 s, fixes that.
-5. **CPU**: our process averaged 56 % of one core over an hour (two
+6. **CPU**: our process averaged 56 % of one core over an hour (two
    displays, five audio sources) and peaks at 165 to 386 % at start.
    A 20 s `sample` of 2026-11-16 (build `7ad0b6b`; shares solid,
    absolute values maybe 1.2 to 1.5 times high from `sample` itself):
@@ -180,11 +170,58 @@ Still open from D34: what AGC does and whether it is on in auto mode;
    9), and the colour-space work dropped if the pixels stay identical.
    Not in the first step: a cheaper AAC setting, shared guide tracks,
    24 kHz guides. The design docs get these findings with that PR.
-6. **Audio after v0** (D12, D18): AGC, in its own PR, with its own
+7. **Auto-recovery from disturbances** (the owner, 2026-11-16: "if
+   after a few seconds the recording is again good then I'd accept
+   that. Main goal is auto-recovery after changes and continuing the
+   recording instead of giving up"). The analyst's report of
+   2026-11-16 on the owner's runs `12.24.51`, `12.41.06`, `12.50.45`:
+   - Cause: plugging the Wacom's USB side into the CalDigit TS3 Plus's
+     downstream USB-C port exhausts PCI address space, and macOS pauses
+     every PCIe function of the dock for about 4 s ("pci pause", the
+     dock's Ethernet last). Every USB audio device hangs off that
+     dock; the MacBook microphone does not. Unplugging is harmless.
+   - What the recorder gets: exact zeros, or a 250 ms loop of old
+     audio (BRIO, Razer), delivered late in one burst (CMIO "Overload
+     prepending silence"). Gap detection sees none of it; the guide
+     tracks carry the loops into the display files; the disturbed
+     stretches corrupt `clockDriftPpm` (BRIO 184.8, system audio
+     -964.3 ppm).
+   - The BRIO wedges after a pause: usbaudiod restarts it 12 times,
+     then gives up; only a replug helps, an app cannot reset it.
+   - The DELL's lost seconds (`12.24.51`): the hardware encoder did not
+     stall (983 frames in, 0 dropped); the writer's video input stopped
+     accepting frames for more than 2 s while macOS reconfigured. On
+     "fell behind" the held frames are discarded, then finalizing, the
+     1 s back-off and a new stream add 3 to 5 s.
+   - A display's stream starts up to 5.6 s late: the screen-recording
+     permission check before each stream (tccd checking the terminal's
+     code signature), and msr held up during the pause.
+   - Designs, ranked by recording saved against cost: (a) the 6 s
+     allowance (item 1); (b) a new display file on the same stream
+     when a writer falls behind, carrying the held frames, no back-off;
+     (c) audio honesty: one event per episode (zeros, repeated audio,
+     late burst, input dead), never write repeated audio, a dead input
+     becomes a problem that says to replug it, one indicator per input
+     in the status window (together with item 11); (d) fetch the
+     shareable content ahead, off the Core Audio path; (e) a ready-check
+     warning when audio inputs share a dock with a USB-C display;
+     (f) leave disturbed stretches out of the drift measurement
+     (item 5); (g) our own process tap for system audio, low: it is the
+     mechanism ScreenCaptureKit already uses. Design first.
+   - Advice for the owner [ASSUMED, from the mechanism]: the Wacom
+     straight into a Mac port avoids the pause; check with one replug
+     and `log show` for "pci pause".
+   - Open, the owner's: was system audio playing in `12.41.06` and
+     `12.50.45` (exact zeros throughout, while ScreenCaptureKit
+     delivered buffers)? Is the dock's Ethernet in use? App-against-CLI
+     repeat runs with `--debug` to settle whether the app's front end
+     adds to the stall (msr logged "skipping cycle due to overload" only
+     in the app run).
+8. **Audio after v0** (D12, D18): AGC, in its own PR, with its own
    design, its column in the window's table and the HDMI test.
    What AGC does is open (D34). Recording all audio inputs is no
    longer here: auto mode brings it (D34).
-7. **v1 gate:** acceptance tests on the owner's Mac (M3 Pro, macOS 26):
+9. **v1 gate:** acceptance tests on the owner's Mac (M3 Pro, macOS 26):
    - Timing by content: record a full-screen clock showing
      milliseconds; across a still period of at least 60 s followed by a
      change, each sampled frame shows the time of its timestamp within
@@ -221,7 +258,7 @@ Still open from D34: what AGC does and whether it is on in auto mode;
      decides whether the joining command below is needed.
    - A snapshot release installed over an earlier one keeps both
      permissions, with the app started from Finder (D5).
-8. **Audio files in editors**: Resolve shows the audio files' timecode
+10. **Audio files in editors**: Resolve shows the audio files' timecode
    but no reel name or camera number (the owner, 2026-11-16), though
    they carry the same items as the display files; the owner wants
    "meaningful metadata for resolve and others". Research found no
@@ -232,7 +269,7 @@ Still open from D34: what AGC does and whether it is on in auto mode;
    scripts in a session scratchpad, so remake them if gone. A WAV copy
    derived at Stop or a CSV per recording are the candidates; the
    recording itself stays a fragmented `.mov`. Design first.
-9. **An input that delivers only zeros** (from the live runs,
+11. **An input that delivers only zeros** (from the live runs,
    2026-11-16): a broken BRIO and, during USB re-enumeration, every USB
    input and the system-audio capture delivered exact zeros for 4 to
    10 s, with no event (macOS's doing; the speakers kept playing). Tell
@@ -249,12 +286,12 @@ Still open from D34: what AGC does and whether it is on in auto mode;
    some visual indicator"). A device that delivers broken audio sends a
    storm of gap events (the BRIO, 28 in 5 s, 2026-11-16): tell one
    event per episode. Design first.
-10. **Cameras** (the owner, 2026-11-16: "we'll have to add a feature to
+12. **Cameras** (the owner, 2026-11-16: "we'll have to add a feature to
    record cameras, same slider: none, default, all, all + virtual. Auto
    defaults to default camera if available"). A camera's file carries
    audio too ("Later for webcam we'll have more combined files as we of
    course want have audio there as well", 2026-11-16). Design first.
-11. **Presentation: the window and the terminal output** (the owner,
+13. **Presentation: the window and the terminal output** (the owner,
    2026-11-16: "if running in a terminal (try) then show the running
    status as persistent last line, recording time, CPU, recording size
    etc."). Signed off on 2026-11-16, with the owner's additions ("a
@@ -288,13 +325,13 @@ Still open from D34: what AGC does and whether it is on in auto mode;
      everything after 1.5 minutes). The GB/h estimate is about twice
      what one hour wrote (4.0 GB/h estimated, 1.7 GB in the hour run):
      calibrate it with the v1 gate's hour run.
-12. **App icon, what is left** after PR #7 (classic `.icns` rendered
+14. **App icon, what is left** after PR #7 (classic `.icns` rendered
    from `assets/icon/app-icon.svg`): the macOS 26 layered icon format
    from the SVG's layers, if a plain package build can compile it; a
    simplified drawing below 32 px (two displays and a larger dot), from
    the owner's choice of 2026-11-12. Revisit when the owner finds the
    Dock or Finder icon lacking.
-13. **Homepage** (D7): the branch name and how changes reach it
+15. **Homepage** (D7): the branch name and how changes reach it
    (architect); the DNS entry for `multiscreenrecorder.schapiro.org`
    (owner).
 
@@ -302,7 +339,7 @@ Still open from D34: what AGC does and whether it is on in auto mode;
 
 - **Skipping the MacBook microphone while the lid is closed**: Apple
   silicon MacBooks disconnect it in hardware then, so its file holds
-  only zeros (seen 2026-11-16). Harmless; revisit with item 9 (an input
+  only zeros (seen 2026-11-16). Harmless; revisit with item 11 (an input
   that delivers only zeros) or if the files bother the owner.
 - **Developer ID signing and notarization** (D5). Deferred because the
   Apple Developer Program costs €99 a year and the owner can work with
@@ -389,7 +426,7 @@ Still open from D34: what AGC does and whether it is on in auto mode;
 - **macOS 27 as the minimum.** The owner offered it on 2026-11-15;
   nothing found depends on it and the pipeline cannot build for it
   (D45). Revisit when a runner image with Xcode 27 is generally
-  available (queued item 1), or if macOS 27 is shown to fix the
+  available (queued item 2), or if macOS 27 is shown to fix the
   wrong-display fault.
 - **Frame rates other than 30 fps** (60, or 100 and more). The owner,
   2026-11-15: "maybe somebody would like to record at 60 or 100 fps, so
@@ -424,6 +461,31 @@ Still open from D34: what AGC does and whether it is on in auto mode;
 
 ## Done (recent)
 
+- 2026-11-16: PR #12 merged by the owner: B2, the audio, with B1's
+  follow-ups (D48 to D52); release `v0.20261116.33`. Leftovers, kept
+  here until they land in a later PR:
+  - **Open, found on `12f846a`:** in the owner's app recording
+    (`2026-11-16 12.24.51`), the DELL's file writer fell behind twice,
+    within about 3 s after the Wacom changed USB-C port and the built-in
+    display came and went: its files end at 33.0 and 68.6 s and the next
+    start at 38.0 and 75.3 s, so the main display lost 5 and 7 s.
+    Not seen with a virtual screen on the same build, nor in the
+    owner's Wacom replugs on `7ad0b6b`. The recorder gives a writer 2 s
+    before it ends the file. To settle with a `--debug` run during a
+    Wacom port change: whether it is the hardware encoder stalling
+    through macOS's display and USB reconfiguration, and whether a
+    longer allowance (frames held, not dropped) keeps the file.
+    Not reproduced by the lid alone (`12.50.45`) or the Wacom port
+    change alone (`12.41.06`) from `msr record`. The owner
+    (2026-11-16): "if after a few seconds the recording is again good
+    then I'd accept that. Main goal is auto-recovery after changes and
+    continuing the recording instead of giving up". The recording did
+    recover by itself, so this does not hold up B2; shortening such
+    gaps belongs to the USB resilience analysis (running).
+  - Guide tracks end with about 0.3 s of zeros at Stop although the
+    microphones recorded sound then (`2026-11-16 12.29.59`): the audio
+    sources stop at the same moment as the display files' last mix.
+    Stop the audio sources after the display files' last mix.
 - 2026-11-15: PR #11 merged by the owner: B1, the displays (D45, D46,
   D47). The owner's runs: reconnects, frame size changes, the lid,
   Ctrl-C and the status window from `msr record`; Resolve and Kdenlive
