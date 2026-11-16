@@ -314,7 +314,7 @@ final class AudioCapture: @unchecked Sendable {
 
     /// Ends the current file, if any: the samples still waiting are written
     /// for at most the drain timeout, then it is finalized. Its end counts
-    /// only what the writer took; the rest is told as lost.
+    /// only what the writer took; the rest is lost (`lostSamples`).
     private func finishFile() {
         let drift = timeline?.clockDriftPpm
         timeline = nil
