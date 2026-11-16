@@ -28,11 +28,11 @@ public struct AudioFileEnd: Equatable, Sendable {
 /// What an audio capture tells the recorder; each is called on the capture's queue.
 struct AudioCaptureReports: Sendable {
     var fileStarted: @Sendable (RecordingManifest.AudioFile) -> Void
-    /// A file ended while the capture goes on: a long gap or a new channel count.
+    /// A file ended, finalized or not; each file's end once.
     var fileEnded: @Sendable (AudioFileEnd) -> Void
     var event: @Sendable (RecordingEvent) -> Void
-    /// The capture ended by itself, with the ends of all its files.
-    var ended: @Sendable (AudioTracker.CaptureEnd, [AudioFileEnd]) -> Void
+    /// The capture ended by itself, after its last file's end.
+    var ended: @Sendable (AudioTracker.CaptureEnd) -> Void
 }
 
 /// What the audio captures reported, in the order they reported it, until
@@ -44,7 +44,7 @@ final class AudioReportInbox: Sendable {
         case fileStarted(RecordingManifest.AudioFile, AudioTracker.SourceID, name: String)
         case fileEnded(AudioFileEnd)
         case event(RecordingEvent)
-        case ended(AudioTracker.SourceID, number: Int, name: String, AudioTracker.CaptureEnd, [AudioFileEnd])
+        case ended(AudioTracker.SourceID, number: Int, name: String, AudioTracker.CaptureEnd)
     }
 
     private let reports = Mutex<[Report]>([])
@@ -108,8 +108,8 @@ final class AudioCapture: @unchecked Sendable {
     private var channelCount = 0
     /// The current file, from its first sample after its first tick on.
     private var open: OpenFile?
-    /// Every file's end, in the order the files started.
-    private var finishing: [Task<AudioFileEnd, Never>] = []
+    /// Every file's finishing, in the order the files started.
+    private var finishing: [Task<Void, Never>] = []
     private var isEnding = false
     private var guideChannels: Int?
 
@@ -187,18 +187,16 @@ final class AudioCapture: @unchecked Sendable {
     }
 
     /// Stops the capture at the recorder's request and finalizes its file;
-    /// the ends of all its files, also those ended before.
-    func stop() async -> [AudioFileEnd] {
+    /// returns once every file's end was reported.
+    func stop() async {
         await source.stop()
-        let tasks = queue.sync { () -> [Task<AudioFileEnd, Never>] in
+        let tasks = queue.sync { () -> [Task<Void, Never>] in
             isEnding = true
             finishFile()
             leaveGuide()
             return finishing
         }
-        var ends: [AudioFileEnd] = []
-        for task in tasks { ends.append(await task.value) }
-        return ends
+        for task in tasks { await task.value }
     }
 
     /// Ends the capture by itself: its file ends, then it says why.
@@ -211,9 +209,8 @@ final class AudioCapture: @unchecked Sendable {
         let reports = reports
         Task {
             await self.source.stop()
-            var ends: [AudioFileEnd] = []
-            for task in tasks { ends.append(await task.value) }
-            reports.ended(reason, ends)
+            for task in tasks { await task.value }
+            reports.ended(reason)
         }
     }
 
@@ -321,7 +318,6 @@ final class AudioCapture: @unchecked Sendable {
         guard let file = open else { return }
         open = nil
         let reports = reports
-        let isLast = isEnding
         let drainTimeout = drainTimeout
         let name = name
         finishing.append(Task {
@@ -338,9 +334,7 @@ final class AudioCapture: @unchecked Sendable {
             }
             entry.end = entry.start + Double(file.written) / Double(RecorderValues.audioSampleRate)
             entry.clockDriftPpm = drift.map { ($0 * 10).rounded() / 10 }
-            let end = AudioFileEnd(file: entry, error: failure, lostSamples: lost)
-            if !isLast { reports.fileEnded(end) }
-            return end
+            reports.fileEnded(AudioFileEnd(file: entry, error: failure, lostSamples: lost))
         })
     }
 

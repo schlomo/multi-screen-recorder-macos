@@ -428,9 +428,7 @@ public final class Recorder {
             })
         case .stop(let id):
             guard let (_, capture) = audioCaptures.removeValue(forKey: id) else { return }
-            stopping.append(Task { [weak self] in
-                for end in await capture.stop() { self?.audioFileEnded(end) }
-            })
+            stopping.append(Task { await capture.stop() })
         }
     }
 
@@ -451,22 +449,23 @@ public final class Recorder {
             fileStarted: { file in post(.fileStarted(file, id, name: name)) },
             fileEnded: { end in post(.fileEnded(end)) },
             event: { event in post(.event(event)) },
-            ended: { reason, ends in post(.ended(id, number: number, name: name, reason, ends)) })
+            ended: { reason in post(.ended(id, number: number, name: name, reason)) })
         let capture = AudioCapture(id: id, name: name, source: source, context: context, guides: guides, reports: reports)
         audioCaptures[id] = (number, capture)
         capture.start()
     }
 
-    /// The audio captures' reports, in order. Once finalized, the manifest
-    /// changes no more: the stop gave every file's end and took the rest.
+    /// The audio captures' reports, in order, the one route by which they
+    /// reach the manifest. Stop takes the rest, every file's end included,
+    /// right before it finalizes; after that the manifest changes no more.
     private func takeAudioReports() {
         for report in audioReports.take() {
             switch report {
             case .fileStarted(let file, let id, let name): audioFileStarted(file, id: id, name: name)
             case .fileEnded(let end): audioFileEnded(end)
             case .event(let event): audioEvent(event)
-            case .ended(let id, let number, let name, let reason, let ends):
-                audioCaptureEnded(id, number: number, name: name, reason: reason, ends: ends)
+            case .ended(let id, let number, let name, let reason):
+                audioCaptureEnded(id, number: number, name: name, reason: reason)
             }
         }
     }
@@ -497,9 +496,8 @@ public final class Recorder {
     }
 
     private func audioCaptureEnded(
-        _ id: AudioTracker.SourceID, number: Int, name: String, reason: AudioTracker.CaptureEnd, ends: [AudioFileEnd]
+        _ id: AudioTracker.SourceID, number: Int, name: String, reason: AudioTracker.CaptureEnd
     ) {
-        for end in ends { audioFileEnded(end) }
         guard !isStopped, let (current, _) = audioCaptures[id], current == number else { return }
         audioCaptures[id] = nil
         switch reason {

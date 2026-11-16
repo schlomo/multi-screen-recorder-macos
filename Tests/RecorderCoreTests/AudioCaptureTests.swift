@@ -68,24 +68,24 @@ import Testing
     }
 
     final class Reported: @unchecked Sendable {
-        private let state = Mutex<(started: [String], ended: [AudioFileEnd], events: [RecordingEvent], end: (AudioTracker.CaptureEnd, [AudioFileEnd])?)>(
+        private let state = Mutex<(started: [String], ended: [AudioFileEnd], events: [RecordingEvent], end: AudioTracker.CaptureEnd?)>(
             ([], [], [], nil))
 
         var started: [String] { state.withLock { $0.started } }
         var ended: [AudioFileEnd] { state.withLock { $0.ended } }
         var events: [RecordingEvent] { state.withLock { $0.events } }
-        var captureEnd: (AudioTracker.CaptureEnd, [AudioFileEnd])? { state.withLock { $0.end } }
+        var captureEnd: AudioTracker.CaptureEnd? { state.withLock { $0.end } }
 
         var reports: AudioCaptureReports {
             AudioCaptureReports(
                 fileStarted: { file in self.state.withLock { $0.started.append(file.name) } },
                 fileEnded: { end in self.state.withLock { $0.ended.append(end) } },
                 event: { event in self.state.withLock { $0.events.append(event) } },
-                ended: { end, files in self.state.withLock { $0.end = (end, files) } })
+                ended: { end in self.state.withLock { $0.end = end } })
         }
 
         /// Waits until the capture said it ended, for at most 5 s.
-        func waitForCaptureEnd() async throws -> (AudioTracker.CaptureEnd, [AudioFileEnd]) {
+        func waitForCaptureEnd() async throws -> AudioTracker.CaptureEnd {
             for _ in 0..<500 {
                 if let end = captureEnd { return end }
                 try await Task.sleep(for: .milliseconds(10))
@@ -136,7 +136,8 @@ import Testing
             try? await Task.sleep(for: .milliseconds(50))
             writer.isReady = true
         }
-        let ends = await capture.stop()
+        await capture.stop()
+        let ends = reported.ended
         #expect(writer.samples == 3 * Int64(samplesPerBuffer))
         #expect(writer.endPosition == .some(3 * Int64(samplesPerBuffer)))
         let end = try #require(ends.first)
@@ -151,7 +152,8 @@ import Testing
         source.send(try buffer(at: 0))
         writer.isReady = false
         source.send(try buffer(at: time(ofBuffer: 1)))
-        let ends = await capture.stop()
+        await capture.stop()
+        let ends = reported.ended
         let end = try #require(ends.first)
         #expect(writer.endPosition == .some(Int64(samplesPerBuffer)))
         #expect(end.file.end == end.file.start + Double(samplesPerBuffer) / Double(RecorderValues.audioSampleRate))
@@ -171,7 +173,8 @@ import Testing
     @Test func aFileEndWithNothingLostHasNoEvent() async throws {
         let capture = capture()
         source.send(try buffer(at: 0))
-        let ends = await capture.stop()
+        await capture.stop()
+        let ends = reported.ended
         #expect(ends.first?.lostSamples == 0)
         #expect(ends.first?.events.isEmpty == true)
     }
@@ -187,7 +190,7 @@ import Testing
         #expect(inbox.take().isEmpty)
     }
 
-    @Test func stopGivesTheEndOfEveryFileOfTheCapture() async throws {
+    @Test func stopEndsEveryFileOfTheCapture() async throws {
         let capture = capture()
         source.send(try buffer(at: 0))
         // A gap over the longest filled gap ends the file and starts a new one.
@@ -195,18 +198,39 @@ import Testing
         #expect(reported.events.map(\.event) == [.audioInputGap])
         #expect(reported.events.first?.audioSource == "Razer Seiren V3 Mini")
         #expect(reported.started.count == 2)
-        let ends = await capture.stop()
+        await capture.stop()
+        let ends = reported.ended
         #expect(ends.map(\.file.name) == reported.started)
         #expect(ends.allSatisfy { $0.file.state == .finalized })
-        // Only the file that ended while the capture went on was reported by itself.
-        #expect(reported.ended.map(\.file.name) == [reported.started[0]])
+    }
+
+    /// One route only: a file end reported twice would be applied twice,
+    /// its `audio file writer fell behind` written and told twice.
+    @Test func everyFileEndIsReportedOnceThroughItsReports() async throws {
+        let capture = capture(drainTimeout: .milliseconds(10))
+        source.send(try buffer(at: 0))
+        source.send(try buffer(at: 2_000_000_000))
+        writer.isReady = false
+        source.send(try buffer(at: 2_000_000_000 + time(ofBuffer: 1)))
+        await capture.stop()
+        #expect(reported.ended.map(\.file.name) == reported.started)
+        #expect(reported.ended.flatMap(\.events).map(\.event) == [.audioFileWriterFellBehind])
+    }
+
+    @Test func aCaptureThatEndsByItselfReportsEachFileEndOnce() async throws {
+        let capture = capture()
+        source.send(try buffer(at: 0))
+        source.lose(.disconnected)
+        _ = try await reported.waitForCaptureEnd()
+        withExtendedLifetime(capture) {}
+        #expect(reported.ended.map(\.file.name) == reported.started)
     }
 
     @Test func aGapFilledWithSilenceGoesToTheWriterAsSilence() async throws {
         let capture = capture()
         source.send(try buffer(at: 0))
         source.send(try buffer(at: time(ofBuffer: 1) + 100_000_000))
-        _ = await capture.stop()
+        await capture.stop()
         #expect(writer.samples == 2 * Int64(samplesPerBuffer))
         #expect(writer.endPosition == .some(2 * Int64(samplesPerBuffer) + 4800))
     }
@@ -215,7 +239,8 @@ import Testing
         let capture = capture()
         source.send(try buffer(at: 0))
         source.lose(.disconnected)
-        let (end, files) = try await reported.waitForCaptureEnd()
+        let end = try await reported.waitForCaptureEnd()
+        let files = reported.ended
         withExtendedLifetime(capture) {}
         #expect(end == .disconnected)
         #expect(files.map(\.file.name) == reported.started)
@@ -225,7 +250,8 @@ import Testing
     @Test func systemAudioThatIsNotStereoIsACaptureFailure() async throws {
         let capture = capture(.systemAudio)
         source.send(try buffer(at: 0, channels: 1))
-        let (end, files) = try await reported.waitForCaptureEnd()
+        let end = try await reported.waitForCaptureEnd()
+        let files = reported.ended
         withExtendedLifetime(capture) {}
         #expect(end == .captureFailed("the system audio came with 1 channels instead of 2"))
         #expect(files.isEmpty)
@@ -236,7 +262,8 @@ import Testing
         writer.isReady = false
         let buffers = RecorderValues.lateTickBoundSeconds * RecorderValues.audioSampleRate / samplesPerBuffer + 2
         for index in 0..<buffers { source.send(try buffer(at: time(ofBuffer: index))) }
-        let (end, files) = try await reported.waitForCaptureEnd()
+        let end = try await reported.waitForCaptureEnd()
+        let files = reported.ended
         withExtendedLifetime(capture) {}
         #expect(end == .writerFellBehind)
         #expect(files.first?.error?.description.contains("lost") == true)

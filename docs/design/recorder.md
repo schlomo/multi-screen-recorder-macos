@@ -385,8 +385,12 @@ input disconnected`, `system audio started`, `system audio stopped`,
 fell behind`;
 each names its display (`display`) or its audio source (`audioSource`)
 where it is about one; `display` always means a display.
-Their fields: `at`, `event`, `display` or `audioSource`; `from` and `to` (the old and
-the new frame size) for `display frame size changed`, and the old and
+`audio file writer fell behind` comes in two shapes: without `error`
+when a capture ended because its writer fell behind, and with `error`
+when samples were lost at a file's end, so one recording can have it
+twice for the same file.
+Their fields: `at`, `event`, `display` or `audioSource`; `from` and
+`to` (the old and the new frame size) for `display frame size changed`, and the old and
 the new default microphone for `default microphone changed` (either
 absent where there was or is none); `mirrors` (the display mirrored)
 for `display mirroring started`; `length` (seconds, to the
@@ -1142,27 +1146,27 @@ and writer, audio files and guide tracks written from synthetic PCM and
 read back. Live audio capture is UNVERIFIED until the owner's run.
 
 Built in B2 where this document leaves the detail open, decided by the
-architect on review (D50): the failure events are named `audio input failed`,
-`system audio failed`, `audio file writer failed` and `audio file
-writer fell behind`; an event about an audio source names it in
+architect on review (D50): the failure events are named `audio input
+failed`, `system audio failed`, `audio file writer failed` and `audio
+file writer fell behind`; an event about an audio source names it in
 `audioSource`, never in `display`; samples lost at an audio file's end
-are `audio file writer fell behind`, a failure; an audio source the audio mode
-records but that has no file yet shows the state `not recorded`; an
-audio input is recorded only when Core Audio gives its UID, which
-`AVCaptureDevice` opens it by; the beginning of a recording tells no
-`default microphone changed` or `audio input connected` events; the
-system audio's stream asks for 2×2 pixels at 1 frame per second and
+are `audio file writer fell behind`, a failure; an audio source the
+audio mode records but that has no file yet shows the state `not
+recorded`; an audio input is recorded only when Core Audio gives its
+UID, which `AVCaptureDevice` opens it by; the beginning of a recording
+tells no `default microphone changed` or `audio input connected` events;
+the system audio's stream asks for 2×2 pixels at 1 frame per second and
 drops them; a display file's guide tracks may end up to 300 ms before
-its last tick; the video track's name is written as QuickTime user
-data `©nam`, which ffprobe shows as `title` (track-level metadata items
-do not show and are not written; the file-level items are); `msr
-record`'s summary ends with the line `CPU N % on average, N % at the
-peak, of one core (this process only)`.
+its last tick; the video track's name is written as QuickTime user data
+`©nam`, which ffprobe shows as `title` (track-level metadata items do
+not show and are not written; the file-level items are); `msr record`'s
+summary ends with the line `CPU N % on average, N % at the peak, of one
+core (this process only)`.
 
-Open, for the owner's live run to answer (D50): the system audio's timestamps
-may follow the host clock rather than its sample count; then the
-output device's clock drift would show as `audio input gap` events of
-about 32 ms at a steady interval, each filled with silence. The gap
+Open, for the owner's live run to answer (D50): the system audio's
+timestamps may follow the host clock rather than its sample count; then
+the output device's clock drift would show as `audio input gap` events
+of about 32 ms at a steady interval, each filled with silence. The gap
 events of the run show whether it does.
 
 Details the design left open, as built and confirmed by the owner
