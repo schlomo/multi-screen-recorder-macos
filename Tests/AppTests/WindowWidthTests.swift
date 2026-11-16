@@ -1,4 +1,5 @@
 import AppKit
+import RecorderCore
 import RecorderLogic
 import SwiftUI
 import Testing
@@ -37,6 +38,75 @@ import Testing
         // The input's name is the longest either way, so Source is as wide.
         let name = "CalDigit Thunderbolt 3 Audio"
         #expect(width(table(section(inputName: name, screensError: true))) == width(table(section(inputName: name))))
+    }
+
+    // MARK: The start window
+
+    private static let shortScreens = [
+        ScreenInfo(name: "LG", pixelSize: FrameSize(width: 3840, height: 2160), pointSize: FrameSize(width: 3840, height: 2160), isMain: true, originX: 0, originY: 0),
+    ]
+    private static let inputs = [
+        AudioInputInfo(name: "CalDigit Thunderbolt 3 Audio", channelCount: 2, isDefault: false, transport: .usb, uid: "A"),
+        AudioInputInfo(name: "MacBook Pro Microphone", channelCount: 1, isDefault: true, transport: .builtIn, uid: "B"),
+        AudioInputInfo(name: "AirPods Pro", channelCount: 1, isDefault: false, transport: .bluetooth, uid: "C"),
+    ]
+
+    /// The start window's model with stand-in probes, its ready check run and the settings changed.
+    private func startModel(screens: [ScreenInfo], inputs: [AudioInputInfo], _ edit: (inout RecorderLogic.Settings) -> Void = { _ in }) async -> StartModel {
+        let home = FileManager.default.temporaryDirectory.appending(path: "WindowWidth-\(UUID().uuidString)", directoryHint: .isDirectory)
+        let probes = ReadyCheckProbes(
+            screenRecording: { _ in .granted }, microphonePermission: { true },
+            screens: { .success(screens) }, audioInputs: { .success(inputs) },
+            outputFolder: { _ in .usable(.bytes(100_000_000_000)) })
+        let model = StartModel(homeFolder: home, probes: probes, whenContentMayChange: { $0() })
+        model.load()
+        model.change(edit)
+        for _ in 0..<600 where model.isChecking || model.readyCheck == nil { try? await Task.sleep(for: .milliseconds(5)) }
+        return model
+    }
+
+    private func start(_ model: StartModel) -> some View {
+        StartView(model: model) {}
+    }
+
+    @Test func aSettingDoesNotChangeTheStartWindowsWidth() async {
+        let auto = await startModel(screens: Self.screens, inputs: Self.inputs) { $0.auto = true }
+        let none = await startModel(screens: Self.screens, inputs: Self.inputs) { $0.auto = false; $0.audioMode = .none }
+        let all = await startModel(screens: Self.screens, inputs: Self.inputs) { $0.auto = false; $0.audioMode = .allInputs }
+        let widths = [width(start(auto)), width(start(none)), width(start(all))]
+        #expect(Set(widths).count == 1, "\(widths)")
+    }
+
+    @Test func theStartWindowIsAsWideAsItsTableAndTheTextBelowWraps() async throws {
+        let model = await startModel(screens: Self.screens, inputs: Self.inputs)
+        let section = try #require(model.whatWillBeRecorded)
+        let tableWidth = width(WhatWillBeRecordedView(section: section, outputFolder: model.settings.outputFolder) {})
+        #expect(tableWidth > width(AppHeader()))
+        #expect(width(start(model)) == tableWidth + 2 * TableLayout.windowPadding)
+        // The audio mode's explanation, on one line, would be wider.
+        let explanation = (AudioMode.bluetoothAndVirtualNote as NSString)
+            .size(withAttributes: [.font: NSFont.preferredFont(forTextStyle: .callout)]).width
+        #expect(explanation > tableWidth)
+    }
+
+    @Test func whenTheTaglineHeaderIsWiderThanTheTableItSetsTheWidth() async throws {
+        let model = await startModel(screens: Self.shortScreens, inputs: [])
+        let section = try #require(model.whatWillBeRecorded)
+        let tableWidth = width(WhatWillBeRecordedView(section: section, outputFolder: model.settings.outputFolder) {})
+        #expect(width(AppHeader()) > tableWidth)
+        #expect(width(start(model)) == width(AppHeader()) + 2 * TableLayout.windowPadding)
+    }
+
+    /// Through the start window this cannot fail today: the header is wider
+    /// than the settings form needs at least. So the rule is held on the
+    /// layout the window is built on.
+    @Test func aWidthSettingStackIsNeverNarrowerThanItsOtherChildrenNeed() {
+        let stack = WidthSettingStack(spacing: 0) {
+            Color.clear.frame(width: 100, height: 10).setsTheWidth()
+            Color.clear.frame(minWidth: 300, maxWidth: .infinity, minHeight: 10)
+            Text(String(repeating: "wraps ", count: 100))
+        }
+        #expect(width(stack) == 300)
     }
 
     private func statusModel(name: String, cpu: String) -> StatusModel {
