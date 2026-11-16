@@ -307,12 +307,34 @@ public struct RecordingManifest: Codable, Equatable, Sendable {
         return true
     }
 
-    /// The recording ends: its end time, its result and its CPU use.
+    /// The recording ends: its end time, its result and its CPU use; a
+    /// result of `problems` never comes with empty `problems` (D47).
     public mutating func finalize(ended date: Date, timeZone: TimeZone, cpu: CPU? = nil) {
         state = .finalized
         ended = Self.timestamp(date, timeZone: timeZone)
+        problems += untoldProblems
         result = endedWell ? .ok : .problems
         self.cpu = cpu
+    }
+
+    /// D47's rule that `problems` is never empty when the result is
+    /// `problems`: failures are told while recording, so this adds a
+    /// problem only when nothing was told, naming the first failure and
+    /// how many there were, or else the first file not finalized.
+    private var untoldProblems: [RecordingProblem] {
+        guard problems.isEmpty, !endedWell else { return [] }
+        let failures = events.filter(\.event.isFailure).sorted { $0.at < $1.at }
+        if let first = failures.first {
+            let count = failures.count == 1 ? "1 failure event" : "\(failures.count) failure events"
+            return [RecordingProblem(
+                atSeconds: first.at, problem: "A failure was not told while recording",
+                error: "\(first.problem.text) (\(count), see events)")]
+        }
+        let notFinalized = files.filter { $0.state != .finalized }.map { ($0.name, $0.end ?? $0.start) }
+            + audioFiles.filter { $0.state != .finalized }.map { ($0.name, $0.end ?? $0.start) }
+        guard let (name, at) = notFinalized.first else { return [] }
+        return [RecordingProblem(
+            atSeconds: at, problem: "A file was not finalized and nothing was told while recording", error: name)]
     }
 
     /// "2026-11-12T14:03:05.120+01:00".
@@ -445,6 +467,12 @@ public struct RecordingEvent: Codable, Equatable, Sendable {
 
     /// The display or audio source the event is about, if any.
     public var subject: String? { display ?? audioSource }
+
+    /// The event as a problem told to the person, at its time.
+    public var problem: RecordingProblem {
+        let what = display.map { "Display \($0)" } ?? audioSource.map { "Audio source \($0)" } ?? "The recording"
+        return RecordingProblem(atSeconds: at, problem: what, error: error.map { "\(event.rawValue): \($0)" } ?? event.rawValue)
+    }
 }
 
 /// A problem told to the person (the Dock badge's "!", the status window,
@@ -461,6 +489,11 @@ public struct RecordingProblem: Codable, Equatable, Sendable {
         at = (Double(nanoseconds) / 1_000_000).rounded() / 1000
         self.problem = problem
         self.error = error
+    }
+
+    /// `at` in seconds from the recording's start, as a manifest entry has it.
+    init(atSeconds seconds: Double, problem: String, error: String?) {
+        self.init(at: Int64((seconds * 1_000_000_000).rounded()), problem: problem, error: error)
     }
 
     /// The problem as the person reads it.

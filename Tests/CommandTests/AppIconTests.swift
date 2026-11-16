@@ -13,4 +13,10 @@ import Testing
         #expect(bigEndian(header[12..<16]) == 1024, "height")
         #expect([4, 6].contains(header[17]), "colour type \(header[17]) has no alpha")
     }
+
+    /// The homepage's favicons are rendered from the app icon (`scripts/render-app-icon`).
+    @Test func theHomepagesSVGFaviconIsTheAppIcon() throws {
+        let icon = try Data(contentsOf: repositoryRoot.appending(path: "assets/icon/app-icon.svg"))
+        #expect(try Data(contentsOf: repositoryRoot.appending(path: "homepage/static/favicon.svg")) == icon)
+    }
 }

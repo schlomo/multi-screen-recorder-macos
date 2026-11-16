@@ -248,8 +248,9 @@ The only environment the software runs in (D7).
 
 ## Homepage
 
-`multiscreenrecorder.schapiro.org`, served by GitHub Pages from a
-separate branch of this repository (D7).
+`multiscreenrecorder.schapiro.org`: a Hugo site in `homepage/` on
+`main`, built and served by Cloudflare Workers Builds (D53, which
+replaces D7's GitHub Pages branch).
 
 ## End-to-end test
 

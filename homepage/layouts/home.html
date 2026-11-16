@@ -1,0 +1,17 @@
+{{ define "main" }}
+<p class="tagline">{{ site.Params.description }}</p>
+<p class="download"><a class="button" href="{{ site.Params.downloadURL }}">Download the latest release</a></p>
+
+<h2>Requirements</h2>
+<p>A Mac with Apple silicon and macOS 26 or later.</p>
+
+<h2>Getting started</h2>
+<p>Multi Screen Recorder is in testing. The <a href="{{ site.Params.testerGuideURL }}">tester guide</a>
+says how to install it, how to open it the first time, which permissions it needs, and what it
+cannot do yet.</p>
+
+<h2>Problems and ideas</h2>
+<p>Report a problem with the <a href="{{ site.Params.problemReportURL }}">problem report form</a>
+on GitHub. The source is in the <a href="{{ site.Params.repositoryURL }}">GitHub repository</a>,
+under the GNU General Public License version 3.</p>
+{{ end }}

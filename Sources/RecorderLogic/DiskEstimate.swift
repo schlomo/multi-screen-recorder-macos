@@ -40,6 +40,12 @@ public enum DiskEstimate {
         String(format: "%.1f GB", bytes / 1_000_000_000)
     }
 
+    /// Decimal megabytes without a digit below 1 GB, as they round, from
+    /// there gigabytes with one digit: the status window's sizes.
+    public static func megabytesOrGigabytes(_ bytes: Double) -> String {
+        bytes < 999_500_000 ? String(format: "%.0f MB", bytes / 1_000_000) : gigabytes(bytes)
+    }
+
     /// Decimal gigabytes per hour with one digit, "<0.1" below 0.05.
     public static func gigabytesPerHour(_ bytesPerHour: Double) -> String {
         bytesPerHour < 50_000_000 ? "<0.1" : String(format: "%.1f", bytesPerHour / 1_000_000_000)

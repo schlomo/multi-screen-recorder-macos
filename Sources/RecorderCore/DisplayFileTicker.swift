@@ -102,11 +102,14 @@ public final class DisplayFileTicker {
     /// Guide track samples waiting for the writer, by their position in the file.
     private var waitingGuides: [(guide: GuideTrack, position: Int64, channels: [[Float]])] = []
     /// At most this many hand-overs wait per guide track; older ones are dropped.
-    private let guideWaitBound = Int(RecorderValues.lateTickBoundSeconds * 1000 / Int(RecorderValues.guideTrackInterval.nanoseconds / 1_000_000))
+    private let guideWaitBound = Int(RecorderValues.audioWaitBoundSeconds * 1000 / Int(RecorderValues.guideTrackInterval.nanoseconds / 1_000_000))
+
+    /// How long the end waits for the writer: as long as ticks may wait (D53).
+    public static let defaultDrainTimeout = Duration.seconds(RecorderValues.displayFileLateTickSeconds)
 
     /// `captureStart` in nanoseconds from t0: the file's first tick is never before it.
     public init(
-        captureStart: Int64, drainTimeout: Duration = .seconds(RecorderValues.lateTickBoundSeconds),
+        captureStart: Int64, drainTimeout: Duration = defaultDrainTimeout,
         makeWriter: @escaping MakeWriter
     ) {
         self.makeWriter = makeWriter
@@ -180,7 +183,9 @@ public final class DisplayFileTicker {
     /// Ends the file: writes the ticks due by `now` and, with
     /// `writeWaitingTicks`, those still waiting, for at most the drain
     /// timeout on a clock that does not count sleep, and the guide tracks
-    /// up to the video's end from `lastMix`, given that end, each joined
+    /// up to the video's end from `lastMix`, given that end (the capture's
+    /// `lastMix` first waits up to `audioWaitBoundSeconds` for its sources'
+    /// sound up to that end), each joined
     /// into one buffer that waits for the writer as long again; then always
     /// finalizes. A guide track whose last mix has a hole after what the
     /// file received is written up to the hole, never filled with silence,
@@ -189,7 +194,7 @@ public final class DisplayFileTicker {
     /// mix. Nil when no file had started.
     public func finish(
         now: Int64, writeWaitingTicks: Bool,
-        lastMix: (_ videoEnd: Int64) -> GuideLastMix = { _ in GuideLastMix(pending: [], peeks: [:]) }
+        lastMix: (_ videoEnd: Int64) async -> GuideLastMix = { _ in GuideLastMix(pending: [], peeks: [:]) }
     ) async -> DisplayFileEnd? {
         guard let writer, var file = entry else { return nil }
         var cut: [GuideTrackCut] = []
@@ -200,7 +205,7 @@ public final class DisplayFileTicker {
                 let perTick = Int64(RecorderValues.audioSampleRate) / Int64(ticks.grid.framesPerSecond)
                 let videoEnd = (lastTick + 1) * perTick
                 let fileStart = writer.firstTick * perTick
-                let last = lastMix(videoEnd)
+                let last = await lastMix(videoEnd)
                 for guide in [GuideTrack.microphones, .systemAudio] {
                     var parts = last.pending.filter { $0.guide == guide }.map { (start: $0.positionFromStart, channels: $0.channels) }
                     if let peek = last.peeks[guide] { parts.append((peek.start, peek.channels)) }

@@ -70,6 +70,19 @@ public final class GuideTrackFeed: Sendable {
         }
     }
 
+    /// Waits until every guide track's sources have delivered their
+    /// samples up to the sample position `end`, for at most `bound`;
+    /// whether they did.
+    func waitUntilReceived(upTo end: Int64, bound: Duration) async -> Bool {
+        let clock = SuspendingClock()
+        let deadline = clock.now + bound
+        while true {
+            if state.withLock({ $0.mixes.values.allSatisfy { $0.hasReceived(upTo: end) } }) { return true }
+            guard clock.now < deadline else { return false }
+            try? await clock.sleep(for: .milliseconds(10))
+        }
+    }
+
     /// An audio source joins its guide track, if the recording has it.
     func add(source name: String, channelCount: Int, to guide: GuideTrack) {
         state.withLock { state in

@@ -31,8 +31,9 @@ Recorded by the setup skill; re-run it when any of this changes.
   `test-and-build` tests, builds and smoke-tests without any secret,
   then a separate signing job signs and publishes, for every push to a
   PR the PR's snapshot release (a pre-release tagged `pr-<n>`), for a
-  push to `main` that changes more than Markdown files a release
-  `v0.<DATE>.<N>`; a closed PR's snapshot release is removed. PRs from
+  push to `main` that changes more than Markdown files and the homepage
+  (`homepage/`) a release `v0.<DATE>.<N>`, so a homepage-only push makes
+  no release; a closed PR's snapshot release is removed. PRs from
   forks and Dependabot are tested, built and smoke-tested, never signed
   or published. Signing needs the repository secret
   `SIGNING_CERTIFICATE_P12` ([delivery.md](docs/design/delivery.md)).
@@ -43,8 +44,10 @@ Recorded by the setup skill; re-run it when any of this changes.
   (recent)"). GitHub Issues are the intake for outside users; the
   architect triages them into `backlog.md`. Access: the checkout, and
   for Issues the agent's own GitHub access.
-- **Environments:** the user's Mac; the homepage (GitHub Pages at
-  `multiscreenrecorder.schapiro.org`, not set up yet).
+- **Environments:** the user's Mac; the homepage, a Hugo site in
+  `homepage/` on `main`, built and served by Cloudflare Workers Builds
+  at `multiscreenrecorder.schapiro.org` (D53); connecting the Worker to
+  the repository is the owner's ([homepage/README.md](homepage/README.md)).
 - **Principles:** `docs/principles/`; a deviation goes through
   "Changing a principle", with an entry in `docs/decisions.md`.
 

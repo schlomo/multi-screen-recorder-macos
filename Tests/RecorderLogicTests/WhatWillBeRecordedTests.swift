@@ -39,28 +39,36 @@ import Testing
                 .init(name: "RØDE Wireless GO II RX", channels: "2 channels", isRecorded: true, gigabytesPerHour: "0.1"),
                 .init(name: "System audio", channels: "stereo", isRecorded: true, gigabytesPerHour: "0.1"),
             ],
-            total: "Total 5.3 GB/h. 2 hours need 10.7 GB, 3.1 GB free.",
+            total: .init(gigabytesPerHour: "5.3", need: "2 hours need 10.7 GB, 3.1 GB free."),
             outputFolder: "Files go to ~/Movies/Multi Screen Recorder",
             continuity: "Recording continues when displays or audio sources change."))
     }
 
     @Test func the1080pSettingsOfBeforeAutoModeRecordSmallerFiles() {
         #expect(section().displays.map(\.recordsAt) == ["1670×1080", "1920×1080"])
-        #expect(section().total == "Total 2.2 GB/h. 2 hours need 4.3 GB, 3.1 GB free.")
+        #expect(section().total == .init(gigabytesPerHour: "2.2", need: "2 hours need 4.3 GB, 3.1 GB free."))
     }
 
     @Test func theColumns() {
-        #expect(WhatWillBeRecorded.columns == ["Source", "Looks like", "Drawn at", "Records at", "GB/h"])
+        #expect(WhatWillBeRecorded.columns == ["Source", "Looks like", "Drawn at", "Records at", "GB/h max"])
     }
 
-    /// The table and the total line in docs/design/recorder.md, as Markdown.
+    /// The table with its total row, and the line of what the required
+    /// recording hours need, in docs/design/recorder.md, as Markdown.
     @Test func theDesignShowsTheExample() throws {
         let example = defaultSection
         var lines = ["| " + WhatWillBeRecorded.columns.joined(separator: " | ") + " |",
                      "|" + String(repeating: "---|", count: WhatWillBeRecorded.columns.count)]
-        lines += (example.displayRows + example.audioRows).map { "| " + $0.cells.joined(separator: " | ") + " |" }
-        lines += ["", try #require(example.total)]
+        let rows = example.displayRows + example.audioRows + [try #require(example.totalRow)]
+        lines += rows.map { "| " + $0.cells.joined(separator: " | ") + " |" }
+        lines += ["", try #require(example.total?.need)]
         #expect(try repositoryFile("docs/design/recorder.md").contains(lines.joined(separator: "\n") + "\n"))
+    }
+
+    /// The total is the table's last row, in the GB/h max column.
+    @Test func theTotalIsARowWithItsValueInTheLastColumn() {
+        #expect(defaultSection.totalRow == .init(cells: ["Total", "", "", "", "5.3"], isRecorded: true))
+        #expect(section(displays: .failure(DeviceReadError("no display"))).totalRow == nil)
     }
 
     @Test func oneTableHasTheDisplayRowsThenTheAudioRowsAndSystemAudioLast() {
@@ -146,14 +154,16 @@ import Testing
     @Test func theTextForMSRCheckIsOneTableAndTheTotal() {
         #expect(defaultSection.text == """
             What will be recorded
-              Source                            Looks like  Drawn at   Records at  GB/h
-              1 Built-in Retina Display         1728×1117   3456×2234  1728×1116    1.0
-              2 LG HDR 4K                       3840×2160   3840×2160  3840×2160    4.1
-              ─────────────────────────────────────────────────────────────────────────
-              MacBook Pro Microphone (default)                         1 channel    0.1
-              RØDE Wireless GO II RX                                   2 channels   0.1
-              System audio                                             stereo       0.1
-              Total 5.3 GB/h. 2 hours need 10.7 GB, 3.1 GB free.
+              Source                            Looks like  Drawn at   Records at  GB/h max
+              1 Built-in Retina Display         1728×1117   3456×2234  1728×1116        1.0
+              2 LG HDR 4K                       3840×2160   3840×2160  3840×2160        4.1
+              ─────────────────────────────────────────────────────────────────────────────
+              MacBook Pro Microphone (default)                         1 channel        0.1
+              RØDE Wireless GO II RX                                   2 channels       0.1
+              System audio                                             stereo           0.1
+              ─────────────────────────────────────────────────────────────────────────────
+              Total                                                                     5.3
+              2 hours need 10.7 GB, 3.1 GB free.
               Files go to ~/Movies/Multi Screen Recorder
 
             """)
@@ -185,15 +195,15 @@ import Testing
 
     @Test(arguments: [nil, OutputFolderProbe.unusable("gone"), .usable(.unreadable("no such volume"))])
     func withoutTheFreeSpaceTheTotalLeavesItOut(outputFolder: OutputFolderProbe?) {
-        #expect(section(outputFolder: outputFolder).total == "Total 2.2 GB/h. 2 hours need 4.3 GB.")
+        #expect(section(outputFolder: outputFolder).total == .init(gigabytesPerHour: "2.2", need: "2 hours need 4.3 GB."))
     }
 
     @Test func oneHourNeedsItsShare() {
-        #expect(section { $0.requiredRecordingHours = 1 }.total == "Total 2.2 GB/h. 1 hour needs 2.2 GB, 3.1 GB free.")
+        #expect(section { $0.requiredRecordingHours = 1 }.total?.need == "1 hour needs 2.2 GB, 3.1 GB free.")
     }
 
     @Test func aHugeRequiredRecordingTimeIsNamedWithoutCrashing() {
-        #expect(section { $0.requiredRecordingHours = 1e20 }.total?.contains("1e+20 hours") == true)
+        #expect(section { $0.requiredRecordingHours = 1e20 }.total?.need.contains("1e+20 hours") == true)
     }
 
     @Test func theOutputFolderIsAsSet() {

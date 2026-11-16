@@ -1,11 +1,5 @@
 import Foundation
 
-/// This product's repository on GitHub.
-public enum GitHubRepository {
-    public static let url = URL(string: "https://github.com/schlomo/multi-screen-recorder-macos")!
-    public static let issues = url.appending(path: "issues")
-}
-
 /// Choosing the crash report to offer, and the new-issue link that reports it.
 /// The app opens the link in the browser and opens no connection itself (D15).
 public enum CrashReport {

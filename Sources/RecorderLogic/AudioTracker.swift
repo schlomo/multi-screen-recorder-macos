@@ -28,7 +28,7 @@ public struct AudioTracker: Sendable {
         case disconnected
         case captureFailed(String)
         case writerFailed(String)
-        /// The writer took none of the samples of the late-tick bound.
+        /// The writer took none of the samples of `audioWaitBoundSeconds`.
         case writerFellBehind
         case diskFull
     }

@@ -56,7 +56,7 @@ architect's reading.
 
 ## D2: Licence GPLv3 (2026-11-12)
 
-- **Status:** in force
+- **Status:** in force, extended by D54
 - **Context:** The owner chose GPLv3 for the new repository.
 - **Decision:** The project is licensed under the GNU GPL version 3
   (`LICENSE`, the text from gnu.org).
@@ -125,7 +125,9 @@ architect's reading.
 
 ## D7: Environments: the user's Mac and a homepage (2026-11-12)
 
-- **Status:** in force
+- **Status:** in force; superseded in part by D53 (the homepage is
+  `homepage/` on `main`, built and served by Cloudflare Workers Builds,
+  not GitHub Pages from a separate branch)
 - **Context:** The app runs locally; the owner wants
   `multiscreenrecorder.schapiro.org` as its homepage, "built from a
   separate branch in the same repo".
@@ -1421,3 +1423,75 @@ architect's reading.
   clipped. The audio files are unchanged.
 - **Evidence:** [design/recorder.md](design/recorder.md), "Guide
   tracks".
+
+## D53: The first tester release: the homepage on Cloudflare, GB/h max, "Open Anyway", 6 s for a display file's writer (2026-11-16)
+
+- **Status:** in force. Supersedes D7 in part (where the homepage is
+  built and served). Built in the PR "First tester release".
+- **Context:** The owner, 2026-11-16: "I'd like to come to a working
+  app I can share with friendly testers ASAP and then keep optimizing",
+  and on the design of the first tester release: "I agree with your
+  proposal". On the homepage, after first asking for "a basic homepage
+  in a gh-pages branch": "OK, homepage/ on main, all in one PR for the
+  testers". On the GB/h estimate, about twice what one hour wrote
+  (4.0 GB/h estimated, 1.7 GB in the hour run): "Label it a maximum".
+- **Decision:**
+  1. The homepage is a small Hugo site in `homepage/` on `main`, built
+     and served by Cloudflare Workers Builds at
+     `multiscreenrecorder.schapiro.org`, in place of D7's GitHub Pages
+     from a separate branch. A push to `main` that changes only
+     `homepage/` makes no app release. Connecting the Worker and its
+     dashboard settings are the owner's
+     ([homepage/README.md](../homepage/README.md)).
+  2. "GB/h max": the window and `msr check` show the estimate as a
+     maximum, the encoder's ceiling
+     (`kVTCompressionPropertyKey_DataRateLimits`); the disk checks keep
+     relying on it, and nothing is calibrated.
+  3. Testers install the build signed with the self-signed certificate
+     (D5) and click "Open Anyway" once; Developer ID signing and
+     notarization (99 USD a year) come when testers beyond friends do.
+  4. A display file's writer may fall 6 s behind before the file ends
+     (`RecorderValues.displayFileLateTickSeconds`), up from 2 s; the
+     display file's end waits as long for its writer; the guide track
+     wait and the audio drain keep 2 s
+     (`RecorderValues.audioWaitBoundSeconds`). Before its last guide
+     mix, a display file waits up to that 2 s for the sound to reach
+     the video's end. Stop can take up to 10 s longer than before: up
+     to 8 s when the encoder is behind (the waiting ticks and the last
+     guide samples wait one after the other), and up to 2 s more when
+     an audio source stalls.
+  5. The safety net at the end of a recording only guarantees that
+     `problems` is not empty when the result is `problems` (D47); a
+     failure not told while some other problem was told appears only in
+     `events`.
+- **Consequences:** The homepage no longer needs a second long-lived
+  branch; it depends on the owner's Cloudflare account. The disk checks
+  ask for about twice the space an hour usually takes. A tester who
+  cannot manage "Open Anyway" cannot install the app. A display file
+  holds up to 6 s of ticks while its writer is not ready.
+- **Evidence:** the PR "First tester release";
+  [design/delivery.md](design/delivery.md), "Homepage";
+  [design/recorder.md](design/recorder.md), "The app".
+
+## D54: Contributions grant the author a licence; App Store builds may be dual-licensed (2026-11-16)
+
+- **Status:** in force; extends D2.
+- **Context:** The owner wants to sell the app through the Mac App
+  Store at about 5 to 10 € while it stays free through Homebrew; the
+  GPLv3 conflicts with the App Store's terms. The owner is the sole
+  rights holder so far. The owner, 2026-11-16: "let's keep it simple
+  and add the contributor clause suitable for Germany and a hint about
+  dual licensing for potential app store distribution to the readme so
+  that we are future proof", and "sandbox then comes after the
+  optimizations".
+- **Decision:** Keep the GPLv3. The root `README.md`'s License section
+  gets a contributor clause ("Contributing") and a licensing note
+  ("Licensing"). The clause grants a simple usage right, because
+  copyright cannot be transferred under German law (§29 UrhG), and it
+  leaves out unknown types of use, because §31a UrhG requires written
+  form for those.
+- **Consequences:** The App Store work itself is backlog item 16, after
+  the optimizations. A lawyer should check the clause, notably the
+  claim to fair pay under §32 UrhG.
+- **Evidence:** [README.md](../README.md), "License"; the PR "First
+  tester release".

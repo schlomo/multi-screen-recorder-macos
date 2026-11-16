@@ -200,7 +200,9 @@ import Testing
         #expect(reported.started.count == 2)
         await capture.stop()
         let ends = reported.ended
-        #expect(ends.map(\.file.name) == reported.started)
+        // Each file finishes in its own task, so the order of their ends is not promised.
+        #expect(ends.count == reported.started.count)
+        #expect(ends.map(\.file.name).sorted() == reported.started.sorted())
         #expect(ends.allSatisfy { $0.file.state == .finalized })
     }
 
@@ -257,10 +259,10 @@ import Testing
         #expect(files.isEmpty)
     }
 
-    @Test func aWriterThatTakesNothingForTheLateTickBoundFellBehind() async throws {
+    @Test func aWriterThatTakesNothingForTheAudioWaitBoundFellBehind() async throws {
         let capture = capture(drainTimeout: .milliseconds(10))
         writer.isReady = false
-        let buffers = RecorderValues.lateTickBoundSeconds * RecorderValues.audioSampleRate / samplesPerBuffer + 2
+        let buffers = RecorderValues.audioWaitBoundSeconds * RecorderValues.audioSampleRate / samplesPerBuffer + 2
         for index in 0..<buffers { source.send(try buffer(at: time(ofBuffer: index))) }
         let end = try await reported.waitForCaptureEnd()
         let files = reported.ended

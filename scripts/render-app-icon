@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
-# Renders the derived images in assets/icon/: app-icon.png (1024 x 1024,
+# Renders the derived images: in assets/icon/, app-icon.png (1024 x 1024,
 # transparent outside the tile) from app-icon.svg, and the 256 px
-# app-icon-fancy-256.jpeg for the README from app-icon-fancy.jpeg. They are
+# app-icon-fancy-256.jpeg for the README from app-icon-fancy.jpeg; in
+# homepage/static/, the homepage's favicons from app-icon.svg. They are
 # committed; run this after changing either source. CI does not render, it
 # builds the .icns from the committed PNG (scripts/build-app).
 set -euo pipefail
@@ -15,3 +16,15 @@ rsvg-convert --width 1024 --height 1024 assets/icon/app-icon.svg --output assets
 sips -Z 256 assets/icon/app-icon-fancy.jpeg --out assets/icon/app-icon-fancy-256.jpeg >/dev/null
 echo assets/icon/app-icon.png
 echo assets/icon/app-icon-fancy-256.jpeg
+
+favicons=homepage/static
+cp assets/icon/app-icon.svg "$favicons/favicon.svg"
+echo "$favicons/favicon.svg"
+for size in 48 96 192; do
+    rsvg-convert --width "$size" --height "$size" assets/icon/app-icon.svg --output "$favicons/favicon-$size.png"
+    echo "$favicons/favicon-$size.png"
+done
+rsvg-convert --width 180 --height 180 assets/icon/app-icon.svg --output "$favicons/apple-touch-icon.png"
+echo "$favicons/apple-touch-icon.png"
+sips -s format ico "$favicons/favicon-48.png" --out "$favicons/favicon.ico" >/dev/null
+echo "$favicons/favicon.ico"

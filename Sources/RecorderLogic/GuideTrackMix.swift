@@ -67,6 +67,12 @@ public struct GuideTrackMix: Sendable {
 
     public func contains(source name: String) -> Bool { sources[name] != nil }
 
+    /// Whether every source has delivered its samples up to the sample
+    /// position `end`; true without sources.
+    public func hasReceived(upTo end: Int64) -> Bool {
+        sources.values.allSatisfy { mixedUpTo + Int64($0.queued.first?.count ?? 0) >= end }
+    }
+
     /// A buffer of a source, one array per channel, its first sample at
     /// `time`. Samples at positions already mixed are dropped.
     public mutating func receive(_ channels: [[Float]], from name: String, at time: Int64) {

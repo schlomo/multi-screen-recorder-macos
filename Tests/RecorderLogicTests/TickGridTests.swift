@@ -80,11 +80,20 @@ import Testing
         #expect(ticks.framesRepeatedForLateness == 2)
     }
 
+    /// A display file's writer may fall 6 s behind, also at the file's end;
+    /// the guide track wait and the audio drain keep 2 s.
+    @Test func theDisplayFileMayFallSixSecondsBehind() {
+        #expect(RecorderValues.displayFileLateTickSeconds == 6)
+        #expect(RecorderValues.lateTickBound == 6 * RecorderValues.framesPerSecond)
+        #expect(TickLoop<String>().lateTickBound == 6 * RecorderValues.framesPerSecond)
+        #expect(RecorderValues.audioWaitBoundSeconds == 2)
+    }
+
     @Test(arguments: [RecorderValues.framesPerSecond, 60])
     func moreThanTheBoundOfWaitingTicksMeansTheWriterFellBehind(rate: Int) {
-        var ticks = loop(rate: rate, bound: RecorderValues.lateTickBoundSeconds * rate)
+        var ticks = loop(rate: rate, bound: RecorderValues.displayFileLateTickSeconds * rate)
         ticks.receive("a", capturedAt: 0)
-        let bound = Int64(RecorderValues.lateTickBoundSeconds * rate)
+        let bound = Int64(RecorderValues.displayFileLateTickSeconds * rate)
         // Ticks 0 to bound - 1 wait: exactly the bound.
         #expect(ticks.advance(to: ticks.grid.time(ofTick: bound - 1)) { _, _ in false } == .running)
         #expect(ticks.advance(to: ticks.grid.time(ofTick: bound)) { _, _ in false } == .writerFellBehind)

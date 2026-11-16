@@ -100,7 +100,7 @@ private struct StatusView: View {
             HStack {
                 Spacer()
                 Button("Continue", action: continueRecording).keyboardShortcut(.cancelAction)
-                Button("Stop", action: stop).keyboardShortcut(.defaultAction)
+                Button("Stop", action: stop).buttonStyle(.borderedProminent).keyboardShortcut(.defaultAction)
             }
         }
         .padding(20)
