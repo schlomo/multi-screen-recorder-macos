@@ -12,9 +12,9 @@ file (`AGENTS.md`); the choice of model tier is in
 
 **Rule:** the root instruction file, everything it imports, and every
 always-loaded agent or skill definition stay small and point to detail
-instead of containing it. Detail loads on demand: a path-scoped rule
-that applies to one area of the tree, or a doc read when a task needs
-that topic. Tool, MCP-server and plugin listings are always-loaded
+instead of containing it. Detail loads on demand: a platform note or
+rule for one area of the tree, or a doc read when a task needs that
+topic. Tool, MCP-server and plugin listings are always-loaded
 too: a project enables only the servers and plugins it uses.
 **Why:** always-loaded context enters every session and every
 subagent that does work, and is re-read on every turn of each. Output
@@ -34,9 +34,12 @@ what disabling unused ones saves is measured.
 on demand; an import directive is always-loaded — import only what
 every session needs. The root instruction file holds the guardrails,
 one line per principle, pointers and the per-tool settings. Rules for
-one area go to path-scoped rule files (this project's are under
-`.claude/rules/`, whose README says when they load); a delegated
-agent reads the ones its brief names. A principle, a design or a
+one area go to a platform note in `docs/principles/platform-notes/`,
+which every agent, whatever its tool, reaches through the root
+instruction file; a tool's path-scoped rule files (Claude Code's
+`.claude/rules/`, whose README says when they load) hold only what
+concerns that tool alone (D56). A delegated agent reads the ones its
+brief names. A principle, a design or a
 platform note is its own file, opened when the topic comes up. A
 change to what agents read, or to when they read it (a rule, a fact, a
 path scope, a memory file), says in its proposal which consumers it
@@ -124,8 +127,8 @@ almost nobody. Status kept in always-loaded context is paid on every
 call and goes stale there. Memory pointed into the working copy puts
 agent-written files that nobody reviewed into shared git, or leaves
 notes stranded in a directory on one host that no one else sees.
-**How:** promote a team lesson to its place in the repo (a
-path-scoped rule, a platform note, a principle, the backlog) and drop
+**How:** promote a team lesson to its place in the repo (a platform
+note, a principle, the backlog) and drop
 the memory copy. In Claude Code, never set `autoMemoryDirectory` to a
 path inside the working copy, and never give a subagent
 `memory: project` or `memory: local`, which both write under the

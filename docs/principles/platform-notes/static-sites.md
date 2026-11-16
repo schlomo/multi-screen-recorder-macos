@@ -10,18 +10,35 @@ How an agent checks a static site, here the homepage: Hugo in
   (*observed live, 2026-11-16*, Chrome 157, `--headless=new`), and its
   screenshots of a page loaded that narrow came out cropped, so the
   page is loaded in an `iframe` of the phone's width and the two
-  numbers are read from the DOM. From `homepage/`, after
-  `./build.sh`, for 320 px (repeat for 375 and 430):
+  numbers are read from the DOM. The check needs `python3`, `curl` and
+  Chrome on the `PATH` as `chrome`. On a Mac that is a two-line script
+  named `chrome` in a folder on the `PATH`; a symbolic link does not
+  work, as Chrome then cannot find its own files (*observed live,
+  2026-11-16*):
 
   ```sh
-  cat > public/phone-check.html <<'EOF'
+  #!/bin/sh
+  exec "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" "$@"
+  ```
+
+  From `homepage/`, after `./build.sh`, for 320 px (repeat for 375
+  and 430):
+
+  ```sh
+  (
+    set -euo pipefail
+    for tool in chrome python3 curl; do
+      command -v "$tool" >/dev/null || { echo "phone check: $tool is not on the PATH" >&2; exit 1; }
+    done
+    cat > public/phone-check.html <<'EOF'
   <!doctype html><iframe id=f src="/" style="width:320px;height:900px;border:0"></iframe><pre id=out></pre>
   <script>f.onload=()=>{out.textContent=`innerWidth=${f.contentWindow.innerWidth} scrollWidth=${f.contentDocument.documentElement.scrollWidth}`}</script>
   EOF
-  python3 -m http.server 8765 -d public >/dev/null 2>&1 & server=$!
-  sleep 1
-  "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --headless=new --virtual-time-budget=5000 --dump-dom http://localhost:8765/phone-check.html | grep -o 'innerWidth=[0-9]* scrollWidth=[0-9]*'
-  kill $server; rm public/phone-check.html
+    python3 -m http.server 8765 -d public >/dev/null 2>&1 & server=$!
+    trap 'kill $server; rm -f public/phone-check.html' EXIT
+    curl -s --retry 10 --retry-connrefused -o /dev/null http://localhost:8765/phone-check.html
+    chrome --headless=new --virtual-time-budget=5000 --dump-dom http://localhost:8765/phone-check.html | grep -o 'innerWidth=[0-9]* scrollWidth=[0-9]*'
+  )
   ```
 
   Equal numbers mean nothing scrolls sideways (the command run as

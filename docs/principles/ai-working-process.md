@@ -43,9 +43,10 @@ so rather than silently picking a side.
   (recommended), optionally also marking the ones agents opened ready
   once they are fully reviewed; it commits locally only and a human
   pushes; or it writes nothing to the repo without a per-change
-  instruction. The recommended level lets an agent iterate on real CI
-  results by itself — push, read the pipeline, push a fix — before a
-  human spends review time on it. With the option, the session that
+  instruction. The recommended level lets an agent push its rounds and
+  read the pipeline's result by itself, once per MR/PR ("Iterate
+  locally; wait for the pipeline once" below), before a human spends
+  review time on it. With the option, the session that
   owns an MR/PR an agent opened (it opened it, briefed the agent that
   did, or took it over) marks it ready once its adversarial review
   leaves no BLOCKER or SHOULD-FIX open, its pipeline passes, and any
@@ -266,7 +267,7 @@ a stray change in about a minute. What a word diff does not show can
 still slip through, which is the risk taken.
 **How:** the read-only reviewer agent (`.claude/agents/reviewer.md`),
 pinned to the top tier, runs the review on the highest tier available
-to the project. Its findings go back to whoever wrote the change; the
+to the project, unless the review is sized lower (below). Its findings go back to whoever wrote the change; the
 reviewer never fixes them itself.
 - The review is sized to the change's cost and complexity: a change to
   Markdown only, or a small, low-risk one, usually gets its review on
@@ -324,15 +325,20 @@ scripts, on the round's final commit. The round is pushed without
 waiting for the pipeline, and reviews start on the pushed commit. The
 pipeline is waited for once per MR/PR: on the commit about to be
 marked ready.
-**Why:** by design the pipeline runs nothing that cannot run locally
-("Thin CI" in [engineering.md](engineering.md)), so waiting for it
-after every round adds its run time to every round and catches
-nothing a local run would not. Waiting per round cost a whole session
-most of its time (the owner, 2026-11-16, D56).
+**Why:** the pipeline's jobs are the project's own scripts ("Thin
+CI" in [engineering.md](engineering.md)), and the owner designed it so
+that nothing on it cannot be tested locally (D56). A wait after every
+round adds the pipeline's run time to every round and catches only
+what differs between the two places: a toolchain version or the
+runner's load (the troubleshooting log has both). The one wait before
+ready still catches those. The owner, on waiting per round: "We
+wasted way way too much time waiting on CI" (D56).
 **How:** a builder's report states the local run (commands and
 exit codes) on the commit it pushed; the delegating session relies on
 it for the round and waits for the pipeline only before marking the
-MR/PR ready. A difference between the local run and the pipeline
+MR/PR ready. An agent that cannot run the scripts (a Linux container
+for a macOS build) says so: its round is UNVERIFIED, and the pipeline
+is its gate. A difference between the local run and the pipeline
 (another toolchain version, a missing tool) shows up at that one
 wait: it is fixed, recorded in the troubleshooting log, and the local
 procedure is brought closer to the pipeline's. What only the pipeline
@@ -586,9 +592,9 @@ front, every time:
    in, what's deliberately out; repo paths and the deliverable files.
 3. **What applies**: always "Test first" and docs completeness, plus
    any other guardrail or hard standard (in
-   [AGENTS.md](../../AGENTS.md)) the task touches, the path-scoped
-   rule files of the area the task touches, by path, for the agent to
-   read, and how the environment provides credentials or other local
+   [AGENTS.md](../../AGENTS.md)) the task touches, the platform notes
+   and rule files of the area the task touches, by path, for the agent
+   to read, and how the environment provides credentials or other local
    facts — never a value.
 4. **Isolation**: where the agent's fresh clone of the repo is —
    never a human's working copy or a worktree of it (see "Work
@@ -666,8 +672,9 @@ gives one-line commands.
   in [platform-notes/](platform-notes/) for one technology or one
   part of the tree. A tool's own files (Claude Code's `.claude/` with
   its skills, agent definitions and path-scoped rules) hold only what
-  is specific to that tool: the architect skill, its references and
-  the agent definitions it delegates to.
+  is specific to that tool: the skills (architect, setup) with their
+  references, the agent definitions they delegate to, and a
+  path-scoped rule only for what concerns Claude Code alone.
 
 ## Finish a series of rule edits with one consistency pass
 

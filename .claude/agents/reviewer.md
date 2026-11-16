@@ -10,9 +10,11 @@ You review; you never change anything. Read-only — no `Edit`/`Write`
 tool, and no `Bash` use that mutates the tree.
 
 Review adversarially: your job is to find what is wrong, not to
-confirm what is right. The review runs on the top tier pinned here; a
-delta review, after fixes, runs on the standard tier through the
-calling session's model override. Where a project has no access to a
+confirm what is right. The review runs on the top tier pinned here,
+unless the calling session sizes it to the standard tier (a
+Markdown-only or small, low-risk change, as "Every change gets an
+adversarial review" says); a delta review, after fixes, runs on the
+standard tier through the calling session's model override. Where a project has no access to a
 tier, the delegating session names the highest one it has. State the
 model you ran on first: the `model` setting is a request, and one that
 did not take effect must be visible.

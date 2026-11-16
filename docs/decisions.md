@@ -1579,7 +1579,7 @@ architect's reading.
 
 ## D56: Iterate locally and wait for the pipeline once; reviews sized to the change; agent how-to in `docs/principles/`; the owner tries changes early; tests that record are announced (2026-11-16)
 
-- **Status:** in force; two principle changes and three rulings.
+- **Status:** in force; three principle changes and two rulings.
 - **Context:** The owner's retro of the session of 2026-11-15 and
   2026-11-16: "We wasted way way too much time waiting on CI. the
   development needs to be much more local and iterating locally so
@@ -1610,10 +1610,13 @@ architect's reading.
     Feedback during the review that fixes something joins the fix
     round; feedback that adds something new gets its own adversarial
     review (the architect's recommendation, which the owner accepted).
-  - Ruling on "Write a behavior where the acting agent reads it":
+  - Principle change in "Write a behavior where the acting agent
+    reads it" and "Always-loaded context is paid on every call":
     how-to for agents goes into `docs/principles/` (a principle or a
-    platform note); Claude Code's files only for the architect skill,
-    its references and the agent definitions it delegates to.
+    platform note, rules for one area of the tree included); Claude
+    Code's files hold only the skills with their references, the agent
+    definitions and what concerns Claude Code alone. The setup skill
+    places an absorbed area convention accordingly.
   - Ruling: a change that shows in the window or on the command line
     goes to the owner to try as soon as its local run is green, while
     the review runs alongside (the architect's reading of the owner's

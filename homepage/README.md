@@ -50,7 +50,9 @@ The footer links to the owner's legal notice and privacy policy at
 Install Hugo (`brew install hugo`), then run `hugo server` in this folder for a
 live-reloading preview on <http://localhost:1313>. `./build.sh` builds into
 `public/` (`./build.sh -p` for an indexable production build; all other builds
-are `noindex`).
+are `noindex`). How agents check the site (phone widths, the preview, served
+URLs) is in
+[docs/principles/platform-notes/static-sites.md](../docs/principles/platform-notes/static-sites.md).
 
 ## Deployment
 
