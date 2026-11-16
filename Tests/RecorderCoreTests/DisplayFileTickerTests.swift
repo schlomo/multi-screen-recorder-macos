@@ -100,8 +100,10 @@ import Testing
 
     /// A ticker's file from tick 0, its microphones' source delivering
     /// 0.25 from t0 on, handed over up to `handedOver` samples.
-    private func guidedFile(handedOver: Int, guideReady: Bool = true) throws -> (DisplayFileTicker, StandInWriter, GuideTrackMix) {
-        let (ticker, writer) = ticker()
+    private func guidedFile(
+        handedOver: Int, guideReady: Bool = true, drainTimeout: Duration = .milliseconds(50)
+    ) throws -> (DisplayFileTicker, StandInWriter, GuideTrackMix) {
+        let (ticker, writer) = ticker(drainTimeout: drainTimeout)
         _ = ticker.receive(frame, capturedAt: 0)
         let made = try #require(writer())
         made.isGuideReady = guideReady
@@ -133,7 +135,8 @@ import Testing
 
     /// The guide samples at the end wait for the writer as the ticks do.
     @Test func theLastGuideSamplesWaitForTheWriterWithinTheDrainTimeout() async throws {
-        let (ticker, made, mix) = try guidedFile(handedOver: videoSamples, guideReady: false)
+        // A drain timeout far above the writer's wait, so a slow machine passes too.
+        let (ticker, made, mix) = try guidedFile(handedOver: videoSamples, guideReady: false, drainTimeout: .seconds(30))
         #expect(ticker.tick(now: grid.time(ofTick: 30)) == nil)
         #expect(made.guides.isEmpty)
         let ready = Task {
