@@ -1289,8 +1289,10 @@ version string and the commit, such as `0.20261115.2-dev+a1b2c3d (a1b2c3d)`,
 from the bundle's Info.plist keys `MSRVersion` and `MSRCommit`;
 outside a bundle it prints `development build (not bundled)`. The
 banner's build date is the key `MSRBuildDate`, the commit's date in
-UTC, so a rebuild of the same commit gives the same banner; without
-it the banner leaves the date out. The
+UTC, the same date the version carries, so a rebuild of the same
+commit gives the same banner; a bundle without it says `built (build
+date missing from Info.plist)`, and outside a bundle the banner has no
+build date. The
 settings file is found through `HOME`. The disk estimate follows its
 rule, file by file (10.7 GB in the `msr check` example above). The
 recording resolution box turns with a portrait screen (1080×1920 for a

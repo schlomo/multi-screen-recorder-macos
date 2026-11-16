@@ -15,8 +15,8 @@ cd "$(dirname "$0")/.."
 version="$(scripts/version)"
 short_version="${version%%[-+]*}"
 commit="$(git rev-parse --short=7 HEAD)"
-# The commit date in UTC, as the version's date: a rebuild of a commit gives the same banner.
-build_date="$(TZ=UTC git show -s --no-show-signature --date=format-local:%Y-%m-%d --format=%cd HEAD)"
+# The version's date: a rebuild of a commit gives the same banner.
+build_date="$(scripts/version --build-date)"
 bundle="Multi Screen Recorder.app"
 app="build/$bundle"
 archive="build/msr-app.tar"

@@ -9,6 +9,8 @@ origin/main, DATE the committer date of HEAD in UTC as YYYYMMDD:
 Uncommitted changes to tracked files append .dirty to a local build,
 0.<DATE>.<N+1>-dev+<commit>.dirty; a release or a snapshot stops on them.
 Untracked files do not count.
+With --build-date it prints DATE as YYYY-MM-DD instead, the build date the
+bundle carries for the banner.
 """
 
 import os
@@ -16,7 +18,7 @@ import re
 import shutil
 import subprocess
 import sys
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from pathlib import Path
 from typing import NoReturn
 
@@ -41,12 +43,12 @@ def git(*arguments: str, failure: str | None = None) -> str:
     return result.stdout.strip()
 
 
-def commit_date_utc() -> str:
-    """The committer date of HEAD in UTC as YYYYMMDD, independent of locale and time zone."""
+def commit_date_utc() -> date:
+    """The committer date of HEAD in UTC, independent of locale and time zone."""
     stamp = git("show", "-s", "--no-show-signature", "--format=%ct", "HEAD", failure="cannot read the commit date of HEAD")
     if not re.fullmatch(r"[0-9]+", stamp):
         stop(f"the commit date of HEAD is not a number of seconds: '{stamp}'")
-    return datetime.fromtimestamp(int(stamp), UTC).strftime("%Y%m%d")
+    return datetime.fromtimestamp(int(stamp), UTC).date()
 
 
 def has_uncommitted_changes() -> bool:
@@ -56,6 +58,14 @@ def has_uncommitted_changes() -> bool:
 def main() -> None:
     if shutil.which("git") is None:
         stop("git is not on the PATH")
+    match sys.argv[1:]:
+        case []:
+            pass
+        case ["--build-date"]:
+            print(commit_date_utc().isoformat())
+            return
+        case [argument, *_]:
+            stop(f"unknown argument '{argument}'; the only one is --build-date")
     release_build = os.environ.get("RELEASE_BUILD", "")
     pr_number = os.environ.get("PR_NUMBER", "")
     if release_build not in ("", "true"):
@@ -71,7 +81,7 @@ def main() -> None:
                            failure="cannot count the commits on origin/main; fetch it with its full history"))
     commit = git("rev-parse", "--short=7", "HEAD")
 
-    date = commit_date_utc()
+    date = commit_date_utc().strftime("%Y%m%d")
     dirty = has_uncommitted_changes()
 
     if pr_number and dirty:

@@ -45,6 +45,18 @@ def bundled_version(info: dict) -> str:
     return info["MSRVersion"]
 
 
+def build_date_problem(info: dict, version: str) -> str | None:
+    """Why the bundle's build date is not its version's date (0.YYYYMMDD.…), or None when it is."""
+    build_date = info.get("MSRBuildDate")
+    if not isinstance(build_date, str):
+        return "MSRBuildDate is missing"
+    version_date = version.split(".")[1] if version.count(".") >= 2 else ""
+    expected = f"{version_date[:4]}-{version_date[4:6]}-{version_date[6:]}"
+    if build_date != expected:
+        return f"MSRBuildDate is '{build_date}', the version's date {expected}"
+    return None
+
+
 def icon_problem(info: dict, resources: Path) -> str | None:
     """Why the bundle does not name and hold its icon file, or None when it does."""
     icon_name = info.get("CFBundleIconFile")
@@ -114,6 +126,8 @@ def main() -> None:
 
         problem = icon_problem(info, APP / "Contents/Resources")
         checks.report("the bundle names its icon file and holds it", problem is None, problem or "")
+        problem = build_date_problem(info, version)
+        checks.report("the bundle's build date is its version's date", problem is None, problem or "")
 
         checks.expect_version("msr version prints this commit's version", msr, expected_version)
         checks.expect_version("msr version through a symbolic link prints the same", linked_msr, expected_version)

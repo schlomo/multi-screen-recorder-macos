@@ -110,6 +110,25 @@ import Testing
         #expect(outcome.output == "0.20300102.4-dev+\(try await shortHead(of: work))\n")
     }
 
+    /// The build date the banner shows: the version's date, from the same commit date in UTC.
+    @Test func theBuildDateIsTheVersionsDate() async throws {
+        defer { scratch.remove() }
+        let work = try await clone()
+        try await commitWork(in: work, committedAt: "2026-11-16T00:30:00+01:00")
+        let outcome = try await run(work.appending(path: "scripts/version"), ["--build-date"], environment: [:], in: scratch.url)
+        #expect(outcome.status == 0, "\(outcome.errors)")
+        #expect(outcome.output == "2026-11-15\n")
+        #expect(try await version(in: work).output.hasPrefix("0.20261115."))
+    }
+
+    @Test func anUnknownArgumentStops() async throws {
+        defer { scratch.remove() }
+        let outcome = try await run(try clone().appending(path: "scripts/version"), ["--bogus"], environment: [:], in: scratch.url)
+        #expect(outcome.status == 1)
+        #expect(outcome.output.isEmpty)
+        #expect(outcome.errors.contains("unknown argument '--bogus'"))
+    }
+
     @Test func aCommitJustAfterMidnightUTCIsOfThatDay() async throws {
         defer { scratch.remove() }
         let work = try await clone()

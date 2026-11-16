@@ -38,7 +38,13 @@ import Testing
             """)
     }
 
-    @Test func aBannerWithoutABuildDateLeavesItOut() {
+    @Test func aBundleWithoutABuildDateSaysSoInTheBanner() {
+        let version = AppVersion(infoDictionary: [AppVersion.versionKey: "0.20261116.42", AppVersion.commitKey: "9dc9443"])
+        #expect(version.banner.hasPrefix(
+            "Multi Screen Recorder 0.20261116.42 (9dc9443), built (build date missing from Info.plist)\n"))
+    }
+
+    @Test func aBannerOutsideABundleHasNoBuildDate() {
         #expect(AppVersion(infoDictionary: nil).banner == """
             Multi Screen Recorder development build (not bundled)
             https://multiscreenrecorder.schapiro.org

@@ -52,7 +52,7 @@ import Testing
         return outcome.output.trimmingCharacters(in: .newlines)
     }
 
-    private func writeInfo(commit: String, iconFile: String? = "AppIcon") throws {
+    private func writeInfo(commit: String, iconFile: String? = "AppIcon", buildDate: String? = "2026-11-15") throws {
         var plist: [String: String] = [
             "CFBundleExecutable": "msr",
             "CFBundleIdentifier": "org.schapiro.multiscreenrecorder.test",
@@ -61,6 +61,7 @@ import Testing
             "MSRCommit": commit,
         ]
         plist["CFBundleIconFile"] = iconFile
+        plist["MSRBuildDate"] = buildDate
         try PropertyListSerialization.data(fromPropertyList: plist, format: .xml, options: 0)
             .write(to: checkout.appending(path: "build/Multi Screen Recorder.app/Contents/Info.plist"))
     }
@@ -76,6 +77,7 @@ import Testing
         #expect(outcome.status == 0, "\(outcome.errors)")
         #expect(outcome.output.contains("ok    msr version through a symbolic link prints the same"))
         #expect(outcome.output.contains("ok    the bundle names its icon file and holds it"))
+        #expect(outcome.output.contains("ok    the bundle's build date is its version's date"))
         #expect(outcome.output.contains("all checks passed"))
     }
 
@@ -106,6 +108,25 @@ import Testing
         let outcome = try await smokeTest()
         #expect(outcome.status == 1)
         #expect(outcome.errors.contains("FAIL  the bundle names its icon file and holds it: Contents/Resources/AppIcon.icns is missing"),
+                "\(outcome.errors)")
+    }
+
+    @Test func aBundleWithoutABuildDateFails() async throws {
+        defer { scratch.remove() }
+        try writeInfo(commit: head, buildDate: nil)
+        let outcome = try await smokeTest()
+        #expect(outcome.status == 1)
+        #expect(outcome.errors.contains("FAIL  the bundle's build date is its version's date: MSRBuildDate is missing"),
+                "\(outcome.errors)")
+    }
+
+    @Test func aBuildDateOtherThanTheVersionsDateFails() async throws {
+        defer { scratch.remove() }
+        try writeInfo(commit: head, buildDate: "2026-11-16")
+        let outcome = try await smokeTest()
+        #expect(outcome.status == 1)
+        #expect(outcome.errors.contains(
+            "FAIL  the bundle's build date is its version's date: MSRBuildDate is '2026-11-16', the version's date 2026-11-15"),
                 "\(outcome.errors)")
     }
 

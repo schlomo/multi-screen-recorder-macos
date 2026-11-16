@@ -24,10 +24,10 @@ when it moves.
 | Script | Does |
 |---|---|
 | `scripts/test` | Compiles the Python scripts (`python3 -I -m py_compile`), then runs the unit tests and the tests that run `msr` and the scripts as commands |
-| `scripts/version` | Prints the version of the current checkout; stops on a shallow clone |
+| `scripts/version` | Prints the version of the current checkout, or with `--build-date` its date as `YYYY-MM-DD`; stops on a shallow clone |
 | `scripts/build-app` | Compiles `msr`, assembles the app bundle in `build/` (with `Contents/Resources/AppIcon.icns`, built at build time from the committed `assets/icon/app-icon.png` by `sips` and `iconutil`, both required up front; it stops if the PNG is missing or the iconset is not the ten expected files; the `.icns` is never committed), signs it ad hoc with the real signing's options, and archives it as `build/msr-app.tar` |
 | `scripts/render-app-icon` | Renders the derived images in `assets/icon/`: `app-icon.png` (1024 x 1024, transparent outside the tile) from `app-icon.svg` with `rsvg-convert` (librsvg), and the 256 px `app-icon-fancy-256.jpeg` for the README with `sips`; both tools required up front. Run by hand after changing a source and commit both images; CI never renders (no `rsvg-convert` on the runner) and uses the committed PNG |
-| `scripts/smoke-test` | Checks the bundle names its icon file (`CFBundleIconFile`) and holds an icon that is 1024 px wide (`sips`), then runs the bundled `msr` with a scratch `HOME`: version (also through a symbolic link), settings (which writes no file), a settings flag that saves it, a settings file with an unknown key (never refused) and exit 64; nothing that needs a permission, a screen or a microphone |
+| `scripts/smoke-test` | Checks the bundle names its icon file (`CFBundleIconFile`) and holds an icon that is 1024 px wide (`sips`), and that its build date (`MSRBuildDate`) is its version's date, then runs the bundled `msr` with a scratch `HOME`: version (also through a symbolic link), settings (which writes no file), a settings flag that saves it, a settings file with an unknown key (never refused) and exit 64; nothing that needs a permission, a screen or a microphone |
 | `scripts/unpack-app` | Unpacks the app archive into an empty `build/` with the `data` filter of Python's `tarfile`, rooted at the bundle folder, which refuses absolute paths, links pointing out of the bundle and special files; before writing anything the script itself refuses an archive that is not a plain tar, a member named twice, a member outside the bundle or with a `..` component (the build writes none), a bundle that is not a folder and a member below a symbolic link of the archive; a member that cannot be extracted stops it, and it removes what it wrote when it stops |
 | `scripts/sign-app` | Checks the bundle's version, commit and identifier, re-signs it, checks the signature, identifier, hardened runtime and entitlements, and zips it into `build/` |
 | `scripts/ci-import-signing-certificate` | CI only: puts the certificate from the secret into a temporary keychain |
@@ -116,8 +116,9 @@ N grows with every commit on `main`, including Markdown-only ones that
 publish nothing, so release numbers can skip but never repeat. The
 version is computed once, by `scripts/version` in `scripts/build-app`,
 and written into the bundle's `Info.plist` (`MSRVersion`, `MSRCommit`,
-and `MSRBuildDate`, the commit's date in UTC that the banner of
-`msr check` and `msr record` shows);
+and `MSRBuildDate`, the version's own date as `scripts/version
+--build-date` prints it, `2026-11-16`, for the banner of `msr check`
+and `msr record`);
 every later script reads it from there as data, so a push to `main`
 between the build job and the signing job cannot change it. The
 bundle's short version is the numeric part; `msr version` and the About
