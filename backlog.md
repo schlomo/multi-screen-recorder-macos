@@ -46,6 +46,13 @@ Still open from D34: what AGC does and whether it is on in auto mode;
     Wacom port change: whether it is the hardware encoder stalling
     through macOS's display and USB reconfiguration, and whether a
     longer allowance (frames held, not dropped) keeps the file.
+    Not reproduced by the lid alone (`12.50.45`) or the Wacom port
+    change alone (`12.41.06`) from `msr record`. The owner
+    (2026-11-16): "if after a few seconds the recording is again good
+    then I'd accept that. Main goal is auto-recovery after changes and
+    continuing the recording instead of giving up". The recording did
+    recover by itself, so this does not hold up B2; shortening such
+    gaps belongs to the USB resilience analysis (running).
   - Guide tracks end with about 0.3 s of zeros at Stop although the
     microphones recorded sound then (`2026-11-16 12.29.59`): the audio
     sources stop at the same moment as the display files' last mix.
