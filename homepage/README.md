@@ -23,9 +23,10 @@ to the tester guide, the problem report form and the repository.
   defined
 - **Header image:** the app icon artwork `../assets/icon/app-icon-fancy.jpeg`,
   mounted by `[module]` in `hugo.toml` (never copied here) and resized by
-  Hugo to a 256 px WebP in `layouts/baseof.html`. Changing that file
-  triggers no homepage build (it is outside the watch path); the next
-  homepage change picks it up.
+  Hugo to a 256 px WebP in `layouts/baseof.html`; the link preview image
+  below is drawn from it too. Changing that file triggers no homepage
+  build (it is outside the watch path); the next homepage change picks it
+  up.
 - **Screenshots:** the start and status windows, `assets/images/*.png` as
   taken with macOS's screenshot tool, placed in `layouts/home.html` and shown
   by `layouts/_partials/screenshot.html` as WebP at the window's size in
