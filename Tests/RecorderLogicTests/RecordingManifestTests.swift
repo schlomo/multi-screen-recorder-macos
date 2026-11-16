@@ -220,7 +220,28 @@ import Testing
         #expect(files[0]["audioSourceUID"] == nil)
         #expect(files[2]["channels"] as? Int == 2)
         #expect(files[2]["clockDriftPpm"] is NSNull)
+        #expect(files[2]["clockDriftCorrection"] is NSNull)
         #expect(try RecordingManifest(json: data) == manifest)
+    }
+
+    /// The clock drift over the file is the correction against its
+    /// duration: sound added means the device's clock runs slow.
+    @Test func anAudioFilesClockDriftIsItsCorrectionOverItsDuration() throws {
+        var file = RecordingManifest.AudioFile(
+            name: "a.mov", audioSource: "Razer Seiren V3 Mini", audioSourceUID: "R", channels: .mono(1), start: 0, timecode: "t")
+        file.clockDrift(correction: 0.034_94, duration: 300.9)
+        #expect(file.clockDriftCorrection == 0.0349)
+        #expect(file.clockDriftPpm == -116.1)
+        file.clockDrift(correction: -0.000_491, duration: 10)
+        #expect(file.clockDriftCorrection == -0.0005)
+        #expect(file.clockDriftPpm == 49.1)
+        // Shorter than 10 s: the correction alone.
+        file.clockDrift(correction: 0.000_2, duration: 9.99)
+        #expect(file.clockDriftCorrection == 0.0002)
+        #expect(file.clockDriftPpm == nil)
+        let object = try #require(try JSONSerialization.jsonObject(with: try JSONEncoder().encode(file)) as? [String: Any])
+        #expect(object["clockDriftPpm"] is NSNull)
+        #expect(object["clockDriftCorrection"] as? Double == 0.0002)
     }
 
     @Test func aFinalizedManifestTakesNoMoreEventsOrAudioFiles() {

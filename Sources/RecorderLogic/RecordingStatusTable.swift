@@ -1,8 +1,8 @@
 import Foundation
 
 /// The status window of a running recording (D46): a row per screen and
-/// per audio source with its files, the data written and its state, and a
-/// line with the elapsed time, the data, the files and the free space.
+/// per audio source with its files, the data written, its state and the
+/// clock drift corrected, and a line with the elapsed time, the data, the files and the free space.
 public enum RecordingStatusTable {
     /// "1:07:00" for 1 hour 7 minutes: h:mm:ss (D47).
     public static func elapsed(_ seconds: Double) -> String {
@@ -10,7 +10,7 @@ public enum RecordingStatusTable {
         return String(format: "%d:%02d:%02d", whole / 3600, whole / 60 % 60, whole % 60)
     }
 
-    public static let columns = ["Source", "Records at", "Files", "Written", "State"]
+    public static let columns = ["Source", "Records at", "Files", "Written", "State", "Drift corrected"]
 
     public struct Row: Equatable, Sendable {
         public var source: SourceCell
@@ -19,17 +19,20 @@ public enum RecordingStatusTable {
         /// The size of its files on disk, "350 MB" or "1.3 GB".
         public var written: String
         public var state: String
+        /// An audio source's clock drift correction, "+34.9 ms (-116 ppm)"; empty for a screen.
+        public var driftCorrected: String
 
-        public init(source: SourceCell, recordsAt: String, files: Int, written: String, state: String) {
+        public init(source: SourceCell, recordsAt: String, files: Int, written: String, state: String, driftCorrected: String = "") {
             self.source = source
             self.recordsAt = recordsAt
             self.files = files
             self.written = written
             self.state = state
+            self.driftCorrected = driftCorrected
         }
 
         /// The cells after Source.
-        public var values: [String] { [recordsAt, String(files), written, state] }
+        public var values: [String] { [recordsAt, String(files), written, state, driftCorrected] }
     }
 
     /// `bytes`: each screen file's size on disk, by its name; a file
@@ -52,8 +55,12 @@ public enum RecordingStatusTable {
     }
 
     /// The audio sources' rows, below the screens': Records at is the
-    /// channels of the source's newest audio file.
-    public static func audioRows(sources: [AudioTracker.Source], files: [RecordingManifest.AudioFile], bytes: [String: Int64]) -> [Row] {
+    /// channels of the source's newest audio file; `clockDrift` the latest
+    /// clock drift correction status of each source's running capture.
+    public static func audioRows(
+        sources: [AudioTracker.Source], files: [RecordingManifest.AudioFile], bytes: [String: Int64],
+        clockDrift: [AudioTracker.SourceID: ClockDriftCorrection.Status]
+    ) -> [Row] {
         sources.map { source in
             let own = files.filter { file in
                 switch source.id {
@@ -70,9 +77,20 @@ public enum RecordingStatusTable {
             }
             let cell: SourceCell = source.id == .systemAudio
                 ? .systemAudio(isRecorded: true) : .audioInput(source.number, name: source.name)
-            return Row(source: cell, recordsAt: channels, files: own.count, written: written, state: text(source.state))
+            return Row(
+                source: cell, recordsAt: channels, files: own.count, written: written, state: text(source.state),
+                driftCorrected: source.state == .recording ? driftCorrected(clockDrift[source.id]) : "")
         }
     }
+
+    /// "+34.9 ms (-116 ppm)": the sound added so far and the clock drift;
+    /// `measuring` until the clock drift is known.
+    public static func driftCorrected(_ status: ClockDriftCorrection.Status?) -> String {
+        guard let status, let ppm = status.clockDriftPpm else { return measuring }
+        return String(format: "%+.1f ms (%+.0f ppm)", status.applied * 1000, ppm)
+    }
+
+    public static let measuring = "measuring"
 
     /// The files' sizes together; "?" when one cannot be read.
     private static func writtenText(_ sizes: [Int64?]) -> String {

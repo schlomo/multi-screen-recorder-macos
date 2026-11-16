@@ -44,12 +44,13 @@ enum TableLayout {
     }
 
     /// The widest possible content of each status column after Source:
-    /// Records at, Files, Written and State, every state's text.
+    /// Records at, Files, Written, State, every state's text, and Drift corrected.
     static let statusSamples: [[String]] = [
         ["8888×8888", "2 channels", "stereo"],
         ["888"],
         ["888.8 GB", "999 MB", "?"],
         RecordingStatusTable.StateText.allCases.map(\.rawValue),
+        ["-8888.8 ms (-1000 ppm)", RecordingStatusTable.measuring],
     ]
 
     /// The status window's columns after Source; its headers, in a bolder

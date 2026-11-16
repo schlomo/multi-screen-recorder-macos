@@ -48,6 +48,15 @@ public enum DebugLine {
         })
     }
 
+    /// "Audio 1 - Razer Seiren V3 Mini: clock drift -116.1 ppm, corrected +34.94 ms so far, 0.04 ms off";
+    /// "clock drift not measured yet" until it is, and no "off" before the first measurement.
+    public static func clockDrift(of label: String, _ status: ClockDriftCorrection.Status) -> String {
+        let drift = status.clockDriftPpm.map { "clock drift " + String(format: "%+.1f ppm", $0) } ?? "clock drift not measured yet"
+        var line = "\(label): \(drift), corrected " + String(format: "%+.2f ms", status.applied * 1000) + " so far"
+        if let remaining = status.remaining { line += String(format: ", %.2f ms off", abs(remaining) * 1000) }
+        return line
+    }
+
     private static func text(_ ending: ScreenTracker.Ending) -> String {
         switch ending {
         case .disconnected: "disconnected"

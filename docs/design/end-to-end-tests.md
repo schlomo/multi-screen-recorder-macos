@@ -371,6 +371,26 @@ tried:
   design, untested). Not tried: a run of several
   hours, other audio inputs, a run under load or with the Mac asleep,
   a Bluetooth input, and any correction.
+- **When an audio input's buffers arrive shows its clock; their
+  timestamps do not.** Tried (2026-11-16, one probe of 300 s, macOS
+  26.7.1): one `AVCaptureSession` per audio input, five inputs, each
+  buffer's arrival on the host clock against its sample count.
+  `AVCaptureSession`'s timestamps follow the sample count exactly (the
+  timestamp minus the samples spread 0.000 ms over 300 s, all five), so
+  they carry no clock drift. The smallest, per second, of a buffer's
+  arrival minus its audio time is the device's clock against the host
+  clock: a straight line with a residual of 0.04 ms (standard
+  deviation) for the Razer Seiren V3 Mini (-116.1 ppm), CalDigit
+  Thunderbolt 3 Audio (+49.1 ppm), MacBook Pro Microphone (+1.7 ppm)
+  and BlackHole 2ch (0.0 ppm), agreeing with Core Audio's own device
+  clock (`AudioDeviceGetCurrentTime`,
+  `kAudioDevicePropertyActualSampleRate`) to under 0.1 ppm. The
+  Logitech BRIO's rate is not constant: -116 ppm for the first 45 s,
+  then swinging between about -60 and +110 ppm with a period of about
+  25 s around 0 (a sawtooth of ±0.5 ms), so a single measured rate
+  cannot correct it; a correction must follow the offset. After 300 s
+  the Razer was 34.7 ms behind the host clock, more than one frame. Not
+  tried: how the system audio's (ScreenCaptureKit) buffers arrive.
 - **An unplugged audio input ends its `AVCaptureSession`, which does
   not resume.** Tried (2026-11-15, the Razer Seiren V3 Mini over USB,
   unplugged during a running session): `AVCaptureSession`'s runtime

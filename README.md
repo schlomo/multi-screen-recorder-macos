@@ -9,8 +9,8 @@ keeps going when screens, resolutions or audio sources change.
 source. The app shows its settings and the ready check and records with
 Start, and the command line lists screens and audio inputs, runs the
 ready check, records and manages the settings. An audio input with its
-own clock still drifts against the screen files (measured, not yet
-corrected).
+own clock is resampled continuously to stay with the screen files
+(clock drift correction).
 
 ## What it does
 
@@ -82,7 +82,9 @@ confirmed yet.
 - **CPU:** recording takes about half of one CPU core over an hour,
   with two screens and five audio sources.
 - **Audio drift:** some USB audio devices drift against the video, by
-  up to about 0.4 s per hour. A correction is planned.
+  up to about 0.4 s per hour. The recorder corrects it by resampling
+  their sound; that the correction holds over an hour is not verified
+  yet.
 - **USB docks:** plugging a USB device into a dock while recording can
   cause a few seconds of silence or repeated audio in the USB audio
   inputs.
@@ -106,7 +108,7 @@ Then send the person who asked you to test:
   the screenshot lands on your desktop;
 - `recording.json` from the recording folder of every recording you
   made, the ones that went fine too: it shows how far each audio input
-  drifted and everything that happened. The recording folders are in
+  drifted, how much the recorder corrected, and everything that happened. The recording folders are in
   the output folder the app's window shows, by default
   `~/Movies/Multi Screen Recorder/`, one folder per recording;
 - a few sentences: where installing or the first start was confusing

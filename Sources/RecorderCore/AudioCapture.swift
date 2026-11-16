@@ -6,7 +6,7 @@ import RecorderLogic
 import Synchronization
 
 /// How an audio file ended, for the recording manifest: its entry with its
-/// end, state and clock drift, the writer's error, if any, and the samples
+/// end, state, clock drift and clock drift correction, the writer's error, if any, and the samples
 /// the writer never took at the end.
 public struct AudioFileEnd: Equatable, Sendable {
     public var file: RecordingManifest.AudioFile
@@ -31,6 +31,8 @@ struct AudioCaptureReports: Sendable {
     /// A file ended, finalized or not; each file's end once.
     var fileEnded: @Sendable (AudioFileEnd) -> Void
     var event: @Sendable (RecordingEvent) -> Void
+    /// The clock drift correction's latest status, about once a second.
+    var clockDrift: @Sendable (ClockDriftCorrection.Status) -> Void
     /// The capture ended by itself, after its last file's end.
     var ended: @Sendable (AudioTracker.CaptureEnd) -> Void
 }
@@ -44,6 +46,7 @@ final class AudioReportInbox: Sendable {
         case fileStarted(RecordingManifest.AudioFile, AudioTracker.SourceID, name: String)
         case fileEnded(AudioFileEnd)
         case event(RecordingEvent)
+        case clockDrift(AudioTracker.SourceID, number: Int, ClockDriftCorrection.Status)
         case ended(AudioTracker.SourceID, number: Int, name: String, AudioTracker.CaptureEnd)
     }
 
@@ -82,11 +85,12 @@ protocol AudioFileWriting: AnyObject {
 
 extension AudioFileWriter: AudioFileWriting {}
 
-/// One audio source's capture and its audio files: buffers are placed on
-/// the tick grid by `AudioFileTimeline`, written by an `AudioFileWriting`,
-/// and handed to the source's guide track. A gap over the longest filled
-/// gap or a change of the channel count ends the file and starts a new
-/// one, in the same capture. Everything runs on its own queue.
+/// One audio source's capture and its audio files: buffers are resampled
+/// to follow the shared clock by `ClockDriftCorrection`, and its corrected
+/// chunks placed on the tick grid by `AudioFileTimeline`, written by an
+/// `AudioFileWriting`, and handed to the source's guide track. A gap over
+/// the longest filled gap or a change of the channel count ends the file
+/// and starts a new one, in the same capture. Everything runs on its own queue.
 final class AudioCapture: @unchecked Sendable {
     typealias MakeWriter = @Sendable (_ url: URL, _ description: AudioFileDescription, _ firstTick: Int64)
         throws(AudioFileWriterError) -> any AudioFileWriting
@@ -119,6 +123,14 @@ final class AudioCapture: @unchecked Sendable {
     private var finishing: [Task<Void, Never>] = []
     private var isEnding = false
     private var guideChannels: Int?
+    private var correction = ClockDriftCorrection()
+    /// The correction applied up to the end of the latest chunk, and up to
+    /// the current file's start, in seconds.
+    private var applied = 0.0
+    private var appliedAtFileStart = 0.0
+    /// When the clock drift was last reported and written to `--debug`; nil before the first buffer.
+    private var clockDriftReported: Int64?
+    private var clockDriftDebugged: Int64?
 
     private enum Chunk {
         case samples([[Float]])
@@ -200,6 +212,7 @@ final class AudioCapture: @unchecked Sendable {
         await source.stop()
         let tasks = queue.sync { () -> [Task<Void, Never>] in
             isEnding = true
+            flushCorrection()
             finishFile()
             leaveGuide()
             return finishing
@@ -207,10 +220,12 @@ final class AudioCapture: @unchecked Sendable {
         for task in tasks { await task.value }
     }
 
-    /// Ends the capture by itself: its file ends, then it says why.
-    private func end(_ reason: AudioTracker.CaptureEnd) {
+    /// Ends the capture by itself: its file ends, then it says why. The
+    /// correction's held-back samples go to the file, unless its writer failed.
+    private func end(_ reason: AudioTracker.CaptureEnd, keepTail: Bool = true) {
         guard !isEnding else { return }
         isEnding = true
+        if keepTail { flushCorrection() }
         finishFile()
         leaveGuide()
         let tasks = finishing
@@ -234,29 +249,40 @@ final class AudioCapture: @unchecked Sendable {
             end(.captureFailed(error.description))
             return
         }
-        guard let count = channels.first?.count, count > 0 else { return }
+        guard channels.first?.isEmpty == false else { return }
         if id == .systemAudio, channels.count != GuideTrack.systemAudio.channelCount {
             end(.captureFailed("the system audio came with \(channels.count) channels instead of \(GuideTrack.systemAudio.channelCount)"))
             return
         }
         let pts = CMTimeConvertScale(CMSampleBufferGetPresentationTimeStamp(buffer), timescale: 1_000_000_000, method: .roundHalfAwayFromZero)
         let time = context.clock.sinceStart(host: UInt64(max(0, pts.value)))
+        for chunk in correction.correct(channels, at: time, arrival: arrival) where !isEnding { take(chunk) }
+        reportClockDrift(at: arrival)
+    }
 
+    /// The correction's samples left at the end of its input go to the file.
+    private func flushCorrection() {
+        for chunk in correction.flush() { take(chunk) }
+    }
+
+    /// A corrected chunk: to the guide track, and placed in the audio file.
+    private func take(_ chunk: ClockDriftCorrection.Chunk) {
+        let channels = chunk.channels
+        let time = chunk.time
+        let count = channels[0].count
+        let appliedBefore = applied
+        applied = chunk.applied
         joinGuide(channelCount: channels.count)
         guides.receive(channels, from: label, to: guide, at: time)
 
         if timeline != nil, channelCount != channels.count { finishFile() }
-        if timeline == nil {
-            timeline = AudioFileTimeline()
-            channelCount = channels.count
-        }
-        var placement = timeline!.place(bufferAt: time, sampleCount: count, arrival: arrival)
+        if timeline == nil { startTimeline(channelCount: channels.count, appliedBefore: appliedBefore) }
+        var placement = timeline!.place(bufferAt: time, sampleCount: count)
         if let gap = placement.gap { reports.event(gapEvent(gap, at: time)) }
         if placement.action == .endFile {
             finishFile()
-            timeline = AudioFileTimeline()
-            channelCount = channels.count
-            placement = timeline!.place(bufferAt: time, sampleCount: count, arrival: arrival)
+            startTimeline(channelCount: channels.count, appliedBefore: appliedBefore)
+            placement = timeline!.place(bufferAt: time, sampleCount: count)
         }
         guard case .write(let silence, let firstSample, let position) = placement.action else { return }
         if open == nil {
@@ -265,6 +291,27 @@ final class AudioCapture: @unchecked Sendable {
         if silence > 0 { open!.waiting.append((.silence(silence), position - silence)) }
         open!.waiting.append((.samples(firstSample == 0 ? channels : channels.map { Array($0[firstSample...]) }), position))
         writeWaiting()
+    }
+
+    private func startTimeline(channelCount: Int, appliedBefore: Double) {
+        timeline = AudioFileTimeline()
+        self.channelCount = channelCount
+        appliedAtFileStart = appliedBefore
+    }
+
+    /// The correction's status to the recorder about once a second, and with
+    /// `--debug` every 10 s as a detail line.
+    private func reportClockDrift(at now: Int64) {
+        let reported = clockDriftReported ?? now - RecorderValues.clockDriftStatusInterval.nanoseconds
+        let debugged = clockDriftDebugged ?? now
+        clockDriftDebugged = debugged
+        guard now - reported >= RecorderValues.clockDriftStatusInterval.nanoseconds else { return }
+        clockDriftReported = now
+        let status = correction.status
+        reports.clockDrift(status)
+        guard now - debugged >= RecorderValues.clockDriftDebugInterval.nanoseconds else { return }
+        clockDriftDebugged = now
+        RecorderLog.detail(DebugLine.clockDrift(of: label, status), category: "recorder")
     }
 
     private func gapEvent(_ gap: AudioGap, at time: Int64) -> RecordingEvent {
@@ -287,7 +334,7 @@ final class AudioCapture: @unchecked Sendable {
 
     private func fail(_ error: AudioFileWriterError) {
         open?.waiting = []
-        end(error.isDiskFull ? .diskFull : .writerFailed(error.description))
+        end(error.isDiskFull ? .diskFull : .writerFailed(error.description), keepTail: false)
     }
 
     // MARK: Files
@@ -321,7 +368,7 @@ final class AudioCapture: @unchecked Sendable {
     /// for at most the drain timeout, then it is finalized. Its end counts
     /// only what the writer took; the rest is lost (`lostSamples`).
     private func finishFile() {
-        let drift = timeline?.clockDriftPpm
+        let correction = applied - appliedAtFileStart
         timeline = nil
         guard let file = open else { return }
         open = nil
@@ -340,8 +387,9 @@ final class AudioCapture: @unchecked Sendable {
                 failure = failure ?? error
                 entry.state = .notFinalized
             }
-            entry.end = entry.start + Double(file.written) / Double(RecorderValues.audioSampleRate)
-            entry.clockDriftPpm = drift.map { ($0 * 10).rounded() / 10 }
+            let duration = Double(file.written) / Double(RecorderValues.audioSampleRate)
+            entry.end = entry.start + duration
+            entry.clockDrift(correction: correction, duration: duration)
             reports.fileEnded(AudioFileEnd(file: entry, error: failure, lostSamples: lost))
         })
     }

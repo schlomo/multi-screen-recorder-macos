@@ -59,6 +59,8 @@ public final class Recorder {
     private var audioDueTask: Task<Void, Never>?
     private var audioWatch: AudioInputWatch?
     private let audioReports = AudioReportInbox()
+    /// The latest clock drift correction status of each audio capture, by its number among all audio captures.
+    private var audioClockDrift: [AudioTracker.SourceID: (number: Int, status: ClockDriftCorrection.Status)] = [:]
     private let guides: GuideTrackFeed
     private var cpu = CPUUsage()
     private var cpuTask: Task<Void, Never>?
@@ -143,6 +145,7 @@ public final class Recorder {
     /// The status window's table, line and CPU use, read now: each file's
     /// size on disk and the free space in the recording folder.
     public func status() -> (rows: [RecordingStatusTable.Row], line: String, cpu: String?) {
+        let clockDrift = audioClockDrift.filter { id, drift in audioCaptures[id]?.0 == drift.number }.mapValues(\.status)
         let names = manifest.files.map(\.name) + manifest.audioFiles.map(\.name)
         let sizes = names.map { name in
             (name, (try? FileManager.default.attributesOfItem(atPath: folder.appending(path: name).path(percentEncoded: false)))?[.size] as? Int64)
@@ -153,7 +156,8 @@ public final class Recorder {
             .volumeAvailableCapacityForImportantUsage
         return (
             RecordingStatusTable.rows(sources: tracker.sources, files: manifest.files, bytes: bytes)
-                + RecordingStatusTable.audioRows(sources: audioTracker.sourcesShown, files: manifest.audioFiles, bytes: bytes),
+                + RecordingStatusTable.audioRows(
+                    sources: audioTracker.sourcesShown, files: manifest.audioFiles, bytes: bytes, clockDrift: clockDrift),
             RecordingStatusTable.line(
                 elapsedSeconds: elapsedSeconds, bytesWritten: bytesWritten, files: names.count,
                 freeBytes: free),
@@ -478,6 +482,7 @@ public final class Recorder {
             fileStarted: { file in post(.fileStarted(file, id, name: name)) },
             fileEnded: { end in post(.fileEnded(end)) },
             event: { event in post(.event(event)) },
+            clockDrift: { status in post(.clockDrift(id, number: number, status)) },
             ended: { reason in post(.ended(id, number: number, name: name, reason)) })
         let capture = AudioCapture(id: id, number: sourceNumber, name: name, source: source, context: context, guides: guides, reports: reports)
         audioCaptures[id] = (number, capture)
@@ -493,6 +498,7 @@ public final class Recorder {
             case .fileStarted(let file, let id, let name): audioFileStarted(file, id: id, name: name)
             case .fileEnded(let end): audioFileEnded(end)
             case .event(let event): audioEvent(event)
+            case .clockDrift(let id, let number, let status): audioClockDrift[id] = (number, status)
             case .ended(let id, let number, let name, let reason):
                 audioCaptureEnded(id, number: number, name: name, reason: reason)
             }

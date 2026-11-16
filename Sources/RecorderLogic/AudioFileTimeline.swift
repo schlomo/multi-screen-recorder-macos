@@ -32,8 +32,9 @@ public struct AudioBufferPlacement: Equatable, Sendable {
 /// tick after its first buffer, the samples before that tick are trimmed,
 /// and every sample after it is placed by sample count (D45). A gap up to
 /// `longestFilledGap` is filled with silence of exactly its length; a
-/// longer one ends the file. Times are nanoseconds from t0 on the shared
-/// clock.
+/// longer one ends the file. In a recording its buffers are the corrected
+/// chunks of `ClockDriftCorrection`, so the sample count follows the shared
+/// clock. Times are nanoseconds from t0 on the shared clock.
 public struct AudioFileTimeline: Sendable {
     public let grid: TickGrid
     public let sampleRate: Int
@@ -48,7 +49,6 @@ public struct AudioFileTimeline: Sendable {
     private var received: Int64 = 0
     /// Samples from the first buffer's start to the first tick.
     private var trimmed: Int64 = 0
-    private var drift: ClockDriftMeasure
 
     public init(
         grid: TickGrid = .recording, sampleRate: Int = RecorderValues.audioSampleRate,
@@ -60,37 +60,32 @@ public struct AudioFileTimeline: Sendable {
         self.sampleRate = sampleRate
         self.gapTolerance = gapTolerance.nanoseconds
         self.longestFilledGap = longestFilledGap.nanoseconds
-        drift = ClockDriftMeasure(sampleRate: sampleRate)
     }
 
-    /// The file's measured clock drift, nil until two buffers arrived apart.
-    public var clockDriftPpm: Double? { drift.clockDriftPpm }
-
     /// Places a buffer of `sampleCount` samples whose first sample has the
-    /// timestamp `time`, which arrived at `arrival` (both on the shared clock).
-    public mutating func place(bufferAt time: Int64, sampleCount: Int, arrival: Int64) -> AudioBufferPlacement {
+    /// timestamp `time`.
+    public mutating func place(bufferAt time: Int64, sampleCount: Int) -> AudioBufferPlacement {
         precondition(sampleCount >= 0, "a buffer holds no negative sample count")
         guard firstTick != nil else {
             let tick = grid.firstTick(atOrAfter: time)
             firstTick = tick
             origin = time
             trimmed = samples(in: grid.time(ofTick: tick) - time)
-            return write(sampleCount: sampleCount, silence: 0, gap: nil, arrival: arrival)
+            return write(sampleCount: sampleCount, silence: 0, gap: nil)
         }
         let ahead = time - (origin + nanoseconds(in: received))
         guard ahead > gapTolerance else {
-            return write(sampleCount: sampleCount, silence: 0, gap: nil, arrival: arrival)
+            return write(sampleCount: sampleCount, silence: 0, gap: nil)
         }
         let isFilled = ahead <= longestFilledGap
         let gap = AudioGap(length: ahead, samples: samples(in: ahead), isFilled: isFilled)
         guard isFilled else { return AudioBufferPlacement(action: .endFile, gap: gap) }
         received += gap.samples
-        return write(sampleCount: sampleCount, silence: gap.samples, gap: gap, arrival: arrival)
+        return write(sampleCount: sampleCount, silence: gap.samples, gap: gap)
     }
 
-    private mutating func write(sampleCount: Int, silence: Int64, gap: AudioGap?, arrival: Int64) -> AudioBufferPlacement {
+    private mutating func write(sampleCount: Int, silence: Int64, gap: AudioGap?) -> AudioBufferPlacement {
         let start = received
-        drift.record(arrival: arrival, samplesBefore: start)
         received += Int64(sampleCount)
         guard received > trimmed else { return AudioBufferPlacement(action: .trim, gap: gap) }
         let position = max(start, trimmed) - trimmed
@@ -108,35 +103,5 @@ public struct AudioFileTimeline: Sendable {
     /// A length in nanoseconds as samples, rounded to the nearest.
     private func samples(in nanoseconds: Int64) -> Int64 {
         (nanoseconds * Int64(sampleRate) + 500_000_000) / 1_000_000_000
-    }
-}
-
-/// An audio file's clock drift, `clockDriftPpm` (D45): the samples written
-/// against the shared clock's elapsed time, from the host times at which
-/// buffers arrive, from the file's first buffer to its latest. Positive
-/// when the audio source's clock runs faster than the shared clock.
-public struct ClockDriftMeasure: Equatable, Sendable {
-    public let sampleRate: Int
-    private var firstArrival: Int64?
-    private var latestArrival: Int64 = 0
-    private var latestSamplesBefore: Int64 = 0
-
-    public init(sampleRate: Int = RecorderValues.audioSampleRate) {
-        self.sampleRate = sampleRate
-    }
-
-    /// A buffer arrived at `arrival`, with `samplesBefore` samples written
-    /// before it since the file's first buffer.
-    public mutating func record(arrival: Int64, samplesBefore: Int64) {
-        if firstArrival == nil { firstArrival = arrival }
-        latestArrival = arrival
-        latestSamplesBefore = samplesBefore
-    }
-
-    public var clockDriftPpm: Double? {
-        guard let firstArrival, latestArrival > firstArrival else { return nil }
-        let clockElapsed = Double(latestArrival - firstArrival)
-        let audioElapsed = Double(latestSamplesBefore) * 1_000_000_000 / Double(sampleRate)
-        return (audioElapsed - clockElapsed) / clockElapsed * 1_000_000
     }
 }

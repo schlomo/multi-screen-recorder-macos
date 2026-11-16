@@ -219,11 +219,14 @@ which is told as a problem.
 
 ## Clock drift
 
-How far an audio file's sample count runs from the tick grid, in parts
-per million, measured over the file and given in the recording
-manifest as `clockDriftPpm`: positive when the audio device's clock
-runs fast (more samples than the grid's time), negative when slow. Not
-corrected yet (D49).
+How far an audio device's clock runs from the shared clock, in parts
+per million: positive when it runs fast (more samples than the shared
+clock's time), negative when slow (D49). It is measured from when the
+device's buffers arrive and corrected: every audio source's sound is
+resampled continuously so its sample count follows the shared clock.
+The recording manifest gives each audio file's clock drift as
+`clockDriftPpm` and the sound the correction added as
+`clockDriftCorrection`.
 
 ## Recording resolution
 

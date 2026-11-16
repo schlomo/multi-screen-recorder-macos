@@ -46,4 +46,14 @@ import Testing
         #expect(DebugLine.screens(screens)
             == "DELL P3421W 3440×1440 at (0,0) main (display ID 1), unnamed 1920×1080 at (3440,0) mirrors A (display ID 3)")
     }
+
+    @Test func theClockDriftLineSaysWhatTheCorrectionDoes() {
+        let label = "Audio 1 - Razer Seiren V3 Mini"
+        #expect(DebugLine.clockDrift(of: label, .init(clockDriftPpm: -116.12, applied: 0.034_94, remaining: -0.000_04))
+            == "Audio 1 - Razer Seiren V3 Mini: clock drift -116.1 ppm, corrected +34.94 ms so far, 0.04 ms off")
+        #expect(DebugLine.clockDrift(of: label, .init(clockDriftPpm: nil, applied: 0.000_2, remaining: 0.000_5))
+            == "Audio 1 - Razer Seiren V3 Mini: clock drift not measured yet, corrected +0.20 ms so far, 0.50 ms off")
+        #expect(DebugLine.clockDrift(of: "Audio 0 - System", .init(clockDriftPpm: nil, applied: 0, remaining: nil))
+            == "Audio 0 - System: clock drift not measured yet, corrected +0.00 ms so far")
+    }
 }
