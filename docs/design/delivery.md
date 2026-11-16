@@ -171,8 +171,8 @@ builds every push that changes `homepage/` (production from `main`,
 indexable; a preview otherwise, `noindex`), by its build watch path
 `homepage/**`. Cloudflare checks out the whole repository and builds
 in the root directory `/homepage`; the header image is mounted from
-`assets/icon/`, outside that directory [ASSUMED until the first
-Cloudflare build succeeds]. `homepage/wrangler.jsonc`
+`assets/icon/`, outside that directory (the first Cloudflare build,
+of `4862371` on 2026-11-16, succeeded with it). `homepage/wrangler.jsonc`
 holds the deploy; the dashboard settings that cannot live in the
 repository, and connecting the Worker, are the owner's
 ([homepage/README.md](../../homepage/README.md)). Its cost: Cloudflare
