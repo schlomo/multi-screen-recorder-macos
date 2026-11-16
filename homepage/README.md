@@ -52,12 +52,6 @@ live-reloading preview on <http://localhost:1313>. `./build.sh` builds into
 `public/` (`./build.sh -p` for an indexable production build; all other builds
 are `noindex`).
 
-To check a phone width (320 to 430 px) without a phone, load the page in an
-`iframe` that wide and compare `document.documentElement.scrollWidth` with the
-frame's `innerWidth`: equal means nothing scrolls sideways. Headless Chrome
-makes no window narrower than about 500 px, and its screenshots of such a
-page can come out cropped, so the measurement is the check, not the picture.
-
 ## Deployment
 
 Cloudflare Workers Builds runs `./build.sh` and deploys `public/` as Workers
@@ -65,12 +59,6 @@ static assets. [`wrangler.jsonc`](wrangler.jsonc) is the source of truth for
 the deploy: Worker name, custom domain and 404 handling. Only `main` gets an
 indexable production build. A push that changes only `homepage/` makes no app
 release (`.github/workflows/ci.yml`).
-
-Every PR that changes `homepage/` gets a preview; its URLs are in the
-"Workers Builds" check of the PR's head commit (`gh api
-repos/{owner}/{repo}/commits/<sha>/check-runs`). Check a served URL with
-`curl -sI` and without `-L`: Cloudflare answers some paths (one with `@`, for
-example) with a redirect, which a check that follows redirects never shows.
 
 ### Cloudflare dashboard settings
 

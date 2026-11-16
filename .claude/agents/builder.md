@@ -18,7 +18,11 @@ silently picking a side.
 ## Before you report done
 
 Run every command in the FOREGROUND. Do not start a background watch
-and end your turn waiting on a notification. Commit and, at the
+and end your turn waiting on a notification. Iterate locally: the
+gate for each round is the local run of what CI runs (`scripts/test`,
+`scripts/build-app`, `scripts/smoke-test`; for the homepage,
+`homepage/build.sh`) on your final commit. Push when the round is
+done, and never wait for CI unless the brief asks (D56). Commit and, at the
 recorded write level, push before reporting; if something backgrounds
 anyway, collect its result now and finish. Verify what you built
 against the actual pushed state (or your local commit, below the

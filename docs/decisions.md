@@ -1577,23 +1577,38 @@ architect's reading.
   "Labels" and the start and status windows; the glossary's "Screen",
   "Label" and "Tagline"; the PR "Naming and window polish".
 
-## D56: The owner tries visible changes early; live runs on the owner's Mac are announced (2026-11-16)
+## D56: Iterate locally and wait for CI once; the owner tries changes early; live runs announced; agent how-to in the AI docs; reviews sized to the change (2026-11-16)
 
 - **Status:** in force
 - **Context:** The owner, 2026-11-15: "what about working locally and
   letting me test first to speed up?" On 2026-11-16, during an agent's
   test run the architect had not announced: "I hear some tone playing
-  and saw that a recording was active?"
+  and saw that a recording was active?" The owner's retro of the
+  session, 2026-11-16: "We wasted way way too much time waiting on CI.
+  the development needs to be much more local and iterating locally so
+  that we wait for CI at most once per PR. there is nothing on CI you
+  can't test locally and this is by design. we put the AI how to into
+  the section for that and not clutter the regular docs. MD reviews
+  need to be cost and complexity appropriate of course"
 - **Decision:** A change that shows in the window or on the command
   line goes to the owner, as a local build or the PR's snapshot
   release, as soon as the builder's tests pass; the review runs
   alongside, and the owner's feedback and the review's findings go
   into one fix round. Before an agent records or plays sound on the
   owner's Mac (D48), the session that briefed the run tells the owner
-  (the architect's reading of the owner's question).
+  (the architect's reading of the owner's question). Each round is
+  gated by the local run of what CI runs; CI is waited for once per
+  PR, before it is marked ready. How-to for agents goes into the AI
+  docs (`.claude/rules/`, `.claude/agents/`, the skills), not the
+  human docs. A Markdown-only or small, low-risk change gets a review
+  sized to it, usually on the standard tier; a principle change and a
+  consistency pass stay on the top tier (the architect's reading of
+  "cost and complexity appropriate").
 - **Consequences:** The owner's check no longer waits for the review;
   a fix round can carry both. A live run waits for the owner to have
-  been told.
-- **Evidence:** `.claude/skills/architect/references/operating-rules.md`,
-  "Deciding and asking"; `AGENTS.md`, "Facts that bite"; the session
-  retro PR of 2026-11-16.
+  been told. A difference between the local toolchain and CI's (backlog
+  item 2) shows up only at the one CI wait, late in the PR.
+- **Evidence:** `.claude/skills/architect/references/operating-rules.md`
+  and `delegation.md`; `.claude/agents/builder.md`;
+  `.claude/rules/homepage.md`; `AGENTS.md`, "Facts that bite"; the
+  session retro PR of 2026-11-16.

@@ -25,7 +25,12 @@ file adds how to apply them.
   tier, with the reason in one line; or, where the pinned model isn't
   available to the project, to name the highest tier that is (the
   reviewer's top-tier pin, for example); or, for a delta review, to
-  lower it to the standard tier. A tier above a human's per-project
+  lower it to the standard tier; or, for a change to Markdown only
+(docs, rules, the backlog) or a small, low-risk one, to size the
+review to its cost and complexity, usually the standard tier (D56),
+except a principle change and the consistency pass ending a series
+of rule edits, which stay on the top tier. A tier above a human's
+per-project
   cap counts as not available. A general-purpose or built-in agent has
   no pin: give it an explicit model every time.
 - **Model and effort, in Claude Code.** A narrow-lane agent pins
