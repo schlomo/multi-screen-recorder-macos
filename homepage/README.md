@@ -27,11 +27,12 @@ to the tester guide, the problem report form and the repository.
   triggers no homepage build (it is outside the watch path); the next
   homepage change picks it up.
 - **Screenshots:** the start and status windows, `assets/images/*.png` as
-  taken with macOS's screenshot tool, shown by
-  `layouts/_partials/screenshot.html` as WebP at the window's size in points
-  and never wider than the page. Its `scale` argument is the screenshot's
-  pixels per point: 2 from a Retina screen, 1 otherwise. Replace a file to
-  update a screenshot.
+  taken with macOS's screenshot tool, placed in `layouts/home.html` and shown
+  by `layouts/_partials/screenshot.html` as WebP at the window's size in
+  points and never wider than the page. A screenshot taken on a Retina
+  screen has 2 pixels per point and its name ends in `@2x.png`, as macOS
+  names such files; any other has 1. To update one, replace the file, and
+  rename it (in `home.html` too) if its pixels per point changed.
 - **Favicons:** `static/favicon*` and `static/apple-touch-icon.png`, rendered
   from `assets/icon/app-icon.svg` by `scripts/render-app-icon`; never edit them
   by hand.

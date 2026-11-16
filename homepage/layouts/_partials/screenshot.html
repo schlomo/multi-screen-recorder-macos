@@ -1,18 +1,19 @@
 {{- /* A window screenshot from assets/images/, shown at the window's size in points
-       and never wider than the page. Arguments: src, alt, caption and scale, the
-       screenshot's pixels per point (2 for a Retina screen, 1 otherwise). A 2x
-       screenshot also gets a 1x version for screens that need no more. */}}
+       and never wider than the page. Arguments: src, alt and caption. A file named
+       with macOS's "@2x" (taken on a Retina screen) has 2 pixels per point and also
+       gets a 1x version for screens that need no more. */}}
 {{- $image := resources.Get .src }}
-{{- $width := div $image.Width .scale }}
-{{- $height := div $image.Height .scale }}
+{{- $scale := cond (strings.Contains .src "@2x") 2 1 }}
+{{- $width := div $image.Width $scale }}
+{{- $height := div $image.Height $scale }}
 {{- $full := $image.Process "webp q90 text" }}
+{{- $shown := $full }}
+{{- $srcset := "" }}
+{{- if eq $scale 2 }}
+{{- $shown = $image.Process (printf "resize %dx webp q90 text" $width) }}
+{{- $srcset = printf "%s 1x, %s 2x" $shown.RelPermalink $full.RelPermalink }}
+{{- end }}
 <figure class="screenshot">
-  {{- if gt .scale 1 }}
-  {{- $half := $image.Process (printf "resize %dx webp q90 text" $width) }}
-  <img src="{{ $half.RelPermalink }}" srcset="{{ $half.RelPermalink }} 1x, {{ $full.RelPermalink }} 2x"
-       alt="{{ .alt }}" width="{{ $width }}" height="{{ $height }}" loading="lazy" />
-  {{- else }}
-  <img src="{{ $full.RelPermalink }}" alt="{{ .alt }}" width="{{ $width }}" height="{{ $height }}" loading="lazy" />
-  {{- end }}
+  <img src="{{ $shown.RelPermalink }}"{{ with $srcset }} srcset="{{ . }}"{{ end }} alt="{{ .alt }}" width="{{ $width }}" height="{{ $height }}" />
   <figcaption>{{ .caption }}</figcaption>
 </figure>
