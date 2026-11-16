@@ -90,8 +90,8 @@ confirmed yet.
 ### What to test and send
 
 1. Make one recording of about an hour with your normal setup: your
-   usual screens, microphone or headset, and dock. Start the app and
-   click Start; at the end, click the app's Dock icon, then Stop: the
+   usual screens, microphone or headset, and dock. Start the app, take
+   the screenshot asked for below, and click Start; at the end, click the app's Dock icon, then Stop: the
    files are finished and the recording folder opens in Finder.
 2. During it, change things as you normally would: plug in or unplug a
    screen or headset, switch audio inputs, close and open the lid.
@@ -116,7 +116,7 @@ Then send the person who asked you to test:
 
 Please don't send the recordings themselves: they show whatever was
 on your screens. The window's screenshot names your screens and audio
-inputs. `recording.json` holds what the
+inputs and shows your output folder. `recording.json` holds what the
 [problem report form](https://github.com/schlomo/multi-screen-recorder-macos/issues/new?template=problem-report.yml)
 lists: the names of your screens and audio inputs and the identifiers
 macOS gives them (which can hold a device's serial number), the start
