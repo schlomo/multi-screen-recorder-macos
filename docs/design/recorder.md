@@ -484,9 +484,9 @@ checked, reported or rewritten at the next start (D47).
 
 - **Start:** a small window. At the top, the app icon, the name, the
   version and a link to the homepage (`Homepage.url`, defined once),
-  and on the right the claim in two lines, "Every screen, all audio."
-  and "Keeps going when things change." (`Claim.lines`, defined once;
-  the homepage's tagline too, in the same two lines), right-aligned,
+  and on the right the tagline in two lines, "Every screen, all audio."
+  and "Keeps going when things change." (`Tagline.lines`, defined
+  once; on the homepage too, in the same two lines), right-aligned,
   in italics and the secondary text colour; neither line wraps (D55).
   Then a section "What will be recorded", built from the settings and
   the devices connected now and
@@ -503,14 +503,20 @@ checked, reported or rewritten at the next start (D47).
   connected, so no column moves when auto mode, a slider or the devices
   change; Source takes the rest of the window, which is as wide as the
   table, holds the kind's icon and "88 MacBook Pro Microphone (default)"
-  and truncates a longer name in the middle (the label is its tooltip).
+  and truncates a longer name in the middle (its tooltip is the label,
+  with "(default)" after it for the default input).
   - Source shows each source as an SF Symbol for its kind (`display` for
     a screen, `mic` for an audio input, `speaker.wave.2` for the system
     audio), then its number and its name, as its label numbers it (D55):
     the screens and the recorded audio inputs from 1, those in the order
     listed, the system audio 0 and named "System". A source not recorded
-    gets no number. `msr check` prints the label as text instead
-    (`Screen 1 - Built-in Retina Display`).
+    gets no number. The window applies the recording's own rules
+    (`ScreenTracker.recordedInNumberingOrder`, `AudioTracker.records`),
+    so its numbers are the recording's: a screen that mirrors another is
+    not listed, and an audio input without a Core Audio UID is not
+    recorded, its row dimmed, and neither counts in the total. `msr check` prints the label as text instead
+    (`Screen 1 - Built-in Retina Display`), the default input marked
+    "(default)" after it (`Audio 1 - MacBook Pro Microphone (default)`).
   - Screen rows first: the number and name, "Looks like" (the size in
     points), "Drawn at" (the pixel size, shown also where both are
     equal), "Records at" (the frame size) and GB/h max (the screen file,

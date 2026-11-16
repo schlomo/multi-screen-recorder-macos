@@ -29,7 +29,25 @@ public struct ConnectedScreen: Equatable, Sendable {
         self.mirrorsUUID = mirrorsUUID
     }
 
-    var isMirroring: Bool { mirrorsUUID != nil }
+    public var isMirroring: Bool { mirrorsUUID != nil }
+}
+
+extension ConnectedScreen: PlacedScreen {
+    public var originX: Double { bounds.x }
+    public var originY: Double { bounds.y }
+    public var placementTieBreak: String { uuid }
+}
+
+/// A screen where the recording numbers it: main first, then left to
+/// right, then top to bottom (D45).
+public protocol PlacedScreen {
+    var isMain: Bool { get }
+    var originX: Double { get }
+    var originY: Double { get }
+    /// It mirrors another screen, so a recording does not record it.
+    var isMirroring: Bool { get }
+    /// Orders two screens at the same place.
+    var placementTieBreak: String { get }
 }
 
 /// A rectangle in points in the global screen space, top-left origin, as

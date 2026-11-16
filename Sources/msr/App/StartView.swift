@@ -46,7 +46,7 @@ struct StartView: View {
     }
 }
 
-/// The app icon, the name, the version and the homepage, and the claim.
+/// The app icon, the name, the version and the homepage, and the tagline.
 struct AppHeader: View {
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
@@ -64,7 +64,7 @@ struct AppHeader: View {
             Spacer(minLength: 12)
             // Each line whole: the window is wide enough for both.
             VStack(alignment: .trailing, spacing: 2) {
-                ForEach(Claim.lines, id: \.self) { line in
+                ForEach(Tagline.lines, id: \.self) { line in
                     Text(line).fixedSize()
                 }
             }

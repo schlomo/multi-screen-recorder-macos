@@ -1496,7 +1496,7 @@ architect's reading.
 - **Evidence:** [README.md](../README.md), "License"; the PR "First
   tester release".
 
-## D55: "Screen" is the term; every source has a label; the claim (2026-11-16)
+## D55: "Screen" is the term; every source has a label; the tagline (2026-11-16)
 
 - **Status:** in force; changes the names of D31, D46, D49 and D52.
 - **Context:** The app said "display" in some places and "screen" in
@@ -1514,7 +1514,7 @@ architect's reading.
      `screenUUID`), code and file names, the docs, the homepage and
      the issue forms. Apple's API and type names and macOS's own names
      (System Settings › Displays, Built-in Retina Display) keep theirs,
-     as do earlier decisions, the backlog and the architecture doc.
+     as do earlier decisions and the backlog.
   2. Every recorded source has a label, `<kind> <n> - <name>`:
      `Screen <n> - <name>`, `Audio <n> - <name>`, and always
      `Audio 0 - System` for the system audio. Numbers count per kind
@@ -1533,17 +1533,25 @@ architect's reading.
      shows an SF Symbol for the kind (`display`, `mic`,
      `speaker.wave.2`), then the number and the name; a source not
      recorded stays dimmed and has no number. `msr check` prints the
-     label as text.
-  5. The claim stands in the start window's header, right-aligned, in
-     italics and the secondary text colour, and is the homepage's
-     tagline, the longer description a paragraph below it. It is
-     always two lines, the owner after seeing the first render: "the
-     claim needs to break the line after audio and start the 2nd line
-     from Keeps": "Every screen, all audio." and "Keeps going when
-     things change."; neither line wraps in the window. It is defined
-     once, `Claim.lines`, joined by a space where one line is needed
-     (`Claim.text`), and a test ties `homepage/hugo.toml` to it.
+     label as text, the default input marked "(default)" after it, and
+     the window shows the same as the Source cell's tooltip.
+  5. The tagline stands in the start window's header, right-aligned, in
+     italics and the secondary text colour, and on the homepage under
+     its title, the longer description a paragraph below it. It is
+     always two lines, the owner after seeing the first render (who
+     called it the claim, a word the project keeps for taking the
+     recording folder, D20): "the claim needs to break the line after
+     audio and start the 2nd line from Keeps": "Every screen, all
+     audio." and "Keeps going when things change."; neither line wraps
+     in the window. It is defined
+     once, `Tagline.lines`, joined by a space where one line is needed
+     (`Tagline.text`), and a test ties `homepage/hugo.toml` to it.
   6. The buttons stay as they are.
+  7. The start window and `msr list` number only what the recording
+     records, by the recording's own rules: a screen that mirrors
+     another is left out, and an audio input without a Core Audio UID is
+     not recorded (`ScreenTracker.recordedInNumberingOrder`,
+     `AudioTracker.records`); the disk estimate counts neither.
 - **Consequences:** No settings or state migration: neither holds a
   changed key, and no code reads a recording manifest back. A manifest
   written by an earlier build keeps `display` and `displayUUID`. The
@@ -1556,4 +1564,4 @@ architect's reading.
   alone; the manifest's `audioSourceUID` tells them apart.
 - **Evidence:** [recorder.md](design/recorder.md), "Output on disk",
   "Labels" and the start and status windows; the glossary's "Screen",
-  "Label" and "Claim"; the PR "Naming and window polish".
+  "Label" and "Tagline"; the PR "Naming and window polish".

@@ -165,7 +165,7 @@ only if that falls short. See "Unknowns".
 |---|---|---|
 | Screen connects, disconnects | the helper creates a virtual screen through Apple's private `CGVirtualDisplay` interface; ending its process removes it | private interface |
 | Frame size changes, HiDPI | the helper replaces a virtual screen by one of another size (a mode switch on a virtual screen is reported to leave it unremovable); on one of the Mac's own screens, a mode change through the public interface | |
-| Mirroring, arrangement, main screen | the helper, through the public screen configuration interface | |
+| Mirroring, arrangement, main screen | the helper, through the public display configuration interface (Apple's) | |
 | Rotation; one of the Mac's own screens switched off and on | BetterDisplay's command line | BetterDisplay Pro, a paid licence (the owner: "I have BetterDisplay Pro if it helps we can use it"); a scenario set of its own, asked for by name, which stops with an error where BetterDisplay is missing |
 | Audio input appears, vanishes, changes its channel count | the helper creates and removes an aggregate device around BlackHole through the public CoreAudio interface | BlackHole installed once (administrator) |
 | Sample rate, input volume | the helper sets them on BlackHole | |

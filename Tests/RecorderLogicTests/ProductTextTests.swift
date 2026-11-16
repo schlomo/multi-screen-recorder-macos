@@ -16,14 +16,14 @@ import Testing
         #expect(try repositoryFile("homepage/wrangler.jsonc").contains("\"pattern\": \"\(Homepage.url.host() ?? "")\""))
     }
 
-    /// D55: the app's header and the homepage's tagline say the same claim, in the same two lines.
-    @Test func theHomepageTaglineIsTheClaim() throws {
-        let lines = Claim.lines.map { "\"\($0)\"" }.joined(separator: ", ")
-        #expect(Claim.lines == ["Every screen, all audio.", "Keeps going when things change."])
-        #expect(Claim.text == "Every screen, all audio. Keeps going when things change.")
-        #expect(try repositoryFile("homepage/hugo.toml").contains("claim = [\(lines)]"))
+    /// D55: the app's header and the homepage say the same tagline, in the same two lines.
+    @Test func theAppAndTheHomepageShowTheSameTagline() throws {
+        let lines = Tagline.lines.map { "\"\($0)\"" }.joined(separator: ", ")
+        #expect(Tagline.lines == ["Every screen, all audio.", "Keeps going when things change."])
+        #expect(Tagline.text == "Every screen, all audio. Keeps going when things change.")
+        #expect(try repositoryFile("homepage/hugo.toml").contains("tagline = [\(lines)]"))
         #expect(try repositoryFile("homepage/layouts/home.html")
-            .contains("<p class=\"tagline\">{{ delimit site.Params.claim \"<br />\" | safeHTML }}</p>"))
+            .contains("<p class=\"tagline\">{{ delimit site.Params.tagline \"<br />\" | safeHTML }}</p>"))
     }
 
     /// The README and the homepage link to the problem report form.
@@ -34,7 +34,7 @@ import Testing
         #expect(try repositoryFile("homepage/hugo.toml").contains(link))
     }
 
-    @Test func resolutionLabels() {
+    @Test func resolutionShownNames() {
         #expect(RecordingResolution.allCases.map(\.shownName) == ["Native", "4K", "1440p", "1200p", "1080p", "720p"])
     }
 }

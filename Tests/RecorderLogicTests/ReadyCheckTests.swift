@@ -24,7 +24,7 @@ import Testing
         )
     }
 
-    private static let builtInMicrophoneOnly = [AudioInputInfo(name: "MacBook Pro Microphone", channelCount: 1, isDefault: true)]
+    private static let builtInMicrophoneOnly = [AudioInputInfo(name: "MacBook Pro Microphone", channelCount: 1, isDefault: true, uid: "BuiltIn")]
 
     /// The example in docs/design/recorder.md, from the screens of its `msr list` example.
     static let designExample = """
@@ -161,7 +161,7 @@ import Testing
     }
 
     @Test func aPresentButNotRecordedInputNeedsNoPermission() {
-        let notDefault = [AudioInputInfo(name: "USB", channelCount: 1, isDefault: false, transport: .usb)]
+        let notDefault = [AudioInputInfo(name: "USB", channelCount: 1, isDefault: false, transport: .usb, uid: "USB")]
         let result = ReadyCheck.evaluate(facts(microphoneGranted: nil, audioInputs: notDefault), settings: .manual)
         #expect(result.isReady)
         #expect(!result.items.contains { $0.title == "Microphone permission" })
@@ -184,7 +184,7 @@ import Testing
 
     private static func unreadable(isDefault: Bool) -> AudioInputInfo {
         AudioInputInfo(name: "X", channelCount: .failure(DeviceReadError("the audio input X does not report its format")),
-                       isDefault: isDefault)
+                       isDefault: isDefault, uid: "X")
     }
 
     @Test func anUnreadableInputThatIsNotRecordedPasses() {
@@ -230,7 +230,7 @@ import Testing
     @Test func theDiskEstimateCountsTheAudioFilesAndGuideTracks() throws {
         var settings = Settings.manual
         settings.requiredRecordingHours = 1
-        let twoChannels = [AudioInputInfo(name: "RØDE Wireless GO II RX", channelCount: 2, isDefault: true)]
+        let twoChannels = [AudioInputInfo(name: "RØDE Wireless GO II RX", channelCount: 2, isDefault: true, uid: "RODE")]
         let result = ReadyCheck.evaluate(facts(audioInputs: twoChannels), settings: settings)
         let item = try #require(result.items.last)
         // two screens at 1080p: 2 × (1 GB video + 72 MB guide tracks), 115.2 MB microphone, 86.4 MB system audio
@@ -300,7 +300,7 @@ import Testing
             .first { $0.title.hasPrefix("Audio:") }?.title
     }
 
-    private static let airPods = AudioInputInfo(name: "AirPods", channelCount: 1, isDefault: false, transport: .bluetooth)
+    private static let airPods = AudioInputInfo(name: "AirPods", channelCount: 1, isDefault: false, transport: .bluetooth, uid: "AirPods")
 
     @Test func theAudioItemNamesEveryRecordedInputOfTheAudioMode() {
         let inputs = DesignExample.audioInputs + [Self.airPods]
@@ -327,7 +327,7 @@ import Testing
 
     @Test(arguments: [AudioMode.defaultMicrophone, .wired, .allInputs])
     func aBluetoothDefaultMicrophoneIsEnoughInEveryModeBut(none mode: AudioMode) {
-        let headset = AudioInputInfo(name: "AirPods", channelCount: 1, isDefault: true, transport: .bluetooth)
+        let headset = AudioInputInfo(name: "AirPods", channelCount: 1, isDefault: true, transport: .bluetooth, uid: "AirPods")
         #expect(audioTitle(mode, [headset]) == "Audio: AirPods (default), system audio")
     }
 

@@ -22,7 +22,7 @@ corrected).
   system audio if you want it.
   Each source gets an audio file of its own, each channel its own
   track; every screen file also carries two guide tracks, the
-  microphones and the system audio, for playback and for syncing by
+  audio inputs and the system audio, for playback and for syncing by
   waveform with a separate recording.
 - **Edit-ready video.** A constant 30 frames per second, with a fixed
   frame size per file and a recording resolution you choose (Native,

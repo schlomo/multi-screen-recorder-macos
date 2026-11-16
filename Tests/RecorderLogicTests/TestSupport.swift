@@ -8,8 +8,8 @@ enum DesignExample {
         ScreenInfo(name: "Built-in Retina Display", pixelSize: FrameSize(width: 3456, height: 2234), pointSize: FrameSize(width: 1728, height: 1117), isMain: true, originX: 0, originY: 0),
     ]
     static let audioInputs = [
-        AudioInputInfo(name: "MacBook Pro Microphone", channelCount: 1, isDefault: true),
-        AudioInputInfo(name: "RØDE Wireless GO II RX", channelCount: 2, isDefault: false, transport: .usb),
+        AudioInputInfo(name: "MacBook Pro Microphone", channelCount: 1, isDefault: true, uid: "BuiltInMicrophoneDevice"),
+        AudioInputInfo(name: "RØDE Wireless GO II RX", channelCount: 2, isDefault: false, transport: .usb, uid: "RODE"),
     ]
 }
 

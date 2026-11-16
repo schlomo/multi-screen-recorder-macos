@@ -51,7 +51,7 @@ public struct GuideTrackMix: Sendable {
         return sample < 0 ? -limited : limited
     }
 
-    /// A source joins the mix under its unique name.
+    /// A source joins the mix under a name unique in the recording: an audio input's label.
     public mutating func add(source name: String, channelCount: Int) {
         precondition(sources[name] == nil, "\(name) is already in the guide track \(track.name)")
         precondition(channelCount > 0, "\(name) has no channels")

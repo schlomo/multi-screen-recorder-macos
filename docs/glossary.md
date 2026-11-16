@@ -20,12 +20,12 @@ This product: the app and its command line for macOS. The repository is
 `multi-screen-recorder-macos`; the bundle ID is
 `org.schapiro.multiscreenrecorder`.
 
-## Claim
+## Tagline
 
 The product's promise, always shown as two lines: "Every screen, all
 audio." and "Keeps going when things change." Shown in the app's
-header and as the homepage's tagline; where one line is needed, the two
-joined by a space (D55).
+header and on the homepage; where one line is needed, the two joined by
+a space (D55).
 
 ## Former upstream
 
@@ -230,7 +230,7 @@ like" for the screen, never the size it is drawn at (D44).
 ## Looks like
 
 macOS's word for a screen's size in points, as in System Settings ›
-Screens; a column of the table. What Native records (D44).
+Displays; a column of the table. What Native records (D44).
 
 ## Drawn at
 

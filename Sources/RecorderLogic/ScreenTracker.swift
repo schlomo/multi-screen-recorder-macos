@@ -110,7 +110,7 @@ public struct ScreenTracker: Sendable {
         }
         mainUUID = connected.first(where: \.isMain)?.uuid
         var step = Step()
-        for screen in Self.leftToRight(connected.filter { !$0.isMirroring }) {
+        for screen in Self.recordedInNumberingOrder(connected) {
             step.actions.append(start(screen.uuid, at: now))
         }
         return step
@@ -400,13 +400,19 @@ public struct ScreenTracker: Sendable {
         RecordingEvent(at: now, event: kind, screen: name(of: uuid))
     }
 
+    /// The screens a recording records at its start, in the order it
+    /// numbers them; the start window and `msr list` number by it too.
+    public static func recordedInNumberingOrder<Screen: PlacedScreen>(_ screens: [Screen]) -> [Screen] {
+        leftToRight(screens.filter { !$0.isMirroring })
+    }
+
     /// Main screen first, then left to right, then top to bottom.
-    static func leftToRight(_ connected: [ConnectedScreen]) -> [ConnectedScreen] {
-        connected.sorted { lhs, rhs in
+    static func leftToRight<Screen: PlacedScreen>(_ screens: [Screen]) -> [Screen] {
+        screens.sorted { lhs, rhs in
             if lhs.isMain != rhs.isMain { return lhs.isMain }
-            if lhs.bounds.x != rhs.bounds.x { return lhs.bounds.x < rhs.bounds.x }
-            if lhs.bounds.y != rhs.bounds.y { return lhs.bounds.y < rhs.bounds.y }
-            return lhs.uuid < rhs.uuid
+            if lhs.originX != rhs.originX { return lhs.originX < rhs.originX }
+            if lhs.originY != rhs.originY { return lhs.originY < rhs.originY }
+            return lhs.placementTieBreak < rhs.placementTieBreak
         }
     }
 }

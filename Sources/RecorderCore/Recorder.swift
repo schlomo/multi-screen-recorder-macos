@@ -600,8 +600,9 @@ public final class Recorder {
         for file in manifest.files {
             newestFrameSize[file.screenUUID] = FrameSize(width: file.frameSize[0], height: file.frameSize[1])
         }
-        var newestChannels: [String: RecordingManifest.AudioFile.Channels] = [:]
-        for file in manifest.audioFiles { newestChannels[file.audioSource] = file.channels }
+        // By the input's Core Audio UID, the system audio's being nil: two inputs may share a name.
+        var newestChannels: [String?: RecordingManifest.AudioFile.Channels] = [:]
+        for file in manifest.audioFiles { newestChannels[file.audioSourceUID] = file.channels }
         let audioBytesPerHour = newestChannels.values.reduce(0.0) { total, channels in
             switch channels {
             case .mono(let count): total + DiskEstimate.audioInputFileBytesPerHour(channelCount: count)

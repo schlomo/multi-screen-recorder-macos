@@ -104,7 +104,7 @@ public struct WhatWillBeRecorded: Equatable, Sendable {
         case .success(let audioInputs):
             var number = 0
             audio = audioInputs.map { input in
-                let isRecorded = settings.records(input)
+                let isRecorded = AudioTracker.records(input, settings: settings)
                 if isRecorded { number += 1 }
                 return Self.audio(input, number: isRecorded ? number : nil, settings: settings)
             }

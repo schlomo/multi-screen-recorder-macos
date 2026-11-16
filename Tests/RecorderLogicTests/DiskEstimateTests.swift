@@ -69,7 +69,7 @@ import Testing
     }
 
     @Test func aRecordedInputWhoseChannelsCannotBeReadLeavesTheTotalUnknown() {
-        let unreadable = AudioInputInfo(name: "X", channelCount: .failure(DeviceReadError("no format")), isDefault: true)
+        let unreadable = AudioInputInfo(name: "X", channelCount: .failure(DeviceReadError("no format")), isDefault: true, uid: "X")
         #expect(DiskEstimate.bytesPerHour(settings: settings(), screens: DesignExample.screens, audioInputs: [unreadable]) == nil)
         #expect(DiskEstimate.bytesPerHour(settings: silent, screens: DesignExample.screens, audioInputs: [unreadable]) != nil)
     }
@@ -119,5 +119,15 @@ import Testing
                         Encoding.audioInputsGuideTrackBitRate, Encoding.systemAudioGuideTrackBitRate] {
             #expect(design.contains("\(bitRate / 1000) kbit/s"), "\(bitRate)")
         }
+    }
+}
+
+@Suite struct DiskEstimateMirroringTests {
+    /// A screen that mirrors another is not recorded, so it needs no space.
+    @Test func aMirroringScreenNeedsNoSpace() {
+        var mirror = DesignExample.screens[1]
+        mirror.isMirroring = true
+        #expect(DiskEstimate.bytesPerHour(settings: .defaults, screens: [DesignExample.screens[0], mirror], audioInputs: [])
+            == DiskEstimate.bytesPerHour(settings: .defaults, screens: [DesignExample.screens[0]], audioInputs: []))
     }
 }

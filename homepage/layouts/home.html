@@ -1,5 +1,5 @@
 {{ define "main" }}
-<p class="tagline">{{ delimit site.Params.claim "<br />" | safeHTML }}</p>
+<p class="tagline">{{ delimit site.Params.tagline "<br />" | safeHTML }}</p>
 <p class="description">{{ site.Params.description }}</p>
 <p class="download"><a class="button" href="{{ site.Params.downloadURL }}">Download the latest release</a></p>
 

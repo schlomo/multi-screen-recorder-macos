@@ -124,6 +124,17 @@ import Testing
         ])
     }
 
+    /// D55: the window numbers only what the recording records; it opens
+    /// an input by its Core Audio UID, so one without is not recorded.
+    @Test func anInputWithoutAUIDIsNotRecordedAndGetsNoNumber() {
+        let noUID = AudioInputInfo(name: "Mystery", channelCount: 1, isDefault: false, transport: .usb)
+        let withNoUID = section({ $0.audioMode = .wired }, audioInputs: [noUID] + DesignExample.audioInputs)
+        #expect(withNoUID.audio.first == .init(source: .audioInput(nil, name: "Mystery"), channels: "1 channel",
+                                               isRecorded: false, gigabytesPerHour: "0"))
+        #expect(withNoUID.audio.map(\.source.number) == [nil, 1, 2, 0])
+        #expect(withNoUID.total == section { $0.audioMode = .wired }.total)
+    }
+
     @Test func audioModeNoneRecordsNoInputAndNoAudioInputsGuideTrack() {
         let none = section { $0.audioMode = .none }
         #expect(none.audio.dropLast().allSatisfy { !$0.isRecorded && $0.gigabytesPerHour == "0" })
@@ -146,8 +157,8 @@ import Testing
         #expect(auto.audio == defaultSection.audio)
     }
 
-    private static let airPods = AudioInputInfo(name: "AirPods", channelCount: 1, isDefault: false, transport: .bluetooth)
-    private static let virtualInput = AudioInputInfo(name: "Loopback", channelCount: 2, isDefault: false, transport: .virtual)
+    private static let airPods = AudioInputInfo(name: "AirPods", channelCount: 1, isDefault: false, transport: .bluetooth, uid: "AirPods")
+    private static let virtualInput = AudioInputInfo(name: "Loopback", channelCount: 2, isDefault: false, transport: .virtual, uid: "Loopback")
 
     @Test func wiredRecordsTheDefaultAndWiredInputsButNotBluetoothOrVirtualOnes() {
         let audio = section({ $0.audioMode = .wired },
@@ -163,7 +174,7 @@ import Testing
     }
 
     @Test func aBluetoothDefaultMicrophoneIsRecordedInEveryModeButNone() {
-        let headset = AudioInputInfo(name: "AirPods", channelCount: 1, isDefault: true, transport: .bluetooth)
+        let headset = AudioInputInfo(name: "AirPods", channelCount: 1, isDefault: true, transport: .bluetooth, uid: "AirPods")
         for mode in AudioMode.allCases {
             let audio = section({ $0.audioMode = mode }, audioInputs: [headset]).audio
             #expect(audio.first?.isRecorded == (mode != .none))
@@ -240,7 +251,7 @@ import Testing
     }
 
     private static func unreadable(isDefault: Bool) -> AudioInputInfo {
-        AudioInputInfo(name: "X", channelCount: .failure(DeviceReadError("no format")), isDefault: isDefault)
+        AudioInputInfo(name: "X", channelCount: .failure(DeviceReadError("no format")), isDefault: isDefault, uid: "X")
     }
 
     @Test func anUnreadableInputThatIsNotRecordedIsARowAndKeepsTheTotal() {

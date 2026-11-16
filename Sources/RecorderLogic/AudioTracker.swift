@@ -13,7 +13,7 @@ public struct AudioTracker: Sendable {
     }
 
     public enum Action: Equatable, Sendable {
-        /// Capture the audio input into audio files under its unique name.
+        /// Capture the audio input into audio files under its number and device name.
         case startInput(uid: String, number: Int, name: String)
         /// Capture the system audio through a stream on the main screen as
         /// read when it starts; the recorder reports the screen back.
@@ -101,6 +101,12 @@ public struct AudioTracker: Sendable {
     private var systemAudioDisplayID: UInt32?
     private var isAsleep = false
 
+    /// Whether a recording records `input`: the settings record it, and it
+    /// has a Core Audio UID to open it by. The start window numbers by it too.
+    public static func records(_ input: AudioInputInfo, settings: Settings) -> Bool {
+        settings.records(input) && input.uid != nil
+    }
+
     public init(
         settings: Settings,
         settleTime: Duration = RecorderValues.settleTime,
@@ -139,8 +145,8 @@ public struct AudioTracker: Sendable {
         let newDefault = inputs.first(where: \.isDefault).flatMap { input in input.uid.map { ($0, input.name) } }
         if !isBeginning, settings.effectiveAudioMode != .none, newDefault?.0 != defaultInput?.uid {
             var changed = RecordingEvent(at: now, event: .defaultMicrophoneChanged)
-            changed.from = defaultInput.map { .name(shownName($0.uid, fallback: $0.name)) }
-            changed.to = newDefault.map { .name(shownName($0.0, fallback: $0.1)) }
+            changed.from = defaultInput.map { .name(trackedName($0.uid, fallback: $0.name)) }
+            changed.to = newDefault.map { .name(trackedName($0.0, fallback: $0.1)) }
             step.events.append(changed)
         }
         defaultInput = newDefault.map { (uid: $0.0, name: $0.1) }
@@ -184,7 +190,7 @@ public struct AudioTracker: Sendable {
             sources[id]?.isWanted = isWanted
         }
         for input in inputs where settings.records(input) {
-            guard let uid = input.uid else {
+            guard Self.records(input, settings: settings), let uid = input.uid else {
                 step.notRecordable.append(input.name)
                 continue
             }
@@ -376,7 +382,7 @@ public struct AudioTracker: Sendable {
         sources[id]?.restartDelay = min(delay * 2, longestRestartDelay)
     }
 
-    private func shownName(_ uid: String, fallback: String) -> String {
+    private func trackedName(_ uid: String, fallback: String) -> String {
         sources[.input(uid)]?.name ?? fallback
     }
 

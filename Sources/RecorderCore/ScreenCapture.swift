@@ -220,9 +220,9 @@ public final class ScreenCapture: NSObject, @unchecked Sendable, SCStreamOutput,
               CFGetTypeID(rectDictionary) == CFDictionaryGetTypeID(),
               let screenRect = CGRect(dictionaryRepresentation: rectDictionary as! CFDictionary),
               // When the frame was shown, in mach absolute time: the host clock.
-              let screenTime = (attachments[.displayTime] as? NSNumber)?.uint64Value
+              let displayTime = (attachments[.displayTime] as? NSNumber)?.uint64Value
         else { return }
-        let capturedAt = context.clock.sinceStart(host: nanoseconds(machTicks: screenTime))
+        let capturedAt = context.clock.sinceStart(host: nanoseconds(machTicks: displayTime))
         let (bounds, lastChange) = context.bounds(of: uuid)
         guard let bounds else { return }
         switch check.judge(frameRect: ScreenRect(screenRect), screenBounds: bounds, capturedAt: capturedAt,
