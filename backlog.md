@@ -106,7 +106,24 @@ Still open from D34: what AGC does and whether it is on in auto mode;
    30 s, fixes that.
 5. **CPU**: our process averaged 56 % of one core over an hour (two
    displays, five audio sources) and peaks at 165 to 386 % at start.
-   A profile of 2026-11-16 is being analysed; measure before changing.
+   A 20 s `sample` of 2026-11-16 (build `7ad0b6b`; shares solid,
+   absolute values maybe 1.2 to 1.5 times high from `sample` itself):
+   11 AAC encoders 22 % (guide tracks about 5.8 % per display, more
+   than the video's own cost), movie writers 6 %, microphone capture
+   7 %, VideoToolbox 5 % (3 % of it rebuilding a colour space from the
+   frame's ICC profile, twice per frame), our own code 1.6 %. Without
+   design changes: interleave stereo in `pcmSample` without per-sample
+   arrays (about 3 %, `MovieTracks.swift:134`); small Swift fixes
+   (about 1 %); set the stream's colour space to drop the ICC work (up
+   to 3 %, colours checked by pixels, D24). Needing a decision: guide
+   tracks encoded once for all display files (about 4 %), at 24 kHz
+   (about 4 %) or with a mono system-audio guide (about 3 %); audio
+   appended in 100 ms pieces (1 to 3 %, 0.1 s more at risk in a
+   crash); uncompressed audio in the audio files (no encoder cost,
+   about 0.5 GB per hour per mono channel) [ASSUMED]. A better profile:
+   `sample <pid> 120 10`, runs with parts switched off, and the start-up
+   peak sampled from launch. Scripts and outputs were in the session
+   scratchpad.
 6. **Audio after v0** (D12, D18): AGC, in its own PR, with its own
    design, its column in the window's table and the HDMI test.
    What AGC does is open (D34). Recording all audio inputs is no
