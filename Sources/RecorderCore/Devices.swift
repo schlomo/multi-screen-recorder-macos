@@ -2,7 +2,7 @@ import AppKit
 import CoreGraphics
 import RecorderLogic
 
-/// The connected screens, each saying whether it mirrors another. Needs no permission.
+/// The connected screens, mirrored ones excluded. Needs no permission.
 @MainActor
 public func currentScreens() throws(DeviceReadError) -> [ScreenInfo] {
     let mainID = CGMainDisplayID()
@@ -21,7 +21,6 @@ public func currentScreens() throws(DeviceReadError) -> [ScreenInfo] {
             pointSize: FrameSize(width: mode.width, height: mode.height),
             isMain: id == mainID,
             originX: bounds.origin.x,
-            originY: bounds.origin.y,
-            isMirroring: CGDisplayMirrorsDisplay(id) != kCGNullDirectDisplay)
+            originY: bounds.origin.y)
     }
 }

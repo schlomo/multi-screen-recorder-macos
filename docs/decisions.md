@@ -1547,11 +1547,17 @@ architect's reading.
      once, `Tagline.lines`, joined by a space where one line is needed
      (`Tagline.text`), and a test ties `homepage/hugo.toml` to it.
   6. The buttons stay as they are.
-  7. The start window and `msr list` number only what the recording
-     records, by the recording's own rules: a screen that mirrors
-     another is left out, and an audio input without a Core Audio UID is
-     not recorded (`ScreenTracker.recordedInNumberingOrder`,
-     `AudioTracker.records`); the disk estimate counts neither.
+  7. One rule says whether an audio input is recorded,
+     `AudioTracker.records`: the audio mode includes it and it has a
+     Core Audio UID to open it by. The recording, the start window, the
+     disk estimate, the ready check and `msr list` all use it, so an
+     input without a UID is neither numbered, counted nor listed. The
+     window may still number the screens differently from the recording
+     when a screen mirrors another, as the recording skips a mirroring
+     screen and the window does not check for one. That was left out
+     deliberately: whether macOS lists a mirroring screen to the window
+     at all is unchecked, and leaving one out would make the disk check
+     optimistic for a screen that stops mirroring during a recording.
 - **Consequences:** No settings or state migration: neither holds a
   changed key, and no code reads a recording manifest back. A manifest
   written by an earlier build keeps `display` and `displayUUID`. The
@@ -1559,9 +1565,12 @@ architect's reading.
   the same name stay apart there too. The word "label" has this one
   meaning now: the settings' and an audio input's shown names, called
   `label` in the code before, are `shownName`. Two audio inputs with
-  the same name are told apart by their numbers in file names, but the
-  events and the manifest's `audioSource` name them by the device name
-  alone; the manifest's `audioSourceUID` tells them apart.
+  the same name are told apart by their numbers in the files' names and
+  by `audioSourceUID` in the manifest's file entries. The events name an
+  audio input by its device name only and carry no UID, so the events
+  cannot tell two inputs with the same name apart; the owner is told,
+  and adding the UID to the events is a later decision if it ever
+  matters.
 - **Evidence:** [recorder.md](design/recorder.md), "Output on disk",
   "Labels" and the start and status windows; the glossary's "Screen",
   "Label" and "Tagline"; the PR "Naming and window polish".

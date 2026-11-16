@@ -101,6 +101,18 @@ import Testing
         #expect(!result.isReady)
     }
 
+    /// D55: a recording opens an input by its Core Audio UID; one without
+    /// is not recorded, so it is not listed and needs no permission.
+    @Test func anInputWithoutAUIDIsNotListedAndNeedsNoMicrophonePermission() {
+        let noUID = AudioInputInfo(name: "Mystery", channelCount: 1, isDefault: true, transport: .usb)
+        let result = ReadyCheck.evaluate(facts(microphoneGranted: false, audioInputs: [noUID]), settings: .defaults)
+        #expect(!result.items.contains { $0.title == "Microphone permission" })
+        let audio = result.items.first { $0.title.hasPrefix("Audio:") }
+        #expect(audio?.title == "Audio: no microphone, system audio")
+        let withBuiltIn = ReadyCheck.evaluate(facts(audioInputs: Self.builtInMicrophoneOnly + [noUID]), settings: .defaults)
+        #expect(withBuiltIn.items.contains { $0.title == "Audio: MacBook Pro Microphone (default), system audio" })
+    }
+
     @Test func aMissingMicrophonePermissionNamesTheSettingsPath() throws {
         let result = ReadyCheck.evaluate(facts(microphoneGranted: false), settings: .manual)
         let item = try #require(result.items.first { $0.title == "Microphone permission" })

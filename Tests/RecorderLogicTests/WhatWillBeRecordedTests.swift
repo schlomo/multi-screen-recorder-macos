@@ -135,6 +135,26 @@ import Testing
         #expect(withNoUID.total == section { $0.audioMode = .wired }.total)
     }
 
+    /// D55: the window's numbers are the recording's, also when an input has no UID.
+    @Test func theWindowNumbersTheInputsAsTheRecordingDoes() {
+        var settings = Settings.manual
+        settings.audioMode = .allInputs
+        let inputs = [
+            AudioInputInfo(name: "A", channelCount: 1, isDefault: false, transport: .usb, uid: "A"),
+            AudioInputInfo(name: "No UID", channelCount: 1, isDefault: true, transport: .usb),
+            AudioInputInfo(name: "B", channelCount: 2, isDefault: false, transport: .bluetooth, uid: "B"),
+        ]
+        let window = WhatWillBeRecorded(settings: settings, screens: .success(DesignExample.screens),
+                                        audioInputs: .success(inputs), outputFolder: nil)
+        var tracker = AudioTracker(settings: settings)
+        let started = tracker.begin(inputs: inputs, mainDisplayID: 1, screens: [1], at: 0).actions.compactMap { action -> String? in
+            if case .startInput(_, let number, let name) = action { "\(number) \(name)" } else { nil }
+        }
+        let numbered = window.audio.compactMap { audio in audio.source.number.flatMap { $0 > 0 ? "\($0) \(audio.name)" : nil } }
+        #expect(started == ["1 A", "2 B"])
+        #expect(numbered == started)
+    }
+
     @Test func audioModeNoneRecordsNoInputAndNoAudioInputsGuideTrack() {
         let none = section { $0.audioMode = .none }
         #expect(none.audio.dropLast().allSatisfy { !$0.isRecorded && $0.gigabytesPerHour == "0" })

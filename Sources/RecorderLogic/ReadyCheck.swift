@@ -89,7 +89,7 @@ public enum ReadyCheck {
         _ audioInputs: Result<[AudioInputInfo], DeviceReadError>, settings: Settings
     ) -> Bool {
         guard case .success(let inputs) = audioInputs else { return false }
-        return inputs.contains(where: settings.records)
+        return inputs.contains { AudioTracker.records($0, settings: settings) }
     }
 
     /// One item per cause: a free disk space item appears only when the
@@ -155,7 +155,7 @@ public enum ReadyCheck {
         if case .failure(let error) = unreadableRecordedInputs(audioInputs, settings: settings).first?.channelCount {
             return cannotBeRead(error)
         }
-        var sources = audioInputs.filter(settings.records).map(\.shownName)
+        var sources = audioInputs.filter { AudioTracker.records($0, settings: settings) }.map(\.shownName)
         // A Mac without an audio input is ready in every audio mode: the screens and the system audio are recorded.
         let noMicrophone = settings.effectiveAudioMode != .none && sources.isEmpty
         if noMicrophone { sources.append("no microphone") }

@@ -101,10 +101,11 @@ public struct AudioTracker: Sendable {
     private var systemAudioDisplayID: UInt32?
     private var isAsleep = false
 
-    /// Whether a recording records `input`: the settings record it, and it
-    /// has a Core Audio UID to open it by. The start window numbers by it too.
+    /// Whether a recording records `input`, the one rule wherever an input
+    /// counts as recorded: the audio mode includes it, and it has a Core
+    /// Audio UID to open it by.
     public static func records(_ input: AudioInputInfo, settings: Settings) -> Bool {
-        settings.records(input) && input.uid != nil
+        settings.audioModeIncludes(input) && input.uid != nil
     }
 
     public init(
@@ -155,7 +156,7 @@ public struct AudioTracker: Sendable {
         for (id, tracked) in sources.sorted(by: { $0.key < $1.key }) {
             guard case .input(let uid) = id else { continue }
             let input = listed[uid]
-            let isWanted = input.map(settings.records) ?? false
+            let isWanted = input.map { Self.records($0, settings: settings) } ?? false
             let channelCount = input.flatMap { try? $0.channelCount.get() }
             if tracked.isPresent, input == nil {
                 sources[id]?.isPresent = false
@@ -189,9 +190,10 @@ public struct AudioTracker: Sendable {
             }
             sources[id]?.isWanted = isWanted
         }
-        for input in inputs where settings.records(input) {
+        for input in inputs {
             guard Self.records(input, settings: settings), let uid = input.uid else {
-                step.notRecordable.append(input.name)
+                // The audio mode includes it, but it has no UID to open it by.
+                if input.uid == nil, settings.audioModeIncludes(input) { step.notRecordable.append(input.name) }
                 continue
             }
             guard sources[.input(uid)] == nil else { continue }

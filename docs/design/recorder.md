@@ -436,8 +436,10 @@ is `problems`; a failure not told while some other problem was told
 appears only in `events`.
 `events` and `problems` are written in the order of their time.
 An audio file's `audioSource` is the audio input's device name or
-`System audio`; `audioSourceUID` the input's
-Core Audio UID, absent for the system audio; `channels` the number of
+`System audio`; `audioSourceUID` the input's Core Audio UID, absent
+for the system audio, which tells two inputs with the same name apart
+(D55); the events name an audio input by its device name only and
+carry no UID, so they cannot tell two such inputs apart; `channels` the number of
 its mono tracks, or `stereo` for the system audio; `clockDriftPpm` its
 measured clock drift (see "Audio"), null until known. `files` lists the
 screen files and the audio files in the order of their start.
@@ -510,13 +512,16 @@ checked, reported or rewritten at the next start (D47).
     audio), then its number and its name, as its label numbers it (D55):
     the screens and the recorded audio inputs from 1, those in the order
     listed, the system audio 0 and named "System". A source not recorded
-    gets no number. The window applies the recording's own rules
-    (`ScreenTracker.recordedInNumberingOrder`, `AudioTracker.records`),
-    so its numbers are the recording's: a screen that mirrors another is
-    not listed, and an audio input without a Core Audio UID is not
-    recorded, its row dimmed, and neither counts in the total. `msr check` prints the label as text instead
-    (`Screen 1 - Built-in Retina Display`), the default input marked
-    "(default)" after it (`Audio 1 - MacBook Pro Microphone (default)`).
+    gets no number. Whether an audio input is recorded follows the
+    recording's own rule (`AudioTracker.records`): the audio mode
+    includes it and it has a Core Audio UID, so an input without one is
+    dimmed, unnumbered and left out of the total. The window may number
+    the screens differently from the recording when a screen mirrors
+    another: the recording skips a mirroring screen, the window does not
+    check for one (left out deliberately, D55). `msr check` prints the
+    label as text instead (`Screen 1 - Built-in Retina Display`), the
+    default input marked "(default)" after it
+    (`Audio 1 - MacBook Pro Microphone (default)`).
   - Screen rows first: the number and name, "Looks like" (the size in
     points), "Drawn at" (the pixel size, shown also where both are
     equal), "Records at" (the frame size) and GB/h max (the screen file,

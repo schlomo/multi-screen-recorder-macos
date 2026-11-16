@@ -18,7 +18,7 @@ public enum DiskEstimate {
     /// Every file a recording with these settings and devices writes; nil
     /// when the channels of an audio input it records cannot be read.
     public static func bytesPerHour(settings: Settings, screens: [ScreenInfo], audioInputs: [AudioInputInfo]) -> Double? {
-        let screenFiles = ScreenTracker.recordedInNumberingOrder(screens).map {
+        let screenFiles = screens.map {
             screenFileBytesPerHour(
                 frameSize: settings.effectiveResolution.frameSize(forLooksLike: $0.pointSize), settings: settings)
         }

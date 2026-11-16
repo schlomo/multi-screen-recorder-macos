@@ -26,7 +26,7 @@ import Testing
     private func probes(
         _ calls: Calls, screenRecording: PermissionProbe = .granted,
         screens: Result<[ScreenInfo], DeviceReadError> = .success([]),
-        audioInputs: [AudioInputInfo] = [AudioInputInfo(name: "Microphone", channelCount: 1, isDefault: true)],
+        audioInputs: [AudioInputInfo] = [AudioInputInfo(name: "Microphone", channelCount: 1, isDefault: true, uid: "Microphone")],
         outputFolder: OutputFolderProbe = .usable(.bytes(5))
     ) -> ReadyCheckProbes {
         ReadyCheckProbes(
@@ -58,7 +58,7 @@ import Testing
         #expect(facts.screenRecording == .notGranted)
         #expect(facts.microphoneGranted == true)
         #expect(facts.screens == .failure(DeviceReadError("none")))
-        #expect(facts.audioInputs == .success([AudioInputInfo(name: "Microphone", channelCount: 1, isDefault: true)]))
+        #expect(facts.audioInputs == .success([AudioInputInfo(name: "Microphone", channelCount: 1, isDefault: true, uid: "Microphone")]))
         #expect(facts.outputFolder == .unusable("read-only"))
     }
 
@@ -103,7 +103,7 @@ import Testing
         settings.auto = false
         settings.audioMode = .defaultMicrophone
         let calls = Calls()
-        let notDefault = [AudioInputInfo(name: "USB", channelCount: 1, isDefault: false, transport: .usb)]
+        let notDefault = [AudioInputInfo(name: "USB", channelCount: 1, isDefault: false, transport: .usb, uid: "USB")]
         let facts = await probeReadyCheckFacts(proof: .listScreens, settings: settings, homeFolder: home, probes: probes(calls, audioInputs: notDefault))
         #expect(facts.microphoneGranted == nil)
         #expect(!calls.names.contains("microphonePermission"))

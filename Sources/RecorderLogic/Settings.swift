@@ -102,10 +102,11 @@ public struct Settings: Equatable, Sendable, Encodable {
     /// The audio mode a recording with these settings uses.
     public var effectiveAudioMode: AudioMode { auto ? Self.autoAudioMode : audioMode }
 
-    /// Whether a recording with these settings records the audio input. The
-    /// default microphone is recorded in every audio mode but none, whatever
-    /// its transport.
-    public func records(_ input: AudioInputInfo) -> Bool {
+    /// Whether the audio mode includes the audio input: the settings' part
+    /// of `AudioTracker.records`, the one rule for what a recording records.
+    /// The default microphone is included in every audio mode but none,
+    /// whatever its transport.
+    public func audioModeIncludes(_ input: AudioInputInfo) -> Bool {
         switch effectiveAudioMode {
         case .none: false
         case .defaultMicrophone: input.isDefault

@@ -126,7 +126,7 @@ import Testing
         var settings = Settings.defaults
         settings.auto = false
         settings.audioMode = mode
-        return settings.records(input)
+        return settings.audioModeIncludes(input)
     }
 
     @Test(arguments: [
@@ -161,9 +161,9 @@ import Testing
     }
 
     @Test func autoModeRecordsWhatWiredRecords() {
-        #expect(Settings.defaults.records(input(.usb)))
-        #expect(!Settings.defaults.records(input(.bluetooth)))
-        #expect(Settings.defaults.records(input(.bluetooth, isDefault: true)))
+        #expect(Settings.defaults.audioModeIncludes(input(.usb)))
+        #expect(!Settings.defaults.audioModeIncludes(input(.bluetooth)))
+        #expect(Settings.defaults.audioModeIncludes(input(.bluetooth, isDefault: true)))
     }
 }
 

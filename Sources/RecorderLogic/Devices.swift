@@ -8,20 +8,14 @@ public struct ScreenInfo: Equatable, Sendable {
     /// The top-left corner in the global screen space, for numbering left to right.
     public var originX: Double
     public var originY: Double
-    /// It mirrors another screen, so a recording does not record it.
-    public var isMirroring: Bool
 
-    public init(
-        name: String, pixelSize: FrameSize, pointSize: FrameSize, isMain: Bool, originX: Double, originY: Double,
-        isMirroring: Bool = false
-    ) {
+    public init(name: String, pixelSize: FrameSize, pointSize: FrameSize, isMain: Bool, originX: Double, originY: Double) {
         self.name = name
         self.pixelSize = pixelSize
         self.pointSize = pointSize
         self.isMain = isMain
         self.originX = originX
         self.originY = originY
-        self.isMirroring = isMirroring
     }
 
     /// "3440×1440", or "looks like 3440×1440, drawn at 6880×2880" when the
@@ -47,7 +41,12 @@ public struct NumberedScreen: Equatable, Sendable {
 
 /// Screen 1 is the main screen; the others are numbered left to right.
 public func numberScreens(_ screens: [ScreenInfo]) -> [NumberedScreen] {
-    ScreenTracker.recordedInNumberingOrder(screens)
+    screens
+        .sorted { lhs, rhs in
+            if lhs.isMain != rhs.isMain { return lhs.isMain }
+            if lhs.originX != rhs.originX { return lhs.originX < rhs.originX }
+            return lhs.originY < rhs.originY
+        }
         .enumerated()
         .map { NumberedScreen(number: $0.offset + 1, screen: $0.element) }
 }
@@ -92,7 +91,7 @@ public struct AudioInputInfo: Equatable, Sendable {
 /// The audio inputs a recording with these settings records whose channels cannot be read.
 public func unreadableRecordedInputs(_ audioInputs: [AudioInputInfo], settings: Settings) -> [AudioInputInfo] {
     audioInputs.filter { input in
-        guard settings.records(input), case .failure = input.channelCount else { return false }
+        guard AudioTracker.records(input, settings: settings), case .failure = input.channelCount else { return false }
         return true
     }
 }
@@ -151,8 +150,4 @@ public func renderList(
 
 func padded(_ text: String, _ width: Int) -> String {
     text + String(repeating: " ", count: max(0, width - text.count))
-}
-
-extension ScreenInfo: PlacedScreen {
-    public var placementTieBreak: String { name }
 }

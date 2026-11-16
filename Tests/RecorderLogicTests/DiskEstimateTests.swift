@@ -74,6 +74,16 @@ import Testing
         #expect(DiskEstimate.bytesPerHour(settings: silent, screens: DesignExample.screens, audioInputs: [unreadable]) != nil)
     }
 
+    /// D55: a recording opens an input by its Core Audio UID; one without is not recorded and needs no space.
+    @Test func anInputWithoutAUIDAddsNothing() {
+        let noUID = AudioInputInfo(name: "Mystery", channelCount: 2, isDefault: true, transport: .usb)
+        let unreadableNoUID = AudioInputInfo(name: "X", channelCount: .failure(DeviceReadError("no format")), isDefault: true)
+        let alone = DiskEstimate.bytesPerHour(settings: settings(), screens: DesignExample.screens, audioInputs: [])
+        #expect(DiskEstimate.bytesPerHour(settings: settings(), screens: DesignExample.screens, audioInputs: [noUID]) == alone)
+        #expect(DiskEstimate.bytesPerHour(settings: settings(), screens: DesignExample.screens, audioInputs: [unreadableNoUID])
+            == alone)
+    }
+
     @Test func noScreensNeedNoSpaceForVideo() {
         #expect(DiskEstimate.bytesPerHour(settings: silent, screens: [], audioInputs: []) == 0)
     }
@@ -119,15 +129,5 @@ import Testing
                         Encoding.audioInputsGuideTrackBitRate, Encoding.systemAudioGuideTrackBitRate] {
             #expect(design.contains("\(bitRate / 1000) kbit/s"), "\(bitRate)")
         }
-    }
-}
-
-@Suite struct DiskEstimateMirroringTests {
-    /// A screen that mirrors another is not recorded, so it needs no space.
-    @Test func aMirroringScreenNeedsNoSpace() {
-        var mirror = DesignExample.screens[1]
-        mirror.isMirroring = true
-        #expect(DiskEstimate.bytesPerHour(settings: .defaults, screens: [DesignExample.screens[0], mirror], audioInputs: [])
-            == DiskEstimate.bytesPerHour(settings: .defaults, screens: [DesignExample.screens[0]], audioInputs: []))
     }
 }

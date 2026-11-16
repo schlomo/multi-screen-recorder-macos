@@ -26,27 +26,6 @@ import Testing
         #expect(numbered.map(\.screen.name) == ["Main", "Upper", "Lower"])
     }
 
-    /// D55: the window and `msr list` number only what the recording
-    /// records: a screen that mirrors another is not recorded.
-    @Test func aMirroringScreenGetsNoNumberAndTheOthersAreNumberedAsTheRecordingDoes() {
-        var mirror = screen("Mirror", x: -1920)
-        mirror.isMirroring = true
-        let infos = [screen("Right", x: 3000), mirror, screen("Main", main: true, x: 0), screen("Middle", x: 1728)]
-        let numbered = numberScreens(infos)
-        #expect(numbered.map(\.screen.name) == ["Main", "Middle", "Right"])
-        #expect(numbered.map(\.number) == [1, 2, 3])
-        let connected = infos.enumerated().map { index, info in
-            ConnectedScreen(uuid: info.name, displayID: UInt32(index + 1), name: info.name, pointSize: info.pointSize,
-                            bounds: ScreenRect(x: info.originX, y: info.originY, width: 1920, height: 1080), isMain: info.isMain,
-                            mirrorsUUID: info.isMirroring ? "Main" : nil)
-        }
-        var tracker = ScreenTracker(resolution: .native)
-        let started = tracker.begin(connected, at: 0).actions.compactMap { action -> String? in
-            if case .start(_, _, _, let number, let name) = action { "\(number) \(name)" } else { nil }
-        }
-        #expect(started == numbered.map { "\($0.number) \($0.screen.name)" })
-    }
-
     @Test func noScreensNoNumbers() {
         #expect(numberScreens([]).isEmpty)
     }
@@ -78,8 +57,8 @@ import Testing
     }
 
     @Test func onlyARecordedInputThatCannotBeReadCounts() {
-        let unreadable = AudioInputInfo(name: "X", channelCount: .failure(DeviceReadError("no format")), isDefault: false)
-        let unreadableDefault = AudioInputInfo(name: "Y", channelCount: .failure(DeviceReadError("no format")), isDefault: true)
+        let unreadable = AudioInputInfo(name: "X", channelCount: .failure(DeviceReadError("no format")), isDefault: false, uid: "X")
+        let unreadableDefault = AudioInputInfo(name: "Y", channelCount: .failure(DeviceReadError("no format")), isDefault: true, uid: "Y")
         #expect(unreadableRecordedInputs([unreadable], settings: .manual).isEmpty)
         #expect(unreadableRecordedInputs([unreadable, unreadableDefault], settings: .manual) == [unreadableDefault])
         var none = Settings.manual

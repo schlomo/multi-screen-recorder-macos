@@ -35,8 +35,8 @@ public struct WhatWillBeRecorded: Equatable, Sendable {
 
     /// An audio input, or the system audio as the last row.
     public struct Audio: Equatable, Sendable {
-        /// Recorded inputs are numbered from 1 in the order listed, as the
-        /// recording numbers them at its start.
+        /// Recorded inputs (`AudioTracker.records`) are numbered from 1 in
+        /// the order listed, as the recording numbers them at its start.
         public var source: SourceCell
         public var name: String { source.name }
         /// "1 channel", "2 channels", "stereo" or "cannot be read": the Records at cell.
