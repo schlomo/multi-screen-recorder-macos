@@ -77,10 +77,62 @@ import Testing
         #expect(manifest.problems.count == 1)
     }
 
-    @Test func theFailuresAreTheFiveWaysADisplayFileEndsBadly() {
+    @Test func theFailuresAreTheWaysAFileEndsBadly() {
         #expect(RecordingEvent.Kind.allCases.filter(\.isFailure) == [
             .displayStreamFailed, .displayShowsAnotherDisplaysPicture, .displayFileWriterFellBehind, .displayFileWriterFailed, .diskFull,
+            .audioInputFailed, .systemAudioFailed, .audioFileWriterFailed,
         ])
+    }
+
+    @Test func anAudioFileNotFinalizedMakesTheResultProblems() {
+        var manifest = manifest()
+        var file = RecordingManifest.AudioFile(
+            name: "a.mov", audioSource: "Mic", audioSourceUID: "uid", channels: .mono(1), start: 0, timecode: "14:03:05:04")
+        file.state = .notFinalized
+        manifest.audioFiles = [file]
+        manifest.finalize(ended: start + 60, timeZone: berlin)
+        #expect(manifest.result == .problems)
+    }
+
+    @Test func filesAreWrittenInTheOrderOfTheirStartAndReadBackByKind() throws {
+        var manifest = manifest()
+        manifest.files = [RecordingManifest.DisplayFile(
+            name: "d.mov", display: "LG", displayUUID: "U", frameSize: FrameSize(width: 2, height: 2), start: 3, timecode: "t")]
+        manifest.audioFiles = [
+            RecordingManifest.AudioFile(name: "s.mov", audioSource: "System audio", audioSourceUID: nil, channels: .stereo, start: 1, timecode: "t"),
+            RecordingManifest.AudioFile(name: "m.mov", audioSource: "Mic", audioSourceUID: "uid", channels: .mono(2), start: 5, timecode: "t"),
+        ]
+        let data = try manifest.jsonData()
+        let object = try #require(try JSONSerialization.jsonObject(with: data) as? [String: Any])
+        let files = try #require(object["files"] as? [[String: Any]])
+        #expect(files.map { $0["name"] as? String } == ["s.mov", "d.mov", "m.mov"])
+        #expect(files[0]["channels"] as? String == "stereo")
+        #expect(files[0]["audioSourceUID"] == nil)
+        #expect(files[2]["channels"] as? Int == 2)
+        #expect(files[2]["clockDriftPpm"] is NSNull)
+        #expect(try RecordingManifest(json: data) == manifest)
+    }
+
+    @Test func theCPUUseIsWrittenAtTheEnd() throws {
+        var manifest = manifest()
+        let running = try #require(try JSONSerialization.jsonObject(with: manifest.jsonData()) as? [String: Any])
+        #expect(running["cpu"] is NSNull)
+        manifest.finalize(ended: start + 60, timeZone: berlin, cpu: .init(averagePercent: 12.5, peakPercent: 40))
+        let ended = try #require(try JSONSerialization.jsonObject(with: manifest.jsonData()) as? [String: Any])
+        #expect(ended["cpu"] as? [String: Double] == ["averagePercent": 12.5, "peakPercent": 40])
+    }
+
+    @Test func aGapAndADefaultMicrophoneChangeCarryTheirFields() throws {
+        var gap = RecordingEvent(at: 0, event: .audioInputGap, display: "Mic")
+        gap.length = 0.25
+        var changed = RecordingEvent(at: 0, event: .defaultMicrophoneChanged)
+        changed.from = "Mic"
+        changed.to = "Razer"
+        for event in [gap, changed] {
+            #expect(try JSONDecoder().decode(RecordingEvent.self, from: prettyJSON(event)) == event)
+        }
+        let text = String(decoding: try prettyJSON(changed), as: UTF8.self)
+        #expect(text.contains(#""from" : "Mic""#))
     }
 
     @Test func aProblemHasItsTimeAndFullError() throws {
@@ -178,6 +230,16 @@ import Testing
     @Test func charactersAFileNameCannotHoldBecomeDashes() {
         let name = RecordingNames.displayFile(start: Date(timeIntervalSince1970: 0), timeZone: utc, number: 3, display: "Dell U2720Q/2: left")
         #expect(name == "1970-01-01 00.00.00 Display 3 - Dell U2720Q-2- left.mov")
+    }
+
+    @Test func anAudioFileIsNamedByItsSource() {
+        let start = Date(timeIntervalSince1970: 0)
+        let microphone = RecordingNames.audioFile(
+            start: start, timeZone: utc, source: .audioInput(name: "Mic 1/2", coreAudioUID: "u", channelCount: 1))
+        #expect(microphone == "1970-01-01 00.00.00 Microphone - Mic 1-2.mov")
+        #expect(RecordingNames.audioFile(start: start, timeZone: utc, source: .systemAudio) == "1970-01-01 00.00.00 System audio.mov")
+        #expect(RecordingNames.audioFile(start: start, timeZone: utc, source: .systemAudio, taken: ["1970-01-01 00.00.00 System audio.mov"])
+            == "1970-01-01 00.00.00 System audio (2).mov")
     }
 
     @Test func aTakenNameGetsANumber() {

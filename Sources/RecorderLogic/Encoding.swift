@@ -36,7 +36,7 @@ public enum Encoding {
 
 /// A guide track: a track in every display file for playback and waveform
 /// sync only; the audio files hold the sources themselves.
-public enum GuideTrack: Equatable, Sendable {
+public enum GuideTrack: Hashable, Sendable {
     case microphones
     case systemAudio
 
@@ -44,6 +44,14 @@ public enum GuideTrack: Equatable, Sendable {
         switch self {
         case .microphones: "Microphones"
         case .systemAudio: "System audio"
+        }
+    }
+
+    /// "Microphones" is one mono mix, "System audio" stereo.
+    public var channelCount: Int {
+        switch self {
+        case .microphones: 1
+        case .systemAudio: 2
         }
     }
 

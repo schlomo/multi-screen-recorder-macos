@@ -11,11 +11,12 @@ public enum EventLine {
         var line = String(format: "%02d:%02d:%02d +%.1fs %@", time.hour ?? 0, time.minute ?? 0, time.second ?? 0,
                           event.at, event.event.rawValue)
         if let display = event.display { line += ": \(display)" }
-        if let from = event.from, let to = event.to { line += " \(size(from)) → \(size(to))" }
+        if event.from != nil || event.to != nil {
+            line += " \(event.from?.text ?? "none") → \(event.to?.text ?? "none")"
+        }
+        if let length = event.length { line += String(format: " %.3fs", length) }
         if let mirrors = event.mirrors { line += " mirrors \(mirrors)" }
         if let error = event.error { line += " (\(error))" }
         return line
     }
-
-    private static func size(_ size: [Int]) -> String { size.map(String.init).joined(separator: "x") }
 }

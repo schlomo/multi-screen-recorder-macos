@@ -25,8 +25,9 @@ public struct AudioInputNames: Sendable {
     }
 }
 
-/// What an audio file holds and says about itself (D45, D46): its audio
-/// tracks, the reel name in its timecode track and its metadata items.
+/// What an audio file holds and says about itself (D46, D49): its audio
+/// tracks, the reel name in its timecode track and its metadata items, as a
+/// display file's (`DisplayFileMetadata`).
 public struct AudioFileDescription: Equatable, Sendable {
     public enum Source: Equatable, Sendable {
         /// An audio input under its unique name (`AudioInputNames`).
@@ -34,23 +35,18 @@ public struct AudioFileDescription: Equatable, Sendable {
         case systemAudio
     }
 
-    public struct MetadataItem: Equatable, Sendable {
-        public let key: String
-        public let value: String
-    }
-
-    public static let metadataKeyPrefix = "org.schapiro.multiscreenrecorder."
     public static let systemAudioName = "System audio"
 
     public let source: Source
-    /// The recording's start as the recording manifest gives it.
-    public let recordingStart: String
-    public let appVersion: String
+    /// The recording's start, as the recording manifest's `started`.
+    public let recordingStarted: String
+    /// The app and its version, as the recording manifest's `app`.
+    public let app: String
 
-    public init(source: Source, recordingStart: Date, timeZone: TimeZone, appVersion: String) {
+    public init(source: Source, recordingStarted: String, app: String) {
         self.source = source
-        self.recordingStart = RecordingManifest.timestamp(recordingStart, timeZone: timeZone)
-        self.appVersion = appVersion
+        self.recordingStarted = recordingStarted
+        self.app = app
     }
 
     public var sourceName: String {
@@ -65,6 +61,18 @@ public struct AudioFileDescription: Equatable, Sendable {
         case .audioInput(_, _, let channelCount): channelCount
         case .systemAudio: 2
         }
+    }
+
+    /// As the recording manifest's `channels`.
+    public var channels: RecordingManifest.AudioFile.Channels {
+        switch source {
+        case .audioInput(_, _, let channelCount): .mono(channelCount)
+        case .systemAudio: .stereo
+        }
+    }
+
+    public var coreAudioUID: String? {
+        if case .audioInput(_, let uid, _) = source { uid } else { nil }
     }
 
     /// One mono track per channel of an audio input; one stereo track for the system audio.
@@ -98,17 +106,20 @@ public struct AudioFileDescription: Equatable, Sendable {
         }
     }
 
-    /// QuickTime metadata items, each key under `metadataKeyPrefix`.
-    public var metadata: [MetadataItem] {
-        var items = [MetadataItem(key: "sourceName", value: sourceName)]
-        if case .audioInput(_, let coreAudioUID, _) = source {
-            items.append(MetadataItem(key: "coreAudioUID", value: coreAudioUID))
+    /// Each metadata item's full key and value: under
+    /// `DisplayFileMetadata.keyPrefix` as the manifest names them, the app
+    /// and the reel name also under the standard keys a display file uses.
+    public var items: [(key: String, value: String)] {
+        var own = [("audioSource", sourceName)]
+        if let coreAudioUID { own.append(("audioSourceUID", coreAudioUID)) }
+        let channelsText = switch channels {
+        case .mono(let count): String(count)
+        case .stereo: "stereo"
         }
-        items += [
-            MetadataItem(key: "channelCount", value: String(channelCount)),
-            MetadataItem(key: "recordingStart", value: recordingStart),
-            MetadataItem(key: "appVersion", value: appVersion),
+        own += [("channels", channelsText), ("recordingStarted", recordingStarted), ("app", app)]
+        return own.map { (DisplayFileMetadata.keyPrefix + $0.0, $0.1) } + [
+            (DisplayFileMetadata.softwareKey, app), (DisplayFileMetadata.reelKey, reelName),
+            (DisplayFileMetadata.cameraNameKey, reelName),
         ]
-        return items.map { MetadataItem(key: Self.metadataKeyPrefix + $0.key, value: $0.value) }
     }
 }

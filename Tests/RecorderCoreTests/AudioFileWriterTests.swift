@@ -12,7 +12,9 @@ import Testing
     private let berlin = TimeZone(identifier: "Europe/Berlin")!
     private let start = Date(timeIntervalSince1970: 1_794_488_585.12) // 2026-11-12 14:03:05.120 in Berlin
     private let rate = RecorderValues.audioSampleRate
-    private let prefix = AudioFileDescription.metadataKeyPrefix
+    private let prefix = DisplayFileMetadata.keyPrefix
+    private let started = "2026-11-12T14:03:05.120+01:00"
+    private let app = "Multi Screen Recorder 0.20261115.3 (a1b2c3d)"
 
     init() throws {
         scratch = FileManager.default.temporaryDirectory
@@ -27,7 +29,7 @@ import Testing
     private func microphone(channels: Int) -> AudioFileDescription {
         AudioFileDescription(
             source: .audioInput(name: "Razer Seiren V3 Mini", coreAudioUID: "AppleUSBAudioEngine:Razer:1", channelCount: channels),
-            recordingStart: start, timeZone: berlin, appVersion: "0.20261115.3")
+            recordingStarted: started, app: app)
     }
 
     /// A sine tone per channel, 440 Hz times the channel's number, under
@@ -83,18 +85,21 @@ import Testing
         try await expectTimecode(asset, frame: timecode.frame(ofTick: 45), reelName: "Microphone - Razer Seiren V3 Mini")
         let metadata = try await metadataValues(asset)
         #expect(metadata == [
-            prefix + "sourceName": "Razer Seiren V3 Mini",
-            prefix + "coreAudioUID": "AppleUSBAudioEngine:Razer:1",
-            prefix + "channelCount": "2",
-            prefix + "recordingStart": "2026-11-12T14:03:05.120+01:00",
-            prefix + "appVersion": "0.20261115.3",
+            prefix + "audioSource": "Razer Seiren V3 Mini",
+            prefix + "audioSourceUID": "AppleUSBAudioEngine:Razer:1",
+            prefix + "channels": "2",
+            prefix + "recordingStarted": started,
+            prefix + "app": app,
+            "com.apple.quicktime.software": app,
+            "com.apple.proapps.reel": "Microphone - Razer Seiren V3 Mini",
+            "com.apple.proapps.cameraName": "Microphone - Razer Seiren V3 Mini",
         ])
     }
 
     @Test func theSystemAudiosFileHasOneStereoTrack() async throws {
         defer { removeScratch() }
         let url = scratch.appending(path: "system audio.mov")
-        let description = AudioFileDescription(source: .systemAudio, recordingStart: start, timeZone: berlin, appVersion: "0.20261115.3")
+        let description = AudioFileDescription(source: .systemAudio, recordingStarted: started, app: app)
         let writer = try AudioFileWriter(url: url, description: description, firstTick: 0, timecode: Timecode(start: start, timeZone: berlin))
         try await writeTone(writer, channels: 2, from: 0, samples: 2 * rate)
         try await writer.finish(endPosition: Int64(2 * rate))
@@ -108,7 +113,7 @@ import Testing
         let dataRate = try await track.load(.estimatedDataRate)
         #expect(abs(dataRate - 192_000) < 192_000 * 0.2, "\(dataRate)")
         try await expectTimecode(asset, frame: Timecode(start: start, timeZone: berlin).frame(ofTick: 0), reelName: "System audio")
-        #expect(try await metadataValues(asset)[prefix + "coreAudioUID"] == nil)
+        #expect(try await metadataValues(asset)[prefix + "audioSourceUID"] == nil)
     }
 
     /// A filled gap is silence of exactly its length at its place.
@@ -152,7 +157,7 @@ import Testing
             #expect(seconds >= 9 - Double(RecorderValues.fragmentSeconds) - 0.1, "\(seconds) s of 9")
         }
         try await expectTimecode(asset, frame: timecode.frame(ofTick: 30), reelName: "Microphone - Razer Seiren V3 Mini")
-        #expect(try await metadataValues(asset)[prefix + "sourceName"] == "Razer Seiren V3 Mini")
+        #expect(try await metadataValues(asset)[prefix + "audioSource"] == "Razer Seiren V3 Mini")
         withExtendedLifetime(writer) {}
     }
 
@@ -162,7 +167,7 @@ import Testing
     }
 
     private func trackName(of track: AVAssetTrack) async throws -> String? {
-        let names = try await track.load(.metadata).filter { $0.identifier == .quickTimeUserDataTrackName }
+        let names = try await track.load(.metadata).filter { $0.identifier == .quickTimeUserDataFullName }
         return try await names.first?.load(.stringValue)
     }
 

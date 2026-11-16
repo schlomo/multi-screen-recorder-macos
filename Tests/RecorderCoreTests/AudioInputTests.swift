@@ -15,7 +15,8 @@ import Testing
     ) throws -> [AudioInputInfo] {
         try audioInputs(
             devices: channels.indices.map { AudioObjectID($0 + 1) },
-            inputChannels: { channels[Int($0) - 1] }, name: name, transport: transport, defaultInput: defaultInput)
+            inputChannels: { channels[Int($0) - 1] }, name: name, transport: transport, uid: { _ in nil },
+            defaultInput: defaultInput)
     }
 
     @Test func onlyDevicesWithInputChannelsAreAudioInputsAndTheDefaultIsMarked() throws {
@@ -23,6 +24,13 @@ import Testing
             AudioInputInfo(name: "Device 2", channelCount: 1, isDefault: false),
             AudioInputInfo(name: "Device 3", channelCount: 2, isDefault: true),
         ])
+    }
+
+    @Test func eachInputCarriesItsCoreAudioUID() throws {
+        let listed = try audioInputs(
+            devices: [1, 2], inputChannels: { _ in .count(1) }, name: { "Device \($0)" }, transport: { _ in .usb },
+            uid: { $0 == 1 ? "AppleUSBAudioEngine:1" : nil }, defaultInput: { 1 })
+        #expect(listed.map(\.uid) == ["AppleUSBAudioEngine:1", nil])
     }
 
     @Test func eachInputKeepsItsTransport() throws {

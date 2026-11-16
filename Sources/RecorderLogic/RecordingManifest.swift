@@ -23,8 +23,7 @@ public struct RecordingManifest: Codable, Equatable, Sendable {
         }
     }
 
-    /// A display file. Until the audio half of the recording core (B2,
-    /// D45), a display file has no guide tracks.
+    /// A display file, with its guide tracks.
     public struct DisplayFile: Codable, Equatable, Sendable {
         public var name: String
         public var display: String
@@ -75,11 +74,101 @@ public struct RecordingManifest: Codable, Equatable, Sendable {
         }
     }
 
+    /// An audio file: an audio input's mono tracks or the system audio's
+    /// stereo track (D49).
+    public struct AudioFile: Codable, Equatable, Sendable {
+        /// An audio input's number of mono tracks, or `stereo` for the system audio.
+        public enum Channels: Equatable, Sendable, Codable {
+            case mono(Int)
+            case stereo
+
+            public init(from decoder: any Decoder) throws {
+                let container = try decoder.singleValueContainer()
+                if let count = try? container.decode(Int.self) {
+                    self = .mono(count)
+                } else if try container.decode(String.self) == "stereo" {
+                    self = .stereo
+                } else {
+                    throw DecodingError.dataCorruptedError(in: container, debugDescription: "channels is a count or \"stereo\"")
+                }
+            }
+
+            public func encode(to encoder: any Encoder) throws {
+                var container = encoder.singleValueContainer()
+                switch self {
+                case .mono(let count): try container.encode(count)
+                case .stereo: try container.encode("stereo")
+                }
+            }
+        }
+
+        public var name: String
+        public var audioSource: String
+        /// The audio input's Core Audio UID; nil for the system audio.
+        public var audioSourceUID: String?
+        public var channels: Channels
+        /// Seconds from the recording's start on the shared clock.
+        public var start: Double
+        /// Nil while the file is being written.
+        public var end: Double?
+        public var timecode: String
+        public var state: State
+        /// The audio source's clock against the shared clock, in parts per
+        /// million, positive when it runs fast; nil until it can be measured.
+        public var clockDriftPpm: Double?
+
+        public init(
+            name: String, audioSource: String, audioSourceUID: String?, channels: Channels, start: Double, timecode: String
+        ) {
+            self.name = name
+            self.audioSource = audioSource
+            self.audioSourceUID = audioSourceUID
+            self.channels = channels
+            self.start = start
+            end = nil
+            self.timecode = timecode
+            state = .recording
+            clockDriftPpm = nil
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case name, audioSource, audioSourceUID, channels, start, end, timecode, state, clockDriftPpm
+        }
+
+        /// `end` and `clockDriftPpm` are written as null until known;
+        /// `audioSourceUID` only for an audio input.
+        public func encode(to encoder: any Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encode(name, forKey: .name)
+            try container.encode(audioSource, forKey: .audioSource)
+            try container.encodeIfPresent(audioSourceUID, forKey: .audioSourceUID)
+            try container.encode(channels, forKey: .channels)
+            try container.encode(start, forKey: .start)
+            try container.encode(end, forKey: .end)
+            try container.encode(timecode, forKey: .timecode)
+            try container.encode(state, forKey: .state)
+            try container.encode(clockDriftPpm, forKey: .clockDriftPpm)
+        }
+    }
+
+    /// Our process's CPU use over the recording, sampled every second, in
+    /// percent of one core as Activity Monitor shows it; encoding and
+    /// capture in macOS's own processes are not in it.
+    public struct CPU: Codable, Equatable, Sendable {
+        public var averagePercent: Double
+        public var peakPercent: Double
+
+        public init(averagePercent: Double, peakPercent: Double) {
+            self.averagePercent = averagePercent
+            self.peakPercent = peakPercent
+        }
+    }
+
     /// How a finalized recording went (D47).
     public enum Result: String, Codable, Sendable {
-        /// Every file is finalized and no display file was ended by a failure.
+        /// Every file is finalized and no file was ended by a failure.
         case ok
-        /// A file is not finalized or a display file was ended by a failure.
+        /// A file is not finalized or was ended by a failure.
         case problems
     }
 
@@ -91,8 +180,13 @@ public struct RecordingManifest: Codable, Equatable, Sendable {
     public var ended: String?
     /// Nil until the recording is finalized.
     public var result: Result?
+    /// Nil until the recording is finalized.
+    public var cpu: CPU?
     public var settings: RecordedSettings
+    /// The display files; `files` in the JSON lists them with the audio
+    /// files, in the order of their start.
     public var files: [DisplayFile]
+    public var audioFiles: [AudioFile]
     public var events: [RecordingEvent]
     /// Every problem told to the person.
     public var problems: [RecordingProblem]
@@ -103,16 +197,61 @@ public struct RecordingManifest: Codable, Equatable, Sendable {
         self.started = Self.timestamp(started, timeZone: timeZone)
         self.settings = RecordedSettings(settings)
         files = []
+        audioFiles = []
         events = []
         problems = []
     }
 
     private enum CodingKeys: String, CodingKey {
-        case app, state, started, ended, result, settings, files, events, problems
+        case app, state, started, ended, result, cpu, settings, files, events, problems
     }
 
-    /// `ended` and `result` are written as null until the recording is
-    /// finalized; `events` and `problems` in the order of their time.
+    /// One entry of `files`: an audio file has `audioSource`, a display file not.
+    private enum FileEntry: Codable {
+        case display(DisplayFile)
+        case audio(AudioFile)
+
+        private enum Keys: String, CodingKey { case audioSource }
+
+        init(from decoder: any Decoder) throws {
+            let keys = try decoder.container(keyedBy: Keys.self)
+            self = keys.contains(.audioSource) ? .audio(try AudioFile(from: decoder)) : .display(try DisplayFile(from: decoder))
+        }
+
+        func encode(to encoder: any Encoder) throws {
+            switch self {
+            case .display(let file): try file.encode(to: encoder)
+            case .audio(let file): try file.encode(to: encoder)
+            }
+        }
+
+        var start: Double {
+            switch self {
+            case .display(let file): file.start
+            case .audio(let file): file.start
+            }
+        }
+    }
+
+    public init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        app = try container.decode(String.self, forKey: .app)
+        state = try container.decode(State.self, forKey: .state)
+        started = try container.decode(String.self, forKey: .started)
+        ended = try container.decodeIfPresent(String.self, forKey: .ended)
+        result = try container.decodeIfPresent(Result.self, forKey: .result)
+        cpu = try container.decodeIfPresent(CPU.self, forKey: .cpu)
+        settings = try container.decode(RecordedSettings.self, forKey: .settings)
+        let entries = try container.decode([FileEntry].self, forKey: .files)
+        files = entries.compactMap { if case .display(let file) = $0 { file } else { nil } }
+        audioFiles = entries.compactMap { if case .audio(let file) = $0 { file } else { nil } }
+        events = try container.decode([RecordingEvent].self, forKey: .events)
+        problems = try container.decode([RecordingProblem].self, forKey: .problems)
+    }
+
+    /// `ended`, `result` and `cpu` are written as null until the recording
+    /// is finalized; `files` in the order of their start, `events` and
+    /// `problems` in the order of their time.
     public func encode(to encoder: any Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(app, forKey: .app)
@@ -120,8 +259,10 @@ public struct RecordingManifest: Codable, Equatable, Sendable {
         try container.encode(started, forKey: .started)
         try container.encode(ended, forKey: .ended)
         try container.encode(result, forKey: .result)
+        try container.encode(cpu, forKey: .cpu)
         try container.encode(settings, forKey: .settings)
-        try container.encode(files, forKey: .files)
+        let entries = files.map(FileEntry.display) + audioFiles.map(FileEntry.audio)
+        try container.encode(Self.inTimeOrder(entries, at: \.start), forKey: .files)
         try container.encode(Self.inTimeOrder(events, at: \.at), forKey: .events)
         try container.encode(Self.inTimeOrder(problems, at: \.at), forKey: .problems)
     }
@@ -133,17 +274,19 @@ public struct RecordingManifest: Codable, Equatable, Sendable {
             .map(\.element)
     }
 
-    /// Whether nothing was lost: every file is finalized and no display
-    /// file was ended by a failure. A problem told alone changes nothing (D47).
+    /// Whether nothing was lost: every file is finalized and no file was
+    /// ended by a failure. A problem told alone changes nothing (D47).
     public var endedWell: Bool {
-        files.allSatisfy { $0.state == .finalized } && !events.contains(where: \.event.isFailure)
+        files.allSatisfy { $0.state == .finalized } && audioFiles.allSatisfy { $0.state == .finalized }
+            && !events.contains(where: \.event.isFailure)
     }
 
-    /// The recording ends: its end time and its result.
-    public mutating func finalize(ended date: Date, timeZone: TimeZone) {
+    /// The recording ends: its end time, its result and its CPU use.
+    public mutating func finalize(ended date: Date, timeZone: TimeZone, cpu: CPU? = nil) {
         state = .finalized
         ended = Self.timestamp(date, timeZone: timeZone)
         result = endedWell ? .ok : .problems
+        self.cpu = cpu
     }
 
     /// "2026-11-12T14:03:05.120+01:00".
@@ -193,14 +336,54 @@ public struct RecordingEvent: Codable, Equatable, Sendable {
         case audioInputDisconnected = "audio input disconnected"
         case systemAudioStarted = "system audio started"
         case systemAudioStopped = "system audio stopped"
+        case defaultMicrophoneChanged = "default microphone changed"
+        case audioInputGap = "audio input gap"
+        case audioInputFailed = "audio input failed"
+        case systemAudioFailed = "system audio failed"
+        case audioFileWriterFailed = "audio file writer failed"
 
-        /// The events of a display file ended by a failure, which make the
-        /// result `problems` and `msr record` exit 3 (D47).
+        /// The events of a file ended by a failure, which make the result
+        /// `problems` and `msr record` exit 3 (D47). An audio input that
+        /// disconnects, and a gap, are none.
         public var isFailure: Bool {
             switch self {
             case .displayStreamFailed, .displayShowsAnotherDisplaysPicture, .displayFileWriterFellBehind,
-                 .displayFileWriterFailed, .diskFull: true
+                 .displayFileWriterFailed, .diskFull, .audioInputFailed, .systemAudioFailed, .audioFileWriterFailed: true
             default: false
+            }
+        }
+    }
+
+    /// A `from` or a `to`: a frame size, or an audio input's name.
+    public enum Value: Codable, Equatable, Sendable, ExpressibleByArrayLiteral, ExpressibleByStringLiteral {
+        case frameSize([Int])
+        case name(String)
+
+        public init(arrayLiteral elements: Int...) { self = .frameSize(elements) }
+        public init(stringLiteral value: String) { self = .name(value) }
+
+        public init(from decoder: any Decoder) throws {
+            let container = try decoder.singleValueContainer()
+            if let size = try? container.decode([Int].self) {
+                self = .frameSize(size)
+            } else {
+                self = .name(try container.decode(String.self))
+            }
+        }
+
+        public func encode(to encoder: any Encoder) throws {
+            var container = encoder.singleValueContainer()
+            switch self {
+            case .frameSize(let size): try container.encode(size)
+            case .name(let name): try container.encode(name)
+            }
+        }
+
+        /// "1670x1080" or the name.
+        public var text: String {
+            switch self {
+            case .frameSize(let size): size.map(String.init).joined(separator: "x")
+            case .name(let name): name
             }
         }
     }
@@ -208,14 +391,19 @@ public struct RecordingEvent: Codable, Equatable, Sendable {
     /// Seconds from the recording's start, to the millisecond.
     public var at: Double
     public var event: Kind
-    /// The display the event is about, where it has one.
+    /// The display or audio source the event is about, where it has one.
     public var display: String?
-    /// For `display frame size changed`: the old and the new frame size.
-    public var from: [Int]?
-    public var to: [Int]?
+    /// For `display frame size changed`: the old and the new frame size;
+    /// for `default microphone changed`: the old and the new default
+    /// microphone, absent where there was or is none.
+    public var from: Value?
+    public var to: Value?
+    /// For `audio input gap`: its length in seconds, to the millisecond.
+    public var length: Double?
     /// For `display mirroring started`: the display it mirrors.
     public var mirrors: String?
-    /// For `display stream failed` and `display file writer failed`: why.
+    /// For a failure (`display stream failed`, `audio input failed` and the
+    /// like) and a failing writer: why.
     public var error: String?
 
     public init(at nanoseconds: Int64, event: Kind, display: String? = nil) {

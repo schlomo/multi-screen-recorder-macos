@@ -16,7 +16,7 @@ public func currentAudioInputs() throws(DeviceReadError) -> [AudioInputInfo] {
     try audioInputs(
         devices: try audioDeviceIDs(), inputChannels: inputChannels, name: audioDeviceName,
         transport: { audioTransport(coreAudioValue: audioDeviceTransportType($0)) },
-        defaultInput: defaultInputDeviceID)
+        uid: audioDeviceUID, defaultInput: defaultInputDeviceID)
 }
 
 /// A device without input channels is asked nothing more, so it cannot fail
@@ -29,6 +29,7 @@ func audioInputs(
     inputChannels: (AudioObjectID) -> InputChannels,
     name: (AudioObjectID) throws(DeviceReadError) -> String?,
     transport: (AudioObjectID) -> AudioTransport,
+    uid: (AudioObjectID) -> String?,
     defaultInput: () throws(DeviceReadError) -> AudioObjectID
 ) throws(DeviceReadError) -> [AudioInputInfo] {
     var inputs: [(id: AudioObjectID, name: String, channelCount: Result<Int, DeviceReadError>)] = []
@@ -50,7 +51,8 @@ func audioInputs(
     let defaultID = try defaultInput()
     return inputs.map {
         AudioInputInfo(
-            name: $0.name, channelCount: $0.channelCount, isDefault: $0.id == defaultID, transport: transport($0.id))
+            name: $0.name, channelCount: $0.channelCount, isDefault: $0.id == defaultID, transport: transport($0.id),
+            uid: uid($0.id))
     }
 }
 
@@ -127,6 +129,17 @@ private func inputChannels(_ id: AudioObjectID) -> InputChannels {
         return .unreadable("it names \(buffers.count) streams and describes fewer")
     }
     return .count(buffers.reduce(0) { $0 + Int($1.mNumberChannels) })
+}
+
+/// The device's Core Audio UID, which `AVCaptureDevice` uses as its
+/// `uniqueID`; nil when it cannot be read.
+private func audioDeviceUID(_ id: AudioObjectID) -> String? {
+    var address = address(kAudioDevicePropertyDeviceUID)
+    var uid: Unmanaged<CFString>?
+    var size = UInt32(MemoryLayout<Unmanaged<CFString>?>.size)
+    let status = withUnsafeMutablePointer(to: &uid) { AudioObjectGetPropertyData(id, &address, 0, nil, &size, $0) }
+    guard status == noErr, let uid else { return nil }
+    return uid.takeRetainedValue() as String
 }
 
 /// Nil for a device that disappeared since the list was read.
