@@ -423,6 +423,9 @@ A failure is told while recording, at its event's time. A `result` of
 been told, finalizing adds one problem, "A failure was not told while
 recording", naming the first failure and how many failure events there
 were (or, without a failure event, the first file not finalized).
+The net only guarantees that `problems` is not empty when the result
+is `problems`; a failure not told while some other problem was told
+appears only in `events`.
 `events` and `problems` are written in the order of their time.
 An audio file's `audioSource` is the audio input's name (see "Audio
 input names" below) or `System audio`; `audioSourceUID` the input's

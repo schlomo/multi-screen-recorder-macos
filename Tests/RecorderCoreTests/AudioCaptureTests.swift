@@ -200,7 +200,9 @@ import Testing
         #expect(reported.started.count == 2)
         await capture.stop()
         let ends = reported.ended
-        #expect(ends.map(\.file.name) == reported.started)
+        // Each file finishes in its own task, so the order of their ends is not promised.
+        #expect(ends.count == reported.started.count)
+        #expect(ends.map(\.file.name).sorted() == reported.started.sorted())
         #expect(ends.allSatisfy { $0.file.state == .finalized })
     }
 

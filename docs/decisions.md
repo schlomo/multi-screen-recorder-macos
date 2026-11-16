@@ -1460,6 +1460,10 @@ architect's reading.
      to 8 s when the encoder is behind (the waiting ticks and the last
      guide samples wait one after the other), and up to 2 s more when
      an audio source stalls.
+  5. The safety net at the end of a recording only guarantees that
+     `problems` is not empty when the result is `problems` (D47); a
+     failure not told while some other problem was told appears only in
+     `events`.
 - **Consequences:** The homepage no longer needs a second long-lived
   branch; it depends on the owner's Cloudflare account. The disk checks
   ask for about twice the space an hour usually takes. A tester who

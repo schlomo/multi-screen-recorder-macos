@@ -152,6 +152,46 @@ import Testing
         #expect(manifest.problems == [told])
     }
 
+    @Test func aDisplayFileNotFinalizedWithNothingToldGetsOneProblemNamingIt() {
+        var manifest = manifest()
+        var display = RecordingManifest.DisplayFile(
+            name: "d.mov", display: "LG", displayUUID: "U", frameSize: FrameSize(width: 2, height: 2), start: 1, timecode: "t")
+        display.end = 5
+        display.state = .notFinalized
+        manifest.files = [display]
+        manifest.finalize(ended: start + 60, timeZone: berlin)
+        #expect(manifest.result == .problems)
+        #expect(manifest.problems == [RecordingProblem(
+            at: 5_000_000_000, problem: "A file was not finalized and nothing was told while recording", error: "d.mov")])
+    }
+
+    /// Failure events come first: with an unfinalized file too, the one problem names the failure.
+    @Test func aFailureAndAFileNotFinalizedWithNothingToldGetOneProblemNamingTheFailure() {
+        var manifest = manifest()
+        var audio = RecordingManifest.AudioFile(
+            name: "a.mov", audioSource: "Mic", audioSourceUID: "uid", channels: .mono(1), start: 2, timecode: "t")
+        audio.state = .notFinalized
+        manifest.audioFiles = [audio]
+        manifest.events.append(RecordingEvent(at: 30_000_000_000, event: .displayFileWriterFellBehind, display: "DELL"))
+        manifest.finalize(ended: start + 60, timeZone: berlin)
+        #expect(manifest.problems == [RecordingProblem(
+            at: 30_000_000_000, problem: "A failure was not told while recording",
+            error: "Display DELL: display file writer fell behind (1 failure event, see events)")])
+    }
+
+    @Test func aFileNotFinalizedAddsNothingWhenAProblemWasTold() {
+        var manifest = manifest()
+        var audio = RecordingManifest.AudioFile(
+            name: "a.mov", audioSource: "Mic", audioSourceUID: "uid", channels: .mono(1), start: 2, timecode: "t")
+        audio.state = .notFinalized
+        manifest.audioFiles = [audio]
+        let told = RecordingProblem(at: 1_000_000_000, problem: "The free space cannot be read", error: "no volume")
+        manifest.problems = [told]
+        manifest.finalize(ended: start + 60, timeZone: berlin)
+        #expect(manifest.result == .problems)
+        #expect(manifest.problems == [told])
+    }
+
     @Test func aFileNotFinalizedWithNothingToldGetsOneProblem() {
         var manifest = manifest()
         var audio = RecordingManifest.AudioFile(
