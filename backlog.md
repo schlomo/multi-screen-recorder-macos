@@ -166,6 +166,13 @@ Still open from D34: what AGC does and whether it is on in auto mode;
    capture session (by subtraction), 2.1 % writer appends, 1.7 % its
    guides in two display files, 1.3 % encoder, 1.1 % our queue, split
    and mix. Scripts were in the session scratchpad.
+   The owner's first step (2026-11-16): "batching and doing away with
+   redundant work will be a good 1st step, without adding extra
+   complexity": the audio files' appends batched to about 100 ms, the
+   stereo interleave without per-sample arrays, no zeros written (item
+   9), and the colour-space work dropped if the pixels stay identical.
+   Not in the first step: a cheaper AAC setting, shared guide tracks,
+   24 kHz guides. The design docs get these findings with that PR.
 6. **Audio after v0** (D12, D18): AGC, in its own PR, with its own
    design, its column in the window's table and the HDMI test.
    What AGC does is open (D34). Recording all audio inputs is no
