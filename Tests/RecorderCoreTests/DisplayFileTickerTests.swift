@@ -10,19 +10,23 @@ import Testing
     final class StandInWriter: DisplayFileWriting, @unchecked Sendable {
         let firstTick: Int64
         var isReady = true
+        var isGuideReady = true
         var appendError: DisplayFileWriterError?
         var finishError: DisplayFileWriterError?
         private(set) var written: [Int64] = []
         private(set) var finishedAt: Int64??
 
         private(set) var guides: [(GuideTrack, Int64, Int)] = []
+        /// The first channel of every guide sample written, in order.
+        private(set) var guideSamples: [GuideTrack: [Float]] = [:]
 
         init(firstTick: Int64) { self.firstTick = firstTick }
 
         func appendGuide(_ guide: GuideTrack, _ channels: [[Float]], at position: Int64) throws(DisplayFileWriterError) -> Bool {
             if let appendError { throw appendError }
-            guard isReady else { return false }
+            guard isReady, isGuideReady else { return false }
             guides.append((guide, position, channels[0].count))
+            guideSamples[guide, default: []] += channels[0]
             return true
         }
 
@@ -94,24 +98,53 @@ import Testing
         #expect(made.guides.map(\.2) == [4800 - 2 * samplesPerTick, 4800])
     }
 
-    /// At the end, one final mix of what the sources delivered: the guide
-    /// tracks end with the video, not the mix's delay early.
-    @Test func theGuideTracksEndWithTheVideo() async throws {
+    /// A ticker's file from tick 0, its microphones' source delivering
+    /// 0.25 from t0 on, handed over up to `handedOver` samples.
+    private func guidedFile(handedOver: Int, guideReady: Bool = true) throws -> (DisplayFileTicker, StandInWriter, GuideTrackMix) {
         let (ticker, writer) = ticker()
         _ = ticker.receive(frame, capturedAt: 0)
         let made = try #require(writer())
-        let videoSamples = 31 * RecorderValues.audioSampleRate / RecorderValues.framesPerSecond
-        let buffer = 512
+        made.isGuideReady = guideReady
         var mix = GuideTrackMix(.microphones)
         mix.add(source: "A", channelCount: 1)
-        mix.receive([[Float](repeating: 0.25, count: videoSamples + buffer)], from: "A", at: 0)
-        // Handed over every 100 ms, 200 ms behind: the last 0.2 s are not handed over yet.
-        let handedOver = mix.mix(upTo: Int64(videoSamples - 9600))
-        _ = ticker.receiveGuide(.microphones, handedOver, positionFromStart: 0)
+        mix.receive([[Float](repeating: 0.25, count: handedOver)], from: "A", at: 0)
+        _ = ticker.receiveGuide(.microphones, mix.mix(upTo: Int64(handedOver)), positionFromStart: 0)
+        return (ticker, made, mix)
+    }
+
+    private let videoSamples = 31 * RecorderValues.audioSampleRate / RecorderValues.framesPerSecond
+
+    /// At the end, the last mix reads what the sources delivered by then:
+    /// the guide tracks end exactly with the video, with sound, not padding.
+    @Test func theGuideTracksEndWithTheVideo() async throws {
+        let (ticker, made, handedOver) = try guidedFile(handedOver: videoSamples - 9600)
+        var mix = handedOver
+        // Delivered after the file stopped listening, before its video's end.
+        mix.receive([[Float](repeating: 0.25, count: 9600 + 512)], from: "A", at: 1_000_000_000 * Int64(videoSamples - 9600) / 48_000)
+        let delivered = mix
         #expect(ticker.tick(now: grid.time(ofTick: 30)) == nil)
-        _ = try #require(await ticker.finish(now: grid.time(ofTick: 30), writeWaitingTicks: true, finalGuides: [mix]))
-        let written = made.guides.filter { $0.0 == .microphones }.map(\.2).reduce(0, +)
-        #expect(abs(written - videoSamples) <= buffer, "\(written) guide samples for \(videoSamples) of video")
+        _ = try #require(await ticker.finish(now: grid.time(ofTick: 30), writeWaitingTicks: true) { guide, from, upTo in
+            guide == .microphones ? delivered.read(from: from, upTo: upTo) : nil
+        })
+        let samples = try #require(made.guideSamples[.microphones])
+        #expect(samples.count == videoSamples)
+        #expect(samples.allSatisfy { $0 == 0.25 })
+    }
+
+    /// The guide samples at the end wait for the writer as the ticks do.
+    @Test func theLastGuideSamplesWaitForTheWriterWithinTheDrainTimeout() async throws {
+        let (ticker, made, mix) = try guidedFile(handedOver: videoSamples, guideReady: false)
+        #expect(ticker.tick(now: grid.time(ofTick: 30)) == nil)
+        #expect(made.guides.isEmpty)
+        let ready = Task {
+            try? await Task.sleep(for: .milliseconds(20))
+            made.isGuideReady = true
+        }
+        _ = try #require(await ticker.finish(now: grid.time(ofTick: 30), writeWaitingTicks: true) { guide, from, upTo in
+            guide == .microphones ? mix.read(from: from, upTo: upTo) : nil
+        })
+        await ready.value
+        #expect(made.guides.map(\.2).reduce(0, +) == videoSamples, "\(made.guides.map(\.2))")
     }
 
     @Test func aWriterErrorReachesTheFileEnd() async throws {

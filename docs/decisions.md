@@ -1401,3 +1401,23 @@ architect's reading.
   tracks end with the video.
 - **Evidence:** [design/recorder.md](design/recorder.md), "Audio",
   "Guide tracks".
+
+## D52: The "Microphones" guide mix: inputs averaged, summed at unity, soft-limited (2026-11-16)
+
+- **Status:** in force. Supersedes D49's mix of the recorded channels'
+  sum divided by √n, clamped.
+- **Context:** The live runs of the PR "Recording core B2" measured the
+  guide as 0.4061 × (Razer + CalDigit), that is 1/√6: n counted
+  channels, not inputs, the BRIO's two identical channels counted twice,
+  and silent inputs lowered the live one by 7.8 dB. The owner, on
+  2026-11-16: "yes to try other mixing for mic track on video, of
+  course. my ruling is not important related to getting good results".
+- **Decision:** The architect's rule: each audio input is averaged to
+  mono, the inputs are summed at unity gain, and a soft limiter keeps
+  the sum within ±1, unchanged up to 0.5 (−6 dBFS) and above it
+  `0.5 + 0.5 · tanh((|x| − 0.5) / 0.5)` with its sign.
+- **Consequences:** One live microphone among silent ones keeps its
+  level; loud speech on several inputs at once is compressed, not
+  clipped. The audio files are unchanged.
+- **Evidence:** [design/recorder.md](design/recorder.md), "Guide
+  tracks".

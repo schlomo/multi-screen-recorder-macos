@@ -42,6 +42,8 @@ public final class DisplayFileTicker {
     private var entry: RecordingManifest.DisplayFile?
     /// The writer's first error, for the manifest and the person.
     private var writerError: DisplayFileWriterError?
+    /// Per guide track, the end of the samples received, from t0.
+    private var guidesReceivedUpTo: [GuideTrack: Int64] = [:]
     /// Guide track samples waiting for the writer, by their position in the file.
     private var waitingGuides: [(guide: GuideTrack, position: Int64, channels: [[Float]])] = []
     /// At most this many hand-overs wait per guide track; older ones are dropped.
@@ -92,6 +94,7 @@ public final class DisplayFileTicker {
         let fileStart = writer.firstTick * Int64(RecorderValues.audioSampleRate) / Int64(ticks.grid.framesPerSecond)
         let before = Int(max(0, fileStart - positionFromStart))
         guard let count = channels.first?.count, count > before else { return nil }
+        guidesReceivedUpTo[guide] = max(guidesReceivedUpTo[guide] ?? 0, positionFromStart + Int64(count))
         waitingGuides.append((guide, positionFromStart + Int64(before) - fileStart, channels.map { Array($0[before...]) }))
         if waitingGuides.count(where: { $0.guide == guide }) > guideWaitBound,
            let oldest = waitingGuides.firstIndex(where: { $0.guide == guide }) {
@@ -122,22 +125,28 @@ public final class DisplayFileTicker {
     /// Ends the file: writes the ticks due by `now` and, with
     /// `writeWaitingTicks`, those still waiting, for at most the drain
     /// timeout on a clock that does not count sleep, and the guide tracks
-    /// up to the video's end, from `finalGuides`, the mixes of what the
-    /// sources delivered, starting where the last hand-over ended; then
-    /// always finalizes. Nil when no file had started.
-    public func finish(now: Int64, writeWaitingTicks: Bool, finalGuides: [GuideTrackMix] = []) async -> DisplayFileEnd? {
+    /// from where they were received up to the video's end, as `lastMix`
+    /// reads the guide track (nil: not in the recording) now, waiting for
+    /// the writer as long again; then always finalizes. A file ended by a
+    /// failure gets neither. Nil when no file had started.
+    public func finish(
+        now: Int64, writeWaitingTicks: Bool,
+        lastMix: (_ guide: GuideTrack, _ from: Int64, _ upTo: Int64) -> [[Float]]? = { _, _, _ in nil }
+    ) async -> DisplayFileEnd? {
         guard let writer, var file = entry else { return nil }
         if writerError == nil, writeWaitingTicks {
             _ = tick(now: now)
             if writerError == nil { await drain(writer) }
             if writerError == nil, let lastTick = ticks.lastWrittenTick {
-                let videoEnd = (lastTick + 1) * Int64(RecorderValues.audioSampleRate) / Int64(ticks.grid.framesPerSecond)
-                for var mix in finalGuides {
-                    let start = mix.mixedUpTo
-                    _ = receiveGuide(mix.track, mix.mix(upTo: videoEnd), positionFromStart: start)
+                let perTick = Int64(RecorderValues.audioSampleRate) / Int64(ticks.grid.framesPerSecond)
+                let videoEnd = (lastTick + 1) * perTick
+                for guide in [GuideTrack.microphones, .systemAudio] {
+                    let from = guidesReceivedUpTo[guide] ?? writer.firstTick * perTick
+                    guard let channels = lastMix(guide, from, videoEnd) else { continue }
+                    _ = receiveGuide(guide, channels, positionFromStart: from)
                 }
             }
-            if writerError == nil { _ = writeGuides(writer) }
+            if writerError == nil { await drainGuides(writer) }
         }
         waitingGuides = []
         do {
@@ -152,6 +161,14 @@ public final class DisplayFileTicker {
         self.writer = nil
         ticks = TickLoop(notBefore: ticks.notBefore)
         return DisplayFileEnd(file: file, error: writerError)
+    }
+
+    private func drainGuides(_ writer: any DisplayFileWriting) async {
+        let clock = SuspendingClock()
+        let deadline = clock.now + drainTimeout
+        while writeGuides(writer) == nil, !waitingGuides.isEmpty, writerError == nil, clock.now < deadline {
+            try? await clock.sleep(for: .milliseconds(5))
+        }
     }
 
     private func drain(_ writer: any DisplayFileWriting) async {

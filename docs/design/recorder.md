@@ -814,18 +814,26 @@ the metadata items (see "Output on disk").
   and samples left over are lost: `audio file writer fell behind` with
   its `error`, a failure, and a problem.
 - **Guide tracks.** For playback and waveform sync, every display file
-  also carries guide tracks: "Microphones", one mono mix of all recorded
-  audio input channels, their sum divided by √n for n channels, clamped
-  to ±1, unless the audio mode is `none`; "System audio", stereo, unless
-  system audio is off. The two are never mixed together. Each source
-  is placed by its own timestamps, the mix runs 200 ms (*data*) behind
-  real time so every source's buffers have arrived, and a source that
-  is missing is silence in its guide track. The mix is handed to every
-  open display file every 100 ms (*data*); a display file's guide tracks
-  cover exactly its own time, so a frame size change gives them the
-  same gap as the video. When a display file ends, one last mix of
-  everything the sources delivered goes up to the end of its video, so
-  its guide tracks end with the video (D51).
+  also carries guide tracks: "Microphones", one mono mix of the
+  recorded audio inputs, unless the audio mode is `none`; "System
+  audio", stereo, unless system audio is off. The two are never mixed
+  together. For "Microphones" each audio input is averaged to mono, the
+  inputs are summed at unity gain, so a silent input never lowers a
+  live one, and a soft limiter keeps the sum within ±1: unchanged up to
+  0.5 (−6 dBFS), above it `0.5 + 0.5 · tanh((|x| − 0.5) / 0.5)` with its
+  sign (D52). "System audio" is clamped to ±1. Each source is placed by
+  its own timestamps, the mix runs 200 ms (*data*) behind real time so
+  every source's buffers have arrived, and a source that is missing is
+  silence in its guide track. The mix is handed to every open display
+  file every 100 ms (*data*); a display file's guide tracks cover
+  exactly its own time, so a frame size change gives them the same gap
+  as the video. When a display file ends, one last mix reads the guide
+  tracks from where the file received them up to the end of its video,
+  from the mix's recent output (it keeps 5 s, *data*) and what the
+  sources delivered by then, and waits for the writer as long as its
+  ticks do, so its guide tracks end with the video (D51). A file ended
+  by a failure (its writer failed or fell behind) gets no last mix, so
+  its guide tracks may end early.
 
 **Display identity.** A display is known by the UUID macOS gives it
 (`CGDisplayCreateUUIDFromDisplayID`), never by its display ID, which
@@ -910,22 +918,21 @@ display sleep while recording.
 
 ## Logging
 
-No log file of our own (D46). The app and `msr` write every event of
-the recording manifest and every problem to the macOS unified log, subsystem
-`org.schapiro.multiscreenrecorder`, at `.notice` (problems at
-`.error`), levels macOS keeps on disk, with names (displays, folders)
-public, not redacted. `msr record` also prints each event as one line on
-standard error: the local time, the offset from the recording's start,
-the event and its display, and the details it has, such as
-`22:14:40 +9.2s display connected: Wacom One 13T` or
-`22:15:32 +61.3s display stream failed: LG (-3811)`. `--debug` (for
-`msr record` and `msr check`) adds detail lines (the tracker's actions,
-the displays as read, files started and ended, the ready check's facts)
-on standard error and at `.debug` in the log; while a recording runs,
-each line on standard error carries the time since its start as the
-event lines do, such as `debug recorder: +27.9s start Display 3 - LG`. The log of the last 2
-hours, of the app and `msr` only (the tests log under the same
-subsystem on a developer's Mac):
+No log file of our own (D46). The app and `msr` write every event of the
+recording manifest and every problem to the macOS unified log, subsystem
+`org.schapiro.multiscreenrecorder`, at `.notice` (problems at `.error`),
+levels macOS keeps on disk, with names (displays, folders) public, not
+redacted. `msr record` also prints each event as one line on standard
+error: the local time, the offset from the recording's start, the event
+and its display, and the details it has, such as `22:14:40 +9.2s display
+connected: Wacom One 13T` or `22:15:32 +61.3s display stream failed: LG
+(-3811)`. `--debug` (for `msr record` and `msr check`) adds detail lines
+(the tracker's actions, the displays as read, files started and ended,
+the ready check's facts) on standard error and at `.debug` in the log;
+while a recording runs, each line on standard error carries the time
+since its start as the event lines do, such as `debug recorder: +27.9s
+start Display 3 - LG`. The log of the last 2 hours, of the app and `msr`
+only (the tests log under the same subsystem on a developer's Mac):
 
 ```sh
 log show --last 2h --predicate 'subsystem == "org.schapiro.multiscreenrecorder" and process == "msr"'
@@ -1157,12 +1164,12 @@ recorded`; an audio input is recorded only when Core Audio gives its
 UID, which `AVCaptureDevice` opens it by; the beginning of a recording
 tells no `default microphone changed` or `audio input connected` events;
 the system audio's stream asks for 2×2 pixels at 1 frame per second and
-drops them; a display file's guide tracks end with its video, by a
-last mix at its end (D51); the video track's name is written as QuickTime user data
-`©nam`, which ffprobe shows as `title` (track-level metadata items do
-not show and are not written; the file-level items are); `msr record`'s
-summary ends with the line `CPU N % on average, N % at the peak, of one
-core (this process only)`.
+drops them; a display file's guide tracks end with its video, by a last
+mix at its end (D51); the video track's name is written as QuickTime
+user data `©nam`, which ffprobe shows as `title` (track-level metadata
+items do not show and are not written; the file-level items are); `msr
+record`'s summary ends with the line `CPU N % on average, N % at the
+peak, of one core (this process only)`.
 
 Open, for the owner's live run to answer (D50): the system audio's
 timestamps may follow the host clock rather than its sample count; then

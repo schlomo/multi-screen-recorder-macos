@@ -100,10 +100,6 @@ public final class DisplayCapture: NSObject, @unchecked Sendable, SCStreamOutput
     private let lifecycle = StreamLifecycle()
     private let guides: GuideTrackFeed
     private var guideListener: Int?
-    /// Guide samples handed over while the file was ending, and the mixes
-    /// for its last mix; both for `finish`.
-    private var lateGuides: [(GuideTrack, [[Float]], Int64)] = []
-    private var finalGuides: [GuideTrackMix] = []
 
     /// The file started; reports its manifest entry.
     private let onFileStarted: @Sendable (RecordingManifest.DisplayFile) -> Void
@@ -237,12 +233,8 @@ public final class DisplayCapture: NSObject, @unchecked Sendable, SCStreamOutput
                 guideListener = guides.listen { [weak self] guide, channels, position in
                     guard let self else { return }
                     queue.async {
-                        guard !self.isEnding else {
-                            // Handed over before the file stopped listening: for its end.
-                            self.lateGuides.append((guide, channels, position))
-                            return
-                        }
-                        guard let reason = self.ticker?.receiveGuide(guide, channels, positionFromStart: position) else { return }
+                        // Once ending, the file's last mix reads these samples again.
+                        guard !self.isEnding, let reason = self.ticker?.receiveGuide(guide, channels, positionFromStart: position) else { return }
                         self.end(reason)
                     }
                 }
@@ -296,7 +288,7 @@ public final class DisplayCapture: NSObject, @unchecked Sendable, SCStreamOutput
             self.isEnding = true
             self.timer?.cancel()
             self.timer = nil
-            if let listener = self.guideListener { self.finalGuides = self.guides.stopListening(listener) }
+            if let listener = self.guideListener { self.guides.stopListening(listener) }
             self.guideListener = nil
             let task = Task { await self.finish(writeWaitingTicks: writeWaitingTicks) }
             self.finishTask = task
@@ -309,11 +301,13 @@ public final class DisplayCapture: NSObject, @unchecked Sendable, SCStreamOutput
     /// writer and the frames it held.
     private func finish(writeWaitingTicks: Bool) async -> DisplayFileEnd? {
         await lifecycle.stop()
-        // Every hand-over before the file stopped listening is queued before this.
-        let (stream, ticker, late, finalGuides) = queue.sync { (self.stream, self.ticker, self.lateGuides, self.finalGuides) }
+        let (stream, ticker) = queue.sync { (self.stream, self.ticker) }
         if let stream { try? stream.removeStreamOutput(self, type: .screen) }
-        for (guide, channels, position) in late { _ = ticker?.receiveGuide(guide, channels, positionFromStart: position) }
-        let file = await ticker?.finish(now: context.now(), writeWaitingTicks: writeWaitingTicks, finalGuides: finalGuides)
+        // The last mix reads the guide tracks from where this file received
+        // them, so a hand-over it no longer took leaves no hole.
+        let file = await ticker?.finish(now: context.now(), writeWaitingTicks: writeWaitingTicks) { [guides] guide, from, upTo in
+            guides.read(guide, from: from, upTo: upTo)
+        }
         queue.sync {
             self.stream = nil
             self.ticker = nil

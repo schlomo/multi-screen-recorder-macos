@@ -55,13 +55,15 @@ public final class GuideTrackFeed: Sendable {
         }
     }
 
-    /// The listener stops; returns the mixes as they are now, for the
-    /// file's last mix: they start where its last hand-over ended.
-    func stopListening(_ id: Int) -> [GuideTrackMix] {
-        state.withLock { state in
-            state.listeners.removeValue(forKey: id)
-            return tracks.compactMap { state.mixes[$0] }
-        }
+    func stopListening(_ id: Int) {
+        _ = state.withLock { $0.listeners.removeValue(forKey: id) }
+    }
+
+    /// A display file's last mix, read now: the guide track from sample
+    /// position `start` up to `end`, the recent mix and then what the
+    /// sources delivered so far; nil when the recording has no such track.
+    func read(_ guide: GuideTrack, from start: Int64, upTo end: Int64) -> [[Float]]? {
+        state.withLock { $0.mixes[guide]?.read(from: start, upTo: end) }
     }
 
     /// An audio source joins its guide track, if the recording has it.
