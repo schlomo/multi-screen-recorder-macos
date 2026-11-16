@@ -267,8 +267,10 @@ hoc, for a local check only).
   in the app record the screens; `msr list` reads the devices. An agent
   runs these on the owner's Mac only to test the roadmap's work, into its
   own scratch folder (`--output-folder`), deleting the recordings once
-  checked and never changing settings or permissions (D48); on anyone
-  else's Mac, never unasked. On start the app also reads
+  checked and never changing settings or permissions (D48); the
+  session that briefs such a run tells the owner before it starts, as
+  it shows on their screen and may play sound (D56); on anyone else's
+  Mac, never unasked. On start the app also reads
   `~/Library/Logs/DiagnosticReports`, may show the crash report dialog
   and open the browser and Finder, and may write `state.json` and a text
   copy under `~/Library/Application Support/Multi Screen Recorder`

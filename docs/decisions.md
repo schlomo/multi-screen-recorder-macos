@@ -1576,3 +1576,24 @@ architect's reading.
 - **Evidence:** [recorder.md](design/recorder.md), "Output on disk",
   "Labels" and the start and status windows; the glossary's "Screen",
   "Label" and "Tagline"; the PR "Naming and window polish".
+
+## D56: The owner tries visible changes early; live runs on the owner's Mac are announced (2026-11-16)
+
+- **Status:** in force
+- **Context:** The owner, 2026-11-15: "what about working locally and
+  letting me test first to speed up?" On 2026-11-16, during an agent's
+  test run the architect had not announced: "I hear some tone playing
+  and saw that a recording was active?"
+- **Decision:** A change that shows in the window or on the command
+  line goes to the owner, as a local build or the PR's snapshot
+  release, as soon as the builder's tests pass; the review runs
+  alongside, and the owner's feedback and the review's findings go
+  into one fix round. Before an agent records or plays sound on the
+  owner's Mac (D48), the session that briefed the run tells the owner
+  (the architect's reading of the owner's question).
+- **Consequences:** The owner's check no longer waits for the review;
+  a fix round can carry both. A live run waits for the owner to have
+  been told.
+- **Evidence:** `.claude/skills/architect/references/operating-rules.md`,
+  "Deciding and asking"; `AGENTS.md`, "Facts that bite"; the session
+  retro PR of 2026-11-16.

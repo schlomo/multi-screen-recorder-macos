@@ -32,6 +32,12 @@ verifying agent output are in the principles (linked from
 - **A ruling that changes how agents work is delivered only when its
   text is in a file those agents read**; its backlog entry stays open
   until then.
+- **A fact written into a description, a PR comment or a message to
+  the human is read from its source when it is written**: a SHA, a
+  status code, what a command prints, what a file holds. A check done
+  the lenient way (following redirects, an agent's summary, a render
+  that may be cropped) is redone strictly or named as such; a 200
+  reached through a redirect is not a 200.
 
 ## Deciding and asking
 
@@ -41,6 +47,16 @@ verifying agent output are in the principles (linked from
   sign-off ("Agree the design before anyone builds it" in the
   principles); a rule is applied for what it protects, not to every
   artifact.
+- **Before designing something a person has to do, ask what they
+  already see.** The window, a file they already have or a screenshot
+  often carries the facts a new command, channel or check would
+  collect (the owner, 2026-11-16: a screenshot of the start window
+  instead of two Terminal commands).
+- **The owner tries a visible change early** (D56): a change that
+  shows in the window or on the command line goes to the owner, as a
+  local build or the PR's snapshot release, as soon as the builder's
+  tests pass, while the review runs alongside; the owner's feedback
+  and the review's findings go into the same fix round.
 
 ## Supervising long-running work
 

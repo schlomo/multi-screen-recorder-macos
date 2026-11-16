@@ -17,15 +17,7 @@ item 5, drift correction; then item 16, the Mac App Store and Homebrew
 optimizations"). Agents may run `msr record` on the owner's Mac (D48;
 the owner's go-ahead in the session, 2026-11-16), and BetterDisplay's
 command line with the owner's virtual screen "Virtual 16:9"; the
-architect tells the owner before an agent records (a tone played
-unannounced on 2026-11-16).
-
-How the owner wants changes that show in the window or on the command
-line handled (2026-11-15: "what about working locally and letting me
-test first to speed up?"): as soon as the builder's tests pass, the
-owner gets the local build or snapshot release to try, while the
-review runs alongside; the owner's feedback and the review findings go
-into the same fix round. Not yet written into the architect skill.
+owner is told before an agent records (D56).
 
 Still open from D34: what AGC does and whether it is on in auto mode;
 "AGC can also come as an improvement after the recorder" (the owner,
