@@ -43,10 +43,18 @@ Nothing.
    - The window part of item 13: the version and a link, Cancel, the
      table, the folder as a link, MB below 1 GB, the GB/h estimate
      calibrated against the measured 1.7 GB/h.
+   - A basic homepage on the `gh-pages` branch, published by GitHub
+     Pages (the owner, 2026-11-16: "the tester build should also create
+     a basic homepage in a gh-pages branch that we then use to
+     publish"); the owner sets up the DNS entry for
+     `multiscreenrecorder.schapiro.org`. The window, the banner and the
+     tester guide link to it.
    - A tester guide in the README: download, install, "Open Anyway",
      the two permissions, known limits (CPU, drift, USB disturbances),
      and how to report: a GitHub Issue form asking for `msr version`,
      the recording's `recording.json` and what happened.
+   - The testers all have Apple-silicon MacBooks (the owner,
+     2026-11-16); the guide states macOS 26 as the minimum.
    - Signing for testers: the self-signed certificate (D5), testers
      click "Open Anyway" once; Developer ID (99 USD a year, Apple's
      notarization) when testers beyond friends come. The PR records
@@ -160,8 +168,9 @@ Nothing.
    medium (the default), 128k per mono track, 192k system audio, guides
    64k and 96k. AAC quality "min" at 160k: +19 % size, SNR −1.4 dB,
    about −0.5 % per track (the owner's "cheaper encoder" compromise; a
-   listening test decides). Opus writes into `.mov` but costs more CPU
-   than AAC; ALAC and PCM are 5 to 11 times the size; the bit-rate
+   listening test decides). Opus writes into `.mov` and Resolve
+   imports and plays it with its timecode (the owner, 2026-11-16), but
+   it costs more CPU than AAC; ALAC and PCM are 5 to 11 times the size; the bit-rate
    strategy changes nothing. A silent (all-zero) input still costs
    about 3 % in the writer. One mono input's live 9.1 %: about 2.7 %
    capture session (by subtraction), 2.1 % writer appends, 1.7 % its
@@ -269,11 +278,14 @@ Nothing.
    they carry the same items as the display files; the owner wants
    "meaningful metadata for resolve and others". Research found no
    documented route for audio-only clips; Final Cut Pro reads iXML
-   `TAPE` from WAV. Five test variants (QuickTime user data, XMP, a
-   black video track, Broadcast WAV with iXML, a Resolve metadata CSV)
-   wait for the owner's check in Resolve; they were made by throwaway
-   scripts in a session scratchpad, so remake them if gone. A WAV copy
-   derived at Stop or a CSV per recording are the candidates; the
+   `TAPE` from WAV. The owner's check in Resolve (2026-11-16) of the
+   test variants: QuickTime user data and XMP in an audio-only `.mov`
+   show nothing; a `.mov` with a video track shows the timecode
+   track's name as Reel Name; a Broadcast WAV shows its BEXT
+   originator as Camera #; all keep their timecode. Not checked yet: a
+   Resolve metadata CSV imported per recording. The variants were made
+   by throwaway scripts in a session scratchpad, so remake them if
+   gone. Candidates: a WAV copy derived at Stop, or the CSV; the
    recording itself stays a fragmented `.mov`. Design first.
 11. **An input that delivers only zeros** (from the live runs,
    2026-11-16): a broken BRIO and, during USB re-enumeration, every USB
@@ -337,9 +349,10 @@ Nothing.
    simplified drawing below 32 px (two displays and a larger dot), from
    the owner's choice of 2026-11-12. Revisit when the owner finds the
    Dock or Finder icon lacking.
-15. **Homepage** (D7): the branch name and how changes reach it
-   (architect); the DNS entry for `multiscreenrecorder.schapiro.org`
-   (owner).
+15. **Homepage** (D7): the basic page and the `gh-pages` branch come
+   with item 1; the DNS entry for `multiscreenrecorder.schapiro.org` is
+   the owner's. Left: how later changes reach the page, if more than
+   the branch.
 
 ## Deliberately deferred
 
