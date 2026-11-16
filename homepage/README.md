@@ -58,6 +58,13 @@ The Workers project `multiscreenrecorder-homepage` is connected to this
 repository by the owner. These settings can't live in this repo (as the owner
 set them, 2026-11-16):
 
+- **Git access:** the Cloudflare Workers and Pages GitHub app must have
+  access to this repository (GitHub, Settings, Applications); without it
+  Cloudflare shows "This project is disconnected from your Git account"
+  and builds nothing
+- **Branch control:** production branch `main`, builds for non-production
+  branches on; previews stay on the version command below (the old preview
+  model, as for schapiro.org), not "Worker Previews"
 - **Build command:** `./build.sh`
 - **Deploy command:** `npx wrangler deploy`
 - **Version command:** `npx wrangler versions upload`
