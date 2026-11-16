@@ -2,20 +2,23 @@
 
 ## Next session starts here
 
-PR #13 (the first tester release) merged 2026-11-16; the homepage is
-live at `multiscreenrecorder.schapiro.org` (Cloudflare Workers Builds,
-D53). The owner's goal (2026-11-16): "I'd like to come to a working app
-I can share with friendly testers ASAP and then keep optimizing". The
-testers get the build after queued item 1, the naming and window polish
-(in flight), and item 1a, the homepage screenshot. Then: item 3, the
-end-to-end tests; item 4, the simplification; item 7, auto-recovery
-from disturbances; item 6, CPU; item 5, drift correction; then item
-16, the Mac App Store and Homebrew (the owner, 2026-11-16: "sandbox
-then comes after the optimizations"). Agents may run `msr record` on
-the owner's Mac (D48; the owner's go-ahead in the session,
-2026-11-16), and BetterDisplay's command line with the owner's virtual
-screen "Virtual 16:9"; the architect tells the owner before an agent
-records (a tone played unannounced on 2026-11-16).
+PR #14 (naming and window polish, D55) merged 2026-11-16; release
+`v0.20261116.43`. The homepage is live at
+`multiscreenrecorder.schapiro.org` (Cloudflare Workers Builds, D53).
+The owner's goal (2026-11-16): "I'd like to come to a working app I
+can share with friendly testers ASAP and then keep optimizing". Next:
+queued item 1a, the homepage screenshot from `v0.20261116.43`, in a
+homepage-only PR; it is also the first check that Cloudflare's preview
+URL works on a PR (it gave none on PR #13). Then the owner shares the
+release with testers. Then: item 3, the end-to-end tests; item 4, the
+simplification; item 7, auto-recovery from disturbances; item 6, CPU;
+item 5, drift correction; then item 16, the Mac App Store and Homebrew
+(the owner, 2026-11-16: "sandbox then comes after the
+optimizations"). Agents may run `msr record` on the owner's Mac (D48;
+the owner's go-ahead in the session, 2026-11-16), and BetterDisplay's
+command line with the owner's virtual screen "Virtual 16:9"; the
+architect tells the owner before an agent records (a tone played
+unannounced on 2026-11-16).
 
 How the owner wants changes that show in the window or on the command
 line handled (2026-11-15: "what about working locally and letting me
@@ -30,32 +33,12 @@ Still open from D34: what AGC does and whether it is on in auto mode;
 
 ## In flight
 
-- **Naming and window polish** (queued item 1), branch
-  `naming-and-window-polish`, one PR, a builder at work since
-  2026-11-16.
+Nothing.
 
 ## Queued
 
-1. **Naming and window polish** (the owner signed off 2026-11-16: "yes
-   to all other points", "I approve the naming change to screen and
-   audio for consistency. the next PR fixes what is left now"), D55:
-   - "Screen" and "audio" are the terms everywhere, code included
-     (Apple's API names stay); the claim "Every screen, all audio.
-     Keeps going when things change." in italics, right-aligned in the
-     window's header, and as the homepage tagline.
-   - Every recorded source is `Screen <n>`, `Audio <n>` (later
-     `Camera <n>`), numbered per kind from 1 in order of appearance,
-     kept for the whole recording (a screen by its UUID, an audio
-     input by its UID; a screen on another port is another screen,
-     the owner: "good as-is"); system audio is `Audio 0 - System`; the
-     " (2)" suffix goes. File names `<start time> <label>.mov`; the
-     reel names use the label.
-   - The window's Source column: an icon for the kind, the number and
-     the name; the terminal prints the label.
-   - Buttons stay at the macOS defaults (the owner, 2026-11-16).
-   - The leftovers of PR #13: see "Done (recent)".
-1a. **Homepage screenshot**: the start window from the release build
-   after item 1 merges, in a homepage-only PR (no app release).
+1a. **Homepage screenshot**: the start window from release
+   `v0.20261116.43`, in a homepage-only PR (no app release).
 2. **Toolchain catch-up** (D28): the pipeline builds with Xcode 26.6,
    Swift 6.3 and Python 3.15, the newest on GitHub's generally
    available runner image (D32 for Python), while the owner's Mac has
@@ -528,6 +511,23 @@ Still open from D34: what AGC does and whether it is on in auto mode;
 
 ## Done (recent)
 
+- 2026-11-16: PR #14 merged by the owner: naming and window polish
+  (D55): `Screen <n>`, `Audio <n>`, `Audio 0 - System`, the "Audio
+  inputs" guide mix, icons in the window table, the tagline in the
+  header, windows as wide as their table, the status window keeping
+  its width, the banner and header rule in `msr check`; release
+  `v0.20261116.43`. Reviews: one top tier, three delta rounds, the
+  last NIT commit read by the architect. Leftovers, kept here until
+  they land:
+  - The owner's check on the real screen of the window widths and the
+    banner was asked for before the merge; its result is not recorded
+    here.
+  - A one-word-per-concept pass: the window's tagline was called "the
+    claim" in this backlog, and the process docs use "claim" for a
+    stated fact; check the process docs' "claim" and "evidence label"
+    against the glossary (item 4's naming pass).
+  - `docs/design/recorder.md`, the "Stop" bullet of the status window:
+    two lines over 72 characters.
 - 2026-11-16: PR #13 merged by the owner: the first tester release
   (D53, D54): the fixes, the window, the homepage, the tester guide,
   the problem report form, the contributor clause. Reviews: one top
