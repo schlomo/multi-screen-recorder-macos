@@ -260,7 +260,7 @@ import Testing
     @Test func aWriterThatTakesNothingForTheLateTickBoundFellBehind() async throws {
         let capture = capture(drainTimeout: .milliseconds(10))
         writer.isReady = false
-        let buffers = RecorderValues.lateTickBoundSeconds * RecorderValues.audioSampleRate / samplesPerBuffer + 2
+        let buffers = RecorderValues.audioWaitBoundSeconds * RecorderValues.audioSampleRate / samplesPerBuffer + 2
         for index in 0..<buffers { source.send(try buffer(at: time(ofBuffer: index))) }
         let end = try await reported.waitForCaptureEnd()
         let files = reported.ended

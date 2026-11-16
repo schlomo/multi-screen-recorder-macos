@@ -683,7 +683,7 @@ recording checks this from outside the recorder. A display file starts
 at the first tick after its stream's first frame that passes the
 display check (below), and never before the stream's own start. When a
 display file ends, the ticks due are written, then those still waiting,
-for at most 2 s (*data*) on a clock that does not count
+for at most the late-tick bound (6 s, D53) on a clock that does not count
 sleep, and the file is finalized also when the writer fell behind or
 the wait ran out; what failed is in the manifest.
 

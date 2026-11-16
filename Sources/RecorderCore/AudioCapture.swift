@@ -152,7 +152,7 @@ final class AudioCapture: @unchecked Sendable {
     init(
         id: AudioTracker.SourceID, name: String, source: any AudioBufferSource, context: RecordingContext,
         guides: GuideTrackFeed, reports: AudioCaptureReports,
-        drainTimeout: Duration = .seconds(RecorderValues.lateTickBoundSeconds),
+        drainTimeout: Duration = .seconds(RecorderValues.audioWaitBoundSeconds),
         makeWriter: MakeWriter? = nil
     ) {
         self.id = id
@@ -272,7 +272,7 @@ final class AudioCapture: @unchecked Sendable {
             fail(error)
             return
         }
-        if let waiting = open?.waitingSamples, waiting > Int64(RecorderValues.lateTickBoundSeconds * RecorderValues.audioSampleRate) {
+        if let waiting = open?.waitingSamples, waiting > Int64(RecorderValues.audioWaitBoundSeconds * RecorderValues.audioSampleRate) {
             end(.writerFellBehind)
         }
     }

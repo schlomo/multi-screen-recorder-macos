@@ -269,6 +269,13 @@ import Testing
         #expect(end.error?.isDiskFull == true)
     }
 
+    /// The writer's allowance before a display file ends includes its end:
+    /// the waiting ticks are written for as long as they may wait (D53).
+    @Test func theEndWaitsForTheWriterAsLongAsTicksMayWait() {
+        #expect(DisplayFileTicker.defaultDrainTimeout == .seconds(RecorderValues.displayFileLateTickSeconds))
+        #expect(DisplayFileTicker.defaultDrainTimeout == .seconds(6))
+    }
+
     @Test func aWriterThatFellBehindIsStillFinalized() async throws {
         let (ticker, writer) = ticker()
         _ = ticker.receive(frame, capturedAt: 0)

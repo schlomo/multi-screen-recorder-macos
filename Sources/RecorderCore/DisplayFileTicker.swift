@@ -102,11 +102,14 @@ public final class DisplayFileTicker {
     /// Guide track samples waiting for the writer, by their position in the file.
     private var waitingGuides: [(guide: GuideTrack, position: Int64, channels: [[Float]])] = []
     /// At most this many hand-overs wait per guide track; older ones are dropped.
-    private let guideWaitBound = Int(RecorderValues.lateTickBoundSeconds * 1000 / Int(RecorderValues.guideTrackInterval.nanoseconds / 1_000_000))
+    private let guideWaitBound = Int(RecorderValues.audioWaitBoundSeconds * 1000 / Int(RecorderValues.guideTrackInterval.nanoseconds / 1_000_000))
+
+    /// How long the end waits for the writer: as long as ticks may wait (D53).
+    public static let defaultDrainTimeout = Duration.seconds(RecorderValues.displayFileLateTickSeconds)
 
     /// `captureStart` in nanoseconds from t0: the file's first tick is never before it.
     public init(
-        captureStart: Int64, drainTimeout: Duration = .seconds(RecorderValues.lateTickBoundSeconds),
+        captureStart: Int64, drainTimeout: Duration = defaultDrainTimeout,
         makeWriter: @escaping MakeWriter
     ) {
         self.makeWriter = makeWriter
