@@ -2,14 +2,19 @@
 /// ahead of it), measured from when its buffers arrive, and the correction
 /// rate that follows it. A buffer's lateness is its arrival minus its
 /// timestamp; a buffer can arrive late, never early, so the smallest
-/// lateness of a window of buffers is the device's clock against the shared
-/// clock. The first measurement is the reference; `target`, a measurement
-/// minus the reference, is the sound that must have been added so far.
+/// lateness of the last few windows of buffers (a rolling minimum, each
+/// window's moved along the drift to the newest) is the device's clock
+/// against the shared clock; a source delivering in bursts, such as the
+/// system audio, sits high in some windows. The first measurement, once
+/// the rolling minimum spans all its windows, is the reference; `target`,
+/// a measurement minus the reference, is the sound that must have been
+/// added so far.
 /// Times are nanoseconds on the shared clock; lateness, `target` and
 /// `applied` are seconds; a rate is output samples per input sample minus 1.
 public struct ClockDriftTracker: Sendable {
     public let window: Int64
     public let minimumBuffers: Int
+    public let rollingWindows: Int
     public let rateFitLength: Int
     public let shownFitLength: Int
     public let shownMinimum: Int
@@ -33,6 +38,10 @@ public struct ClockDriftTracker: Sendable {
     /// When the window's least late buffer arrived, in seconds from the first arrival.
     private var windowLatenessAt = 0.0
     private var reference: Double?
+    /// The smallest lateness of the latest windows that were not rejected,
+    /// each with when its least late buffer arrived; the reference is taken
+    /// once there are `rollingWindows`.
+    private var rolling: [(time: Double, lateness: Double)] = []
     /// The accepted measurements: when the least late buffer arrived, in
     /// seconds from the first arrival, and the lateness against the reference.
     private var history: [(time: Double, target: Double)] = []
@@ -41,6 +50,7 @@ public struct ClockDriftTracker: Sendable {
     public init(
         window: Duration = RecorderValues.clockDriftWindow,
         minimumBuffers: Int = RecorderValues.clockDriftWindowMinimumBuffers,
+        rollingWindows: Int = RecorderValues.clockDriftRollingWindows,
         rateFitLength: Int = RecorderValues.clockDriftRateFitMeasurements,
         shownFitLength: Int = RecorderValues.clockDriftShownFitMeasurements,
         shownMinimum: Int = RecorderValues.clockDriftShownMinimumMeasurements,
@@ -52,8 +62,11 @@ public struct ClockDriftTracker: Sendable {
         precondition(window > .zero && followTime > .zero, "the clock drift tracker needs a positive window and follow time")
         precondition(rateFitLength >= 3 && shownFitLength >= shownMinimum && shownMinimum >= 3,
                      "the clock drift tracker's fits need at least 3 measurements")
+        precondition(shownFitLength >= rateFitLength, "the clock drift tracker keeps the rate fit's measurements")
+        precondition(rollingWindows > 0, "the clock drift tracker's rolling minimum needs a window")
         self.window = window.nanoseconds
         self.minimumBuffers = minimumBuffers
+        self.rollingWindows = rollingWindows
         self.rateFitLength = rateFitLength
         self.shownFitLength = shownFitLength
         self.shownMinimum = shownMinimum
@@ -95,27 +108,50 @@ public struct ClockDriftTracker: Sendable {
         }
     }
 
-    /// A window's smallest lateness, measured at `time`; `target` and the
-    /// rate are taken forward along the fit to `now`, where `applied` is.
+    /// A window's smallest lateness, at `time`: the rolling minimum with
+    /// the windows before is the measurement; `target` and the rate are
+    /// taken forward along the fit to `now`, where `applied` is.
     private mutating func measure(_ lateness: Double, at time: Double, now: Double) {
-        let reference = reference ?? lateness
-        self.reference = reference
-        let measured = lateness - reference
+        let slope = rateSlope
+        let candidates = rolling.suffix(rollingWindows - 1) + [(time: time, lateness: lateness)]
+        let smallest = candidates.map { $0.lateness + slope * (time - $0.time) }.min()!
+        guard let reference else {
+            rolling = Array(candidates)
+            guard rolling.count >= rollingWindows else { return }
+            self.reference = smallest
+            accept(0, at: time, now: now)
+            return
+        }
+        let measured = smallest - reference
         if let expected = expected(at: time), measured - expected > rejectedLateness {
             guard rejectedInARow >= rejectedInARowLimit else {
                 rejectedInARow += 1
                 return
             }
+            // The lateness really stepped up: the fit and the rolling minimum start again here.
             history = []
+            rolling = [(time, lateness)]
+            accept(lateness - reference, at: time, now: now)
+            return
         }
+        rolling = Array(candidates)
+        accept(measured, at: time, now: now)
+    }
+
+    private mutating func accept(_ measured: Double, at time: Double, now: Double) {
         rejectedInARow = 0
         history.append((time, measured))
         if history.count > shownFitLength { history.removeFirst() }
-        let rateFit = history.suffix(rateFitLength)
-        let slope = rateFit.count >= 3 ? Self.slope(rateFit) : 0
+        let slope = rateSlope
         let target = measured + slope * (now - time)
         self.target = target
         rate = min(maximumRate, max(-maximumRate, slope + (target - applied) / followSeconds))
+    }
+
+    /// The rate fit's slope; 0 while it has fewer than 3 measurements.
+    private var rateSlope: Double {
+        let rateFit = history.suffix(rateFitLength)
+        return rateFit.count >= 3 ? Self.slope(rateFit) : 0
     }
 
     /// The lateness expected at `time`: the rate fit's line, or the last

@@ -389,8 +389,22 @@ tried:
   then swinging between about -60 and +110 ppm with a period of about
   25 s around 0 (a sawtooth of ±0.5 ms), so a single measured rate
   cannot correct it; a correction must follow the offset. After 300 s
-  the Razer was 34.7 ms behind the host clock, more than one frame. Not
-  tried: how the system audio's (ScreenCaptureKit) buffers arrive.
+  the Razer was 34.7 ms behind the host clock, more than one frame.
+- **The system audio arrives in bursts, so one second's smallest
+  lateness is not its clock.** Tried (2026-11-17, one probe of 120 s of
+  a ScreenCaptureKit audio stream, macOS 26.7.1): its buffers hold 960
+  samples, their timestamps follow the sample count exactly, but they
+  arrive every 21.33 ms (median) with catch-up bursts. The smallest
+  lateness per second is a sawtooth, not a line: 41.6, 44.3, 47.2 and
+  43.1 ms, repeating every 4 s, with no clock drift (the lowest points
+  stay within 0.25 ms over 120 s). The smallest over about 5 s is its
+  clock. In a simulation on the real arrivals of the system audio and
+  five audio inputs, a rolling minimum over 5 windows with a follow
+  time of 15 s and a rate fit over 30 measurements kept the system
+  audio within ±0.36 ms at a rate within ±18 ppm (with one second's
+  minimum, a follow time of 5 s and a fit over 10, its rate swung by
+  over 1000 ppm), and the steady inputs under 0.1 ms with a rate swing
+  under 20 ppm.
 - **An unplugged audio input ends its `AVCaptureSession`, which does
   not resume.** Tried (2026-11-15, the Razer Seiren V3 Mini over USB,
   unplugged during a running session): `AVCaptureSession`'s runtime

@@ -25,13 +25,14 @@ struct SeededRandom: RandomNumberGenerator {
     }
 }
 
-/// A simulated audio device: buffers of 512 samples whose timestamps follow
+/// A simulated audio device: buffers of `bufferSamples` whose timestamps follow
 /// the sample count, while the device's clock runs `offset(t)` seconds
 /// behind the shared clock at the timestamp t (positive: the device is slow).
 struct SimulatedDevice {
-    static let bufferSamples = 512
     static let sampleRate = 48_000
     var offset: (Double) -> Double
+    /// 512, as an `AVCaptureSession` delivers them; 960 for the system audio.
+    var bufferSamples = 512
     /// Extra lateness of the buffer captured at a shared clock time, in seconds.
     var extraLateness: (Double, inout SeededRandom) -> Double = { _, _ in 0 }
 
@@ -51,15 +52,15 @@ struct SimulatedDevice {
         var previous = -Double.infinity
         var index = 0
         while true {
-            let time = Double(index * Self.bufferSamples) / Double(Self.sampleRate)
+            let time = Double(index * bufferSamples) / Double(Self.sampleRate)
             if time > seconds { return buffers }
             let captured = time + offset(time)
-            let lateness = Double(Self.bufferSamples) / Double(Self.sampleRate) + random.jitter()
+            let lateness = Double(bufferSamples) / Double(Self.sampleRate) + random.jitter()
                 + extraLateness(captured, &random)
             let arrival = max(previous, captured + lateness)
             previous = arrival
             buffers.append(Buffer(
-                index: index, time: Int64(index * Self.bufferSamples) * 1_000_000_000 / Int64(Self.sampleRate),
+                index: index, time: Int64(index * bufferSamples) * 1_000_000_000 / Int64(Self.sampleRate),
                 arrival: Int64((arrival * 1e9).rounded()), seconds: time))
             index += 1
         }

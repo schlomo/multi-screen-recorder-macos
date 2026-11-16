@@ -23,19 +23,23 @@ extension RecorderValues {
 /// The clock drift correction's values (*data*): the windows the buffers'
 /// lateness is measured in, the fits, and how fast the correction follows.
 extension RecorderValues {
-    /// Buffers are grouped by arrival in windows of this length; a window's
-    /// smallest lateness is one measurement.
+    /// Buffers are grouped by arrival in windows of this length; each
+    /// window's smallest lateness goes into the rolling minimum.
     public static let clockDriftWindow = Duration.seconds(1)
     /// A window with fewer buffers gives no measurement.
     public static let clockDriftWindowMinimumBuffers = 10
+    /// A measurement is the smallest lateness of this many windows, the
+    /// newest and those before it: the system audio arrives in bursts, so
+    /// one window's smallest lateness is not its clock.
+    public static let clockDriftRollingWindows = 5
     /// The measurements the correction rate's slope is fitted over.
-    public static let clockDriftRateFitMeasurements = 10
+    public static let clockDriftRateFitMeasurements = 30
     /// The measurements the clock drift shown is fitted over, and the
     /// fewest it is shown with.
     public static let clockDriftShownFitMeasurements = 60
     public static let clockDriftShownMinimumMeasurements = 10
     /// How fast the correction closes what is still off: that divided by this.
-    public static let clockDriftFollowTime = Duration.seconds(5)
+    public static let clockDriftFollowTime = Duration.seconds(15)
     /// The largest correction rate, in parts per million.
     public static let clockDriftMaximumRatePpm = 1000.0
     /// A measurement more than this above the expected lateness is a stall,

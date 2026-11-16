@@ -7,21 +7,21 @@ import Testing
 
     /// Clicks of a device 500 ppm slow at known shared clock times, with
     /// jittered arrivals: each comes out at its time once the correction
-    /// has caught up.
+    /// has caught up (it starts after 5 windows and follows over 15 s).
     @Test func clicksComeOutAtTheirSharedClockTimes() throws {
         let device = SimulatedDevice.steady(ppm: -500)
         let seconds = 60.0
         let buffers = device.buffers(for: seconds)
         // A click at the shared clock time T is at the device's sample T · rate / (1 + 500 ppm).
         let clicks = stride(from: 0.75, to: seconds - 1, by: 1.0).map { $0 }
-        var input = [Float](repeating: 0, count: buffers.count * SimulatedDevice.bufferSamples)
+        var input = [Float](repeating: 0, count: buffers.count * device.bufferSamples)
         for click in clicks { input[Int((click * sampleRate / (1 + 500e-6)).rounded())] = 1 }
 
         var correction = ClockDriftCorrection()
         var chunks: [ClockDriftCorrection.Chunk] = []
         for buffer in buffers {
-            let start = buffer.index * SimulatedDevice.bufferSamples
-            chunks += correction.correct([Array(input[start..<(start + SimulatedDevice.bufferSamples)])], at: buffer.time, arrival: buffer.arrival)
+            let start = buffer.index * device.bufferSamples
+            chunks += correction.correct([Array(input[start..<(start + device.bufferSamples)])], at: buffer.time, arrival: buffer.arrival)
         }
         chunks += correction.flush()
 
@@ -36,10 +36,13 @@ import Testing
             }
         }
         for (click, found) in zip(clicks, loudest) {
-            #expect(abs(found.seconds - click) < (click < 15 ? 0.002 : 0.0005), "the click at \(click) s came at \(found.seconds) s")
+            let bound = click < 15 ? 0.0035 : click < 40 ? 0.001 : 0.0005
+            #expect(abs(found.seconds - click) < bound, "the click at \(click) s came at \(found.seconds) s")
         }
         let status = correction.status
-        #expect(abs(try #require(status.clockDriftPpm) - -500) < 2)
+        // The shown fit still holds the first measurements, taken before
+        // the rate fit had a slope to move the rolling minimum along.
+        #expect(abs(try #require(status.clockDriftPpm) - -500) < 10)
         #expect(abs(status.applied - 0.03) < 0.0005)
         #expect(abs(try #require(status.remaining)) < 0.0005)
     }
@@ -52,7 +55,7 @@ import Testing
         var correction = ClockDriftCorrection()
         var before: [ClockDriftCorrection.Chunk] = []
         var after: [ClockDriftCorrection.Chunk] = []
-        let samples = [Float](repeating: 0.25, count: SimulatedDevice.bufferSamples)
+        let samples = [Float](repeating: 0.25, count: device.bufferSamples)
         for buffer in buffers {
             let isAfter = buffer.index >= gapAt
             let chunks = correction.correct(
@@ -70,7 +73,7 @@ import Testing
         let output = before.reduce(0) { $0 + $1.channels[0].count }
         let appliedAtGap = try #require(before.last).applied
         // Every sample before the gap came out: the input and the correction applied.
-        let input = Double(gapAt * SimulatedDevice.bufferSamples)
+        let input = Double(gapAt * device.bufferSamples)
         #expect(abs(Double(output) - input - appliedAtGap * sampleRate) <= 1)
         let end = Double(try #require(before.first).time) + Double(output) / sampleRate * 1e9
         let jump = Double(try #require(after.first).time) - end
