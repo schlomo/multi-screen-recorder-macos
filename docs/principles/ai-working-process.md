@@ -542,7 +542,8 @@ From weighing these together, a few heuristics follow:
   - **top:** mistakes that would be silent and expensive — a novel
     design that is expensive to change later (data model, security
     boundary, interfaces), the one adversarial review of a settled
-    change (its delta reviews run on the standard tier), the analysis
+    change that "Every change gets an adversarial review" does not
+    size lower (its delta reviews run on the standard tier), the analysis
     behind a principle change, the consistency pass after a series of
     rule edits, a tie-break when two strong-tier attempts disagree or
     fail.
@@ -553,7 +554,8 @@ From weighing these together, a few heuristics follow:
   definition. A delegation overrides the model only to raise the
   tier, stating the reason in one line; or, where the pinned model
   isn't available to the project, to name the highest tier that is;
-  or, for a delta review, to lower it to the standard tier. A tier
+  or, for a delta review or a first review the review principle sizes
+  to the standard tier, to lower it to the standard tier. A tier
   above a human's per-project cap (below) counts as not available.
   An agent without a pin (a general-purpose or built-in agent) always
   gets an explicit model.

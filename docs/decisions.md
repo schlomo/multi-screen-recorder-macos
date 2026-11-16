@@ -1632,5 +1632,7 @@ architect's reading.
 - **Evidence:** [ai-working-process.md](principles/ai-working-process.md),
   "Iterate locally; wait for the pipeline once", "Every change gets an
   adversarial review", "Write a behavior where the acting agent reads
-  it"; [static-sites.md](principles/platform-notes/static-sites.md);
+  it", "Delegation"; [context-economy.md](principles/context-economy.md),
+  "Always-loaded context is paid on every call";
+  [static-sites.md](principles/platform-notes/static-sites.md);
   `AGENTS.md`; PR #17.

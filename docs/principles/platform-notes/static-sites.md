@@ -36,7 +36,7 @@ How an agent checks a static site, here the homepage: Hugo in
   EOF
     python3 -m http.server 8765 -d public >/dev/null 2>&1 & server=$!
     trap 'kill $server; rm -f public/phone-check.html' EXIT
-    curl -s --retry 10 --retry-connrefused -o /dev/null http://localhost:8765/phone-check.html
+    curl -sf --retry 10 --retry-connrefused -o /dev/null http://localhost:8765/phone-check.html
     chrome --headless=new --virtual-time-budget=5000 --dump-dom http://localhost:8765/phone-check.html | grep -o 'innerWidth=[0-9]* scrollWidth=[0-9]*'
   )
   ```
