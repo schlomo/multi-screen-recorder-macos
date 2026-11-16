@@ -79,7 +79,10 @@ final class AudioCapture: @unchecked Sendable {
     func start() {
         source.start(
             queue: queue, deliver: { [weak self] buffer in self?.receive(buffer) },
-            ended: { [weak self] end in self?.queue.async { self?.end(end) } })
+            ended: { [weak self] end in
+                guard let self else { return }
+                queue.async { self.end(end) }
+            })
     }
 
     /// Stops the capture at the recorder's request and finalizes its file.
