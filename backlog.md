@@ -55,27 +55,26 @@ Nothing.
    - An audio input the audio mode leaves out: its name keeps the
      column of the other names, the `Audio <n> - ` part left blank;
      the reason follows the name in parentheses like "(default)":
-     "(virtual)", and by the same rule "(Bluetooth)" [the Bluetooth
-     label is the architect's extension of the owner's "(virtual)";
-     confirm in the brief]; GB/h shows `-`, not 0. Under audio mode
+     "(virtual)", and by the same rule "(Bluetooth)"; GB/h shows `-`,
+     not 0. The window's table shows the same, besides dimming the row
+     (the owner, 2026-11-16: "yes to both details"). Under audio mode
      None or Default microphone the settings line gives the reason.
    - The ready check's "Fix:" lines wrap with their indent.
    - `msr list`'s system audio line says that the program running
      `msr` (a terminal app) lacks the Screen & System Audio Recording
      permission, not the app (the owner saw "not available" in
      Terminal on 2026-11-16 although the app has it).
-   - Open: whether the window's table also shows "(virtual)" and `-`
-     (it dims the row today); ask the owner in the brief.
 1a. **Audio only** (the owner, 2026-11-16: "video resolution needs a
    none mode to disable screen recording and record audio only. cost
    nothing and adds use cases and I accept the potential misnomer,
    application name stays for now"): a recording resolution None,
    in the window's slider and as `--resolution none`, records no
-   screen. To settle in the design: what auto mode does (it stays
-   Native); the ready check without screens (system audio still needs
-   the Screen & System Audio Recording permission, the microphone
-   alone does not); no screen file means no guide tracks; a recording
-   with neither screens nor audio refuses to start.
+   screen. The owner signed off these details (2026-11-16: "yes to the
+   audio only PR details"): auto mode stays Native; without screens
+   the ready check still needs the Screen & System Audio Recording
+   permission for system audio, and the microphone alone does not; no
+   screen file means no guide tracks; a recording with neither
+   screens nor audio refuses to start.
 2. **Toolchain catch-up** (D28): the pipeline builds with Xcode 26.6,
    Swift 6.3 and Python 3.15, the newest on GitHub's generally
    available runner image (D32 for Python), while the owner's Mac has
