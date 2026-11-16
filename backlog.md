@@ -6,7 +6,7 @@ PR #12 (B2, the audio) merged 2026-11-16; release `v0.20261116.33`.
 The owner's goal now (2026-11-16): "I'd like to come to a working app
 I can share with friendly testers ASAP and then keep optimizing". The
 architect's order: queued item 1, the first tester release (signed off
-2026-11-16; the owner started it in a new session); then item 3,
+2026-11-16; in flight, see below); then item 3,
 the end-to-end tests; item 4, the simplification; item 7, auto-recovery
 from disturbances; item 6, CPU; item 5, drift correction. Agents may
 run `msr record` on the owner's Mac (D48; the owner's go-ahead in the
@@ -26,7 +26,18 @@ Still open from D34: what AGC does and whether it is on in auto mode;
 
 ## In flight
 
-Nothing.
+- **First tester release** (queued item 1), branch
+  `first-tester-release`, one PR, a builder at work since 2026-11-16.
+  Two of the owner's rulings of 2026-11-16 changed the design, recorded
+  as D53 in the PR: the homepage is a Hugo site in `homepage/` on
+  `main`, built and served by Cloudflare Workers Builds like
+  `schapiro-org/homepage` ("OK, homepage/ on main, all in one PR for
+  the testers"), not a `gh-pages` branch on GitHub Pages; the window's
+  GB/h is labelled a maximum ("GB/h max", the encoder's ceiling, which
+  the disk checks rely on), not calibrated. The architect fixes
+  `docs/architecture.md` on the branch. Next: adversarial review, the
+  owner tries the local build, the owner connects the Cloudflare
+  Worker.
 
 ## Queued
 
