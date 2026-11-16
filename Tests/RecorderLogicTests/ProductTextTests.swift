@@ -16,6 +16,12 @@ import Testing
         #expect(try repositoryFile("homepage/wrangler.jsonc").contains("\"pattern\": \"\(Homepage.url.host() ?? "")\""))
     }
 
+    /// D55: the app's header and the homepage's tagline say the same claim.
+    @Test func theHomepageTaglineIsTheClaim() throws {
+        #expect(try repositoryFile("homepage/hugo.toml").contains("claim = \"\(Claim.text)\""))
+        #expect(try repositoryFile("homepage/layouts/home.html").contains("<p class=\"tagline\">{{ site.Params.claim }}</p>"))
+    }
+
     /// The README and the homepage link to the problem report form.
     @Test func theProblemReportLinksOpenTheForm() throws {
         _ = try repositoryFile(".github/ISSUE_TEMPLATE/problem-report.yml")
@@ -25,6 +31,6 @@ import Testing
     }
 
     @Test func resolutionLabels() {
-        #expect(RecordingResolution.allCases.map(\.label) == ["Native", "4K", "1440p", "1200p", "1080p", "720p"])
+        #expect(RecordingResolution.allCases.map(\.shownName) == ["Native", "4K", "1440p", "1200p", "1080p", "720p"])
     }
 }

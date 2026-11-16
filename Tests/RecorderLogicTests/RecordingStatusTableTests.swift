@@ -26,8 +26,8 @@ import Testing
         let rows = RecordingStatusTable.rows(
             sources: tracker.sources, files: files, bytes: ["a1.mov": 1_000_000_000, "a2.mov": 260_000_000, "b1.mov": 40_000_000])
         #expect(rows == [
-            .init(source: "1 Built-in Retina Display", recordsAt: "1920×1080", files: 2, written: "1.3 GB", state: "recording"),
-            .init(source: "2 LG HDR 4K", recordsAt: "1920×1080", files: 1, written: "40 MB", state: "disk full"),
+            .init(source: .screen(1, name: "Built-in Retina Display"), recordsAt: "1920×1080", files: 2, written: "1.3 GB", state: "recording"),
+            .init(source: .screen(2, name: "LG HDR 4K"), recordsAt: "1920×1080", files: 1, written: "40 MB", state: "disk full"),
         ])
         #expect(RecordingStatusTable.columns == ["Source", "Records at", "Files", "Written", "State"])
     }
@@ -52,7 +52,22 @@ import Testing
         _ = tracker.observe([built, screen("B", "LG", x: 1920)], at: 1)
         let rows = RecordingStatusTable.rows(sources: tracker.sources, files: [], bytes: [:])
         #expect(rows.map(\.state) == ["recording", "waiting"])
-        #expect(rows[1].source == "LG" && rows[1].recordsAt == "" && rows[1].files == 0)
+        #expect(rows[1].source == .screen(nil, name: "LG") && rows[1].recordsAt == "" && rows[1].files == 0)
+    }
+
+    @Test func eachAudioSourceIsARowUnderItsNumber() {
+        var settings = Settings.defaults
+        settings.auto = false
+        settings.audioMode = .allInputs
+        settings.systemAudio = true
+        var tracker = AudioTracker(settings: settings)
+        let usb = AudioInputInfo(name: "USB Audio", channelCount: 1, isDefault: true, transport: .usb, uid: "U1")
+        let twin = AudioInputInfo(name: "USB Audio", channelCount: 2, isDefault: false, transport: .usb, uid: "U2")
+        _ = tracker.begin(inputs: [usb, twin], mainDisplayID: 1, screens: [1], at: 0)
+        let rows = RecordingStatusTable.audioRows(sources: tracker.sourcesShown, files: [], bytes: [:])
+        #expect(rows.map(\.source) == [
+            .audioInput(1, name: "USB Audio"), .audioInput(2, name: "USB Audio"), .systemAudio(isRecorded: true),
+        ])
     }
 
     /// A size that cannot be read is not shown as nothing written.

@@ -8,7 +8,7 @@ public enum AudioMode: String, CaseIterable, Sendable, Encodable {
     case allInputs = "all-inputs"
 
     /// The word on the slider.
-    public var label: String {
+    public var shownName: String {
         switch self {
         case .none: "None"
         case .defaultMicrophone: "Default microphone"

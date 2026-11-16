@@ -58,7 +58,7 @@ public enum RecordingResolution: String, CaseIterable, Sendable, Encodable {
     }
 
     /// The name a person reads, in the app and its texts.
-    public var label: String {
+    public var shownName: String {
         switch self {
         case .native: "Native"
         case .uhd4k: "4K"

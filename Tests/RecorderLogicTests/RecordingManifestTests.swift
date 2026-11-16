@@ -365,14 +365,14 @@ import Testing
         #expect(name == "1970-01-01 00.00.00 Screen 3 - Dell U2720Q-2- left.mov")
     }
 
-    @Test func anAudioFileIsNamedByItsSource() {
+    @Test func anAudioFileIsNamedByItsLabel() {
         let start = Date(timeIntervalSince1970: 0)
         let microphone = RecordingNames.audioFile(
-            start: start, timeZone: utc, source: .audioInput(name: "Mic 1/2", coreAudioUID: "u", channelCount: 1))
-        #expect(microphone == "1970-01-01 00.00.00 Microphone - Mic 1-2.mov")
-        #expect(RecordingNames.audioFile(start: start, timeZone: utc, source: .systemAudio) == "1970-01-01 00.00.00 System audio.mov")
-        #expect(RecordingNames.audioFile(start: start, timeZone: utc, source: .systemAudio, taken: ["1970-01-01 00.00.00 System audio.mov"])
-            == "1970-01-01 00.00.00 System audio (2).mov")
+            start: start, timeZone: utc, source: .audioInput(number: 2, name: "Mic 1/2", coreAudioUID: "u", channelCount: 1))
+        #expect(microphone == "1970-01-01 00.00.00 Audio 2 - Mic 1-2.mov")
+        #expect(RecordingNames.audioFile(start: start, timeZone: utc, source: .systemAudio) == "1970-01-01 00.00.00 Audio 0 - System.mov")
+        #expect(RecordingNames.audioFile(start: start, timeZone: utc, source: .systemAudio, taken: ["1970-01-01 00.00.00 Audio 0 - System.mov"])
+            == "1970-01-01 00.00.00 Audio 0 - System (2).mov")
     }
 
     @Test func aTakenNameGetsANumber() {

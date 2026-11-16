@@ -13,14 +13,14 @@ public enum RecordingStatusTable {
     public static let columns = ["Source", "Records at", "Files", "Written", "State"]
 
     public struct Row: Equatable, Sendable {
-        public var source: String
+        public var source: SourceCell
         public var recordsAt: String
         public var files: Int
         /// The size of its files on disk, "350 MB" or "1.3 GB".
         public var written: String
         public var state: String
 
-        public init(source: String, recordsAt: String, files: Int, written: String, state: String) {
+        public init(source: SourceCell, recordsAt: String, files: Int, written: String, state: String) {
             self.source = source
             self.recordsAt = recordsAt
             self.files = files
@@ -28,7 +28,8 @@ public enum RecordingStatusTable {
             self.state = state
         }
 
-        public var cells: [String] { [source, recordsAt, String(files), written, state] }
+        /// The cells after Source.
+        public var values: [String] { [recordsAt, String(files), written, state] }
     }
 
     /// `bytes`: each screen file's size on disk, by its name; a file
@@ -42,7 +43,7 @@ public enum RecordingStatusTable {
                 own.last.map { FrameSize(width: $0.frameSize[0], height: $0.frameSize[1]) }
             }
             return Row(
-                source: source.number.map { "\($0) \(source.name)" } ?? source.name,
+                source: .screen(source.number, name: source.name),
                 recordsAt: frameSize.map { "\($0.width)×\($0.height)" } ?? "",
                 files: own.count,
                 written: written,
@@ -67,7 +68,9 @@ public enum RecordingStatusTable {
             case .stereo: "stereo"
             case nil: ""
             }
-            return Row(source: source.name, recordsAt: channels, files: own.count, written: written, state: text(source.state))
+            let cell: SourceCell = source.id == .systemAudio
+                ? .systemAudio(isRecorded: true) : .audioInput(source.number, name: source.name)
+            return Row(source: cell, recordsAt: channels, files: own.count, written: written, state: text(source.state))
         }
     }
 

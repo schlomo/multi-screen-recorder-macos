@@ -8,8 +8,8 @@ public enum Encoding {
     public static let audioInputTrackBitRate = 128_000
     /// The stereo track of the system audio's audio file.
     public static let systemAudioTrackBitRate = 192_000
-    /// The guide track "Microphones": one mono mix of every recorded microphone channel.
-    public static let microphonesGuideTrackBitRate = 64_000
+    /// The guide track "Audio inputs": one mono mix of every recorded audio input channel.
+    public static let audioInputsGuideTrackBitRate = 64_000
     /// The guide track "System audio", stereo.
     public static let systemAudioGuideTrackBitRate = 96_000
     /// A keyframe every this many seconds of video.
@@ -37,27 +37,27 @@ public enum Encoding {
 /// A guide track: a track in every screen file for playback and waveform
 /// sync only; the audio files hold the sources themselves.
 public enum GuideTrack: Hashable, Sendable {
-    case microphones
+    case audioInputs
     case systemAudio
 
     public var name: String {
         switch self {
-        case .microphones: "Microphones"
+        case .audioInputs: "Audio inputs"
         case .systemAudio: "System audio"
         }
     }
 
-    /// "Microphones" is one mono mix, "System audio" stereo.
+    /// "Audio inputs" is one mono mix, "System audio" stereo.
     public var channelCount: Int {
         switch self {
-        case .microphones: 1
+        case .audioInputs: 1
         case .systemAudio: 2
         }
     }
 
     public var bitRate: Int {
         switch self {
-        case .microphones: Encoding.microphonesGuideTrackBitRate
+        case .audioInputs: Encoding.audioInputsGuideTrackBitRate
         case .systemAudio: Encoding.systemAudioGuideTrackBitRate
         }
     }
@@ -65,6 +65,6 @@ public enum GuideTrack: Hashable, Sendable {
     /// The guide tracks a screen file has follow from the settings alone: a
     /// source that is missing is silence in its guide track.
     public static func tracks(for settings: Settings) -> [GuideTrack] {
-        (settings.effectiveAudioMode == .none ? [] : [.microphones]) + (settings.systemAudio ? [.systemAudio] : [])
+        (settings.effectiveAudioMode == .none ? [] : [.audioInputs]) + (settings.systemAudio ? [.systemAudio] : [])
     }
 }

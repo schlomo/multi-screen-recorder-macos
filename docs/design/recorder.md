@@ -90,15 +90,15 @@ the defaults and 3.1 GB free:
 
 ```
 What will be recorded
-  Source                            Looks like  Drawn at   Records at  GB/h max
-  1 Built-in Retina Display         1728×1117   3456×2234  1728×1116        1.0
-  2 LG HDR 4K                       3840×2160   3840×2160  3840×2160        4.1
-  ─────────────────────────────────────────────────────────────────────────────
-  MacBook Pro Microphone (default)                         1 channel        0.1
-  RØDE Wireless GO II RX                                   2 channels       0.1
-  System audio                                             stereo           0.1
-  ─────────────────────────────────────────────────────────────────────────────
-  Total                                                                     5.3
+  Source                                      Looks like  Drawn at   Records at  GB/h max
+  Screen 1 - Built-in Retina Display          1728×1117   3456×2234  1728×1116        1.0
+  Screen 2 - LG HDR 4K                        3840×2160   3840×2160  3840×2160        4.1
+  ───────────────────────────────────────────────────────────────────────────────────────
+  Audio 1 - MacBook Pro Microphone (default)                         1 channel        0.1
+  Audio 2 - RØDE Wireless GO II RX                                   2 channels       0.1
+  Audio 0 - System                                                   stereo           0.1
+  ───────────────────────────────────────────────────────────────────────────────────────
+  Total                                                                               5.3
   2 hours need 10.7 GB, 3.1 GB free.
   Files go to ~/Movies/Multi Screen Recorder
 ```
@@ -261,22 +261,30 @@ One recording folder per recording, named by its local start time
 ~/Movies/Multi Screen Recorder/2026-11-12 14.03.05/
   2026-11-12 14.03.05 Screen 1 - Built-in Retina Display.mov
   2026-11-12 14.03.05 Screen 2 - LG HDR 4K.mov
-  2026-11-12 14.03.05 Microphone - MacBook Pro Microphone.mov
-  2026-11-12 14.03.05 System audio.mov
+  2026-11-12 14.03.05 Audio 1 - MacBook Pro Microphone.mov
+  2026-11-12 14.03.05 Audio 0 - System.mov
   2026-11-12 14.27.41 Screen 2 - LG HDR 4K.mov    ← back after a reconnect
   2026-11-12 14.41.10 Screen 1 - Built-in Retina Display.mov    ← new frame size after a mode change
   recording.json
 ```
 
-One file per source, each named by its own start time (D31): a screen
-file per screen, an audio file per recorded audio input
-(`<date time> Microphone - <device name>.mov`) and one for system audio
-(`<date time> System audio.mov`). The manifest below lists exactly
-these files.
+One file per source, each named by its own start time and the
+source's label (D31, D55): a screen file per screen, an audio file per
+recorded audio input and one for system audio, each
+`<date time> <label>.mov`. The manifest below lists exactly these
+files.
 
-Screen 1 is the main screen; the others are numbered left to right,
-later arrivals in order of appearance. A screen keeps its number for
-the whole recording.
+**Labels (D55).** Every recorded source has a label,
+`<kind> <n> - <name>`: `Screen <n> - <screen name>` for a screen,
+`Audio <n> - <device name>` for an audio input, and always
+`Audio 0 - System` for the system audio. The numbers count per kind
+from 1. Screen 1 is the main screen; the others are numbered left to
+right, later arrivals in order of appearance. Audio inputs are
+numbered in the order they are first recorded, those at the start in
+Core Audio's order. A source keeps its number for the whole recording,
+also when it comes back: a screen by its UUID, an audio input by its
+Core Audio UID. So two audio inputs with the same name have different
+numbers and nothing else tells them apart in a name.
 
 `recording.json` is the recording manifest, rewritten atomically on
 every change:
@@ -300,7 +308,7 @@ every change:
       "end": 2285.0,
       "timecode": "14:03:05:04",
       "state": "finalized",
-      "guideTracks": ["Microphones", "System audio"],
+      "guideTracks": ["Audio inputs", "System audio"],
       "framesRepeatedForLateness": 0
     },
     {
@@ -312,11 +320,11 @@ every change:
       "end": 1446.2,
       "timecode": "14:03:05:04",
       "state": "finalized",
-      "guideTracks": ["Microphones", "System audio"],
+      "guideTracks": ["Audio inputs", "System audio"],
       "framesRepeatedForLateness": 0
     },
     {
-      "name": "2026-11-12 14.03.05 Microphone - MacBook Pro Microphone.mov",
+      "name": "2026-11-12 14.03.05 Audio 1 - MacBook Pro Microphone.mov",
       "audioSource": "MacBook Pro Microphone",
       "audioSourceUID": "BuiltInMicrophoneDevice",
       "channels": 1,
@@ -327,7 +335,7 @@ every change:
       "clockDriftPpm": null
     },
     {
-      "name": "2026-11-12 14.03.05 System audio.mov",
+      "name": "2026-11-12 14.03.05 Audio 0 - System.mov",
       "audioSource": "System audio",
       "channels": "stereo",
       "start": 0.0,
@@ -345,7 +353,7 @@ every change:
       "end": null,
       "timecode": "14:27:41:04",
       "state": "recording",
-      "guideTracks": ["Microphones", "System audio"],
+      "guideTracks": ["Audio inputs", "System audio"],
       "framesRepeatedForLateness": 0
     },
     {
@@ -357,7 +365,7 @@ every change:
       "end": null,
       "timecode": "14:41:10:04",
       "state": "recording",
-      "guideTracks": ["Microphones", "System audio"],
+      "guideTracks": ["Audio inputs", "System audio"],
       "framesRepeatedForLateness": 0
     }
   ],
@@ -427,29 +435,27 @@ The net only guarantees that `problems` is not empty when the result
 is `problems`; a failure not told while some other problem was told
 appears only in `events`.
 `events` and `problems` are written in the order of their time.
-An audio file's `audioSource` is the audio input's name (see "Audio
-input names" below) or `System audio`; `audioSourceUID` the input's
+An audio file's `audioSource` is the audio input's device name or
+`System audio`; `audioSourceUID` the input's
 Core Audio UID, absent for the system audio; `channels` the number of
 its mono tracks, or `stereo` for the system audio; `clockDriftPpm` its
 measured clock drift (see "Audio"), null until known. `files` lists the
 screen files and the audio files in the order of their start.
 
-**Audio input names (D49).** In a file name, a reel name and a track
-name, `/` and `:` in an audio input's name become `-`, as for a screen;
-two audio inputs with the same name get " (2)", " (3)" in the order they
-appeared in the recording, and an input that comes back keeps its name.
+**Names in a file name (D49, D55).** In a file name, `/` and `:` in a
+label become `-`, so a device name never stops a source from
+recording.
 
-**Metadata in every file (D46, D49).** The timecode track names the
-source as its reel name (the source reference name of its format
-description): `Screen <n> - <name>` for a screen file, the screen's
-name unchanged; `Microphone - <name>` or `System audio` for an audio
-file. It is written with the track, so a file never finalized keeps it.
+**Metadata in every file (D46, D49, D55).** The timecode track names
+the source as its reel name (the source reference name of its format
+description): the source's label, its name unchanged. It is written with the track, so a file never finalized keeps it.
 Each track is named in its user data full name (`©nam`), the one
 track-level item `ffprobe` shows (as the stream's `title`, checked on
 2026-11-16; items in the track's `mdta` metadata it does not show): a
 screen file's video track by the reel name, its guide tracks
-`Microphones` and `System audio`, an audio file's tracks
-`Microphone: <name>, channel <n>` or `System audio`. A screen file's QuickTime
+`Audio inputs` and `System audio`, an audio file's tracks
+`<label>, channel <n>` (`Audio 1 - MacBook Pro Microphone, channel 1`)
+or, for the system audio, `Audio 0 - System`. A screen file's QuickTime
 metadata items, all text, under `org.schapiro.multiscreenrecorder.`:
 `screenUUID`, `screenNumber`, `screenName`, `frameSize`
 (`1920x1080`), `recordingStarted` (as the manifest's `started`) and
@@ -477,7 +483,10 @@ checked, reported or rewritten at the next start (D47).
 ## The app
 
 - **Start:** a small window. At the top, the app icon, the name, the
-  version and a link to the homepage (`Homepage.url`, defined once).
+  version and a link to the homepage (`Homepage.url`, defined once),
+  and on the right the claim, "Every screen, all audio. Keeps going
+  when things change." (`Claim.text`, defined once; the homepage's
+  tagline too), in italics and the secondary text colour (D55).
   Then a section "What will be recorded", built from the settings and
   the devices connected now and
   refreshed whenever the ready check runs (D33): one table, with a
@@ -492,8 +501,15 @@ checked, reported or rewritten at the next start (D47).
   "888.8" and so on, and the header), never from what is
   connected, so no column moves when auto mode, a slider or the devices
   change; Source takes the rest of the window, which is as wide as the
-  table, holds "MacBook Pro Microphone (default)" and truncates a longer
-  name in the middle (the full name is its tooltip).
+  table, holds the kind's icon and "88 MacBook Pro Microphone (default)"
+  and truncates a longer name in the middle (the label is its tooltip).
+  - Source shows each source as an SF Symbol for its kind (`display` for
+    a screen, `mic` for an audio input, `speaker.wave.2` for the system
+    audio), then its number and its name, as its label numbers it (D55):
+    the screens and the recorded audio inputs from 1, those in the order
+    listed, the system audio 0 and named "System". A source not recorded
+    gets no number. `msr check` prints the label as text instead
+    (`Screen 1 - Built-in Retina Display`).
   - Screen rows first: the number and name, "Looks like" (the size in
     points), "Drawn at" (the pixel size, shown also where both are
     equal), "Records at" (the frame size) and GB/h max (the screen file,
@@ -502,15 +518,16 @@ checked, reported or rewritten at the next start (D47).
     each audio input (the default one marked "(default)") in Source,
     Looks like and Drawn at empty, its number of channels in Records
     at ("1 channel", "2 channels", "cannot be read"), and GB/h max (the
-    audio file); the last row is "System audio" with "stereo". A source not recorded
+    audio file); the last row is the system audio with "stereo", "System
+  audio" without a number when it is off. A source not recorded
     is dimmed and its GB/h max is 0 (D46): every input with the audio
     mode `none`; every input but the default one with
     `default-microphone`; with `wired` every input but the default one
     that is not built-in or wired; and the system audio row when it is
     off.
   - The table's digits are all one width, so the GB/h max figures, the
-    Total's included, line up on the decimal point; only the Total's
-    label is bold.
+    Total's included, line up on the decimal point; only the word
+    "Total" is bold.
   - GB/h max is numbers only (D46), with one decimal; under 0.05 it shows
     "<0.1", and "?" when the rate cannot be told (an input whose
     channels cannot be read).
@@ -560,11 +577,11 @@ checked, reported or rewritten at the next start (D47).
 
 | Source | Looks like | Drawn at | Records at | GB/h max |
 |---|---|---|---|---|
-| 1 Built-in Retina Display | 1728×1117 | 3456×2234 | 1728×1116 | 1.0 |
-| 2 LG HDR 4K | 3840×2160 | 3840×2160 | 3840×2160 | 4.1 |
-| MacBook Pro Microphone (default) |  |  | 1 channel | 0.1 |
-| RØDE Wireless GO II RX |  |  | 2 channels | 0.1 |
-| System audio |  |  | stereo | 0.1 |
+| Screen 1 - Built-in Retina Display | 1728×1117 | 3456×2234 | 1728×1116 | 1.0 |
+| Screen 2 - LG HDR 4K | 3840×2160 | 3840×2160 | 3840×2160 | 4.1 |
+| Audio 1 - MacBook Pro Microphone (default) |  |  | 1 channel | 0.1 |
+| Audio 2 - RØDE Wireless GO II RX |  |  | 2 channels | 0.1 |
+| Audio 0 - System |  |  | stereo | 0.1 |
 | Total |  |  |  | 5.3 |
 
 2 hours need 10.7 GB, 3.1 GB free.
@@ -581,7 +598,8 @@ checked, reported or rewritten at the next start (D47).
 - **Status window (D46):** clicking the Dock icon while recording opens
   a small window, and Quit opens it too: a table with a row per screen,
   then a row per audio source the recording records or recorded (the
-  audio inputs by name, the system audio last), and the columns Source,
+  audio inputs by number, the system audio last), and the columns Source
+  (as in the start window: the kind's icon, the number and the name),
   "Records at" (a screen's frame size; an audio source's `1 channel`,
   `2 channels` or `stereo`), Files, Written (its files on disk, below
   1 GB in whole MB, from there in GB with one decimal) and
@@ -718,7 +736,7 @@ questions").
 encoder in `.mov`; keyframe every 2 s; quality-targeted variable bit
 rate with a ceiling. Audio AAC-LC at 48 kHz: in an audio file
 128 kbit/s per mono track and 192 kbit/s for the system audio's stereo
-track; in a screen file 64 kbit/s for the guide track "Microphones"
+track; in a screen file 64 kbit/s for the guide track "Audio inputs"
 and 96 kbit/s for the guide track "System audio". Every screen is
 recorded in SDR, also one
 in HDR mode, with its colour space tagged so editors show the colours
@@ -760,8 +778,8 @@ short screen files, each valid.
 **Audio (D12, D22, D31, D49).** One audio file per recorded audio
 source, beside the screen files. Each recorded audio input gets its
 own audio file, a `.mov` with one mono track per channel, named
-`Microphone: <device>, channel <n>`; the system audio gets its own
-audio file with one stereo track, named `System audio`. Every audio
+`<label>, channel <n>`; the system audio gets its own audio file with
+one stereo track, named `Audio 0 - System`. Every audio
 file carries the timecode track with the source as its reel name and
 the metadata items (see "Output on disk").
 
@@ -843,10 +861,10 @@ the metadata items (see "Output on disk").
   and samples left over are lost: `audio file writer fell behind` with
   its `error`, a failure, and a problem.
 - **Guide tracks.** For playback and waveform sync, every screen file
-  also carries guide tracks: "Microphones", one mono mix of the
+  also carries guide tracks: "Audio inputs", one mono mix of the
   recorded audio inputs, unless the audio mode is `none`; "System
   audio", stereo, unless system audio is off. The two are never mixed
-  together. For "Microphones" each audio input is averaged to mono, the
+  together. For "Audio inputs" each audio input is averaged to mono, the
   inputs are summed at unity gain, so a silent input never lowers a
   live one, and a soft limiter keeps the sum within ±1: unchanged up to
   0.5 (−6 dBFS), above it `0.5 + 0.5 · tanh((|x| − 0.5) / 0.5)` with its
@@ -1080,7 +1098,7 @@ folder, and by the v1 gate. The design of the end-to-end tests is
   parallel recordings at no extra cost (D20).
 - **Mixing an input down to mono or stereo in its audio file:**
   channels may carry different people (D22); only the guide track
-  "Microphones" is a mix, for playback and sync (D31).
+  "Audio inputs" is a mix, for playback and sync (D31).
 - **A notification for low disk space:** see "The app".
 - **Recording HDR screens as HDR:** files of mixed kinds on one
   timeline, larger files, and weak support outside DaVinci Resolve, for
@@ -1185,7 +1203,7 @@ one; a new audio file on a channel count change; the system audio from
 a ScreenCaptureKit stream on the main screen, moving with it; audio
 files placed on the tick grid, gaps up to 1 s filled with silence, a
 longer one ending the file; `clockDriftPpm` per audio file; the guide
-tracks "Microphones" and "System audio" in every screen file; audio
+tracks "Audio inputs" and "System audio" in every screen file; audio
 sources in the status window and the summary; audio files counted in
 the low disk warning threshold; our process's CPU use in the status
 window, the summary and the manifest. Tested without a microphone or a
@@ -1199,7 +1217,7 @@ its audio file and starting a new one; screens connected and
 disconnected, a virtual screen and main screen changes among them;
 the "System audio" guide track equal to `System audio.mov` at 0
 samples of lag; the timecode aligned in DaVinci Resolve; the
-"Microphones" gain of 1/√6 of that build, the rule D52 replaced,
+"Microphones" (now "Audio inputs") gain of 1/√6 of that build, the rule D52 replaced,
 measured. Seen there, and not the
 recorder's: while USB devices re-enumerated, macOS delivered zeros on
 the USB inputs and on the system audio for 4 to 10 s. Not verified

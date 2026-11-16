@@ -42,6 +42,8 @@ header {
   text-wrap: balance;
 }
 
+.description { text-align: center; text-wrap: balance; }
+
 .download { text-align: center; margin-block: 2rem; }
 
 .button {

@@ -12,13 +12,19 @@ settings, the ready check, the pipeline for snapshot releases and
 releases, and the recording core (recording, recording folder,
 recording manifest, problem, status window, screen file, screen
 identity, settle time, screen check, tick, timecode, audio track,
-audio file, guide track, clock drift; D45, D49).
+audio file, guide track, clock drift; D45, D49), labels (D55).
 
 ## Multi Screen Recorder
 
 This product: the app and its command line for macOS. The repository is
 `multi-screen-recorder-macos`; the bundle ID is
 `org.schapiro.multiscreenrecorder`.
+
+## Claim
+
+The product's one-line promise: "Every screen, all audio. Keeps going
+when things change." Shown in the app's header and as the homepage's
+tagline (D55).
 
 ## Former upstream
 
@@ -78,6 +84,22 @@ apart from the settings file because the person never edits it (D40).
 
 The end-to-end driver's file of what a run changed, read by `restore`;
 called "state file" in D38.
+
+## Screen
+
+A monitor the Mac shows a picture on, built in or connected, by any
+port. Apple's APIs and System Settings call it a display; this project
+says screen everywhere else (D55).
+
+## Label
+
+What a recorded source is called in its file names, its reel name, its
+track names and the terminal's tables (the window shows an icon for
+the kind instead of the word):
+`Screen <n> - <name>`, `Audio <n> - <name>`, or `Audio 0 - System` for
+the system audio. The numbers count per kind from 1 in order of
+appearance in the recording, and a source keeps its number when it
+comes back (D55).
 
 ## Screen file
 
@@ -176,7 +198,7 @@ starts a new one (D31, D46, D49).
 ## Guide track
 
 A track in a screen file for playback and waveform sync only:
-"Microphones", one mono mix of the recorded audio inputs (each averaged
+"Audio inputs", one mono mix of the recorded audio inputs (each averaged
 to mono, summed at unity gain, through a soft limiter; D52), or
 "System audio", stereo; the two are never mixed together. Which ones a
 screen file has follows from the settings alone; a missing source is

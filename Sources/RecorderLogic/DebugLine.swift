@@ -17,7 +17,7 @@ public enum DebugLine {
         case .failure(let error): "screens cannot be read (\(error))"
         }
         let audioInputs = switch facts.audioInputs {
-        case .success(let inputs): "audio inputs: " + list(inputs.map { "\($0.label) \($0.channelsText)" })
+        case .success(let inputs): "audio inputs: " + list(inputs.map { "\($0.shownName) \($0.channelsText)" })
         case .failure(let error): "audio inputs cannot be read (\(error))"
         }
         let folder = switch facts.outputFolder {

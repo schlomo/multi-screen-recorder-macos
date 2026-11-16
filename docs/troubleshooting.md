@@ -34,7 +34,7 @@ One row per entry, the error text exactly as in the entry.
 
 - **Error:** `<the exact error text, verbatim>`
 - **Symptom:** what is seen, and where (command, job, log).
-- **Why:** the root cause, with its evidence label.
+- **Why:** the root cause, with its evidence tag.
 - **Fix:** the literal command or change.
 - **Verify:** the check that proves the fix worked.
 - **Observed:** <date>, <tool and version>; open | resolved upstream

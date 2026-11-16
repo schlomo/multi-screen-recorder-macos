@@ -35,9 +35,11 @@ import Testing
             ],
             audioError: nil,
             audio: [
-                .init(name: "MacBook Pro Microphone (default)", channels: "1 channel", isRecorded: true, gigabytesPerHour: "0.1"),
-                .init(name: "RØDE Wireless GO II RX", channels: "2 channels", isRecorded: true, gigabytesPerHour: "0.1"),
-                .init(name: "System audio", channels: "stereo", isRecorded: true, gigabytesPerHour: "0.1"),
+                .init(source: .audioInput(1, name: "MacBook Pro Microphone (default)"), channels: "1 channel", isRecorded: true,
+                      gigabytesPerHour: "0.1"),
+                .init(source: .audioInput(2, name: "RØDE Wireless GO II RX"), channels: "2 channels", isRecorded: true,
+                      gigabytesPerHour: "0.1"),
+                .init(source: .systemAudio(isRecorded: true), channels: "stereo", isRecorded: true, gigabytesPerHour: "0.1"),
             ],
             total: .init(gigabytesPerHour: "5.3", need: "2 hours need 10.7 GB, 3.1 GB free."),
             outputFolder: "Files go to ~/Movies/Multi Screen Recorder",
@@ -67,32 +69,36 @@ import Testing
 
     /// The total is the table's last row, in the GB/h max column.
     @Test func theTotalIsARowWithItsValueInTheLastColumn() {
-        #expect(defaultSection.totalRow == .init(cells: ["Total", "", "", "", "5.3"], isRecorded: true))
+        #expect(defaultSection.totalRow == .init(source: nil, values: ["", "", "", "5.3"], isRecorded: true))
+        #expect(defaultSection.totalRow?.cells == ["Total", "", "", "", "5.3"])
         #expect(section(screens: .failure(DeviceReadError("no screen"))).totalRow == nil)
     }
 
     @Test func oneTableHasTheScreenRowsThenTheAudioRowsAndSystemAudioLast() {
         let example = defaultSection
-        #expect(example.screenRows == [
-            .init(cells: ["1 Built-in Retina Display", "1728×1117", "3456×2234", "1728×1116", "1.0"], isRecorded: true),
-            .init(cells: ["2 LG HDR 4K", "3840×2160", "3840×2160", "3840×2160", "4.1"], isRecorded: true),
+        #expect(example.screenRows.map(\.cells) == [
+            ["Screen 1 - Built-in Retina Display", "1728×1117", "3456×2234", "1728×1116", "1.0"],
+            ["Screen 2 - LG HDR 4K", "3840×2160", "3840×2160", "3840×2160", "4.1"],
         ])
-        #expect(example.audioRows == [
-            .init(cells: ["MacBook Pro Microphone (default)", "", "", "1 channel", "0.1"], isRecorded: true),
-            .init(cells: ["RØDE Wireless GO II RX", "", "", "2 channels", "0.1"], isRecorded: true),
-            .init(cells: ["System audio", "", "", "stereo", "0.1"], isRecorded: true),
+        #expect(example.audioRows.map(\.cells) == [
+            ["Audio 1 - MacBook Pro Microphone (default)", "", "", "1 channel", "0.1"],
+            ["Audio 2 - RØDE Wireless GO II RX", "", "", "2 channels", "0.1"],
+            ["Audio 0 - System", "", "", "stereo", "0.1"],
         ])
+        #expect((example.screenRows + example.audioRows).map(\.source?.kind)
+            == [.screen, .screen, .audioInput, .audioInput, .systemAudio])
     }
 
     @Test func aSourceNotRecordedIsARowWithNotRecordedAndIsDimmed() {
         let rows = section(audioInputs: DesignExample.audioInputs + [AudioInputInfo(
             name: "AirPods", channelCount: 1, isDefault: false, transport: .bluetooth)]).audioRows
-        #expect(rows.last { $0.cells[0] == "AirPods" } == .init(cells: ["AirPods", "", "", "1 channel", "0"], isRecorded: false))
+        #expect(rows.last { $0.cells[0] == "AirPods" }
+            == .init(source: .audioInput(nil, name: "AirPods"), values: ["", "", "1 channel", "0"], isRecorded: false))
     }
 
     @Test func anUnreadableRecordedInputIsARowWithUnknown() {
         let rows = section(audioInputs: [Self.unreadable(isDefault: true)]).audioRows
-        #expect(rows.first == .init(cells: ["X (default)", "", "", "cannot be read", "?"], isRecorded: true))
+        #expect(rows.first?.cells == ["Audio 1 - X (default)", "", "", "cannot be read", "?"])
     }
 
     @Test func everyRowHasOneCellPerColumn() {
@@ -105,7 +111,20 @@ import Testing
         #expect(section { $0.resolution = .p720 }.screens.map(\.recordsAt) == ["1112×720", "1280×720"])
     }
 
-    @Test func audioModeNoneRecordsNoInputAndNoMicrophonesGuideTrack() {
+    /// D55: recorded inputs are numbered from 1 in the order listed, as
+    /// the recording numbers them at its start; one not recorded gets no
+    /// number, the system audio is 0.
+    @Test func recordedInputsAreNumberedInOrderAndOnesNotRecordedGetNoNumber() {
+        let audio = section({ $0.audioMode = .wired },
+                            audioInputs: [Self.airPods] + DesignExample.audioInputs + [Self.virtualInput]).audio
+        #expect(audio.map(\.source.number) == [nil, 1, 2, nil, 0])
+        #expect(audio.map(\.source.text) == [
+            "AirPods", "Audio 1 - MacBook Pro Microphone (default)", "Audio 2 - RØDE Wireless GO II RX", "Loopback",
+            "Audio 0 - System",
+        ])
+    }
+
+    @Test func audioModeNoneRecordsNoInputAndNoAudioInputsGuideTrack() {
         let none = section { $0.audioMode = .none }
         #expect(none.audio.dropLast().allSatisfy { !$0.isRecorded && $0.gigabytesPerHour == "0" })
         #expect(none.audio.last?.isRecorded == true)
@@ -117,7 +136,7 @@ import Testing
             AudioInputInfo(name: $0.name, channelCount: $0.channelCount, isDefault: false)
         }
         let audio = section(audioInputs: inputs).audio
-        #expect(audio.map(\.name) == ["MacBook Pro Microphone", "RØDE Wireless GO II RX", "System audio"])
+        #expect(audio.map(\.source.text) == ["MacBook Pro Microphone", "RØDE Wireless GO II RX", "Audio 0 - System"])
         #expect(audio.dropLast().allSatisfy { !$0.isRecorded })
     }
 
@@ -154,15 +173,15 @@ import Testing
     @Test func theTextForMSRCheckIsOneTableAndTheTotal() {
         #expect(defaultSection.text == """
             What will be recorded
-              Source                            Looks like  Drawn at   Records at  GB/h max
-              1 Built-in Retina Display         1728×1117   3456×2234  1728×1116        1.0
-              2 LG HDR 4K                       3840×2160   3840×2160  3840×2160        4.1
-              ─────────────────────────────────────────────────────────────────────────────
-              MacBook Pro Microphone (default)                         1 channel        0.1
-              RØDE Wireless GO II RX                                   2 channels       0.1
-              System audio                                             stereo           0.1
-              ─────────────────────────────────────────────────────────────────────────────
-              Total                                                                     5.3
+              Source                                      Looks like  Drawn at   Records at  GB/h max
+              Screen 1 - Built-in Retina Display          1728×1117   3456×2234  1728×1116        1.0
+              Screen 2 - LG HDR 4K                        3840×2160   3840×2160  3840×2160        4.1
+              ───────────────────────────────────────────────────────────────────────────────────────
+              Audio 1 - MacBook Pro Microphone (default)                         1 channel        0.1
+              Audio 2 - RØDE Wireless GO II RX                                   2 channels       0.1
+              Audio 0 - System                                                   stereo           0.1
+              ───────────────────────────────────────────────────────────────────────────────────────
+              Total                                                                               5.3
               2 hours need 10.7 GB, 3.1 GB free.
               Files go to ~/Movies/Multi Screen Recorder
 
@@ -177,7 +196,7 @@ import Testing
         let broken = section(screens: .failure(DeviceReadError("no screen")), audioInputsError: DeviceReadError("no list"))
         #expect(broken.text.contains("  The screens cannot be read: no screen\n"))
         #expect(broken.text.contains("  The audio inputs cannot be read: no list\n"))
-        #expect(broken.text.contains("System audio"))
+        #expect(broken.text.contains("Audio 0 - System"))
         #expect(!broken.text.contains("Total"))
     }
 
@@ -190,7 +209,8 @@ import Testing
 
     @Test func systemAudioOffIsNotRecorded() {
         #expect(section { $0.systemAudio = false }.audio.last
-            == .init(name: "System audio", channels: "stereo", isRecorded: false, gigabytesPerHour: "0"))
+            == .init(source: .systemAudio(isRecorded: false), channels: "stereo", isRecorded: false, gigabytesPerHour: "0"))
+        #expect(section { $0.systemAudio = false }.audioRows.last?.cells[0] == "System audio")
     }
 
     @Test(arguments: [nil, OutputFolderProbe.unusable("gone"), .usable(.unreadable("no such volume"))])
@@ -226,7 +246,7 @@ import Testing
     @Test func anUnreadableInputThatIsNotRecordedIsARowAndKeepsTheTotal() {
         let withUnreadable = section(audioInputs: DesignExample.audioInputs + [Self.unreadable(isDefault: false)])
         #expect(withUnreadable.audio[2]
-            == .init(name: "X", channels: "cannot be read", isRecorded: false, gigabytesPerHour: "0"))
+            == .init(source: .audioInput(nil, name: "X"), channels: "cannot be read", isRecorded: false, gigabytesPerHour: "0"))
         #expect(withUnreadable.screens == section().screens)
         #expect(withUnreadable.total == section().total)
     }
@@ -234,7 +254,7 @@ import Testing
     @Test func anUnreadableRecordedInputLeavesTheTotalOut() {
         let broken = section(audioInputs: [Self.unreadable(isDefault: true)])
         #expect(broken.audio.first
-            == .init(name: "X (default)", channels: "cannot be read", isRecorded: true, gigabytesPerHour: "?"))
+            == .init(source: .audioInput(1, name: "X (default)"), channels: "cannot be read", isRecorded: true, gigabytesPerHour: "?"))
         #expect(broken.screens == section().screens)
         #expect(broken.total == nil)
     }
@@ -242,7 +262,7 @@ import Testing
     @Test func anUnreadableListOfAudioInputsIsSaidAndLeavesTheTotalOut() {
         let broken = section(audioInputsError: DeviceReadError("no list"))
         #expect(broken.audioError == "The audio inputs cannot be read: no list")
-        #expect(broken.audio.map(\.name) == ["System audio"])
+        #expect(broken.audio.map(\.source.text) == ["Audio 0 - System"])
         #expect(broken.screens == section().screens)
         #expect(broken.total == nil)
     }

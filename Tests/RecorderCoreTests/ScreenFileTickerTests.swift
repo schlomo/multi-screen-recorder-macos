@@ -88,18 +88,18 @@ import Testing
     @Test func guideSamplesArePlacedFromTheFilesFirstTick() throws {
         let (ticker, writer) = ticker()
         // Before a file: nothing.
-        #expect(ticker.receiveGuide(.microphones, [[0, 0]], positionFromStart: 0) == nil)
+        #expect(ticker.receiveGuide(.audioInputs, [[0, 0]], positionFromStart: 0) == nil)
         _ = ticker.receive(frame, capturedAt: grid.time(ofTick: 2) - 1)
         let made = try #require(writer())
         #expect(made.firstTick == 2)
         let samplesPerTick = RecorderValues.audioSampleRate / RecorderValues.framesPerSecond
         let chunk = [Float](repeating: 0, count: 4800)
-        _ = ticker.receiveGuide(.microphones, [chunk], positionFromStart: 0)
+        _ = ticker.receiveGuide(.audioInputs, [chunk], positionFromStart: 0)
         made.isReady = false
         _ = ticker.receiveGuide(.systemAudio, [chunk, chunk], positionFromStart: 4800)
         made.isReady = true
         #expect(ticker.tick(now: grid.time(ofTick: 2)) == nil)
-        #expect(made.guides.map(\.0) == [.microphones, .systemAudio])
+        #expect(made.guides.map(\.0) == [.audioInputs, .systemAudio])
         #expect(made.guides.map(\.1) == [0, Int64(4800 - 2 * samplesPerTick)])
         #expect(made.guides.map(\.2) == [4800 - 2 * samplesPerTick, 4800])
     }
@@ -113,10 +113,10 @@ import Testing
         _ = ticker.receive(frame, capturedAt: 0)
         let made = try #require(writer())
         made.isGuideReady = guideReady
-        var mix = GuideTrackMix(.microphones)
+        var mix = GuideTrackMix(.audioInputs)
         mix.add(source: "A", channelCount: 1)
         mix.receive([[Float](repeating: 0.25, count: handedOver)], from: "A", at: 0)
-        _ = ticker.receiveGuide(.microphones, mix.mix(upTo: Int64(handedOver)), positionFromStart: 0)
+        _ = ticker.receiveGuide(.audioInputs, mix.mix(upTo: Int64(handedOver)), positionFromStart: 0)
         return (ticker, made, mix)
     }
 
@@ -130,11 +130,11 @@ import Testing
         var position = handedOver
         while position < end {
             let next = min(end, position + 4800)
-            pending.append(.init(guide: .microphones, channels: mix.mix(upTo: next), positionFromStart: position))
+            pending.append(.init(guide: .audioInputs, channels: mix.mix(upTo: next), positionFromStart: position))
             position = next
         }
         let peek = mix.peek(upTo: videoEnd)
-        return GuideLastMix(pending: pending, peeks: [.microphones: .init(start: peek.start, channels: peek.channels)])
+        return GuideLastMix(pending: pending, peeks: [.audioInputs: .init(start: peek.start, channels: peek.channels)])
     }
 
     /// At the end, the hand-overs that came while the file ended and a peek
@@ -164,7 +164,7 @@ import Testing
         })
         await ready.value
         #expect(made.written.last == ticksOfVideo)
-        let samples = try #require(made.guideSamples[.microphones])
+        let samples = try #require(made.guideSamples[.audioInputs])
         #expect(samples.count == videoSamples)
         #expect(samples.allSatisfy { $0 == 0.25 })
         #expect(end.guideTracksCut.isEmpty)
@@ -189,7 +189,7 @@ import Testing
         }
         let end = try #require(await ticker.finish(now: grid.time(ofTick: ticksOfVideo), writeWaitingTicks: true) { _ in last })
         await ready.value
-        let samples = try #require(made.guideSamples[.microphones])
+        let samples = try #require(made.guideSamples[.audioInputs])
         #expect(samples.count == videoSamples)
         #expect(samples.allSatisfy { $0 == 0.25 })
         #expect(end.guideTracksCut.isEmpty)
@@ -202,10 +202,10 @@ import Testing
         made.isGuideReady = false
         let peek = mix.peek(upTo: Int64(videoSamples))
         let end = try #require(await ticker.finish(now: grid.time(ofTick: 30), writeWaitingTicks: true) { _ in
-            GuideLastMix(pending: [], peeks: [.microphones: .init(start: peek.start, channels: peek.channels)])
+            GuideLastMix(pending: [], peeks: [.audioInputs: .init(start: peek.start, channels: peek.channels)])
         })
-        #expect(made.guideSamples[.microphones]?.count == 48_000)
-        #expect(end.guideTracksCut == [GuideTrackCut(guide: .microphones, why: .writerTimedOut)])
+        #expect(made.guideSamples[.audioInputs]?.count == 48_000)
+        #expect(end.guideTracksCut == [GuideTrackCut(guide: .audioInputs, why: .writerTimedOut)])
         #expect(end.file.state == .finalized)
     }
 
@@ -218,10 +218,10 @@ import Testing
         #expect(ticker.tick(now: grid.time(ofTick: 30)) == nil)
         let peek = mix.peek(upTo: 49_600)
         let end = try #require(await ticker.finish(now: grid.time(ofTick: 30), writeWaitingTicks: true) { _ in
-            GuideLastMix(pending: [], peeks: [.microphones: .init(start: peek.start, channels: peek.channels)])
+            GuideLastMix(pending: [], peeks: [.audioInputs: .init(start: peek.start, channels: peek.channels)])
         })
-        #expect(made.guideSamples[.microphones]?.count == 48_000)
-        #expect(end.guideTracksCut == [GuideTrackCut(guide: .microphones, why: .samplesGone)])
+        #expect(made.guideSamples[.audioInputs]?.count == 48_000)
+        #expect(end.guideTracksCut == [GuideTrackCut(guide: .audioInputs, why: .samplesGone)])
     }
 
     /// The guide samples at the end wait for the writer as the ticks do.
@@ -236,7 +236,7 @@ import Testing
         }
         let peek = mix.peek(upTo: Int64(videoSamples))
         _ = try #require(await ticker.finish(now: grid.time(ofTick: 30), writeWaitingTicks: true) { _ in
-            GuideLastMix(pending: [], peeks: [.microphones: .init(start: peek.start, channels: peek.channels)])
+            GuideLastMix(pending: [], peeks: [.audioInputs: .init(start: peek.start, channels: peek.channels)])
         })
         await ready.value
         #expect(made.guides.map(\.2).reduce(0, +) == videoSamples, "\(made.guides.map(\.2))")

@@ -17,8 +17,12 @@ enum TableLayout {
     /// The space between the table's border and its first and last column.
     static let cellPadding: CGFloat = 6
 
-    /// The longest source name expected, which Source must hold; a longer one is truncated.
-    static let longestSourceName = "MacBook Pro Microphone (default)"
+    /// The longest source name expected, with its number, which Source
+    /// must hold after the kind's icon; a longer one is truncated.
+    static let longestSourceName = "88 MacBook Pro Microphone (default)"
+    /// The kind's icon in Source, and the space after it.
+    static let iconWidth: CGFloat = 20
+    static let iconSpacing: CGFloat = 6
 
     /// The widest possible content of each column after Source.
     static let samples: [[String]] = [
@@ -28,7 +32,8 @@ enum TableLayout {
         ["888.8", "<0.1", "?", "0"],
     ]
 
-    static let sourceWidth = measuredWidth(longestSourceName, WhatWillBeRecorded.columns[0])
+    static let sourceWidth = max(iconWidth + iconSpacing + measuredWidth(longestSourceName),
+                                 measuredWidth(WhatWillBeRecorded.columns[0]))
 
     /// Looks like, Drawn at, Records at and GB/h max.
     static let fixedColumnWidths: [CGFloat] = samples.enumerated().map { offset, samples in

@@ -107,7 +107,7 @@ import Testing
             clock: SharedClock(reading: reading), app: "Multi Screen Recorder (tests)")
         let writer = writer
         let capture = AudioCapture(
-            id: id, name: id == .systemAudio ? "System audio" : "Razer Seiren V3 Mini", source: source, context: context,
+            id: id, number: id == .systemAudio ? 0 : 2, name: id == .systemAudio ? "System audio" : "Razer Seiren V3 Mini", source: source, context: context,
             guides: GuideTrackFeed(tracks: [], now: { 0 }), reports: reported.reports, drainTimeout: drainTimeout,
             makeWriter: { _, _, _ in writer })
         capture.start()

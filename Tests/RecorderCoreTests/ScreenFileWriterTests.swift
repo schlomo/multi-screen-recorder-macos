@@ -156,7 +156,7 @@ import Testing
         #expect(associated.count == 1)
     }
 
-    /// A screen file's guide tracks, "Microphones" mono and "System audio"
+    /// A screen file's guide tracks, "Audio inputs" mono and "System audio"
     /// stereo, cover its time, written as the guide track feed does.
     @Test func aScreenFileCarriesItsGuideTracks() async throws {
         defer { removeScratch() }
@@ -164,14 +164,14 @@ import Testing
         let url = scratch.appending(path: "guide.mov")
         let writer = try ScreenFileWriter(
             url: url, frameSize: frameSize, firstTick: 0, timecode: Timecode(start: try startDate(), timeZone: berlin),
-            metadata: metadata, guideTracks: [.microphones, .systemAudio])
+            metadata: metadata, guideTracks: [.audioInputs, .systemAudio])
         let image = try frame(brightness: 90)
         let samplesPerTick = RecorderValues.audioSampleRate / rate
         for tick in Int64(0)..<Int64(3 * rate) {
             while try !writer.append(image, tick: tick) { try await Task.sleep(for: .milliseconds(1)) }
             let tone = (0..<samplesPerTick).map { Float(0.2 * sin(Double(Int(tick) * samplesPerTick + $0) / 10)) }
             let position = tick * Int64(samplesPerTick)
-            while try !writer.appendGuide(.microphones, [tone], at: position) { try await Task.sleep(for: .milliseconds(1)) }
+            while try !writer.appendGuide(.audioInputs, [tone], at: position) { try await Task.sleep(for: .milliseconds(1)) }
             while try !writer.appendGuide(.systemAudio, [tone, tone], at: position) { try await Task.sleep(for: .milliseconds(1)) }
         }
         try await writer.finish(lastTick: Int64(3 * rate) - 1)
@@ -186,7 +186,7 @@ import Testing
             found[try await name?.load(.stringValue) ?? "?"] = channels
             #expect(abs(try await track.load(.timeRange).duration.seconds - 3) < 0.05)
         }
-        #expect(found == ["Microphones": 1, "System audio": 2])
+        #expect(found == ["Audio inputs": 1, "System audio": 2])
     }
 
     /// A file the process never finalized, as after a crash, is readable up

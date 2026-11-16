@@ -30,11 +30,11 @@ import Testing
     }
 
     @Test func theGuideTracksFollowTheSettingsAlone() {
-        #expect(GuideTrack.tracks(for: settings()) == [.microphones, .systemAudio])
+        #expect(GuideTrack.tracks(for: settings()) == [.audioInputs, .systemAudio])
         #expect(GuideTrack.tracks(for: settings { $0.audioMode = .none }) == [.systemAudio])
-        #expect(GuideTrack.tracks(for: settings { $0.systemAudio = false }) == [.microphones])
+        #expect(GuideTrack.tracks(for: settings { $0.systemAudio = false }) == [.audioInputs])
         #expect(GuideTrack.tracks(for: silent).isEmpty)
-        #expect(GuideTrack.microphones.name == "Microphones")
+        #expect(GuideTrack.audioInputs.name == "Audio inputs")
         #expect(GuideTrack.systemAudio.name == "System audio")
     }
 
@@ -116,7 +116,7 @@ import Testing
     @Test func theDesignStatesTheEncodingRates() throws {
         let design = try repositoryFile("docs/design/recorder.md")
         for bitRate in [Encoding.audioInputTrackBitRate, Encoding.systemAudioTrackBitRate,
-                        Encoding.microphonesGuideTrackBitRate, Encoding.systemAudioGuideTrackBitRate] {
+                        Encoding.audioInputsGuideTrackBitRate, Encoding.systemAudioGuideTrackBitRate] {
             #expect(design.contains("\(bitRate / 1000) kbit/s"), "\(bitRate)")
         }
     }

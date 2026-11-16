@@ -46,10 +46,10 @@ struct StartView: View {
     }
 }
 
-/// The app icon, the name, the version and the homepage.
-private struct AppHeader: View {
+/// The app icon, the name, the version and the homepage, and the claim.
+struct AppHeader: View {
     var body: some View {
-        HStack(spacing: 12) {
+        HStack(alignment: .top, spacing: 12) {
             Image(nsImage: NSApp.applicationIconImage)
                 .resizable()
                 .frame(width: 48, height: 48)
@@ -61,6 +61,12 @@ private struct AppHeader: View {
                     .textSelection(.enabled)
                 Link(Homepage.url.host() ?? Homepage.url.absoluteString, destination: Homepage.url)
             }
+            Spacer(minLength: 12)
+            Text(Claim.text)
+                .italic()
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.trailing)
+                .fixedSize(horizontal: false, vertical: true)
         }
     }
 }
@@ -87,8 +93,8 @@ private struct SettingsForm: View {
                     HStack {
                         Slider(value: resolutionIndex, in: 0...Double(RecordingResolution.smallestFirst.count - 1), step: 1)
                             .accessibilityLabel("Recording resolution")
-                            .accessibilityValue(model.settings.effectiveResolution.label)
-                        Text(model.settings.effectiveResolution.label).frame(width: 60, alignment: .leading)
+                            .accessibilityValue(model.settings.effectiveResolution.shownName)
+                        Text(model.settings.effectiveResolution.shownName).frame(width: 60, alignment: .leading)
                             .accessibilityHidden(true)
                     }
                 }
@@ -98,8 +104,8 @@ private struct SettingsForm: View {
                         HStack {
                             Slider(value: audioModeIndex, in: 0...Double(AudioMode.allCases.count - 1), step: 1)
                                 .accessibilityLabel("Audio mode")
-                                .accessibilityValue(model.settings.effectiveAudioMode.label)
-                            Text(model.settings.effectiveAudioMode.label).frame(width: 130, alignment: .leading)
+                                .accessibilityValue(model.settings.effectiveAudioMode.shownName)
+                            Text(model.settings.effectiveAudioMode.shownName).frame(width: 130, alignment: .leading)
                                 .accessibilityHidden(true)
                         }
                         Text(AudioMode.bluetoothAndVirtualNote)
@@ -159,7 +165,7 @@ private struct SettingsForm: View {
 
 /// One table with a header, striped rows and a border: the screens, the
 /// audio sources and the total.
-private struct WhatWillBeRecordedView: View {
+struct WhatWillBeRecordedView: View {
     let section: WhatWillBeRecorded
     /// The output folder as the settings name it, a link that opens it in Finder.
     let outputFolder: String
@@ -171,25 +177,25 @@ private struct WhatWillBeRecordedView: View {
             if let error = section.screensError { errorLabel(error) }
             if let error = section.audioError { errorLabel(error) }
             VStack(spacing: 0) {
-                row(WhatWillBeRecorded.columns)
+                row(nil, WhatWillBeRecorded.columns)
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(.secondary)
                     .background(.quaternary.opacity(0.5))
                 Divider()
                 ForEach(Array(section.screenRows.enumerated()), id: \.offset) { index, screenRow in
-                    row(screenRow.cells).background(stripe(index))
+                    row(screenRow).background(stripe(index))
                 }
                 if !section.screenRows.isEmpty { Divider() }
                 ForEach(Array(section.audioRows.enumerated()), id: \.offset) { index, audioRow in
-                    row(audioRow.cells)
+                    row(audioRow)
                         .foregroundStyle(audioRow.isRecorded ? .primary : .tertiary)
                         .background(stripe(section.screenRows.count + index))
                 }
                 if let totalRow = section.totalRow {
                     Divider()
-                    // Only the label is bold: bold digits are wider and
+                    // Only "Total" is bold: bold digits are wider and
                     // would move the total's decimal point.
-                    row(totalRow.cells, boldLabel: true)
+                    row(totalRow, boldSource: true)
                 }
             }
             .frame(width: TableLayout.tableWidth)
@@ -218,17 +224,27 @@ private struct WhatWillBeRecordedView: View {
             .fixedSize(horizontal: false, vertical: true)
     }
 
-    /// Digits of one width, so the GB/h max figures line up on the decimal point.
-    private func row(_ cells: [String], boldLabel: Bool = false) -> some View {
+    private func row(_ row: WhatWillBeRecorded.Row, boldSource: Bool = false) -> some View {
+        self.row(row.source, row.cells, boldSource: boldSource)
+    }
+
+    /// Digits of one width, so the GB/h max figures line up on the decimal
+    /// point. A source shows its icon and number; the header and the total
+    /// row have none.
+    private func row(_ source: SourceCell?, _ cells: [String], boldSource: Bool = false) -> some View {
         HStack(spacing: TableLayout.columnSpacing) {
             ForEach(Array(cells.enumerated()), id: \.offset) { column, cell in
                 if column == 0 {
-                    Text(cell)
-                        .fontWeight(boldLabel ? .semibold : nil)
-                        .lineLimit(1)
-                        .truncationMode(.middle)
-                        .help(cell)
-                        .frame(width: TableLayout.sourceWidth, alignment: .leading)
+                    Group {
+                        if let source {
+                            SourceCellView(cell: source)
+                        } else {
+                            Text(cell)
+                                .fontWeight(boldSource ? .semibold : nil)
+                                .lineLimit(1)
+                        }
+                    }
+                    .frame(width: TableLayout.sourceWidth, alignment: .leading)
                 } else {
                     Text(cell)
                         .lineLimit(1)

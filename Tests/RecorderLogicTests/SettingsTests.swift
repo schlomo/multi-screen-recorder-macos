@@ -98,7 +98,7 @@ import Testing
 @Suite struct AudioModeTests {
     @Test func theFourStepsInSliderOrderWithTheirWords() {
         #expect(AudioMode.allCases.map(\.rawValue) == ["none", "default-microphone", "wired", "all-inputs"])
-        #expect(AudioMode.allCases.map(\.label) == ["None", "Default microphone", "Wired", "All"])
+        #expect(AudioMode.allCases.map(\.shownName) == ["None", "Default microphone", "Wired", "All"])
     }
 
     @Test func theSliderIndexRoundTrips() {

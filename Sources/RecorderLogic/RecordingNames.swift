@@ -17,26 +17,27 @@ public enum RecordingNames {
         timeStamp(start, timeZone: timeZone)
     }
 
-    /// "2026-11-12 14.03.05 Screen 1 - Built-in Retina Display.mov"; when that
+    /// "2026-11-12 14.03.05 Screen 1 - Built-in Retina Display.mov": the
+    /// file's start time and the screen's label (`SourceLabel`); when that
     /// name is taken in the recording folder (a new file within the same
     /// second), " (2)", " (3)" and so on before the extension.
     public static func screenFile(
         start: Date, timeZone: TimeZone, number: Int, screen: String, taken: Set<String> = []
     ) -> String {
-        untaken("\(timeStamp(start, timeZone: timeZone)) Screen \(number) - \(fileNamePart(screen))", taken: taken)
+        file(start: start, timeZone: timeZone, label: SourceLabel.screen(number, name: screen), taken: taken)
     }
 
-    /// "2026-11-12 14.03.05 Microphone - MacBook Pro Microphone.mov" for an
-    /// audio input under its unique name, "2026-11-12 14.03.05 System
-    /// audio.mov" for the system audio; a taken name as for a screen file.
+    /// "2026-11-12 14.03.05 Audio 1 - MacBook Pro Microphone.mov",
+    /// "2026-11-12 14.03.05 Audio 0 - System.mov"; a taken name as for a
+    /// screen file.
     public static func audioFile(
         start: Date, timeZone: TimeZone, source: AudioFileDescription.Source, taken: Set<String> = []
     ) -> String {
-        let what = switch source {
-        case .audioInput(let name, _, _): "Microphone - \(fileNamePart(name))"
-        case .systemAudio: AudioFileDescription.systemAudioName
-        }
-        return untaken("\(timeStamp(start, timeZone: timeZone)) \(what)", taken: taken)
+        file(start: start, timeZone: timeZone, label: source.label, taken: taken)
+    }
+
+    private static func file(start: Date, timeZone: TimeZone, label: String, taken: Set<String>) -> String {
+        untaken("\(timeStamp(start, timeZone: timeZone)) \(fileNamePart(label))", taken: taken)
     }
 
     private static func untaken(_ base: String, taken: Set<String>) -> String {

@@ -66,11 +66,12 @@ private struct StatusView: View {
                 Divider()
                 ForEach(Array(model.rows.enumerated()), id: \.offset) { _, row in
                     GridRow {
-                        ForEach(Array(row.cells.enumerated()), id: \.offset) { column, cell in
+                        SourceCellView(cell: row.source).monospacedDigit()
+                        ForEach(Array(row.values.enumerated()), id: \.offset) { offset, cell in
                             Text(cell)
                                 .lineLimit(1)
                                 .monospacedDigit()
-                                .gridColumnAlignment(column == 2 || column == 3 ? .trailing : .leading)
+                                .gridColumnAlignment(offset == 1 || offset == 2 ? .trailing : .leading)
                         }
                     }
                 }

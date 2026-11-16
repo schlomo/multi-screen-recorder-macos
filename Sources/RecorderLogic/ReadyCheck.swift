@@ -155,7 +155,7 @@ public enum ReadyCheck {
         if case .failure(let error) = unreadableRecordedInputs(audioInputs, settings: settings).first?.channelCount {
             return cannotBeRead(error)
         }
-        var sources = audioInputs.filter(settings.records).map(\.label)
+        var sources = audioInputs.filter(settings.records).map(\.shownName)
         // A Mac without an audio input is ready in every audio mode: the screens and the system audio are recorded.
         let noMicrophone = settings.effectiveAudioMode != .none && sources.isEmpty
         if noMicrophone { sources.append("no microphone") }

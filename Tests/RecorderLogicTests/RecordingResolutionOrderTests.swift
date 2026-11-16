@@ -15,7 +15,7 @@ import Testing
     }
 
     @Test func theOrderIsTheSliderOrder() {
-        #expect(RecordingResolution.smallestFirst.map(\.label) == ["720p", "1080p", "1200p", "1440p", "4K", "Native"])
+        #expect(RecordingResolution.smallestFirst.map(\.shownName) == ["720p", "1080p", "1200p", "1440p", "4K", "Native"])
     }
 
     @Test func theSliderIndexRoundTrips() {

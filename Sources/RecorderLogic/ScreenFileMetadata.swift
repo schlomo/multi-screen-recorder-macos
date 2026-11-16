@@ -29,7 +29,7 @@ public struct ScreenFileMetadata: Equatable, Sendable {
 
     /// "Screen 2 - LG HDR 4K", as in the screen file's name; also the
     /// video track's name.
-    public var reelName: String { "Screen \(screenNumber) - \(screenName)" }
+    public var reelName: String { SourceLabel.screen(screenNumber, name: screenName) }
 
     /// Each metadata item's full key and value.
     public var items: [(key: String, value: String)] {

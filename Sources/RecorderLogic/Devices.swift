@@ -77,7 +77,7 @@ public struct AudioInputInfo: Equatable, Sendable {
     }
 
     /// "MacBook Pro Microphone (default)" or just the name.
-    public var label: String { isDefault ? "\(name) (default)" : name }
+    public var shownName: String { isDefault ? "\(name) (default)" : name }
 
     public var channelsText: String {
         switch channelCount {
@@ -138,7 +138,7 @@ public func renderList(
         lines.append("  none")
     } else {
         for input in audioInputs {
-            lines.append("  \(input.label), \(input.channelsText)")
+            lines.append("  \(input.shownName), \(input.channelsText)")
         }
     }
     lines.append(

@@ -14,7 +14,7 @@ public struct AudioTracker: Sendable {
 
     public enum Action: Equatable, Sendable {
         /// Capture the audio input into audio files under its unique name.
-        case startInput(uid: String, name: String)
+        case startInput(uid: String, number: Int, name: String)
         /// Capture the system audio through a stream on the main screen as
         /// read when it starts; the recorder reports the screen back.
         case startSystemAudio
@@ -61,7 +61,10 @@ public struct AudioTracker: Sendable {
     }
 
     private struct Tracked {
+        /// The device name; "System audio" for the system audio.
         var name: String
+        /// Its number in the recording (`SourceLabel`), 0 for the system audio.
+        var number: Int
         var phase: Phase = .idle
         /// Listed by Core Audio as last read, or for the system audio: on.
         var isPresent: Bool
@@ -87,7 +90,7 @@ public struct AudioTracker: Sendable {
     public let longestRestartDelay: Duration
 
     private var sources: [SourceID: Tracked] = [:]
-    private var names = AudioInputNames()
+    private var nextInputNumber = 1
     private var defaultInput: (uid: String, name: String)?
     /// The audio inputs listed as last read, by UID.
     private var listedBefore: Set<String> = []
@@ -116,7 +119,7 @@ public struct AudioTracker: Sendable {
         var step = observe(inputs, at: now, isBeginning: true)
         if settings.systemAudio {
             sources[.systemAudio] = Tracked(
-                name: AudioFileDescription.systemAudioName, isPresent: true, isWanted: true, changedAt: Int64.min / 2,
+                name: AudioFileDescription.systemAudioName, number: 0, isPresent: true, isWanted: true, changedAt: Int64.min / 2,
                 restartDelay: firstRestartDelay)
         }
         self.mainDisplayID = mainDisplayID
@@ -186,10 +189,11 @@ public struct AudioTracker: Sendable {
                 continue
             }
             guard sources[.input(uid)] == nil else { continue }
-            let name = names.name(coreAudioUID: uid, deviceName: input.name)
+            let name = input.name
             sources[.input(uid)] = Tracked(
-                name: name, isPresent: true, isWanted: true, changedAt: isBeginning ? Int64.min / 2 : now,
+                name: name, number: nextInputNumber, isPresent: true, isWanted: true, changedAt: isBeginning ? Int64.min / 2 : now,
                 restartDelay: firstRestartDelay, channelCount: try? input.channelCount.get())
+            nextInputNumber += 1
             // Newly listed, not only newly recorded, as when it becomes the default.
             if !isBeginning, !listedBefore.contains(uid) {
                 step.events.append(RecordingEvent(at: now, event: .audioInputConnected, audioSource: name))
@@ -290,7 +294,7 @@ public struct AudioTracker: Sendable {
             switch id {
             case .input(let uid):
                 guard tracked.isPresent else { continue }
-                step.actions.append(.startInput(uid: uid, name: tracked.name))
+                step.actions.append(.startInput(uid: uid, number: tracked.number, name: tracked.name))
             case .systemAudio:
                 // A screen to capture is known; the stream reads the main one as it starts.
                 guard mainDisplayID != nil else { continue }
@@ -373,7 +377,7 @@ public struct AudioTracker: Sendable {
     }
 
     private func shownName(_ uid: String, fallback: String) -> String {
-        sources[.input(uid)]?.name ?? RecordingNames.fileNamePart(fallback)
+        sources[.input(uid)]?.name ?? fallback
     }
 
     /// Every audio source the recording records or recorded, as the status window shows it.
@@ -389,11 +393,16 @@ public struct AudioTracker: Sendable {
         }
 
         public var id: SourceID
+        public var number: Int
         public var name: String
         public var state: State
+
+        public var label: String {
+            id == .systemAudio ? SourceLabel.systemAudio : SourceLabel.audioInput(number, name: name)
+        }
     }
 
-    /// The audio inputs by name, then the system audio.
+    /// The audio inputs by number, then the system audio.
     public var sourcesShown: [Source] {
         sources.filter { $0.value.wasRecorded || $0.value.isWanted }.map { id, tracked in
             let state: Source.State = switch tracked.phase {
@@ -406,8 +415,8 @@ public struct AudioTracker: Sendable {
             case .idle where !tracked.isWanted: .notRecorded
             case .idle: .waiting
             }
-            return Source(id: id, name: tracked.name, state: state)
+            return Source(id: id, number: tracked.number, name: tracked.name, state: state)
         }
-        .sorted { ($0.id == .systemAudio ? 1 : 0, $0.name) < ($1.id == .systemAudio ? 1 : 0, $1.name) }
+        .sorted { ($0.id == .systemAudio ? 1 : 0, $0.number) < ($1.id == .systemAudio ? 1 : 0, $1.number) }
     }
 }

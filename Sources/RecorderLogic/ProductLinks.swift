@@ -10,3 +10,8 @@ public enum GitHubRepository {
 public enum Homepage {
     public static let url = URL(string: "https://multiscreenrecorder.schapiro.org")!
 }
+
+/// The product's claim (D55): the app's header and the homepage's tagline.
+public enum Claim {
+    public static let text = "Every screen, all audio. Keeps going when things change."
+}

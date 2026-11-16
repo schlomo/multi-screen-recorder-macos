@@ -21,15 +21,24 @@ public struct WhatWillBeRecorded: Equatable, Sendable {
         public var gigabytesPerHour: String
     }
 
-    /// One row of the table: a cell per column. A source not recorded is shown dimmed.
+    /// One row of the table. A source not recorded is shown dimmed.
     public struct Row: Equatable, Sendable {
-        public var cells: [String]
+        /// Nil for the total row.
+        public var source: SourceCell?
+        /// The cells after Source.
+        public var values: [String]
         public var isRecorded: Bool
+
+        /// A cell per column, Source as text.
+        public var cells: [String] { [source?.text ?? "Total"] + values }
     }
 
     /// An audio input, or the system audio as the last row.
     public struct Audio: Equatable, Sendable {
-        public var name: String
+        /// Recorded inputs are numbered from 1 in the order listed, as the
+        /// recording numbers them at its start.
+        public var source: SourceCell
+        public var name: String { source.name }
         /// "1 channel", "2 channels", "stereo" or "cannot be read": the Records at cell.
         public var channels: String
         /// A source not recorded is shown dimmed.
@@ -93,12 +102,17 @@ public struct WhatWillBeRecorded: Equatable, Sendable {
         }
         switch readAudioInputs {
         case .success(let audioInputs):
-            audio = audioInputs.map { Self.audio($0, settings: settings) }
+            var number = 0
+            audio = audioInputs.map { input in
+                let isRecorded = settings.records(input)
+                if isRecorded { number += 1 }
+                return Self.audio(input, number: isRecorded ? number : nil, settings: settings)
+            }
         case .failure(let error):
             audioError = "The audio inputs cannot be read: \(error)"
         }
         audio.append(Audio(
-            name: "System audio", channels: "stereo", isRecorded: settings.systemAudio,
+            source: .systemAudio(isRecorded: settings.systemAudio), channels: "stereo", isRecorded: settings.systemAudio,
             gigabytesPerHour: settings.systemAudio
                 ? DiskEstimate.gigabytesPerHour(DiskEstimate.systemAudioFileBytesPerHour) : Self.notRecorded))
     }
@@ -111,16 +125,17 @@ public struct WhatWillBeRecorded: Equatable, Sendable {
     }
 
     /// An input whose channels cannot be read says so; its GB/h max is "?" if it is recorded.
-    private static func audio(_ input: AudioInputInfo, settings: Settings) -> Audio {
-        let isRecorded = settings.records(input)
+    private static func audio(_ input: AudioInputInfo, number: Int?, settings: Settings) -> Audio {
+        let isRecorded = number != nil
+        let source = SourceCell.audioInput(number, name: input.shownName)
         return switch input.channelCount {
         case .success(let count):
-            Audio(name: input.label, channels: count == 1 ? "1 channel" : "\(count) channels", isRecorded: isRecorded,
+            Audio(source: source, channels: count == 1 ? "1 channel" : "\(count) channels", isRecorded: isRecorded,
                   gigabytesPerHour: isRecorded
                       ? DiskEstimate.gigabytesPerHour(DiskEstimate.audioInputFileBytesPerHour(channelCount: count))
                       : notRecorded)
         case .failure:
-            Audio(name: input.label, channels: cannotBeRead, isRecorded: isRecorded,
+            Audio(source: source, channels: cannotBeRead, isRecorded: isRecorded,
                   gigabytesPerHour: isRecorded ? unknown : notRecorded)
         }
     }
@@ -147,7 +162,7 @@ public struct WhatWillBeRecorded: Equatable, Sendable {
     /// The screen rows of the table; none when the screens cannot be read.
     public var screenRows: [Row] {
         screens.map {
-            Row(cells: ["\($0.number) \($0.name)", $0.looksLike, $0.drawnAt, $0.recordsAt, $0.gigabytesPerHour],
+            Row(source: .screen($0.number, name: $0.name), values: [$0.looksLike, $0.drawnAt, $0.recordsAt, $0.gigabytesPerHour],
                 isRecorded: true)
         }
     }
@@ -155,13 +170,13 @@ public struct WhatWillBeRecorded: Equatable, Sendable {
     /// The audio rows of the table, the system audio last: no Looks like and Drawn at.
     public var audioRows: [Row] {
         audio.map {
-            Row(cells: [$0.name, "", "", $0.channels, $0.gigabytesPerHour], isRecorded: $0.isRecorded)
+            Row(source: $0.source, values: ["", "", $0.channels, $0.gigabytesPerHour], isRecorded: $0.isRecorded)
         }
     }
 
     /// The table's last row: the total GB/h max; nil without a total.
     public var totalRow: Row? {
-        total.map { Row(cells: ["Total", "", "", "", $0.gigabytesPerHour], isRecorded: true) }
+        total.map { Row(source: nil, values: ["", "", "", $0.gigabytesPerHour], isRecorded: true) }
     }
 
     /// The text `msr check` prints: the window's one table with its total

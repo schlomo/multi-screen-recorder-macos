@@ -206,7 +206,7 @@ public final class ScreenFileTicker {
                 let videoEnd = (lastTick + 1) * perTick
                 let fileStart = writer.firstTick * perTick
                 let last = await lastMix(videoEnd)
-                for guide in [GuideTrack.microphones, .systemAudio] {
+                for guide in [GuideTrack.audioInputs, .systemAudio] {
                     var parts = last.pending.filter { $0.guide == guide }.map { (start: $0.positionFromStart, channels: $0.channels) }
                     if let peek = last.peeks[guide] { parts.append((peek.start, peek.channels)) }
                     let from = guidesReceivedUpTo[guide] ?? fileStart
@@ -220,7 +220,7 @@ public final class ScreenFileTicker {
             }
             if writerError == nil {
                 await drainGuides(writer)
-                for guide in [GuideTrack.microphones, .systemAudio]
+                for guide in [GuideTrack.audioInputs, .systemAudio]
                 where waitingGuides.contains(where: { $0.guide == guide }) && !cut.contains(where: { $0.guide == guide }) {
                     cut.append(GuideTrackCut(guide: guide, why: .writerTimedOut))
                 }

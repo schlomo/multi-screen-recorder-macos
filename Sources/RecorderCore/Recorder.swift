@@ -432,11 +432,11 @@ public final class Recorder {
     private func performAudio(_ action: AudioTracker.Action) {
         RecorderLog.detail("audio: \(action)", category: "recorder")
         switch action {
-        case .startInput(let uid, let name):
-            startAudio(.input(uid), name: name, source: MicrophoneSource(uid: uid))
+        case .startInput(let uid, let sourceNumber, let name):
+            startAudio(.input(uid), sourceNumber: sourceNumber, name: name, source: MicrophoneSource(uid: uid))
         case .startSystemAudio:
             let number = audioCaptureCount + 1
-            startAudio(.systemAudio, name: AudioFileDescription.systemAudioName, source: SystemAudioSource { [weak self] displayID in
+            startAudio(.systemAudio, sourceNumber: 0, name: AudioFileDescription.systemAudioName, source: SystemAudioSource { [weak self] displayID in
                 Task { @MainActor in self?.systemAudioCaptures(displayID: displayID, number: number) }
             })
         case .stop(let id):
@@ -450,7 +450,7 @@ public final class Recorder {
         audioTracker.systemAudioCaptures(displayID: displayID)
     }
 
-    private func startAudio(_ id: AudioTracker.SourceID, name: String, source: any AudioBufferSource) {
+    private func startAudio(_ id: AudioTracker.SourceID, sourceNumber: Int, name: String, source: any AudioBufferSource) {
         audioCaptureCount += 1
         let number = audioCaptureCount
         let inbox = audioReports
@@ -463,7 +463,7 @@ public final class Recorder {
             fileEnded: { end in post(.fileEnded(end)) },
             event: { event in post(.event(event)) },
             ended: { reason in post(.ended(id, number: number, name: name, reason)) })
-        let capture = AudioCapture(id: id, name: name, source: source, context: context, guides: guides, reports: reports)
+        let capture = AudioCapture(id: id, number: sourceNumber, name: name, source: source, context: context, guides: guides, reports: reports)
         audioCaptures[id] = (number, capture)
         capture.start()
     }

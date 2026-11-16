@@ -29,7 +29,8 @@ import Testing
     }
 
     @Test func theSourceColumnHoldsTheLongestExpectedName() {
-        #expect(TableLayout.sourceWidth >= measured("MacBook Pro Microphone (default)"))
+        #expect(TableLayout.sourceWidth
+            >= TableLayout.iconWidth + TableLayout.iconSpacing + measured("88 MacBook Pro Microphone (default)"))
     }
 
     @Test func theWindowIsAsWideAsTheTable() {
