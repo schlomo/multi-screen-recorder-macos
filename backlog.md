@@ -123,7 +123,17 @@ Still open from D34: what AGC does and whether it is on in auto mode;
    about 0.5 GB per hour per mono channel) [ASSUMED]. A better profile:
    `sample <pid> 120 10`, runs with parts switched off, and the start-up
    peak sampled from launch. Scripts and outputs were in the session
-   scratchpad.
+   scratchpad. Measured steady CPU (after 30 s, 3-minute runs, two
+   displays, 2026-11-16): video only 11.5 % (11.9 % at 1080p, so the
+   resolution costs nothing); with system audio 25.9 % (+14.4 %); plus
+   the default microphone 35.0 % (+9.1 %); wired, four inputs and six
+   channels, 54.9 %; all inputs 62.0 %. Audio costs about four times
+   the video, and far more per channel than an AAC encoder alone
+   (0.17 % per mono stream benchmarked): per-buffer appends of 512
+   samples are the suspect. The owner (2026-11-16): a cheaper encoder
+   setting is welcome if files grow only 10 to 20 % "without quality
+   loss", and redundant work goes "where obviously not needed"; the
+   optimisations come later, research first.
 6. **Audio after v0** (D12, D18): AGC, in its own PR, with its own
    design, its column in the window's table and the HDMI test.
    What AGC does is open (D34). Recording all audio inputs is no
@@ -182,10 +192,17 @@ Still open from D34: what AGC does and whether it is on in auto mode;
    10 s, with no event (macOS's doing; the speakers kept playing). Tell
    it as an event and a problem when an input delivers exact zeros for
    2 s or more (system audio excluded, silence is normal there).
-   Design first.
+   The owner (2026-11-16): "We don't need to record zeros, MacBook
+   internal mic is off on lid closed. Hardware muted mic would probably
+   be the same, we can test that with my razer". So such an input is
+   not written while it delivers only zeros (and is told), which also
+   covers the closed lid; to test: what a hardware-muted Razer
+   delivers. Design first.
 10. **Cameras** (the owner, 2026-11-16: "we'll have to add a feature to
    record cameras, same slider: none, default, all, all + virtual. Auto
-   defaults to default camera if available"). Design first.
+   defaults to default camera if available"). A camera's file carries
+   audio too ("Later for webcam we'll have more combined files as we of
+   course want have audio there as well", 2026-11-16). Design first.
 11. **App icon, what is left** after PR #7 (classic `.icns` rendered
    from `assets/icon/app-icon.svg`): the macOS 26 layered icon format
    from the SVG's layers, if a plain package build can compile it; a
