@@ -206,8 +206,29 @@ Still open from D34: what AGC does and whether it is on in auto mode;
 11. **A live status line for `msr record` in a terminal** (the owner,
    2026-11-16: "if running in a terminal (try) then show the running
    status as persistent last line, recording time, CPU, recording size
-   etc."). Design first; the architect's proposal is in the session's
-   reply of 2026-11-16.
+   etc."). Signed off on 2026-11-16, with the owner's additions ("a
+   --quiet option to suppress all regular output", "make sure that
+   stdout and error are handled properly for managed or scripted
+   operation", "a brief banner with version info, build date and
+   homepage link"):
+   - Only when standard error is a terminal: one line, redrawn every
+     second: recording time with seconds, CPU of our process, the
+     recording folder's size, free space, sources, problems. An event
+     or debug line clears it, prints, redraws it; it goes at the end
+     and the summary follows. No option for it.
+   - Today all human output goes to standard output (seen 2026-11-16).
+     The architect's proposal for the split, to confirm in the PR's
+     design: standard output carries only data a script uses (the
+     recording folder's path, one line, when recording starts);
+     everything for people (the banner, the table, the ready check,
+     events, the status line, the summary, debug) goes to standard
+     error; `recording.json` stays the machine-readable result.
+   - `--quiet`: no output for people; errors still go to standard
+     error; exit codes unchanged.
+   - Banner in normal mode: version, build date, a link (the GitHub
+     repository until the homepage, D7, is live).
+   - Check the other commands (`check`, `list`, `settings`, `version`)
+     against the same split.
 12. **App icon, what is left** after PR #7 (classic `.icns` rendered
    from `assets/icon/app-icon.svg`): the macOS 26 layered icon format
    from the SVG's layers, if a plain package build can compile it; a
