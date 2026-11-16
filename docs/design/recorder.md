@@ -26,7 +26,7 @@ signature); if that fails it exits 71 (`EX_OSERR`).
 |---|---|---|
 | `msr list` | Shows displays, audio inputs and system audio | 0, 1 when the displays, the audio inputs or an audio input the settings record cannot be read |
 | `msr check [flags] [--debug]` | Prints "What will be recorded", then runs the ready check and prints each item; `--debug` adds detail on standard error and in the log | 0 ready, 1 not ready |
-| `msr record [flags] [--duration 1h30m] [--debug]` | Records the displays (B1 of the recording core; the audio comes with B2, D45). Without flags it does what Start in the window does, with the same settings file; it prints "What will be recorded" at its start, then runs the ready check, records until Ctrl-C, SIGTERM, SIGHUP, the duration or Stop in the status window (below), and prints the recording folder at the start and a summary at the end. It runs as a full AppKit app without a Dock icon (the `accessory` activation policy) until the ready check passed and the recording starts, then shows the icon; a run that is not ready shows none, and an icon macOS refuses is a problem, and the recording goes on (Ctrl-C stops it); while it records, the icon shows with its badge, and clicking it or Quit opens the status window as in the app (D45, D46). When it stops, for any reason, it first prints `Stopping the recording and finalizing the files…` on standard error, then finalizes and prints the summary; a Ctrl-C while it finalizes prints `Still finalizing the files…` and does nothing more. It prints every event of the recording manifest as one line on standard error (see "Logging"). `--debug` adds detail on standard error and in the log. `--duration` takes hours, minutes and seconds (`1h30m`, `45m`, `90s`); a number without a suffix is minutes (`90` is 90 minutes) | 0 ok (every file finalized, no display file ended by a failure, D47), 1 not ready, 3 when the recording manifest's `result` is `problems`, the finalized manifest could not be written, or the recording could not start |
+| `msr record [flags] [--duration 1h30m] [--debug]` | Records the displays and the audio sources (the recording core, D45, D49). Without flags it does what Start in the window does, with the same settings file; it prints "What will be recorded" at its start, then runs the ready check, records until Ctrl-C, SIGTERM, SIGHUP, the duration or Stop in the status window (below), and prints the recording folder at the start and a summary at the end: every file with its state and our process's CPU use, average and peak. It runs as a full AppKit app without a Dock icon (the `accessory` activation policy) until the ready check passed and the recording starts, then shows the icon; a run that is not ready shows none, and an icon macOS refuses is a problem, and the recording goes on (Ctrl-C stops it); while it records, the icon shows with its badge, and clicking it or Quit opens the status window as in the app (D45, D46). When it stops, for any reason, it first prints `Stopping the recording and finalizing the files…` on standard error, then finalizes and prints the summary; a Ctrl-C while it finalizes prints `Still finalizing the files…` and does nothing more. It prints every event of the recording manifest as one line on standard error (see "Logging"). `--debug` adds detail on standard error and in the log. `--duration` takes hours, minutes and seconds (`1h30m`, `45m`, `90s`); a number without a suffix is minutes (`90` is 90 minutes) | 0 ok (every file finalized, no file ended by a failure, D47), 1 not ready, 3 when the recording manifest's `result` is `problems`, the finalized manifest could not be written, or the recording could not start |
 | `msr settings [flags]` | Without flags prints the effective settings as JSON (show); with any settings flag, `--auto` included, saves the run's effective settings into the settings file and prints them (change). The only command that writes the file; the window also writes it | 0, 1 when it cannot write the file |
 | `msr version` | Prints the version and commit | 0 |
 
@@ -285,6 +285,7 @@ every change:
   "started": "2026-11-12T14:03:05.120+01:00",
   "ended": null,
   "result": null,
+  "cpu": null,
   "settings": { "resolution": "1080p", "audioMode": "default-microphone", "systemAudio": true },
   "files": [
     {
@@ -314,11 +315,13 @@ every change:
     {
       "name": "2026-11-12 14.03.05 Microphone - MacBook Pro Microphone.mov",
       "audioSource": "MacBook Pro Microphone",
+      "audioSourceUID": "BuiltInMicrophoneDevice",
       "channels": 1,
       "start": 0.0,
       "end": null,
       "timecode": "14:03:05:04",
-      "state": "recording"
+      "state": "recording",
+      "clockDriftPpm": null
     },
     {
       "name": "2026-11-12 14.03.05 System audio.mov",
@@ -327,7 +330,8 @@ every change:
       "start": 0.0,
       "end": null,
       "timecode": "14:03:05:04",
-      "state": "recording"
+      "state": "recording",
+      "clockDriftPpm": null
     },
     {
       "name": "2026-11-12 14.27.41 Display 2 - LG HDR 4K.mov",
@@ -355,6 +359,7 @@ every change:
     }
   ],
   "events": [
+    { "at": 812.4, "event": "audio input gap", "display": "MacBook Pro Microphone", "length": 0.25 },
     { "at": 1446.2, "event": "display disconnected", "display": "LG HDR 4K" },
     { "at": 2285.0, "event": "display frame size changed", "display": "Built-in Retina Display",
       "from": [1670, 1080], "to": [1662, 1080] }
@@ -374,35 +379,65 @@ started`, `display mirroring stopped`, `main display changed`,
 `display stream failed`, `display shows another display's picture`,
 `display file writer fell behind`, `display file writer failed`, `disk
 full`, `sleep`, `wake`, and for audio `audio input connected`, `audio
-input disconnected`, `system audio started`, `system audio stopped`;
+input disconnected`, `system audio started`, `system audio stopped`,
+`default microphone changed`, `audio input gap`, `audio input failed`,
+`system audio failed`, `audio file writer failed`;
 each names its display or audio source where it has one (`display`).
 Their fields: `at`, `event`, `display`; `from` and `to` (the old and
-the new frame size) for `display frame size changed`; `mirrors` (the
-display mirrored) for `display mirroring started`; `error` (why) for
-`display stream failed` and `display file writer failed`. The
+the new frame size) for `display frame size changed`, and the old and
+the new default microphone for `default microphone changed` (either
+absent where there was or is none); `mirrors` (the display mirrored)
+for `display mirroring started`; `length` (seconds, to the
+millisecond) for `audio input gap`; `error` (why) for `display stream
+failed`, `display file writer failed`, `audio input failed`, `system
+audio failed` and `audio file writer failed`. The
 manifest's `state` is `recording` or `finalized`; a file's `state` is
 `recording`, `finalized` or `not finalized`.
 `ended` is the local end time, as `started`, and `result` is `ok` when
-every file is finalized and no display file was ended by a failure
-(`display stream failed`, `display file writer failed`, `disk full`,
-`display file writer fell behind`, `display shows another display's
-picture`), otherwise `problems` (D47); both are null until the
+every file is finalized and no file was ended by a failure (`display
+stream failed`, `display file writer failed`, `disk full`, `display
+file writer fell behind`, `display shows another display's picture`,
+`audio input failed`, `system audio failed`, `audio file writer
+failed`; an unplugged audio input and a gap are none), otherwise
+`problems` (D47); `cpu` is our process's CPU use over the recording,
+`averagePercent` and `peakPercent` in percent of one core as Activity
+Monitor shows it, sampled every second, to one decimal (encoding and
+capture in macOS's own processes, `VTEncoderXPCService`, `replayd`,
+`WindowServer`, are not in it); all three are null until the
 recording is finalized. `problems` lists every problem told to the
 person, also those that leave `result` `ok`, each with `at`,
 `problem` (what went wrong) and `error` (the full error text, or null).
 `events` and `problems` are written in the order of their time.
-An audio file's `channels` is the number of its mono tracks, or
-`stereo` for system audio.
+An audio file's `audioSource` is the audio input's name (see "Audio
+input names" below) or `System audio`; `audioSourceUID` the input's
+Core Audio UID, absent for the system audio; `channels` the number of
+its mono tracks, or `stereo` for the system audio; `clockDriftPpm` its
+measured clock drift (see "Audio"), null until known. `files` lists the
+display files and the audio files in the order of their start.
 
-**Metadata in every display file (D46).** The timecode track names the
+**Audio input names (D49).** In a file name, a reel name and a track
+name, `/` and `:` in an audio input's name become `-`, as for a display;
+two audio inputs with the same name get " (2)", " (3)" in the order they
+appeared in the recording, and an input that comes back keeps its name.
+
+**Metadata in every file (D46, D49).** The timecode track names the
 source as its reel name (the source reference name of its format
-description), `Display <n> - <name>`, the display's name unchanged; it
-is written with the track, so a file never finalized keeps it. QuickTime
+description): `Display <n> - <name>` for a display file, the display's
+name unchanged; `Microphone - <name>` or `System audio` for an audio
+file. It is written with the track, so a file never finalized keeps it.
+Each track is named in its user data full name (`©nam`), the one
+track-level item `ffprobe` shows (as the stream's `title`, checked on
+2026-11-16; items in the track's `mdta` metadata it does not show): a
+display file's video track by the reel name, its guide tracks
+`Microphones` and `System audio`, an audio file's tracks
+`Microphone: <name>, channel <n>` or `System audio`. A display file's QuickTime
 metadata items, all text, under `org.schapiro.multiscreenrecorder.`:
 `displayUUID`, `displayNumber`, `displayName`, `frameSize`
 (`1920x1080`), `recordingStarted` (as the manifest's `started`) and
-`app` (as the manifest's `app`), and the app also under the standard
-`com.apple.quicktime.software`; the reel name also under
+`app` (as the manifest's `app`); an audio file's: `audioSource`,
+`audioSourceUID` (not for the system audio), `channels` (as in the
+manifest), `recordingStarted` and `app`; in every file the app also
+under the standard `com.apple.quicktime.software`; the reel name also under
 `com.apple.proapps.reel` and `com.apple.proapps.cameraName`, which
 DaVinci Resolve may map to Reel Name or Camera # [CONJECTURE]. All
 items, like the reel name, are in a file never finalized too. Whether
@@ -505,17 +540,27 @@ Total 5.3 GB/h. 2 hours need 10.7 GB, 3.1 GB free.
   bouncing Dock icon; no notification, which would need a third
   permission and is hidden by Focus modes. A recording problem (the
   recording manifest cannot be written, the displays or the free space
-  cannot be read, a display file's writer fails) shows the same way,
+  cannot be read, a display file's or an audio file's writer fails, an
+  audio source's capture fails) shows the same way,
   and the status window lists it in red; `msr record` also names each
   on standard error.
 - **Status window (D46):** clicking the Dock icon while recording opens
-  a small window, and Quit opens it too: a table with a row per display
-  and the columns Source, "Records at", Files, "GB written" (its display
-  files on disk) and State (`recording`, `waiting`, `failed, retrying`,
-  `shows another display`, `disk full`, `mirroring`, `disconnected`,
-  `asleep`); under it the line "Recording 1:07:00 · 1.3 GB in 3 files ·
-  120.4 GB free", the elapsed time as `h:mm:ss` (D47); the problems in red, with the command for the log
-  (see "Logging"); and [Stop] [Continue]. It refreshes every second
+  a small window, and Quit opens it too: a table with a row per display,
+  then a row per audio source the recording records or recorded (the
+  audio inputs by name, the system audio last), and the columns Source,
+  "Records at" (a display's frame size; an audio source's `1 channel`,
+  `2 channels` or `stereo`), Files, "GB written" (its files on disk) and
+  State (`recording`, `waiting`, `failed, retrying`, `shows another
+  display`, `disk full`, `mirroring`, `disconnected`, `asleep`, and for
+  an audio input no longer in the audio mode, such as the default
+  microphone before a change, `not recorded`); under it the line
+  "Recording 1:07:00 · 1.3 GB in 3 files · 120.4 GB free", the elapsed
+  time as `h:mm:ss` (D47); then "CPU 23 %", our process's CPU use in
+  percent of one core as Activity Monitor shows it, sampled every
+  second, with the line "Encoding and capture also run in macOS's own
+  processes (VTEncoderXPCService, replayd, WindowServer), which this
+  number does not include."; the problems in red, with the command for
+  the log (see "Logging"); and [Stop] [Continue]. It refreshes every second
   while open; Continue closes it. A display file whose size cannot be
   read makes its display's GB written `?`, and the line's data written
   `? GB`. Free space that the volume does not report is a problem as a
@@ -620,13 +665,17 @@ the wait ran out; what failed is in the manifest.
 carries a timecode track: local time of day at 30 fps, non-drop, the
 clock time also on a day with a daylight saving change. A display
 file's timecode track has one sample, at its first tick, as is the
-convention; the writer finishes that track at once, so a display file
-that is never finalized still carries its timecode (tested). All
-files share t0 and the tick grid, so their timecodes agree to the frame
-and an editor can place every file, also a later-starting one, by
-timecode. Unproven until the owner's first real recording: that
-DaVinci Resolve reads the timecode of an audio-only `.mov`, and how
-Kdenlive places the files (see "Open questions").
+convention; the writer finishes that track at once, so a file
+that is never finalized still carries its timecode (tested). An audio
+file's timecode track is the same: `AVAssetWriter` writes it into an
+audio-only fragmented `.mov`, and AVFoundation and `ffprobe` read it
+back with its reel name, finalized or not (the proof of 2026-11-15,
+tested). All files share t0 and the tick grid, so their timecodes
+agree to the frame and an editor can place every file, also a
+later-starting one, by timecode. Unproven until the owner's first real
+recording with audio: that DaVinci Resolve reads the timecode of an
+audio-only `.mov`, and how Kdenlive places the files (see "Open
+questions").
 
 **Encoding (D21, values are *data*).** HEVC 8-bit through the hardware
 encoder in `.mov`; keyframe every 2 s; quality-targeted variable bit
@@ -671,43 +720,93 @@ video and guide tracks only; the audio files and the other displays'
 files continue unbroken; a display that flaps between modes makes many
 short display files, each valid.
 
-**Audio (D12, D22, D31).** One audio file per source, beside the
-display files. Each recorded audio input gets its own audio file, a
-`.mov` with one mono track per channel, named
-`Microphone: <device>, channel <n>`; system audio gets its own audio
-file with one stereo track. Both carry the timecode track. An audio
-file starts on a tick of the shared grid, so its timecode is exact. An
-audio input that appears starts its audio file then (event `audio
-input connected`); one that disappears ends its file (event `audio
-input disconnected`); one whose channel count changes ends its audio
-file and starts a new one. System audio's file has the events `system
-audio started` and `system audio stopped`. An audio file is never
-padded with silence, and a display event never touches an audio file.
-A failing audio stream and a full disk are handled for an audio file as
-for a display file (below): the file ends, the stream is restarted
-with the same back-off, and a new audio file starts once there is
-room. For playback and waveform
-sync, every display file also carries guide tracks: "Microphones", one
-mono mix of all recorded microphone channels, unless the audio mode is
-`none`; "System audio", stereo, unless system audio is off. The two are
-never mixed together, and a source that is missing is silence in its
-guide track. The microphone comes from an `AVCaptureSession` on the
-default input (to be tried before it is built: the app crashed after
-the microphone was unplugged, and the ready check's short-lived
-capture sessions are the cause [ASSUMED], see "Ready check"); system audio from a ScreenCaptureKit stream of its own,
-so a failing display stream never takes the audio with it. Buffers are
-placed on the shared clock and written to the audio files and the
-guide tracks of every open display file. Which audio inputs are
-recorded follows the audio mode (D44): `none` none, `default-microphone`
-the default one, `wired` the default one plus every built-in and wired
-one (transport type built-in, USB, FireWire, PCI, Thunderbolt, HDMI,
-DisplayPort; Bluetooth, Bluetooth LE, virtual, aggregate, AirPlay,
-Continuity capture, an unknown transport and one that cannot be read are
-not wired), `all-inputs` every input. The default microphone is
-recorded in every audio mode but `none`, whatever its transport. A
-Bluetooth headset's microphone switches to call quality when recorded,
-and a virtual microphone often carries a copy of other sound, so those
-are recorded only under `all-inputs` or as the default microphone.
+**Audio (D12, D22, D31, D49).** One audio file per recorded audio
+source, beside the display files. Each recorded audio input gets its
+own audio file, a `.mov` with one mono track per channel, named
+`Microphone: <device>, channel <n>`; the system audio gets its own
+audio file with one stereo track, named `System audio`. Every audio
+file carries the timecode track with the source as its reel name and
+the metadata items (see "Output on disk").
+
+- **Sources.** Each recorded audio input has an `AVCaptureSession` of
+  its own (D49), its PCM converted to 32-bit float at 48 kHz by the
+  session's output; the system audio comes from a ScreenCaptureKit
+  stream of its own on the main display, with `capturesAudio`, our own
+  process's audio excluded, its video at 2×2 pixels and one frame a
+  second and dropped, so a failing display stream never takes the
+  audio with it. When the system audio's display goes, its stream
+  starts again on the new main display, with the events `system audio
+  stopped` and `system audio started`. Which audio inputs are recorded
+  follows the audio mode (D44): `none` none, `default-microphone` the
+  default one, `wired` the default one plus every built-in and wired one
+  (transport type built-in, USB, FireWire, PCI, Thunderbolt, HDMI,
+  DisplayPort; Bluetooth, Bluetooth LE, virtual, aggregate, AirPlay,
+  Continuity capture, an unknown transport and one that cannot be read
+  are not wired), `all-inputs` every input. The default microphone is
+  recorded in every audio mode but `none`, whatever its transport, and
+  followed (D34): when the default input changes, the event `default
+  microphone changed` (`from` and `to`, the old and the new default
+  microphone) is written, the old one's file ends if the audio mode no
+  longer records it, and the new one starts after the settle time. A
+  Bluetooth headset's microphone switches to call quality when
+  recorded, and a virtual microphone often carries a copy of other
+  sound, so those are recorded only under `all-inputs` or as the
+  default microphone. Audio inputs are known by their Core Audio UID,
+  which is also `AVCaptureDevice`'s `uniqueID`; one whose UID cannot be
+  read cannot be recorded, which is a problem.
+- **Coming and going.** The recorder reads the audio inputs again
+  whenever Core Audio reports a change of the devices or of the
+  default input. An audio input that appears starts its audio file
+  after the settle time (event `audio input connected`); one that
+  disappears ends its file (event `audio input disconnected`). An
+  unplugged input stops its session with
+  `AVCaptureSession.runtimeErrorNotification` (-11808) and
+  `AVCaptureDevice.wasDisconnectedNotification`, at once; the session
+  does not resume by itself, so its file ends and a replug starts a new
+  session and a new audio file ([end-to-end-tests.md](end-to-end-tests.md),
+  "What research found for the recorder"). An unplug is no failure.
+  One whose channel count changes ends its audio file and starts a new
+  one. A display event never touches an audio file, but sleep ends
+  every audio file and wake starts new ones, as for display files.
+- **Placement.** An audio file starts at the first tick after its first
+  buffer, and the samples before that tick are trimmed, so its timecode
+  is exact; from there every sample is placed by sample count, not by
+  its timestamp. A buffer whose timestamp is more than 32 ms (*data*;
+  one buffer of 512 samples is about 10.7 ms) ahead of the position its
+  sample count gives is a gap, the event `audio input gap` with its
+  `length` in seconds: a gap up to 1 s (*data*) is filled with silence
+  of exactly its length; a longer one ends the audio file and a new one
+  starts (D46 point 7). A buffer behind that position is written by its
+  sample count and is no gap.
+- **Clock drift.** An audio input runs on its own clock, up to 117 ppm
+  off the host clock (measured), and `AVCaptureSession`'s timestamps
+  follow its sample count, so drift shows as no gap. Each audio file's
+  drift is measured, not corrected (a later PR): `clockDriftPpm` in the
+  recording manifest, the samples written against the shared clock's
+  time between the host times at which the file's first and latest
+  buffers arrived, positive when the source's clock runs fast (more
+  samples than time passed), to a tenth of a ppm; null until two
+  buffers arrived apart.
+- **Failures.** A failing audio capture or writer and a full disk are
+  handled for an audio file as for a display file (below): the file
+  ends, the event (`audio input failed`, `system audio failed`, `audio
+  file writer failed` with its `error`, or `disk full`) and a problem
+  are told, the capture is started again with the same back-off, and
+  after a full disk a new audio file starts once there is room. Such
+  an end makes the recording's `result` `problems` (D47); an unplug
+  and a gap do not.
+- **Guide tracks.** For playback and waveform sync, every display file
+  also carries guide tracks: "Microphones", one mono mix of all recorded
+  audio input channels, their sum divided by √n for n channels, clamped
+  to ±1, unless the audio mode is `none`; "System audio", stereo, unless
+  system audio is off. The two are never mixed together. Each source
+  is placed by its own timestamps, the mix runs 200 ms (*data*) behind
+  real time so every source's buffers have arrived, and a source that
+  is missing is silence in its guide track. The mix is handed to every
+  open display file every 100 ms (*data*); a display file's guide tracks
+  cover exactly its own time, so a frame size change gives them the
+  same gap as the video. A display file's guide tracks may end up to
+  200 ms early: the samples not yet mixed when it ends.
 
 **Display identity.** A display is known by the UUID macOS gives it
 (`CGDisplayCreateUUIDFromDisplayID`), never by its display ID, which
@@ -783,7 +882,9 @@ comparable as they are, in points and the same coordinates, is
 **Disk (D14).** Below the warning threshold: the warning. A writer that
 fails on a full disk ends its file, readable up to the last fragment;
 the recorder checks free space every 5 s and starts new display files
-and audio files once there is room. Nothing written is ever deleted.
+and audio files once there is room. The low disk warning threshold
+counts every display's newest display file and every audio source's
+newest audio file. Nothing written is ever deleted.
 
 **Keep awake (D14).** A power assertion against idle system and
 display sleep while recording.
@@ -848,7 +949,15 @@ size changes, mirroring, the main display, back-off, the display check's
 fault, a full disk, sleep and wake), the display check, the shared clock,
 the timecode (also on a daylight saving day and at a second frame rate),
 `--duration`, the summary of `msr record`, the Dock badge and the
-problems of a recording, the version, the state file's content, the choice of
+problems of a recording, the audio tracker (the audio modes, inputs
+coming and going, an unplug told once, a replug, the default
+microphone followed, failures with the back-off, the system audio
+moving to the new main display, a full disk, a channel count change,
+two inputs with the same name, sleep and wake), the audio file's
+placement on the tick grid (trimming, gaps filled or ending the file,
+jitter within 32 ms) and its `clockDriftPpm`, splitting interleaved and
+non-interleaved PCM, the guide track mixes, audio file names and
+metadata, our process's CPU use, the status window's rows, the version, the state file's content, the choice of
 the crash report to offer, the new-issue link (and that the issue form
 has the fields it fills), the name of a crash report's text copy, and
 the text of the examples in this document, which the tests hold to the
@@ -860,8 +969,13 @@ saved, broken), the listing of the crash report folder (a missing one
 is no crash reports, an unreadable one an error), the text copy of a
 crash report, display files written from synthetic frames and read
 back (constant frame rate, timecode, BT.709, fragments, a file never
-finalized), a display file's ticks with a stand-in writer (a failing
-writer, one that fell behind, a slow end), a stream stopped while it
+finalized, the guide tracks), audio files written from synthetic PCM
+and read back (a mono track per channel or one stereo track, the bit
+rates, the timecode with its reel name, the metadata, a filled gap
+decoding as silence, a file never finalized), the proof that an
+audio-only fragmented `.mov` carries a timecode track, a display file's
+ticks with a stand-in writer (a failing writer, one that fell behind, a
+slow end, guide samples placed from the file's first tick), a stream stopped while it
 starts, that an action
 waiting for the main run loop's default mode runs only there, the
 classification of Core Audio's transport types, and the ready check's
@@ -926,19 +1040,16 @@ folder, and by the v1 gate. The design of the end-to-end tests is
 
 ## Open questions
 
-- Unproven until the owner's first real recording (D31): that DaVinci
-  Resolve reads the timecode of an audio-only `.mov`, and how Kdenlive
-  places the display files and audio files.
-- What happens when the default microphone changes during a recording
-  (the owner will rule).
-- Whether `AVAssetWriter` writes a timecode track into an audio-only
-  fragmented `.mov`.
-- How drift between an audio device's clock and the tick grid is
-  handled over hours. The drift is measured: up to 117 ppm (the Razer
-  Seiren V3 Mini: 0.42 s slow after an hour; one of five inputs), and `AVCaptureSession`'s timestamps do not correct it ([end-to-end-tests.md](end-to-end-tests.md),
-  "What research found for the recorder"); the design stays open.
-- Two audio inputs with the same name.
-- The gain of the guide track "Microphones".
+- Unproven until the owner's first real recording with audio (D31):
+  that DaVinci Resolve reads the timecode of an audio-only `.mov`, and
+  how Kdenlive places the display files and audio files.
+- How the drift between an audio device's clock and the tick grid is
+  corrected over hours. It is measured per audio file
+  (`clockDriftPpm`, D49): up to 117 ppm (the Razer Seiren V3 Mini:
+  0.42 s slow after an hour; one of five inputs), and
+  `AVCaptureSession`'s timestamps do not correct it
+  ([end-to-end-tests.md](end-to-end-tests.md), "What research found for
+  the recorder"); correcting it is a later PR.
 
 ## Build state
 
@@ -960,10 +1071,7 @@ captures nothing. The recording core builds the rest, in two PRs
 (D45): B1 `msr record`, Start and Stop, the display files with their
 timecode, display changes and the display check, the recording
 manifest and the Dock badge; B2 the audio files, the
-guide tracks, system audio and the default microphone followed. Until
-B2, a display file has no guide tracks, and the window and `msr record`
-say under the table "This build records the displays only; audio
-comes with the next version."
+guide tracks, system audio and the default microphone followed.
 
 Built (the recording core's displays, B1, D45): `msr record` with
 `--duration`, Start and Stop in the app, the Dock icon, its badge and
@@ -991,7 +1099,7 @@ ceiling (4 times the estimated rate); `msr record` prints `Recording
 into <folder>` at its start and, at its end, how long it recorded, each
 file with its state, each failure event and each problem; it ends with
 an error (exit 3) when the manifest's `result` is `problems` (D47): a
-file is not finalized or a display file was ended by a failure, and
+file is not finalized or a file was ended by a failure, and
 when the finalized manifest could not be written (the problem is told,
 the app shows an alert after the person's Stop, never at logout, restart or shutdown, and the file on disk keeps no `ended`); `at` is rounded to
 the millisecond; a display file whose name is taken (a new file within
@@ -1001,6 +1109,36 @@ start once the free space is above the low disk warning threshold;
 low disk space bounces the Dock icon until the app is activated; a
 frame's rectangle passes the display check within 0.5 points of its
 display's bounds.
+
+Built (the recording core's audio, B2, D49): an `AVCaptureSession` per
+recorded audio input, following the audio mode and the default
+microphone; an unplug ending the audio file and a replug starting a new
+one; a new audio file on a channel count change; the system audio from
+a ScreenCaptureKit stream on the main display, moving with it; audio
+files placed on the tick grid, gaps up to 1 s filled with silence, a
+longer one ending the file; `clockDriftPpm` per audio file; the guide
+tracks "Microphones" and "System audio" in every display file; audio
+sources in the status window, the summary and the disk estimate; our
+process's CPU use in the status window, the summary and the manifest.
+Tested without a microphone or a screen: the logic by unit tests, audio
+files and guide tracks written from synthetic PCM and read back. Live
+capture is verified on the owner's Mac.
+
+Built in B2 where this document leaves the detail open, provisional and
+for the architect to settle: the failure events are named `audio input
+failed`, `system audio failed` and `audio file writer failed`, and a
+gap's event `audio input gap` names the source in the `display` field;
+an audio source the audio mode records but that has no file yet shows
+the state `not recorded`; an audio input is recorded only when Core
+Audio gives its UID, which `AVCaptureDevice` opens it by; the beginning
+of a recording tells no `default microphone changed` or `audio input
+connected` events; the system audio's stream asks for 2×2 pixels at 1
+frame per second and drops them; the guide tracks lag real time by
+200 ms, so they may end up to 200 ms before a display file's last tick;
+the track names are written as QuickTime user data `©nam`, which
+ffprobe shows as `title` (track-level metadata items do not show and
+are not written); `msr record`'s summary ends with the line `CPU N % on
+average, N % at the peak, of one core (this process only)`.
 
 Details the design left open, as built and confirmed by the owner
 (D25, D28, D44): a key missing from the settings file takes its default;

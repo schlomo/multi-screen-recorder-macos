@@ -9,11 +9,10 @@ Where a concept is designed but not yet implemented, say so explicitly
 rather than letting the definition imply it already exists. Built so
 far: auto mode, the recording resolution, audio mode and system audio as
 settings, the ready check, the pipeline for snapshot releases and
-releases, and the display half of the recording core (recording,
-recording folder, recording manifest, problem, status window, display
-file without guide tracks, display identity, settle time, display
-check, tick, timecode). Not built yet: audio track, audio file, guide track (B2 of
-the recording core, D45).
+releases, and the recording core (recording, recording folder,
+recording manifest, problem, status window, display file, display
+identity, settle time, display check, tick, timecode, audio track,
+audio file, guide track, clock drift; D45, D49).
 
 ## Multi Screen Recorder
 
@@ -170,7 +169,9 @@ The file for one audio source, beside the display files: a recorded
 audio input's audio tracks, one per channel, or the system audio's one
 audio track, with its timecode. It starts when the source appears and
 ends when it disappears or its channel count changes, which starts a new
-one; never padded with silence (D31).
+one. Its samples sit on the tick grid by their count: a gap in the
+audio up to 1 s is filled with silence, a longer one ends the file and
+starts a new one (D31, D46, D49).
 
 ## Guide track
 
@@ -178,7 +179,16 @@ A track in a display file for playback and waveform sync only:
 "Microphones", one mono mix of all recorded microphone channels, or
 "System audio", stereo; the two are never mixed together. Which ones a
 display file has follows from the settings alone; a missing source is
-silence in its guide track (D31).
+silence in its guide track (D31). It lags real time by 200 ms, so it
+may end up to 200 ms before its display file (D49).
+
+## Clock drift
+
+How far an audio file's sample count runs from the tick grid, in parts
+per million, measured over the file and given in the recording
+manifest as `clockDriftPpm`: positive when the audio device's clock
+runs fast (more samples than the grid's time), negative when slow. Not
+corrected yet (D49).
 
 ## Recording resolution
 

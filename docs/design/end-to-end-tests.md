@@ -371,6 +371,21 @@ tried:
   design, untested). Not tried: a run of several
   hours, other audio inputs, a run under load or with the Mac asleep,
   a Bluetooth input, and any correction.
+- **An unplugged audio input ends its `AVCaptureSession`, which does
+  not resume.** Tried (2026-11-15, the Razer Seiren V3 Mini over USB,
+  unplugged during a running session): `AVCaptureSession`'s runtime
+  error -11808 (`AVErrorDeviceWasDisconnected`) and
+  `AVCaptureDevice.wasDisconnectedNotification` came at once,
+  `wasConnectedNotification` 17 s after plugging it in again; nothing
+  crashed, and the session did not resume by itself. Hence the
+  recorder ends the audio file on the unplug and starts a new session
+  and file on the replug (D49).
+- **An audio-only fragmented `.mov` carries a timecode track.**
+  Tried (2026-11-16, the tests in `AudioFileWriterTests`):
+  `AVAssetWriter` writes a timecode track with its reel name into a
+  fragmented `.mov` that has only audio tracks, finalized and not
+  finalized, and AVFoundation reads it back associated with every
+  audio track. Whether DaVinci Resolve reads it is UNVERIFIED.
 - **A plain executable no longer appears in the Screen Recording list**
   (macOS 26.1, called a bug by Apple); see "Permissions".
 - **A build signed ad hoc is reported to lose its permissions with
