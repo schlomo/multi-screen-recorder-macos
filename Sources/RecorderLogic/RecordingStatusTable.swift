@@ -1,6 +1,6 @@
 import Foundation
 
-/// The status window of a running recording (D46): a row per display and
+/// The status window of a running recording (D46): a row per screen and
 /// per audio source with its files, the data written and its state, and a
 /// line with the elapsed time, the data, the files and the free space.
 public enum RecordingStatusTable {
@@ -13,14 +13,14 @@ public enum RecordingStatusTable {
     public static let columns = ["Source", "Records at", "Files", "Written", "State"]
 
     public struct Row: Equatable, Sendable {
-        public var source: String
+        public var source: SourceCell
         public var recordsAt: String
         public var files: Int
         /// The size of its files on disk, "350 MB" or "1.3 GB".
         public var written: String
         public var state: String
 
-        public init(source: String, recordsAt: String, files: Int, written: String, state: String) {
+        public init(source: SourceCell, recordsAt: String, files: Int, written: String, state: String) {
             self.source = source
             self.recordsAt = recordsAt
             self.files = files
@@ -28,21 +28,22 @@ public enum RecordingStatusTable {
             self.state = state
         }
 
-        public var cells: [String] { [source, recordsAt, String(files), written, state] }
+        /// The cells after Source.
+        public var values: [String] { [recordsAt, String(files), written, state] }
     }
 
-    /// `bytes`: each display file's size on disk, by its name; a file
-    /// without one makes its display's Written "?".
-    public static func rows(sources: [DisplayTracker.Source], files: [RecordingManifest.DisplayFile], bytes: [String: Int64]) -> [Row] {
+    /// `bytes`: each screen file's size on disk, by its name; a file
+    /// without one makes its screen's Written "?".
+    public static func rows(sources: [ScreenTracker.Source], files: [RecordingManifest.ScreenFile], bytes: [String: Int64]) -> [Row] {
         sources.map { source in
-            let own = files.filter { $0.displayUUID == source.uuid }
+            let own = files.filter { $0.screenUUID == source.uuid }
             let sizes = own.map { bytes[$0.name] }
             let written = writtenText(sizes)
             let frameSize: FrameSize? = if case .recording(let size) = source.state { size } else {
                 own.last.map { FrameSize(width: $0.frameSize[0], height: $0.frameSize[1]) }
             }
             return Row(
-                source: source.number.map { "\($0) \(source.name)" } ?? source.name,
+                source: .screen(source.number, name: source.name),
                 recordsAt: frameSize.map { "\($0.width)×\($0.height)" } ?? "",
                 files: own.count,
                 written: written,
@@ -50,7 +51,7 @@ public enum RecordingStatusTable {
         }
     }
 
-    /// The audio sources' rows, below the displays': Records at is the
+    /// The audio sources' rows, below the screens': Records at is the
     /// channels of the source's newest audio file.
     public static func audioRows(sources: [AudioTracker.Source], files: [RecordingManifest.AudioFile], bytes: [String: Int64]) -> [Row] {
         sources.map { source in
@@ -67,7 +68,9 @@ public enum RecordingStatusTable {
             case .stereo: "stereo"
             case nil: ""
             }
-            return Row(source: source.name, recordsAt: channels, files: own.count, written: written, state: text(source.state))
+            let cell: SourceCell = source.id == .systemAudio
+                ? .systemAudio(isRecorded: true) : .audioInput(source.number, name: source.name)
+            return Row(source: cell, recordsAt: channels, files: own.count, written: written, state: text(source.state))
         }
     }
 
@@ -76,29 +79,44 @@ public enum RecordingStatusTable {
         sizes.contains(nil) ? "?" : DiskEstimate.megabytesOrGigabytes(Double(sizes.compactMap(\.self).reduce(0, +)))
     }
 
-    static func text(_ state: AudioTracker.Source.State) -> String {
-        switch state {
-        case .recording: "recording"
-        case .waiting: "waiting"
-        case .failedRetrying: "failed, retrying"
-        case .diskFull: "disk full"
-        case .disconnected: "disconnected"
-        case .notRecorded: "not recorded"
-        case .asleep: "asleep"
-        }
+    /// Every text the State column can show; the window sizes the column from them.
+    public enum StateText: String, CaseIterable, Sendable {
+        case recording
+        case waiting
+        case failedRetrying = "failed, retrying"
+        case showsAnotherScreen = "shows another screen"
+        case diskFull = "disk full"
+        case mirroring
+        case disconnected
+        case notRecorded = "not recorded"
+        case asleep
     }
 
-    static func text(_ state: DisplayTracker.Source.State) -> String {
-        switch state {
-        case .recording: "recording"
-        case .waiting: "waiting"
-        case .failedRetrying: "failed, retrying"
-        case .showsAnotherDisplay: "shows another display"
-        case .diskFull: "disk full"
-        case .mirroring: "mirroring"
-        case .disconnected: "disconnected"
-        case .asleep: "asleep"
+    static func text(_ state: AudioTracker.Source.State) -> String {
+        let text: StateText = switch state {
+        case .recording: .recording
+        case .waiting: .waiting
+        case .failedRetrying: .failedRetrying
+        case .diskFull: .diskFull
+        case .disconnected: .disconnected
+        case .notRecorded: .notRecorded
+        case .asleep: .asleep
         }
+        return text.rawValue
+    }
+
+    static func text(_ state: ScreenTracker.Source.State) -> String {
+        let text: StateText = switch state {
+        case .recording: .recording
+        case .waiting: .waiting
+        case .failedRetrying: .failedRetrying
+        case .showsAnotherScreen: .showsAnotherScreen
+        case .diskFull: .diskFull
+        case .mirroring: .mirroring
+        case .disconnected: .disconnected
+        case .asleep: .asleep
+        }
+        return text.rawValue
     }
 
     /// "Recording 1:07:00 · 1.3 GB in 3 files · 120.4 GB free", below 1 GB

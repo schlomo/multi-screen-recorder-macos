@@ -4,7 +4,7 @@ import Synchronization
 
 /// The guide tracks of a recording (D31, D49): audio captures hand their
 /// buffers in, and every `guideTrackInterval` the mixes, `guideTrackDelay`
-/// behind real time, go to every display file listening. Thread-safe.
+/// behind real time, go to every screen file listening. Thread-safe.
 public final class GuideTrackFeed: Sendable {
     public typealias Listener = @Sendable (_ guide: GuideTrack, _ channels: [[Float]], _ positionFromStart: Int64) -> Void
 
@@ -46,7 +46,7 @@ public final class GuideTrackFeed: Sendable {
         timer.cancel()
     }
 
-    /// A display file's ticker listens from now on, until it stops; the
+    /// A screen file's ticker listens from now on, until it stops; the
     /// listener runs under the feed's lock, so it only queues the samples.
     func listen(_ listener: @escaping Listener) -> Int {
         state.withLock { state in

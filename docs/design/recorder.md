@@ -24,9 +24,9 @@ signature); if that fails it exits 71 (`EX_OSERR`).
 
 | Command | Does | Exit code |
 |---|---|---|
-| `msr list` | Shows displays, audio inputs and system audio | 0, 1 when the displays, the audio inputs or an audio input the settings record cannot be read |
-| `msr check [flags] [--debug]` | Prints "What will be recorded", then runs the ready check and prints each item; `--debug` adds detail on standard error and in the log | 0 ready, 1 not ready |
-| `msr record [flags] [--duration 1h30m] [--debug]` | Records the displays and the audio sources (the recording core, D45, D49). Without flags it does what Start in the window does, with the same settings file; it prints "What will be recorded" at its start, then runs the ready check, records until Ctrl-C, SIGTERM, SIGHUP, the duration or Stop in the status window (below), and prints the recording folder at the start and a summary at the end: every file with its state and our process's CPU use, average and peak. It runs as a full AppKit app without a Dock icon (the `accessory` activation policy) until the ready check passed and the recording starts, then shows the icon; a run that is not ready shows none, and an icon macOS refuses is a problem, and the recording goes on (Ctrl-C stops it); while it records, the icon shows with its badge, and clicking it or Quit opens the status window as in the app (D45, D46). When it stops, for any reason, it first prints `Stopping the recording and finalizing the files…` on standard error, then finalizes and prints the summary; a Ctrl-C while it finalizes prints `Still finalizing the files…` and does nothing more. It prints every event of the recording manifest as one line on standard error (see "Logging"). `--debug` adds detail on standard error and in the log. `--duration` takes hours, minutes and seconds (`1h30m`, `45m`, `90s`); a number without a suffix is minutes (`90` is 90 minutes) | 0 ok (every file finalized, no file ended by a failure, D47), 1 not ready, 3 when the recording manifest's `result` is `problems`, the finalized manifest could not be written, or the recording could not start |
+| `msr list` | Shows screens, audio inputs and system audio | 0, 1 when the screens, the audio inputs or an audio input the settings record cannot be read |
+| `msr check [flags] [--debug]` | Prints the banner and "What will be recorded", then runs the ready check and prints each item; `--debug` adds detail on standard error and in the log | 0 ready, 1 not ready |
+| `msr record [flags] [--duration 1h30m] [--debug]` | Records the screens and the audio sources (the recording core, D45, D49). Without flags it does what Start in the window does, with the same settings file; it prints the banner (as `msr check`) and "What will be recorded" at its start, then runs the ready check, records until Ctrl-C, SIGTERM, SIGHUP, the duration or Stop in the status window (below), and prints the recording folder at the start and a summary at the end: every file with its state and our process's CPU use, average and peak. It runs as a full AppKit app without a Dock icon (the `accessory` activation policy) until the ready check passed and the recording starts, then shows the icon; a run that is not ready shows none, and an icon macOS refuses is a problem, and the recording goes on (Ctrl-C stops it); while it records, the icon shows with its badge, and clicking it or Quit opens the status window as in the app (D45, D46). When it stops, for any reason, it first prints `Stopping the recording and finalizing the files…` on standard error, then finalizes and prints the summary; a Ctrl-C while it finalizes prints `Still finalizing the files…` and does nothing more. It prints every event of the recording manifest as one line on standard error (see "Logging"). `--debug` adds detail on standard error and in the log. `--duration` takes hours, minutes and seconds (`1h30m`, `45m`, `90s`); a number without a suffix is minutes (`90` is 90 minutes) | 0 ok (every file finalized, no file ended by a failure, D47), 1 not ready, 3 when the recording manifest's `result` is `problems`, the finalized manifest could not be written, or the recording could not start |
 | `msr settings [flags]` | Without flags prints the effective settings as JSON (show); with any settings flag, `--auto` included, saves the run's effective settings into the settings file and prints them (change). The only command that writes the file; the window also writes it | 0, 1 when it cannot write the file |
 | `msr version` | Prints the version and commit | 0 |
 
@@ -62,7 +62,7 @@ with a flag writes the run's effective settings. There is no `--save`
 `msr list` prints:
 
 ```
-Displays
+Screens
   1  Built-in Retina Display   looks like 1728×1117, drawn at 3456×2234  records at 1728×1116
   2  LG HDR 4K                 3840×2160                                 records at 3840×2160
 Audio inputs
@@ -71,7 +71,7 @@ Audio inputs
 System audio: available
 ```
 
-A display is described by what macOS calls "looks like" (its size in
+A screen is described by what macOS calls "looks like" (its size in
 points) and the size it is drawn at (its pixel size): `3840×2160` where
 both are equal, `looks like 1728×1117, drawn at 3456×2234` where they
 differ (a HiDPI mode). "records at" is the frame size, from the looks-like
@@ -79,26 +79,31 @@ size; the drawn-at size is never recorded (D44). It is the one of the
 recording resolution the settings choose: Native with auto mode, the
 default.
 
-`msr check` first prints "What will be recorded": the window's one
-table with its total row, the line of what the required recording
-hours need, and "Files go to <output folder>", from the same
-code (see "The app"; the window's last line, "Recording continues when
-displays or audio sources change.", is not printed), then one line per
-item of the ready check, `ok` or `FAIL`, a fix under each failure, and
-`Ready.` or `Not ready.` last. For the devices of the `msr list` example,
-the defaults and 3.1 GB free:
+`msr check` first prints a banner, the name with the version as
+`msr version` shows it and the build date, such as `Multi Screen
+Recorder 0.20261116.42 (9dc9443), built 2026-11-16`, then the
+homepage's address and an empty line (`msr record` prints the same
+banner first). Then it prints "What will be recorded": the window's
+one table with its header row and total row, the line of what the
+required recording hours need, and "Files go to <output folder>", from
+the same code (see "The app"; the window's last line, "Recording
+continues when screens or audio sources change.", is not printed), then
+one line per item of the ready check, `ok` or `FAIL`, a fix under each
+failure, and `Ready.` or `Not ready.` last. For the devices of the
+`msr list` example, the defaults and 3.1 GB free:
 
 ```
 What will be recorded
-  Source                            Looks like  Drawn at   Records at  GB/h max
-  1 Built-in Retina Display         1728×1117   3456×2234  1728×1116        1.0
-  2 LG HDR 4K                       3840×2160   3840×2160  3840×2160        4.1
-  ─────────────────────────────────────────────────────────────────────────────
-  MacBook Pro Microphone (default)                         1 channel        0.1
-  RØDE Wireless GO II RX                                   2 channels       0.1
-  System audio                                             stereo           0.1
-  ─────────────────────────────────────────────────────────────────────────────
-  Total                                                                     5.3
+  Source                                      Looks like  Drawn at   Records at  GB/h max
+  ───────────────────────────────────────────────────────────────────────────────────────
+  Screen 1 - Built-in Retina Display          1728×1117   3456×2234  1728×1116        1.0
+  Screen 2 - LG HDR 4K                        3840×2160   3840×2160  3840×2160        4.1
+  ───────────────────────────────────────────────────────────────────────────────────────
+  Audio 1 - MacBook Pro Microphone (default)                         1 channel        0.1
+  Audio 2 - RØDE Wireless GO II RX                                   2 channels       0.1
+  Audio 0 - System                                                   stereo           0.1
+  ───────────────────────────────────────────────────────────────────────────────────────
+  Total                                                                               5.3
   2 hours need 10.7 GB, 3.1 GB free.
   Files go to ~/Movies/Multi Screen Recorder
 ```
@@ -108,7 +113,7 @@ then:
 ```
 ok    Screen & System Audio Recording permission
 ok    Microphone permission
-ok    Displays: 2
+ok    Screens: 2
 ok    Audio: MacBook Pro Microphone (default), RØDE Wireless GO II RX, system audio
 ok    Output folder: ~/Movies/Multi Screen Recorder
 FAIL  Free disk space: 3.1 GB in ~/Movies/Multi Screen Recorder, 10.7 GB needed for 2 hours
@@ -174,29 +179,29 @@ saves, so a fresh Mac has none and the defaults apply:
 Items, in this order: the Screen & System Audio Recording permission,
 the Microphone permission (only when the recording records at least one
 audio input: with no audio input present, or none recorded under the
-audio mode, the item is left out and the permission is neither asked
-nor read), the displays (at least one, each
-readable), the chosen audio sources (each audio input the audio mode
-records readable; another that cannot be read does not count; with an
-audio mode but `none` the item says "no microphone" when no input is
-recorded, such as on a Mac without any audio input, and passes: no
-microphone works in every audio mode, the displays and the system audio
-are recorded as usual, and the item then reads `Audio: no microphone,
-system audio`, or `Audio: no microphone, no system audio` with system
+audio mode, the item is left out and the permission is neither asked nor
+read), the screens (at least one, each readable), the chosen audio
+sources (each audio input the audio mode records readable; another that
+cannot be read does not count; with an audio mode but `none` the item
+says "no microphone recorded" when no input is recorded, such as on a
+Mac without any audio input or with only inputs the audio mode leaves
+out or that have no Core Audio UID, and passes: no microphone works in
+every audio mode, the screens and the system audio are recorded as
+usual, and the item then reads `Audio: no microphone recorded, system
+audio`, or `Audio: no microphone recorded, no system audio` with system
 audio off; an input that is recorded and whose channels cannot be read
-fails it), the output
-folder, and free disk space in the output folder for
-`requiredRecordingHours`.
+fails it), the output folder, and free disk space in the output folder
+for `requiredRecordingHours`.
 
 - A permission that was never asked for is requested, so macOS shows
   its prompt; a denied one is reported with the System Settings path.
 - The screen recording grant is proven, not just read, and proven again
   by every check: at the app's start, on "Check again", in `msr check`
   and in `msr record`'s own check the check captures one small frame of
-  one display (a ScreenCaptureKit screenshot), so macOS shows every
+  one screen (a ScreenCaptureKit screenshot), so macOS shows every
   prompt of a capture then and Start really starts (D46); the checks
   after a change (a device, a settings change, the app becoming active)
-  only fetch the display list. Whether the screenshot brings the prompt
+  only fetch the screen list. Whether the screenshot brings the prompt
   the owner saw at Start ("requesting to bypass the system private
   window picker") is UNVERIFIED until the owner's next run. The Microphone permission is read, and no
   microphone is opened (D36): the app
@@ -204,7 +209,8 @@ folder, and free disk space in the output folder for
   (owner's Mac, 2026-11-13), and the capture session an earlier ready
   check opened for a moment on every run is the cause [ASSUMED]. With
   no microphone connected, the permission item is left out and the audio
-  item passes, saying "no microphone", whatever the permission.
+  item passes, saying "no microphone recorded", whatever the
+  permission.
   The audio inputs are read from Core Audio's device list, which
   creates no capture object; if that list, the default audio input or
   the name of an audio input cannot be read, the audio item fails with
@@ -214,7 +220,7 @@ folder, and free disk space in the output folder for
   path and the reason.
 - Free disk space is measured on the output folder itself. Disk
   estimate, file by file at the encoding rates (*data*, see "Encoding"):
-  a display file is its video, 1 GB per hour at 1080p scaled by the
+  a screen file is its video, 1 GB per hour at 1080p scaled by the
   pixel count of its frame size, plus its guide tracks; an audio file is
   its tracks' bit rates. The item compares the total of every file the
   recording would write, for `requiredRecordingHours`, with the free
@@ -222,11 +228,11 @@ folder, and free disk space in the output folder for
   is 5.3 GB per hour, 10.7 GB for 2 hours (the table in "The app" shows
   each file).
 - One cause, one red item: when the output folder fails, or the
-  displays, the audio inputs or an audio input the recording records
+  screens, the audio inputs or an audio input the recording records
   cannot be read, the free disk space item is left out. With the audio
   mode `none`, audio inputs that cannot be read fail nothing.
 - In the app the check runs when the window opens, when the app becomes
-  active again (unless a check is still running), when a display
+  active again (unless a check is still running), when a screen
   comes, goes or changes, when an audio device comes or goes, when the
   default audio input changes, after every settings change, and on
   "Check again"; the table of what will be recorded follows with it.
@@ -241,7 +247,7 @@ folder, and free disk space in the output folder for
   ("The window has been marked as needing another Layout Window pass,
   but it has already had more Layout Window passes than there are views
   in the window") thrown in a popup menu's own window, opened 1 to 7 s
-  after a display's backing scale (HiDPI) was switched, not in the
+  after a screen's backing scale (HiDPI) was switched, not in the
   start window's layout [KNOWN, unified log]. Whether the hold kept the
   content still under the open menu is not shown by the log, and the
   owner saw the table change with the menu open [ASSUMED from the
@@ -259,24 +265,32 @@ One recording folder per recording, named by its local start time
 
 ```
 ~/Movies/Multi Screen Recorder/2026-11-12 14.03.05/
-  2026-11-12 14.03.05 Display 1 - Built-in Retina Display.mov
-  2026-11-12 14.03.05 Display 2 - LG HDR 4K.mov
-  2026-11-12 14.03.05 Microphone - MacBook Pro Microphone.mov
-  2026-11-12 14.03.05 System audio.mov
-  2026-11-12 14.27.41 Display 2 - LG HDR 4K.mov    ← back after a reconnect
-  2026-11-12 14.41.10 Display 1 - Built-in Retina Display.mov    ← new frame size after a mode change
+  2026-11-12 14.03.05 Screen 1 - Built-in Retina Display.mov
+  2026-11-12 14.03.05 Screen 2 - LG HDR 4K.mov
+  2026-11-12 14.03.05 Audio 1 - MacBook Pro Microphone.mov
+  2026-11-12 14.03.05 Audio 0 - System.mov
+  2026-11-12 14.27.41 Screen 2 - LG HDR 4K.mov    ← back after a reconnect
+  2026-11-12 14.41.10 Screen 1 - Built-in Retina Display.mov    ← new frame size after a mode change
   recording.json
 ```
 
-One file per source, each named by its own start time (D31): a display
-file per display, an audio file per recorded audio input
-(`<date time> Microphone - <device name>.mov`) and one for system audio
-(`<date time> System audio.mov`). The manifest below lists exactly
-these files.
+One file per source, each named by its own start time and the
+source's label (D31, D55): a screen file per screen, an audio file per
+recorded audio input and one for system audio, each
+`<date time> <label>.mov`. The manifest below lists exactly these
+files.
 
-Display 1 is the main display; the others are numbered left to right,
-later arrivals in order of appearance. A display keeps its number for
-the whole recording.
+**Labels (D55).** Every recorded source has a label,
+`<kind> <n> - <name>`: `Screen <n> - <screen name>` for a screen,
+`Audio <n> - <device name>` for an audio input, and always
+`Audio 0 - System` for the system audio. The numbers count per kind
+from 1. Screen 1 is the main screen; the others are numbered left to
+right, later arrivals in order of appearance. Audio inputs are
+numbered in the order they are first recorded, those at the start in
+Core Audio's order. A source keeps its number for the whole recording,
+also when it comes back: a screen by its UUID, an audio input by its
+Core Audio UID. So two audio inputs with the same name have different
+numbers and nothing else tells them apart in a name.
 
 `recording.json` is the recording manifest, rewritten atomically on
 every change:
@@ -292,31 +306,31 @@ every change:
   "settings": { "resolution": "1080p", "audioMode": "default-microphone", "systemAudio": true },
   "files": [
     {
-      "name": "2026-11-12 14.03.05 Display 1 - Built-in Retina Display.mov",
-      "display": "Built-in Retina Display",
-      "displayUUID": "37D8832A-2D66-02CA-B9F7-8F30A301B230",
+      "name": "2026-11-12 14.03.05 Screen 1 - Built-in Retina Display.mov",
+      "screen": "Built-in Retina Display",
+      "screenUUID": "37D8832A-2D66-02CA-B9F7-8F30A301B230",
       "frameSize": [1670, 1080],
       "start": 0.0,
       "end": 2285.0,
       "timecode": "14:03:05:04",
       "state": "finalized",
-      "guideTracks": ["Microphones", "System audio"],
+      "guideTracks": ["Audio inputs", "System audio"],
       "framesRepeatedForLateness": 0
     },
     {
-      "name": "2026-11-12 14.03.05 Display 2 - LG HDR 4K.mov",
-      "display": "LG HDR 4K",
-      "displayUUID": "1E6E43E3-6E7B-4C2A-9F6B-2B0F4C1A9D11",
+      "name": "2026-11-12 14.03.05 Screen 2 - LG HDR 4K.mov",
+      "screen": "LG HDR 4K",
+      "screenUUID": "1E6E43E3-6E7B-4C2A-9F6B-2B0F4C1A9D11",
       "frameSize": [1920, 1080],
       "start": 0.0,
       "end": 1446.2,
       "timecode": "14:03:05:04",
       "state": "finalized",
-      "guideTracks": ["Microphones", "System audio"],
+      "guideTracks": ["Audio inputs", "System audio"],
       "framesRepeatedForLateness": 0
     },
     {
-      "name": "2026-11-12 14.03.05 Microphone - MacBook Pro Microphone.mov",
+      "name": "2026-11-12 14.03.05 Audio 1 - MacBook Pro Microphone.mov",
       "audioSource": "MacBook Pro Microphone",
       "audioSourceUID": "BuiltInMicrophoneDevice",
       "channels": 1,
@@ -327,7 +341,7 @@ every change:
       "clockDriftPpm": null
     },
     {
-      "name": "2026-11-12 14.03.05 System audio.mov",
+      "name": "2026-11-12 14.03.05 Audio 0 - System.mov",
       "audioSource": "System audio",
       "channels": "stereo",
       "start": 0.0,
@@ -337,34 +351,34 @@ every change:
       "clockDriftPpm": null
     },
     {
-      "name": "2026-11-12 14.27.41 Display 2 - LG HDR 4K.mov",
-      "display": "LG HDR 4K",
-      "displayUUID": "1E6E43E3-6E7B-4C2A-9F6B-2B0F4C1A9D11",
+      "name": "2026-11-12 14.27.41 Screen 2 - LG HDR 4K.mov",
+      "screen": "LG HDR 4K",
+      "screenUUID": "1E6E43E3-6E7B-4C2A-9F6B-2B0F4C1A9D11",
       "frameSize": [1920, 1080],
       "start": 1476.0,
       "end": null,
       "timecode": "14:27:41:04",
       "state": "recording",
-      "guideTracks": ["Microphones", "System audio"],
+      "guideTracks": ["Audio inputs", "System audio"],
       "framesRepeatedForLateness": 0
     },
     {
-      "name": "2026-11-12 14.41.10 Display 1 - Built-in Retina Display.mov",
-      "display": "Built-in Retina Display",
-      "displayUUID": "37D8832A-2D66-02CA-B9F7-8F30A301B230",
+      "name": "2026-11-12 14.41.10 Screen 1 - Built-in Retina Display.mov",
+      "screen": "Built-in Retina Display",
+      "screenUUID": "37D8832A-2D66-02CA-B9F7-8F30A301B230",
       "frameSize": [1662, 1080],
       "start": 2285.0,
       "end": null,
       "timecode": "14:41:10:04",
       "state": "recording",
-      "guideTracks": ["Microphones", "System audio"],
+      "guideTracks": ["Audio inputs", "System audio"],
       "framesRepeatedForLateness": 0
     }
   ],
   "events": [
     { "at": 812.4, "event": "audio input gap", "audioSource": "MacBook Pro Microphone", "length": 0.25 },
-    { "at": 1446.2, "event": "display disconnected", "display": "LG HDR 4K" },
-    { "at": 2285.0, "event": "display frame size changed", "display": "Built-in Retina Display",
+    { "at": 1446.2, "event": "screen disconnected", "screen": "LG HDR 4K" },
+    { "at": 2285.0, "event": "screen frame size changed", "screen": "Built-in Retina Display",
       "from": [1670, 1080], "to": [1662, 1080] }
   ],
   "problems": [
@@ -375,38 +389,38 @@ every change:
 ```
 
 `start`, `end` and `at` are seconds from the recording's start on the
-shared clock. A display file's `displayUUID` is its display's identity (see
-"Display identity"). The events: `display connected`, `display
-disconnected`, `display frame size changed`, `display mirroring
-started`, `display mirroring stopped`, `main display changed`,
-`display stream failed`, `display shows another display's picture`,
-`display file writer fell behind`, `display file writer failed`, `disk
+shared clock. A screen file's `screenUUID` is its screen's identity (see
+"Screen identity"). The events: `screen connected`, `screen
+disconnected`, `screen frame size changed`, `screen mirroring
+started`, `screen mirroring stopped`, `main screen changed`,
+`screen stream failed`, `screen shows another screen's picture`,
+`screen file writer fell behind`, `screen file writer failed`, `disk
 full`, `sleep`, `wake`, and for audio `audio input connected`, `audio
 input disconnected`, `system audio started`, `system audio stopped`,
 `default microphone changed`, `audio input gap`, `audio input failed`,
 `system audio failed`, `audio file writer failed`, `audio file writer
 fell behind`;
-each names its display (`display`) or its audio source (`audioSource`)
-where it is about one; `display` always means a display.
+each names its screen (`screen`) or its audio source (`audioSource`)
+where it is about one; `screen` always means a screen.
 `audio file writer fell behind` comes in two shapes: without `error`
 when a capture ended because its writer fell behind, and with `error`
 when samples were lost at a file's end, so one recording can have it
 twice for the same file.
-Their fields: `at`, `event`, `display` or `audioSource`; `from` and
-`to` (the old and the new frame size) for `display frame size changed`, and the old and
+Their fields: `at`, `event`, `screen` or `audioSource`; `from` and
+`to` (the old and the new frame size) for `screen frame size changed`, and the old and
 the new default microphone for `default microphone changed` (either
-absent where there was or is none); `mirrors` (the display mirrored)
-for `display mirroring started`; `length` (seconds, to the
-millisecond) for `audio input gap`; `error` (why) for `display stream
-failed`, `display file writer failed`, `audio input failed`, `system
+absent where there was or is none); `mirrors` (the screen mirrored)
+for `screen mirroring started`; `length` (seconds, to the
+millisecond) for `audio input gap`; `error` (why) for `screen stream
+failed`, `screen file writer failed`, `audio input failed`, `system
 audio failed`, `audio file writer failed`, and `audio file writer fell
 behind` when samples were lost at a file's end. The
 manifest's `state` is `recording` or `finalized`; a file's `state` is
 `recording`, `finalized` or `not finalized`.
 `ended` is the local end time, as `started`, and `result` is `ok` when
-every file is finalized and no file was ended by a failure (`display
-stream failed`, `display file writer failed`, `disk full`, `display
-file writer fell behind`, `display shows another display's picture`,
+every file is finalized and no file was ended by a failure (`screen
+stream failed`, `screen file writer failed`, `disk full`, `screen
+file writer fell behind`, `screen shows another screen's picture`,
 `audio input failed`, `system audio failed`, `audio file writer
 failed`, `audio file writer fell behind`; an unplugged audio input and
 a gap are none), otherwise
@@ -427,31 +441,32 @@ The net only guarantees that `problems` is not empty when the result
 is `problems`; a failure not told while some other problem was told
 appears only in `events`.
 `events` and `problems` are written in the order of their time.
-An audio file's `audioSource` is the audio input's name (see "Audio
-input names" below) or `System audio`; `audioSourceUID` the input's
-Core Audio UID, absent for the system audio; `channels` the number of
-its mono tracks, or `stereo` for the system audio; `clockDriftPpm` its
-measured clock drift (see "Audio"), null until known. `files` lists the
-display files and the audio files in the order of their start.
+An audio file's `audioSource` is the audio input's device name or
+`System audio`; `audioSourceUID` the input's Core Audio UID, absent
+for the system audio, which tells two inputs with the same name apart
+(D55); the events name an audio input by its device name only and
+carry no UID, so they cannot tell two such inputs apart; `channels`
+the number of its mono tracks, or `stereo` for the system audio;
+`clockDriftPpm` its measured clock drift (see "Audio"), null until
+known. `files` lists the screen files and the audio files in the order
+of their start.
 
-**Audio input names (D49).** In a file name, a reel name and a track
-name, `/` and `:` in an audio input's name become `-`, as for a display;
-two audio inputs with the same name get " (2)", " (3)" in the order they
-appeared in the recording, and an input that comes back keeps its name.
+**Names in a file name (D49, D55).** In a file name, `/` and `:` in a
+label become `-`, so a device name never stops a source from
+recording.
 
-**Metadata in every file (D46, D49).** The timecode track names the
-source as its reel name (the source reference name of its format
-description): `Display <n> - <name>` for a display file, the display's
-name unchanged; `Microphone - <name>` or `System audio` for an audio
-file. It is written with the track, so a file never finalized keeps it.
+**Metadata in every file (D46, D49, D55).** The timecode track names
+the source as its reel name (the source reference name of its format
+description): the source's label, its name unchanged. It is written with the track, so a file never finalized keeps it.
 Each track is named in its user data full name (`©nam`), the one
 track-level item `ffprobe` shows (as the stream's `title`, checked on
 2026-11-16; items in the track's `mdta` metadata it does not show): a
-display file's video track by the reel name, its guide tracks
-`Microphones` and `System audio`, an audio file's tracks
-`Microphone: <name>, channel <n>` or `System audio`. A display file's QuickTime
+screen file's video track by the reel name, its guide tracks
+`Audio inputs` and `System audio`, an audio file's tracks
+`<label>, channel <n>` (`Audio 1 - MacBook Pro Microphone, channel 1`)
+or, for the system audio, `Audio 0 - System`. A screen file's QuickTime
 metadata items, all text, under `org.schapiro.multiscreenrecorder.`:
-`displayUUID`, `displayNumber`, `displayName`, `frameSize`
+`screenUUID`, `screenNumber`, `screenName`, `frameSize`
 (`1920x1080`), `recordingStarted` (as the manifest's `started`) and
 `app` (as the manifest's `app`); an audio file's: `audioSource`,
 `audioSourceUID` (not for the system audio), `channels` (as in the
@@ -477,7 +492,11 @@ checked, reported or rewritten at the next start (D47).
 ## The app
 
 - **Start:** a small window. At the top, the app icon, the name, the
-  version and a link to the homepage (`Homepage.url`, defined once).
+  version and a link to the homepage (`Homepage.url`, defined once),
+  and on the right the tagline in two lines, "Every screen, all audio."
+  and "Keeps going when things change." (`Tagline.lines`, defined
+  once; on the homepage too, in the same two lines), right-aligned,
+  in italics and the secondary text colour; neither line wraps (D55).
   Then a section "What will be recorded", built from the settings and
   the devices connected now and
   refreshed whenever the ready check runs (D33): one table, with a
@@ -490,27 +509,51 @@ checked, reported or rewritten at the next start (D47).
   the columns after Source are measured at runtime from the widest
   possible content in the table's font ("8888×8888", "cannot be read",
   "888.8" and so on, and the header), never from what is
-  connected, so no column moves when auto mode, a slider or the devices
-  change; Source takes the rest of the window, which is as wide as the
-  table, holds "MacBook Pro Microphone (default)" and truncates a longer
-  name in the middle (the full name is its tooltip).
-  - Display rows first: the number and name, "Looks like" (the size in
+  connected, so no column moves when auto mode or a slider change.
+  Source is as wide as the kind's icon and the longest name connected
+  now, each measured with the number "88", so that a setting that
+  numbers a source or not moves nothing; no cell wraps or is cut (its
+  tooltip is the label, with "(default)" after it for the default
+  input). The window is as wide as the table, or as the tagline header
+  when that is wider, and Source then takes the rest; it is never
+  narrower than the controls below need, and the text below the table,
+  such as the audio mode's explanation, wraps to that width instead of
+  widening the window. So the window's width follows the devices'
+  names, not the settings.
+  - Source shows each source as an SF Symbol for its kind (`display` for
+    a screen, `mic` for an audio input, `speaker.wave.2` for the system
+    audio), then its number and its name, as its label numbers it (D55):
+    the screens and the recorded audio inputs from 1, those in the order
+    listed, the system audio 0 and named "System". A source not recorded
+    gets no number. Whether an audio input is recorded follows the
+    recording's own rule (`AudioTracker.records`): the audio mode
+    includes it and it has a Core Audio UID, so an input without one is
+    dimmed, unnumbered and left out of the total. A screen that mirrors
+    another is left out by both, so they number the screens alike: the
+    recording skips it, and macOS does not list it to the window at all
+    (the owner's Mac, 2026-11-16: with the DELL P3421W mirroring the
+    Wacom One 13T, `msr check` of `v0.20261116.40` listed only "1 Wacom
+    One 13T"; D55). `msr check` prints the label as text instead
+    (`Screen 1 - Built-in Retina Display`), the default input marked
+    "(default)" after it (`Audio 1 - MacBook Pro Microphone (default)`).
+  - Screen rows first: the number and name, "Looks like" (the size in
     points), "Drawn at" (the pixel size, shown also where both are
-    equal), "Records at" (the frame size) and GB/h max (the display file,
+    equal), "Records at" (the frame size) and GB/h max (the screen file,
     its guide tracks included).
   - A thin divider, no second header, then the audio rows: the name of
     each audio input (the default one marked "(default)") in Source,
     Looks like and Drawn at empty, its number of channels in Records
     at ("1 channel", "2 channels", "cannot be read"), and GB/h max (the
-    audio file); the last row is "System audio" with "stereo". A source not recorded
+    audio file); the last row is the system audio with "stereo", "System
+  audio" without a number when it is off. A source not recorded
     is dimmed and its GB/h max is 0 (D46): every input with the audio
     mode `none`; every input but the default one with
     `default-microphone`; with `wired` every input but the default one
     that is not built-in or wired; and the system audio row when it is
     off.
   - The table's digits are all one width, so the GB/h max figures, the
-    Total's included, line up on the decimal point; only the Total's
-    label is bold.
+    Total's included, line up on the decimal point; only the word
+    "Total" is bold.
   - GB/h max is numbers only (D46), with one decimal; under 0.05 it shows
     "<0.1", and "?" when the rate cannot be told (an input whose
     channels cannot be read).
@@ -521,19 +564,19 @@ checked, reported or rewritten at the next start (D47).
     output folder item failed).
   - Below, "Files go to" and the output folder, a link that opens it in
     Finder (an alert says so if Finder cannot), and "Recording continues
-    when displays or audio sources change." If the displays cannot be read, that error
-    stands as a red line above the table, which then has no display
+    when screens or audio sources change." If the screens cannot be read, that error
+    stands as a red line above the table, which then has no screen
     rows; if the audio inputs cannot be read, "The audio inputs cannot
     be read: <reason>" stands as a red line above the table too, which
     then has the system audio row only; an audio input whose channels
     cannot be read shows "cannot be read" in the Records at column (and "?" GB/h max if it is recorded). The total row
-    and the line below it appear only when the displays and every recorded audio input can
+    and the line below it appear only when the screens and every recorded audio input can
     be read. The ready check's items stay as they are.
 
   Then a switch "Auto", on by default: the two sliders are always shown, so
   that the switch shifts nothing: on, they are disabled (grayed out) and
   show auto mode's choices, Native and Wired, not the saved values, and
-  a caption says what auto mode records (every display at Native, the
+  a caption says what auto mode records (every screen at Native, the
   audio mode Wired); off, they are enabled and show the saved values: the recording resolution (over 720p,
   1080p, 1200p, 1440p, 4K, Native, smallest to largest) and the audio
   mode (over None, Default microphone, Wired, All), each with the chosen
@@ -560,11 +603,11 @@ checked, reported or rewritten at the next start (D47).
 
 | Source | Looks like | Drawn at | Records at | GB/h max |
 |---|---|---|---|---|
-| 1 Built-in Retina Display | 1728×1117 | 3456×2234 | 1728×1116 | 1.0 |
-| 2 LG HDR 4K | 3840×2160 | 3840×2160 | 3840×2160 | 4.1 |
-| MacBook Pro Microphone (default) |  |  | 1 channel | 0.1 |
-| RØDE Wireless GO II RX |  |  | 2 channels | 0.1 |
-| System audio |  |  | stereo | 0.1 |
+| Screen 1 - Built-in Retina Display | 1728×1117 | 3456×2234 | 1728×1116 | 1.0 |
+| Screen 2 - LG HDR 4K | 3840×2160 | 3840×2160 | 3840×2160 | 4.1 |
+| Audio 1 - MacBook Pro Microphone (default) |  |  | 1 channel | 0.1 |
+| Audio 2 - RØDE Wireless GO II RX |  |  | 2 channels | 0.1 |
+| Audio 0 - System |  |  | stereo | 0.1 |
 | Total |  |  |  | 5.3 |
 
 2 hours need 10.7 GB, 3.1 GB free.
@@ -573,46 +616,52 @@ checked, reported or rewritten at the next start (D47).
   all is well, no timer (D47). Low disk space shows as a "!" badge and a
   bouncing Dock icon; no notification, which would need a third
   permission and is hidden by Focus modes. A recording problem (the
-  recording manifest cannot be written, the displays or the free space
-  cannot be read, a display file's or an audio file's writer fails, an
+  recording manifest cannot be written, the screens or the free space
+  cannot be read, a screen file's or an audio file's writer fails, an
   audio source's capture fails) shows the same way,
   and the status window lists it in red; `msr record` also names each
   on standard error.
 - **Status window (D46):** clicking the Dock icon while recording opens
-  a small window, and Quit opens it too: a table with a row per display,
+  a small window, and Quit opens it too: a table with a row per screen,
   then a row per audio source the recording records or recorded (the
-  audio inputs by name, the system audio last), and the columns Source,
-  "Records at" (a display's frame size; an audio source's `1 channel`,
-  `2 channels` or `stereo`), Files, Written (its files on disk, below
-  1 GB in whole MB, from there in GB with one decimal) and
-  State (`recording`, `waiting`, `failed, retrying`, `shows another
-  display`, `disk full`, `mirroring`, `disconnected`, `asleep`, and for
-  an audio input no longer in the audio mode, such as the default
-  microphone before a change, `not recorded`); under it the line
-  "Recording 1:07:00 · 1.3 GB in 3 files · 120.4 GB free", the elapsed
-  time as `h:mm:ss` (D47) and the sizes as in Written; then "CPU 23 %", our process's CPU use in
-  percent of one core as Activity Monitor shows it, sampled every
+  audio inputs by number, the system audio last), and the columns Source
+  (as in the start window: the kind's icon, the number and the name),
+  "Records at" (a screen's frame size; an audio source's `1 channel`, `2
+  channels` or `stereo`), Files, Written (its files on disk, below 1 GB
+  in whole MB, from there in GB with one decimal) and State
+  (`recording`, `waiting`, `failed, retrying`, `shows another screen`,
+  `disk full`, `mirroring`, `disconnected`, `asleep`, and for an audio
+  input no longer in the audio mode, such as the default microphone
+  before a change, `not recorded`); under it the line "Recording 1:07:00
+  · 1.3 GB in 3 files · 120.4 GB free", the elapsed time as `h:mm:ss`
+  (D47) and the sizes as in Written; then "CPU 23 %", our process's CPU
+  use in percent of one core as Activity Monitor shows it, sampled every
   second, with the line "Encoding and capture also run in macOS's own
   processes (VTEncoderXPCService, replayd, WindowServer), which this
   number does not include."; the problems in red, with the command for
   the log (see "Logging"); and, in the lower right corner, Continue and
-  Stop, Stop on the right in blue as the call to action. Esc presses
-  Continue; Return presses Stop. It refreshes every second
-  while open; Continue closes it. A display file whose size cannot be
-  read makes its display's Written `?`, and the line's data written
-  `? GB`. Free space that the volume does not report is a problem as a
-  failing read is. A problem goes into the
-  recording manifest, which is written at once (unless writing it is
-  the problem); one that repeats, such as the free space that cannot be
-  read on every check, is told once (one manifest entry, one red line,
-  one line on standard error, one bounce) until it clears, and again if
-  it comes back.
+  Stop, Stop on the right in blue as the call to action. The window is
+  as wide as its table, no cell wrapping or cut, and the text below,
+  such as the CPU line's explanation, wraps to that width. As in the
+  start window, the columns after Source are as wide as their widest
+  possible content (`8888×8888`, `888`, `888.8 GB`, and the longest of
+  every State's text, `RecordingStatusTable.StateText`), so the width
+  stays the same during a recording and changes only with the source
+  names. Esc presses Continue; Return presses Stop. It refreshes every
+  second while open; Continue closes it. A screen file whose size cannot
+  be read makes its screen's Written `?`, and the line's data written `?
+  GB`. Free space that the volume does not report is a problem as a
+  failing read is. A problem goes into the recording manifest, which is
+  written at once (unless writing it is the problem); one that repeats,
+  such as the free space that cannot be read on every check, is told
+  once (one manifest entry, one red line, one line on standard error,
+  one bounce) until it clears, and again if it comes back.
 - **Stop:** Stop in the status window finalizes, opens the recording folder itself
   in Finder (D46) and quits the app: a recording is typically one shot (D45).
   Logout, restart and shutdown finalize without asking, told apart from
   a Quit by the quit Apple event's reason (`kAEQuitReason`); one that
   comes while Stop is in progress waits for it. A failing writer and a
-  full disk are a recording problem also when no display file had
+  full disk are a recording problem also when no screen file had
   started. While a recording runs,
   the app does not quit when its last window closes, and the ready
   check does not run, also not when the app is activated.
@@ -659,13 +708,13 @@ it; every timestamp in every file and in the manifest is an offset from
 t0. The host clock that frames and audio buffers are stamped with does
 not advance while the Mac sleeps, so a buffer's time is converted by
 the difference of the two clocks, read at the start and again at every
-wake; no file spans a sleep (see "Displays coming and going"), so the
+wake; no file spans a sleep (see "Screens coming and going"), so the
 conversion within a file is exact. A file starting after a wake so
 keeps its place on the timeline and its timecode the time of day.
 
 **Event loop.** The app and `msr record` run the same AppKit event
 loop and show the app's Dock icon, `msr record` once the recording
-starts (D45, D46): macOS reports display changes
+starts (D45, D46): macOS reports screen changes
 (`CGDisplayRegisterReconfigurationCallback`) only to a process running
 `NSApplication.run()`, which the experiments of 2026-11-15 showed
 ([end-to-end-tests.md](end-to-end-tests.md), "What research found for
@@ -673,10 +722,10 @@ the recorder"). Both start it from `main` itself, at the same
 synchronous point, with `msr record`'s arguments parsed before: an
 event loop started inside a main-queue job, such as after the first
 `await` of an `async` `main`, never drains the main queue again, so no
-task, signal source or display change would reach the recorder.
+task, signal source or screen change would reach the recorder.
 `msr record` stops on its signals through the same path as Stop.
 
-**Constant 30 fps (D11, D21).** Per display, a ScreenCaptureKit stream
+**Constant 30 fps (D11, D21).** Per screen, a ScreenCaptureKit stream
 delivers complete frames when the screen changes; the newest is kept.
 The mouse pointer is recorded.
 Tick k is at t0 + k/30 s, computed, never accumulated. Every tick
@@ -687,20 +736,20 @@ tick is written late with its correct timestamp and counted in
 `framesRepeatedForLateness`. A tick written late carries the newest
 frame captured before the tick's own time, never one captured while it
 waited, so its picture is right and only its writing is late. At most
-6 s of ticks wait (*data*, D53); a writer further behind ends its display
-file with the event `display file writer fell behind`, and a new
-display file starts, as after a failing stream. The v1 gate's clock
-recording checks this from outside the recorder. A display file starts
+6 s of ticks wait (*data*, D53); a writer further behind ends its screen
+file with the event `screen file writer fell behind`, and a new
+screen file starts, as after a failing stream. The v1 gate's clock
+recording checks this from outside the recorder. A screen file starts
 at the first tick after its stream's first frame that passes the
-display check (below), and never before the stream's own start. When a
-display file ends, the ticks due are written, then those still waiting,
+screen check (below), and never before the stream's own start. When a
+screen file ends, the ticks due are written, then those still waiting,
 for at most the late-tick bound (6 s, D53) on a clock that does not count
 sleep, and the file is finalized also when the writer fell behind or
 the wait ran out; what failed is in the manifest.
 
-**Timecode (D21, D31).** Every display file and every audio file
+**Timecode (D21, D31).** Every screen file and every audio file
 carries a timecode track: local time of day at 30 fps, non-drop, the
-clock time also on a day with a daylight saving change. A display
+clock time also on a day with a daylight saving change. A screen
 file's timecode track has one sample, at its first tick, as is the
 convention; the writer finishes that track at once, so a file
 that is never finalized still carries its timecode (tested). An audio
@@ -718,12 +767,12 @@ questions").
 encoder in `.mov`; keyframe every 2 s; quality-targeted variable bit
 rate with a ceiling. Audio AAC-LC at 48 kHz: in an audio file
 128 kbit/s per mono track and 192 kbit/s for the system audio's stereo
-track; in a display file 64 kbit/s for the guide track "Microphones"
-and 96 kbit/s for the guide track "System audio". Every display is
+track; in a screen file 64 kbit/s for the guide track "Audio inputs"
+and 96 kbit/s for the guide track "System audio". Every screen is
 recorded in SDR, also one
 in HDR mode, with its colour space tagged so editors show the colours
 unchanged (D24): the stream delivers 420v frames, which carry BT.709
-(the experiment of 2026-11-15), and the display file is tagged BT.709
+(the experiment of 2026-11-15), and the screen file is tagged BT.709
 for primaries, transfer and matrix. Apple's `SCRecordingOutput` is not used:
 it writes a variable frame rate with its own track layout.
 
@@ -731,49 +780,49 @@ it writes a variable frame rate with its own track layout.
 (*data*; independent of the keyframe interval), so a crash loses at
 most the last 2 s.
 
-**Frame size (D11, D30, D44).** A display file's frame size is the
-display's looks-like size (what macOS shows as "looks like", in points)
+**Frame size (D11, D30, D44).** A screen file's frame size is the
+screen's looks-like size (what macOS shows as "looks like", in points)
 fitted into the recording resolution box: proportions kept, never
 enlarged, each side rounded down to an even number. The size the
-display is drawn at (its pixels) is never recorded: a HiDPI mode that
-looks like 1920×1080 on a 3840×2160 display records at 1920×1080. The
-box turns with a portrait display (taller than wide): at 1080p a
-2160×3840 display records at 1080×1920 (D25). Examples: the built-in
-display, looks like 1728×1117, drawn at 3456×2234, records at Native
-1728×1116 and at 1080p 1670×1080; a 4K display without HiDPI records at
-Native 3840×2160. While a display's frame size stays the same, its file
-continues, whatever else changed about the display, a switch of its
+screen is drawn at (its pixels) is never recorded: a HiDPI mode that
+looks like 1920×1080 on a 3840×2160 screen records at 1920×1080. The
+box turns with a portrait screen (taller than wide): at 1080p a
+2160×3840 screen records at 1080×1920 (D25). Examples: the built-in
+screen, looks like 1728×1117, drawn at 3456×2234, records at Native
+1728×1116 and at 1080p 1670×1080; a 4K screen without HiDPI records at
+Native 3840×2160. While a screen's frame size stays the same, its file
+continues, whatever else changed about the screen, a switch of its
 HiDPI mode that keeps its looks-like size included. When the frame size
-changes, the display's current file ends and a new file starts at the
-new frame size, like after a reconnect, with the event `display frame
-size changed` (the display, the old and the new frame size) in the
+changes, the screen's current file ends and a new file starts at the
+new frame size, like after a reconnect, with the event `screen frame
+size changed` (the screen, the old and the new frame size) in the
 manifest. At `native` the frame size is the looks-like size rounded
 down to even numbers, so nearly every looks-like size change is such a
 change; at `1080p` a change from 3840×2160 to 5120×2880 is not (both
 give 1920×1080), while 3440×1440 to 1920×1080 is (1920×802 to
 1920×1080).
-The cost: a gap of under one second at the change in that display's
-video and guide tracks only; the audio files and the other displays'
-files continue unbroken; a display that flaps between modes makes many
-short display files, each valid.
+The cost: a gap of under one second at the change in that screen's
+video and guide tracks only; the audio files and the other screens'
+files continue unbroken; a screen that flaps between modes makes many
+short screen files, each valid.
 
 **Audio (D12, D22, D31, D49).** One audio file per recorded audio
-source, beside the display files. Each recorded audio input gets its
+source, beside the screen files. Each recorded audio input gets its
 own audio file, a `.mov` with one mono track per channel, named
-`Microphone: <device>, channel <n>`; the system audio gets its own
-audio file with one stereo track, named `System audio`. Every audio
+`<label>, channel <n>`; the system audio gets its own audio file with
+one stereo track, named `Audio 0 - System`. Every audio
 file carries the timecode track with the source as its reel name and
 the metadata items (see "Output on disk").
 
 - **Sources.** Each recorded audio input has an `AVCaptureSession` of
   its own (D49), its PCM converted to 32-bit float at 48 kHz by the
   session's output; the system audio comes from a ScreenCaptureKit
-  stream of its own on the main display, with `capturesAudio`, our own
+  stream of its own on the main screen, with `capturesAudio`, our own
   process's audio excluded, its video at 2×2 pixels and one frame a
-  second and dropped, so a failing display stream never takes the
-  audio with it. The stream reads the main display each time it
-  starts, never an older reading. When the system audio's display goes,
-  its stream starts again on the new main display, with the events
+  second and dropped, so a failing screen stream never takes the
+  audio with it. The stream reads the main screen each time it
+  starts, never an older reading. When the system audio's screen goes,
+  its stream starts again on the new main screen, with the events
   `system audio stopped` and `system audio started`. Which audio inputs are recorded
   follows the audio mode (D44): `none` none, `default-microphone` the
   default one, `wired` the default one plus every built-in and wired one
@@ -804,8 +853,8 @@ the metadata items (see "Output on disk").
   session and a new audio file ([end-to-end-tests.md](end-to-end-tests.md),
   "What research found for the recorder"). An unplug is no failure.
   One whose channel count changes ends its audio file and starts a new
-  one. A display event never touches an audio file, but sleep ends
-  every audio file and wake starts new ones, as for display files.
+  one. A screen event never touches an audio file, but sleep ends
+  every audio file and wake starts new ones, as for screen files.
 - **Placement.** An audio file starts at the first tick after its first
   buffer, and the samples before that tick are trimmed, so its timecode
   is exact; from there every sample is placed by sample count, not by
@@ -826,46 +875,46 @@ the metadata items (see "Output on disk").
   samples than time passed), to a tenth of a ppm; null until two
   buffers arrived apart.
 - **Failures.** A failing audio capture or writer and a full disk are
-  handled for an audio file as for a display file (below): the file
+  handled for an audio file as for a screen file (below): the file
   ends, the event (`audio input failed`, `system audio failed`, `audio
   file writer failed` with its `error`, `audio file writer fell behind`
   when the writer took none of the last 2 s of samples, or `disk full`)
   and a problem are told, the capture is started again with the same
   back-off, and after a full disk a new audio file starts once there is
   room. Such an end makes the recording's `result` `problems` (D47); an
-  unplug and a gap do not. As for a display, a source lost a second
+  unplug and a gap do not. As for a screen, a source lost a second
   time while it is still listed and recorded, with no change of the
-  audio devices (an audio input) or of the displays (the system audio)
+  audio devices (an audio input) or of the screens (the system audio)
   in between, is a failure: `audio input failed` or `system audio
   failed` with that as its `error`, a problem and the back-off. When an
   audio file ends, the samples still waiting for its writer are
   written for at most 2 s; its `end` counts only what the writer took,
   and samples left over are lost: `audio file writer fell behind` with
   its `error`, a failure, and a problem.
-- **Guide tracks.** For playback and waveform sync, every display file
-  also carries guide tracks: "Microphones", one mono mix of the
+- **Guide tracks.** For playback and waveform sync, every screen file
+  also carries guide tracks: "Audio inputs", one mono mix of the
   recorded audio inputs, unless the audio mode is `none`; "System
   audio", stereo, unless system audio is off. The two are never mixed
-  together. For "Microphones" each audio input is averaged to mono, the
+  together. For "Audio inputs" each audio input is averaged to mono, the
   inputs are summed at unity gain, so a silent input never lowers a
   live one, and a soft limiter keeps the sum within ±1: unchanged up to
   0.5 (−6 dBFS), above it `0.5 + 0.5 · tanh((|x| − 0.5) / 0.5)` with its
   sign (D52). "System audio" is clamped to ±1. Each source is placed by
   its own timestamps, the mix runs 200 ms (*data*) behind real time so
   every source's buffers have arrived, and a source that is missing is
-  silence in its guide track. The mix is handed to every open display
-  file every 100 ms (*data*); a display file's guide tracks cover
+  silence in its guide track. The mix is handed to every open screen
+  file every 100 ms (*data*); a screen file's guide tracks cover
   exactly its own time, so a frame size change gives them the same gap
-  as the video. A display file listens to the mix until its last mix:
+  as the video. A screen file listens to the mix until its last mix:
   stopping hands it every mix handed over before, and its last mix
   takes, from the samples the sources delivered and not mixed yet, the
   rest up to the end of its video, without taking them from the other
-  display files. Before it takes its last mix, a display file waits
+  screen files. Before it takes its last mix, a screen file waits
   until every source in each guide track has delivered its samples up
   to the end of its video, for at most 2 s (`audioWaitBoundSeconds`,
   *data*); if the wait runs out, it mixes what is there, and a source's
   samples that have not come are silence in it. At Stop the audio
-  sources stop only after every display file's last mix. Its last mix
+  sources stop only after every screen file's last mix. Its last mix
   is joined into one buffer per guide track,
   cut at the end of the video, and waits for the writer as long as its
   ticks do, so its guide tracks end with the video (D51). Should the
@@ -875,71 +924,71 @@ the metadata items (see "Output on disk").
   file's end. A file ended by a failure (its writer failed or fell
   behind) gets no last mix, so its guide tracks may end early.
 
-**Display identity.** A display is known by the UUID macOS gives it
+**Screen identity.** A screen is known by the UUID macOS gives it
 (`CGDisplayCreateUUIDFromDisplayID`), never by its display ID, which
-changes when a display comes back, nor by its name, which macOS may
-change ("MSR Test (1)"). A display that comes back with the same UUID
+changes when a screen comes back, nor by its name, which macOS may
+change ("MSR Test (1)"). A screen that comes back with the same UUID
 keeps its number and its name in the file names for the whole
-recording. Whether a real display keeps its UUID after it was
+recording. Whether a real screen keeps its UUID after it was
 unplugged is UNVERIFIED (the owner's check on the first build). In a
-file name, `/` and `:` in a display's name become `-`, so a name never
-stops a display from recording. A display reached through another port
-(a monitor with two USB-C inputs) may be another display, with its own
+file name, `/` and `:` in a screen's name become `-`, so a name never
+stops a screen from recording. A screen reached through another port
+(a monitor with two USB-C inputs) may be another screen, with its own
 UUID and number: macOS treats it so, and so does the recorder (D46).
 
-**Displays coming and going (D14).** A display that appears gets a
-stream and a display file (event `display connected`); one that
-vanishes has its file finalized (event `display disconnected`). A
-display that is asleep counts as disconnected; that macOS's display
-change callback fires when a display falls asleep is [ASSUMED]. When
-a display is unplugged, its stream ends first, with ScreenCaptureKit's
-`noCaptureSource` (-3815), and macOS's display-change notice may come
+**Screens coming and going (D14).** A screen that appears gets a
+stream and a screen file (event `screen connected`); one that
+vanishes has its file finalized (event `screen disconnected`). A
+screen that is asleep counts as disconnected; that macOS's screen
+change callback fires when a screen falls asleep is [ASSUMED]. When
+a screen is unplugged, its stream ends first, with ScreenCaptureKit's
+`noCaptureSource` (-3815), and macOS's screen-change notice may come
 seconds later (8 s for the Wacom One, observed in the owner's run of
-2026-11-15, `--debug` log). That stream end is no failure: the display
-file ends as on a disconnect, with no `display stream failed` event and
-no back-off; the event `display disconnected` comes with the notice. A
-display still listed one settle time after such a stream end gets a new
+2026-11-15, `--debug` log). That stream end is no failure: the screen
+file ends as on a disconnect, with no `screen stream failed` event and
+no back-off; the event `screen disconnected` comes with the notice. A
+screen still listed one settle time after such a stream end gets a new
 stream, as after any change, without a failure event. Only the first
 such end is free: if the stream ends with `noCaptureSource` again with
-no display-change notice for that display in between, it is a failure
-(`display stream failed` with its error, back-off, and a problem told),
-so a display that stays listed but cannot be captured never goes
+no screen-change notice for that screen in between, it is a failure
+(`screen stream failed` with its error, back-off, and a problem told),
+so a screen that stays listed but cannot be captured never goes
 unrecorded silently. Any other stream error is a failure: a stream that fails finalizes its file and is restarted after 1 s,
-backing off to 10 s (*data*), for as long as the display exists. Each
-gap is an event in the manifest. A display's stream starts, or starts
-again, only once the display has been unchanged for the settle time,
+backing off to 10 s (*data*), for as long as the screen exists. Each
+gap is an event in the manifest. A screen's stream starts, or starts
+again, only once the screen has been unchanged for the settle time,
 1 s (*data*): a mode change that macOS reports as a disconnect and a
 reconnect, or modes switched through quickly, so make no burst of
-short display files. When a mode change gives a new frame size, the
-current display file runs on through the settle time, with the picture
+short screen files. When a mode change gives a new frame size, the
+current screen file runs on through the settle time, with the picture
 scaled to the old frame size, and then ends; the stream is stopped and
 a new one started at the new frame size, the same path as a reconnect
 (`updateConfiguration` is not used: never tried). The gap is the
 restart only.
-- **Mirroring:** a display that starts mirroring another
-  (`CGDisplayMirrorsDisplay`) ends its display file with the event
-  `display mirroring started` (the display and the one it mirrors);
-  when mirroring stops, a new display file starts with `display
-  mirroring stopped`. The display keeps its number.
-- **Main display:** a change of the main display is the event `main
-  display changed`; the numbers stay.
+- **Mirroring:** a screen that starts mirroring another
+  (`CGDisplayMirrorsDisplay`) ends its screen file with the event
+  `screen mirroring started` (the screen and the one it mirrors);
+  when mirroring stops, a new screen file starts with `screen
+  mirroring stopped`. The screen keeps its number.
+- **Main screen:** a change of the main screen is the event `main
+  screen changed`; the numbers stay.
 - **Sleep and wake:** at sleep every file ends (event `sleep`); at wake
-  (event `wake`) new files start, the displays after the settle time.
+  (event `wake`) new files start, the screens after the settle time.
 
-**Display check (D45).** Every frame is checked before it is kept: the
+**Screen check (D45).** Every frame is checked before it is kept: the
 rectangle ScreenCaptureKit attaches to it (`SCStreamFrameInfo.screenRect`)
-must be its display's bounds (`CGDisplayBounds`, held in memory and
-read again when the displays change). It reads no pixels. A frame that
+must be its screen's bounds (`CGDisplayBounds`, held in memory and
+read again when the screens change). It reads no pixels. A frame that
 fails is never written, and its tick repeats the last frame that
-passed. Why: after a display reconnects, ScreenCaptureKit can deliver
-another display's picture on its stream, and a restart does not clear
-it (the experiments of 2026-11-13 and 2026-11-15 with virtual displays,
+passed. Why: after a screen reconnects, ScreenCaptureKit can deliver
+another screen's picture on its stream, and a restart does not clear
+it (the experiments of 2026-11-13 and 2026-11-15 with virtual screens,
 [end-to-end-tests.md](end-to-end-tests.md), "What research found for
-the recorder"); a frame then carries the other display's rectangle.
+the recorder"); a frame then carries the other screen's rectangle.
 After 30 failing frames in a row (*data*), not counting those within
-the settle time after a display change, the display file ends with the
-event `display shows another display's picture`, the Dock badge shows
-"!", `msr record` names the display on standard error, and the display
+the settle time after a screen change, the screen file ends with the
+event `screen shows another screen's picture`, the Dock badge shows
+"!", `msr record` names the screen on standard error, and the screen
 is tried again only after its next change. Its limit: a frame whose
 rectangle is right can still be black (seen once, cause unknown); the
 check cannot see that. That `screenRect` and `CGDisplayBounds` are
@@ -948,30 +997,30 @@ comparable as they are, in points and the same coordinates, is
 
 **Disk (D14).** Below the warning threshold: the warning. A writer that
 fails on a full disk ends its file, readable up to the last fragment;
-the recorder checks free space every 5 s and starts new display files
+the recorder checks free space every 5 s and starts new screen files
 and audio files once there is room. The low disk warning threshold
-counts every display's newest display file and every audio source's
+counts every screen's newest screen file and every audio source's
 newest audio file. Nothing written is ever deleted.
 
 **Keep awake (D14).** A power assertion against idle system and
-display sleep while recording.
+screen sleep while recording.
 
 ## Logging
 
 No log file of our own (D46). The app and `msr` write every event of the
 recording manifest and every problem to the macOS unified log, subsystem
 `org.schapiro.multiscreenrecorder`, at `.notice` (problems at `.error`),
-levels macOS keeps on disk, with names (displays, folders) public, not
+levels macOS keeps on disk, with names (screens, folders) public, not
 redacted. `msr record` also prints each event as one line on standard
 error: the local time, the offset from the recording's start, the event
-and its display, and the details it has, such as `22:14:40 +9.2s display
-connected: Wacom One 13T` or `22:15:32 +61.3s display stream failed: LG
+and its screen, and the details it has, such as `22:14:40 +9.2s screen
+connected: Wacom One 13T` or `22:15:32 +61.3s screen stream failed: LG
 (-3811)`. `--debug` (for `msr record` and `msr check`) adds detail lines
-(the tracker's actions, the displays as read, files started and ended,
+(the tracker's actions, the screens as read, files started and ended,
 the ready check's facts) on standard error and at `.debug` in the log;
 while a recording runs, each line on standard error carries the time
 since its start as the event lines do, such as `debug recorder: +27.9s
-start Display 3 - LG`. The log of the last 2 hours, of the app and `msr`
+start Screen 3 - LG`. The log of the last 2 hours, of the app and `msr`
 only (the tests log under the same subsystem on a developer's Mac):
 
 ```sh
@@ -1012,15 +1061,15 @@ modes and which input each records (every transport type), settings read
 leniently with the line for standard error, flags (`--auto` against
 `--resolution` and `--audio-mode`) and their errors, the text `msr check`
 prints for "What will be recorded", file naming, manifest states,
-the display tracker (numbers, the settle time, frame
-size changes, mirroring, the main display, back-off, the display check's
-fault, a full disk, sleep and wake), the display check, the shared clock,
+the screen tracker (numbers, the settle time, frame
+size changes, mirroring, the main screen, back-off, the screen check's
+fault, a full disk, sleep and wake), the screen check, the shared clock,
 the timecode (also on a daylight saving day and at a second frame rate),
 `--duration`, the summary of `msr record`, the Dock badge and the
 problems of a recording, the audio tracker (the audio modes, inputs
 coming and going, an unplug told once, a replug, the default
 microphone followed, failures with the back-off, the system audio
-moving to the new main display, a full disk, a channel count change,
+moving to the new main screen, a full disk, a channel count change,
 two inputs with the same name, sleep and wake), the audio file's
 placement on the tick grid (trimming, gaps filled or ending the file,
 jitter within 32 ms) and its `clockDriftPpm`, splitting interleaved and
@@ -1035,13 +1084,13 @@ audio inputs can be read and a listener for their changes registered,
 which needs no permission and shows no prompt, the state file (missing,
 saved, broken), the listing of the crash report folder (a missing one
 is no crash reports, an unreadable one an error), the text copy of a
-crash report, display files written from synthetic frames and read
+crash report, screen files written from synthetic frames and read
 back (constant frame rate, timecode, BT.709, fragments, a file never
 finalized, the guide tracks), audio files written from synthetic PCM
 and read back (a mono track per channel or one stereo track, the bit
 rates, the timecode with its reel name, the metadata, a filled gap
 decoding as silence, a file never finalized), the proof that an
-audio-only fragmented `.mov` carries a timecode track, a display file's
+audio-only fragmented `.mov` carries a timecode track, a screen file's
 ticks with a stand-in writer (a failing writer, one that fell behind, a
 slow end, guide samples placed from the file's first tick), a stream stopped while it
 starts, that an action
@@ -1073,16 +1122,16 @@ folder, and by the v1 gate. The design of the end-to-end tests is
 
 - **Rust**, also as a core under a Swift shell: every framework call
   would be `unsafe` through generated bindings (D17).
-- **One JSON file per display file** (the reference implementation):
+- **One JSON file per screen file** (the reference implementation):
   with a constant frame rate on a shared clock a file needs only its
   start offset.
 - **A global "one recording at a time" lock:** folder claims allow
   parallel recordings at no extra cost (D20).
 - **Mixing an input down to mono or stereo in its audio file:**
   channels may carry different people (D22); only the guide track
-  "Microphones" is a mix, for playback and sync (D31).
+  "Audio inputs" is a mix, for playback and sync (D31).
 - **A notification for low disk space:** see "The app".
-- **Recording HDR displays as HDR:** files of mixed kinds on one
+- **Recording HDR screens as HDR:** files of mixed kinds on one
   timeline, larger files, and weak support outside DaVinci Resolve, for
   content that is rarely HDR (D24).
 - **Sequenced after v0** (D18, D44, `backlog.md`): AGC.
@@ -1092,14 +1141,14 @@ folder, and by the v1 gate. The design of the end-to-end tests is
 - **A "Reset to defaults" in the window, an `--auto on` / `--auto off`
   value, a repair of the file on read:** the settings file is not
   something people deal with by hand (the owner, D44).
-- **Every audio source in every display file** (D12): one audio file
-  per source instead, with guide tracks in the display files (D31).
+- **Every audio source in every screen file** (D12): one audio file
+  per source instead, with guide tracks in the screen files (D31).
   Joining the files into one without re-encoding is deferred
   (`backlog.md`).
 - **The command line driving the running app**, so a terminal needs no
   permissions of its own: deferred (`backlog.md`).
-- **Screenshots as a fallback** for a display that shows another
-  display's picture (`SCScreenshotManager`, right in 3 of 3 faulty
+- **Screenshots as a fallback** for a screen that shows another
+  screen's picture (`SCScreenshotManager`, right in 3 of 3 faulty
   runs, its cost at 30 frames per second unknown): a second capture
   path; deferred (`backlog.md`, D45).
 - **Choosing audio inputs one by one** with auto mode off (open in
@@ -1110,7 +1159,7 @@ folder, and by the v1 gate. The design of the end-to-end tests is
 
 - Unproven until the owner's first real recording with audio (D31):
   that DaVinci Resolve reads the timecode of an audio-only `.mov`, and
-  how Kdenlive places the display files and audio files.
+  how Kdenlive places the screen files and audio files.
 - How the drift between an audio device's clock and the tick grid is
   corrected over hours. It is measured per audio file
   (`clockDriftPpm`, D49): up to 117 ppm (the Razer Seiren V3 Mini:
@@ -1136,28 +1185,28 @@ types read from Core Audio), the switch "Auto" and the two sliders in the
 window, `--auto` and "What will be recorded" in `msr check`, the ready
 check's probes with a seam and the window's refresh with its tests. It
 captures nothing. The recording core builds the rest, in two PRs
-(D45): B1 `msr record`, Start and Stop, the display files with their
-timecode, display changes and the display check, the recording
+(D45): B1 `msr record`, Start and Stop, the screen files with their
+timecode, screen changes and the screen check, the recording
 manifest and the Dock badge; B2 the audio files, the
 guide tracks, system audio and the default microphone followed.
 
-Built (the recording core's displays, B1, D45): `msr record` with
+Built (the recording core's screens, B1, D45): `msr record` with
 `--duration`, Start and Stop in the app, the Dock icon, its badge and
 the status window also for `msr record`, the app quitting after Stop
 and not on its last window closing while it records, the ready check
 held while recording, the recording folder claim, the recording manifest with
-its display files and events, the shared clock, the tick grid with late
-ticks, display files (HEVC, fragments of 2 s, the timecode track,
-BT.709), the frame size, display identity by UUID, the settle time,
-displays coming and going, failing streams with back-off, mirroring, the
-main display, sleep and wake, the display check, a full disk and the
+its screen files and events, the shared clock, the tick grid with late
+ticks, screen files (HEVC, fragments of 2 s, the timecode track,
+BT.709), the frame size, screen identity by UUID, the settle time,
+screens coming and going, failing streams with back-off, mirroring, the
+main screen, sleep and wake, the screen check, a full disk and the
 free space check, and keep awake. The frame rate is one value
 (*data*); the tick grid, the timecode, the keyframe interval, the
-late-tick bound (6 s) and the display check's limit (1 s of frames)
+late-tick bound (6 s) and the screen check's limit (1 s of frames)
 derive from it. Tested without a screen: the logic by unit tests, and
-display files written from synthetic frames and read back (a constant
+screen files written from synthetic frames and read back (a constant
 frame rate, the timecode, BT.709, a file never finalized readable up to
-its last fragment). A finalized display file is a regular movie:
+its last fragment). A finalized screen file is a regular movie:
 Apple's writer joins the fragments when it finalizes [KNOWN, the
 tests]. Live capture is verified on the owner's Mac.
 
@@ -1170,22 +1219,22 @@ an error (exit 3) when the manifest's `result` is `problems` (D47): a
 file is not finalized or a file was ended by a failure, and
 when the finalized manifest could not be written (the problem is told,
 the app shows an alert after the person's Stop, never at logout, restart or shutdown, and the file on disk keeps no `ended`); `at` is rounded to
-the millisecond; a display file whose name is taken (a new file within
+the millisecond; a screen file whose name is taken (a new file within
 the same second) gets " (2)"; the timecode of tick 0 is t0's time of
-day rounded to the nearest frame; after a full disk, new display files
+day rounded to the nearest frame; after a full disk, new screen files
 start once the free space is above the low disk warning threshold;
 low disk space bounces the Dock icon until the app is activated; a
-frame's rectangle passes the display check within 0.5 points of its
-display's bounds.
+frame's rectangle passes the screen check within 0.5 points of its
+screen's bounds.
 
 Built (the recording core's audio, B2, D49): an `AVCaptureSession` per
 recorded audio input, following the audio mode and the default
 microphone; an unplug ending the audio file and a replug starting a new
 one; a new audio file on a channel count change; the system audio from
-a ScreenCaptureKit stream on the main display, moving with it; audio
+a ScreenCaptureKit stream on the main screen, moving with it; audio
 files placed on the tick grid, gaps up to 1 s filled with silence, a
 longer one ending the file; `clockDriftPpm` per audio file; the guide
-tracks "Microphones" and "System audio" in every display file; audio
+tracks "Audio inputs" and "System audio" in every screen file; audio
 sources in the status window and the summary; audio files counted in
 the low disk warning threshold; our process's CPU use in the status
 window, the summary and the manifest. Tested without a microphone or a
@@ -1195,11 +1244,11 @@ read back. Verified live on the owner's Mac on 2026-11-16, build
 `7ad0b6b`, in two runs by the owner and five by the architect: capture
 from 4 audio inputs and the system audio into finalized files; default
 microphone changes; a USB microphone unplugged and replugged, ending
-its audio file and starting a new one; displays connected and
-disconnected, a virtual screen and main display changes among them;
+its audio file and starting a new one; screens connected and
+disconnected, a virtual screen and main screen changes among them;
 the "System audio" guide track equal to `System audio.mov` at 0
 samples of lag; the timecode aligned in DaVinci Resolve; the
-"Microphones" gain of 1/√6 of that build, the rule D52 replaced,
+"Microphones" (now "Audio inputs") gain of 1/√6 of that build, the rule D52 replaced,
 measured. Seen there, and not the
 recorder's: while USB devices re-enumerated, macOS delivered zeros on
 the USB inputs and on the system audio for 4 to 10 s. Not verified
@@ -1211,14 +1260,14 @@ Built in B2 where this document leaves the detail open, decided by the
 architect on review (D50): the failure events are named `audio input
 failed`, `system audio failed`, `audio file writer failed` and `audio
 file writer fell behind`; an event about an audio source names it in
-`audioSource`, never in `display`; samples lost at an audio file's end
+`audioSource`, never in `screen`; samples lost at an audio file's end
 are `audio file writer fell behind`, a failure; an audio source the
 audio mode records but that has no file yet shows the state `not
 recorded`; an audio input is recorded only when Core Audio gives its
 UID, which `AVCaptureDevice` opens it by; the beginning of a recording
 tells no `default microphone changed` or `audio input connected` events;
 the system audio's stream asks for 2×2 pixels at 1 frame per second and
-drops them; a display file's guide tracks end with its video, by a last
+drops them; a screen file's guide tracks end with its video, by a last
 mix at its end (D51); the video track's name is written as QuickTime
 user data `©nam`, which ffprobe shows as `title` (track-level metadata
 items do not show and are not written; the file-level items are); `msr
@@ -1239,14 +1288,19 @@ must be greater than 0 (an invalid one is ignored, see "Settings file").
 version string and the commit, such as `0.20261115.2-dev+a1b2c3d (a1b2c3d)`,
 from the bundle's Info.plist keys `MSRVersion` and `MSRCommit`;
 outside a bundle it prints `development build (not bundled)`. The
+banner's build date is the key `MSRBuildDate`, the commit's date in
+UTC, the same date the version carries, so a rebuild of the same
+commit gives the same banner; a bundle without it says `built (build
+date missing from Info.plist)`, and outside a bundle the banner has no
+build date. The
 settings file is found through `HOME`. The disk estimate follows its
 rule, file by file (10.7 GB in the `msr check` example above). The
-recording resolution box turns with a portrait display (1080×1920 for a
-2160×3840 display at 1080p).
+recording resolution box turns with a portrait screen (1080×1920 for a
+2160×3840 screen at 1080p).
 
 Further details, as built and decided by the architect for PR #1: an
 unset `HOME` exits 78; `msr` that cannot re-execute
-itself at its real path exits 71. When the displays cannot be read,
+itself at its real path exits 71. When the screens cannot be read,
 the free disk space item is left out, as when the output folder fails.
 The ready check reads each audio input by itself, so the disk estimate
 counts the default microphone's channels; when the channels of an input

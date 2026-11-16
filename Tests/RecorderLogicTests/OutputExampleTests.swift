@@ -45,12 +45,12 @@ import Testing
         let manifest = try manifest()
         let files = try #require(manifest["files"] as? [[String: Any]])
         let events = try #require(manifest["events"] as? [[String: Any]])
-        for event in events where event["event"] as? String == "display frame size changed" {
-            let display = try #require(event["display"] as? String)
+        for event in events where event["event"] as? String == "screen frame size changed" {
+            let screen = try #require(event["screen"] as? String)
             let at = try #require(event["at"] as? Double)
-            let ofDisplay = files.filter { $0["display"] as? String == display }
-            #expect(ofDisplay.contains { $0["end"] as? Double == at && $0["frameSize"] as? [Int] == event["from"] as? [Int] })
-            #expect(ofDisplay.contains { $0["start"] as? Double == at && $0["frameSize"] as? [Int] == event["to"] as? [Int] })
+            let ofScreen = files.filter { $0["screen"] as? String == screen }
+            #expect(ofScreen.contains { $0["end"] as? Double == at && $0["frameSize"] as? [Int] == event["from"] as? [Int] })
+            #expect(ofScreen.contains { $0["start"] as? Double == at && $0["frameSize"] as? [Int] == event["to"] as? [Int] })
         }
     }
 }

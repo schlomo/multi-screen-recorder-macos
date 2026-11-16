@@ -10,7 +10,7 @@ import Testing
         return settings
     }
 
-    /// No microphone and no system audio: a display file is its video alone.
+    /// No microphone and no system audio: a screen file is its video alone.
     private var silent: Settings {
         settings {
             $0.audioMode = .none
@@ -18,30 +18,30 @@ import Testing
         }
     }
 
-    @Test func aDisplayFileWithoutGuideTracksIsOneGigabytePerHourAt1080p() {
-        #expect(DiskEstimate.displayFileBytesPerHour(frameSize: fullHD, settings: silent) == 1_000_000_000)
+    @Test func aScreenFileWithoutGuideTracksIsOneGigabytePerHourAt1080p() {
+        #expect(DiskEstimate.screenFileBytesPerHour(frameSize: fullHD, settings: silent) == 1_000_000_000)
     }
 
     @Test func theVideoScalesByThePixelCount() {
-        #expect(DiskEstimate.displayFileBytesPerHour(frameSize: FrameSize(width: 3840, height: 2160), settings: silent)
+        #expect(DiskEstimate.screenFileBytesPerHour(frameSize: FrameSize(width: 3840, height: 2160), settings: silent)
             == 4_000_000_000)
-        #expect(DiskEstimate.displayFileBytesPerHour(frameSize: FrameSize(width: 960, height: 540), settings: silent)
+        #expect(DiskEstimate.screenFileBytesPerHour(frameSize: FrameSize(width: 960, height: 540), settings: silent)
             == 250_000_000)
     }
 
     @Test func theGuideTracksFollowTheSettingsAlone() {
-        #expect(GuideTrack.tracks(for: settings()) == [.microphones, .systemAudio])
+        #expect(GuideTrack.tracks(for: settings()) == [.audioInputs, .systemAudio])
         #expect(GuideTrack.tracks(for: settings { $0.audioMode = .none }) == [.systemAudio])
-        #expect(GuideTrack.tracks(for: settings { $0.systemAudio = false }) == [.microphones])
+        #expect(GuideTrack.tracks(for: settings { $0.systemAudio = false }) == [.audioInputs])
         #expect(GuideTrack.tracks(for: silent).isEmpty)
-        #expect(GuideTrack.microphones.name == "Microphones")
+        #expect(GuideTrack.audioInputs.name == "Audio inputs")
         #expect(GuideTrack.systemAudio.name == "System audio")
     }
 
     @Test func theGuideTracksAdd64And96KilobitsPerSecond() {
-        #expect(DiskEstimate.displayFileBytesPerHour(frameSize: fullHD, settings: settings())
+        #expect(DiskEstimate.screenFileBytesPerHour(frameSize: fullHD, settings: settings())
             == 1_000_000_000 + 28_800_000 + 43_200_000)
-        #expect(DiskEstimate.displayFileBytesPerHour(frameSize: fullHD, settings: settings { $0.audioMode = .none })
+        #expect(DiskEstimate.screenFileBytesPerHour(frameSize: fullHD, settings: settings { $0.audioMode = .none })
             == 1_000_000_000 + 43_200_000)
     }
 
@@ -56,7 +56,7 @@ import Testing
 
     @Test func theTotalCountsEveryFileARecordingWrites() throws {
         let total = try #require(DiskEstimate.bytesPerHour(
-            settings: settings(), displays: DesignExample.displays, audioInputs: DesignExample.audioInputs))
+            settings: settings(), screens: DesignExample.screens, audioInputs: DesignExample.audioInputs))
         let retina = 1670.0 * 1080 / (1920 * 1080) * 1_000_000_000 + 72_000_000
         let lg = 1_000_000_000.0 + 72_000_000
         #expect(abs(total - (retina + lg + 57_600_000 + 86_400_000)) < 1)
@@ -64,18 +64,28 @@ import Testing
 
     @Test func theTotalLeavesOutWhatIsNotRecorded() {
         #expect(DiskEstimate.bytesPerHour(
-            settings: silent, displays: DesignExample.displays, audioInputs: DesignExample.audioInputs)
-            == DiskEstimate.bytesPerHour(settings: silent, displays: DesignExample.displays, audioInputs: []))
+            settings: silent, screens: DesignExample.screens, audioInputs: DesignExample.audioInputs)
+            == DiskEstimate.bytesPerHour(settings: silent, screens: DesignExample.screens, audioInputs: []))
     }
 
     @Test func aRecordedInputWhoseChannelsCannotBeReadLeavesTheTotalUnknown() {
-        let unreadable = AudioInputInfo(name: "X", channelCount: .failure(DeviceReadError("no format")), isDefault: true)
-        #expect(DiskEstimate.bytesPerHour(settings: settings(), displays: DesignExample.displays, audioInputs: [unreadable]) == nil)
-        #expect(DiskEstimate.bytesPerHour(settings: silent, displays: DesignExample.displays, audioInputs: [unreadable]) != nil)
+        let unreadable = AudioInputInfo(name: "X", channelCount: .failure(DeviceReadError("no format")), isDefault: true, uid: "X")
+        #expect(DiskEstimate.bytesPerHour(settings: settings(), screens: DesignExample.screens, audioInputs: [unreadable]) == nil)
+        #expect(DiskEstimate.bytesPerHour(settings: silent, screens: DesignExample.screens, audioInputs: [unreadable]) != nil)
     }
 
-    @Test func noDisplaysNeedNoSpaceForVideo() {
-        #expect(DiskEstimate.bytesPerHour(settings: silent, displays: [], audioInputs: []) == 0)
+    /// D55: a recording opens an input by its Core Audio UID; one without is not recorded and needs no space.
+    @Test func anInputWithoutAUIDAddsNothing() {
+        let noUID = AudioInputInfo(name: "Mystery", channelCount: 2, isDefault: true, transport: .usb)
+        let unreadableNoUID = AudioInputInfo(name: "X", channelCount: .failure(DeviceReadError("no format")), isDefault: true)
+        let alone = DiskEstimate.bytesPerHour(settings: settings(), screens: DesignExample.screens, audioInputs: [])
+        #expect(DiskEstimate.bytesPerHour(settings: settings(), screens: DesignExample.screens, audioInputs: [noUID]) == alone)
+        #expect(DiskEstimate.bytesPerHour(settings: settings(), screens: DesignExample.screens, audioInputs: [unreadableNoUID])
+            == alone)
+    }
+
+    @Test func noScreensNeedNoSpaceForVideo() {
+        #expect(DiskEstimate.bytesPerHour(settings: silent, screens: [], audioInputs: []) == 0)
     }
 
     @Test(arguments: [
@@ -116,7 +126,7 @@ import Testing
     @Test func theDesignStatesTheEncodingRates() throws {
         let design = try repositoryFile("docs/design/recorder.md")
         for bitRate in [Encoding.audioInputTrackBitRate, Encoding.systemAudioTrackBitRate,
-                        Encoding.microphonesGuideTrackBitRate, Encoding.systemAudioGuideTrackBitRate] {
+                        Encoding.audioInputsGuideTrackBitRate, Encoding.systemAudioGuideTrackBitRate] {
             #expect(design.contains("\(bitRate / 1000) kbit/s"), "\(bitRate)")
         }
     }

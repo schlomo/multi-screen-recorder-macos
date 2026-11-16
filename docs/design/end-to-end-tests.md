@@ -14,7 +14,7 @@ project's Mac, except what "Unknowns" marks as tried.
 ## What this covers
 
 How the recorder is tested as a whole, automatically, on one Mac:
-displays and audio inputs change, things fail, and a program examines
+screens and audio inputs change, things fail, and a program examines
 the result. What the recorder does is in [recorder.md](recorder.md).
 The unit tests and the pipeline are in [recorder.md](recorder.md)
 "Tests" and [delivery.md](delivery.md). What a person verifies by hand
@@ -62,7 +62,7 @@ bundle, which `scripts/build-app` assembles from `msr` alone.
 package (D35).
 
 1. **Device helper.** It makes the events and the known picture and
-   sound. Each virtual display lives in a process of its own, a
+   sound. Each virtual screen lives in a process of its own, a
    subcommand of the executable, so ending the process disconnects it.
 2. **Driver:** reads a scenario, starts the helper and the recorder,
    fires the events on a clock, stops the recorder, runs the
@@ -91,12 +91,12 @@ of `scripts/test`, which must not come to need `ffmpeg`. That the
 pipeline does not run this self-test is an accepted risk, below.
 
 **The Mac's own devices do not leak into the result.** The driver
-lists displays and audio inputs before a run and asserts exactly only
-on the virtual ones it adds; for the Mac's own displays and audio
+lists screens and audio inputs before a run and asserts exactly only
+on the virtual ones it adds; for the Mac's own screens and audio
 inputs it asserts only that their files are readable and listed.
 
 **Run in a person's own session** (D35). A run adds
-displays, covers every display with a pattern and changes the default
+screens, covers every screen with a pattern and changes the default
 microphone: the Mac cannot be used meanwhile. On the owner's Mac an
 agent may start one to test the roadmap's work (D48); elsewhere never
 unasked (`AGENTS.md`, "Facts that bite"). Not part of
@@ -107,18 +107,18 @@ unasked (`AGENTS.md`, "Facts that bite"). Not part of
 An assertion can only detect a wrong picture or sound if it knows what
 was shown and played.
 
-- **Picture:** the helper shows a full-screen pattern on every display:
-  blocks that encode the display's identity, a frame counter and the
+- **Picture:** the helper shows a full-screen pattern on every screen:
+  blocks that encode the screen's identity, a frame counter and the
   time in milliseconds, large enough to survive scaling and HEVC.
   The blocks are black and white and are read by brightness, because
   HEVC stores colour at a lower resolution than brightness. Tried (see
   "Unknowns"): the menu bar of macOS covers the top of a virtual
-  display, so the blocks stay below it.
+  screen, so the blocks stay below it.
   Colour is asserted on its own. The owner: "shouldn't we also check
   colors to ensure that no problem creeps in with colors? After all,
   all screen content is colored". So the pattern also carries large
   colour fields (red, green, blue, their mixes) and grey steps from
-  black to white. Two assertions use them. One reads the display
+  black to white. Two assertions use them. One reads the screen
   file's colour tags with `ffprobe` (primaries, transfer, matrix,
   range) and compares them with what the recorder design says it
   writes (always SDR with the colour space tagged, D24; which colour
@@ -149,13 +149,13 @@ only if that falls short. See "Unknowns".
 
 | Error class | Events that provoke it | Assertions that detect it |
 |---|---|---|
-| **A file is lost or unreadable** | kill the recorder (`kill -9`), also while it finalizes; full disk; output folder made unwritable or its volume removed; sleep; a display or audio input vanishing | every file in the recording folder opens and decodes to its last complete fragment (fragments of 2 s, [recorder.md](recorder.md)); nothing recorded more than one fragment before the event is missing |
-| **Wrong picture** | displays connect and reconnect (a macOS fault then delivers another display's picture, seen on the owner's Mac with virtual displays), mirroring, main display change, many displays at once | the identity decoded from each display file is that file's display; no black stretch; the pattern's counter keeps advancing; the colour fields and grey steps come back as shown, within a tolerance, black as black and white as white |
-| **Wrong sound** | audio inputs appear and vanish, default microphone changes, channel count and sample rate change | a virtual audio input's audio file holds the tone, on every track; no silent stretch in it; each guide track is present in every display file |
-| **Wrong timing** | still picture for 60 s, load on the processor, a stalled recorder (`SIGSTOP`, then `SIGCONT`), long random runs | every display file has 30 frames for each second of its length; the time shown in each recorded frame is that frame's time within one frame, except where the last picture is repeated by design (D11, D21): during a still picture or a stall the scenario makes, the shown time may lag by up to the length of that still picture or stall, and under load by a bound the recorder design sets ("What the recorder design must provide"); it never runs backwards or ahead of the frame's time; the timecode of every file matches its start; where no picture is repeated, the click sits at the frame that shows its time |
-| **A change handled wrongly** | every display and audio event below | the right file ends and the right one begins; a frame size change leaves under one second without picture (D30); the audio files have no gap across it; a display keeps its number; an unchanged frame size continues the file |
+| **A file is lost or unreadable** | kill the recorder (`kill -9`), also while it finalizes; full disk; output folder made unwritable or its volume removed; sleep; a screen or audio input vanishing | every file in the recording folder opens and decodes to its last complete fragment (fragments of 2 s, [recorder.md](recorder.md)); nothing recorded more than one fragment before the event is missing |
+| **Wrong picture** | screens connect and reconnect (a macOS fault then delivers another screen's picture, seen on the owner's Mac with virtual screens), mirroring, main screen change, many screens at once | the identity decoded from each screen file is that file's screen; no black stretch; the pattern's counter keeps advancing; the colour fields and grey steps come back as shown, within a tolerance, black as black and white as white |
+| **Wrong sound** | audio inputs appear and vanish, default microphone changes, channel count and sample rate change | a virtual audio input's audio file holds the tone, on every track; no silent stretch in it; each guide track is present in every screen file |
+| **Wrong timing** | still picture for 60 s, load on the processor, a stalled recorder (`SIGSTOP`, then `SIGCONT`), long random runs | every screen file has 30 frames for each second of its length; the time shown in each recorded frame is that frame's time within one frame, except where the last picture is repeated by design (D11, D21): during a still picture or a stall the scenario makes, the shown time may lag by up to the length of that still picture or stall, and under load by a bound the recorder design sets ("What the recorder design must provide"); it never runs backwards or ahead of the frame's time; the timecode of every file matches its start; where no picture is repeated, the click sits at the frame that shows its time |
+| **A change handled wrongly** | every screen and audio event below | the right file ends and the right one begins; a frame size change leaves under one second without picture (D30); the audio files have no gap across it; a screen keeps its number; an unchanged frame size continues the file |
 | **The recording manifest is wrong** | all of them | `recording.json` lists exactly the files in the folder; each event the recorder design defines appears once, in order, at the scenario's time; its state is right after Stop and after a kill |
-| **Resources run out** | a small disk image as output folder, filled during a recording, then given room again; processor and memory pressure; more displays than the Mac has hardware encoder sessions | what was written stays readable; the recorder keeps retrying and continues in new files once there is room (D14); nothing is discarded |
+| **Resources run out** | a small disk image as output folder, filled during a recording, then given room again; processor and memory pressure; more screens than the Mac has hardware encoder sessions | what was written stays readable; the recorder keeps retrying and continues in new files once there is room (D14); nothing is discarded |
 | **The process ends badly** | `kill -9`, `SIGTERM`, a second recording into the same recording folder, a recording into another folder in parallel (D20) | after `kill -9` the recording manifest has no `ended` and the files are readable up to the last 2 s (D47); after `SIGTERM` the recording ends as after Stop, finalized ([recorder.md](recorder.md), "Command line"); the second recording into the same folder is refused; parallel recordings do not disturb each other |
 | **Settings and start** | old, damaged and empty settings files; auto mode on and off (D34) | a settings file is never refused; the recording folder holds what the settings ask for |
 
@@ -163,14 +163,14 @@ only if that falls short. See "Unknowns".
 
 | Event | How it is made | Needs |
 |---|---|---|
-| Display connects, disconnects | the helper creates a virtual display through Apple's private `CGVirtualDisplay` interface; ending its process removes it | private interface |
-| Frame size changes, HiDPI | the helper replaces a virtual display by one of another size (a mode switch on a virtual display is reported to leave it unremovable); on one of the Mac's own displays, a mode change through the public interface | |
-| Mirroring, arrangement, main display | the helper, through the public display configuration interface | |
-| Rotation; one of the Mac's own displays switched off and on | BetterDisplay's command line | BetterDisplay Pro, a paid licence (the owner: "I have BetterDisplay Pro if it helps we can use it"); a scenario set of its own, asked for by name, which stops with an error where BetterDisplay is missing |
+| Screen connects, disconnects | the helper creates a virtual screen through Apple's private `CGVirtualDisplay` interface; ending its process removes it | private interface |
+| Frame size changes, HiDPI | the helper replaces a virtual screen by one of another size (a mode switch on a virtual screen is reported to leave it unremovable); on one of the Mac's own screens, a mode change through the public interface | |
+| Mirroring, arrangement, main screen | the helper, through the public display configuration interface (Apple's) | |
+| Rotation; one of the Mac's own screens switched off and on | BetterDisplay's command line | BetterDisplay Pro, a paid licence (the owner: "I have BetterDisplay Pro if it helps we can use it"); a scenario set of its own, asked for by name, which stops with an error where BetterDisplay is missing |
 | Audio input appears, vanishes, changes its channel count | the helper creates and removes an aggregate device around BlackHole through the public CoreAudio interface | BlackHole installed once (administrator) |
 | Sample rate, input volume | the helper sets them on BlackHole | |
 | Default microphone changes | the helper, through the public CoreAudio interface | |
-| Display sleep; sleep and wake | `pmset` | display sleep locks the Mac where macOS is set to ask for the password after it; wake is reported unreliable, and the Mac may wake locked; a locked Mac needs the person: a scenario set of its own, asked for by name, with the person present |
+| Screen sleep; sleep and wake | `pmset` | screen sleep locks the Mac where macOS is set to ask for the password after it; wake is reported unreliable, and the Mac may wake locked; a locked Mac needs the person: a scenario set of its own, asked for by name, with the person present |
 | Kill, stall, full disk, unwritable folder, volume removed, load | `kill`, a small disk image, `chmod`, `memory_pressure` | |
 | A real USB microphone is pulled; the clock, the date or the time zone changes | the helper captures the USB device so the Mac loses it; the system clock is set | administrator; a scenario set of its own, asked for by name; the USB capture is unproven on macOS 26 |
 
@@ -182,7 +182,7 @@ Their output names what a run did not cover. These stay with a person
 - the app itself: Start in the window, the Dock icon, Stop, Quit,
   finalizing at logout (the tests drive `msr record` only);
 - closing the lid, a cable pulled from the Mac's own port, a real
-  display's own behaviour (HDR, variable refresh rate);
+  screen's own behaviour (HDR, variable refresh rate);
 - power loss and a kernel panic: after `kill -9` macOS still writes
   out what the recorder handed it, so a kill does not prove what
   survives losing power;
@@ -195,15 +195,15 @@ Their output names what a run did not cover. These stay with a person
   a recording, and the monthly "continue to allow" prompt of macOS;
 - whether an editor (DaVinci Resolve, Kdenlive) places the files right.
 
-A virtual display is drawn by the same window server and captured
+A virtual screen is drawn by the same window server and captured
 through the same ScreenCaptureKit as a real one, so these tests should
 show how the recorder handles a change. That removing a virtual
-display looks to the recorder like pulling a cable is an assumption,
-UNVERIFIED. One difference may already be known: the wrong-display
-fault shows after a virtual display reconnects ("Unknowns"), and
-whether it shows with the Mac's own displays is untried. Until that
+screen looks to the recorder like pulling a cable is an assumption,
+UNVERIFIED. One difference may already be known: the wrong-screen
+fault shows after a virtual screen reconnects ("Unknowns"), and
+whether it shows with the Mac's own screens is untried. Until that
 is tried, a wrong picture after a reconnect is a failed assertion all
-the same: the recorder has to deliver the right display in either
+the same: the recorder has to deliver the right screen in either
 case, and a recorder that cannot yet keeps those scenarios failing.
 
 ### What the recorder design must provide
@@ -211,12 +211,12 @@ case, and a recorder that cannot yet keeps those scenarios failing.
 The assertions need these, and [recorder.md](recorder.md) does not
 have them yet; they go into the recorder PR's design:
 
-- an expected result, and a manifest event, for: a display connecting,
-  mirroring switched on and off, the main display changing, the default
+- an expected result, and a manifest event, for: a screen connecting,
+  mirroring switched on and off, the main screen changing, the default
   microphone changing, sleep and wake;
-- the gap allowed in a display file's guide tracks across a frame size
+- the gap allowed in a screen file's guide tracks across a frame size
   change;
-- on the command line, which displays and audio inputs a recording
+- on the command line, which screens and audio inputs a recording
   will record, as the window's tables show it (D13: every feature in
   both front ends);
 - with auto mode off, a way to choose audio inputs (open in D34):
@@ -255,83 +255,83 @@ The two permissions are granted once by a person.
 For the recorder PR's design, each UNVERIFIED here unless marked as
 tried:
 
-- **ScreenCaptureKit delivers the wrong display** after a virtual
-  display reconnects when two exist (reported as Apple feedback
+- **ScreenCaptureKit delivers the wrong screen** after a virtual
+  screen reconnects when two exist (reported as Apple feedback
   FB17797423; BetterDisplay is said to work around it). Tried, and it
-  shows on the owner's Mac (see "Unknowns"; one run): after display A
-  came back, every new stream on A delivered display B's picture, in three
+  shows on the owner's Mac (see "Unknowns"; one run): after screen A
+  came back, every new stream on A delivered screen B's picture, in three
   reconnects of three, while a screenshot of A through the same
-  ScreenCaptureKit display was right. The recorder must verify which
-  display a stream delivers, and its design needs a way to get the
+  ScreenCaptureKit screen was right. The recorder must verify which
+  screen a stream delivers, and its design needs a way to get the
   right one, which no experiment has found yet. Tried again
   (2026-11-15, 13 runs): it depends on the order of creation. When the
-  display that reconnects was created before the other one, every
-  reconnect showed the other display's picture (11 of 11 in 8 runs);
+  screen that reconnects was created before the other one, every
+  reconnect showed the other screen's picture (11 of 11 in 8 runs);
   when it was created after, none did (7 of 7 in 3 runs). The system
   holds the fault: a fresh process, a new serial number, a new fetch of
   the shareable content and the other workarounds tried did not clear
-  it, and a screenshot through the display filter was wrong too.
+  it, and a screenshot through the screen filter was wrong too.
   `SCStreamFrameInfo.screenRect` is a one-directional sign: in every
-  reconnect that showed the other display's picture (11 of 11, one
+  reconnect that showed the other screen's picture (11 of 11, one
   frame sampled per check) the frame's `screenRect` was the other
-  display's rectangle, and with a filter that includes A's window the
-  frame was transparent, at the other display's rectangle; but once a
+  screen's rectangle, and with a filter that includes A's window the
+  frame was transparent, at the other screen's rectangle; but once a
   frame with a matching `screenRect` was black (cause not known,
   perhaps not yet painted), so a match does not prove the picture
   right. The run logs of 2026-11-15 are not kept. A screenshot with
-  `SCScreenshotManager.captureImage(in:)` of the display's bounds
+  `SCScreenshotManager.captureImage(in:)` of the screen's bounds
   was right in 3 of 3 faulty runs; as a recording path it is
   UNVERIFIED (its cost at 30 frames per second is not known). So the
   recorder needs a check per frame that never writes a mismatched
-  frame as that display, and, since restarting does not help, a way
-  to fail that display loudly. Proposals for the recording core's
+  frame as that screen, and, since restarting does not help, a way
+  to fail that screen loudly. Proposals for the recording core's
   design, untested: compare `screenRect` with `CGDisplayBounds` on
   every frame, act after several mismatched frames in a row (what
   debounce a mode change needs is UNVERIFIED), fall back to the
-  screenshot. For these tests: create the reconnecting display first
+  screenshot. For these tests: create the reconnecting screen first
   to trigger the fault, last to avoid it. Not tried: whether this happens with the
-  Mac's own displays or only with virtual ones, and three or more
-  displays.
+  Mac's own screens or only with virtual ones, and three or more
+  screens.
   Whether the owner's BetterDisplay HiDPI mode works through virtual
   screens, and so meets this fault in daily use, is a question for
   the owner.
-- **A stream is told when its display goes.** Tried (see "Unknowns"):
-  the stream on a virtual display stopped with error -3815 of
+- **A stream is told when its screen goes.** Tried (see "Unknowns"):
+  the stream on a virtual screen stopped with error -3815 of
   ScreenCaptureKit's stream error domain 0.12 to 0.24 s after the
-  display went, in three cases of three; a stream on the other display
+  screen went, in three cases of three; a stream on the other screen
   kept delivering throughout.
 - **A screenshot's colour space had no name** in that run (see
   "Unknowns"). The recorder design names the colour space it tags
   (D24), so it must find out what ScreenCaptureKit delivers. Tried
   (2026-11-15, one run): the frames carry a colour space attachment
-  without a name, whose ICC description is the display's name, and no
+  without a name, whose ICC description is the screen's name, and no
   ICC profile key, in every format; BGRA has no primaries, transfer or
   matrix keys, while 420v and 420f are BT.709 in all three. So the
   recorder cannot read a colour space's name from the frames; for BGRA
   the frames carry no primaries, transfer or matrix to read either. Not tried: `colorSpaceName` and
   `colorMatrix`.
-- **macOS's display ID is not a display's identity.** Tried (see
-  "Unknowns"): the same virtual display got a new display ID each time
-  it was created. A display that comes back during a recording may
+- **macOS's display ID is not a screen's identity.** Tried (see
+  "Unknowns"): the same virtual screen got a new display ID each time
+  it was created. A screen that comes back during a recording may
   so have another display ID; the recorder's stable identity for a
-  display (`backlog.md`, recorder PR) cannot be the display ID alone.
+  screen (`backlog.md`, recorder PR) cannot be the display ID alone.
   Tried again (2026-11-15, 55 creations in the logs): the UUID from
   `CGDisplayCreateUUIDFromDisplayID` stayed the same across
   reconnects, processes and runs for the same vendor, product and
   serial number, and changed with a new serial number; the name did
   not stay ("MSR Test", "MSR Test (1)"). A serial number can be 0
   (the Wacom). So the UUID is the candidate identity; whether a
-  real display keeps its UUID after it was unplugged is UNVERIFIED.
+  real screen keeps its UUID after it was unplugged is UNVERIFIED.
 - **AppKit may not list a new screen to a program that does not handle
   the app's events.** Tried (see "Unknowns"): not listed within 5 s
   without, listed after about a second with. The recorder lists
-  displays through AppKit today; `msr record` from the command line
-  must be shown to see a display that connects during a recording.
+  screens through AppKit today; `msr record` from the command line
+  must be shown to see a screen that connects during a recording.
   Tried again (2026-11-15, six runs): `CGDisplayRegisterReconfigurationCallback`
   never fired under `CFRunLoopRun`, `dispatchMain` or
   `NSApplication.shared` with `CFRunLoopRun`, and fired under
   `NSApplication.shared.run()`; polling `CGGetActiveDisplayList` saw a
-  new display after 0.11 to 0.16 s and `SCShareableContent` after 0.17
+  new screen after 0.11 to 0.16 s and `SCShareableContent` after 0.17
   to 0.23 s. So `msr record` would need to poll or run the AppKit loop.
 - **A mode change is not a reconnect, and the frames keep the configured size.**
   Tried (2026-11-15, HiDPI in two runs, 1x in one; see "Unknowns"): a
@@ -339,11 +339,11 @@ tried:
   with a configured size of 1920 × 1080 the frames stayed that size
   with the content scaled and `screenRect` following the new bounds;
   a 4:3 mode came pillarboxed. The running stream kept delivering the
-  configured size, so a display file at the new size needs the stream
+  configured size, so a screen file at the new size needs the stream
   reconfigured or restarted. A mode change can be told from a
   reconnect by the display ID and the callback's flags. Not tried:
   `updateConfiguration` or a restart to the new size, and a mode
-  switch while the wrong display's picture is shown.
+  switch while the wrong screen's picture is shown.
 - **The audio clock of an audio input drifts against the host clock,
   and `AVCaptureSession` does not correct it.** Tried (2026-11-15, one run of one
   hour, macOS 26.7.1): one `AVCaptureSession` for each of five audio
@@ -365,7 +365,7 @@ tried:
   Hence two inputs
   recorded for an hour drift apart by up to 0.6 s, and an audio file
   that is placed by its sample count alone is that much off the
-  display files. A recorder
+  screen files. A recorder
   that places each audio input on the host clock needs a correction;
   resampling is the obvious one (a proposal for the recording core's
   design, untested). Not tried: a run of several
@@ -394,13 +394,13 @@ tried:
 
 ## Safeguards for the person's session
 
-- A run records the Mac's own displays and audio inputs too. Its
+- A run records the Mac's own screens and audio inputs too. Its
   recording folders live in a scratch folder, are deleted after a run
   that passes, and kept after one that fails, which the driver says
   with the path.
 - Before a run the driver writes to a restore file what the run may
-  change: the display arrangement, mirroring and the main display;
-  whether each of the Mac's own displays is on, with its mode and
+  change: the screen arrangement, mirroring and the main screen;
+  whether each of the Mac's own screens is on, with its mode and
   rotation; the default
   microphone and the default output; the sample rate and input volume
   of every BlackHole device; and, for the scenario set that changes
@@ -408,7 +408,7 @@ tried:
   time itself. It restores them after the run, after a failure and
   after Ctrl-C. If the driver itself is killed, `restore` as its only
   argument does the same from the restore file, and removes every
-  virtual display and aggregate device carrying the tests' name prefix
+  virtual screen and aggregate device carrying the tests' name prefix
   (an aggregate device may outlive the helper that made it).
 - The time is restored first, as the saved time plus the time elapsed
   since, read from a clock that counts sleep and that setting the time
@@ -417,10 +417,10 @@ tried:
   lost: `restore` restores the rest and says that the time is the
   person's to set, unless it is set automatically again. Untried (see
   "Unknowns").
-- Virtual displays use a small fixed set of identities: macOS keeps an
+- Virtual screens use a small fixed set of identities: macOS keeps an
   arrangement and a colour profile (owned by root, never removed) per
   identity.
-- Nothing switches off the built-in display: a helper killed while
+- Nothing switches off the built-in screen: a helper killed while
   holding it off is reported to leave it off until logout.
 - Nothing sends keystrokes or asks for the person's password.
 - Whether the tones are heard on the Mac's speakers is unknown; the
@@ -440,9 +440,9 @@ its run time.
 ## Why not otherwise
 
 - **A macOS virtual machine** (Parallels Desktop, Tart): the guest has
-  one display, one sound device tied to the host's default microphone,
-  no USB audio and no hardware HEVC encoder, so display changes need
-  the same virtual displays as on the Mac itself, and the encoder under
+  one screen, one sound device tied to the host's default microphone,
+  no USB audio and no hardware HEVC encoder, so screen changes need
+  the same virtual screens as on the Mac itself, and the encoder under
   test is another one. It would give a clean start and permissions
   granted once in an image; the owner's Mac has both without it.
   Parallels adds nothing over free tools here.
@@ -453,7 +453,7 @@ its run time.
   one for a public repository; a pull request could run code on the
   Mac.
 - **Hardware** (switchable HDMI or USB hubs): real unplugging, at a
-  price and with wiring; revisit if virtual displays prove too far
+  price and with wiring; revisit if virtual screens prove too far
   from real ones.
 - **Faking ScreenCaptureKit and CoreAudio inside the unit tests:** fast
   and worth having for the recorder's logic, but it tests our idea of
@@ -465,7 +465,7 @@ its run time.
   of it, one test suite covers it, and an agent changing an event
   changes one definition.
 - **The driver inside the Swift test suite,** as tests with a tag:
-  `swift test` would then need displays, permissions and `ffmpeg` for
+  `swift test` would then need screens, permissions and `ffmpeg` for
   some of its tests, and a random run with a seed and a time budget is
   a program with arguments, not a test case.
 - **Starting the recorder through macOS (`open`)** so that the app
@@ -501,22 +501,22 @@ its run time.
 Throwaway code, run by the owner or on the owner's go-ahead, before
 this design is built:
 
-- a virtual display appears in ScreenCaptureKit and delivers a real
+- a virtual screen appears in ScreenCaptureKit and delivers a real
   picture. **Tried** (2026-11-13, macOS 26.7.1, five runs as the
   owner's user without `sudo`: three from an app without Screen
   Recording, then two by the owner from an app that holds it).
-  Observed in the first three: a virtual display of 1920 × 1080 was an active
-  display 0.3 to 0.4 s after it was created, at the left of the main
-  display; AppKit listed it as a screen about a second later in the
+  Observed in the first three: a virtual screen of 1920 × 1080 was an active
+  screen 0.3 to 0.4 s after it was created, at the left of the main
+  screen; AppKit listed it as a screen about a second later in the
   run that handled the app's events, and not within 5 s in the two
-  runs that did not; every run started with the Mac's two displays, so
-  the virtual display of the run before was gone by then; macOS's
+  runs that did not; every run started with the Mac's two screens, so
+  the virtual screen of the run before was gone by then; macOS's
   display ID was 5, 6 and 7 in the three runs, though the program
-  gave the display the same vendor, product and serial number each
+  gave the screen the same vendor, product and serial number each
   time. The capture part did not run in these: the program asks macOS
   whether Screen Recording is granted in the way that raises no
   prompt, and stopped. Observed in the owner's two runs (display ID 9
-  and 10): ScreenCaptureKit listed three displays, the virtual one
+  and 10): ScreenCaptureKit listed three screens, the virtual one
   among them at 1920 × 1080; a screenshot of it showed the program's
   full-screen window, with the menu bar of macOS across the top; the
   window's magenta (sRGB 1, 0, 1) is in the saved screenshot exactly
@@ -526,33 +526,33 @@ this design is built:
   the second, a stream at 30 frames per second delivered
   150 buffers in 5 s, 63 of
   them complete frames, while the picture changed 50 times; the
-  display was gone 0.11 s after the program released it. **Tried
+  screen was gone 0.11 s after the program released it. **Tried
   again** (2026-11-15, macOS 26.7.1, about 35 runs of 3 to 25 s from
   the owner's terminal, which holds Screen Recording; the runs of the
-  next four items belong to these). The virtual displays were left of
-  the main display and gone after each run; the Mac's own displays
+  next four items belong to these). The virtual screens were left of
+  the main screen and gone after each run; the Mac's own screens
   kept their display IDs, bounds and modes; one hung probe was killed,
   no process was left and no prompt showed. macOS may remember the
   arrangement and name for the serial numbers 101, 102, 111, 121, 301, 401
-  and 501 (UNVERIFIED). A virtual display's identity, its looks-like size
+  and 501 (UNVERIFIED). A virtual screen's identity, its looks-like size
   and mode changes, its colour space and how to list it without
-  AppKit are in the items below. Not tried: three or more displays;
-- the identity of a display. **Tried** (2026-11-15, 55 creations
-  in the logs; the Mac's own displays were only read, twice). With the
+  AppKit are in the items below. Not tried: three or more screens;
+- the identity of a screen. **Tried** (2026-11-15, 55 creations
+  in the logs; the Mac's own screens were only read, twice). With the
   same vendor, product and serial number,
   `CGDisplayCreateUUIDFromDisplayID` gave the same UUID across
   reconnects, processes and runs; with a new serial number, a new
   UUID. The display ID was new every time (18 to 72). The name was not
   stable: "MSR Test", then "MSR Test (1)", then "(2)". Two virtual
-  displays with the same vendor, product and serial number cannot
-  exist at once (the initialiser returns nil). The Mac's own displays:
+  screens with the same vendor, product and serial number cannot
+  exist at once (the initialiser returns nil). The Mac's own screens:
   a Dell with vendor 4268, model 41382 and serial 810828108, and a
   Wacom with vendor 23587, model 4217 and serial 0. A serial number
   can be 0, so the UUID is the candidate identity. Not tried: a real
-  display's UUID after it was unplugged (UNVERIFIED);
+  screen's UUID after it was unplugged (UNVERIFIED);
 - the looks-like size and a mode change during a stream. **Tried**
-  (2026-11-15; a HiDPI display in two runs, a 1x display in one). A
-  display that looks like 1920 × 1080 in HiDPI: `CGDisplayBounds` and
+  (2026-11-15; a HiDPI screen in two runs, a 1x screen in one). A
+  screen that looks like 1920 × 1080 in HiDPI: `CGDisplayBounds` and
   the mode's width 1920 × 1080, pixel width 3840 × 2160, `SCDisplay`
   1920 × 1080, `pointPixelScale` 2. A default `SCStreamConfiguration`
   always delivered 1920 × 1080 in YCbCr; with the size in points set,
@@ -565,34 +565,34 @@ this design is built:
   reconnect: the display ID stayed the same, and the reconfiguration
   callback's flags were 0x1 then 0x100a; HiDPI to 1x at the same size
   gave 0x8 only. Connecting gave 0x111a and disconnecting 0x1220. Not
-  tried: a mode switch on the display that shows the wrong picture
+  tried: a mode switch on the screen that shows the wrong picture
   (the next item);
 - the colour space of the frames. **Tried** (2026-11-15, one run; the
-  virtual display and both of the Mac's own displays). The ICC profile
+  virtual screen and both of the Mac's own screens). The ICC profile
   key was absent (`ICC=nil`) in every format; the frames carried a
   `CGColorSpace` attachment with no name, whose ICC description was the
-  display's name. BGRA carried no primaries, transfer or
+  screen's name. BGRA carried no primaries, transfer or
   matrix keys; 420v and 420f carried BT.709 primaries, transfer and
   matrix. Red read back as BGRA 0, 0, 255, 255; 420v Y/Cb/Cr 63, 102,
   240; 420f 54, 99, 255 (what BT.709 gives for 255, 0, 0). Not tried:
   `colorSpaceName` and `colorMatrix`;
-- listing displays without AppKit. **Tried** (2026-11-15, six runs).
-  Polling `CGGetActiveDisplayList` saw a new display 0.11 to 0.16 s
+- listing screens without AppKit. **Tried** (2026-11-15, six runs).
+  Polling `CGGetActiveDisplayList` saw a new screen 0.11 to 0.16 s
   after the helper started and `SCShareableContent` 0.17 to 0.23 s;
-  the display was gone after 0.02 to 0.18 s and 0.17 to 0.74 s
+  the screen was gone after 0.02 to 0.18 s and 0.17 to 0.74 s
   respectively. The mean of an `SCShareableContent` fetch was 110 to 300 ms per run; single fetches took up to 731 ms.
   `CGDisplayRegisterReconfigurationCallback` never fired under
   `CFRunLoopRun` (two runs), `dispatchMain` (two runs) or
   `NSApplication.shared` with `CFRunLoopRun` (one run); it fired under
   `NSApplication.shared.run()` on the main thread (one run). So
   `msr record` would need to poll or run the AppKit loop;
-- two virtual displays, one reconnects: does the wrong-display fault
+- two virtual screens, one reconnects: does the wrong-screen fault
   show on this Mac. **Tried, and it does** (2026-11-13, one run by the
-  owner, from an app that holds Screen Recording). Display A showed
-  red, display B blue; A was released and created again three times,
-  with the same vendor, product and serial number, and got display
+  owner, from an app that holds Screen Recording). Screen A showed
+  red, screen B blue; A was released and created again three times,
+  with the same vendor, product and serial number, and got screen
   IDs 11, 13, 14 and 15. Before any reconnect a screenshot and a
-  stream of each display showed its own colour, with the bytes
+  stream of each screen showed its own colour, with the bytes
   exactly as shown (255, 0, 0 and 0, 0, 255). After each of the three
   reconnects: a screenshot of A showed red and one of B blue; a new
   stream on A delivered blue, B's picture; a new stream on B delivered
@@ -607,7 +607,7 @@ this design is built:
   delivered B's picture in 8 runs, in 11 of 11 reconnects. B created
   before A: right in 3 runs, 7 of 7 reconnects. A alone: right in 1
   run, 2 of 2. In the faulty state a new stream on B was right, and a
-  screenshot of A through its display filter
+  screenshot of A through its screen filter
   (`captureSampleBuffer`) was also wrong, 11 of 11, unlike the run of
   2026-11-13. Failed ways around it: fetching the shareable content
   again at once, after 1, 3 and 5 s and every 5 s to about 19 s; a
@@ -620,12 +620,12 @@ this design is built:
   with `CGDisplayBounds` of A gave A's picture in 3 of 3 faulty runs
   (BGRA 0, 0, 255, 255); its cost at 30 frames per second is
   UNVERIFIED. What shows it: `SCStreamFrameInfo.screenRect` was the
-  other display's rectangle in every reconnect that showed the other
-  display's picture (11 of 11, one frame sampled per check), and with
+  other screen's rectangle in every reconnect that showed the other
+  screen's picture (11 of 11, one frame sampled per check), and with
   a filter that includes A's window the frame was transparent, at the
-  other display's rectangle; once a frame with a matching `screenRect`
-  was black (cause not known, perhaps not yet painted). Not tried: the Mac's own displays (BetterDisplay can
-  switch one off and on), three or more displays, a mode switch on B,
+  other screen's rectangle; once a frame with a matching `screenRect`
+  was black (cause not known, perhaps not yet painted). Not tried: the Mac's own screens (BetterDisplay can
+  switch one off and on), three or more screens, a mode switch on B,
   the cause;
 - an aggregate device created and removed is seen as an audio input
   appearing and vanishing; a change of its members arrives as a channel
@@ -649,10 +649,10 @@ this design is built:
 
 Research of 2026-11-13; the most load-bearing ones:
 
-- Virtual displays: [go-macos/virtualdisplay](https://pkg.go.dev/github.com/go-macos/virtualdisplay)
-  (measured on macOS 26), [Chromium's virtual display utility](https://chromium.googlesource.com/chromium/src/+/main/ui/display/mac/test/virtual_display_util_mac.mm),
+- Virtual screens: [go-macos/virtualdisplay](https://pkg.go.dev/github.com/go-macos/virtualdisplay)
+  (measured on macOS 26), [Chromium's virtual screen utility](https://chromium.googlesource.com/chromium/src/+/main/ui/display/mac/test/virtual_display_util_mac.mm),
   [Electron's multi-monitor testing](https://electronjs.org/docs/latest/development/multi-monitor-testing).
-- The wrong-display fault: [Apple developer forums 786829](https://developer.apple.com/forums/thread/786829),
+- The wrong-screen fault: [Apple developer forums 786829](https://developer.apple.com/forums/thread/786829),
   [BetterDisplay issue 4405](https://github.com/waydabber/BetterDisplay/issues/4405).
 - BetterDisplay's command line: [reference](https://betterdisplay.pro/guide/integration/cli-reference/).
 - Audio inputs: [BlackHole](https://github.com/ExistentialAudio/BlackHole),

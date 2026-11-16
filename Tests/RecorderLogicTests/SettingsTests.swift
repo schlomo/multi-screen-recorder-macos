@@ -98,7 +98,7 @@ import Testing
 @Suite struct AudioModeTests {
     @Test func theFourStepsInSliderOrderWithTheirWords() {
         #expect(AudioMode.allCases.map(\.rawValue) == ["none", "default-microphone", "wired", "all-inputs"])
-        #expect(AudioMode.allCases.map(\.label) == ["None", "Default microphone", "Wired", "All"])
+        #expect(AudioMode.allCases.map(\.shownName) == ["None", "Default microphone", "Wired", "All"])
     }
 
     @Test func theSliderIndexRoundTrips() {
@@ -126,7 +126,7 @@ import Testing
         var settings = Settings.defaults
         settings.auto = false
         settings.audioMode = mode
-        return settings.records(input)
+        return settings.audioModeIncludes(input)
     }
 
     @Test(arguments: [
@@ -161,9 +161,9 @@ import Testing
     }
 
     @Test func autoModeRecordsWhatWiredRecords() {
-        #expect(Settings.defaults.records(input(.usb)))
-        #expect(!Settings.defaults.records(input(.bluetooth)))
-        #expect(Settings.defaults.records(input(.bluetooth, isDefault: true)))
+        #expect(Settings.defaults.audioModeIncludes(input(.usb)))
+        #expect(!Settings.defaults.audioModeIncludes(input(.bluetooth)))
+        #expect(Settings.defaults.audioModeIncludes(input(.bluetooth, isDefault: true)))
     }
 }
 

@@ -1,20 +1,20 @@
 import Foundation
 
-/// The display check (D45): every frame's screen rectangle, as
-/// ScreenCaptureKit attaches it, must be its display's bounds. It reads no
+/// The screen check (D45): every frame's screen rectangle, as
+/// ScreenCaptureKit attaches it, must be its screen's bounds. It reads no
 /// pixels. A frame that fails is never written. After
-/// `RecorderValues.displayCheckFailuresInARow` failing frames in a row, not
-/// counting those within the settle time after a display change, the
-/// display shows another display's picture.
+/// `RecorderValues.screenCheckFailuresInARow` failing frames in a row, not
+/// counting those within the settle time after a screen change, the
+/// screen shows another screen's picture.
 ///
 /// That the frame's rectangle and `CGDisplayBounds` are comparable as they
 /// are, in points and the same coordinates, is [ASSUMED] (recorder.md).
-public struct DisplayCheck: Sendable {
+public struct ScreenCheck: Sendable {
     public enum Verdict: Equatable, Sendable {
         case passes
         case fails
-        /// Failed too often in a row: the display file ends.
-        case showsAnotherDisplay
+        /// Failed too often in a row: the screen file ends.
+        case showsAnotherScreen
     }
 
     public let failuresInARow: Int
@@ -23,27 +23,27 @@ public struct DisplayCheck: Sendable {
     public private(set) var failuresSoFar = 0
 
     public init(
-        failuresInARow: Int = RecorderValues.displayCheckFailuresInARow,
+        failuresInARow: Int = RecorderValues.screenCheckFailuresInARow,
         settleTime: Duration = RecorderValues.settleTime,
-        tolerance: Double = RecorderValues.displayCheckTolerancePoints
+        tolerance: Double = RecorderValues.screenCheckTolerancePoints
     ) {
         self.failuresInARow = failuresInARow
         self.settleTime = settleTime
         self.tolerance = tolerance
     }
 
-    /// Judges one frame captured at `time`; `lastDisplayChange` is the time
-    /// of the newest display change, all times in nanoseconds from t0.
+    /// Judges one frame captured at `time`; `lastScreenChange` is the time
+    /// of the newest screen change, all times in nanoseconds from t0.
     public mutating func judge(
-        frameRect: ScreenRect, displayBounds: ScreenRect, capturedAt time: Int64, lastDisplayChange: Int64?
+        frameRect: ScreenRect, screenBounds: ScreenRect, capturedAt time: Int64, lastScreenChange: Int64?
     ) -> Verdict {
-        if matches(frameRect, displayBounds) {
+        if matches(frameRect, screenBounds) {
             failuresSoFar = 0
             return .passes
         }
-        if let change = lastDisplayChange, time - change < settleTime.nanoseconds { return .fails }
+        if let change = lastScreenChange, time - change < settleTime.nanoseconds { return .fails }
         failuresSoFar += 1
-        return failuresSoFar >= failuresInARow ? .showsAnotherDisplay : .fails
+        return failuresSoFar >= failuresInARow ? .showsAnotherScreen : .fails
     }
 
     private func matches(_ lhs: ScreenRect, _ rhs: ScreenRect) -> Bool {

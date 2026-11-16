@@ -2,15 +2,15 @@ import Testing
 @testable import RecorderLogic
 
 @Suite struct ReadyCheckTests {
-    private let fullHDDisplays = [
-        DisplayInfo(name: "One", pixelSize: FrameSize(width: 1920, height: 1080), pointSize: FrameSize(width: 1920, height: 1080), isMain: true, originX: 0, originY: 0),
-        DisplayInfo(name: "Two", pixelSize: FrameSize(width: 3840, height: 2160), pointSize: FrameSize(width: 3840, height: 2160), isMain: false, originX: 1920, originY: 0),
+    private let fullHDScreens = [
+        ScreenInfo(name: "One", pixelSize: FrameSize(width: 1920, height: 1080), pointSize: FrameSize(width: 1920, height: 1080), isMain: true, originX: 0, originY: 0),
+        ScreenInfo(name: "Two", pixelSize: FrameSize(width: 3840, height: 2160), pointSize: FrameSize(width: 3840, height: 2160), isMain: false, originX: 1920, originY: 0),
     ]
 
     private func facts(
         screenRecording: PermissionProbe = .granted,
         microphoneGranted: Bool? = true,
-        displays: Result<[DisplayInfo], DeviceReadError>? = nil,
+        screens: Result<[ScreenInfo], DeviceReadError>? = nil,
         audioInputs: [AudioInputInfo] = builtInMicrophoneOnly,
         audioInputsError: DeviceReadError? = nil,
         outputFolder: OutputFolderProbe = .usable(.bytes(100_000_000_000))
@@ -18,19 +18,19 @@ import Testing
         ReadyCheckFacts(
             screenRecording: screenRecording,
             microphoneGranted: microphoneGranted,
-            displays: displays ?? .success(fullHDDisplays),
+            screens: screens ?? .success(fullHDScreens),
             audioInputs: audioInputsError.map { .failure($0) } ?? .success(audioInputs),
             outputFolder: outputFolder
         )
     }
 
-    private static let builtInMicrophoneOnly = [AudioInputInfo(name: "MacBook Pro Microphone", channelCount: 1, isDefault: true)]
+    private static let builtInMicrophoneOnly = [AudioInputInfo(name: "MacBook Pro Microphone", channelCount: 1, isDefault: true, uid: "BuiltIn")]
 
-    /// The example in docs/design/recorder.md, from the displays of its `msr list` example.
+    /// The example in docs/design/recorder.md, from the screens of its `msr list` example.
     static let designExample = """
         ok    Screen & System Audio Recording permission
         ok    Microphone permission
-        ok    Displays: 2
+        ok    Screens: 2
         ok    Audio: MacBook Pro Microphone (default), RØDE Wireless GO II RX, system audio
         ok    Output folder: ~/Movies/Multi Screen Recorder
         FAIL  Free disk space: 3.1 GB in ~/Movies/Multi Screen Recorder, 10.7 GB needed for 2 hours
@@ -41,7 +41,7 @@ import Testing
 
     @Test func rendersExactlyAsTheDesign() {
         let result = ReadyCheck.evaluate(
-            facts(displays: .success(DesignExample.displays), audioInputs: DesignExample.audioInputs,
+            facts(screens: .success(DesignExample.screens), audioInputs: DesignExample.audioInputs,
                   outputFolder: .usable(.bytes(3_100_000_000))),
             settings: .defaults)
         #expect(result.text == Self.designExample)
@@ -67,7 +67,7 @@ import Testing
         #expect(result.isReady)
         #expect(result.items.map(\.title) == [
             "Screen & System Audio Recording permission",
-            "Displays: 2",
+            "Screens: 2",
             "Audio: system audio",
             "Output folder: ~/Movies/Multi Screen Recorder",
             "Free disk space: 100.0 GB in ~/Movies/Multi Screen Recorder, 4.3 GB needed for 2 hours",
@@ -101,6 +101,18 @@ import Testing
         #expect(!result.isReady)
     }
 
+    /// D55: a recording opens an input by its Core Audio UID; one without
+    /// is not recorded, so it is not listed and needs no permission.
+    @Test func anInputWithoutAUIDIsNotListedAndNeedsNoMicrophonePermission() {
+        let noUID = AudioInputInfo(name: "Mystery", channelCount: 1, isDefault: true, transport: .usb)
+        let result = ReadyCheck.evaluate(facts(microphoneGranted: false, audioInputs: [noUID]), settings: .defaults)
+        #expect(!result.items.contains { $0.title == "Microphone permission" })
+        let audio = result.items.first { $0.title.hasPrefix("Audio:") }
+        #expect(audio?.title == "Audio: no microphone recorded, system audio")
+        let withBuiltIn = ReadyCheck.evaluate(facts(audioInputs: Self.builtInMicrophoneOnly + [noUID]), settings: .defaults)
+        #expect(withBuiltIn.items.contains { $0.title == "Audio: MacBook Pro Microphone (default), system audio" })
+    }
+
     @Test func aMissingMicrophonePermissionNamesTheSettingsPath() throws {
         let result = ReadyCheck.evaluate(facts(microphoneGranted: false), settings: .manual)
         let item = try #require(result.items.first { $0.title == "Microphone permission" })
@@ -110,21 +122,21 @@ import Testing
             + "If it was started from a terminal, then the terminal app needs the permission.")
     }
 
-    @Test func noDisplayFails() throws {
-        let result = ReadyCheck.evaluate(facts(displays: .success([])), settings: .manual)
-        let item = try #require(result.items.first { $0.title.hasPrefix("Displays") })
-        #expect(item == ReadyCheckItem(title: "Displays: 0", passed: false, fix: "connect a display"))
+    @Test func noScreenFails() throws {
+        let result = ReadyCheck.evaluate(facts(screens: .success([])), settings: .manual)
+        let item = try #require(result.items.first { $0.title.hasPrefix("Screens") })
+        #expect(item == ReadyCheckItem(title: "Screens: 0", passed: false, fix: "connect a screen"))
     }
 
-    @Test func unreadableDisplaysFailOnceWithTheReason() {
+    @Test func unreadableScreensFailOnceWithTheReason() {
         let result = ReadyCheck.evaluate(
-            facts(displays: .failure(DeviceReadError("the display DELL U2720Q does not report its display mode"))),
+            facts(screens: .failure(DeviceReadError("the screen DELL U2720Q does not report its screen mode"))),
             settings: .manual)
         #expect(result.items.filter { !$0.passed } == [
             ReadyCheckItem(
-                title: "Displays: cannot be read (the display DELL U2720Q does not report its display mode)",
+                title: "Screens: cannot be read (the screen DELL U2720Q does not report its screen mode)",
                 passed: false,
-                fix: "reconnect the displays, then check again"),
+                fix: "reconnect the screens, then check again"),
         ])
         #expect(!result.items.contains { $0.title.hasPrefix("Free disk space") })
     }
@@ -139,7 +151,7 @@ import Testing
         #expect(result.isReady)
         let audio = result.items.first { $0.title.hasPrefix("Audio:") }
         #expect(audio == ReadyCheckItem(
-            title: mode == .none ? "Audio: system audio" : "Audio: no microphone, system audio",
+            title: mode == .none ? "Audio: system audio" : "Audio: no microphone recorded, system audio",
             passed: true, fix: nil))
         #expect(result.items.contains { $0.title.hasPrefix("Free disk space") })
     }
@@ -161,7 +173,7 @@ import Testing
     }
 
     @Test func aPresentButNotRecordedInputNeedsNoPermission() {
-        let notDefault = [AudioInputInfo(name: "USB", channelCount: 1, isDefault: false, transport: .usb)]
+        let notDefault = [AudioInputInfo(name: "USB", channelCount: 1, isDefault: false, transport: .usb, uid: "USB")]
         let result = ReadyCheck.evaluate(facts(microphoneGranted: nil, audioInputs: notDefault), settings: .manual)
         #expect(result.isReady)
         #expect(!result.items.contains { $0.title == "Microphone permission" })
@@ -173,7 +185,7 @@ import Testing
         let result = ReadyCheck.evaluate(facts(audioInputs: []), settings: settings)
         #expect(result.isReady)
         #expect(result.items.contains(ReadyCheckItem(
-            title: "Audio: no microphone, no system audio", passed: true, fix: nil)))
+            title: "Audio: no microphone recorded, no system audio", passed: true, fix: nil)))
     }
 
     @Test func autoModeWithoutAnyAudioInputIsReady() {
@@ -184,7 +196,7 @@ import Testing
 
     private static func unreadable(isDefault: Bool) -> AudioInputInfo {
         AudioInputInfo(name: "X", channelCount: .failure(DeviceReadError("the audio input X does not report its format")),
-                       isDefault: isDefault)
+                       isDefault: isDefault, uid: "X")
     }
 
     @Test func anUnreadableInputThatIsNotRecordedPasses() {
@@ -230,10 +242,10 @@ import Testing
     @Test func theDiskEstimateCountsTheAudioFilesAndGuideTracks() throws {
         var settings = Settings.manual
         settings.requiredRecordingHours = 1
-        let twoChannels = [AudioInputInfo(name: "RØDE Wireless GO II RX", channelCount: 2, isDefault: true)]
+        let twoChannels = [AudioInputInfo(name: "RØDE Wireless GO II RX", channelCount: 2, isDefault: true, uid: "RODE")]
         let result = ReadyCheck.evaluate(facts(audioInputs: twoChannels), settings: settings)
         let item = try #require(result.items.last)
-        // two displays at 1080p: 2 × (1 GB video + 72 MB guide tracks), 115.2 MB microphone, 86.4 MB system audio
+        // two screens at 1080p: 2 × (1 GB video + 72 MB guide tracks), 115.2 MB microphone, 86.4 MB system audio
         #expect(item.title == "Free disk space: 100.0 GB in ~/Movies/Multi Screen Recorder, 2.3 GB needed for 1 hour")
     }
 
@@ -300,7 +312,7 @@ import Testing
             .first { $0.title.hasPrefix("Audio:") }?.title
     }
 
-    private static let airPods = AudioInputInfo(name: "AirPods", channelCount: 1, isDefault: false, transport: .bluetooth)
+    private static let airPods = AudioInputInfo(name: "AirPods", channelCount: 1, isDefault: false, transport: .bluetooth, uid: "AirPods")
 
     @Test func theAudioItemNamesEveryRecordedInputOfTheAudioMode() {
         let inputs = DesignExample.audioInputs + [Self.airPods]
@@ -327,12 +339,12 @@ import Testing
 
     @Test(arguments: [AudioMode.defaultMicrophone, .wired, .allInputs])
     func aBluetoothDefaultMicrophoneIsEnoughInEveryModeBut(none mode: AudioMode) {
-        let headset = AudioInputInfo(name: "AirPods", channelCount: 1, isDefault: true, transport: .bluetooth)
+        let headset = AudioInputInfo(name: "AirPods", channelCount: 1, isDefault: true, transport: .bluetooth, uid: "AirPods")
         #expect(audioTitle(mode, [headset]) == "Audio: AirPods (default), system audio")
     }
 
-    @Test func withoutAnyRecordedInputTheItemSaysNoMicrophoneAndPasses() {
-        #expect(audioTitle(.wired, [Self.airPods]) == "Audio: no microphone, system audio")
+    @Test func withoutAnyRecordedInputTheItemSaysNoMicrophoneRecordedAndPasses() {
+        #expect(audioTitle(.wired, [Self.airPods]) == "Audio: no microphone recorded, system audio")
     }
 
     @Test func inputsToJudgeAreNoneWithTheAudioModeNoneWhetherTheyCanBeReadOrNot() {

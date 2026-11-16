@@ -78,10 +78,10 @@ final class RecordingSession: RecorderObserver {
         if lowDiskSpace { needsAttention() } else { updateBadge() }
     }
 
-    func recorder(_ recorder: Recorder, displayShowsAnotherDisplaysPicture display: String?) {
-        status.displayShowingAnotherDisplaysPicture = display
-        if let display, tellOnStandardError {
-            standardError("The display \(display) shows another display's picture: its display file ended,"
+    func recorder(_ recorder: Recorder, screenShowsAnotherScreensPicture screen: String?) {
+        status.screenShowingAnotherScreensPicture = screen
+        if let screen, tellOnStandardError {
+            standardError("The screen \(screen) shows another screen's picture: its screen file ended,"
                 + " and it is recorded again after its next change.")
         }
         updateBadge()

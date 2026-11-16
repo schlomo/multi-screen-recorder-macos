@@ -25,14 +25,14 @@ import Testing
 
     private func probes(
         _ calls: Calls, screenRecording: PermissionProbe = .granted,
-        displays: Result<[DisplayInfo], DeviceReadError> = .success([]),
-        audioInputs: [AudioInputInfo] = [AudioInputInfo(name: "Microphone", channelCount: 1, isDefault: true)],
+        screens: Result<[ScreenInfo], DeviceReadError> = .success([]),
+        audioInputs: [AudioInputInfo] = [AudioInputInfo(name: "Microphone", channelCount: 1, isDefault: true, uid: "Microphone")],
         outputFolder: OutputFolderProbe = .usable(.bytes(5))
     ) -> ReadyCheckProbes {
         ReadyCheckProbes(
             screenRecording: { proof in calls.record("screenRecording \(proof)"); return screenRecording },
             microphonePermission: { calls.record("microphonePermission"); return true },
-            displays: { calls.record("displays"); return displays },
+            screens: { calls.record("screens"); return screens },
             audioInputs: { calls.record("audioInputs"); return .success(audioInputs) },
             outputFolder: { folder in
                 calls.record("outputFolder \(folder.path(percentEncoded: false))")
@@ -45,26 +45,26 @@ import Testing
     @Test func theScreenRecordingProbeProvesAsAsked() async {
         let calls = Calls()
         _ = await probeReadyCheckFacts(proof: .captureOneFrame, settings: .defaults, homeFolder: home, probes: probes(calls))
-        _ = await probeReadyCheckFacts(proof: .listDisplays, settings: .defaults, homeFolder: home, probes: probes(calls))
-        #expect(calls.names.filter { $0.hasPrefix("screenRecording") } == ["screenRecording captureOneFrame", "screenRecording listDisplays"])
+        _ = await probeReadyCheckFacts(proof: .listScreens, settings: .defaults, homeFolder: home, probes: probes(calls))
+        #expect(calls.names.filter { $0.hasPrefix("screenRecording") } == ["screenRecording captureOneFrame", "screenRecording listScreens"])
     }
 
     @Test func theFactsAreWhatTheProbesFound() async {
         let calls = Calls()
         let facts = await probeReadyCheckFacts(
-            proof: .listDisplays, settings: .defaults, homeFolder: home,
-            probes: probes(calls, screenRecording: .notGranted, displays: .failure(DeviceReadError("none")),
+            proof: .listScreens, settings: .defaults, homeFolder: home,
+            probes: probes(calls, screenRecording: .notGranted, screens: .failure(DeviceReadError("none")),
                            outputFolder: .unusable("read-only")))
         #expect(facts.screenRecording == .notGranted)
         #expect(facts.microphoneGranted == true)
-        #expect(facts.displays == .failure(DeviceReadError("none")))
-        #expect(facts.audioInputs == .success([AudioInputInfo(name: "Microphone", channelCount: 1, isDefault: true)]))
+        #expect(facts.screens == .failure(DeviceReadError("none")))
+        #expect(facts.audioInputs == .success([AudioInputInfo(name: "Microphone", channelCount: 1, isDefault: true, uid: "Microphone")]))
         #expect(facts.outputFolder == .unusable("read-only"))
     }
 
     @Test func theOutputFolderIsTheSettingsFolderInTheHomeFolder() async {
         let calls = Calls()
-        _ = await probeReadyCheckFacts(proof: .listDisplays, settings: .defaults, homeFolder: home, probes: probes(calls))
+        _ = await probeReadyCheckFacts(proof: .listScreens, settings: .defaults, homeFolder: home, probes: probes(calls))
         #expect(calls.names.contains("outputFolder /Users/someone/Movies/Multi Screen Recorder/"))
     }
 
@@ -73,7 +73,7 @@ import Testing
         settings.auto = false
         settings.audioMode = .none
         let calls = Calls()
-        let facts = await probeReadyCheckFacts(proof: .listDisplays, settings: settings, homeFolder: home, probes: probes(calls))
+        let facts = await probeReadyCheckFacts(proof: .listScreens, settings: settings, homeFolder: home, probes: probes(calls))
         #expect(facts.microphoneGranted == nil)
         #expect(!calls.names.contains("microphonePermission"))
     }
@@ -82,7 +82,7 @@ import Testing
         var settings = Settings.defaults
         settings.audioMode = .none
         let calls = Calls()
-        let facts = await probeReadyCheckFacts(proof: .listDisplays, settings: settings, homeFolder: home, probes: probes(calls))
+        let facts = await probeReadyCheckFacts(proof: .listScreens, settings: settings, homeFolder: home, probes: probes(calls))
         #expect(facts.microphoneGranted == true)
     }
 
@@ -93,7 +93,7 @@ import Testing
         settings.auto = false
         settings.audioMode = mode
         let calls = Calls()
-        let facts = await probeReadyCheckFacts(proof: .listDisplays, settings: settings, homeFolder: home, probes: probes(calls, audioInputs: []))
+        let facts = await probeReadyCheckFacts(proof: .listScreens, settings: settings, homeFolder: home, probes: probes(calls, audioInputs: []))
         #expect(facts.microphoneGranted == nil)
         #expect(!calls.names.contains("microphonePermission"))
     }
@@ -103,30 +103,30 @@ import Testing
         settings.auto = false
         settings.audioMode = .defaultMicrophone
         let calls = Calls()
-        let notDefault = [AudioInputInfo(name: "USB", channelCount: 1, isDefault: false, transport: .usb)]
-        let facts = await probeReadyCheckFacts(proof: .listDisplays, settings: settings, homeFolder: home, probes: probes(calls, audioInputs: notDefault))
+        let notDefault = [AudioInputInfo(name: "USB", channelCount: 1, isDefault: false, transport: .usb, uid: "USB")]
+        let facts = await probeReadyCheckFacts(proof: .listScreens, settings: settings, homeFolder: home, probes: probes(calls, audioInputs: notDefault))
         #expect(facts.microphoneGranted == nil)
         #expect(!calls.names.contains("microphonePermission"))
     }
 
     @Test func aRecordedInputAsksForThePermission() async {
         let calls = Calls()
-        let facts = await probeReadyCheckFacts(proof: .listDisplays, settings: .defaults, homeFolder: home, probes: probes(calls))
+        let facts = await probeReadyCheckFacts(proof: .listScreens, settings: .defaults, homeFolder: home, probes: probes(calls))
         #expect(facts.microphoneGranted == true)
         #expect(calls.names.contains("microphonePermission"))
     }
 
-    @Test func fileAccessIsOffTheMainThreadAndTheDisplaysAreOnIt() async {
+    @Test func fileAccessIsOffTheMainThreadAndTheScreensAreOnIt() async {
         let calls = Calls()
-        _ = await probeReadyCheckFacts(proof: .listDisplays, settings: .defaults, homeFolder: home, probes: probes(calls))
-        #expect(calls.names.contains("displays"))
-        #expect(calls.namesOnTheMainThread == ["displays"])
+        _ = await probeReadyCheckFacts(proof: .listScreens, settings: .defaults, homeFolder: home, probes: probes(calls))
+        #expect(calls.names.contains("screens"))
+        #expect(calls.namesOnTheMainThread == ["screens"])
     }
 
     @MainActor @Test func fileAccessIsOffTheMainThreadAlsoWhenTheCallerIsOnIt() async {
         let calls = Calls()
-        _ = await probeReadyCheckFacts(proof: .listDisplays, settings: .defaults, homeFolder: home, probes: probes(calls))
+        _ = await probeReadyCheckFacts(proof: .listScreens, settings: .defaults, homeFolder: home, probes: probes(calls))
         #expect(calls.names.contains { $0.hasPrefix("outputFolder") })
-        #expect(calls.namesOnTheMainThread == ["displays"])
+        #expect(calls.namesOnTheMainThread == ["screens"])
     }
 }

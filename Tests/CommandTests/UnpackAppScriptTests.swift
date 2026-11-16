@@ -29,17 +29,17 @@ import Testing
 
     /// Archives the given members with bsdtar, run in the sources folder;
     /// -P keeps absolute paths and `..` as given.
-    private func archive(_ members: String..., compressed: Bool = false) throws -> URL {
+    private func archive(_ members: String..., compressed: Bool = false) async throws -> URL {
         let archive = scratch.url.appending(path: "app.tar")
-        let outcome = try run(URL(filePath: "/usr/bin/env"),
+        let outcome = try await run(URL(filePath: "/usr/bin/env"),
                               ["tar", "--no-mac-metadata", compressed ? "-czPf" : "-cPf", archive.path(percentEncoded: false)]
                                   + members, in: sources)
         try #require(outcome.status == 0, "tar failed: \(outcome.errors)")
         return archive
     }
 
-    private func unpack(_ archive: URL) throws -> CommandOutcome {
-        try run(checkout.appending(path: "scripts/unpack-app"), [archive.path(percentEncoded: false)], in: scratch.url)
+    private func unpack(_ archive: URL) async throws -> CommandOutcome {
+        try await run(checkout.appending(path: "scripts/unpack-app"), [archive.path(percentEncoded: false)], in: scratch.url)
     }
 
     private func buildContents() throws -> [String] {
@@ -47,67 +47,67 @@ import Testing
         return try FileManager.default.contentsOfDirectory(atPath: build.path(percentEncoded: false))
     }
 
-    @Test func aGoodArchiveIsUnpackedWithItsExecutableBit() throws {
+    @Test func aGoodArchiveIsUnpackedWithItsExecutableBit() async throws {
         defer { scratch.remove() }
-        let outcome = try unpack(try archive(Self.bundle))
+        let outcome = try await unpack(try archive(Self.bundle))
         #expect(outcome.status == 0, "\(outcome.errors)")
         let program = build.appending(path: "\(Self.bundle)/Contents/MacOS/msr").path(percentEncoded: false)
         #expect(FileManager.default.isExecutableFile(atPath: program))
     }
 
-    @Test func aSymbolicLinkInsideTheBundleIsAccepted() throws {
+    @Test func aSymbolicLinkInsideTheBundleIsAccepted() async throws {
         defer { scratch.remove() }
         try FileManager.default.createSymbolicLink(
             atPath: sources.appending(path: "\(Self.bundle)/Contents/link").path(percentEncoded: false),
             withDestinationPath: "MacOS/msr")
-        #expect(try unpack(try archive(Self.bundle)).status == 0)
+        #expect(try await unpack(try await archive(Self.bundle)).status == 0)
     }
 
-    @Test func aNonEmptyBuildFolderStops() throws {
+    @Test func aNonEmptyBuildFolderStops() async throws {
         defer { scratch.remove() }
         try FileManager.default.createDirectory(at: build, withIntermediateDirectories: true)
         try Data("left over".utf8).write(to: build.appending(path: "old.zip"))
-        let outcome = try unpack(try archive(Self.bundle))
+        let outcome = try await unpack(try archive(Self.bundle))
         #expect(outcome.status == 1)
         #expect(outcome.errors.contains("is not empty"))
         #expect(try buildContents() == ["old.zip"])
     }
 
-    @Test func aMemberWithDotDotStops() throws {
+    @Test func aMemberWithDotDotStops() async throws {
         defer { scratch.remove() }
         try Data("outside".utf8).write(to: sources.deletingLastPathComponent().appending(path: "evil"))
-        let outcome = try unpack(try archive(Self.bundle, "../evil"))
+        let outcome = try await unpack(try archive(Self.bundle, "../evil"))
         #expect(outcome.status == 1)
         #expect(outcome.errors.contains("'../evil'"))
         #expect(outcome.errors.contains(".."))
         #expect(try buildContents().isEmpty)
     }
 
-    @Test func aMemberWithAnAbsolutePathStops() throws {
+    @Test func aMemberWithAnAbsolutePathStops() async throws {
         defer { scratch.remove() }
         let absolute = scratch.url.appending(path: "absolute")
         try Data("outside".utf8).write(to: absolute)
-        let outcome = try unpack(try archive(Self.bundle, absolute.path(percentEncoded: false)))
+        let outcome = try await unpack(try archive(Self.bundle, absolute.path(percentEncoded: false)))
         #expect(outcome.status == 1)
         #expect(outcome.errors.contains("absolute path"))
         #expect(try buildContents().isEmpty)
     }
 
-    @Test func aMemberOutsideTheBundleStops() throws {
+    @Test func aMemberOutsideTheBundleStops() async throws {
         defer { scratch.remove() }
         try Data("beside".utf8).write(to: sources.appending(path: "beside"))
-        let outcome = try unpack(try archive(Self.bundle, "beside"))
+        let outcome = try await unpack(try archive(Self.bundle, "beside"))
         #expect(outcome.status == 1)
         #expect(outcome.errors.contains("outside \(Self.bundle)"))
         #expect(try buildContents().isEmpty)
     }
 
-    @Test func aSymbolicLinkPointingOutsideTheBundleStops() throws {
+    @Test func aSymbolicLinkPointingOutsideTheBundleStops() async throws {
         defer { scratch.remove() }
         try FileManager.default.createSymbolicLink(
             atPath: sources.appending(path: "\(Self.bundle)/Contents/escape").path(percentEncoded: false),
             withDestinationPath: "../../..")
-        let outcome = try unpack(try archive(Self.bundle))
+        let outcome = try await unpack(try archive(Self.bundle))
         #expect(outcome.status == 1)
         #expect(outcome.errors.contains("points outside"))
         #expect(try buildContents().isEmpty)
@@ -126,29 +126,29 @@ import Testing
         return url
     }
 
-    @Test func aHandWrittenGoodArchiveIsUnpacked() throws {
+    @Test func aHandWrittenGoodArchiveIsUnpacked() async throws {
         defer { scratch.remove() }
-        let outcome = try unpack(try handWritten([]))
+        let outcome = try await unpack(try handWritten([]))
         #expect(outcome.status == 0, "\(outcome.errors)")
         let program = build.appending(path: "\(Self.bundle)/Contents/MacOS/msr").path(percentEncoded: false)
         #expect(FileManager.default.isExecutableFile(atPath: program))
     }
 
-    @Test func aBundleThatIsASymbolicLinkStops() throws {
+    @Test func aBundleThatIsASymbolicLinkStops() async throws {
         defer { scratch.remove() }
         var tar = TarArchive()
         tar.add(Self.bundle, .symbolicLink(to: "../scripts"))
         let url = scratch.url.appending(path: "hostile.tar")
         try tar.write(to: url)
-        let outcome = try unpack(url)
+        let outcome = try await unpack(url)
         #expect(outcome.status == 1)
         #expect(outcome.errors.contains("not a folder"), "\(outcome.errors)")
         #expect(try buildContents().isEmpty)
     }
 
-    @Test func aMemberWrittenThroughASymbolicLinkStops() throws {
+    @Test func aMemberWrittenThroughASymbolicLinkStops() async throws {
         defer { scratch.remove() }
-        let outcome = try unpack(try handWritten([
+        let outcome = try await unpack(try handWritten([
             ("\(Self.bundle)/Contents/Resources", .symbolicLink(to: "MacOS")),
             ("\(Self.bundle)/Contents/Resources/planted", .file("planted")),
         ]))
@@ -158,25 +158,25 @@ import Testing
     }
 
     @Test(arguments: ["../../outside", "/etc/hosts", "beside"])
-    func aHardLinkToATargetOutsideTheBundleStops(target: String) throws {
+    func aHardLinkToATargetOutsideTheBundleStops(target: String) async throws {
         defer { scratch.remove() }
-        let outcome = try unpack(try handWritten([("\(Self.bundle)/Contents/hard", .hardLink(to: target))]))
+        let outcome = try await unpack(try handWritten([("\(Self.bundle)/Contents/hard", .hardLink(to: target))]))
         #expect(outcome.status == 1)
         #expect(outcome.errors.contains("hard link"), "\(outcome.errors)")
         #expect(try buildContents().isEmpty)
     }
 
-    @Test func aHardLinkInsideTheBundleIsAccepted() throws {
+    @Test func aHardLinkInsideTheBundleIsAccepted() async throws {
         defer { scratch.remove() }
-        let outcome = try unpack(try handWritten([
+        let outcome = try await unpack(try handWritten([
             ("\(Self.bundle)/Contents/copy", .hardLink(to: "\(Self.bundle)/Contents/MacOS/msr")),
         ]))
         #expect(outcome.status == 0, "\(outcome.errors)")
     }
 
-    @Test func aHardLinkThatCannotBeResolvedStops() throws {
+    @Test func aHardLinkThatCannotBeResolvedStops() async throws {
         defer { scratch.remove() }
-        let outcome = try unpack(try handWritten([
+        let outcome = try await unpack(try handWritten([
             ("\(Self.bundle)/Contents/deep/", .folder),
             ("\(Self.bundle)/Contents/deep/1/", .folder),
             ("\(Self.bundle)/Contents/deep/1/2/", .folder),
@@ -188,9 +188,9 @@ import Testing
         #expect(try buildContents().isEmpty)
     }
 
-    @Test func aMemberWithDotDotInsideTheBundleStops() throws {
+    @Test func aMemberWithDotDotInsideTheBundleStops() async throws {
         defer { scratch.remove() }
-        let outcome = try unpack(try handWritten([
+        let outcome = try await unpack(try handWritten([
             ("\(Self.bundle)/Contents/x/", .folder),
             ("\(Self.bundle)/Contents/Resources", .symbolicLink(to: "MacOS")),
             ("\(Self.bundle)/Contents/x/../Resources/planted", .file("planted")),
@@ -200,9 +200,9 @@ import Testing
         #expect(try buildContents().isEmpty)
     }
 
-    @Test func aMemberNamedTwiceStops() throws {
+    @Test func aMemberNamedTwiceStops() async throws {
         defer { scratch.remove() }
-        let outcome = try unpack(try handWritten([("\(Self.bundle)/Contents/MacOS/msr", .file("other"))]))
+        let outcome = try await unpack(try handWritten([("\(Self.bundle)/Contents/MacOS/msr", .file("other"))]))
         #expect(outcome.status == 1)
         #expect(outcome.errors.contains("appears twice"), "\(outcome.errors)")
         #expect(try buildContents().isEmpty)
@@ -210,9 +210,9 @@ import Testing
 
     /// The bundle is unpacked on a case-insensitive file system, where
     /// names differing only in case are the same file.
-    @Test func aMemberWrittenThroughASymbolicLinkSpelledInAnotherCaseStops() throws {
+    @Test func aMemberWrittenThroughASymbolicLinkSpelledInAnotherCaseStops() async throws {
         defer { scratch.remove() }
-        let outcome = try unpack(try handWritten([
+        let outcome = try await unpack(try handWritten([
             ("\(Self.bundle)/Contents/resources", .symbolicLink(to: "MacOS")),
             ("\(Self.bundle)/Contents/Resources/planted", .file("planted")),
         ]))
@@ -221,17 +221,17 @@ import Testing
         #expect(try buildContents().isEmpty)
     }
 
-    @Test func aMemberNamedTwiceInAnotherCaseStops() throws {
+    @Test func aMemberNamedTwiceInAnotherCaseStops() async throws {
         defer { scratch.remove() }
-        let outcome = try unpack(try handWritten([("\(Self.bundle)/Contents/MacOS/MSR", .file("other"))]))
+        let outcome = try await unpack(try handWritten([("\(Self.bundle)/Contents/MacOS/MSR", .file("other"))]))
         #expect(outcome.status == 1)
         #expect(outcome.errors.contains("appears twice"), "\(outcome.errors)")
         #expect(try buildContents().isEmpty)
     }
 
-    @Test func aCompressedArchiveStops() throws {
+    @Test func aCompressedArchiveStops() async throws {
         defer { scratch.remove() }
-        let outcome = try unpack(try archive(Self.bundle, compressed: true))
+        let outcome = try await unpack(try archive(Self.bundle, compressed: true))
         #expect(outcome.status == 1)
         #expect(outcome.errors.contains("is not a plain tar archive"), "\(outcome.errors)")
         #expect(try buildContents().isEmpty)

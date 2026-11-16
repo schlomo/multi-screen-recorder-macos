@@ -3,7 +3,7 @@ import Foundation
 /// A guide track's samples (D31, D49, D52), mixed `delay` behind real time
 /// so every source's buffers have arrived; each source is placed by its own
 /// timestamps, and a source with no samples for a stretch is silence there.
-/// "Microphones" is one mono mix: each recorded audio input averaged to
+/// "Audio inputs" is one mono mix: each recorded audio input averaged to
 /// mono, the inputs summed at unity gain, through a soft limiter
 /// (`limit`). "System audio" carries the system audio's two channels as
 /// they are, clamped to ±1. Times are nanoseconds from t0 on the shared
@@ -35,10 +35,10 @@ public struct GuideTrackMix: Sendable {
         self.delay = delay.nanoseconds
     }
 
-    /// Up to this level, the "Microphones" mix passes unchanged: −6 dBFS.
+    /// Up to this level, the "Audio inputs" mix passes unchanged: −6 dBFS.
     public static let limiterKnee: Float = 0.5
 
-    /// The soft limiter of "Microphones": unchanged up to the knee, above it
+    /// The soft limiter of "Audio inputs": unchanged up to the knee, above it
     /// `knee + (1 − knee) · tanh((|x| − knee) / (1 − knee))`, which starts
     /// with slope 1 and approaches ±1 without reaching beyond it. A sample
     /// that is not finite (NaN, ±infinity) becomes 0.
@@ -51,11 +51,11 @@ public struct GuideTrackMix: Sendable {
         return sample < 0 ? -limited : limited
     }
 
-    /// A source joins the mix under its unique name.
+    /// A source joins the mix under a name unique in the recording: an audio input's label.
     public mutating func add(source name: String, channelCount: Int) {
         precondition(sources[name] == nil, "\(name) is already in the guide track \(track.name)")
         precondition(channelCount > 0, "\(name) has no channels")
-        precondition(track == .microphones || channelCount == track.channelCount,
+        precondition(track == .audioInputs || channelCount == track.channelCount,
                      "the guide track \(track.name) takes \(track.channelCount) channels, not \(channelCount)")
         sources[name] = Source(channelCount: channelCount, queued: Array(repeating: [], count: track.channelCount))
     }
@@ -88,7 +88,7 @@ public struct GuideTrackMix: Sendable {
         let average = 1 / Float(channels.count)
         for frame in max(0, -offset)..<max(0, Int64(frameCount)) {
             let index = Int(offset + frame)
-            if track == .microphones {
+            if track == .audioInputs {
                 source.queued[0][index] = channels.reduce(0) { $0 + $1[Int(frame)] } * average
             } else {
                 for output in source.queued.indices { source.queued[output][index] = channels[output][Int(frame)] }
@@ -118,8 +118,8 @@ public struct GuideTrackMix: Sendable {
     }
 
     /// The samples waiting from `mixedUpTo` up to the sample position `end`,
-    /// mixed as `mix(upTo:)` would, without taking them: a display file's
-    /// last mix, while other display files go on with the same mix.
+    /// mixed as `mix(upTo:)` would, without taking them: a screen file's
+    /// last mix, while other screen files go on with the same mix.
     public func peek(upTo end: Int64) -> (start: Int64, channels: [[Float]]) {
         (mixedUpTo, end > mixedUpTo ? mixed(count: Int(end - mixedUpTo)) : Array(repeating: [], count: track.channelCount))
     }
@@ -134,7 +134,7 @@ public struct GuideTrackMix: Sendable {
             }
         }
         return switch track {
-        case .microphones: mixed.map { $0.map(Self.limit) }
+        case .audioInputs: mixed.map { $0.map(Self.limit) }
         case .systemAudio: mixed.map { $0.map { $0.isFinite ? min(1, max(-1, $0)) : 0 } }
         }
     }

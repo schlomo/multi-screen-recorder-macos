@@ -20,12 +20,12 @@ import Testing
         try Data(text.utf8).write(to: settingsFile)
     }
 
-    private func msr(_ arguments: String..., home: String? = nil) throws -> CommandOutcome {
-        try msr(arguments, home: home)
+    private func msr(_ arguments: String..., home: String? = nil) async throws -> CommandOutcome {
+        try await msr(arguments, home: home)
     }
 
-    private func msr(_ arguments: [String], home: String? = nil) throws -> CommandOutcome {
-        try run(try buildProducts().appending(path: "msr"), arguments,
+    private func msr(_ arguments: [String], home: String? = nil) async throws -> CommandOutcome {
+        try await run(try buildProducts().appending(path: "msr"), arguments,
                 environment: ["HOME": home ?? self.home.url.path(percentEncoded: false)])
     }
 
@@ -37,9 +37,9 @@ import Testing
         try #require(JSONSerialization.jsonObject(with: Data(contentsOf: settingsFile)) as? [String: Any])
     }
 
-    @Test func settingsPrintsTheDefaultsAndWritesNothing() throws {
+    @Test func settingsPrintsTheDefaultsAndWritesNothing() async throws {
         defer { home.remove() }
-        let outcome = try msr("settings")
+        let outcome = try await msr("settings")
         #expect(outcome.status == 0)
         #expect(outcome.output.contains(#""requiredRecordingHours" : 2"#))
         #expect(outcome.output.contains(#""auto" : true"#))
@@ -49,128 +49,128 @@ import Testing
         #expect(!settingsFileExists)
     }
 
-    @Test func aFlagSavesTheEffectiveSettingsWholeAndPrintsThem() throws {
+    @Test func aFlagSavesTheEffectiveSettingsWholeAndPrintsThem() async throws {
         defer { home.remove() }
-        let outcome = try msr("settings", "--system-audio", "off")
+        let outcome = try await msr("settings", "--system-audio", "off")
         #expect(outcome.status == 0)
         #expect(try String(contentsOf: settingsFile, encoding: .utf8) == outcome.output)
         #expect(try savedSettings()["systemAudio"] as? Bool == false)
     }
 
-    @Test func aResolutionFlagSavesAndTurnsAutoOff() throws {
+    @Test func aResolutionFlagSavesAndTurnsAutoOff() async throws {
         defer { home.remove() }
-        #expect(try msr("settings", "--resolution", "1080p").status == 0)
+        #expect(try await msr("settings", "--resolution", "1080p").status == 0)
         let saved = try savedSettings()
         #expect(saved["resolution"] as? String == "1080p")
         #expect(saved["auto"] as? Bool == false)
     }
 
-    @Test func anAudioModeFlagSavesAndTurnsAutoOff() throws {
+    @Test func anAudioModeFlagSavesAndTurnsAutoOff() async throws {
         defer { home.remove() }
-        #expect(try msr("settings", "--audio-mode", "all-inputs").status == 0)
+        #expect(try await msr("settings", "--audio-mode", "all-inputs").status == 0)
         let saved = try savedSettings()
         #expect(saved["audioMode"] as? String == "all-inputs")
         #expect(saved["auto"] as? Bool == false)
     }
 
-    @Test func theAutoFlagSavesAutoOn() throws {
+    @Test func theAutoFlagSavesAutoOn() async throws {
         defer { home.remove() }
         try writeSettings(#"{"auto": false, "resolution": "720p"}"#)
-        #expect(try msr("settings", "--auto").status == 0)
+        #expect(try await msr("settings", "--auto").status == 0)
         let saved = try savedSettings()
         #expect(saved["auto"] as? Bool == true)
         #expect(saved["resolution"] as? String == "720p")
     }
 
-    @Test func plainSettingsOnlyShowsAndLeavesTheFileAsItIs() throws {
+    @Test func plainSettingsOnlyShowsAndLeavesTheFileAsItIs() async throws {
         defer { home.remove() }
         let content = #"{"auto": false}"#
         try writeSettings(content)
-        #expect(try msr("settings").output.contains(#""auto" : false"#))
+        #expect(try await msr("settings").output.contains(#""auto" : false"#))
         #expect(try String(contentsOf: settingsFile, encoding: .utf8) == content)
     }
 
-    @Test func saveIsNoLongerAFlag() throws {
+    @Test func saveIsNoLongerAFlag() async throws {
         defer { home.remove() }
-        #expect(try msr("settings", "--save").status == 64)
-        #expect(try msr("settings", "--resolution", "720p", "--save").status == 64)
+        #expect(try await msr("settings", "--save").status == 64)
+        #expect(try await msr("settings", "--resolution", "720p", "--save").status == 64)
         #expect(!settingsFileExists)
     }
 
     @Test(arguments: [["--resolution", "720p"], ["--audio-mode", "none"]])
-    func autoWithAChoiceFlagIsAUsageError(choice: [String]) throws {
+    func autoWithAChoiceFlagIsAUsageError(choice: [String]) async throws {
         defer { home.remove() }
-        let outcome = try msr(["settings", "--auto"] + choice)
+        let outcome = try await msr(["settings", "--auto"] + choice)
         #expect(outcome.status == 64)
         #expect(outcome.errors.contains("--auto cannot be combined with \(choice[0])"))
         #expect(!settingsFileExists)
     }
 
-    @Test func aSettingsFileWithAnUnknownKeyIsNeverRefused() throws {
+    @Test func aSettingsFileWithAnUnknownKeyIsNeverRefused() async throws {
         defer { home.remove() }
         try writeSettings(#"{"agc": true, "resolution": "720p"}"#)
-        let outcome = try msr("settings")
+        let outcome = try await msr("settings")
         #expect(outcome.status == 0)
         #expect(outcome.errors == "Settings file: ignored agc (unknown key); using defaults for those.\n")
         #expect(outcome.output.contains(#""resolution" : "720p""#))
     }
 
-    @Test func aBrokenSettingsFileGivesTheDefaultsAndIsLeftAsItIs() throws {
+    @Test func aBrokenSettingsFileGivesTheDefaultsAndIsLeftAsItIs() async throws {
         defer { home.remove() }
         try writeSettings("garbage")
-        let outcome = try msr("settings")
+        let outcome = try await msr("settings")
         #expect(outcome.status == 0)
         #expect(outcome.errors == "Settings file: ignored the whole file (not valid JSON); using defaults for those.\n")
         #expect(outcome.output.contains(#""auto" : true"#))
         #expect(try String(contentsOf: settingsFile, encoding: .utf8) == "garbage")
     }
 
-    @Test func aSettingsFileWithAnInvalidValueIsNeverRefused() throws {
+    @Test func aSettingsFileWithAnInvalidValueIsNeverRefused() async throws {
         defer { home.remove() }
         try writeSettings(#"{"audioMode": "loud"}"#)
-        let outcome = try msr("settings")
+        let outcome = try await msr("settings")
         #expect(outcome.status == 0)
         #expect(outcome.errors.contains("ignored audioMode (invalid value, expected one of none, default-microphone, wired, all-inputs)"))
         #expect(outcome.output.contains(#""audioMode" : "wired""#))
     }
 
-    @Test func aFileOfBeforeAutoModeIsReadWithoutAWord() throws {
+    @Test func aFileOfBeforeAutoModeIsReadWithoutAWord() async throws {
         defer { home.remove() }
         try writeSettings(#"{"resolution": "native", "audioMode": "default-microphone"}"#)
-        let outcome = try msr("settings")
+        let outcome = try await msr("settings")
         #expect(outcome.status == 0)
         #expect(outcome.errors.isEmpty)
         #expect(outcome.output.contains(#""audioMode" : "default-microphone""#))
     }
 
-    @Test func aChangeThatCannotBeWrittenExits1NamingTheFile() throws {
+    @Test func aChangeThatCannotBeWrittenExits1NamingTheFile() async throws {
         defer { home.remove() }
         // A plain file where the Library folder must be.
         try Data().write(to: home.url.appending(path: "Library"))
-        let outcome = try msr("settings", "--system-audio", "off")
+        let outcome = try await msr("settings", "--system-audio", "off")
         #expect(outcome.status == 1)
         #expect(outcome.errors.contains("settings.json"))
         #expect(outcome.errors.contains("cannot be written"))
     }
 
-    @Test func anUnsetHomeExits78() throws {
+    @Test func anUnsetHomeExits78() async throws {
         defer { home.remove() }
-        let outcome = try msr("settings", home: "")
+        let outcome = try await msr("settings", home: "")
         #expect(outcome.status == 78)
         #expect(outcome.errors.contains("HOME is not set"))
     }
 
-    @Test func versionDoesNotReadTheSettings() throws {
+    @Test func versionDoesNotReadTheSettings() async throws {
         defer { home.remove() }
         try writeSettings(#"{"agc": true}"#)
-        let outcome = try msr("version")
+        let outcome = try await msr("version")
         #expect(outcome.status == 0)
         #expect(outcome.errors.isEmpty)
         #expect(outcome.output == "development build (not bundled)\n")
     }
 
-    @Test func aUsageErrorExits64() throws {
+    @Test func aUsageErrorExits64() async throws {
         defer { home.remove() }
-        #expect(try msr("settings", "--resolution", "999p").status == 64)
+        #expect(try await msr("settings", "--resolution", "999p").status == 64)
     }
 }

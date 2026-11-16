@@ -92,7 +92,14 @@ final class AudioCapture: @unchecked Sendable {
         throws(AudioFileWriterError) -> any AudioFileWriting
 
     let id: AudioTracker.SourceID
+    /// Its number in the recording (`SourceLabel`), 0 for the system audio.
+    let number: Int
+    /// The device name; "System audio" for the system audio.
     let name: String
+    /// Unique in the recording: its source in the guide track feed.
+    private var label: String {
+        id == .systemAudio ? SourceLabel.systemAudio : SourceLabel.audioInput(number, name: name)
+    }
     private let context: RecordingContext
     private let guides: GuideTrackFeed
     private let guide: GuideTrack
@@ -150,21 +157,22 @@ final class AudioCapture: @unchecked Sendable {
     }
 
     init(
-        id: AudioTracker.SourceID, name: String, source: any AudioBufferSource, context: RecordingContext,
+        id: AudioTracker.SourceID, number: Int, name: String, source: any AudioBufferSource, context: RecordingContext,
         guides: GuideTrackFeed, reports: AudioCaptureReports,
         drainTimeout: Duration = .seconds(RecorderValues.audioWaitBoundSeconds),
         makeWriter: MakeWriter? = nil
     ) {
         self.id = id
+        self.number = number
         self.name = name
         self.source = source
         self.context = context
         self.guides = guides
-        guide = id == .systemAudio ? .systemAudio : .microphones
+        guide = id == .systemAudio ? .systemAudio : .audioInputs
         self.reports = reports
         self.drainTimeout = drainTimeout
         self.makeWriter = makeWriter ?? Self.audioFileWriter(timecode: context.timecode)
-        queue = DispatchQueue(label: "msr.audio.\(name)", qos: .userInteractive)
+        queue = DispatchQueue(label: "msr.audio.\(number)", qos: .userInteractive)
     }
 
     /// The writer of a recording: an `AudioFileWriter`. A function, not a
@@ -235,7 +243,7 @@ final class AudioCapture: @unchecked Sendable {
         let time = context.clock.sinceStart(host: UInt64(max(0, pts.value)))
 
         joinGuide(channelCount: channels.count)
-        guides.receive(channels, from: name, to: guide, at: time)
+        guides.receive(channels, from: label, to: guide, at: time)
 
         if timeline != nil, channelCount != channels.count { finishFile() }
         if timeline == nil {
@@ -289,7 +297,7 @@ final class AudioCapture: @unchecked Sendable {
     private func openFile(firstTick: Int64) -> Bool {
         let description: AudioFileDescription = switch id {
         case .input(let uid): AudioFileDescription(
-            source: .audioInput(name: name, coreAudioUID: uid, channelCount: channelCount),
+            source: .audioInput(number: number, name: name, coreAudioUID: uid, channelCount: channelCount),
             recordingStarted: context.startedText, app: context.app)
         case .systemAudio: AudioFileDescription(source: .systemAudio, recordingStarted: context.startedText, app: context.app)
         }
@@ -370,14 +378,14 @@ final class AudioCapture: @unchecked Sendable {
 
     private func joinGuide(channelCount: Int) {
         guard guideChannels != channelCount else { return }
-        if guideChannels != nil { guides.remove(source: name, from: guide) }
-        guides.add(source: name, channelCount: channelCount, to: guide)
+        if guideChannels != nil { guides.remove(source: label, from: guide) }
+        guides.add(source: label, channelCount: channelCount, to: guide)
         guideChannels = channelCount
     }
 
     private func leaveGuide() {
         guard guideChannels != nil else { return }
-        guides.remove(source: name, from: guide)
+        guides.remove(source: label, from: guide)
         guideChannels = nil
     }
 

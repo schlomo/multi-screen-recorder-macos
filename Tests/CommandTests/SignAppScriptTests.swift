@@ -9,7 +9,7 @@ import Testing
     private let checkout: URL
     private var head = ""
 
-    init() throws {
+    init() async throws {
         scratch = try ScratchFolder("SignAppScriptTests")
         checkout = scratch.url.appending(path: "checkout", directoryHint: .isDirectory)
         for folder in ["scripts", "Resources", "build/Multi Screen Recorder.app/Contents/MacOS"] {
@@ -22,14 +22,14 @@ import Testing
         try FileManager.default.copyItem(
             at: try buildProducts().appending(path: "msr"),
             to: checkout.appending(path: "build/Multi Screen Recorder.app/Contents/MacOS/msr"))
-        try git("init", "--quiet", "--initial-branch=main")
-        try git("commit", "--quiet", "--allow-empty", "--message=one")
-        head = try git("rev-parse", "--short=7", "HEAD")
+        try await git("init", "--quiet", "--initial-branch=main")
+        try await git("commit", "--quiet", "--allow-empty", "--message=one")
+        head = try await git("rev-parse", "--short=7", "HEAD")
     }
 
     @discardableResult
-    private func git(_ arguments: String...) throws -> String {
-        let outcome = try run(URL(filePath: "/usr/bin/env"), ["git"] + arguments, environment: [
+    private func git(_ arguments: String...) async throws -> String {
+        let outcome = try await run(URL(filePath: "/usr/bin/env"), ["git"] + arguments, environment: [
             "HOME": scratch.url.path(percentEncoded: false),
             "GIT_CONFIG_NOSYSTEM": "1",
             "GIT_CONFIG_GLOBAL": "/dev/null",
@@ -54,8 +54,8 @@ import Testing
             .write(to: checkout.appending(path: "build/Multi Screen Recorder.app/Contents/Info.plist"))
     }
 
-    private func signApp(_ environment: [String: String] = [:]) throws -> CommandOutcome {
-        try run(checkout.appending(path: "scripts/sign-app"),
+    private func signApp(_ environment: [String: String] = [:]) async throws -> CommandOutcome {
+        try await run(checkout.appending(path: "scripts/sign-app"),
                 environment: environment.merging(["SIGNING_IDENTITY": "-"]) { given, _ in given }, in: scratch.url)
     }
 
@@ -75,51 +75,51 @@ import Testing
         ([String: String](), "0.20261115.13-dev+", ".dirty"),
         (["PR_NUMBER": "7"], "0.20261115.13-pr7+", ""),
     ])
-    func aMatchingVersionIsSignedAndZipped(environment: [String: String], prefix: String, suffix: String) throws {
+    func aMatchingVersionIsSignedAndZipped(environment: [String: String], prefix: String, suffix: String) async throws {
         defer { scratch.remove() }
         let version = prefix + head + suffix
         try writeInfo(version: version)
-        let outcome = try signApp(environment)
+        let outcome = try await signApp(environment)
         #expect(outcome.status == 0, "\(outcome.errors)")
         #expect(zipExists(version))
     }
 
     /// The checkout has one commit, committed on 2026-11-15, so a release of it is 0.20261115.1.
-    @Test func aReleaseHasNoSuffix() throws {
+    @Test func aReleaseHasNoSuffix() async throws {
         defer { scratch.remove() }
         try writeInfo(version: "0.20261115.1")
-        let outcome = try signApp(["RELEASE_BUILD": "true"])
+        let outcome = try await signApp(["RELEASE_BUILD": "true"])
         #expect(outcome.status == 0, "\(outcome.errors)")
         #expect(zipExists("0.20261115.1"))
     }
 
-    @Test func aReleaseWhoseNumberIsNotTheCommitCountStops() throws {
+    @Test func aReleaseWhoseNumberIsNotTheCommitCountStops() async throws {
         defer { scratch.remove() }
         try writeInfo(version: "0.20261115.999")
-        let outcome = try signApp(["RELEASE_BUILD": "true"])
+        let outcome = try await signApp(["RELEASE_BUILD": "true"])
         #expect(outcome.status == 1)
         #expect(outcome.errors.contains("does not have the form of a release of HEAD, 0.<DATE>.<N> with N the number of commits up to HEAD (1): 0.20261115.1"),
                 "\(outcome.errors)")
         #expect(try isUnsignedByThisRun())
     }
 
-    @Test func aSignedCommitWithShownSignaturesStillGivesTheDate() throws {
+    @Test func aSignedCommitWithShownSignaturesStillGivesTheDate() async throws {
         defer { scratch.remove() }
-        try git("config", "gpg.program", try scratch.installFakeGPG().path(percentEncoded: false))
-        try git("config", "user.signingkey", "ABCDEF")
-        try git("commit", "--quiet", "--allow-empty", "--gpg-sign", "--message=signed")
-        #expect(try git("cat-file", "-p", "HEAD").contains("gpgsig"))
-        let signedHead = try git("rev-parse", "--short=7", "HEAD")
+        try await git("config", "gpg.program", try scratch.installFakeGPG().path(percentEncoded: false))
+        try await git("config", "user.signingkey", "ABCDEF")
+        try await git("commit", "--quiet", "--allow-empty", "--gpg-sign", "--message=signed")
+        #expect(try await git("cat-file", "-p", "HEAD").contains("gpgsig"))
+        let signedHead = try await git("rev-parse", "--short=7", "HEAD")
         try writeInfo(version: "0.20261115.13-dev+\(signedHead)", commit: signedHead)
-        let outcome = try signApp(["GIT_CONFIG_PARAMETERS": "'log.showSignature=true'"])
+        let outcome = try await signApp(["GIT_CONFIG_PARAMETERS": "'log.showSignature=true'"])
         #expect(outcome.status == 0, "\(outcome.errors)")
         #expect(zipExists("0.20261115.13-dev+\(signedHead)"))
     }
 
-    @Test func theFormIsNamedInWords() throws {
+    @Test func theFormIsNamedInWords() async throws {
         defer { scratch.remove() }
         try writeInfo(version: "0.20261115.13-dev+\(head)")
-        let outcome = try signApp(["PR_NUMBER": "7"])
+        let outcome = try await signApp(["PR_NUMBER": "7"])
         #expect(outcome.status == 1)
         #expect(outcome.errors.contains(
             "does not have the form of a snapshot of PR #7 at \(head), 0.<DATE>.<N>-pr7+\(head) such as 0.20261115.13-pr7+\(head)"),
@@ -127,10 +127,10 @@ import Testing
     }
 
     @Test(arguments: InfoPlistDamage.allCases)
-    func aDamagedInfoPlistStopsBeforeSigning(damage: InfoPlistDamage) throws {
+    func aDamagedInfoPlistStopsBeforeSigning(damage: InfoPlistDamage) async throws {
         defer { scratch.remove() }
         try damage.write(to: checkout.appending(path: "build/Multi Screen Recorder.app/Contents/Info.plist"))
-        let outcome = try signApp()
+        let outcome = try await signApp()
         #expect(outcome.status == 1)
         #expect(outcome.errors.contains(damage.message), "\(outcome.errors)")
         #expect(!outcome.errors.contains("Traceback"))
@@ -151,37 +151,37 @@ import Testing
         (["RELEASE_BUILD": "true", "PR_NUMBER": "7"], "0.20261115.12", "exclude each other"),
         (["PR_NUMBER": "07"], "0.20261115.13-pr07+HEAD", "PR_NUMBER must be a number"),
     ])
-    func aWrongVersionStopsBeforeSigning(environment: [String: String], version: String, message: String) throws {
+    func aWrongVersionStopsBeforeSigning(environment: [String: String], version: String, message: String) async throws {
         defer { scratch.remove() }
         try writeInfo(version: version.replacing("HEAD", with: head))
-        let outcome = try signApp(environment)
+        let outcome = try await signApp(environment)
         #expect(outcome.status == 1)
         #expect(outcome.errors.contains(message), "\(outcome.errors)")
         #expect(try isUnsignedByThisRun())
     }
 
-    @Test func anotherCommitStopsBeforeSigning() throws {
+    @Test func anotherCommitStopsBeforeSigning() async throws {
         defer { scratch.remove() }
         try writeInfo(version: "0.20261115.13-dev+abcdef0", commit: "abcdef0")
-        let outcome = try signApp()
+        let outcome = try await signApp()
         #expect(outcome.status == 1)
         #expect(outcome.errors.contains("the bundle was built from abcdef0, but HEAD is \(head)"))
         #expect(try isUnsignedByThisRun())
     }
 
-    @Test func anotherIdentifierStopsBeforeSigning() throws {
+    @Test func anotherIdentifierStopsBeforeSigning() async throws {
         defer { scratch.remove() }
         try writeInfo(version: "0.20261115.13-dev+\(head)", identifier: "org.example.other")
-        let outcome = try signApp()
+        let outcome = try await signApp()
         #expect(outcome.status == 1)
         #expect(outcome.errors.contains("identifier is org.example.other"))
         #expect(try isUnsignedByThisRun())
     }
 
-    @Test func aMissingBundleStops() throws {
+    @Test func aMissingBundleStops() async throws {
         defer { scratch.remove() }
         try FileManager.default.removeItem(at: checkout.appending(path: "build/Multi Screen Recorder.app"))
-        let outcome = try signApp()
+        let outcome = try await signApp()
         #expect(outcome.status == 1)
         #expect(outcome.errors.contains("does not exist"))
     }

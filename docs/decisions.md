@@ -1495,3 +1495,84 @@ architect's reading.
   claim to fair pay under §32 UrhG.
 - **Evidence:** [README.md](../README.md), "License"; the PR "First
   tester release".
+
+## D55: "Screen" is the term; every source has a label; the tagline (2026-11-16)
+
+- **Status:** in force; changes the names of D31, D46, D49 and D52.
+- **Context:** The app said "display" in some places and "screen" in
+  others, numbered screens but not audio inputs, and told audio inputs
+  with the same name apart by " (2)". The owner signed off this design
+  as text on 2026-11-16: "I approve the naming change to screen and
+  audio for consistency. the next PR fixes what is left now", and "yes
+  to all other points". A screen that comes back on another port "is
+  for all intends and purposes another display, so good as-is"; on the
+  window's buttons: "OK to leave the buttons at their defaults".
+- **Decision:**
+  1. "Screen" replaces "display" as the term everywhere: the windows,
+     the terminal, event and problem texts, file, reel and track
+     names, the recording manifest's keys and values (`screen`,
+     `screenUUID`), code and file names, the docs, the homepage and
+     the issue forms. Apple's API and type names and macOS's own names
+     (System Settings › Displays, Built-in Retina Display) keep theirs,
+     as do earlier decisions and the backlog.
+  2. Every recorded source has a label, `<kind> <n> - <name>`:
+     `Screen <n> - <name>`, `Audio <n> - <name>`, and always
+     `Audio 0 - System` for the system audio. Numbers count per kind
+     from 1 in order of appearance in the recording; a source keeps its
+     number when it comes back, a screen by its UUID, an audio input by
+     its Core Audio UID. The " (2)" suffix for audio inputs is gone.
+     Screens present at the start keep D45's order (the main screen
+     first, then left to right); audio inputs present at the start are
+     numbered in Core Audio's order.
+  3. A file is named `<file start time> <label>.mov`, `/` and `:`
+     becoming `-`; the reel name is the label; an audio file's tracks
+     are `<label>, channel <n>`, the system audio's track the label.
+     The guide mix "Microphones" (D52) is "Audio inputs"; the guide
+     track "System audio" keeps its name.
+  4. The Source column of the start window and of the status window
+     shows an SF Symbol for the kind (`display`, `mic`,
+     `speaker.wave.2`), then the number and the name; a source not
+     recorded stays dimmed and has no number. `msr check` prints the
+     label as text, the default input marked "(default)" after it, and
+     the window shows the same as the Source cell's tooltip.
+  5. The tagline stands in the start window's header, right-aligned, in
+     italics and the secondary text colour, and on the homepage under
+     its title, the longer description a paragraph below it. It is
+     always two lines, the owner after seeing the first render (who
+     called it the claim, a word the project keeps for taking the
+     recording folder, D20): "the claim needs to break the line after
+     audio and start the 2nd line from Keeps": "Every screen, all
+     audio." and "Keeps going when things change."; neither line wraps
+     in the window. It is defined
+     once, `Tagline.lines`, joined by a space where one line is needed
+     (`Tagline.text`), and a test ties `homepage/hugo.toml` to it.
+  6. The buttons stay as they are.
+  7. One rule says whether an audio input is recorded,
+     `AudioTracker.records`: the audio mode includes it and it has a
+     Core Audio UID to open it by. The recording, the start window, the
+     disk estimate, the ready check and `msr list` all use it, so an
+     input without a UID is neither numbered, counted nor listed. A
+     screen that mirrors another is left out by both the recording and
+     the window, so they number the screens alike: the recording skips
+     it, and macOS does not list it to the window at all. Observed on
+     the owner's Mac, 2026-11-16: with the DELL P3421W mirroring the
+     Wacom One 13T, `msr check` of `v0.20261116.40` listed only "1 Wacom
+     One 13T" and the ready check said "Displays: 1". The window has no
+     mirroring check of its own: a fix round added one and the architect
+     reverted it (KISS), as macOS already leaves the screen out.
+- **Consequences:** No settings or state migration: neither holds a
+  changed key, and no code reads a recording manifest back. A manifest
+  written by an earlier build keeps `display` and `displayUUID`. The
+  guide track feed keys an audio input by its label, so two inputs with
+  the same name stay apart there too. The word "label" has this one
+  meaning now: the settings' and an audio input's shown names, called
+  `label` in the code before, are `shownName`. Two audio inputs with
+  the same name are told apart by their numbers in the files' names and
+  by `audioSourceUID` in the manifest's file entries. The events name an
+  audio input by its device name only and carry no UID, so the events
+  cannot tell two inputs with the same name apart; the owner is told,
+  and adding the UID to the events is a later decision if it ever
+  matters.
+- **Evidence:** [recorder.md](design/recorder.md), "Output on disk",
+  "Labels" and the start and status windows; the glossary's "Screen",
+  "Label" and "Tagline"; the PR "Naming and window polish".

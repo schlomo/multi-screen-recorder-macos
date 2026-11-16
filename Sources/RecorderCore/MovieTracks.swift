@@ -7,7 +7,7 @@ struct MovieTrackError: Error {
     let description: String
 }
 
-/// The timecode track every display file and audio file carries (D21, D31,
+/// The timecode track every screen file and audio file carries (D21, D31,
 /// D46): one sample, at the file's first tick, with the source as its reel
 /// name. The writer finishes the track right after that sample, so the
 /// writer can write the fragments without waiting for it and a file that is

@@ -7,7 +7,7 @@ import Testing
 
     /// A mix at 1 kHz with no delay, so positions are milliseconds.
     private func mix(delay: Duration = .zero) -> GuideTrackMix {
-        GuideTrackMix(.microphones, sampleRate: 1000, delay: delay)
+        GuideTrackMix(.audioInputs, sampleRate: 1000, delay: delay)
     }
 
     /// The soft limiter's output for `x`, as the design states it.
@@ -178,8 +178,8 @@ import Testing
     }
 
     @Test func theDelayIsTheDesignsStartingPoint() {
-        #expect(GuideTrackMix(.microphones).delay == 200 * millisecond)
-        #expect(GuideTrackMix(.microphones).sampleRate == RecorderValues.audioSampleRate)
+        #expect(GuideTrackMix(.audioInputs).delay == 200 * millisecond)
+        #expect(GuideTrackMix(.audioInputs).sampleRate == RecorderValues.audioSampleRate)
     }
 
     @Test func theSystemAudioGuideTrackKeepsItsTwoChannels() {

@@ -2,7 +2,7 @@
 
 | File | What it is |
 |---|---|
-| `app-icon.svg` | The app icon source: a vector drawing, 300 units wide, layers tile, displays (back, middle, front with stand) and dot; the viewBox is widened to 372.82 units so the tile is 824 px of a 1024 px canvas, the margin of the macOS icon grid |
+| `app-icon.svg` | The app icon source: a vector drawing, 300 units wide, layers tile, screens (back, middle, front with stand) and dot; the viewBox is widened to 372.82 units so the tile is 824 px of a 1024 px canvas, the margin of the macOS icon grid |
 | `app-icon.png` | 1024 x 1024 PNG with alpha, derived from `app-icon.svg`; committed, because CI does not render it. `scripts/build-app` builds `AppIcon.icns` from it |
 | `app-icon-fancy.jpeg` | Artwork: glossy 2048 x 2048 image from Gemini (Nano Banana), for the root `README.md` and the homepage's header, which mounts it (`homepage/hugo.toml`, `[module]`) and has Hugo resize it to a 256 px WebP at build time |
 | `app-icon-fancy-256.jpeg` | 256 px rendition of the fancy artwork, derived, which the root `README.md` shows |
@@ -19,7 +19,7 @@ The project palette (the owner's choice of 2026-11-12), meant for the homepage a
 | Cool white | `#E9EEF7` |
 | Red | `#FF3B30` |
 
-The SVG uses its own colours, none of them in the palette: back display `#415070`, middle display `#6E7CA0`, front display `#E6EBF7`, stand `#D5DAE6`. The palette's cool white `#E9EEF7` is not used in the SVG.
+The SVG uses its own colours, none of them in the palette: back screen `#415070`, middle screen `#6E7CA0`, front screen `#E6EBF7`, stand `#D5DAE6`. The palette's cool white `#E9EEF7` is not used in the SVG.
 
 ## Regenerating the derived images
 

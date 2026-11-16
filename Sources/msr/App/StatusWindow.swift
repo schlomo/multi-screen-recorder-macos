@@ -52,29 +52,38 @@ final class StatusWindow {
     }
 }
 
-private struct StatusView: View {
+struct StatusView: View {
     let model: StatusModel
     let stop: () -> Void
     let continueRecording: () -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        WidthSettingStack(spacing: 12) {
             Grid(alignment: .leading, horizontalSpacing: 16, verticalSpacing: 4) {
                 GridRow {
-                    ForEach(RecordingStatusTable.columns, id: \.self) { Text($0).font(.headline) }
+                    ForEach(Array(RecordingStatusTable.columns.enumerated()), id: \.offset) { column, header in
+                        if column == 0 {
+                            Text(header).font(.headline)
+                        } else {
+                            Text(header).font(.headline)
+                                .frame(minWidth: TableLayout.statusColumnWidths[column - 1], alignment: Alignment(horizontal: Self.alignment(column), vertical: .center))
+                        }
+                    }
                 }
                 Divider()
                 ForEach(Array(model.rows.enumerated()), id: \.offset) { _, row in
                     GridRow {
-                        ForEach(Array(row.cells.enumerated()), id: \.offset) { column, cell in
+                        SourceCellView(cell: row.source).monospacedDigit()
+                        ForEach(Array(row.values.enumerated()), id: \.offset) { offset, cell in
                             Text(cell)
                                 .lineLimit(1)
                                 .monospacedDigit()
-                                .gridColumnAlignment(column == 2 || column == 3 ? .trailing : .leading)
+                                .gridColumnAlignment(Self.alignment(offset + 1))
                         }
                     }
                 }
             }
+            .setsTheWidth()
             Text(model.line).monospacedDigit()
             if !model.cpu.isEmpty {
                 VStack(alignment: .leading, spacing: 2) {
@@ -103,7 +112,11 @@ private struct StatusView: View {
                 Button("Stop", action: stop).buttonStyle(.borderedProminent).keyboardShortcut(.defaultAction)
             }
         }
-        .padding(20)
-        .frame(minWidth: 560)
+        .padding(TableLayout.windowPadding)
+    }
+
+    /// Files and Written are right-aligned.
+    private static func alignment(_ column: Int) -> HorizontalAlignment {
+        column == 2 || column == 3 ? .trailing : .leading
     }
 }

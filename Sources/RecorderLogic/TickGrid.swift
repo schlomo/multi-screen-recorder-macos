@@ -39,7 +39,7 @@ public struct TickGrid: Equatable, Sendable {
     }
 }
 
-/// One display file's ticks: every tick writes the newest frame captured at
+/// One screen file's ticks: every tick writes the newest frame captured at
 /// or before it, with exactly the tick's time. No tick is dropped: a tick
 /// the writer cannot take waits, carrying the frame chosen at its own time,
 /// and is written late and counted. More than `lateTickBound` ticks waiting
@@ -52,7 +52,7 @@ public struct TickLoop<Frame> {
 
     public let grid: TickGrid
     public let lateTickBound: Int
-    /// The file's first tick: the first after the first frame that passed the display check.
+    /// The file's first tick: the first after the first frame that passed the screen check.
     public private(set) var firstTick: Int64?
     /// The next tick to choose a frame for.
     public private(set) var nextTick: Int64 = 0
@@ -77,7 +77,7 @@ public struct TickLoop<Frame> {
 
     public var waitingTicks: Int { waiting.count }
 
-    /// A frame that passed the display check, captured at `time` (nanoseconds
+    /// A frame that passed the screen check, captured at `time` (nanoseconds
     /// from t0). The first one decides the file's first tick. A frame older
     /// than the newest one kept is ignored: frames arrive in capture order.
     public mutating func receive(_ frame: Frame, capturedAt time: Int64) {

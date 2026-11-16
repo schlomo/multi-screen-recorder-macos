@@ -2,20 +2,20 @@ import AppKit
 import CoreGraphics
 import RecorderLogic
 
-/// The connected displays, mirrored ones excluded. Needs no permission.
+/// The connected screens, mirrored ones excluded. Needs no permission.
 @MainActor
-public func currentDisplays() throws(DeviceReadError) -> [DisplayInfo] {
+public func currentScreens() throws(DeviceReadError) -> [ScreenInfo] {
     let mainID = CGMainDisplayID()
     return try NSScreen.screens.map { screen throws(DeviceReadError) in
         guard let number = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber else {
-            throw DeviceReadError("the display \(screen.localizedName) does not report its display number")
+            throw DeviceReadError("the screen \(screen.localizedName) does not report its screen number")
         }
         let id = CGDirectDisplayID(number.uint32Value)
         guard let mode = CGDisplayCopyDisplayMode(id) else {
-            throw DeviceReadError("the display \(screen.localizedName) does not report its display mode")
+            throw DeviceReadError("the screen \(screen.localizedName) does not report its screen mode")
         }
         let bounds = CGDisplayBounds(id)
-        return DisplayInfo(
+        return ScreenInfo(
             name: screen.localizedName,
             pixelSize: FrameSize(width: mode.pixelWidth, height: mode.pixelHeight),
             pointSize: FrameSize(width: mode.width, height: mode.height),

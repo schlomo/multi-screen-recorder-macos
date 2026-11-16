@@ -23,11 +23,11 @@ public struct RecordingManifest: Codable, Equatable, Sendable {
         }
     }
 
-    /// A display file, with its guide tracks.
-    public struct DisplayFile: Codable, Equatable, Sendable {
+    /// A screen file, with its guide tracks.
+    public struct ScreenFile: Codable, Equatable, Sendable {
         public var name: String
-        public var display: String
-        public var displayUUID: String
+        public var screen: String
+        public var screenUUID: String
         public var frameSize: [Int]
         /// Seconds from the recording's start on the shared clock.
         public var start: Double
@@ -39,12 +39,12 @@ public struct RecordingManifest: Codable, Equatable, Sendable {
         public var framesRepeatedForLateness: Int
 
         public init(
-            name: String, display: String, displayUUID: String, frameSize: FrameSize, start: Double, timecode: String,
+            name: String, screen: String, screenUUID: String, frameSize: FrameSize, start: Double, timecode: String,
             guideTracks: [String] = []
         ) {
             self.name = name
-            self.display = display
-            self.displayUUID = displayUUID
+            self.screen = screen
+            self.screenUUID = screenUUID
             self.frameSize = [frameSize.width, frameSize.height]
             self.start = start
             end = nil
@@ -55,15 +55,15 @@ public struct RecordingManifest: Codable, Equatable, Sendable {
         }
 
         private enum CodingKeys: String, CodingKey {
-            case name, display, displayUUID, frameSize, start, end, timecode, state, guideTracks, framesRepeatedForLateness
+            case name, screen, screenUUID, frameSize, start, end, timecode, state, guideTracks, framesRepeatedForLateness
         }
 
         /// `end` is written as null while the file is being written.
         public func encode(to encoder: any Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(name, forKey: .name)
-            try container.encode(display, forKey: .display)
-            try container.encode(displayUUID, forKey: .displayUUID)
+            try container.encode(screen, forKey: .screen)
+            try container.encode(screenUUID, forKey: .screenUUID)
             try container.encode(frameSize, forKey: .frameSize)
             try container.encode(start, forKey: .start)
             try container.encode(end, forKey: .end)
@@ -183,9 +183,9 @@ public struct RecordingManifest: Codable, Equatable, Sendable {
     /// Nil until the recording is finalized.
     public var cpu: CPU?
     public var settings: RecordedSettings
-    /// The display files; `files` in the JSON lists them with the audio
+    /// The screen files; `files` in the JSON lists them with the audio
     /// files, in the order of their start.
-    public var files: [DisplayFile]
+    public var files: [ScreenFile]
     public var audioFiles: [AudioFile]
     public var events: [RecordingEvent]
     /// Every problem told to the person.
@@ -206,28 +206,28 @@ public struct RecordingManifest: Codable, Equatable, Sendable {
         case app, state, started, ended, result, cpu, settings, files, events, problems
     }
 
-    /// One entry of `files`: an audio file has `audioSource`, a display file not.
+    /// One entry of `files`: an audio file has `audioSource`, a screen file not.
     private enum FileEntry: Codable {
-        case display(DisplayFile)
+        case screen(ScreenFile)
         case audio(AudioFile)
 
         private enum Keys: String, CodingKey { case audioSource }
 
         init(from decoder: any Decoder) throws {
             let keys = try decoder.container(keyedBy: Keys.self)
-            self = keys.contains(.audioSource) ? .audio(try AudioFile(from: decoder)) : .display(try DisplayFile(from: decoder))
+            self = keys.contains(.audioSource) ? .audio(try AudioFile(from: decoder)) : .screen(try ScreenFile(from: decoder))
         }
 
         func encode(to encoder: any Encoder) throws {
             switch self {
-            case .display(let file): try file.encode(to: encoder)
+            case .screen(let file): try file.encode(to: encoder)
             case .audio(let file): try file.encode(to: encoder)
             }
         }
 
         var start: Double {
             switch self {
-            case .display(let file): file.start
+            case .screen(let file): file.start
             case .audio(let file): file.start
             }
         }
@@ -243,7 +243,7 @@ public struct RecordingManifest: Codable, Equatable, Sendable {
         cpu = try container.decodeIfPresent(CPU.self, forKey: .cpu)
         settings = try container.decode(RecordedSettings.self, forKey: .settings)
         let entries = try container.decode([FileEntry].self, forKey: .files)
-        files = entries.compactMap { if case .display(let file) = $0 { file } else { nil } }
+        files = entries.compactMap { if case .screen(let file) = $0 { file } else { nil } }
         audioFiles = entries.compactMap { if case .audio(let file) = $0 { file } else { nil } }
         events = try container.decode([RecordingEvent].self, forKey: .events)
         problems = try container.decode([RecordingProblem].self, forKey: .problems)
@@ -261,7 +261,7 @@ public struct RecordingManifest: Codable, Equatable, Sendable {
         try container.encode(result, forKey: .result)
         try container.encode(cpu, forKey: .cpu)
         try container.encode(settings, forKey: .settings)
-        let entries = files.map(FileEntry.display) + audioFiles.map(FileEntry.audio)
+        let entries = files.map(FileEntry.screen) + audioFiles.map(FileEntry.audio)
         try container.encode(Self.inTimeOrder(entries, at: \.start), forKey: .files)
         try container.encode(Self.inTimeOrder(events, at: \.at), forKey: .events)
         try container.encode(Self.inTimeOrder(problems, at: \.at), forKey: .problems)
@@ -367,16 +367,16 @@ public struct RecordingEvent: Codable, Equatable, Sendable {
     /// Every event the recording manifest knows, as recorder.md lists them.
     /// The audio events are written from B2 of the recording core (D45).
     public enum Kind: String, Codable, CaseIterable, Sendable {
-        case displayConnected = "display connected"
-        case displayDisconnected = "display disconnected"
-        case displayFrameSizeChanged = "display frame size changed"
-        case displayMirroringStarted = "display mirroring started"
-        case displayMirroringStopped = "display mirroring stopped"
-        case mainDisplayChanged = "main display changed"
-        case displayStreamFailed = "display stream failed"
-        case displayShowsAnotherDisplaysPicture = "display shows another display's picture"
-        case displayFileWriterFellBehind = "display file writer fell behind"
-        case displayFileWriterFailed = "display file writer failed"
+        case screenConnected = "screen connected"
+        case screenDisconnected = "screen disconnected"
+        case screenFrameSizeChanged = "screen frame size changed"
+        case screenMirroringStarted = "screen mirroring started"
+        case screenMirroringStopped = "screen mirroring stopped"
+        case mainScreenChanged = "main screen changed"
+        case screenStreamFailed = "screen stream failed"
+        case screenShowsAnotherScreensPicture = "screen shows another screen's picture"
+        case screenFileWriterFellBehind = "screen file writer fell behind"
+        case screenFileWriterFailed = "screen file writer failed"
         case diskFull = "disk full"
         case sleep
         case wake
@@ -396,8 +396,8 @@ public struct RecordingEvent: Codable, Equatable, Sendable {
         /// disconnects, and a gap, are none.
         public var isFailure: Bool {
             switch self {
-            case .displayStreamFailed, .displayShowsAnotherDisplaysPicture, .displayFileWriterFellBehind,
-                 .displayFileWriterFailed, .diskFull, .audioInputFailed, .systemAudioFailed, .audioFileWriterFailed,
+            case .screenStreamFailed, .screenShowsAnotherScreensPicture, .screenFileWriterFellBehind,
+                 .screenFileWriterFailed, .diskFull, .audioInputFailed, .systemAudioFailed, .audioFileWriterFailed,
                  .audioFileWriterFellBehind: true
             default: false
             }
@@ -441,36 +441,36 @@ public struct RecordingEvent: Codable, Equatable, Sendable {
     /// Seconds from the recording's start, to the millisecond.
     public var at: Double
     public var event: Kind
-    /// The display the event is about, where it is about one.
-    public var display: String?
+    /// The screen the event is about, where it is about one.
+    public var screen: String?
     /// The audio source the event is about, where it is about one.
     public var audioSource: String?
-    /// For `display frame size changed`: the old and the new frame size;
+    /// For `screen frame size changed`: the old and the new frame size;
     /// for `default microphone changed`: the old and the new default
     /// microphone, absent where there was or is none.
     public var from: Value?
     public var to: Value?
     /// For `audio input gap`: its length in seconds, to the millisecond.
     public var length: Double?
-    /// For `display mirroring started`: the display it mirrors.
+    /// For `screen mirroring started`: the screen it mirrors.
     public var mirrors: String?
-    /// For a failure (`display stream failed`, `audio input failed` and the
+    /// For a failure (`screen stream failed`, `audio input failed` and the
     /// like) and a failing writer: why.
     public var error: String?
 
-    public init(at nanoseconds: Int64, event: Kind, display: String? = nil, audioSource: String? = nil) {
+    public init(at nanoseconds: Int64, event: Kind, screen: String? = nil, audioSource: String? = nil) {
         at = (Double(nanoseconds) / 1_000_000).rounded() / 1000
         self.event = event
-        self.display = display
+        self.screen = screen
         self.audioSource = audioSource
     }
 
-    /// The display or audio source the event is about, if any.
-    public var subject: String? { display ?? audioSource }
+    /// The screen or audio source the event is about, if any.
+    public var subject: String? { screen ?? audioSource }
 
     /// The event as a problem told to the person, at its time.
     public var problem: RecordingProblem {
-        let what = display.map { "Display \($0)" } ?? audioSource.map { "Audio source \($0)" } ?? "The recording"
+        let what = screen.map { "Screen \($0)" } ?? audioSource.map { "Audio source \($0)" } ?? "The recording"
         return RecordingProblem(atSeconds: at, problem: what, error: error.map { "\(event.rawValue): \($0)" } ?? event.rawValue)
     }
 }
@@ -480,7 +480,7 @@ public struct RecordingEvent: Codable, Equatable, Sendable {
 public struct RecordingProblem: Codable, Equatable, Sendable {
     /// Seconds from the recording's start, to the millisecond.
     public var at: Double
-    /// What went wrong, such as "Display file <name>".
+    /// What went wrong, such as "Screen file <name>".
     public var problem: String
     /// The full error text, nil when the problem says it all.
     public var error: String?

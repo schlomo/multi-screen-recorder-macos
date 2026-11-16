@@ -6,7 +6,7 @@ import RecorderLogic
 struct CommandLineInterface: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "msr",
-        abstract: "Multi Screen Recorder: records every display and audio source.",
+        abstract: "Multi Screen Recorder: records every screen and audio source.",
         discussion: """
             Without arguments, msr starts the app. A settings flag changes the settings for that one run; only `msr settings` saves them. \
             An unset HOME makes every command that reads the settings exit 78.
@@ -17,7 +17,7 @@ struct CommandLineInterface: AsyncParsableCommand {
 
 /// One flag per settings key, changing it for this run; `msr settings` saves the result.
 struct SettingsFlags: ParsableArguments {
-    @Flag(help: "Auto mode for this run, whatever the settings file says: every display at Native, the audio mode Wired. Not with --resolution or --audio-mode.")
+    @Flag(help: "Auto mode for this run, whatever the settings file says: every screen at Native, the audio mode Wired. Not with --resolution or --audio-mode.")
     var auto = false
 
     @Option(help: "Recording resolution: native, 4k, 1440p, 1200p, 1080p or 720p. Turns auto mode off for this run.")
@@ -95,15 +95,15 @@ func standardSettingsFile() throws -> SettingsFile {
 extension CommandLineInterface {
     struct List: AsyncParsableCommand {
         static let configuration = CommandConfiguration(
-            abstract: "Show displays, audio inputs and system audio.")
+            abstract: "Show screens, audio inputs and system audio.")
 
         func run() async throws {
             let file = try standardSettingsFile()
             let settings = loadSettings(from: file)
-            let displays = try await currentDisplays()
+            let screens = try await currentScreens()
             let audioInputs = try currentAudioInputs()
             print(renderList(
-                displays: numberDisplays(displays),
+                screens: numberScreens(screens),
                 resolution: settings.effectiveResolution,
                 audioInputs: audioInputs,
                 systemAudioAvailable: screenRecordingIsGranted()
@@ -128,6 +128,7 @@ extension CommandLineInterface {
             let home = try homeFolderOrExit()
             let facts = await probeReadyCheckFacts(proof: .captureOneFrame, settings: settings, homeFolder: home)
             let result = ReadyCheck.evaluate(facts, settings: settings)
+            print(runningVersion.banner, terminator: "")
             print(WhatWillBeRecorded(settings: settings, facts: facts).text, terminator: "\n")
             print(result.text, terminator: "")
             if !result.isReady { throw ExitCode(1) }

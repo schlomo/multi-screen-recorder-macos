@@ -1,13 +1,13 @@
 /// What a problem is, for telling a repeating one once (D46).
 public enum ProblemKind: Hashable, Sendable {
     case manifestNotWritten
-    case displaysNotRead
+    case screensNotRead
     case freeSpaceNotRead
-    /// A display, by its UUID, whose display file a failure ended (its
-    /// stream failed or lost its capture source again without a display
-    /// change, its writer fell behind, it showed another display's
+    /// A screen, by its UUID, whose screen file a failure ended (its
+    /// stream failed or lost its capture source again without a screen
+    /// change, its writer fell behind, it showed another screen's
     /// picture); clears when a file of it starts.
-    case displayNotCaptured(String)
+    case screenNotCaptured(String)
     /// `msr record` could not show its Dock icon.
     case dockIconNotShown
     case audioInputsNotRead

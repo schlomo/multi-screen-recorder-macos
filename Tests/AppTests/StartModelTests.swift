@@ -53,7 +53,7 @@ import Testing
         let probes = ReadyCheckProbes(
             screenRecording: { proof in probed.ran(proof); return .granted },
             microphonePermission: { true },
-            displays: { .success(DesignExample.displays) },
+            screens: { .success(DesignExample.screens) },
             audioInputs: { .success(DesignExample.audioInputs) },
             outputFolder: { _ in .usable(.bytes(100_000_000_000)) })
         let menu = menu
@@ -83,7 +83,7 @@ import Testing
         await waitUntil { probed.checks == 3 }
         model.change { $0.systemAudio.toggle() }
         await waitUntil { probed.checks == 4 }
-        #expect(probed.proofsRun == [.captureOneFrame, .captureOneFrame, .listDisplays, .listDisplays])
+        #expect(probed.proofsRun == [.captureOneFrame, .captureOneFrame, .listScreens, .listScreens])
     }
 
     @Test func aBurstOfDeviceChangesGivesOneCheck() async {
@@ -235,10 +235,10 @@ import Testing
     }
 }
 
-/// The displays and audio inputs of the examples in docs/design/recorder.md.
+/// The screens and audio inputs of the examples in docs/design/recorder.md.
 enum DesignExample {
-    static let displays = [
-        DisplayInfo(name: "Built-in Retina Display", pixelSize: FrameSize(width: 3456, height: 2234), pointSize: FrameSize(width: 1728, height: 1117), isMain: true, originX: 0, originY: 0),
+    static let screens = [
+        ScreenInfo(name: "Built-in Retina Display", pixelSize: FrameSize(width: 3456, height: 2234), pointSize: FrameSize(width: 1728, height: 1117), isMain: true, originX: 0, originY: 0),
     ]
     static let audioInputs = [AudioInputInfo(name: "MacBook Pro Microphone", channelCount: 1, isDefault: true)]
 }

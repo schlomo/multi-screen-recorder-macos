@@ -1,4 +1,4 @@
-/// A width and height: in points for what a display looks like, or in pixels
+/// A width and height: in points for what a screen looks like, or in pixels
 /// for what it is drawn at.
 public struct FrameSize: Equatable, Hashable, Sendable, CustomStringConvertible {
     public var width: Int
@@ -21,7 +21,7 @@ public struct FrameSize: Equatable, Hashable, Sendable, CustomStringConvertible 
     public var description: String { "\(width)×\(height)" }
 }
 
-/// The maximum box a display's looks-like size is shrunk to fit.
+/// The maximum box a screen's looks-like size is shrunk to fit.
 public enum RecordingResolution: String, CaseIterable, Sendable, Encodable {
     /// The size macOS shows as "looks like": no box.
     case native
@@ -58,7 +58,7 @@ public enum RecordingResolution: String, CaseIterable, Sendable, Encodable {
     }
 
     /// The name a person reads, in the app and its texts.
-    public var label: String {
+    public var shownName: String {
         switch self {
         case .native: "Native"
         case .uhd4k: "4K"
@@ -66,19 +66,19 @@ public enum RecordingResolution: String, CaseIterable, Sendable, Encodable {
         }
     }
 
-    /// The frame size of a display file: the display's looks-like size shrunk
-    /// into the box, turned upright for a portrait display, with its
+    /// The frame size of a screen file: the screen's looks-like size shrunk
+    /// into the box, turned upright for a portrait screen, with its
     /// proportions kept, never enlarged, each side rounded down to an even
-    /// number. The size the display is drawn at is never recorded.
+    /// number. The size the screen is drawn at is never recorded.
     public func frameSize(forLooksLike looksLike: FrameSize) -> FrameSize {
         let fitted = box.map { fit(looksLike, into: looksLike.isPortrait ? $0.rotated : $0) } ?? looksLike
         return FrameSize(width: roundedDownToEven(fitted.width), height: roundedDownToEven(fitted.height))
     }
 
-    /// Whether a display's file continues when its looks-like size changes:
+    /// Whether a screen's file continues when its looks-like size changes:
     /// only while the frame size stays the same; otherwise the file ends
     /// and a new one starts at the new frame size (D30).
-    public func displayFileContinues(from oldLooksLike: FrameSize, to newLooksLike: FrameSize) -> Bool {
+    public func screenFileContinues(from oldLooksLike: FrameSize, to newLooksLike: FrameSize) -> Bool {
         frameSize(forLooksLike: oldLooksLike) == frameSize(forLooksLike: newLooksLike)
     }
 }

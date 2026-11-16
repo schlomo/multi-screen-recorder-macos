@@ -11,10 +11,10 @@ extension RecorderValues {
     /// The longest gap filled with silence; a longer one ends the audio
     /// file and a new one starts (D46).
     public static let longestFilledAudioGap = Duration.seconds(1)
-    /// How far behind real time the guide track "Microphones" is mixed, so
+    /// How far behind real time the guide track "Audio inputs" is mixed, so
     /// every source's buffers have arrived.
     public static let guideTrackDelay = Duration.milliseconds(200)
-    /// How often the guide tracks are mixed and handed to the display files.
+    /// How often the guide tracks are mixed and handed to the screen files.
     public static let guideTrackInterval = Duration.milliseconds(100)
     /// How often the CPU use of our process is sampled.
     public static let cpuSampleInterval = Duration.seconds(1)

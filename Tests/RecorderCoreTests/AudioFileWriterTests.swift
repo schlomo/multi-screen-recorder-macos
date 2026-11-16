@@ -12,7 +12,7 @@ import Testing
     private let berlin = TimeZone(identifier: "Europe/Berlin")!
     private let start = Date(timeIntervalSince1970: 1_794_488_585.12) // 2026-11-12 14:03:05.120 in Berlin
     private let rate = RecorderValues.audioSampleRate
-    private let prefix = DisplayFileMetadata.keyPrefix
+    private let prefix = ScreenFileMetadata.keyPrefix
     private let started = "2026-11-12T14:03:05.120+01:00"
     private let app = "Multi Screen Recorder 0.20261115.3 (a1b2c3d)"
 
@@ -28,7 +28,7 @@ import Testing
 
     private func microphone(channels: Int) -> AudioFileDescription {
         AudioFileDescription(
-            source: .audioInput(name: "Razer Seiren V3 Mini", coreAudioUID: "AppleUSBAudioEngine:Razer:1", channelCount: channels),
+            source: .audioInput(number: 2, name: "Razer Seiren V3 Mini", coreAudioUID: "AppleUSBAudioEngine:Razer:1", channelCount: channels),
             recordingStarted: started, app: app)
     }
 
@@ -75,14 +75,14 @@ import Testing
             #expect(stream.mFormatID == kAudioFormatMPEG4AAC)
             #expect(stream.mChannelsPerFrame == 1)
             #expect(stream.mSampleRate == Double(rate))
-            #expect(try await trackName(of: track) == "Microphone: Razer Seiren V3 Mini, channel \(index + 1)")
+            #expect(try await trackName(of: track) == "Audio 2 - Razer Seiren V3 Mini, channel \(index + 1)")
             #expect(try await track.loadAssociatedTracks(ofType: .timecode).count == 1)
             let dataRate = try await track.load(.estimatedDataRate)
             #expect(abs(dataRate - 128_000) < 128_000 * 0.2, "\(dataRate)")
             #expect(try decodedSamples(of: track, asset: asset).count == 3 * rate)
         }
         #expect(abs(try await asset.load(.duration).seconds - 3) < 0.001)
-        try await expectTimecode(asset, frame: timecode.frame(ofTick: 45), reelName: "Microphone - Razer Seiren V3 Mini")
+        try await expectTimecode(asset, frame: timecode.frame(ofTick: 45), reelName: "Audio 2 - Razer Seiren V3 Mini")
         let metadata = try await metadataValues(asset)
         #expect(metadata == [
             prefix + "audioSource": "Razer Seiren V3 Mini",
@@ -91,8 +91,8 @@ import Testing
             prefix + "recordingStarted": started,
             prefix + "app": app,
             "com.apple.quicktime.software": app,
-            "com.apple.proapps.reel": "Microphone - Razer Seiren V3 Mini",
-            "com.apple.proapps.cameraName": "Microphone - Razer Seiren V3 Mini",
+            "com.apple.proapps.reel": "Audio 2 - Razer Seiren V3 Mini",
+            "com.apple.proapps.cameraName": "Audio 2 - Razer Seiren V3 Mini",
         ])
     }
 
@@ -109,10 +109,10 @@ import Testing
         #expect(tracks.count == 1)
         let track = try #require(tracks.first)
         #expect(try await streamDescription(of: track).mChannelsPerFrame == 2)
-        #expect(try await trackName(of: track) == "System audio")
+        #expect(try await trackName(of: track) == "Audio 0 - System")
         let dataRate = try await track.load(.estimatedDataRate)
         #expect(abs(dataRate - 192_000) < 192_000 * 0.2, "\(dataRate)")
-        try await expectTimecode(asset, frame: Timecode(start: start, timeZone: berlin).frame(ofTick: 0), reelName: "System audio")
+        try await expectTimecode(asset, frame: Timecode(start: start, timeZone: berlin).frame(ofTick: 0), reelName: "Audio 0 - System")
         #expect(try await metadataValues(asset)[prefix + "audioSourceUID"] == nil)
     }
 
@@ -168,7 +168,7 @@ import Testing
             let seconds = Double(try decodedSamples(of: track, asset: asset).count) / Double(rate)
             #expect(seconds >= 9 - Double(RecorderValues.fragmentSeconds) - 0.1, "\(seconds) s of 9")
         }
-        try await expectTimecode(asset, frame: timecode.frame(ofTick: 30), reelName: "Microphone - Razer Seiren V3 Mini")
+        try await expectTimecode(asset, frame: timecode.frame(ofTick: 30), reelName: "Audio 2 - Razer Seiren V3 Mini")
         #expect(try await metadataValues(asset)[prefix + "audioSource"] == "Razer Seiren V3 Mini")
         withExtendedLifetime(writer) {}
     }

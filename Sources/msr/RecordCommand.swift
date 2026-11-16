@@ -16,7 +16,7 @@ let recordingEndedWithErrorExitCode: Int32 = 3
 extension CommandLineInterface {
     struct Record: AsyncParsableCommand {
         static let configuration = CommandConfiguration(
-            abstract: "Record every display and audio source until Ctrl-C, SIGTERM, SIGHUP, the duration or Stop in the status window.",
+            abstract: "Record every screen and audio source until Ctrl-C, SIGTERM, SIGHUP, the duration or Stop in the status window.",
             discussion: "Prints what will be recorded, runs the ready check, then records with the app's Dock icon. "
                 + "Exits 0 when every file is finalized and no file was ended by a failure, 1 when not ready, 3 otherwise or when it could not start.")
 
@@ -71,6 +71,7 @@ final class RecordCommandDelegate: NSObject, NSApplicationDelegate {
         }
         let facts = await probeReadyCheckFacts(proof: .captureOneFrame, settings: settings, homeFolder: home)
         let result = ReadyCheck.evaluate(facts, settings: settings)
+        print(runningVersion.banner, terminator: "")
         print(WhatWillBeRecorded(settings: settings, facts: facts).text)
         print(result.text, terminator: "")
         fflush(stdout)

@@ -26,6 +26,7 @@ One row per entry, the error text exactly as in the entry.
 | `no 'async' operations occur within 'await' expression` | [Swift Argument Parser's async main from top-level code](#swift-argument-parsers-async-main-from-top-level-code) |
 | `The window has been marked as needing another Layout Window pass, but it has already had more Layout Window passes than there are views in the window.` | [Layout loop in a popup menu window after a HiDPI switch](#layout-loop-in-a-popup-menu-window-after-a-hidpi-switch) |
 | The prompt for the Screen & System Audio Recording permission comes back each time the window is clicked (symptom, no error text) | [Screen recording prompt comes back with an ad hoc signed build](#screen-recording-prompt-comes-back-with-an-ad-hoc-signed-build) |
+| `the writer took none of the last 4800 samples (0.100 s) of Razer Seiren V3 Mini within 2.0 seconds; they are lost` | [A timing test fails on CI while command tests run](#a-timing-test-fails-on-ci-while-command-tests-run) |
 
 ## Format
 
@@ -34,7 +35,7 @@ One row per entry, the error text exactly as in the entry.
 
 - **Error:** `<the exact error text, verbatim>`
 - **Symptom:** what is seen, and where (command, job, log).
-- **Why:** the root cause, with its evidence label.
+- **Why:** the root cause, with its evidence tag.
 - **Fix:** the literal command or change.
 - **Verify:** the check that proves the fix worked.
 - **Observed:** <date>, <tool and version>; open | resolved upstream
@@ -85,7 +86,7 @@ One row per entry, the error text exactly as in the entry.
   `<NSPopupMenuWindow …>`, preceded by "-layoutSubtreeIfNeeded for
   <NSTableRowView …> has continued for 300 iterations".
 - **Symptom:** the app quits (`EXC_CRASH (SIGABRT)`) 1 to 7 s after a
-  display's HiDPI (backing scale) mode was switched, with a popup menu
+  screen's HiDPI (backing scale) mode was switched, with a popup menu
   of the start window open or opened. The `.ips` crash report does not
   carry the text; read it with
   `log show --predicate 'process == "msr"'`.
@@ -97,7 +98,7 @@ One row per entry, the error text exactly as in the entry.
   change [ASSUMED]; an AppKit or SwiftUI bug [CONJECTURE] (D41).
 - **Fix:** no popup menus in the start window: the audio mode and the
   recording resolution are sliders (D41, D44).
-- **Verify:** switch a display's HiDPI mode with the start window open;
+- **Verify:** switch a screen's HiDPI mode with the start window open;
   the app keeps running. The owner tried on 2026-11-15 ("I couldn't
   provoke the crash"), which is evidence, not proof.
 - **Observed:** 2026-11-14 and 2026-11-15, macOS 26 on the owner's
@@ -126,3 +127,23 @@ One row per entry, the error text exactly as in the entry.
   repeating the prompt is the contrast case, observed by the owner on
   2026-11-15.
 - **Observed:** 2026-11-15, ad hoc build of `main`; open.
+
+## A timing test fails on CI while command tests run
+
+- **Error:** `the writer took none of the last 4800 samples (0.100 s) of Razer Seiren V3 Mini within 2.0 seconds; they are lost`
+- **Symptom:** `AudioCaptureTests.samplesStillWaitingAtTheEndAreWrittenBeforeTheFileIsFinalized`
+  fails in CI's `scripts/test` (runs 43906122035 and 43910044356 of
+  PR #14) and passes locally.
+- **Why:** [KNOWN] the test let a task make its stand-in writer ready
+  after 50 ms, against a 2 s real-time bound. [KNOWN, measured locally]
+  once the command tests' `run` waited off the cooperative pool, every
+  command test started its program at once: up to 106 child processes
+  together, against at most one per pool thread before. [CONJECTURE]
+  on the 3-core hosted runner, that starved the task past the bound.
+- **Fix:** the test's writer becomes ready on an event (after refusing
+  the drain twice), with a bound far away; `run` in
+  `Tests/CommandTests/Support.swift` runs at most one program per
+  processor (`ProgramSlots`).
+- **Verify:** CI's `scripts/test` passes; locally the command tests run
+  at most 9 programs at once on 12 processors.
+- **Observed:** 2026-11-16, PR #14; resolved.

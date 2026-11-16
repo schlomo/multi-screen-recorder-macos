@@ -22,34 +22,34 @@ import Testing
 
     @Test func atTheStartTheAudioModesInputsAndTheSystemAudioStartAtOnce() {
         var tracker = AudioTracker(settings: settings(.wired, systemAudio: true))
-        let step = tracker.begin(inputs: [builtIn, usb, headset], mainDisplayID: 1, displays: [1], at: 0)
+        let step = tracker.begin(inputs: [builtIn, usb, headset], mainDisplayID: 1, screens: [1], at: 0)
         #expect(step.events.isEmpty)
         #expect(step.actions == [
-            .startInput(uid: "BuiltIn", name: "MacBook Pro Microphone"),
-            .startInput(uid: "Razer", name: "Razer Seiren V3 Mini"),
+            .startInput(uid: "BuiltIn", number: 1, name: "MacBook Pro Microphone"),
+            .startInput(uid: "Razer", number: 2, name: "Razer Seiren V3 Mini"),
             .startSystemAudio,
         ])
     }
 
     @Test func theAudioModeNoneRecordsNoInput() {
         var tracker = AudioTracker(settings: settings(.none))
-        #expect(tracker.begin(inputs: [builtIn, usb], mainDisplayID: 1, displays: [1], at: 0) == AudioTracker.Step())
+        #expect(tracker.begin(inputs: [builtIn, usb], mainDisplayID: 1, screens: [1], at: 0) == AudioTracker.Step())
         #expect(tracker.nextDueTime() == nil)
     }
 
     @Test func anInputThatAppearsStartsAfterTheSettleTime() {
         var tracker = AudioTracker(settings: settings(.wired))
-        _ = tracker.begin(inputs: [builtIn], mainDisplayID: 1, displays: [1], at: 0)
+        _ = tracker.begin(inputs: [builtIn], mainDisplayID: 1, screens: [1], at: 0)
         let appeared = tracker.observe([builtIn, usb], at: 5 * second)
         #expect(names(appeared.events) == ["audio input connected: Razer Seiren V3 Mini"])
         #expect(appeared.actions.isEmpty)
         #expect(tracker.nextDueTime() == 6 * second)
-        #expect(tracker.due(at: 6 * second).actions == [.startInput(uid: "Razer", name: "Razer Seiren V3 Mini")])
+        #expect(tracker.due(at: 6 * second).actions == [.startInput(uid: "Razer", number: 2, name: "Razer Seiren V3 Mini")])
     }
 
     @Test func anInputThatDisconnectsEndsItsFileAndAReplugStartsANewOne() {
         var tracker = AudioTracker(settings: settings(.wired))
-        _ = tracker.begin(inputs: [builtIn, usb], mainDisplayID: 1, displays: [1], at: 0)
+        _ = tracker.begin(inputs: [builtIn, usb], mainDisplayID: 1, screens: [1], at: 0)
         // The capture sees the unplug first, the device list follows.
         let ended = tracker.captureEnded(.input("Razer"), .disconnected, at: 10 * second)
         #expect(names(ended.events) == ["audio input disconnected: Razer Seiren V3 Mini"])
@@ -60,12 +60,12 @@ import Testing
         #expect(tracker.sourcesShown.first { $0.id == .input("Razer") }?.state == .disconnected)
         let back = tracker.observe([builtIn, usb], at: 27 * second)
         #expect(names(back.events) == ["audio input connected: Razer Seiren V3 Mini"])
-        #expect(tracker.due(at: 28 * second).actions == [.startInput(uid: "Razer", name: "Razer Seiren V3 Mini")])
+        #expect(tracker.due(at: 28 * second).actions == [.startInput(uid: "Razer", number: 2, name: "Razer Seiren V3 Mini")])
     }
 
     @Test func anInputGoneFromTheListIsStoppedWithItsEvent() {
         var tracker = AudioTracker(settings: settings(.wired))
-        _ = tracker.begin(inputs: [builtIn, usb], mainDisplayID: 1, displays: [1], at: 0)
+        _ = tracker.begin(inputs: [builtIn, usb], mainDisplayID: 1, screens: [1], at: 0)
         let gone = tracker.observe([builtIn], at: 3 * second)
         #expect(names(gone.events) == ["audio input disconnected: Razer Seiren V3 Mini"])
         #expect(gone.actions == [.stop(.input("Razer"))])
@@ -75,8 +75,8 @@ import Testing
 
     @Test func theDefaultMicrophoneIsFollowed() {
         var tracker = AudioTracker(settings: settings(.defaultMicrophone))
-        #expect(tracker.begin(inputs: [builtIn, usb], mainDisplayID: 1, displays: [1], at: 0).actions
-            == [.startInput(uid: "BuiltIn", name: "MacBook Pro Microphone")])
+        #expect(tracker.begin(inputs: [builtIn, usb], mainDisplayID: 1, screens: [1], at: 0).actions
+            == [.startInput(uid: "BuiltIn", number: 1, name: "MacBook Pro Microphone")])
         var newBuiltIn = builtIn
         newBuiltIn.isDefault = false
         var newUSB = usb
@@ -86,12 +86,12 @@ import Testing
         #expect(changed.events.first?.from == "MacBook Pro Microphone")
         #expect(changed.events.first?.to == "Razer Seiren V3 Mini")
         #expect(changed.actions == [.stop(.input("BuiltIn"))])
-        #expect(tracker.due(at: 5 * second).actions == [.startInput(uid: "Razer", name: "Razer Seiren V3 Mini")])
+        #expect(tracker.due(at: 5 * second).actions == [.startInput(uid: "Razer", number: 2, name: "Razer Seiren V3 Mini")])
     }
 
     @Test func aFailingCaptureIsAFailureAndStartsAgainWithTheBackOff() {
         var tracker = AudioTracker(settings: settings(.defaultMicrophone))
-        _ = tracker.begin(inputs: [builtIn], mainDisplayID: 1, displays: [1], at: 0)
+        _ = tracker.begin(inputs: [builtIn], mainDisplayID: 1, screens: [1], at: 0)
         let failed = tracker.captureEnded(.input("BuiltIn"), .captureFailed("boom"), at: 2 * second)
         #expect(names(failed.events) == ["audio input failed: MacBook Pro Microphone"])
         #expect(failed.events.first?.error == "boom")
@@ -110,12 +110,12 @@ import Testing
         #expect(RecordingEvent.Kind.systemAudioFailed.isFailure)
     }
 
-    @Test func theSystemAudioMovesToTheNewMainDisplayWhenItsDisplayGoes() {
+    @Test func theSystemAudioMovesToTheNewMainScreenWhenItsScreenGoes() {
         var tracker = AudioTracker(settings: settings(.none, systemAudio: true))
-        #expect(tracker.begin(inputs: [], mainDisplayID: 1, displays: [1], at: 0).actions == [.startSystemAudio])
+        #expect(tracker.begin(inputs: [], mainDisplayID: 1, screens: [1], at: 0).actions == [.startSystemAudio])
         tracker.systemAudioCaptures(displayID: 1)
-        #expect(tracker.observeDisplays(mainDisplayID: 1, connected: [1, 2], at: second) == AudioTracker.Step())
-        let moved = tracker.observeDisplays(mainDisplayID: 2, connected: [2], at: 2 * second)
+        #expect(tracker.observeScreens(mainDisplayID: 1, connected: [1, 2], at: second) == AudioTracker.Step())
+        let moved = tracker.observeScreens(mainDisplayID: 2, connected: [2], at: 2 * second)
         #expect(names(moved.events) == ["system audio stopped: System audio"])
         #expect(moved.actions == [.stop(.systemAudio)])
         let started = tracker.due(at: 3 * second)
@@ -123,21 +123,21 @@ import Testing
         #expect(started.actions == [.startSystemAudio])
     }
 
-    @Test func anEventAboutAnAudioSourceNamesItAsAudioSourceNeverAsDisplay() {
+    @Test func anEventAboutAnAudioSourceNamesItAsAudioSourceNeverAsScreen() {
         var tracker = AudioTracker(settings: settings(.wired))
-        _ = tracker.begin(inputs: [builtIn], mainDisplayID: 1, displays: [1], at: 0)
+        _ = tracker.begin(inputs: [builtIn], mainDisplayID: 1, screens: [1], at: 0)
         let appeared = tracker.observe([builtIn, usb], at: second).events
         #expect(appeared.map(\.audioSource) == ["Razer Seiren V3 Mini"])
-        #expect(appeared.map(\.display) == [nil])
+        #expect(appeared.map(\.screen) == [nil])
     }
 
     @Test func anInputLostAgainWithoutADeviceChangeIsAFailure() {
         var tracker = AudioTracker(settings: settings(.wired))
-        _ = tracker.begin(inputs: [builtIn, usb], mainDisplayID: 1, displays: [1], at: 0)
+        _ = tracker.begin(inputs: [builtIn, usb], mainDisplayID: 1, screens: [1], at: 0)
         #expect(names(tracker.captureEnded(.input("Razer"), .disconnected, at: second).events)
             == ["audio input disconnected: Razer Seiren V3 Mini"])
         // Still listed: tried again after the back-off, and lost again with no notice.
-        #expect(tracker.due(at: 2 * second).actions == [.startInput(uid: "Razer", name: "Razer Seiren V3 Mini")])
+        #expect(tracker.due(at: 2 * second).actions == [.startInput(uid: "Razer", number: 2, name: "Razer Seiren V3 Mini")])
         let again = tracker.captureEnded(.input("Razer"), .disconnected, at: 3 * second)
         #expect(names(again.events) == ["audio input failed: Razer Seiren V3 Mini"])
         #expect(again.events.first?.error == AudioTracker.sourceLostAgain(.input("Razer")))
@@ -148,7 +148,7 @@ import Testing
 
     @Test func anInputLostAfterTheDeviceListChangedIsNoFailure() {
         var tracker = AudioTracker(settings: settings(.wired))
-        _ = tracker.begin(inputs: [builtIn, usb], mainDisplayID: 1, displays: [1], at: 0)
+        _ = tracker.begin(inputs: [builtIn, usb], mainDisplayID: 1, screens: [1], at: 0)
         _ = tracker.captureEnded(.input("Razer"), .disconnected, at: second)
         _ = tracker.observe([builtIn], at: 2 * second)
         _ = tracker.observe([builtIn, usb], at: 3 * second)
@@ -157,34 +157,34 @@ import Testing
             == ["audio input disconnected: Razer Seiren V3 Mini"])
     }
 
-    @Test func theSystemAudioLostAgainWithoutADisplayChangeIsAFailure() {
+    @Test func theSystemAudioLostAgainWithoutAScreenChangeIsAFailure() {
         var tracker = AudioTracker(settings: settings(.none, systemAudio: true))
-        _ = tracker.begin(inputs: [], mainDisplayID: 1, displays: [1], at: 0)
+        _ = tracker.begin(inputs: [], mainDisplayID: 1, screens: [1], at: 0)
         #expect(names(tracker.captureEnded(.systemAudio, .disconnected, at: second).events) == ["system audio stopped: System audio"])
         #expect(tracker.due(at: 2 * second).actions == [.startSystemAudio])
         let again = tracker.captureEnded(.systemAudio, .disconnected, at: 3 * second)
         #expect(names(again.events) == ["system audio failed: System audio"])
         #expect(again.events.first?.error == AudioTracker.sourceLostAgain(.systemAudio))
-        // After a display change, a lost stream is a move again, no failure.
+        // After a screen change, a lost stream is a move again, no failure.
         #expect(tracker.due(at: 10 * second).actions == [.startSystemAudio])
-        _ = tracker.observeDisplays(mainDisplayID: 2, connected: [1, 2], at: 11 * second)
+        _ = tracker.observeScreens(mainDisplayID: 2, connected: [1, 2], at: 11 * second)
         #expect(names(tracker.captureEnded(.systemAudio, .disconnected, at: 12 * second).events) == ["system audio stopped: System audio"])
     }
 
-    @Test func theFirstDisplayChangeAfterTheStartLetsTheSystemAudioBeLostAgain() {
+    @Test func theFirstScreenChangeAfterTheStartLetsTheSystemAudioBeLostAgain() {
         var tracker = AudioTracker(settings: settings(.none, systemAudio: true))
-        _ = tracker.begin(inputs: [], mainDisplayID: 1, displays: [1, 2], at: 0)
-        // The main display unplugged: the stream ends before the display notice.
+        _ = tracker.begin(inputs: [], mainDisplayID: 1, screens: [1, 2], at: 0)
+        // The main screen unplugged: the stream ends before the screen notice.
         #expect(names(tracker.captureEnded(.systemAudio, .disconnected, at: second).events) == ["system audio stopped: System audio"])
-        _ = tracker.observeDisplays(mainDisplayID: 2, connected: [2], at: second + second / 2)
+        _ = tracker.observeScreens(mainDisplayID: 2, connected: [2], at: second + second / 2)
         #expect(tracker.due(at: 3 * second).actions == [.startSystemAudio])
-        // The new main display unplugged too, its stream again ending before the notice.
+        // The new main screen unplugged too, its stream again ending before the notice.
         #expect(names(tracker.captureEnded(.systemAudio, .disconnected, at: 4 * second).events) == ["system audio stopped: System audio"])
     }
 
     @Test func aWriterThatFellBehindIsAFailureAndStartsAgain() {
         var tracker = AudioTracker(settings: settings(.defaultMicrophone))
-        _ = tracker.begin(inputs: [builtIn], mainDisplayID: 1, displays: [1], at: 0)
+        _ = tracker.begin(inputs: [builtIn], mainDisplayID: 1, screens: [1], at: 0)
         let behind = tracker.captureEnded(.input("BuiltIn"), .writerFellBehind, at: second)
         #expect(names(behind.events) == ["audio file writer fell behind: MacBook Pro Microphone"])
         #expect(behind.events.first?.event.isFailure == true)
@@ -193,7 +193,7 @@ import Testing
 
     @Test func aFormerDefaultMicrophoneDefaultAgainWaitsTheSettleTime() {
         var tracker = AudioTracker(settings: settings(.defaultMicrophone))
-        _ = tracker.begin(inputs: [builtIn, usb], mainDisplayID: 1, displays: [1], at: 0)
+        _ = tracker.begin(inputs: [builtIn, usb], mainDisplayID: 1, screens: [1], at: 0)
         var otherBuiltIn = builtIn
         otherBuiltIn.isDefault = false
         var defaultUSB = usb
@@ -204,12 +204,12 @@ import Testing
         #expect(back.actions == [.stop(.input("Razer"))])
         #expect(tracker.due(at: 8 * second).actions.isEmpty)
         #expect(tracker.nextDueTime() == 9 * second)
-        #expect(tracker.due(at: 9 * second).actions == [.startInput(uid: "BuiltIn", name: "MacBook Pro Microphone")])
+        #expect(tracker.due(at: 9 * second).actions == [.startInput(uid: "BuiltIn", number: 1, name: "MacBook Pro Microphone")])
     }
 
     @Test func aFullDiskWaitsForRoom() {
         var tracker = AudioTracker(settings: settings(.defaultMicrophone))
-        _ = tracker.begin(inputs: [builtIn], mainDisplayID: 1, displays: [1], at: 0)
+        _ = tracker.begin(inputs: [builtIn], mainDisplayID: 1, screens: [1], at: 0)
         #expect(names(tracker.captureEnded(.input("BuiltIn"), .diskFull, at: second).events) == ["disk full: MacBook Pro Microphone"])
         #expect(tracker.isWaitingForRoom)
         #expect(tracker.due(at: 10 * second).actions.isEmpty)
@@ -219,32 +219,50 @@ import Testing
 
     @Test func aChannelCountChangeStartsANewFile() {
         var tracker = AudioTracker(settings: settings(.defaultMicrophone))
-        _ = tracker.begin(inputs: [builtIn], mainDisplayID: 1, displays: [1], at: 0)
+        _ = tracker.begin(inputs: [builtIn], mainDisplayID: 1, screens: [1], at: 0)
         var stereo = builtIn
         stereo.channelCount = .success(2)
         #expect(tracker.observe([stereo], at: second).actions == [.stop(.input("BuiltIn"))])
-        #expect(tracker.due(at: 2 * second).actions == [.startInput(uid: "BuiltIn", name: "MacBook Pro Microphone")])
+        #expect(tracker.due(at: 2 * second).actions == [.startInput(uid: "BuiltIn", number: 1, name: "MacBook Pro Microphone")])
     }
 
     @Test func anInputWithoutAUIDCannotBeRecordedAndSaysSo() {
         var tracker = AudioTracker(settings: settings(.defaultMicrophone))
         var noUID = builtIn
         noUID.uid = nil
-        #expect(tracker.begin(inputs: [noUID], mainDisplayID: 1, displays: [1], at: 0).notRecordable == ["MacBook Pro Microphone"])
+        #expect(tracker.begin(inputs: [noUID], mainDisplayID: 1, screens: [1], at: 0).notRecordable == ["MacBook Pro Microphone"])
     }
 
-    @Test func twoInputsWithTheSameNameAreNumbered() {
+    @Test func twoInputsWithTheSameNameGetTheirOwnNumbersAndKeepTheName() {
         var tracker = AudioTracker(settings: settings(.allInputs))
         let twin = AudioInputInfo(name: "MacBook Pro Microphone", channelCount: 1, isDefault: false, transport: .usb, uid: "Twin")
-        #expect(tracker.begin(inputs: [builtIn, twin], mainDisplayID: 1, displays: [1], at: 0).actions == [
-            .startInput(uid: "BuiltIn", name: "MacBook Pro Microphone"),
-            .startInput(uid: "Twin", name: "MacBook Pro Microphone (2)"),
+        #expect(tracker.begin(inputs: [builtIn, twin], mainDisplayID: 1, screens: [1], at: 0).actions == [
+            .startInput(uid: "BuiltIn", number: 1, name: "MacBook Pro Microphone"),
+            .startInput(uid: "Twin", number: 2, name: "MacBook Pro Microphone"),
         ])
+    }
+
+    @Test func inputsAreNumberedInOrderOfAppearanceAndOneThatComesBackKeepsItsNumber() {
+        var tracker = AudioTracker(settings: settings(.wired))
+        _ = tracker.begin(inputs: [usb], mainDisplayID: 1, screens: [1], at: 0)
+        _ = tracker.observe([], at: 2 * second)
+        _ = tracker.observe([headset, builtIn], at: 3 * second)
+        #expect(tracker.due(at: 4 * second).actions == [.startInput(uid: "BuiltIn", number: 2, name: "MacBook Pro Microphone")])
+        _ = tracker.observe([usb, builtIn], at: 10 * second)
+        #expect(tracker.due(at: 11 * second).actions == [.startInput(uid: "Razer", number: 1, name: "Razer Seiren V3 Mini")])
+        #expect(tracker.sourcesShown.map(\.number) == [1, 2])
+    }
+
+    @Test func theSystemAudioIsNumberZero() {
+        var tracker = AudioTracker(settings: settings(.none, systemAudio: true))
+        _ = tracker.begin(inputs: [], mainDisplayID: 1, screens: [1], at: 0)
+        #expect(tracker.sourcesShown.map(\.number) == [0])
+        #expect(tracker.sourcesShown.map(\.label) == ["Audio 0 - System"])
     }
 
     @Test func sleepEndsEveryAudioFileAndWakeStartsThemAgain() {
         var tracker = AudioTracker(settings: settings(.defaultMicrophone, systemAudio: true))
-        _ = tracker.begin(inputs: [builtIn], mainDisplayID: 1, displays: [1], at: 0)
+        _ = tracker.begin(inputs: [builtIn], mainDisplayID: 1, screens: [1], at: 0)
         #expect(tracker.sleep() == [.stop(.input("BuiltIn")), .stop(.systemAudio)])
         #expect(tracker.nextDueTime() == nil)
         let woke = tracker.wake([builtIn], at: 100 * second)
