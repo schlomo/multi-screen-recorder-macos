@@ -64,6 +64,8 @@ def main() -> None:
         case ["--build-date"]:
             print(commit_date_utc().isoformat())
             return
+        case ["--build-date", extra, *_]:
+            stop(f"--build-date takes no further argument, not '{extra}'")
         case [argument, *_]:
             stop(f"unknown argument '{argument}'; the only one is --build-date")
     release_build = os.environ.get("RELEASE_BUILD", "")

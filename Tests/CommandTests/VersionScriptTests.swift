@@ -129,6 +129,15 @@ import Testing
         #expect(outcome.errors.contains("unknown argument '--bogus'"))
     }
 
+    @Test func buildDateTakesNoFurtherArgument() async throws {
+        defer { scratch.remove() }
+        let outcome = try await run(try clone().appending(path: "scripts/version"), ["--build-date", "extra"],
+                                    environment: [:], in: scratch.url)
+        #expect(outcome.status == 1)
+        #expect(outcome.output.isEmpty)
+        #expect(outcome.errors.contains("--build-date takes no further argument, not 'extra'"), "\(outcome.errors)")
+    }
+
     @Test func aCommitJustAfterMidnightUTCIsOfThatDay() async throws {
         defer { scratch.remove() }
         let work = try await clone()

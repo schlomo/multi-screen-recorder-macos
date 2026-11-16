@@ -51,9 +51,12 @@ import Testing
         AudioInputInfo(name: "AirPods Pro", channelCount: 1, isDefault: false, transport: .bluetooth, uid: "C"),
     ]
 
+    /// Holds each start window model's own home folder; a test that makes one removes it at its end.
+    private let home = FileManager.default.temporaryDirectory.appending(path: "WindowWidth-\(UUID().uuidString)", directoryHint: .isDirectory)
+
     /// The start window's model with stand-in probes, its ready check run and the settings changed.
-    private func startModel(screens: [ScreenInfo], inputs: [AudioInputInfo], _ edit: (inout RecorderLogic.Settings) -> Void = { _ in }) async -> StartModel {
-        let home = FileManager.default.temporaryDirectory.appending(path: "WindowWidth-\(UUID().uuidString)", directoryHint: .isDirectory)
+    private func startModel(screens: [ScreenInfo], inputs: [AudioInputInfo], _ edit: (inout RecorderLogic.Settings) -> Void = { _ in }) async throws -> StartModel {
+        let home = home.appending(path: UUID().uuidString, directoryHint: .isDirectory)
         let probes = ReadyCheckProbes(
             screenRecording: { _ in .granted }, microphonePermission: { true },
             screens: { .success(screens) }, audioInputs: { .success(inputs) },
@@ -62,6 +65,7 @@ import Testing
         model.load()
         model.change(edit)
         for _ in 0..<600 where model.isChecking || model.readyCheck == nil { try? await Task.sleep(for: .milliseconds(5)) }
+        try #require(model.readyCheck != nil && !model.isChecking, "the ready check did not finish within 3 s")
         return model
     }
 
@@ -69,16 +73,18 @@ import Testing
         StartView(model: model) {}
     }
 
-    @Test func aSettingDoesNotChangeTheStartWindowsWidth() async {
-        let auto = await startModel(screens: Self.screens, inputs: Self.inputs) { $0.auto = true }
-        let none = await startModel(screens: Self.screens, inputs: Self.inputs) { $0.auto = false; $0.audioMode = .none }
-        let all = await startModel(screens: Self.screens, inputs: Self.inputs) { $0.auto = false; $0.audioMode = .allInputs }
+    @Test func aSettingDoesNotChangeTheStartWindowsWidth() async throws {
+        defer { try? FileManager.default.removeItem(at: home) }
+        let auto = try await startModel(screens: Self.screens, inputs: Self.inputs) { $0.auto = true }
+        let none = try await startModel(screens: Self.screens, inputs: Self.inputs) { $0.auto = false; $0.audioMode = .none }
+        let all = try await startModel(screens: Self.screens, inputs: Self.inputs) { $0.auto = false; $0.audioMode = .allInputs }
         let widths = [width(start(auto)), width(start(none)), width(start(all))]
         #expect(Set(widths).count == 1, "\(widths)")
     }
 
     @Test func theStartWindowIsAsWideAsItsTableAndTheTextBelowWraps() async throws {
-        let model = await startModel(screens: Self.screens, inputs: Self.inputs)
+        defer { try? FileManager.default.removeItem(at: home) }
+        let model = try await startModel(screens: Self.screens, inputs: Self.inputs)
         let section = try #require(model.whatWillBeRecorded)
         let tableWidth = width(WhatWillBeRecordedView(section: section, outputFolder: model.settings.outputFolder) {})
         #expect(tableWidth > width(AppHeader()))
@@ -90,7 +96,8 @@ import Testing
     }
 
     @Test func whenTheTaglineHeaderIsWiderThanTheTableItSetsTheWidth() async throws {
-        let model = await startModel(screens: Self.shortScreens, inputs: [])
+        defer { try? FileManager.default.removeItem(at: home) }
+        let model = try await startModel(screens: Self.shortScreens, inputs: [])
         let section = try #require(model.whatWillBeRecorded)
         let tableWidth = width(WhatWillBeRecordedView(section: section, outputFolder: model.settings.outputFolder) {})
         #expect(width(AppHeader()) > tableWidth)

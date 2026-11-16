@@ -179,20 +179,19 @@ saves, so a fresh Mac has none and the defaults apply:
 Items, in this order: the Screen & System Audio Recording permission,
 the Microphone permission (only when the recording records at least one
 audio input: with no audio input present, or none recorded under the
-audio mode, the item is left out and the permission is neither asked
-nor read), the screens (at least one, each
-readable), the chosen audio sources (each audio input the audio mode
-records readable; another that cannot be read does not count; with an
-audio mode but `none` the item says "no microphone recorded" when no
-input is recorded, such as on a Mac without any audio input or with
-only inputs the audio mode leaves out or that have no Core Audio UID,
-and passes: no microphone works in every audio mode, the screens and
-the system audio are recorded as usual, and the item then reads
-`Audio: no microphone recorded, system audio`, or `Audio: no
-microphone recorded, no system audio` with system audio off; an input that is recorded and whose channels cannot be read
-fails it), the output
-folder, and free disk space in the output folder for
-`requiredRecordingHours`.
+audio mode, the item is left out and the permission is neither asked nor
+read), the screens (at least one, each readable), the chosen audio
+sources (each audio input the audio mode records readable; another that
+cannot be read does not count; with an audio mode but `none` the item
+says "no microphone recorded" when no input is recorded, such as on a
+Mac without any audio input or with only inputs the audio mode leaves
+out or that have no Core Audio UID, and passes: no microphone works in
+every audio mode, the screens and the system audio are recorded as
+usual, and the item then reads `Audio: no microphone recorded, system
+audio`, or `Audio: no microphone recorded, no system audio` with system
+audio off; an input that is recorded and whose channels cannot be read
+fails it), the output folder, and free disk space in the output folder
+for `requiredRecordingHours`.
 
 - A permission that was never asked for is requested, so macOS shows
   its prompt; a denied one is reported with the System Settings path.
@@ -627,16 +626,16 @@ checked, reported or rewritten at the next start (D47).
   then a row per audio source the recording records or recorded (the
   audio inputs by number, the system audio last), and the columns Source
   (as in the start window: the kind's icon, the number and the name),
-  "Records at" (a screen's frame size; an audio source's `1 channel`,
-  `2 channels` or `stereo`), Files, Written (its files on disk, below
-  1 GB in whole MB, from there in GB with one decimal) and
-  State (`recording`, `waiting`, `failed, retrying`, `shows another
-  screen`, `disk full`, `mirroring`, `disconnected`, `asleep`, and for
-  an audio input no longer in the audio mode, such as the default
-  microphone before a change, `not recorded`); under it the line
-  "Recording 1:07:00 · 1.3 GB in 3 files · 120.4 GB free", the elapsed
-  time as `h:mm:ss` (D47) and the sizes as in Written; then "CPU 23 %", our process's CPU use in
-  percent of one core as Activity Monitor shows it, sampled every
+  "Records at" (a screen's frame size; an audio source's `1 channel`, `2
+  channels` or `stereo`), Files, Written (its files on disk, below 1 GB
+  in whole MB, from there in GB with one decimal) and State
+  (`recording`, `waiting`, `failed, retrying`, `shows another screen`,
+  `disk full`, `mirroring`, `disconnected`, `asleep`, and for an audio
+  input no longer in the audio mode, such as the default microphone
+  before a change, `not recorded`); under it the line "Recording 1:07:00
+  · 1.3 GB in 3 files · 120.4 GB free", the elapsed time as `h:mm:ss`
+  (D47) and the sizes as in Written; then "CPU 23 %", our process's CPU
+  use in percent of one core as Activity Monitor shows it, sampled every
   second, with the line "Encoding and capture also run in macOS's own
   processes (VTEncoderXPCService, replayd, WindowServer), which this
   number does not include."; the problems in red, with the command for
@@ -648,16 +647,15 @@ checked, reported or rewritten at the next start (D47).
   possible content (`8888×8888`, `888`, `888.8 GB`, and the longest of
   every State's text, `RecordingStatusTable.StateText`), so the width
   stays the same during a recording and changes only with the source
-  names. Esc presses Continue; Return presses Stop. It refreshes every second
-  while open; Continue closes it. A screen file whose size cannot be
-  read makes its screen's Written `?`, and the line's data written
-  `? GB`. Free space that the volume does not report is a problem as a
-  failing read is. A problem goes into the
-  recording manifest, which is written at once (unless writing it is
-  the problem); one that repeats, such as the free space that cannot be
-  read on every check, is told once (one manifest entry, one red line,
-  one line on standard error, one bounce) until it clears, and again if
-  it comes back.
+  names. Esc presses Continue; Return presses Stop. It refreshes every
+  second while open; Continue closes it. A screen file whose size cannot
+  be read makes its screen's Written `?`, and the line's data written `?
+  GB`. Free space that the volume does not report is a problem as a
+  failing read is. A problem goes into the recording manifest, which is
+  written at once (unless writing it is the problem); one that repeats,
+  such as the free space that cannot be read on every check, is told
+  once (one manifest entry, one red line, one line on standard error,
+  one bounce) until it clears, and again if it comes back.
 - **Stop:** Stop in the status window finalizes, opens the recording folder itself
   in Finder (D46) and quits the app: a recording is typically one shot (D45).
   Logout, restart and shutdown finalize without asking, told apart from
