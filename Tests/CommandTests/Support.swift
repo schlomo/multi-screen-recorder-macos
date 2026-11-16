@@ -8,12 +8,50 @@ struct CommandOutcome {
     let errors: String
 }
 
+/// How many programs the tests run at once: one per processor. Waiting off
+/// the pool lets every test start its program together, over a hundred at
+/// once, which starves the timing of the other tests in the process.
+actor ProgramSlots {
+    static let shared = ProgramSlots(ProcessInfo.processInfo.activeProcessorCount)
+
+    private var free: Int
+    private var waiting: [CheckedContinuation<Void, Never>] = []
+
+    init(_ count: Int) { free = count }
+
+    func take() async {
+        if free > 0 {
+            free -= 1
+        } else {
+            await withCheckedContinuation { waiting.append($0) }
+        }
+    }
+
+    func give() {
+        if waiting.isEmpty { free += 1 } else { waiting.removeFirst().resume() }
+    }
+}
+
 /// Runs a program with exactly the given environment, so nothing of the
 /// ambient one leaks into what is tested; PATH is passed through. Output and
 /// errors go to files, so a child filling either cannot block on a full pipe.
-/// Waits for the program's end without blocking a thread of the test's pool.
+/// Waits for the program's end without blocking a thread of the test's pool,
+/// and for a free slot (`ProgramSlots`) before it starts.
 func run(_ program: URL, _ arguments: [String] = [], environment: [String: String] = [:],
          in folder: URL? = nil) async throws -> CommandOutcome {
+    await ProgramSlots.shared.take()
+    do {
+        let outcome = try await runInSlot(program, arguments, environment: environment, in: folder)
+        await ProgramSlots.shared.give()
+        return outcome
+    } catch {
+        await ProgramSlots.shared.give()
+        throw error
+    }
+}
+
+private func runInSlot(_ program: URL, _ arguments: [String], environment: [String: String],
+                       in folder: URL?) async throws -> CommandOutcome {
     let process = Process()
     process.executableURL = program
     process.arguments = arguments

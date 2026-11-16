@@ -36,18 +36,31 @@ import Testing
     }
 
     final class StandInWriter: AudioFileWriting, @unchecked Sendable {
-        private let state = Mutex<(isReady: Bool, samples: Int64, silence: Int64, endPosition: Int64??)>((true, 0, 0, nil))
+        private let state = Mutex<(isReady: Bool, refusalsLeft: Int?, samples: Int64, silence: Int64, endPosition: Int64??)>(
+            (true, nil, 0, 0, nil))
 
         var isReady: Bool {
             get { state.withLock { $0.isReady } }
             set { state.withLock { $0.isReady = newValue } }
         }
 
+        /// Refuses the next `refusals` appends, then takes every one: ready
+        /// on an event, never after a time, so a slow machine changes nothing.
+        func becomesReady(afterRefusals refusals: Int) {
+            state.withLock { $0.refusalsLeft = refusals }
+        }
+
+        var refusalsLeft: Int? { state.withLock { $0.refusalsLeft } }
         var samples: Int64 { state.withLock { $0.samples } }
         var endPosition: Int64?? { state.withLock { $0.endPosition } }
 
         func append(_ channels: [[Float]], at position: Int64) throws(AudioFileWriterError) -> Bool {
             state.withLock { state in
+                if let left = state.refusalsLeft, !state.isReady {
+                    state.refusalsLeft = left - 1
+                    if left > 0 { return false }
+                    state.isReady = true
+                }
                 guard state.isReady else { return false }
                 state.samples += Int64(channels[0].count)
                 return true
@@ -126,17 +139,17 @@ import Testing
         Int64(index * samplesPerBuffer) * 1_000_000_000 / Int64(RecorderValues.audioSampleRate)
     }
 
+    /// The writer takes the waiting samples only after Stop tried twice, so
+    /// the end waits for it; the bound is far away, as the bound itself is
+    /// `samplesTheWriterNeverTookAreNotCountedAndToldAsLost`'s.
     @Test func samplesStillWaitingAtTheEndAreWrittenBeforeTheFileIsFinalized() async throws {
-        let capture = capture()
+        let capture = capture(drainTimeout: .seconds(60))
         writer.isReady = false
         for index in 0..<3 { source.send(try buffer(at: time(ofBuffer: index))) }
         #expect(writer.samples == 0)
-        let writer = writer
-        Task {
-            try? await Task.sleep(for: .milliseconds(50))
-            writer.isReady = true
-        }
+        writer.becomesReady(afterRefusals: 2)
         await capture.stop()
+        #expect(writer.refusalsLeft == -1)
         let ends = reported.ended
         #expect(writer.samples == 3 * Int64(samplesPerBuffer))
         #expect(writer.endPosition == .some(3 * Int64(samplesPerBuffer)))

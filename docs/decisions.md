@@ -1551,13 +1551,15 @@ architect's reading.
      `AudioTracker.records`: the audio mode includes it and it has a
      Core Audio UID to open it by. The recording, the start window, the
      disk estimate, the ready check and `msr list` all use it, so an
-     input without a UID is neither numbered, counted nor listed. The
-     window may still number the screens differently from the recording
-     when a screen mirrors another, as the recording skips a mirroring
-     screen and the window does not check for one. That was left out
-     deliberately: whether macOS lists a mirroring screen to the window
-     at all is unchecked, and leaving one out would make the disk check
-     optimistic for a screen that stops mirroring during a recording.
+     input without a UID is neither numbered, counted nor listed. A
+     screen that mirrors another is left out by both the recording and
+     the window, so they number the screens alike: the recording skips
+     it, and macOS does not list it to the window at all. Observed on
+     the owner's Mac, 2026-11-16: with the DELL P3421W mirroring the
+     Wacom One 13T, `msr check` of `v0.20261116.40` listed only "1 Wacom
+     One 13T" and the ready check said "Displays: 1". The window has no
+     mirroring check of its own: a fix round added one and the architect
+     reverted it (KISS), as macOS already leaves the screen out.
 - **Consequences:** No settings or state migration: neither holds a
   changed key, and no code reads a recording manifest back. A manifest
   written by an earlier build keeps `display` and `displayUUID`. The

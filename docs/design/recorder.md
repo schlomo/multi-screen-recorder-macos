@@ -515,10 +515,12 @@ checked, reported or rewritten at the next start (D47).
     gets no number. Whether an audio input is recorded follows the
     recording's own rule (`AudioTracker.records`): the audio mode
     includes it and it has a Core Audio UID, so an input without one is
-    dimmed, unnumbered and left out of the total. The window may number
-    the screens differently from the recording when a screen mirrors
-    another: the recording skips a mirroring screen, the window does not
-    check for one (left out deliberately, D55). `msr check` prints the
+    dimmed, unnumbered and left out of the total. A screen that mirrors
+    another is left out by both, so they number the screens alike: the
+    recording skips it, and macOS does not list it to the window at all
+    (the owner's Mac, 2026-11-16: with the DELL P3421W mirroring the
+    Wacom One 13T, `msr check` of `v0.20261116.40` listed only "1 Wacom
+    One 13T"; D55). `msr check` prints the
     label as text instead (`Screen 1 - Built-in Retina Display`), the
     default input marked "(default)" after it
     (`Audio 1 - MacBook Pro Microphone (default)`).
