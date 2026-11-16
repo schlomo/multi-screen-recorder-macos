@@ -9,6 +9,8 @@ public protocol DisplayFileWriting: AnyObject {
     var firstTick: Int64 { get }
     /// False when the writer is not ready, so the tick waits.
     func append(_ frame: CVPixelBuffer, tick: Int64) throws(DisplayFileWriterError) -> Bool
+    /// False when the guide track is not ready, so the samples wait.
+    func appendGuide(_ guide: GuideTrack, _ channels: [[Float]], at position: Int64) throws(DisplayFileWriterError) -> Bool
     func finish(lastTick: Int64?) async throws(DisplayFileWriterError)
 }
 
@@ -40,6 +42,10 @@ public final class DisplayFileTicker {
     private var entry: RecordingManifest.DisplayFile?
     /// The writer's first error, for the manifest and the person.
     private var writerError: DisplayFileWriterError?
+    /// Guide track samples waiting for the writer, by their position in the file.
+    private var waitingGuides: [(guide: GuideTrack, position: Int64, channels: [[Float]])] = []
+    /// At most this many hand-overs wait per guide track; older ones are dropped.
+    private let guideWaitBound = Int(RecorderValues.lateTickBoundSeconds * 1000 / Int(RecorderValues.guideTrackInterval.nanoseconds / 1_000_000))
 
     /// `captureStart` in nanoseconds from t0: the file's first tick is never before it.
     public init(
@@ -71,10 +77,39 @@ public final class DisplayFileTicker {
         guard let writer else { return nil }
         do {
             let outcome = try ticks.advance(to: now) { tick, frame in try writer.append(frame, tick: tick) }
-            return outcome == .writerFellBehind ? .writerFellBehind : nil
+            if outcome == .writerFellBehind { return .writerFellBehind }
         } catch {
             return failed(error)
         }
+        return writeGuides(writer)
+    }
+
+    /// Guide track samples, one array per channel, the first at
+    /// `positionFromStart` samples from t0: the part within the file goes
+    /// to the writer, the part before its first tick is dropped.
+    public func receiveGuide(_ guide: GuideTrack, _ channels: [[Float]], positionFromStart: Int64) -> DisplayTracker.StreamEnd? {
+        guard let writer, writerError == nil else { return nil }
+        let fileStart = writer.firstTick * Int64(RecorderValues.audioSampleRate) / Int64(ticks.grid.framesPerSecond)
+        let before = Int(max(0, fileStart - positionFromStart))
+        guard let count = channels.first?.count, count > before else { return nil }
+        waitingGuides.append((guide, positionFromStart + Int64(before) - fileStart, channels.map { Array($0[before...]) }))
+        if waitingGuides.count(where: { $0.guide == guide }) > guideWaitBound,
+           let oldest = waitingGuides.firstIndex(where: { $0.guide == guide }) {
+            waitingGuides.remove(at: oldest)
+        }
+        return writeGuides(writer)
+    }
+
+    private func writeGuides(_ writer: any DisplayFileWriting) -> DisplayTracker.StreamEnd? {
+        do {
+            while let first = waitingGuides.first {
+                guard try writer.appendGuide(first.guide, first.channels, at: first.position) else { return nil }
+                waitingGuides.removeFirst()
+            }
+        } catch {
+            return failed(error)
+        }
+        return nil
     }
 
     private func failed(_ error: any Error) -> DisplayTracker.StreamEnd {
@@ -93,7 +128,9 @@ public final class DisplayFileTicker {
         if writerError == nil, writeWaitingTicks {
             _ = tick(now: now)
             if writerError == nil { await drain(writer) }
+            if writerError == nil { _ = writeGuides(writer) }
         }
+        waitingGuides = []
         do {
             try await writer.finish(lastTick: ticks.lastWrittenTick)
             file.state = .finalized

@@ -28,6 +28,10 @@ public struct PCMLayout: Equatable, Sendable {
 
 public struct PCMLayoutError: Error, Equatable, CustomStringConvertible {
     public let description: String
+
+    public init(description: String) {
+        self.description = description
+    }
 }
 
 /// Splits a buffer of PCM into one array of samples per channel, as

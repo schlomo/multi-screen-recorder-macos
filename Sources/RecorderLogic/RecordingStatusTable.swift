@@ -1,8 +1,8 @@
 import Foundation
 
-/// The status window of a running recording (D46): a row per display with
-/// its files, the data written and its state, and a line with the elapsed
-/// time, the data, the files and the free space.
+/// The status window of a running recording (D46): a row per display and
+/// per audio source with its files, the data written and its state, and a
+/// line with the elapsed time, the data, the files and the free space.
 public enum RecordingStatusTable {
     /// "1:07:00" for 1 hour 7 minutes: h:mm:ss (D47).
     public static func elapsed(_ seconds: Double) -> String {
@@ -46,6 +46,39 @@ public enum RecordingStatusTable {
                 files: own.count,
                 gigabytesWritten: written,
                 state: text(source.state))
+        }
+    }
+
+    /// The audio sources' rows, below the displays': Records at is the
+    /// channels of the source's newest audio file.
+    public static func audioRows(sources: [AudioTracker.Source], files: [RecordingManifest.AudioFile], bytes: [String: Int64]) -> [Row] {
+        sources.map { source in
+            let own = files.filter { file in
+                switch source.id {
+                case .input(let uid): file.audioSourceUID == uid
+                case .systemAudio: file.audioSourceUID == nil
+                }
+            }
+            let sizes = own.map { bytes[$0.name] }
+            let written: String = sizes.contains(nil) ? "?" : String(format: "%.1f", Double(sizes.compactMap(\.self).reduce(0, +)) / 1_000_000_000)
+            let channels: String = switch own.last?.channels {
+            case .mono(let count): count == 1 ? "1 channel" : "\(count) channels"
+            case .stereo: "stereo"
+            case nil: ""
+            }
+            return Row(source: source.name, recordsAt: channels, files: own.count, gigabytesWritten: written, state: text(source.state))
+        }
+    }
+
+    static func text(_ state: AudioTracker.Source.State) -> String {
+        switch state {
+        case .recording: "recording"
+        case .waiting: "waiting"
+        case .failedRetrying: "failed, retrying"
+        case .diskFull: "disk full"
+        case .disconnected: "disconnected"
+        case .notRecorded: "not recorded"
+        case .asleep: "asleep"
         }
     }
 

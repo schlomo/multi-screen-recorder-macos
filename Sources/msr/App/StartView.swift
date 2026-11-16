@@ -136,7 +136,6 @@ private struct WhatWillBeRecordedView: View {
             if let total = section.total { Text(total) }
             Text(section.outputFolder)
             Text(section.continuity).foregroundStyle(.secondary)
-            Text(ProductText.displaysOnly).foregroundStyle(.secondary)
         }
     }
 

@@ -15,7 +15,16 @@ import Testing
         private(set) var written: [Int64] = []
         private(set) var finishedAt: Int64??
 
+        private(set) var guides: [(GuideTrack, Int64, Int)] = []
+
         init(firstTick: Int64) { self.firstTick = firstTick }
+
+        func appendGuide(_ guide: GuideTrack, _ channels: [[Float]], at position: Int64) throws(DisplayFileWriterError) -> Bool {
+            if let appendError { throw appendError }
+            guard isReady else { return false }
+            guides.append((guide, position, channels[0].count))
+            return true
+        }
 
         func append(_ frame: CVPixelBuffer, tick: Int64) throws(DisplayFileWriterError) -> Bool {
             if let appendError { throw appendError }
@@ -62,6 +71,27 @@ import Testing
         #expect(end.file.end == grid.seconds(ofTick: 3))
         #expect(end.error == nil)
         #expect(writer()?.written == [0, 1, 2])
+    }
+
+    /// Guide samples are placed in the file from its first tick; those
+    /// before it are dropped, and those the writer cannot take wait.
+    @Test func guideSamplesArePlacedFromTheFilesFirstTick() throws {
+        let (ticker, writer) = ticker()
+        // Before a file: nothing.
+        #expect(ticker.receiveGuide(.microphones, [[0, 0]], positionFromStart: 0) == nil)
+        _ = ticker.receive(frame, capturedAt: grid.time(ofTick: 2) - 1)
+        let made = try #require(writer())
+        #expect(made.firstTick == 2)
+        let samplesPerTick = RecorderValues.audioSampleRate / RecorderValues.framesPerSecond
+        let chunk = [Float](repeating: 0, count: 4800)
+        _ = ticker.receiveGuide(.microphones, [chunk], positionFromStart: 0)
+        made.isReady = false
+        _ = ticker.receiveGuide(.systemAudio, [chunk, chunk], positionFromStart: 4800)
+        made.isReady = true
+        #expect(ticker.tick(now: grid.time(ofTick: 2)) == nil)
+        #expect(made.guides.map(\.0) == [.microphones, .systemAudio])
+        #expect(made.guides.map(\.1) == [0, Int64(4800 - 2 * samplesPerTick)])
+        #expect(made.guides.map(\.2) == [4800 - 2 * samplesPerTick, 4800])
     }
 
     @Test func aWriterErrorReachesTheFileEnd() async throws {

@@ -8,6 +8,13 @@ public enum ProblemKind: Hashable, Sendable {
     case displayNotCaptured(String)
     /// `msr record` could not show its Dock icon.
     case dockIconNotShown
+    case audioInputsNotRead
+    /// An audio input that is to be recorded and cannot be, by its name.
+    case audioInputNotRecordable(String)
+    /// An audio source whose capture failed, by its name; clears when a file of it starts.
+    case audioSourceFailed(String)
+    /// An audio file whose writer failed, by its name.
+    case audioFileFailed(String)
 }
 
 /// The problems a recording has told: each goes into the recording

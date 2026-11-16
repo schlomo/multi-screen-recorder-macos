@@ -330,6 +330,17 @@ import Testing
         #expect(summary.text.hasSuffix("Problem at 1m05s: The displays cannot be read: denied\n"))
     }
 
+    @Test func theSummaryListsTheAudioFilesAndTheCPUUse() {
+        var recorded = manifest([.finalized])
+        recorded.audioFiles = [RecordingManifest.AudioFile(
+            name: "a.mov", audioSource: "Mic", audioSourceUID: "u", channels: .mono(1), start: 0, timecode: "t")]
+        recorded.audioFiles[0].state = .finalized
+        recorded.cpu = RecordingManifest.CPU(averagePercent: 12.4, peakPercent: 31.6)
+        let summary = RecordingSummary(manifest: recorded, recordingFolder: "/r", seconds: 5, manifestWritten: true)
+        #expect(summary.text == "Recorded 5s into /r\n  f0.mov  finalized\n  a.mov  finalized\n"
+            + "CPU 12 % on average, 32 % at the peak, of one core (this process only)\n")
+    }
+
     @Test func aWriterThatFailedIsAnError() {
         var failed = RecordingEvent(at: 0, event: .displayFileWriterFailed, display: "LG")
         failed.error = "cannot write"

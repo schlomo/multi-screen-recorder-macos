@@ -71,8 +71,7 @@ final class RecordCommandDelegate: NSObject, NSApplicationDelegate {
         }
         let facts = await probeReadyCheckFacts(proof: .captureOneFrame, settings: settings, homeFolder: home)
         let result = ReadyCheck.evaluate(facts, settings: settings)
-        print(WhatWillBeRecorded(settings: settings, facts: facts).text, terminator: "")
-        print("  \(ProductText.displaysOnly)\n")
+        print(WhatWillBeRecorded(settings: settings, facts: facts).text)
         print(result.text, terminator: "")
         fflush(stdout)
         guard result.isReady else {

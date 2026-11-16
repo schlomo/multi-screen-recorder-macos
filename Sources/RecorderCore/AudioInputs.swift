@@ -80,6 +80,34 @@ public func watchAudioInputs(changed: @escaping @MainActor @Sendable () -> Void)
     }
 }
 
+/// Watches the audio devices and the default audio input while a recording
+/// runs: `changed` is called on the main actor for every change, until
+/// `cancel`.
+public final class AudioInputWatch {
+    private var listeners: [(AudioObjectPropertyAddress, AudioObjectPropertyListenerBlock)] = []
+
+    public init(changed: @escaping @MainActor @Sendable () -> Void) throws(DeviceReadError) {
+        for selector in [kAudioHardwarePropertyDevices, kAudioHardwarePropertyDefaultInputDevice] {
+            var address = address(selector)
+            let block: AudioObjectPropertyListenerBlock = { _, _ in Task { @MainActor in changed() } }
+            let status = AudioObjectAddPropertyListenerBlock(systemObject, &address, .main, block)
+            guard status == noErr else {
+                cancel()
+                throw DeviceReadError("changes of the audio devices cannot be watched (Core Audio error \(status))")
+            }
+            listeners.append((address, block))
+        }
+    }
+
+    public func cancel() {
+        for (address, block) in listeners {
+            var address = address
+            AudioObjectRemovePropertyListenerBlock(systemObject, &address, .main, block)
+        }
+        listeners = []
+    }
+}
+
 private let systemObject = AudioObjectID(kAudioObjectSystemObject)
 
 private func address(
