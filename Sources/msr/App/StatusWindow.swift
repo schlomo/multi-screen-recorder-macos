@@ -61,7 +61,14 @@ struct StatusView: View {
         WidthSettingStack(spacing: 12) {
             Grid(alignment: .leading, horizontalSpacing: 16, verticalSpacing: 4) {
                 GridRow {
-                    ForEach(RecordingStatusTable.columns, id: \.self) { Text($0).font(.headline) }
+                    ForEach(Array(RecordingStatusTable.columns.enumerated()), id: \.offset) { column, header in
+                        if column == 0 {
+                            Text(header).font(.headline)
+                        } else {
+                            Text(header).font(.headline)
+                                .frame(minWidth: TableLayout.statusColumnWidths[column - 1], alignment: Alignment(horizontal: Self.alignment(column), vertical: .center))
+                        }
+                    }
                 }
                 Divider()
                 ForEach(Array(model.rows.enumerated()), id: \.offset) { _, row in
@@ -71,7 +78,7 @@ struct StatusView: View {
                             Text(cell)
                                 .lineLimit(1)
                                 .monospacedDigit()
-                                .gridColumnAlignment(offset == 1 || offset == 2 ? .trailing : .leading)
+                                .gridColumnAlignment(Self.alignment(offset + 1))
                         }
                     }
                 }
@@ -106,5 +113,10 @@ struct StatusView: View {
             }
         }
         .padding(TableLayout.windowPadding)
+    }
+
+    /// Files and Written are right-aligned.
+    private static func alignment(_ column: Int) -> HorizontalAlignment {
+        column == 2 || column == 3 ? .trailing : .leading
     }
 }

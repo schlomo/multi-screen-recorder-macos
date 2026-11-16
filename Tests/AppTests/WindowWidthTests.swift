@@ -56,6 +56,24 @@ import Testing
         #expect(width(status(statusModel(name: long, cpu: "CPU 23 %"))) == width(status(statusModel(name: long, cpu: ""))))
     }
 
+    /// Only the source names move it: a state, a size written or a count of files changes nothing.
+    @Test func theStatusWindowKeepsItsWidthWhileItRecords() {
+        func model(state: String, written: String, files: Int) -> StatusModel {
+            let model = statusModel(name: "Mic", cpu: "CPU 3 %")
+            model.rows[0].state = state
+            model.rows[0].written = written
+            model.rows[0].files = files
+            return model
+        }
+        let widths = [
+            model(state: "recording", written: "0 MB", files: 1),
+            model(state: "shows another screen", written: "888.8 GB", files: 888),
+            model(state: "failed, retrying", written: "10.2 GB", files: 10),
+            model(state: "?", written: "?", files: 9),
+        ].map { width(status($0)) }
+        #expect(Set(widths).count == 1, "\(widths)")
+    }
+
     @Test func theStatusWindowWidensForALongName() {
         #expect(width(status(statusModel(name: "Mic", cpu: "")))
             < width(status(statusModel(name: String(repeating: "CalDigit Thunderbolt 3 Audio ", count: 3), cpu: ""))))

@@ -45,6 +45,21 @@ import Testing
         #expect(states == ["failed, retrying", "disconnected", "shows another screen"])
     }
 
+    /// The window sizes the State column from these, so each state a source can be in shows one of them.
+    @Test func everyStateTextIsListed() {
+        let screenStates: [ScreenTracker.Source.State] = [
+            .recording(FrameSize(width: 1, height: 1)), .waiting, .failedRetrying, .showsAnotherScreen, .diskFull,
+            .mirroring, .disconnected, .asleep,
+        ]
+        let audioStates: [AudioTracker.Source.State] = [
+            .recording, .waiting, .failedRetrying, .diskFull, .disconnected, .notRecorded, .asleep,
+        ]
+        let texts = Set(RecordingStatusTable.StateText.allCases.map(\.rawValue))
+        #expect(Set(screenStates.map { RecordingStatusTable.text($0) }).union(audioStates.map { RecordingStatusTable.text($0) })
+            == texts)
+        #expect(texts.contains("shows another screen"))
+    }
+
     @Test func aScreenNotYetRecordingIsWaiting() {
         var tracker = ScreenTracker(resolution: .native)
         let built = screen("A", "Built-in", main: true)

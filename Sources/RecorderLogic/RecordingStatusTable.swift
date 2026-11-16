@@ -79,29 +79,44 @@ public enum RecordingStatusTable {
         sizes.contains(nil) ? "?" : DiskEstimate.megabytesOrGigabytes(Double(sizes.compactMap(\.self).reduce(0, +)))
     }
 
+    /// Every text the State column can show; the window sizes the column from them.
+    public enum StateText: String, CaseIterable, Sendable {
+        case recording
+        case waiting
+        case failedRetrying = "failed, retrying"
+        case showsAnotherScreen = "shows another screen"
+        case diskFull = "disk full"
+        case mirroring
+        case disconnected
+        case notRecorded = "not recorded"
+        case asleep
+    }
+
     static func text(_ state: AudioTracker.Source.State) -> String {
-        switch state {
-        case .recording: "recording"
-        case .waiting: "waiting"
-        case .failedRetrying: "failed, retrying"
-        case .diskFull: "disk full"
-        case .disconnected: "disconnected"
-        case .notRecorded: "not recorded"
-        case .asleep: "asleep"
+        let text: StateText = switch state {
+        case .recording: .recording
+        case .waiting: .waiting
+        case .failedRetrying: .failedRetrying
+        case .diskFull: .diskFull
+        case .disconnected: .disconnected
+        case .notRecorded: .notRecorded
+        case .asleep: .asleep
         }
+        return text.rawValue
     }
 
     static func text(_ state: ScreenTracker.Source.State) -> String {
-        switch state {
-        case .recording: "recording"
-        case .waiting: "waiting"
-        case .failedRetrying: "failed, retrying"
-        case .showsAnotherScreen: "shows another screen"
-        case .diskFull: "disk full"
-        case .mirroring: "mirroring"
-        case .disconnected: "disconnected"
-        case .asleep: "asleep"
+        let text: StateText = switch state {
+        case .recording: .recording
+        case .waiting: .waiting
+        case .failedRetrying: .failedRetrying
+        case .showsAnotherScreen: .showsAnotherScreen
+        case .diskFull: .diskFull
+        case .mirroring: .mirroring
+        case .disconnected: .disconnected
+        case .asleep: .asleep
         }
+        return text.rawValue
     }
 
     /// "Recording 1:07:00 · 1.3 GB in 3 files · 120.4 GB free", below 1 GB

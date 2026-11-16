@@ -29,6 +29,15 @@ import Testing
         }
     }
 
+    @Test func eachFixedStatusColumnHoldsItsWidestContent() {
+        let widest = [["8888×8888", "2 channels", "stereo"], ["888"], ["888.8 GB", "999 MB", "?"],
+                      RecordingStatusTable.StateText.allCases.map(\.rawValue)]
+        #expect(TableLayout.statusColumnWidths.count == RecordingStatusTable.columns.count - 1)
+        for (width, texts) in zip(TableLayout.statusColumnWidths, widest) {
+            for text in texts { #expect(width >= measured(text), Comment(rawValue: text)) }
+        }
+    }
+
     @Test func theSourceColumnHoldsTheLongestNameWholeWithAnyNumber() {
         let names = ["DELL P3421W", "CalDigit Thunderbolt 3 Audio", "System"]
         #expect(TableLayout.sourceWidth(names: names)

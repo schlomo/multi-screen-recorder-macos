@@ -1,11 +1,12 @@
 import AppKit
 import RecorderLogic
 
-/// The widths of the window's table "What will be recorded". The columns
-/// after Source are as wide as their widest possible content in the font the
-/// table uses, so nothing moves when a setting changes; Source is as wide as
-/// the longest name of what is connected, whole, and takes any width the
-/// window has beyond the table's.
+/// The widths of the start window's table "What will be recorded" and of
+/// the status window's table. The columns after Source are as wide as their
+/// widest possible content in the font the tables use, so nothing moves when
+/// a setting or, while recording, a state or a size changes; Source is as
+/// wide as the longest name of what is connected, whole, and in the start
+/// window takes any width the window has beyond the table's.
 enum TableLayout {
     /// The font of a `Text` in the table: SwiftUI's body font, with digits
     /// of one width (`monospacedDigit`).
@@ -41,6 +42,19 @@ enum TableLayout {
     static let fixedColumnWidths: [CGFloat] = samples.enumerated().map { offset, samples in
         measuredWidth(samples + [WhatWillBeRecorded.columns[offset + 1]])
     }
+
+    /// The widest possible content of each status column after Source:
+    /// Records at, Files, Written and State, every state's text.
+    static let statusSamples: [[String]] = [
+        ["8888×8888", "2 channels", "stereo"],
+        ["888"],
+        ["888.8 GB", "999 MB", "?"],
+        RecordingStatusTable.StateText.allCases.map(\.rawValue),
+    ]
+
+    /// The status window's columns after Source; its headers, in a bolder
+    /// font, may make a column wider still, which does not move either.
+    static let statusColumnWidths: [CGFloat] = statusSamples.map(measuredWidth)
 
     static let windowPadding: CGFloat = 20
 

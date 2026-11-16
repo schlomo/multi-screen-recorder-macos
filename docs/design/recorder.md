@@ -641,8 +641,12 @@ checked, reported or rewritten at the next start (D47).
   the log (see "Logging"); and, in the lower right corner, Continue and
   Stop, Stop on the right in blue as the call to action. The window is
   as wide as its table, no cell wrapping or cut, and the text below,
-  such as the CPU line's explanation, wraps to that width. Esc presses
-  Continue; Return presses Stop. It refreshes every second
+  such as the CPU line's explanation, wraps to that width. As in the
+  start window, the columns after Source are as wide as their widest
+  possible content (`8888×8888`, `888`, `888.8 GB`, and the longest of
+  every State's text, `RecordingStatusTable.StateText`), so the width
+  stays the same during a recording and changes only with the source
+  names. Esc presses Continue; Return presses Stop. It refreshes every second
   while open; Continue closes it. A screen file whose size cannot be
   read makes its screen's Written `?`, and the line's data written
   `? GB`. Free space that the volume does not report is a problem as a
