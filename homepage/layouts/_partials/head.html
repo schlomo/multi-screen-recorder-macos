@@ -9,7 +9,10 @@
 {{- if or (ne hugo.Environment "production") .Params.robots }}
 <meta name="robots" content="{{ .Params.robots | default "noindex" }}" />
 {{- end }}
+{{- /* A noindex page (the 404 page) names no URL of its own for search engines and previews. */}}
+{{- if not .Params.robots }}
 <link rel="canonical" href="{{ .Permalink }}" />
+{{- end }}
 {{- /* Inlined so rendering needs no extra request. The colour palette comes first, as
        CSS custom properties generated from [params.colors] in hugo.toml. */}}
 {{- $palette := "" }}
@@ -31,7 +34,9 @@
 <meta property="og:site_name" content="{{ site.Title }}" />
 <meta property="og:title" content="{{ $title }}" />
 <meta property="og:description" content="{{ $description }}" />
+{{- if not .Params.robots }}
 <meta property="og:url" content="{{ .Permalink }}" />
+{{- end }}
 <meta property="og:locale" content="en_US" />
 {{- with partialCached "link-preview-image.html" . }}
 <meta property="og:image" content="{{ .Permalink }}" />

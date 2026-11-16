@@ -2,7 +2,7 @@
        on the artwork's own background colour, the name and the tagline beside it. Returns
        the processed image. */}}
 {{- $colors := site.Params.colors }}
-{{- $icon := (resources.Get "images/app-icon-fancy.jpeg").Resize "400x" }}
+{{- $icon := (resources.Get "images/app-icon-fancy.jpeg" | resources.Copy "images/link-preview.jpeg").Resize "400x" }}
 {{- $canvas := $icon.Filter (images.Padding 115 720 115 80 $colors.artwork) }}
 {{- $name := images.Text site.Title (dict "color" $colors.primary "size" 60 "x" 540 "y" 215) }}
 {{- $tagline := images.Text (delimit site.Params.tagline "\n") (dict "color" (index $colors "text-light") "size" 40 "x" 540 "y" 320 "linespacing" 14) }}
