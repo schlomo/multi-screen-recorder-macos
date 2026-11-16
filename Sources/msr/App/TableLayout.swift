@@ -7,8 +7,11 @@ import RecorderLogic
 /// Source takes the rest of the window and is as wide as the longest name
 /// expected.
 enum TableLayout {
-    /// The font of a `Text` in the table: SwiftUI's body font.
-    static var font: NSFont { NSFont.preferredFont(forTextStyle: .body) }
+    /// The font of a `Text` in the table: SwiftUI's body font, with digits
+    /// of one width (`monospacedDigit`).
+    static var font: NSFont {
+        NSFont.monospacedDigitSystemFont(ofSize: NSFont.preferredFont(forTextStyle: .body).pointSize, weight: .regular)
+    }
 
     static let columnSpacing: CGFloat = 8
     /// The space between the table's border and its first and last column.

@@ -6,7 +6,7 @@ body:
     id: version
     attributes:
       label: Output of msr version
-      description: "In Terminal, run the command below and paste its output here. Without the msr link, run \"/Applications/Multi Screen Recorder.app/Contents/MacOS/msr\" version."
+      description: "In Terminal, run `msr version` and paste its output here. Without the msr link, run `\"/Applications/Multi Screen Recorder.app/Contents/MacOS/msr\" version`."
       placeholder: msr version
       render: text
     validations:

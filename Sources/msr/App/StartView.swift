@@ -27,6 +27,7 @@ struct StartView: View {
                 Button("Cancel") { NSApp.terminate(nil) }
                     .keyboardShortcut(.cancelAction)
                 Button("Start", action: start)
+                    .buttonStyle(.borderedProminent)
                     .keyboardShortcut(.defaultAction)
                     .disabled(!model.canStart)
             }
@@ -158,7 +159,7 @@ private struct SettingsForm: View {
 
 /// One table with a header, striped rows and a border: the displays, the
 /// audio sources and the total.
-private struct WhatWillBeRecordedView: View {
+struct WhatWillBeRecordedView: View {
     let section: WhatWillBeRecorded
     /// The output folder as the settings name it, a link that opens it in Finder.
     let outputFolder: String
@@ -186,7 +187,9 @@ private struct WhatWillBeRecordedView: View {
                 }
                 if let totalRow = section.totalRow {
                     Divider()
-                    row(totalRow.cells).fontWeight(.semibold)
+                    // Only the label is bold: bold digits are wider and
+                    // would move the total's decimal point.
+                    row(totalRow.cells, boldLabel: true)
                 }
             }
             .frame(width: TableLayout.tableWidth)
@@ -215,11 +218,13 @@ private struct WhatWillBeRecordedView: View {
             .fixedSize(horizontal: false, vertical: true)
     }
 
-    private func row(_ cells: [String]) -> some View {
+    /// Digits of one width, so the GB/h max figures line up on the decimal point.
+    private func row(_ cells: [String], boldLabel: Bool = false) -> some View {
         HStack(spacing: TableLayout.columnSpacing) {
             ForEach(Array(cells.enumerated()), id: \.offset) { column, cell in
                 if column == 0 {
                     Text(cell)
+                        .fontWeight(boldLabel ? .semibold : nil)
                         .lineLimit(1)
                         .truncationMode(.middle)
                         .help(cell)
@@ -232,6 +237,7 @@ private struct WhatWillBeRecordedView: View {
                 }
             }
         }
+        .monospacedDigit()
         .padding(.horizontal, TableLayout.cellPadding)
         .padding(.vertical, 3)
     }

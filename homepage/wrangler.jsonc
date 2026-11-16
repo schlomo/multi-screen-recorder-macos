@@ -3,7 +3,7 @@
   // This file is the source of truth for the deploy; the Cloudflare dashboard
   // only holds the Git connection and the build settings listed in README.md.
   "name": "multiscreenrecorder-homepage",
-  "compatibility_date": "2026-11-16",
+  "compatibility_date": "2026-11-05",
 
   // The schapiro.org zone is on Cloudflare, so deploy provisions the DNS
   // record and the certificate.
