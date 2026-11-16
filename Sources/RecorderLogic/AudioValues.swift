@@ -20,36 +20,40 @@ extension RecorderValues {
     public static let cpuSampleInterval = Duration.seconds(1)
 }
 
-/// The clock drift correction's values (*data*): the windows the buffers'
-/// lateness is measured in, the fits, and how fast the correction follows.
+/// The clock drift correction's values (*data*): the intervals the
+/// buffers' lateness is measured in, the loop that follows it, and the fit
+/// of the clock drift shown.
 extension RecorderValues {
-    /// Buffers are grouped by arrival in windows of this length; each
-    /// window's smallest lateness goes into the rolling minimum.
-    public static let clockDriftWindow = Duration.seconds(1)
-    /// A window with fewer buffers gives no measurement.
-    public static let clockDriftWindowMinimumBuffers = 10
-    /// A measurement is the smallest lateness of this many windows, the
+    /// Buffers are grouped by arrival in intervals of this length; each
+    /// interval's smallest lateness goes into the rolling minimum.
+    public static let clockDriftInterval = Duration.seconds(1)
+    /// An interval with fewer buffers gives no measurement: a source with
+    /// buffers of 8192 samples delivers about 6 a second.
+    public static let clockDriftIntervalMinimumBuffers = 3
+    /// A measurement is the smallest lateness of this many intervals, the
     /// newest and those before it: the system audio arrives in bursts, so
-    /// one window's smallest lateness is not its clock.
-    public static let clockDriftRollingWindows = 5
-    /// The measurements the correction rate's slope is fitted over.
-    public static let clockDriftRateFitMeasurements = 30
+    /// one interval's smallest lateness is not its clock.
+    public static let clockDriftRollingIntervals = 5
+    /// The correction loop's natural frequency, per second, critically
+    /// damped: proportional gain 2ω, integral gain ω².
+    public static let clockDriftLoopFrequency = 0.3
     /// The measurements the clock drift shown is fitted over, and the
     /// fewest it is shown with.
     public static let clockDriftShownFitMeasurements = 60
     public static let clockDriftShownMinimumMeasurements = 10
-    /// How fast the correction closes what is still off: that divided by this.
-    public static let clockDriftFollowTime = Duration.seconds(15)
-    /// The largest correction rate, in parts per million.
+    /// The first measurements after the reference or a step the clock
+    /// drift shown leaves out: the loop is still settling then and the
+    /// rolling minimum lags.
+    public static let clockDriftShownSettlingMeasurements = 10
+    /// The largest correction rate and clock drift shown, in parts per million.
     public static let clockDriftMaximumRatePpm = 1000.0
     /// A measurement more than this above the expected lateness is a stall,
-    /// not the device's clock, and is rejected.
-    public static let clockDriftRejectedLateness = Duration.milliseconds(5)
-    /// After this many rejected windows in a row the lateness really
+    /// not the device's clock, and is rejected; more than this below it is
+    /// a step, accepted at once.
+    public static let clockDriftStep = Duration.milliseconds(5)
+    /// After this many rejected intervals in a row the lateness really
     /// stepped up: the next measurement is accepted.
-    public static let clockDriftRejectedWindowsInARow = 10
-    /// An audio file shorter than this has no `clockDriftPpm`.
-    public static let clockDriftShortestFile = Duration.seconds(10)
+    public static let clockDriftRejectedIntervalsInARow = 10
     /// How often an audio capture reports its clock drift to the status window.
     public static let clockDriftStatusInterval = Duration.seconds(1)
     /// How often `--debug` writes each audio source's clock drift line.

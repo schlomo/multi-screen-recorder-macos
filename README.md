@@ -81,7 +81,7 @@ confirmed yet.
 
 - **CPU:** recording takes about half of one CPU core over an hour,
   with two screens and five audio sources.
-- **Audio drift:** some USB audio devices drift against the video, by
+- **Clock drift:** some USB audio devices drift against the video, by
   up to about 0.4 s per hour. The recorder corrects it by resampling
   their sound; that the correction holds over an hour is not verified
   yet.

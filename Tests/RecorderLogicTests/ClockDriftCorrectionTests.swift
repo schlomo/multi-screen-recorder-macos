@@ -7,7 +7,7 @@ import Testing
 
     /// Clicks of a device 500 ppm slow at known shared clock times, with
     /// jittered arrivals: each comes out at its time once the correction
-    /// has caught up (it starts after 5 windows and follows over 15 s).
+    /// has caught up (it starts after 5 intervals and settles within 15 s).
     @Test func clicksComeOutAtTheirSharedClockTimes() throws {
         let device = SimulatedDevice.steady(ppm: -500)
         let seconds = 60.0
@@ -18,18 +18,18 @@ import Testing
         for click in clicks { input[Int((click * sampleRate / (1 + 500e-6)).rounded())] = 1 }
 
         var correction = ClockDriftCorrection()
-        var chunks: [ClockDriftCorrection.Chunk] = []
+        var corrected: [ClockDriftCorrection.CorrectedAudio] = []
         for buffer in buffers {
             let start = buffer.index * device.bufferSamples
-            chunks += correction.correct([Array(input[start..<(start + device.bufferSamples)])], at: buffer.time, arrival: buffer.arrival)
+            corrected += correction.correct([Array(input[start..<(start + device.bufferSamples)])], at: buffer.time, arrival: buffer.arrival).audio
         }
-        chunks += correction.flush()
+        corrected += correction.flush()
 
         // Each click is the loudest output sample within 50 ms of its time.
         var loudest = [(seconds: Double, sample: Float)](repeating: (0, 0), count: clicks.count)
-        for chunk in chunks {
-            for (index, sample) in chunk.channels[0].enumerated() {
-                let at = Double(chunk.time) / 1e9 + Double(index) / sampleRate
+        for audio in corrected {
+            for (index, sample) in audio.channels[0].enumerated() {
+                let at = Double(audio.time) / 1e9 + Double(index) / sampleRate
                 let click = Int((at - clicks[0]).rounded())
                 guard clicks.indices.contains(click), abs(at - clicks[click]) < 0.05, sample > loudest[click].sample else { continue }
                 loudest[click] = (at, sample)
@@ -40,36 +40,47 @@ import Testing
             #expect(abs(found.seconds - click) < bound, "the click at \(click) s came at \(found.seconds) s")
         }
         let status = correction.status
-        // The shown fit still holds the first measurements, taken before
-        // the rate fit had a slope to move the rolling minimum along.
-        #expect(abs(try #require(status.clockDriftPpm) - -500) < 10)
-        #expect(abs(status.applied - 0.03) < 0.0005)
+        #expect(abs(try #require(status.clockDriftPpm) - -500) < 10, "\(status.clockDriftPpm ?? 0) ppm")
+        #expect(abs(status.applied - 0.03) < 0.0005, "\(status.applied * 1000) ms")
         #expect(abs(try #require(status.remaining)) < 0.0005)
     }
 
+    /// A gap at 65 s, the correction well above 1 ms by then: the segment
+    /// after it starts at its own timestamp plus the correction applied,
+    /// a jump of exactly the gap's length.
     @Test func aGapComesOutAsAJumpOfItsLengthWithNothingLostBefore() throws {
         let device = SimulatedDevice.steady(ppm: -500)
-        let buffers = device.buffers(for: 6)
-        let gap: Int64 = 100_000_000
-        let gapAt = 300
+        let buffers = device.buffers(for: 70)
+        let gapLength: Int64 = 100_000_000
+        let gapAt = 65 * 48_000 / device.bufferSamples
         var correction = ClockDriftCorrection()
-        var before: [ClockDriftCorrection.Chunk] = []
-        var after: [ClockDriftCorrection.Chunk] = []
+        var before: [ClockDriftCorrection.CorrectedAudio] = []
+        var after: [ClockDriftCorrection.CorrectedAudio] = []
+        var gaps: [ClockDriftCorrection.Gap] = []
         let samples = [Float](repeating: 0.25, count: device.bufferSamples)
         for buffer in buffers {
             let isAfter = buffer.index >= gapAt
-            let chunks = correction.correct(
-                [samples], at: buffer.time + (isAfter ? gap : 0), arrival: buffer.arrival + (isAfter ? gap : 0))
+            let time = buffer.time + (isAfter ? gapLength : 0)
+            let (audio, gap) = correction.correct([samples], at: time, arrival: buffer.arrival + (isAfter ? gapLength : 0))
+            gaps += gap.map { [$0] } ?? []
             if buffer.index == gapAt {
-                // The tail of the segment before, then the first chunk after.
-                before += chunks.dropLast()
-                after += chunks.suffix(1)
+                // The tail of the segment before, then the first corrected audio after.
+                before += audio.dropLast()
+                after += audio.suffix(1)
+                let appliedAtGap = try #require(before.last).applied
+                #expect(appliedAtGap > 0.001)
+                #expect(try #require(after.first).time == time + Int64((appliedAtGap * 1e9).rounded()))
             } else if isAfter {
-                after += chunks
+                after += audio
             } else {
-                before += chunks
+                before += audio
             }
         }
+        let gap = try #require(gaps.first)
+        #expect(gaps.count == 1)
+        #expect(gap.length == gapLength)
+        #expect(gap.applied == before.last?.applied)
+        #expect(gap.latenessBefore > 0 && gap.latenessAfter > 0)
         let output = before.reduce(0) { $0 + $1.channels[0].count }
         let appliedAtGap = try #require(before.last).applied
         // Every sample before the gap came out: the input and the correction applied.
@@ -77,10 +88,10 @@ import Testing
         #expect(abs(Double(output) - input - appliedAtGap * sampleRate) <= 1)
         let end = Double(try #require(before.first).time) + Double(output) / sampleRate * 1e9
         let jump = Double(try #require(after.first).time) - end
-        #expect(abs(jump - Double(gap)) <= 1e9 / sampleRate, "\(jump) ns")
-        // Within a segment the chunks follow each other by sample count.
-        for (chunk, next) in zip(before, before.dropFirst()) {
-            #expect(abs(Double(next.time - chunk.time) - Double(chunk.channels[0].count) / sampleRate * 1e9) <= 1)
+        #expect(abs(jump - Double(gapLength)) <= 1e9 / sampleRate, "\(jump) ns")
+        // Within a segment the corrected audio follows by sample count.
+        for (audio, next) in zip(before, before.dropFirst()) {
+            #expect(abs(Double(next.time - audio.time) - Double(audio.channels[0].count) / sampleRate * 1e9) <= 1)
         }
     }
 
@@ -88,11 +99,12 @@ import Testing
         var correction = ClockDriftCorrection()
         let mono = [[Float](repeating: 0.25, count: 512)]
         let stereo = mono + mono
-        var chunks = correction.correct(mono, at: 0, arrival: 20_000_000)
-        chunks += correction.correct(mono, at: 10_666_666, arrival: 30_000_000)
-        #expect(chunks.allSatisfy { $0.channels.count == 1 })
-        let monoOut = chunks.reduce(0) { $0 + $1.channels[0].count }
-        let changed = correction.correct(stereo, at: 21_333_333, arrival: 40_000_000)
+        var monoAudio = correction.correct(mono, at: 0, arrival: 20_000_000).audio
+        monoAudio += correction.correct(mono, at: 10_666_666, arrival: 30_000_000).audio
+        #expect(monoAudio.allSatisfy { $0.channels.count == 1 })
+        let monoOut = monoAudio.reduce(0) { $0 + $1.channels[0].count }
+        let (changed, gap) = correction.correct(stereo, at: 21_333_333, arrival: 40_000_000)
+        #expect(gap == nil)
         #expect(changed.map(\.channels.count) == [1, 2])
         #expect(monoOut + changed[0].channels[0].count == 1024)
         // The new segment starts at its own timestamp, the correction applied so far added.
@@ -100,7 +112,7 @@ import Testing
         #expect(changed[1].channels[0].count == 512 - RecorderValues.clockDriftResamplerTaps / 2)
     }
 
-    @Test func noBufferNoChunk() {
+    @Test func noBufferNoCorrectedAudio() {
         var correction = ClockDriftCorrection()
         #expect(correction.flush().isEmpty)
         #expect(correction.status == ClockDriftCorrection.Status(clockDriftPpm: nil, applied: 0, remaining: nil))

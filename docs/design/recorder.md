@@ -450,10 +450,10 @@ for the system audio, which tells two inputs with the same name apart
 carry no UID, so they cannot tell two such inputs apart; `channels`
 the number of its mono tracks, or `stereo` for the system audio;
 `clockDriftCorrection` the seconds of sound the clock drift correction
-added to the file (negative: removed), to 0.0001 s, null until the
-file ends; `clockDriftPpm` its audio source's clock drift over the file
-(see "Audio"), null until the file ends and for a file shorter than
-10 s. `files` lists the screen files and the audio files in the order
+added during the file (negative: removed), to 0.0001 s, null until the
+file ends; `clockDriftPpm` its audio source's clock drift as shown at
+the file's end (see "Audio"), to 0.1 ppm, null until the file ends and
+if it was not measured by then. `files` lists the screen files and the audio files in the order
 of their start.
 
 **Names in a file name (D49, D55).** In a file name, `/` and `:` in a
@@ -637,10 +637,11 @@ checked, reported or rewritten at the next start (D47).
   (`recording`, `waiting`, `failed, retrying`, `shows another screen`,
   `disk full`, `mirroring`, `disconnected`, `asleep`, and for an audio
   input no longer in the audio mode, such as the default microphone
-  before a change, `not recorded`) and "Drift corrected" (an audio
-  source's clock drift correction while it records: the sound added so
-  far and its clock drift, `+34.9 ms (-116 ppm)`, `measuring` until the
-  clock drift is known; empty for a screen); under it the line "Recording 1:07:00
+  before a change, `not recorded`) and "Clock drift" (an audio source's
+  clock drift while it records, with the sound the correction added so
+  far, `-116 ppm (+34.9 ms)`; `measuring (+0.3 ms)` until the clock
+  drift is known, `measuring` before any correction; zero is `0`, never
+  `+0` or `-0`; empty for a screen); under it the line "Recording 1:07:00
   · 1.3 GB in 3 files · 120.4 GB free", the elapsed time as `h:mm:ss`
   (D47) and the sizes as in Written; then "CPU 23 %", our process's CPU
   use in percent of one core as Activity Monitor shows it, sampled every
@@ -877,48 +878,77 @@ the metadata items (see "Output on disk").
   sample count and is no gap.
 - **Clock drift.** An audio device runs on its own clock, up to 117 ppm
   off the host clock (measured), and `AVCaptureSession`'s timestamps
-  follow its sample count, so drift shows as no gap. Every audio
-  source's sound, the system audio's too, goes through a clock drift
-  correction that resamples it continuously so its sample count follows
-  the shared clock; one code path, no bypass. How far the sound falls
-  behind is measured from when the buffers arrive: a buffer's lateness
-  is its arrival minus its timestamp, and since a buffer can arrive
-  late but never early, the smallest lateness is the device's clock
-  against the host clock (a straight line to 0.04 ms for an audio
-  input; [end-to-end-tests.md](end-to-end-tests.md), "What research
-  found for the recorder"). The buffers are grouped by arrival in
-  windows of 1 s (*data*); a window with fewer than 10 buffers (*data*)
-  gives nothing. A measurement is the smallest lateness of the newest
-  window and the 4 before it (5 windows, *data*), each window's moved
-  along the rate fit's slope to the newest window's time: the system
-  audio arrives in catch-up bursts, so one second's smallest lateness
-  is a sawtooth of up to 5.6 ms, and only the smallest over about 5 s
-  is its clock. Nothing is measured or corrected until 5 windows were
-  seen; the first measurement is the reference, and each later one
-  minus the reference is the sound that must have been added so far.
-  After each measurement the correction rate is the slope of a
-  least-squares fit over the last 30 measurements (*data*) plus what is
-  still off divided by 15 s (*data*), the target taken forward along
-  that slope to the newest buffer, limited to ±1000 ppm (*data*). A
-  measurement more than 5 ms (*data*) above the fit's line (or the last
-  measurement, while there are fewer than 3) is a stall, not the clock,
-  and is rejected, its window kept out of the rolling minimum; after 10
-  rejected windows in a row (*data*) the lateness really stepped up: the
-  next window is accepted and the fit and the rolling minimum start
-  again from it. The resampler is a polyphase Kaiser-windowed sinc of
-  64 taps (*data*), its phases interpolated linearly; it adds no latency
-  to the timestamps and holds back the 32 samples its filter needs
-  ahead until the next buffer or the capture's end. A gap (as under
-  Placement) or a change of the channel count ends a segment of the
-  correction: the held-back samples go out, and the next segment starts
-  at its own timestamp plus the correction applied so far, so a gap
-  reaches the audio file and the guide track as a jump of its length,
-  as without the correction. The clock drift shown is a second fit,
-  over the last 60 measurements (*data*), shown from the 10th on. In
-  the recording manifest each audio file has `clockDriftCorrection`,
-  the sound added to it (negative: removed), and `clockDriftPpm`, minus
-  that over the file's duration, positive when the source's clock runs
-  fast, to a tenth of a ppm, null for a file shorter than 10 s (*data*).
+  follow its sample count, so drift shows as no gap; the system audio's
+  timestamps follow its sample count too (measured on the owner's Mac). Every audio source's sound, the
+  system audio's too, goes through a clock drift correction that
+  resamples it continuously so its sample count follows the shared
+  clock; one code path, no bypass. The job is that an audio file stays
+  within a frame (33 ms) of the shared clock over hours; under 1 ms is
+  the engineering target.
+  How far the sound falls behind is measured from when the buffers
+  arrive: a buffer's lateness is its arrival minus its timestamp, and
+  since a buffer can arrive late but never early, the smallest lateness
+  is the device's clock against the host clock (a straight line to
+  0.04 ms for an audio input; [end-to-end-tests.md](end-to-end-tests.md),
+  "What research found for the recorder"). The buffers are grouped by
+  arrival in intervals of 1 s (*data*); an interval with fewer than 3
+  buffers (*data*; a source with buffers of 8192 samples delivers about
+  6 a second) gives nothing. A measurement is the smallest lateness of
+  the newest interval and the 4 before it (5 intervals, *data*), each
+  older interval's moved along the loop's integral (below) to the
+  newest one's time: the system audio arrives in catch-up bursts, so
+  one second's smallest lateness is a sawtooth of up to 5.6 ms, and
+  only the smallest over about 5 s is its clock. Nothing is measured or
+  corrected until 5 intervals were seen; the first measurement is the
+  reference, and each later one minus the reference is the sound that
+  must have been added so far.
+  A critically damped proportional-integral loop turns that into the
+  correction rate: at each measurement the error is the measurement
+  minus the correction applied at the same moment (before the
+  interval's least late buffer), the integral grows by ω² · error ·
+  the time since the last measurement, and the rate is the integral
+  plus 2ω · error, with ω = 0.3 per second (*data*); the rate and the
+  integral are limited to ±1000 ppm (*data*), and while the rate is at
+  that limit the integral holds. The integral is the device's clock
+  drift as the loop has learned it. A slow wander is followed; a fast
+  one (a period under about a minute, as the Logitech BRIO's) stays
+  within about 1 ms, the rolling minimum flattening its peaks; on a
+  source that delivers in bursts the rate may swing by up to about
+  200 ppm, about a third of a cent, which nobody hears.
+  The expected lateness is the last accepted measurement moved along
+  the integral. An interval whose own smallest lateness is more than
+  5 ms (*data*) above it is a stall, not the clock, and is rejected,
+  kept out of the rolling minimum; it is judged by its own lateness
+  because the rolling minimum would hide it behind the older intervals,
+  which the stall would then feed back into. After 10 rejected
+  intervals in a row (*data*) the lateness really stepped up: the next
+  interval is accepted. A measurement more than 5 ms below the expected
+  lateness is a step down, accepted at once. On such a step the rolling
+  minimum and the clock drift shown start again from that interval; the
+  integral, the reference and the correction applied stay.
+  The resampler is a polyphase Kaiser-windowed sinc of 64 taps
+  (*data*), its phases interpolated linearly; it adds no latency to the
+  timestamps and holds back the 32 samples its filter needs ahead until
+  the next buffer or the capture's end. Every source passes it, even at
+  rate 0: it is a low-pass above 20 kHz (−0.07 dB at 20 kHz, −2.0 dB at
+  21 kHz), so an audio file is not sample-identical to what the device
+  delivered. A gap (as under Placement) or a change of the channel
+  count ends a segment of the correction: the held-back samples go out,
+  and the next segment starts at its own timestamp plus the correction
+  applied so far, so a gap reaches the audio file and the guide track as
+  a jump of its length, as without the correction. This assumes a
+  source's timestamps keep following its sample count across a gap; with
+  `--debug` each gap writes a line with the correction applied and the
+  lateness before and after it, which shows if they do not.
+  The clock drift shown is a least-squares fit over the last 60
+  measurements (*data*), leaving out the first 10 (*data*) after the
+  reference or a step, while the loop settles and the rolling minimum
+  lags, limited to ±1000 ppm, and shown from the 10th measurement in the
+  fit on, so from about 25 s. In the recording manifest each audio file
+  has `clockDriftCorrection`, the sound the correction added during the
+  file (negative: removed), to 0.0001 s, and `clockDriftPpm`, the clock
+  drift shown at the file's end, positive when the source's clock runs
+  fast, to a tenth of a ppm, null if not measured by then.
 - **Failures.** A failing audio capture or writer and a full disk are
   handled for an audio file as for a screen file (below): the file
   ends, the event (`audio input failed`, `system audio failed`, `audio
@@ -1065,7 +1095,10 @@ connected: Wacom One 13T` or `22:15:32 +61.3s screen stream failed: LG
 the ready check's facts, and every 10 s (*data*) per audio source its
 clock drift correction, such as `Audio 3 - Razer Seiren V3 Mini: clock
 drift -116.1 ppm, corrected +34.94 ms so far, 0.04 ms off`, or `clock
-drift not measured yet`) on standard error and at `.debug` in the log;
+drift not measured yet`; zero is `0`, never `+0.0`, and at each gap in
+an audio source a line such as `Audio 3 - Razer Seiren V3 Mini: gap of
+100.0 ms, clock drift corrected +3.45 ms so far, lateness 12.30 ms
+before, 12.41 ms after`) on standard error and at `.debug` in the log;
 while a recording runs, each line on standard error carries the time
 since its start as the event lines do, such as `debug recorder: +27.9s
 start Screen 3 - LG`. The log of the last 2 hours, of the app and `msr`
@@ -1121,11 +1154,13 @@ moving to the new main screen, a full disk, a channel count change,
 two inputs with the same name, sleep and wake), the audio file's
 placement on the tick grid (trimming, gaps filled or ending the file,
 jitter within 32 ms), the clock drift correction (the tracker against
-simulated devices: steady, wandering, a stall and a lasting step; the
-resampler's purity, its sample count, chunking and a rate change; a
-source delivering in bursts like the system audio; clicks
-and gaps through the whole correction) and an audio file's
-`clockDriftPpm` and `clockDriftCorrection`, splitting interleaved and
+simulated devices: steady, a rate alternating every 12 s, wandering in
+triangles of 25 to 60 s, a stall, a pause, buffers of 8192 samples,
+steps up and down; the loop's arithmetic; the resampler's purity, its
+sample count, chunking and a rate change; a source delivering in
+bursts like the system audio; clicks and gaps through the whole
+correction; when the status and the `--debug` line are due) and an
+audio file's `clockDriftPpm` and `clockDriftCorrection` (never `-0`), splitting interleaved and
 non-interleaved PCM, the guide track mixes, audio file names and
 metadata, our process's CPU use, the status window's rows, the version, the state file's content, the choice of
 the crash report to offer, the new-issue link (and that the issue form
@@ -1145,12 +1180,21 @@ rates, the timecode with its reel name, the metadata, a filled gap
 decoding as silence, a file never finalized), the proof that an
 audio-only fragmented `.mov` carries a timecode track, a screen file's
 ticks with a stand-in writer (a failing writer, one that fell behind, a
-slow end, guide samples placed from the file's first tick), a stream stopped while it
+slow end, guide samples placed from the file's first tick), audio
+captures with a stand-in source and writer (the clock drift status
+about once a second, each file's `clockDriftCorrection` against a
+correction of the test's own, the second file's counted from its own
+start, the correction's held-back samples written when a capture ends
+by itself, dropped when its writer failed or fell behind, with nothing
+written after that, also by a Stop racing in), a stream stopped while it
 starts, that an action
 waiting for the main run loop's default mode runs only there, the
 classification of Core Audio's transport types, and the ready check's
 probes with stand-ins (the output folder's file access is off the main
-thread). `AppTests` run the start window's model with stand-in probes
+thread). The recorder's filter of the clock drift status by capture
+number, which drops a status from a capture already replaced, has no
+unit test: the recorder runs on the main actor with real captures.
+`AppTests` run the start window's model with stand-in probes
 and a stand-in for the hold: one check per burst of device changes,
 nothing applied while a menu is open, a stale queued refresh does
 nothing, choices saved only when changed, no ready check while
@@ -1322,8 +1366,8 @@ peak, of one core (this process only)`.
 
 Built (the clock drift correction): every audio source resampled to
 follow the shared clock (see "Audio", "Clock drift"), `clockDriftPpm`
-and `clockDriftCorrection` per audio file, the status window's "Drift
-corrected" and the `--debug` line. Tested by unit tests against
+and `clockDriftCorrection` per audio file, the status window's "Clock
+drift" column and the `--debug` lines. Tested by unit tests against
 simulated devices. Run on the owner's Mac on 2026-11-16 (two runs of
 90 s, wired audio mode and the system audio) with one window's smallest
 lateness, a follow time of 5 s and a rate fit over 10: the system
@@ -1341,11 +1385,28 @@ as before within the runs' spread (51 % before; 47 %, 54 % and 56 %
 after). Not verified: the correction over an hour, and by ear or by
 clicks in a real recording.
 
-Open, for the owner's live run to answer (D50): the system audio's
-timestamps may follow the host clock rather than its sample count; then
-the output device's clock drift would show as `audio input gap` events
-of about 32 ms at a steady interval, each filled with silence. The gap
-events of the run show whether it does.
+Rebuilt with the proportional-integral loop (ω = 0.3 per second, the
+clock drift shown leaving out the first 10 measurements) and run on the
+owner's Mac on 2026-11-17 (6 min 51 s, wired audio mode and the system
+audio, `--debug`): the Razer Seiren V3 Mini's clock drift shown -113.8
+to -117.7 ppm and at most 0.25 ms off from 60 s on, `clockDriftPpm`
+-115.3 with +47.5 ms corrected; CalDigit Thunderbolt 3 Audio +47.7 to
++51.3 ppm, `clockDriftPpm` +48.6; MacBook Pro Microphone +2; Logitech
+BRIO wandering from -118.9 ppm (at 40 s) to +7.3 ppm, at most 0.46 ms
+off from 60 s on, `clockDriftPpm` +3.5; the
+system audio's correction between -0.42 and +0.88 ms from 60 s on
+(beyond ±0.5 ms in 4 of its 35 `--debug` lines), its clock drift shown
+-5.6 to +2.7 ppm, `clockDriftPpm` +0.4 (+46.9 ppm at 30 s, the first
+fit). No gap and no event. Our process's CPU use 54 % on average
+(51 % before the correction). Not verified: the correction over an
+hour, and by ear or by clicks in a real recording.
+
+Answered (D50's open question): the system audio's timestamps follow
+its sample count, not the host clock. A probe of 128 s of a
+ScreenCaptureKit audio stream on the owner's Mac (2026-11-17) had every
+timestamp at its sample count from the first to within a microsecond,
+and the clock drift correction corrects the output device's clock
+drift like an input's, so it shows as no `audio input gap` events.
 
 Details the design left open, as built and confirmed by the owner
 (D25, D28, D44): a key missing from the settings file takes its default;

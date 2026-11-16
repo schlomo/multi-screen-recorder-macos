@@ -29,8 +29,8 @@ import Testing
             .init(source: .screen(1, name: "Built-in Retina Display"), recordsAt: "1920×1080", files: 2, written: "1.3 GB", state: "recording"),
             .init(source: .screen(2, name: "LG HDR 4K"), recordsAt: "1920×1080", files: 1, written: "40 MB", state: "disk full"),
         ])
-        #expect(RecordingStatusTable.columns == ["Source", "Records at", "Files", "Written", "State", "Drift corrected"])
-        #expect(rows.allSatisfy { $0.values.count == RecordingStatusTable.columns.count - 1 && $0.driftCorrected.isEmpty })
+        #expect(RecordingStatusTable.columns == ["Source", "Records at", "Files", "Written", "State", "Clock drift"])
+        #expect(rows.allSatisfy { $0.values.count == RecordingStatusTable.columns.count - 1 && $0.clockDrift.isEmpty })
     }
 
     @Test func aScreenWaitingGoneOrFailingSaysSo() {
@@ -86,9 +86,10 @@ import Testing
         ])
     }
 
-    /// The sound added so far and the clock drift; `measuring` until the
-    /// drift is known; nothing for a source that is not recording.
-    @Test func anAudioSourceShowsItsDriftCorrected() {
+    /// The clock drift and the sound added so far; `measuring` until the
+    /// clock drift is known, with the correction once one is applied;
+    /// nothing for a source that is not recording.
+    @Test func anAudioSourceShowsItsClockDrift() {
         var settings = Settings.defaults
         settings.auto = false
         settings.audioMode = .allInputs
@@ -102,13 +103,17 @@ import Testing
         _ = tracker.captureEnded(.systemAudio, .captureFailed("-3805"), at: 1)
         let rows = RecordingStatusTable.audioRows(sources: tracker.sourcesShown, files: [], bytes: [:], clockDrift: [
             .input("R"): ClockDriftCorrection.Status(clockDriftPpm: -116.12, applied: 0.03494, remaining: 0.00004),
-            .input("C"): ClockDriftCorrection.Status(clockDriftPpm: nil, applied: 0.0001, remaining: nil),
+            .input("C"): ClockDriftCorrection.Status(clockDriftPpm: nil, applied: 0.0003, remaining: 0.0001),
             .systemAudio: ClockDriftCorrection.Status(clockDriftPpm: 0, applied: 0, remaining: 0),
         ])
         #expect(rows.map(\.state) == ["recording", "recording", "failed, retrying"])
-        #expect(rows.map(\.driftCorrected) == ["+34.9 ms (-116 ppm)", "measuring", ""])
-        #expect(RecordingStatusTable.driftCorrected(nil) == "measuring")
-        #expect(RecordingStatusTable.driftCorrected(.init(clockDriftPpm: 49.1, applied: -0.0123, remaining: 0)) == "-12.3 ms (+49 ppm)")
+        #expect(rows.map(\.clockDrift) == ["-116 ppm (+34.9 ms)", "measuring (+0.3 ms)", ""])
+        let text = RecordingStatusTable.clockDriftText
+        #expect(text(nil) == "measuring")
+        #expect(text(.init(clockDriftPpm: nil, applied: 0.000_02, remaining: nil)) == "measuring")
+        #expect(text(.init(clockDriftPpm: 49.1, applied: -0.0123, remaining: 0)) == "+49 ppm (-12.3 ms)")
+        // Zero is 0, never +0 or -0.0.
+        #expect(text(.init(clockDriftPpm: -0.3, applied: -0.000_04, remaining: 0)) == "0 ppm (0 ms)")
     }
 
     /// A size that cannot be read is not shown as nothing written.

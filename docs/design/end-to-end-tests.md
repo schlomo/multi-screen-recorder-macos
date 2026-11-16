@@ -206,6 +206,24 @@ is tried, a wrong picture after a reconnect is a failed assertion all
 the same: the recorder has to deliver the right screen in either
 case, and a recorder that cannot yet keeps those scenarios failing.
 
+### Known limits of the clock drift correction
+
+The correction measures a device's clock from when its buffers arrive
+([recorder.md](recorder.md), "Clock drift"); what that cannot tell
+apart, a test cannot either:
+
+- **A lasting latency change is taken as a clock offset.** When a
+  device's buffers start to arrive later or earlier for good (a driver
+  or a dock changing its buffering), the correction follows it as if
+  the device's clock had jumped: a step up after 10 rejected intervals,
+  a step down at once, so that source's sound moves by the change.
+- **A gap assumes the timestamps keep following the sample count.**
+  After a gap the new segment starts at its own timestamp plus the
+  correction applied so far; a source whose timestamps jump to the
+  host clock across a gap would be off by its drift until then. The
+  `--debug` line for each gap shows the lateness before and after it,
+  which tells.
+
 ### What the recorder design must provide
 
 The assertions need these, and [recorder.md](recorder.md) does not

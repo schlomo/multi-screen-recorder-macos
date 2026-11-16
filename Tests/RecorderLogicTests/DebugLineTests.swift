@@ -54,6 +54,15 @@ import Testing
         #expect(DebugLine.clockDrift(of: label, .init(clockDriftPpm: nil, applied: 0.000_2, remaining: 0.000_5))
             == "Audio 1 - Razer Seiren V3 Mini: clock drift not measured yet, corrected +0.20 ms so far, 0.50 ms off")
         #expect(DebugLine.clockDrift(of: "Audio 0 - System", .init(clockDriftPpm: nil, applied: 0, remaining: nil))
-            == "Audio 0 - System: clock drift not measured yet, corrected +0.00 ms so far")
+            == "Audio 0 - System: clock drift not measured yet, corrected 0 ms so far")
+        // Zero is 0, never +0.0 or -0.0.
+        #expect(DebugLine.clockDrift(of: "Audio 0 - System", .init(clockDriftPpm: -0.04, applied: -0.000_001, remaining: -0.000_001))
+            == "Audio 0 - System: clock drift 0 ppm, corrected 0 ms so far, 0 ms off")
+    }
+
+    @Test func aGapLineSaysWhatTheCorrectionKnew() {
+        let gap = ClockDriftCorrection.Gap(length: 100_000_000, applied: 0.003_45, latenessBefore: 0.012_3, latenessAfter: 0.012_41)
+        #expect(DebugLine.clockDriftGap(of: "Audio 2 - Razer Seiren V3 Mini", gap)
+            == "Audio 2 - Razer Seiren V3 Mini: gap of 100.0 ms, clock drift corrected +3.45 ms so far, lateness 12.30 ms before, 12.41 ms after")
     }
 }

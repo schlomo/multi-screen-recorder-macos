@@ -16,7 +16,7 @@ struct SeededRandom: RandomNumberGenerator {
 
     /// A buffer's lateness jitter, in seconds: exponential with a mean of
     /// 3.5 ms, cut at 10 ms, the shape measured on real devices (the
-    /// smallest of a window varies by about 0.04 ms).
+    /// smallest of an interval varies by about 0.04 ms).
     mutating func jitter() -> Double {
         while true {
             let value = -0.0035 * log(1 - Double.random(in: 0..<1, using: &self))
@@ -33,6 +33,8 @@ struct SimulatedDevice {
     var offset: (Double) -> Double
     /// 512, as an `AVCaptureSession` delivers them; 960 for the system audio.
     var bufferSamples = 512
+    /// Whether the device delivers no buffers at a timestamp, in seconds.
+    var paused: (Double) -> Bool = { _ in false }
     /// Extra lateness of the buffer captured at a shared clock time, in seconds.
     var extraLateness: (Double, inout SeededRandom) -> Double = { _, _ in 0 }
 
@@ -54,6 +56,10 @@ struct SimulatedDevice {
         while true {
             let time = Double(index * bufferSamples) / Double(Self.sampleRate)
             if time > seconds { return buffers }
+            if paused(time) {
+                index += 1
+                continue
+            }
             let captured = time + offset(time)
             let lateness = Double(bufferSamples) / Double(Self.sampleRate) + random.jitter()
                 + extraLateness(captured, &random)
@@ -64,6 +70,15 @@ struct SimulatedDevice {
                 arrival: Int64((arrival * 1e9).rounded()), seconds: time))
             index += 1
         }
+    }
+
+    /// A device whose clock wanders ±`amplitude` seconds in a triangle of `period` seconds.
+    static func triangle(amplitude: Double, period: Double) -> SimulatedDevice {
+        SimulatedDevice(offset: { seconds in
+            let phase = (seconds / period).truncatingRemainder(dividingBy: 1)
+            let wave = phase < 0.25 ? 4 * phase : phase < 0.75 ? 2 - 4 * phase : 4 * phase - 4
+            return amplitude * wave
+        })
     }
 
     /// A device whose clock runs at `ppm` parts per million (negative: slow).

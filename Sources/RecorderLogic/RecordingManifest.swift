@@ -113,10 +113,10 @@ public struct RecordingManifest: Codable, Equatable, Sendable {
         public var end: Double?
         public var timecode: String
         public var state: State
-        /// The audio source's clock against the shared clock over the file,
-        /// in parts per million, positive when it runs fast: the clock drift
-        /// correction over the file's duration; nil until the file ends, and
-        /// for a file shorter than `clockDriftShortestFile`.
+        /// The audio source's clock drift at the file's end, in parts per
+        /// million, positive when its clock runs fast: the same the status
+        /// window and `--debug` show; nil until the file ends, and when it
+        /// was not measured.
         public var clockDriftPpm: Double?
         /// The seconds of sound the clock drift correction added to the file
         /// (negative: removed); nil until the file ends.
@@ -137,16 +137,15 @@ public struct RecordingManifest: Codable, Equatable, Sendable {
             clockDriftCorrection = nil
         }
 
-        /// The file ended after `duration` seconds, with `correction`
-        /// seconds of sound added: `clockDriftCorrection` to 0.0001 s and,
-        /// for a file long enough, `clockDriftPpm` to a tenth of a ppm.
-        public mutating func clockDrift(
-            correction: Double, duration: Double, shortest: Duration = RecorderValues.clockDriftShortestFile
-        ) {
-            clockDriftCorrection = (correction * 10_000).rounded() / 10_000
-            let isLongEnough = duration > 0 && duration * 1e9 >= Double(shortest.nanoseconds)
-            clockDriftPpm = isLongEnough ? (-correction / duration * 1e7).rounded() / 10 : nil
+        /// The file ended with `correction` seconds of sound added and the
+        /// clock drift `ppm`, if measured: `clockDriftCorrection` to 0.0001 s,
+        /// `clockDriftPpm` to a tenth of a ppm, neither negative zero.
+        public mutating func clockDrift(correction: Double, ppm: Double?) {
+            clockDriftCorrection = Self.withoutNegativeZero((correction * 10_000).rounded() / 10_000)
+            clockDriftPpm = ppm.map { Self.withoutNegativeZero(($0 * 10).rounded() / 10) }
         }
+
+        private static func withoutNegativeZero(_ value: Double) -> Double { value == 0 ? 0 : value }
 
         private enum CodingKeys: String, CodingKey {
             case name, audioSource, audioSourceUID, channels, start, end, timecode, state, clockDriftPpm, clockDriftCorrection

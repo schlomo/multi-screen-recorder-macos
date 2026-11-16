@@ -5,18 +5,29 @@
 /// timestamp runs more than `gapTolerance` ahead of the position its
 /// segment's sample count gives) and on a change of the channel count; the
 /// resampler is flushed at a segment's end. Within a segment the corrected
-/// chunks are contiguous: the first starts at the segment's first timestamp
+/// audio is contiguous: the first starts at the segment's first timestamp
 /// plus the correction applied by then, each further one where the one
 /// before ended; so a gap reaches the audio file and the guide track as a
-/// jump of its length, as without the correction. Times are nanoseconds on
-/// the shared clock.
+/// jump of its length, as without the correction. That rests on an
+/// assumption: a source's timestamps keep following its sample count across
+/// a gap. Times are nanoseconds on the shared clock.
 public struct ClockDriftCorrection: Sendable {
     /// Corrected samples, one array per channel, the first at `time`;
     /// `applied`: the correction applied up to its end, in seconds.
-    public struct Chunk: Equatable, Sendable {
+    public struct CorrectedAudio: Equatable, Sendable {
         public var time: Int64
         public var channels: [[Float]]
         public var applied: Double
+    }
+
+    /// A gap that started a new segment: its length, the correction
+    /// applied when it came, and the lateness of the buffers before and
+    /// after it, in seconds.
+    public struct Gap: Equatable, Sendable {
+        public var length: Int64
+        public var applied: Double
+        public var latenessBefore: Double
+        public var latenessAfter: Double
     }
 
     /// What the status window and `--debug` show of the correction.
@@ -41,6 +52,8 @@ public struct ClockDriftCorrection: Sendable {
     private var segment: Segment?
     /// The correction applied in the segments that ended.
     private var appliedBefore: Double = 0
+    /// The latest buffer's lateness, in seconds.
+    private var lateness: Double?
 
     private struct Segment {
         var resampler: ClockDriftResampler
@@ -70,44 +83,52 @@ public struct ClockDriftCorrection: Sendable {
     }
 
     /// A buffer whose first sample has the timestamp `time`, which arrived
-    /// at `arrival`: the corrected chunks it gives, the tail of a segment
-    /// that ended before it first.
-    public mutating func correct(_ channels: [[Float]], at time: Int64, arrival: Int64) -> [Chunk] {
+    /// at `arrival`: the corrected audio it gives, the tail of a segment
+    /// that ended before it first, and the gap before it, if any.
+    public mutating func correct(_ channels: [[Float]], at time: Int64, arrival: Int64) -> (audio: [CorrectedAudio], gap: Gap?) {
         let count = channels.first?.count ?? 0
-        var chunks: [Chunk] = []
+        let latenessNow = Double(arrival - time) / 1e9
+        var audio: [CorrectedAudio] = []
+        var gap: Gap?
         if let segment {
             let ahead = time - (segment.start + Self.nanoseconds(in: segment.inputSamples, sampleRate: sampleRate))
-            if segment.resampler.channelCount != channels.count || ahead > gapTolerance { chunks += flush() }
+            if ahead > gapTolerance {
+                audio += flush()
+                gap = Gap(length: ahead, applied: applied, latenessBefore: lateness ?? latenessNow, latenessAfter: latenessNow)
+            } else if segment.resampler.channelCount != channels.count {
+                audio += flush()
+            }
         }
+        lateness = latenessNow
         if segment == nil {
-            let applied = applied
+            let appliedNow = applied
             segment = Segment(
                 resampler: ClockDriftResampler(channelCount: channels.count, sampleRate: sampleRate),
-                start: time, correctedStart: time + Int64((applied * 1e9).rounded()), appliedBefore: applied)
+                start: time, correctedStart: time + Int64((appliedNow * 1e9).rounded()), appliedBefore: appliedNow)
         }
-        let appliedBefore = applied
+        let appliedBeforeBuffer = applied
         let outputBefore = segment!.resampler.outputCount
         let corrected = segment!.resampler.process(channels, rate: tracker.rate)
         segment!.inputSamples += Int64(count)
-        chunks += Self.chunk(corrected, of: segment!, outputBefore: outputBefore, applied: applied)
-        tracker.record(time: time, arrival: arrival, applied: appliedBefore)
-        return chunks
+        audio += Self.corrected(corrected, of: segment!, outputBefore: outputBefore, applied: applied)
+        tracker.record(time: time, arrival: arrival, applied: appliedBeforeBuffer)
+        return (audio, gap)
     }
 
-    /// Ends the current segment, if any: the resampler's tail as the last chunk.
-    public mutating func flush() -> [Chunk] {
+    /// Ends the current segment, if any: the resampler's tail as the last corrected audio.
+    public mutating func flush() -> [CorrectedAudio] {
         guard var segment else { return [] }
         let outputBefore = segment.resampler.outputCount
         let tail = segment.resampler.flush(rate: tracker.rate)
         appliedBefore = segment.appliedBefore + segment.resampler.applied
         self.segment = nil
-        return Self.chunk(tail, of: segment, outputBefore: outputBefore, applied: appliedBefore)
+        return Self.corrected(tail, of: segment, outputBefore: outputBefore, applied: appliedBefore)
     }
 
-    private static func chunk(_ channels: [[Float]], of segment: Segment, outputBefore: Int64, applied: Double) -> [Chunk] {
+    private static func corrected(_ channels: [[Float]], of segment: Segment, outputBefore: Int64, applied: Double) -> [CorrectedAudio] {
         guard let first = channels.first, !first.isEmpty else { return [] }
         let time = segment.correctedStart + nanoseconds(in: outputBefore, sampleRate: segment.resampler.sampleRate)
-        return [Chunk(time: time, channels: channels, applied: applied)]
+        return [CorrectedAudio(time: time, channels: channels, applied: applied)]
     }
 
     /// A sample count as nanoseconds, rounded down, without overflowing on long files.
