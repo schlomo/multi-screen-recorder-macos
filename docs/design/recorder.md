@@ -831,12 +831,14 @@ the metadata items (see "Output on disk").
   stopping hands it every mix handed over before, and its last mix
   takes, from the samples the sources delivered and not mixed yet, the
   rest up to the end of its video, without taking them from the other
-  display files. It waits for the writer as long as its ticks do, so its
-  guide tracks end with the video (D51). Should the samples not mixed
-  yet start after what the file received, it writes nothing more and
-  tells it as a problem at the file's end, never silence in their
-  place. A file ended by a failure (its writer failed or fell behind)
-  gets no last mix, so its guide tracks may end early.
+  display files. Its last mix is joined into one buffer per guide track,
+  cut at the end of the video, and waits for the writer as long as its
+  ticks do, so its guide tracks end with the video (D51). Should the
+  samples not mixed yet start after what the file received, it writes
+  up to there, never silence in their place; that, or a writer that
+  does not take the last mix in time, is told as a problem at the
+  file's end. A file ended by a failure (its writer failed or fell
+  behind) gets no last mix, so its guide tracks may end early.
 
 **Display identity.** A display is known by the UUID macOS gives it
 (`CGDisplayCreateUUIDFromDisplayID`), never by its display ID, which

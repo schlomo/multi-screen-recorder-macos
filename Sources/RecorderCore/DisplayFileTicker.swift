@@ -16,11 +16,29 @@ public protocol DisplayFileWriting: AnyObject {
 
 /// How a display file ended, for the recording manifest: its entry with
 /// its end, state and late frames, the writer's error, if any, and the
-/// guide tracks whose last mix could not be written.
+/// guide tracks that end before its video.
 public struct DisplayFileEnd: Equatable, Sendable {
     public var file: RecordingManifest.DisplayFile
     public var error: DisplayFileWriterError?
-    public var guideTracksCut: [GuideTrack] = []
+    public var guideTracksCut: [GuideTrackCut] = []
+}
+
+/// A guide track that ends before its display file's video, and why.
+public struct GuideTrackCut: Equatable, Sendable {
+    public enum Why: Equatable, Sendable {
+        /// The samples of its last mix were no longer there.
+        case samplesGone
+        /// The writer did not take its last samples within the drain timeout.
+        case writerTimedOut
+    }
+
+    public var guide: GuideTrack
+    public var why: Why
+
+    public init(guide: GuideTrack, why: Why) {
+        self.guide = guide
+        self.why = why
+    }
 }
 
 /// A display file's last mix: the hand-overs that reached it while it
@@ -162,38 +180,46 @@ public final class DisplayFileTicker {
     /// Ends the file: writes the ticks due by `now` and, with
     /// `writeWaitingTicks`, those still waiting, for at most the drain
     /// timeout on a clock that does not count sleep, and the guide tracks
-    /// up to the video's end from `lastMix`, given that end, waiting for
-    /// the writer as long again; then always finalizes. A guide track whose
-    /// peek starts after what the file received is not written further:
-    /// `guideTracksCut`, never silence. A file ended by a failure gets no
-    /// last mix. Nil when no file had started.
+    /// up to the video's end from `lastMix`, given that end, each joined
+    /// into one buffer that waits for the writer as long again; then always
+    /// finalizes. A guide track whose last mix has a hole after what the
+    /// file received is written up to the hole, never filled with silence,
+    /// and one the writer does not take in time is not written further:
+    /// both are `guideTracksCut`. A file ended by a failure gets no last
+    /// mix. Nil when no file had started.
     public func finish(
         now: Int64, writeWaitingTicks: Bool,
         lastMix: (_ videoEnd: Int64) -> GuideLastMix = { _ in GuideLastMix(pending: [], peeks: [:]) }
     ) async -> DisplayFileEnd? {
         guard let writer, var file = entry else { return nil }
-        var cut: [GuideTrack] = []
+        var cut: [GuideTrackCut] = []
         if writerError == nil, writeWaitingTicks {
             _ = tick(now: now)
             if writerError == nil { await drain(writer) }
             if writerError == nil, let lastTick = ticks.lastWrittenTick {
                 let perTick = Int64(RecorderValues.audioSampleRate) / Int64(ticks.grid.framesPerSecond)
-                let last = lastMix((lastTick + 1) * perTick)
-                for chunk in last.pending {
-                    _ = receiveGuide(chunk.guide, chunk.channels, positionFromStart: chunk.positionFromStart)
-                }
+                let videoEnd = (lastTick + 1) * perTick
+                let fileStart = writer.firstTick * perTick
+                let last = lastMix(videoEnd)
                 for guide in [GuideTrack.microphones, .systemAudio] {
-                    guard let peek = last.peeks[guide], let count = peek.channels.first?.count else { continue }
-                    let from = guidesReceivedUpTo[guide] ?? writer.firstTick * perTick
-                    guard peek.start <= from else {
-                        cut.append(guide)
-                        continue
-                    }
-                    let skip = Int(min(Int64(count), from - peek.start))
-                    _ = receiveGuide(guide, peek.channels.map { Array($0[skip...]) }, positionFromStart: from)
+                    var parts = last.pending.filter { $0.guide == guide }.map { (start: $0.positionFromStart, channels: $0.channels) }
+                    if let peek = last.peeks[guide] { parts.append((peek.start, peek.channels)) }
+                    let from = guidesReceivedUpTo[guide] ?? fileStart
+                    let joined = Self.joined(parts, from: from, upTo: videoEnd)
+                    if joined.hasHole { cut.append(GuideTrackCut(guide: guide, why: .samplesGone)) }
+                    guard let count = joined.channels.first?.count, count > 0 else { continue }
+                    guidesReceivedUpTo[guide] = from + Int64(count)
+                    // One buffer, so the bound on waiting hand-overs drops none of it.
+                    waitingGuides.append((guide, from - fileStart, joined.channels))
                 }
             }
-            if writerError == nil { await drainGuides(writer) }
+            if writerError == nil {
+                await drainGuides(writer)
+                for guide in [GuideTrack.microphones, .systemAudio]
+                where waitingGuides.contains(where: { $0.guide == guide }) && !cut.contains(where: { $0.guide == guide }) {
+                    cut.append(GuideTrackCut(guide: guide, why: .writerTimedOut))
+                }
+            }
         }
         waitingGuides = []
         do {
@@ -208,6 +234,26 @@ public final class DisplayFileTicker {
         self.writer = nil
         ticks = TickLoop(notBefore: ticks.notBefore)
         return DisplayFileEnd(file: file, error: writerError, guideTracksCut: cut)
+    }
+
+    /// The parts of a last mix, in order, joined from the sample position
+    /// `from` up to `end`; a part starting after what is joined so far is a
+    /// hole, and joining stops there.
+    static func joined(_ parts: [(start: Int64, channels: [[Float]])], from: Int64, upTo end: Int64)
+        -> (channels: [[Float]], hasHole: Bool) {
+        var joined: [[Float]] = []
+        var position = from
+        for part in parts where position < end {
+            guard part.start <= position else { return (joined, true) }
+            guard let count = part.channels.first?.count else { continue }
+            let skip = Int(min(Int64(count), position - part.start))
+            let take = Int(min(Int64(count - skip), end - position))
+            guard take > 0 else { continue }
+            if joined.isEmpty { joined = Array(repeating: [], count: part.channels.count) }
+            for channel in joined.indices { joined[channel] += part.channels[channel][skip..<(skip + take)] }
+            position += Int64(take)
+        }
+        return (joined, false)
     }
 
     private func drainGuides(_ writer: any DisplayFileWriting) async {

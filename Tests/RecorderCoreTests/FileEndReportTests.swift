@@ -26,14 +26,16 @@ private func failedEvent(at seconds: Double, error: String) -> RecordingEvent {
 @Suite struct FileEndReportTests {
     @Test func guideTracksCutAtTheEndAreAProblemWithoutAnEvent() {
         var end = fileEnd(nil)
-        end.guideTracksCut = [.microphones]
+        end.guideTracksCut = [GuideTrackCut(guide: .microphones, why: .samplesGone), GuideTrackCut(guide: .systemAudio, why: .writerTimedOut)]
         let report = FileEndReport(reason: nil, end: end, display: "LG", at: 3 * second)
         #expect(report.event == nil)
         #expect(report.problem == RecordingProblem(
-            at: 12_500_000_000, problem: "Display file f.mov", error: FileEndReport.guideTracksCut([.microphones])))
+            at: 12_500_000_000, problem: "Display file f.mov",
+            error: "the guide track \"Microphones\" ends before the video: the samples of its last mix were no longer there; "
+                + "the guide track \"System audio\" ends before the video: the writer did not take its last samples in time"))
         // A writer's error says more and wins.
         var failed = fileEnd(writerError("cannot write f.mov: no luck"))
-        failed.guideTracksCut = [.microphones]
+        failed.guideTracksCut = [GuideTrackCut(guide: .microphones, why: .samplesGone)]
         #expect(FileEndReport(reason: nil, end: failed, display: "LG", at: 3 * second).problem?.error == "cannot write f.mov: no luck")
     }
 

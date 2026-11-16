@@ -9,14 +9,19 @@ struct FileEndReport: Equatable {
     var event: RecordingEvent?
     var problem: RecordingProblem?
 
-    /// `reason` is nil when the recorder stopped the capture; `now` is the
-    /// time on the shared clock, the time of the report when no file ended.
-    /// The problem's text for guide tracks whose last mix was not written.
-    static func guideTracksCut(_ guides: [GuideTrack]) -> String {
-        "the guide tracks " + guides.map { "\"\($0.name)\"" }.joined(separator: " and ")
-            + " end before the video: the samples of their last mix were no longer there"
+    /// The problem's text for guide tracks that end before the video.
+    static func guideTracksCut(_ cuts: [GuideTrackCut]) -> String {
+        cuts.map { cut in
+            let why = switch cut.why {
+            case .samplesGone: "the samples of its last mix were no longer there"
+            case .writerTimedOut: "the writer did not take its last samples in time"
+            }
+            return "the guide track \"\(cut.guide.name)\" ends before the video: \(why)"
+        }.joined(separator: "; ")
     }
 
+    /// `reason` is nil when the recorder stopped the capture; `now` is the
+    /// time on the shared clock, the time of the report when no file ended.
     init(reason: DisplayTracker.StreamEnd?, end: DisplayFileEnd?, display: String, at now: Int64) {
         let reasonError: String? = switch reason {
         case .writerFailed(let error): error
