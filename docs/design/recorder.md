@@ -418,10 +418,11 @@ capture in macOS's own processes, `VTEncoderXPCService`, `replayd`,
 recording is finalized. `problems` lists every problem told to the
 person, also those that leave `result` `ok`, each with `at`,
 `problem` (what went wrong) and `error` (the full error text, or null).
-A failure is told at its event's time; one that no problem at its
-time tells, and a file not finalized that no problem names, is listed
-when the recording is finalized, so a `result` of `problems` always
-comes with its problems.
+A failure is told at its event's time. When the recording is
+finalized, a failure counts as told when a problem about its display
+or audio source was told at or before its time; one that is not, and a
+file not finalized that no problem names, is listed then, so a
+`result` of `problems` always comes with its problems.
 `events` and `problems` are written in the order of their time.
 An audio file's `audioSource` is the audio input's name (see "Audio
 input names" below) or `System audio`; `audioSourceUID` the input's
@@ -504,6 +505,9 @@ checked, reported or rewritten at the next start (D47).
     `default-microphone`; with `wired` every input but the default one
     that is not built-in or wired; and the system audio row when it is
     off.
+  - The table's digits are all one width, so the GB/h max figures, the
+    Total's included, line up on the decimal point; only the Total's
+    label is bold.
   - GB/h max is numbers only (D46), with one decimal; under 0.05 it shows
     "<0.1", and "?" when the rate cannot be told (an input whose
     channels cannot be read).
@@ -536,8 +540,10 @@ checked, reported or rewritten at the next start (D47).
   microphone switches it to call quality, and a virtual microphone
   often carries a copy of other sound." Then system audio and output
   folder, which stay as they are; the ready check, with "Check again";
-  and, in the lower right corner, Cancel and Start. Cancel quits the
-  app without recording, as Cmd-Q does. A change of a choice is saved at once; if the settings file
+  and, in the lower right corner, Cancel and Start, Start on the right
+  in blue as the call to action. Cancel quits the app without
+  recording, as Cmd-Q does. Esc presses Cancel and quits; Return
+  presses Start. A change of a choice is saved at once; if the settings file
   cannot be written, a red line says so. The window has no "Reset to
   defaults": a settings file is never refused.
   The table and the line below it are the same data that `msr check`
@@ -586,7 +592,9 @@ checked, reported or rewritten at the next start (D47).
   second, with the line "Encoding and capture also run in macOS's own
   processes (VTEncoderXPCService, replayd, WindowServer), which this
   number does not include."; the problems in red, with the command for
-  the log (see "Logging"); and [Stop] [Continue]. It refreshes every second
+  the log (see "Logging"); and, in the lower right corner, Continue and
+  Stop, Stop on the right in blue as the call to action. Esc presses
+  Continue; Return presses Stop. It refreshes every second
   while open; Continue closes it. A display file whose size cannot be
   read makes its display's Written `?`, and the line's data written
   `? GB`. Free space that the volume does not report is a problem as a
@@ -849,11 +857,15 @@ the metadata items (see "Output on disk").
   stopping hands it every mix handed over before, and its last mix
   takes, from the samples the sources delivered and not mixed yet, the
   rest up to the end of its video, without taking them from the other
-  display files. Its last mix is joined into one buffer per guide track,
+  display files. Before it takes its last mix, a display file waits
+  until every source in each guide track has delivered its samples up
+  to the end of its video, for at most 2 s (`audioWaitBoundSeconds`,
+  *data*); if the wait runs out, it mixes what is there, and a source's
+  samples that have not come are silence in it. At Stop the audio
+  sources stop only after every display file's last mix. Its last mix
+  is joined into one buffer per guide track,
   cut at the end of the video, and waits for the writer as long as its
-  ticks do, so its guide tracks end with the video (D51). At Stop the
-  audio sources stop only after every display file's last mix, so the
-  sound up to the video's end is there to mix. Should the
+  ticks do, so its guide tracks end with the video (D51). Should the
   samples not mixed yet start after what the file received, it writes
   up to there, never silence in their place; that, or a writer that
   does not take the last mix in time, is told as a problem at the

@@ -192,7 +192,7 @@ public final class DisplayFileTicker {
     /// mix. Nil when no file had started.
     public func finish(
         now: Int64, writeWaitingTicks: Bool,
-        lastMix: (_ videoEnd: Int64) -> GuideLastMix = { _ in GuideLastMix(pending: [], peeks: [:]) }
+        lastMix: (_ videoEnd: Int64) async -> GuideLastMix = { _ in GuideLastMix(pending: [], peeks: [:]) }
     ) async -> DisplayFileEnd? {
         guard let writer, var file = entry else { return nil }
         var cut: [GuideTrackCut] = []
@@ -203,7 +203,7 @@ public final class DisplayFileTicker {
                 let perTick = Int64(RecorderValues.audioSampleRate) / Int64(ticks.grid.framesPerSecond)
                 let videoEnd = (lastTick + 1) * perTick
                 let fileStart = writer.firstTick * perTick
-                let last = lastMix(videoEnd)
+                let last = await lastMix(videoEnd)
                 for guide in [GuideTrack.microphones, .systemAudio] {
                     var parts = last.pending.filter { $0.guide == guide }.map { (start: $0.positionFromStart, channels: $0.channels) }
                     if let peek = last.peeks[guide] { parts.append((peek.start, peek.channels)) }

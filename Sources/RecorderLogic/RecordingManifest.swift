@@ -318,18 +318,25 @@ public struct RecordingManifest: Codable, Equatable, Sendable {
         self.cpu = cpu
     }
 
-    /// The failures no problem at their time tells, and the files not
-    /// finalized that no problem names.
+    /// The failures no problem tells, and the files not finalized that no
+    /// problem names. A failure is told by a problem about its display or
+    /// audio source at or before its time, also one listed here for an
+    /// earlier failure; a failure about neither, by a problem at its time.
     private var untoldProblems: [RecordingProblem] {
-        let failures = events.filter { event in
-            event.event.isFailure && !problems.contains { $0.at == event.at }
-        }.map(\.problem)
-        let named = { (name: String) in problems.contains { $0.text.contains(name) } }
+        var told = problems
+        for event in events.sorted(by: { $0.at < $1.at }) where event.event.isFailure {
+            let isTold = told.contains { problem in
+                if let subject = event.subject { problem.at <= event.at && problem.problem.contains(subject) }
+                else { problem.at == event.at }
+            }
+            if !isTold { told.append(event.problem) }
+        }
+        let named = { (name: String) in told.contains { $0.text.contains(name) } }
         let displayFiles = files.filter { $0.state != .finalized && !named($0.name) }
             .map { RecordingProblem(atSeconds: $0.end ?? $0.start, problem: "Display file \($0.name)", error: "not finalized") }
         let audioFiles = audioFiles.filter { $0.state != .finalized && !named($0.name) }
             .map { RecordingProblem(atSeconds: $0.end ?? $0.start, problem: "Audio file \($0.name)", error: "not finalized") }
-        return failures + displayFiles + audioFiles
+        return Array(told.dropFirst(problems.count)) + displayFiles + audioFiles
     }
 
     /// "2026-11-12T14:03:05.120+01:00".

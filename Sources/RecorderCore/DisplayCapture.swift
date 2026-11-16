@@ -307,9 +307,12 @@ public final class DisplayCapture: NSObject, @unchecked Sendable, SCStreamOutput
         await lifecycle.stop()
         let (stream, ticker, listener) = queue.sync { (self.stream, self.ticker, self.guideListener) }
         if let stream { try? stream.removeStreamOutput(self, type: .screen) }
-        // The file listens until its last mix: stopping hands it every
-        // hand-over before, queued here, and peeks at what comes after.
+        // The file listens until its last mix: once the sources have
+        // delivered up to the video's end, or the wait ran out, stopping
+        // hands it every hand-over before, queued here, and peeks at what
+        // comes after.
         let file = await ticker?.finish(now: context.now(), writeWaitingTicks: writeWaitingTicks) { [guides, queue] videoEnd in
+            _ = await guides.waitUntilReceived(upTo: videoEnd, bound: .seconds(RecorderValues.audioWaitBoundSeconds))
             let peeks = listener.map { guides.stopListening($0, peekingUpTo: videoEnd) } ?? [:]
             let pending = queue.sync {
                 defer { self.endingGuides = [] }

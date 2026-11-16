@@ -1454,8 +1454,10 @@ architect's reading.
      (`RecorderValues.displayFileLateTickSeconds`), up from 2 s; the
      display file's end waits as long for its writer; the guide track
      wait and the audio drain keep 2 s
-     (`RecorderValues.audioWaitBoundSeconds`). Stop can take up to 6 s
-     longer, but only when the encoder is behind.
+     (`RecorderValues.audioWaitBoundSeconds`). Stop can take up to 8 s
+     longer than before, and only when the encoder is behind (the
+     waiting ticks and the last guide samples wait one after the
+     other).
 - **Consequences:** The homepage no longer needs a second long-lived
   branch; it depends on the owner's Cloudflare account. The disk checks
   ask for about twice the space an hour usually takes. A tester who

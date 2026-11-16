@@ -17,6 +17,23 @@ import Testing
         return (x < 0 ? -1 : 1) * (knee + (1 - knee) * tanh((abs(x) - knee) / (1 - knee)))
     }
 
+    /// At Stop the last mix waits until every source has delivered up to the video's end.
+    @Test func theMixHasReceivedUpToAPositionWhenEverySourceReachesIt() {
+        var guide = mix()
+        #expect(guide.hasReceived(upTo: 10))
+        guide.add(source: "Razer", channelCount: 1)
+        guide.add(source: "BRIO", channelCount: 2)
+        guide.receive([[Float](repeating: 0.1, count: 10)], from: "Razer", at: 0)
+        guide.receive([[Float](repeating: 0.1, count: 6), [Float](repeating: 0.1, count: 6)], from: "BRIO", at: 0)
+        #expect(guide.hasReceived(upTo: 6))
+        #expect(!guide.hasReceived(upTo: 10))
+        guide.receive([[Float](repeating: 0.1, count: 4), [Float](repeating: 0.1, count: 4)], from: "BRIO", at: 6 * millisecond)
+        #expect(guide.hasReceived(upTo: 10))
+        _ = guide.mix(upTo: 8)
+        #expect(guide.hasReceived(upTo: 10))
+        #expect(!guide.hasReceived(upTo: 11))
+    }
+
     @Test func eachSourceIsAveragedToMonoAndTheSourcesAreSummedAtUnityGain() {
         var guide = mix()
         guide.add(source: "MacBook Pro Microphone", channelCount: 1)
