@@ -2,15 +2,15 @@
 
 ## Next session starts here
 
-PR #14 (naming and window polish, D55) merged 2026-11-16; release
-`v0.20261116.43`. The homepage is live at
-`multiscreenrecorder.schapiro.org` (Cloudflare Workers Builds, D53).
-The owner's goal (2026-11-16): "I'd like to come to a working app I
-can share with friendly testers ASAP and then keep optimizing". Next:
-queued item 1a, the homepage screenshot from `v0.20261116.43`, in a
-homepage-only PR; it is also the first check that Cloudflare's preview
-URL works on a PR (it gave none on PR #13). Then the owner shares the
-release with testers. Then: item 3, the end-to-end tests; item 4, the
+The first tester release is out: release `v0.20261116.43` (PR #14),
+the homepage with screenshots of both windows (PR #15) and the tester
+guide's "What to test and send" (PR #16), all merged 2026-11-16. The
+owner shares it with colleagues, who email a screenshot of the start
+window, `recording.json` of every recording and a few sentences; the
+architect triages what comes back into this backlog. Next: queued item
+1, the command line polish (the owner signed off the design as text,
+2026-11-16: "the next PR should roll that stuff in"), then item 1a,
+audio only. Then: item 3, the end-to-end tests; item 4, the
 simplification; item 7, auto-recovery from disturbances; item 6, CPU;
 item 5, drift correction; then item 16, the Mac App Store and Homebrew
 (the owner, 2026-11-16: "sandbox then comes after the
@@ -37,8 +37,45 @@ Nothing.
 
 ## Queued
 
-1a. **Homepage screenshot**: the start window from release
-   `v0.20261116.43`, in a homepage-only PR (no app release).
+1. **Command line polish** (the owner, 2026-11-16, on `msr check`
+   and `msr list`: "seems to me like check and list show nearly the
+   same info but differently, maybe worth consolidating? Also, check
+   doesn't show the settings it applies, only the effect. And in the
+   console output it is not obvious why BlackHole is not recorded";
+   the design signed off as text: "I agree with your plan, but maybe
+   add (virtual) to the name, same like default and set "-" instead of
+   0 for the GB/h ... the next PR should roll that stuff in"):
+   - One renderer for the "What will be recorded" table, used by
+     `msr check`, `msr record` and `msr list`. `msr list` prints the
+     same table without the ready check and stays the command that
+     never asks for a permission.
+   - A settings line above the table with the effective settings,
+     flags applied, e.g. `Settings: Auto (resolution Native, audio
+     mode Wired), system audio on`.
+   - An audio input the audio mode leaves out: its name keeps the
+     column of the other names, the `Audio <n> - ` part left blank;
+     the reason follows the name in parentheses like "(default)":
+     "(virtual)", and by the same rule "(Bluetooth)" [the Bluetooth
+     label is the architect's extension of the owner's "(virtual)";
+     confirm in the brief]; GB/h shows `-`, not 0. Under audio mode
+     None or Default microphone the settings line gives the reason.
+   - The ready check's "Fix:" lines wrap with their indent.
+   - `msr list`'s system audio line says that the program running
+     `msr` (a terminal app) lacks the Screen & System Audio Recording
+     permission, not the app (the owner saw "not available" in
+     Terminal on 2026-11-16 although the app has it).
+   - Open: whether the window's table also shows "(virtual)" and `-`
+     (it dims the row today); ask the owner in the brief.
+1a. **Audio only** (the owner, 2026-11-16: "video resolution needs a
+   none mode to disable screen recording and record audio only. cost
+   nothing and adds use cases and I accept the potential misnomer,
+   application name stays for now"): a recording resolution None,
+   in the window's slider and as `--resolution none`, records no
+   screen. To settle in the design: what auto mode does (it stays
+   Native); the ready check without screens (system audio still needs
+   the Screen & System Audio Recording permission, the microphone
+   alone does not); no screen file means no guide tracks; a recording
+   with neither screens nor audio refuses to start.
 2. **Toolchain catch-up** (D28): the pipeline builds with Xcode 26.6,
    Swift 6.3 and Python 3.15, the newest on GitHub's generally
    available runner image (D32 for Python), while the owner's Mac has
@@ -386,6 +423,11 @@ Nothing.
 
 ## Deliberately deferred
 
+- **A new app name.** With audio only (queued item 1a) "Multi Screen
+  Recorder" can be a misnomer; the owner accepts that (2026-11-16):
+  "application name stays for now till somebody comes up with a
+  really great improvement on the name". Revive when someone proposes
+  a name the owner finds really great.
 - **Skipping the MacBook microphone while the lid is closed**: Apple
   silicon MacBooks disconnect it in hardware then, so its file holds
   only zeros (seen 2026-11-16). Harmless; revisit with item 11 (an input
@@ -511,6 +553,19 @@ Nothing.
 
 ## Done (recent)
 
+- 2026-11-16: PR #16 merged by the owner: the tester guide's "What to
+  test and send" (a one-hour recording, a screenshot of the start
+  window, `recording.json` of every recording, a few sentences; not
+  the recordings). The owner's idea: the screenshot instead of `msr
+  version` and `msr list`, whose permissions are Terminal's. Reviews:
+  standard tier (Markdown only), two delta rounds.
+- 2026-11-16: PR #15 merged by the owner: the homepage shows the start
+  and status windows and fits phones (measured at 320 and 375 px).
+  Cloudflare's preview URL worked for the first time (PR #13 had
+  none). A Retina screenshot is named `-2x.png`: Cloudflare redirects
+  URLs with `@`. Reviews: one top tier, two delta rounds. Leftover:
+  the start window screenshot is 1x and looks soft on Retina screens;
+  retaking it is the owner's call (`homepage/README.md` says how).
 - 2026-11-16: PR #14 merged by the owner: naming and window polish
   (D55): `Screen <n>`, `Audio <n>`, `Audio 0 - System`, the "Audio
   inputs" guide mix, icons in the window table, the tagline in the
