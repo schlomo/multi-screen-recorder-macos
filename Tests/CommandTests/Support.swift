@@ -11,8 +11,9 @@ struct CommandOutcome {
 /// Runs a program with exactly the given environment, so nothing of the
 /// ambient one leaks into what is tested; PATH is passed through. Output and
 /// errors go to files, so a child filling either cannot block on a full pipe.
+/// Waits for the program's end without blocking a thread of the test's pool.
 func run(_ program: URL, _ arguments: [String] = [], environment: [String: String] = [:],
-         in folder: URL? = nil) throws -> CommandOutcome {
+         in folder: URL? = nil) async throws -> CommandOutcome {
     let process = Process()
     process.executableURL = program
     process.arguments = arguments
@@ -33,8 +34,14 @@ func run(_ program: URL, _ arguments: [String] = [], environment: [String: Strin
     defer { try? output.close(); try? errors.close() }
     process.standardOutput = output
     process.standardError = errors
-    try process.run()
-    process.waitUntilExit()
+    try await withCheckedThrowingContinuation { (ended: CheckedContinuation<Void, any Error>) in
+        process.terminationHandler = { _ in ended.resume() }
+        do {
+            try process.run()
+        } catch {
+            ended.resume(throwing: error)
+        }
+    }
     return CommandOutcome(
         status: process.terminationStatus,
         output: String(decoding: try Data(contentsOf: outputFile), as: UTF8.self),

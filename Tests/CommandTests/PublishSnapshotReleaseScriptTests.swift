@@ -12,7 +12,7 @@ import Testing
     private let ghLog: URL
     private var head = ""
 
-    init() throws {
+    init() async throws {
         scratch = try ScratchFolder("PublishSnapshotReleaseScriptTests")
         checkout = scratch.url.appending(path: "checkout", directoryHint: .isDirectory)
         bin = scratch.url.appending(path: "bin", directoryHint: .isDirectory)
@@ -24,9 +24,9 @@ import Testing
         try FileManager.default.copyItem(
             at: repositoryRoot.appending(path: "scripts/publish-snapshot-release"),
             to: checkout.appending(path: "scripts/publish-snapshot-release"))
-        try git("init", "--quiet", "--initial-branch=main")
-        try git("commit", "--quiet", "--allow-empty", "--message=one")
-        head = try git("rev-parse", "HEAD")
+        try await git("init", "--quiet", "--initial-branch=main")
+        try await git("commit", "--quiet", "--allow-empty", "--message=one")
+        head = try await git("rev-parse", "HEAD")
         let version = "0.20261115.2-pr7+\(head.prefix(7))"
         try PropertyListSerialization.data(fromPropertyList: ["MSRVersion": version], format: .xml, options: 0)
             .write(to: contents.appending(path: "Info.plist"))
@@ -34,8 +34,8 @@ import Testing
     }
 
     @discardableResult
-    private func git(_ arguments: String...) throws -> String {
-        let outcome = try run(URL(filePath: "/usr/bin/env"), ["git"] + arguments, environment: [
+    private func git(_ arguments: String...) async throws -> String {
+        let outcome = try await run(URL(filePath: "/usr/bin/env"), ["git"] + arguments, environment: [
             "HOME": scratch.url.path(percentEncoded: false),
             "GIT_CONFIG_NOSYSTEM": "1",
             "GIT_CONFIG_GLOBAL": "/dev/null",
@@ -67,9 +67,9 @@ import Testing
         try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: gh.path(percentEncoded: false))
     }
 
-    private func publish(_ environment: [String: String] = ["PR_NUMBER": "7"]) throws -> CommandOutcome {
+    private func publish(_ environment: [String: String] = ["PR_NUMBER": "7"]) async throws -> CommandOutcome {
         let path = try #require(ProcessInfo.processInfo.environment["PATH"])
-        return try run(checkout.appending(path: "scripts/publish-snapshot-release"),
+        return try await run(checkout.appending(path: "scripts/publish-snapshot-release"),
                        environment: environment.merging(["PATH": "\(bin.path(percentEncoded: false)):\(path)"]) { given, _ in given },
                        in: scratch.url)
     }
@@ -79,20 +79,20 @@ import Testing
         return try String(contentsOf: ghLog, encoding: .utf8).split(separator: "\n").map(String.init)
     }
 
-    @Test func aClosedPRPublishesNothing() throws {
+    @Test func aClosedPRPublishesNothing() async throws {
         defer { scratch.remove() }
         try stubGH(state: "MERGED", headRefOid: head)
-        let outcome = try publish()
+        let outcome = try await publish()
         #expect(outcome.status == 0, "\(outcome.errors)")
         #expect(outcome.errors.contains(
             "PR #7 is MERGED, not open; publishing nothing and removing its snapshot release if one is left"))
         #expect(try ghCalls() == ["pr view 7 --json state,headRefOid", "release list --limit 1000 --json tagName"])
     }
 
-    @Test func aClosedPRLosesItsSnapshotRelease() throws {
+    @Test func aClosedPRLosesItsSnapshotRelease() async throws {
         defer { scratch.remove() }
         try stubGH(state: "CLOSED", headRefOid: head, releaseTags: ["pr-6", "pr-7"])
-        let outcome = try publish()
+        let outcome = try await publish()
         #expect(outcome.status == 0, "\(outcome.errors)")
         #expect(outcome.errors.contains(
             "PR #7 is CLOSED, not open; publishing nothing and removing its snapshot release if one is left"))
@@ -103,41 +103,41 @@ import Testing
         ])
     }
 
-    @Test func aPRNowAtAnotherCommitPublishesNothing() throws {
+    @Test func aPRNowAtAnotherCommitPublishesNothing() async throws {
         defer { scratch.remove() }
         let other = String(repeating: "1", count: 40)
         try stubGH(state: "OPEN", headRefOid: other)
-        let outcome = try publish()
+        let outcome = try await publish()
         #expect(outcome.status == 0, "\(outcome.errors)")
         #expect(outcome.errors.contains("PR #7 is now at \(other), not \(head); publishing nothing"))
         #expect(try ghCalls() == ["pr view 7 --json state,headRefOid"])
     }
 
-    @Test func anOpenPRAtThisCommitIsPublished() throws {
+    @Test func anOpenPRAtThisCommitIsPublished() async throws {
         defer { scratch.remove() }
         try stubGH(state: "OPEN", headRefOid: head)
-        let outcome = try publish()
+        let outcome = try await publish()
         #expect(outcome.status == 0, "\(outcome.errors)")
         let calls = try ghCalls()
         #expect(calls.count == 3)
         #expect(calls.last?.hasPrefix("release create pr-7 build/Multi Screen Recorder 0.20261115.2-pr7+") == true, "\(calls)")
     }
 
-    @Test func aMissingPRNumberStops() throws {
+    @Test func aMissingPRNumberStops() async throws {
         defer { scratch.remove() }
         try stubGH(state: "OPEN", headRefOid: head)
-        let outcome = try publish([:])
+        let outcome = try await publish([:])
         #expect(outcome.status == 1)
         #expect(outcome.errors.contains("PR_NUMBER is not set"))
         #expect(try ghCalls().isEmpty)
     }
 
     @Test(arguments: InfoPlistDamage.allCases)
-    func aDamagedInfoPlistStops(damage: InfoPlistDamage) throws {
+    func aDamagedInfoPlistStops(damage: InfoPlistDamage) async throws {
         defer { scratch.remove() }
         try stubGH(state: "OPEN", headRefOid: head)
         try damage.write(to: checkout.appending(path: "build/Multi Screen Recorder.app/Contents/Info.plist"))
-        let outcome = try publish()
+        let outcome = try await publish()
         #expect(outcome.status == 1)
         #expect(outcome.errors.contains(damage.message), "\(outcome.errors)")
         #expect(!outcome.errors.contains("Traceback"))
@@ -146,7 +146,7 @@ import Testing
 
     /// scripts/publish-release reads the same Info.plist, with plutil.
     @Test(arguments: InfoPlistDamage.allCases)
-    func publishReleaseStopsOnADamagedInfoPlist(damage: InfoPlistDamage) throws {
+    func publishReleaseStopsOnADamagedInfoPlist(damage: InfoPlistDamage) async throws {
         defer { scratch.remove() }
         try stubGH(state: "OPEN", headRefOid: head)
         try FileManager.default.copyItem(
@@ -154,7 +154,7 @@ import Testing
             to: checkout.appending(path: "scripts/publish-release"))
         try damage.write(to: checkout.appending(path: "build/Multi Screen Recorder.app/Contents/Info.plist"))
         let path = try #require(ProcessInfo.processInfo.environment["PATH"])
-        let outcome = try run(checkout.appending(path: "scripts/publish-release"),
+        let outcome = try await run(checkout.appending(path: "scripts/publish-release"),
                               environment: ["RELEASE_BUILD": "true", "PATH": "\(bin.path(percentEncoded: false)):\(path)"],
                               in: scratch.url)
         #expect(outcome.status == 1)

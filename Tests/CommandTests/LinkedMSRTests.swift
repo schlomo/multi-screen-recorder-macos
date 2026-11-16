@@ -25,24 +25,24 @@ import Testing
             .write(to: contents.appending(path: "Info.plist"))
     }
 
-    private func version(of program: URL) throws -> CommandOutcome {
-        try run(program, ["version"], environment: ["HOME": scratch.url.path(percentEncoded: false)])
+    private func version(of program: URL) async throws -> CommandOutcome {
+        try await run(program, ["version"], environment: ["HOME": scratch.url.path(percentEncoded: false)])
     }
 
-    @Test func theBundledMSRShowsItsVersion() throws {
+    @Test func theBundledMSRShowsItsVersion() async throws {
         defer { scratch.remove() }
-        let outcome = try version(of: bundledMSR)
+        let outcome = try await version(of: bundledMSR)
         #expect(outcome.status == 0)
         #expect(outcome.output == "0.20261115.9-dev+abcdef0 (abcdef0)\n")
     }
 
-    @Test func aLinkToTheBundledMSRShowsTheSameVersion() throws {
+    @Test func aLinkToTheBundledMSRShowsTheSameVersion() async throws {
         defer { scratch.remove() }
         let bin = scratch.url.appending(path: "bin", directoryHint: .isDirectory)
         try FileManager.default.createDirectory(at: bin, withIntermediateDirectories: false)
         let link = bin.appending(path: "msr")
         try FileManager.default.createSymbolicLink(at: link, withDestinationURL: bundledMSR)
-        let outcome = try version(of: link)
+        let outcome = try await version(of: link)
         #expect(outcome.status == 0)
         #expect(outcome.output == "0.20261115.9-dev+abcdef0 (abcdef0)\n")
     }
