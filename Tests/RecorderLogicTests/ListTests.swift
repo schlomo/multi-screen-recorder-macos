@@ -66,6 +66,12 @@ import Testing
         #expect(unreadableRecordedInputs([unreadableDefault], settings: none).isEmpty)
     }
 
+    /// One that cannot be opened is not recorded, so it is not judged.
+    @Test func aRecordedInputWithoutAUIDThatCannotBeReadDoesNotCount() {
+        let noUID = AudioInputInfo(name: "Y", channelCount: .failure(DeviceReadError("no format")), isDefault: true)
+        #expect(unreadableRecordedInputs([noUID], settings: .manual).isEmpty)
+    }
+
     @Test func theDesignShowsTheExample() throws {
         #expect(try repositoryFile("docs/design/recorder.md").contains("```\n\(Self.designExample)```\n"))
     }

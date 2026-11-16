@@ -25,7 +25,7 @@ signature); if that fails it exits 71 (`EX_OSERR`).
 | Command | Does | Exit code |
 |---|---|---|
 | `msr list` | Shows screens, audio inputs and system audio | 0, 1 when the screens, the audio inputs or an audio input the settings record cannot be read |
-| `msr check [flags] [--debug]` | Prints "What will be recorded", then runs the ready check and prints each item; `--debug` adds detail on standard error and in the log | 0 ready, 1 not ready |
+| `msr check [flags] [--debug]` | Prints the banner and "What will be recorded", then runs the ready check and prints each item; `--debug` adds detail on standard error and in the log | 0 ready, 1 not ready |
 | `msr record [flags] [--duration 1h30m] [--debug]` | Records the screens and the audio sources (the recording core, D45, D49). Without flags it does what Start in the window does, with the same settings file; it prints the banner (as `msr check`) and "What will be recorded" at its start, then runs the ready check, records until Ctrl-C, SIGTERM, SIGHUP, the duration or Stop in the status window (below), and prints the recording folder at the start and a summary at the end: every file with its state and our process's CPU use, average and peak. It runs as a full AppKit app without a Dock icon (the `accessory` activation policy) until the ready check passed and the recording starts, then shows the icon; a run that is not ready shows none, and an icon macOS refuses is a problem, and the recording goes on (Ctrl-C stops it); while it records, the icon shows with its badge, and clicking it or Quit opens the status window as in the app (D45, D46). When it stops, for any reason, it first prints `Stopping the recording and finalizing the files…` on standard error, then finalizes and prints the summary; a Ctrl-C while it finalizes prints `Still finalizing the files…` and does nothing more. It prints every event of the recording manifest as one line on standard error (see "Logging"). `--debug` adds detail on standard error and in the log. `--duration` takes hours, minutes and seconds (`1h30m`, `45m`, `90s`); a number without a suffix is minutes (`90` is 90 minutes) | 0 ok (every file finalized, no file ended by a failure, D47), 1 not ready, 3 when the recording manifest's `result` is `problems`, the finalized manifest could not be written, or the recording could not start |
 | `msr settings [flags]` | Without flags prints the effective settings as JSON (show); with any settings flag, `--auto` included, saves the run's effective settings into the settings file and prints them (change). The only command that writes the file; the window also writes it | 0, 1 when it cannot write the file |
 | `msr version` | Prints the version and commit | 0 |
@@ -83,14 +83,14 @@ default.
 `msr version` shows it and the build date, such as `Multi Screen
 Recorder 0.20261116.42 (9dc9443), built 2026-11-16`, then the
 homepage's address and an empty line (`msr record` prints the same
-banner first). Then it prints "What will be recorded": the window's one
-table with its header row and total row, the line of what the required recording
-hours need, and "Files go to <output folder>", from the same
-code (see "The app"; the window's last line, "Recording continues when
-screens or audio sources change.", is not printed), then one line per
-item of the ready check, `ok` or `FAIL`, a fix under each failure, and
-`Ready.` or `Not ready.` last. For the devices of the `msr list` example,
-the defaults and 3.1 GB free:
+banner first). Then it prints "What will be recorded": the window's
+one table with its header row and total row, the line of what the
+required recording hours need, and "Files go to <output folder>", from
+the same code (see "The app"; the window's last line, "Recording
+continues when screens or audio sources change.", is not printed), then
+one line per item of the ready check, `ok` or `FAIL`, a fix under each
+failure, and `Ready.` or `Not ready.` last. For the devices of the
+`msr list` example, the defaults and 3.1 GB free:
 
 ```
 What will be recorded
@@ -183,12 +183,13 @@ audio mode, the item is left out and the permission is neither asked
 nor read), the screens (at least one, each
 readable), the chosen audio sources (each audio input the audio mode
 records readable; another that cannot be read does not count; with an
-audio mode but `none` the item says "no microphone" when no input is
-recorded, such as on a Mac without any audio input, and passes: no
-microphone works in every audio mode, the screens and the system audio
-are recorded as usual, and the item then reads `Audio: no microphone,
-system audio`, or `Audio: no microphone, no system audio` with system
-audio off; an input that is recorded and whose channels cannot be read
+audio mode but `none` the item says "no microphone recorded" when no
+input is recorded, such as on a Mac without any audio input or with
+only inputs the audio mode leaves out or that have no Core Audio UID,
+and passes: no microphone works in every audio mode, the screens and
+the system audio are recorded as usual, and the item then reads
+`Audio: no microphone recorded, system audio`, or `Audio: no
+microphone recorded, no system audio` with system audio off; an input that is recorded and whose channels cannot be read
 fails it), the output
 folder, and free disk space in the output folder for
 `requiredRecordingHours`.
@@ -209,7 +210,8 @@ folder, and free disk space in the output folder for
   (owner's Mac, 2026-11-13), and the capture session an earlier ready
   check opened for a moment on every run is the cause [ASSUMED]. With
   no microphone connected, the permission item is left out and the audio
-  item passes, saying "no microphone", whatever the permission.
+  item passes, saying "no microphone recorded", whatever the
+  permission.
   The audio inputs are read from Core Audio's device list, which
   creates no capture object; if that list, the default audio input or
   the name of an audio input cannot be read, the audio item fails with
@@ -444,10 +446,11 @@ An audio file's `audioSource` is the audio input's device name or
 `System audio`; `audioSourceUID` the input's Core Audio UID, absent
 for the system audio, which tells two inputs with the same name apart
 (D55); the events name an audio input by its device name only and
-carry no UID, so they cannot tell two such inputs apart; `channels` the number of
-its mono tracks, or `stereo` for the system audio; `clockDriftPpm` its
-measured clock drift (see "Audio"), null until known. `files` lists the
-screen files and the audio files in the order of their start.
+carry no UID, so they cannot tell two such inputs apart; `channels`
+the number of its mono tracks, or `stereo` for the system audio;
+`clockDriftPpm` its measured clock drift (see "Audio"), null until
+known. `files` lists the screen files and the audio files in the order
+of their start.
 
 **Names in a file name (D49, D55).** In a file name, `/` and `:` in a
 label become `-`, so a device name never stops a source from
@@ -531,10 +534,9 @@ checked, reported or rewritten at the next start (D47).
     recording skips it, and macOS does not list it to the window at all
     (the owner's Mac, 2026-11-16: with the DELL P3421W mirroring the
     Wacom One 13T, `msr check` of `v0.20261116.40` listed only "1 Wacom
-    One 13T"; D55). `msr check` prints the
-    label as text instead (`Screen 1 - Built-in Retina Display`), the
-    default input marked "(default)" after it
-    (`Audio 1 - MacBook Pro Microphone (default)`).
+    One 13T"; D55). `msr check` prints the label as text instead
+    (`Screen 1 - Built-in Retina Display`), the default input marked
+    "(default)" after it (`Audio 1 - MacBook Pro Microphone (default)`).
   - Screen rows first: the number and name, "Looks like" (the size in
     points), "Drawn at" (the pixel size, shown also where both are
     equal), "Records at" (the frame size) and GB/h max (the screen file,

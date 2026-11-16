@@ -12,7 +12,8 @@ settings, the ready check, the pipeline for snapshot releases and
 releases, and the recording core (recording, recording folder,
 recording manifest, problem, status window, screen file, screen
 identity, settle time, screen check, tick, timecode, audio track,
-audio file, guide track, clock drift; D45, D49), labels (D55).
+audio file, guide track, clock drift; D45, D49), labels (D55), the
+banner.
 
 ## Multi Screen Recorder
 
@@ -26,6 +27,14 @@ The product's promise, always shown as two lines: "Every screen, all
 audio." and "Keeps going when things change." Shown in the app's
 header and on the homepage; where one line is needed, the two joined by
 a space (D55).
+
+## Banner
+
+What `msr check` and `msr record` print first, then an empty line: the
+product's name with the version as `msr version` shows it and the build
+date, the commit's date in UTC (`Multi Screen Recorder 0.20261116.42
+(9dc9443), built 2026-11-16`), and the homepage's address
+(`AppVersion.banner`).
 
 ## Former upstream
 

@@ -158,7 +158,7 @@ public enum ReadyCheck {
         var sources = audioInputs.filter { AudioTracker.records($0, settings: settings) }.map(\.shownName)
         // A Mac without an audio input is ready in every audio mode: the screens and the system audio are recorded.
         let noMicrophone = settings.effectiveAudioMode != .none && sources.isEmpty
-        if noMicrophone { sources.append("no microphone") }
+        if noMicrophone { sources.append("no microphone recorded") }
         if settings.systemAudio {
             sources.append("system audio")
         } else if noMicrophone {
