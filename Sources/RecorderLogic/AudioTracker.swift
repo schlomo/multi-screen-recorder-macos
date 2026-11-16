@@ -93,7 +93,7 @@ public struct AudioTracker: Sendable {
     private var listedBefore: Set<String> = []
     private var mainDisplayID: UInt32?
     /// The displays as last read, to tell a display change.
-    private var connectedDisplays: Set<UInt32>?
+    private var connectedDisplays: Set<UInt32> = []
     /// The display the system audio's stream captures, while it runs.
     private var systemAudioDisplayID: UInt32?
     private var isAsleep = false
@@ -110,8 +110,9 @@ public struct AudioTracker: Sendable {
         self.longestRestartDelay = longestRestartDelay
     }
 
-    /// The audio inputs and the main display at the start: what is recorded starts at once.
-    public mutating func begin(inputs: [AudioInputInfo], mainDisplayID: UInt32?, at now: Int64) -> Step {
+    /// The audio inputs, the main display and the displays connected at the
+    /// start: what is recorded starts at once.
+    public mutating func begin(inputs: [AudioInputInfo], mainDisplayID: UInt32?, displays: Set<UInt32>, at now: Int64) -> Step {
         var step = observe(inputs, at: now, isBeginning: true)
         if settings.systemAudio {
             sources[.systemAudio] = Tracked(
@@ -119,6 +120,7 @@ public struct AudioTracker: Sendable {
                 restartDelay: firstRestartDelay)
         }
         self.mainDisplayID = mainDisplayID
+        connectedDisplays = displays
         step.append(due(at: now))
         return step
     }
@@ -201,7 +203,7 @@ public struct AudioTracker: Sendable {
     /// change: the system audio's stream moves to the new main display when
     /// its display goes.
     public mutating func observeDisplays(mainDisplayID: UInt32?, connected: Set<UInt32>, at now: Int64) -> Step {
-        if connectedDisplays != nil, connectedDisplays != connected || self.mainDisplayID != mainDisplayID {
+        if connectedDisplays != connected || self.mainDisplayID != mainDisplayID {
             sources[.systemAudio]?.mayLoseCaptureSource = true
         }
         connectedDisplays = connected

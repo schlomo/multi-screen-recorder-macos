@@ -1370,3 +1370,22 @@ architect's reading.
 - **Evidence:** [design/recorder.md](design/recorder.md), "Audio"; the
   experiments of 2026-11-15 in
   [design/end-to-end-tests.md](design/end-to-end-tests.md).
+
+## D50: B2's open details, the architect's calls (2026-11-16)
+
+- **Status:** in force; the architect's calls on review of the PR
+  "Recording core B2", not the owner's ruling.
+- **Context:** B2 left details open that recorder.md did not settle; the
+  reviews of the PR raised them.
+- **Decision:** An event about an audio source names it in
+  `audioSource`, never in `display`, which means a display. A display
+  file's guide tracks may end up to 300 ms before its last tick (the
+  200 ms delay plus one 100 ms hand-over); the audio files are complete.
+  The video track keeps its name as QuickTime user data `©nam`; the
+  file-level metadata items stay as they were. Samples an audio file's
+  writer never took at its end are lost, so they are the failure `audio
+  file writer fell behind` and the result is `problems` (D47). Whether
+  the system audio's timestamps follow the host clock, which would show
+  the output device's drift as steady gaps of about 32 ms, stays open
+  for the owner's live run.
+- **Evidence:** [design/recorder.md](design/recorder.md), "Build state".

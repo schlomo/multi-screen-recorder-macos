@@ -157,6 +157,34 @@ import Testing
         #expect(end.file.end == end.file.start + Double(samplesPerBuffer) / Double(RecorderValues.audioSampleRate))
         #expect(end.error?.description.contains("\(samplesPerBuffer) samples") == true)
         #expect(end.error?.description.contains("lost") == true)
+        #expect(end.lostSamples == Int64(samplesPerBuffer))
+        // A failure (D47): the result is `problems`.
+        let event = try #require(end.events.first)
+        #expect(end.events.count == 1)
+        #expect(event.event == .audioFileWriterFellBehind)
+        #expect(event.event.isFailure)
+        #expect(event.audioSource == "Razer Seiren V3 Mini")
+        #expect(event.error == end.error?.description)
+        #expect(event.at == (end.file.end! * 1000).rounded() / 1000)
+    }
+
+    @Test func aFileEndWithNothingLostHasNoEvent() async throws {
+        let capture = capture()
+        source.send(try buffer(at: 0))
+        let ends = await capture.stop()
+        #expect(ends.first?.lostSamples == 0)
+        #expect(ends.first?.events.isEmpty == true)
+    }
+
+    @Test func theInboxGivesTheReportsInOrderOnce() {
+        let inbox = AudioReportInbox()
+        inbox.post(.event(RecordingEvent(at: 0, event: .audioInputGap, audioSource: "A")))
+        inbox.post(.event(RecordingEvent(at: 1_000_000, event: .audioInputGap, audioSource: "B")))
+        let taken = inbox.take().map { report -> String? in
+            if case .event(let event) = report { event.audioSource } else { nil }
+        }
+        #expect(taken == ["A", "B"])
+        #expect(inbox.take().isEmpty)
     }
 
     @Test func stopGivesTheEndOfEveryFileOfTheCapture() async throws {

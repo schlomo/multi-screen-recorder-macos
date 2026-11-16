@@ -3,12 +3,26 @@ import CoreMedia
 import Foundation
 import RecorderLogic
 @preconcurrency import ScreenCaptureKit
+import Synchronization
 
 /// How an audio file ended, for the recording manifest: its entry with its
-/// end, state and clock drift, and the writer's error, if any.
+/// end, state and clock drift, the writer's error, if any, and the samples
+/// the writer never took at the end.
 public struct AudioFileEnd: Equatable, Sendable {
     public var file: RecordingManifest.AudioFile
     public var error: AudioFileWriterError?
+    public var lostSamples: Int64 = 0
+
+    /// Samples lost at the end are `audio file writer fell behind`, a
+    /// failure (D47), at the file's end.
+    public var events: [RecordingEvent] {
+        guard lostSamples > 0 else { return [] }
+        var event = RecordingEvent(
+            at: Int64(((file.end ?? file.start) * 1_000_000_000).rounded()), event: .audioFileWriterFellBehind,
+            audioSource: file.audioSource)
+        event.error = error?.description
+        return [event]
+    }
 }
 
 /// What an audio capture tells the recorder; each is called on the capture's queue.
@@ -19,6 +33,33 @@ struct AudioCaptureReports: Sendable {
     var event: @Sendable (RecordingEvent) -> Void
     /// The capture ended by itself, with the ends of all its files.
     var ended: @Sendable (AudioTracker.CaptureEnd, [AudioFileEnd]) -> Void
+}
+
+/// What the audio captures reported, in the order they reported it, until
+/// the recorder takes it on the main actor; at Stop the recorder takes the
+/// rest before it finalizes, so nothing depends on when a hop to the main
+/// actor runs.
+final class AudioReportInbox: Sendable {
+    enum Report: Sendable {
+        case fileStarted(RecordingManifest.AudioFile, AudioTracker.SourceID, name: String)
+        case fileEnded(AudioFileEnd)
+        case event(RecordingEvent)
+        case ended(AudioTracker.SourceID, number: Int, name: String, AudioTracker.CaptureEnd, [AudioFileEnd])
+    }
+
+    private let reports = Mutex<[Report]>([])
+
+    func post(_ report: Report) {
+        reports.withLock { $0.append(report) }
+    }
+
+    /// Every report not taken yet, oldest first.
+    func take() -> [Report] {
+        reports.withLock { reports in
+            defer { reports = [] }
+            return reports
+        }
+    }
 }
 
 /// Where an audio capture's buffers come from: an audio input's
@@ -126,7 +167,9 @@ final class AudioCapture: @unchecked Sendable {
         queue = DispatchQueue(label: "msr.audio.\(name)", qos: .userInteractive)
     }
 
-    /// The writer of a recording: an `AudioFileWriter`.
+    /// The writer of a recording: an `AudioFileWriter`. A function, not a
+    /// default closure in `init`: Swift 6.4's compiler crashes on a
+    /// typed-throws closure there.
     private static func audioFileWriter(timecode: Timecode) -> MakeWriter {
         let make: MakeWriter = { url, description, firstTick throws(AudioFileWriterError) in
             try AudioFileWriter(url: url, description: description, firstTick: firstTick, timecode: timecode)
@@ -284,7 +327,7 @@ final class AudioCapture: @unchecked Sendable {
         finishing.append(Task {
             // No longer open: only this task uses the writer from here on.
             var file = file
-            var failure = await Self.drain(&file, timeout: drainTimeout, name: name)
+            var (failure, lost) = await Self.drain(&file, timeout: drainTimeout, name: name)
             var entry = file.entry
             do throws(AudioFileWriterError) {
                 try await file.writer.finish(endPosition: file.written > 0 ? file.written : nil)
@@ -295,7 +338,7 @@ final class AudioCapture: @unchecked Sendable {
             }
             entry.end = entry.start + Double(file.written) / Double(RecorderValues.audioSampleRate)
             entry.clockDriftPpm = drift.map { ($0 * 10).rounded() / 10 }
-            let end = AudioFileEnd(file: entry, error: failure)
+            let end = AudioFileEnd(file: entry, error: failure, lostSamples: lost)
             if !isLast { reports.fileEnded(end) }
             return end
         })
@@ -304,7 +347,9 @@ final class AudioCapture: @unchecked Sendable {
     /// Writes the waiting samples, waiting for the writer for at most
     /// `timeout` on a clock that does not count sleep; an error when the
     /// writer failed or samples are left, which are lost.
-    private static func drain(_ file: inout OpenFile, timeout: Duration, name: String) async -> AudioFileWriterError? {
+    private static func drain(
+        _ file: inout OpenFile, timeout: Duration, name: String
+    ) async -> (error: AudioFileWriterError?, lost: Int64) {
         let clock = SuspendingClock()
         let deadline = clock.now + timeout
         while true {
@@ -312,15 +357,16 @@ final class AudioCapture: @unchecked Sendable {
                 try file.write()
             } catch {
                 file.waiting = []
-                return error
+                return (error, 0)
             }
             let left = file.waitingSamples
-            if left == 0 { return nil }
+            if left == 0 { return (nil, 0) }
             if clock.now >= deadline {
                 file.waiting = []
                 let seconds = Double(left) / Double(RecorderValues.audioSampleRate)
-                return AudioFileWriterError(nil, while: "the writer took none of the last \(left) samples ("
+                let error = AudioFileWriterError(nil, while: "the writer took none of the last \(left) samples ("
                     + String(format: "%.3f", seconds) + " s) of \(name) within \(timeout); they are lost")
+                return (error, left)
             }
             try? await clock.sleep(for: .milliseconds(5))
         }

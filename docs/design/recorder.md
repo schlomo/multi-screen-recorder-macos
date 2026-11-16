@@ -392,7 +392,8 @@ absent where there was or is none); `mirrors` (the display mirrored)
 for `display mirroring started`; `length` (seconds, to the
 millisecond) for `audio input gap`; `error` (why) for `display stream
 failed`, `display file writer failed`, `audio input failed`, `system
-audio failed` and `audio file writer failed`. The
+audio failed`, `audio file writer failed`, and `audio file writer fell
+behind` when samples were lost at a file's end. The
 manifest's `state` is `recording` or `finalized`; a file's `state` is
 `recording`, `finalized` or `not finalized`.
 `ended` is the local end time, as `started`, and `result` is `ok` when
@@ -806,7 +807,8 @@ the metadata items (see "Output on disk").
   failed` with that as its `error`, a problem and the back-off. When an
   audio file ends, the samples still waiting for its writer are
   written for at most 2 s; its `end` counts only what the writer took,
-  and samples left over are told as lost in a problem.
+  and samples left over are lost: `audio file writer fell behind` with
+  its `error`, a failure, and a problem.
 - **Guide tracks.** For playback and waveform sync, every display file
   also carries guide tracks: "Microphones", one mono mix of all recorded
   audio input channels, their sum divided by √n for n channels, clamped
@@ -1140,10 +1142,11 @@ and writer, audio files and guide tracks written from synthetic PCM and
 read back. Live audio capture is UNVERIFIED until the owner's run.
 
 Built in B2 where this document leaves the detail open, decided by the
-architect on review: the failure events are named `audio input failed`,
+architect on review (D50): the failure events are named `audio input failed`,
 `system audio failed`, `audio file writer failed` and `audio file
 writer fell behind`; an event about an audio source names it in
-`audioSource`, never in `display`; an audio source the audio mode
+`audioSource`, never in `display`; samples lost at an audio file's end
+are `audio file writer fell behind`, a failure; an audio source the audio mode
 records but that has no file yet shows the state `not recorded`; an
 audio input is recorded only when Core Audio gives its UID, which
 `AVCaptureDevice` opens it by; the beginning of a recording tells no
@@ -1156,7 +1159,7 @@ do not show and are not written; the file-level items are); `msr
 record`'s summary ends with the line `CPU N % on average, N % at the
 peak, of one core (this process only)`.
 
-Open, for the owner's live run to answer: the system audio's timestamps
+Open, for the owner's live run to answer (D50): the system audio's timestamps
 may follow the host clock rather than its sample count; then the
 output device's clock drift would show as `audio input gap` events of
 about 32 ms at a steady interval, each filled with silence. The gap

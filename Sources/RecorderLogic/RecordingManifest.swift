@@ -281,6 +281,32 @@ public struct RecordingManifest: Codable, Equatable, Sendable {
             && !events.contains(where: \.event.isFailure)
     }
 
+    /// An audio file started: listed from now on; false when the manifest
+    /// is finalized, which changes no more, or lists it already.
+    public mutating func audioFileStarted(_ file: AudioFile) -> Bool {
+        guard state != .finalized, !audioFiles.contains(where: { $0.name == file.name }) else { return false }
+        audioFiles.append(file)
+        return true
+    }
+
+    /// An audio file ended: its entry as it ended; false once finalized.
+    public mutating func audioFileEnded(_ file: AudioFile) -> Bool {
+        guard state != .finalized else { return false }
+        if let index = audioFiles.firstIndex(where: { $0.name == file.name }) {
+            audioFiles[index] = file
+        } else {
+            audioFiles.append(file)
+        }
+        return true
+    }
+
+    /// Events reported by a capture; false once finalized.
+    public mutating func record(_ new: [RecordingEvent]) -> Bool {
+        guard state != .finalized else { return false }
+        events += new
+        return true
+    }
+
     /// The recording ends: its end time, its result and its CPU use.
     public mutating func finalize(ended date: Date, timeZone: TimeZone, cpu: CPU? = nil) {
         state = .finalized

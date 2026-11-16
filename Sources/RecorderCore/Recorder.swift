@@ -57,6 +57,7 @@ public final class Recorder {
     private var audioCaptureCount = 0
     private var audioDueTask: Task<Void, Never>?
     private var audioWatch: AudioInputWatch?
+    private let audioReports = AudioReportInbox()
     private let guides: GuideTrackFeed
     private var cpu = CPUUsage()
     private var cpuTask: Task<Void, Never>?
@@ -105,7 +106,8 @@ public final class Recorder {
         guides.start()
         apply(tracker.begin(displays, at: context.now()))
         applyAudio(audioTracker.begin(
-            inputs: readAudioInputs() ?? [], mainDisplayID: displays.first(where: \.isMain)?.displayID, at: context.now()))
+            inputs: readAudioInputs() ?? [], mainDisplayID: displays.first(where: \.isMain)?.displayID,
+            displays: Set(displays.map(\.displayID)), at: context.now()))
         freeSpaceTask = Task { [weak self] in
             while !Task.isCancelled {
                 try? await Task.sleep(for: RecorderValues.freeSpaceCheckInterval)
@@ -168,6 +170,7 @@ public final class Recorder {
             for action in tracker.stopAll() { perform(action) }
             for action in audioTracker.stopAll() { performAudio(action) }
             for task in stopping { await task.value }
+            takeAudioReports()
             guides.stop()
             manifest.finalize(ended: Date(), timeZone: context.timeZone, cpu: cpu.manifestEntry)
             do {
@@ -439,16 +442,33 @@ public final class Recorder {
     private func startAudio(_ id: AudioTracker.SourceID, name: String, source: any AudioBufferSource) {
         audioCaptureCount += 1
         let number = audioCaptureCount
+        let inbox = audioReports
+        let post: @Sendable (AudioReportInbox.Report) -> Void = { [weak self] report in
+            inbox.post(report)
+            Task { @MainActor in self?.takeAudioReports() }
+        }
         let reports = AudioCaptureReports(
-            fileStarted: { [weak self] file in Task { @MainActor in self?.audioFileStarted(file, id: id, name: name) } },
-            fileEnded: { [weak self] end in Task { @MainActor in self?.audioFileEnded(end) } },
-            event: { [weak self] event in Task { @MainActor in self?.audioEvent(event) } },
-            ended: { [weak self] reason, ends in
-                Task { @MainActor in self?.audioCaptureEnded(id, number: number, name: name, reason: reason, ends: ends) }
-            })
+            fileStarted: { file in post(.fileStarted(file, id, name: name)) },
+            fileEnded: { end in post(.fileEnded(end)) },
+            event: { event in post(.event(event)) },
+            ended: { reason, ends in post(.ended(id, number: number, name: name, reason, ends)) })
         let capture = AudioCapture(id: id, name: name, source: source, context: context, guides: guides, reports: reports)
         audioCaptures[id] = (number, capture)
         capture.start()
+    }
+
+    /// The audio captures' reports, in order. Once finalized, the manifest
+    /// changes no more: the stop gave every file's end and took the rest.
+    private func takeAudioReports() {
+        for report in audioReports.take() {
+            switch report {
+            case .fileStarted(let file, let id, let name): audioFileStarted(file, id: id, name: name)
+            case .fileEnded(let end): audioFileEnded(end)
+            case .event(let event): audioEvent(event)
+            case .ended(let id, let number, let name, let reason, let ends):
+                audioCaptureEnded(id, number: number, name: name, reason: reason, ends: ends)
+            }
+        }
     }
 
     private func audioFileStarted(_ file: RecordingManifest.AudioFile, id: AudioTracker.SourceID, name: String) {
@@ -456,28 +476,22 @@ public final class Recorder {
         RecorderLog.detail("file started: \(file.name)", category: "recorder")
         audioTracker.fileStarted(id)
         problemsTold.cleared(.audioSourceFailed(name))
-        guard !manifest.audioFiles.contains(where: { $0.name == file.name }) else { return }
-        manifest.audioFiles.append(file)
-        try? writeManifest()
+        if manifest.audioFileStarted(file) { try? writeManifest() }
     }
 
     private func audioFileEnded(_ end: AudioFileEnd) {
-        // Once finalized, the manifest changes no more; the stop gave every file's end.
-        guard manifest.state != .finalized else { return }
+        guard manifest.audioFileEnded(end.file) else { return }
         RecorderLog.detail("file ended: \(end.file.name), \(end.file.state.rawValue)", category: "recorder")
-        if let index = manifest.audioFiles.firstIndex(where: { $0.name == end.file.name }) {
-            manifest.audioFiles[index] = end.file
-        } else {
-            manifest.audioFiles.append(end.file)
-        }
+        _ = manifest.record(end.events)
         try? writeManifest()
+        told(end.events)
         if let error = end.error {
             tell("Audio file \(end.file.name)", error: error.description, kind: .audioFileFailed(end.file.name))
         }
     }
 
     private func audioEvent(_ event: RecordingEvent) {
-        manifest.events.append(event)
+        guard manifest.record([event]) else { return }
         try? writeManifest()
         told([event])
     }

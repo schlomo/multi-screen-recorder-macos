@@ -113,6 +113,26 @@ import Testing
         #expect(try RecordingManifest(json: data) == manifest)
     }
 
+    @Test func aFinalizedManifestTakesNoMoreEventsOrAudioFiles() {
+        var manifest = manifest()
+        let file = RecordingManifest.AudioFile(
+            name: "a.mov", audioSource: "Mic", audioSourceUID: "uid", channels: .mono(1), start: 0, timecode: "t")
+        let other = RecordingManifest.AudioFile(
+            name: "b.mov", audioSource: "Mic", audioSourceUID: "uid", channels: .mono(1), start: 0, timecode: "t")
+        let gap = RecordingEvent(at: 0, event: .audioInputGap, audioSource: "Mic")
+        var ended = file
+        ended.state = .finalized
+        let taken = [
+            manifest.audioFileStarted(file), manifest.audioFileStarted(file), manifest.audioFileEnded(ended), manifest.record([gap]),
+        ]
+        #expect(taken == [true, false, true, true])
+        manifest.finalize(ended: start + 60, timeZone: berlin)
+        let finalized = manifest
+        let takenAfter = [manifest.record([gap]), manifest.audioFileEnded(file), manifest.audioFileStarted(other)]
+        #expect(takenAfter == [false, false, false])
+        #expect(manifest == finalized)
+    }
+
     @Test func theCPUUseIsWrittenAtTheEnd() throws {
         var manifest = manifest()
         let running = try #require(try JSONSerialization.jsonObject(with: manifest.jsonData()) as? [String: Any])

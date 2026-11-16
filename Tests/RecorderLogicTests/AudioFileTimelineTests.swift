@@ -37,7 +37,9 @@ import Testing
             .write(silence: 0, firstSample: Int(trimmed) - 2 * bufferSamples, position: 0),
             .write(silence: 0, firstSample: 0, position: 3 * Int64(bufferSamples) - trimmed),
         ])
-        #expect(timeline.writtenSamples == 4 * Int64(bufferSamples) - trimmed)
+        // The next buffer follows the samples placed so far.
+        #expect(timeline.place(bufferAt: time(origin, after: 4 * Int64(bufferSamples)), sampleCount: bufferSamples, arrival: 0).action
+            == .write(silence: 0, firstSample: 0, position: 4 * Int64(bufferSamples) - trimmed))
         #expect(samplesPerTick == 1600)
     }
 
@@ -55,8 +57,9 @@ import Testing
         let jittered = timeline.place(bufferAt: time(0, after: Int64(bufferSamples)) + 32 * millisecond, sampleCount: bufferSamples, arrival: 0)
         #expect(jittered == AudioBufferPlacement(action: .write(silence: 0, firstSample: 0, position: Int64(bufferSamples)), gap: nil))
         let early = timeline.place(bufferAt: time(0, after: 2 * Int64(bufferSamples)) - 5 * millisecond, sampleCount: bufferSamples, arrival: 0)
-        #expect(early.gap == nil)
-        #expect(timeline.writtenSamples == 3 * Int64(bufferSamples))
+        #expect(early == AudioBufferPlacement(action: .write(silence: 0, firstSample: 0, position: 2 * Int64(bufferSamples)), gap: nil))
+        #expect(timeline.place(bufferAt: time(0, after: 3 * Int64(bufferSamples)), sampleCount: bufferSamples, arrival: 0).action
+            == .write(silence: 0, firstSample: 0, position: 3 * Int64(bufferSamples)))
     }
 
     @Test func aGapUpToOneSecondIsFilledWithSilenceOfExactlyItsLength() {
@@ -78,7 +81,9 @@ import Testing
         _ = timeline.place(bufferAt: 0, sampleCount: bufferSamples, arrival: 0)
         let afterGap = timeline.place(bufferAt: time(0, after: Int64(bufferSamples)) + 1001 * millisecond, sampleCount: bufferSamples, arrival: 0)
         #expect(afterGap == AudioBufferPlacement(action: .endFile, gap: AudioGap(length: 1001 * millisecond, samples: 48_048, isFilled: false)))
-        #expect(timeline.writtenSamples == Int64(bufferSamples))
+        // The buffer after the long gap is not counted: one in its place is still no gap.
+        #expect(timeline.place(bufferAt: time(0, after: Int64(bufferSamples)), sampleCount: bufferSamples, arrival: 0)
+            == AudioBufferPlacement(action: .write(silence: 0, firstSample: 0, position: Int64(bufferSamples)), gap: nil))
     }
 
     @Test func aGapBeforeTheFirstTickIsTrimmedWithItsBuffer() {

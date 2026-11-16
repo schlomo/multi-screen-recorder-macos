@@ -30,8 +30,9 @@ public final class GuideTrackFeed: Sendable {
             return (track, mix)
         })))
         timer = DispatchSource.makeTimerSource(queue: DispatchQueue(label: "msr.guide-tracks", qos: .userInitiated))
-        // Active from the start, so a feed never started can be released;
-        // it fires only once `start` schedules it.
+        // Activated now: a `DispatchSourceTimer` never activated traps when
+        // released, as when a recording fails to start before `start`. It
+        // fires only once `start` schedules it.
         timer.activate()
     }
 

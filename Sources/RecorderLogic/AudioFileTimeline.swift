@@ -63,9 +63,6 @@ public struct AudioFileTimeline: Sendable {
         drift = ClockDriftMeasure(sampleRate: sampleRate)
     }
 
-    /// Samples written so far, from the file's first tick: where the file ends.
-    public var writtenSamples: Int64 { max(0, received - trimmed) }
-
     /// The file's measured clock drift, nil until two buffers arrived apart.
     public var clockDriftPpm: Double? { drift.clockDriftPpm }
 
