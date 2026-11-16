@@ -45,7 +45,8 @@ credited for the reference implementation.
 
 The skeleton is built (the app window with the ready check and the
 table of what will be recorded, auto mode, the command line without `record`, the
-pipeline); recording is designed, not built yet. The designs:
+pipeline), and so is recording the displays (PR #11); recording the
+audio is in review (PR #12). The designs:
 [design/recorder.md](design/recorder.md) and
 [design/delivery.md](design/delivery.md); how the recorder is tested
 end to end on a Mac: [design/end-to-end-tests.md](design/end-to-end-tests.md)

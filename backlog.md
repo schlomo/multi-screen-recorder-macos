@@ -2,12 +2,15 @@
 
 ## Next session starts here
 
-PR #11 (B1, the displays) merged 2026-11-15. B2 is next and carries
-B1's follow-ups (the owner: "B2 PR needs to carry what was missed here
-together with the audio stuff"). The owner asked agents to run tests
-on the Mac themselves (D48, recorded with B2). After B2: the first
-slice of the end-to-end tests, which lets agents test display changes
-without the owner (virtual displays).
+PR #12 (B2, the audio, with B1's follow-ups) is ready for review
+(2026-11-16, head `12f846a`); the owner checks the new "Microphones"
+mix (D52) and the guide-track ends live before merging. Then, in this
+order (the architect's sequencing, 2026-11-16): queued item 2, the
+end-to-end tests in CI and on the owner's Mac; item 3, the
+simplification; item 4, drift correction. Agents may run `msr record`
+on the owner's Mac (D48; the owner's go-ahead in the session,
+2026-11-16), and BetterDisplay's command line with the owner's virtual
+screen "Virtual 16:9".
 
 How the owner wants changes that show in the window or on the command
 line handled (2026-11-15: "what about working locally and letting me
@@ -22,11 +25,15 @@ Still open from D34: what AGC does and whether it is on in auto mode;
 
 ## In flight
 
-- **Recording core B2, the audio, with B1's follow-ups** (branch
-  `recording-core-audio`): phase 1 built (new files only, unreviewed:
-  the audio file writer, the proof that an audio-only file carries
-  timecode, gaps, drift measure, the "Microphones" mix, names); phase 2
-  wires it in. See queued item 2.
+- **Recording core B2, the audio, with B1's follow-ups**, PR #12
+  (branch `recording-core-audio`, D49 to D52): built, reviewed
+  (adversarial and four delta reviews), ready. Verified live on build
+  `7ad0b6b` (2026-11-16): capture from 4 inputs and system audio,
+  default-microphone changes, a microphone unplugged and replugged,
+  display and main-display changes, the system-audio guide equal to its
+  file, timecode in Resolve, one hour with `result: ok` and no late
+  frame. Not yet live: the changes after `7ad0b6b` (the D52 mix, the
+  guide-track ends, debug times).
 
 ## Queued
 
@@ -37,35 +44,74 @@ Still open from D34: what AGC does and whether it is on in auto mode;
    as a runner image with Xcode 27 is generally available. The gap
    bit in PR #9: code the local Xcode 27.2 accepted failed to compile
    on CI's Swift 6.3.
-2. **Recording core B2, the audio, and B1's follow-ups** (D45, D46,
-   D47; the design signed off 2026-11-15 in the session, to be written
-   into `docs/design/recorder.md` with its decisions entry):
-   - Audio: an audio file per recorded audio source, one mono track per
-     channel, system audio one stereo track from a small ScreenCaptureKit
-     stream on the main display, guide tracks "Microphones" (sum / √n,
-     clamped) and "System audio" in every display file, the default
-     microphone followed, placement by sample count from a tick, drift
-     measured as `clockDriftPpm` per audio file (corrected in a later
-     PR), a gap detected above 32 ms and filled up to 1 s, a new file
-     beyond (D46 point 7), names with `/` and `:` as `-` and " (2)" for
-     a duplicate, the reel name and metadata as for display files.
-   - Settled by experiment on 2026-11-15: `AVAssetWriter` writes
-     timecode into an audio-only fragmented `.mov`; unplugging a
-     microphone recorded by an `AVCaptureSession` does not crash (D36):
-     the session stops with -11808, and a replug needs a new session.
-   - B1's follow-ups: a second lost capture source without a display
-     change is a failure (the review's N-A); the "manifest could not
-     be written" alert only after the person's Stop; the display's name
-     on the video track itself; CPU of our process in the status
-     window, the summary and the manifest (the owner, 2026-11-15),
-     naming that encoding and capture run in macOS's own processes;
-     `SliderSteps.swift:9` converts without a guard (side finding of
-     2026-11-15).
-3. **Audio after v0** (D12, D18): AGC, in its own PR, with its own
+2. **End-to-end tests in CI and on the owner's Mac** (the owner signed
+   off the design as text on 2026-11-16: "Yes to both CI questions and
+   plan for that"; its decisions entry, replacing D37's "out of the
+   pipeline", comes with the PR). An experiment on 2026-11-16 (three
+   runs on GitHub's hosted `macos-26` arm64 runner, image 20261102,
+   macOS 26.7.2) showed: the image grants Screen Recording and
+   Microphone, `msr check` passes, app windows are drawn on the main
+   display and on a `CGVirtualDisplay`, hardware HEVC is there, a
+   virtual display connected and disconnected during a recording gives
+   the right files and events, BlackHole installed with brew carries a
+   1 kHz tone into its file, and system audio is recorded.
+   - Design: a test driver in Swift, separate from the app
+     (`CGVirtualDisplay`, a private API, only there), run by
+     `scripts/end-to-end-test`; a CI job after build and tests, no
+     secrets, BlackHole and `ffmpeg` installed at fixed versions
+     (downloads in CI are fine, the owner, 2026-11-16).
+   - Scenarios: a plain recording; a virtual display connected,
+     disconnected and resized; an audio input appearing and vanishing
+     (an aggregate device on BlackHole); a tone checked for level and
+     timing across files by timecode; system audio; stop by Ctrl-C and
+     by kill; broken settings files; a full disk (a small disk image)
+     and an unwritable folder. Checks: `recording.json` exactly, every
+     file readable, frame counts, timecode, levels.
+   - On the owner's Mac (D37, D48), what needs real hardware: the
+     owner's displays through BetterDisplay, real USB devices, drift,
+     sleep and wake.
+   - To look into there: one of four 10 s recordings on the runner had
+     nothing for 4 s, then gaps and "display file writer fell behind"
+     (`result: problems`); the other three were clean.
+   - Correct with it: `AGENTS.md` "Facts that bite" and `recorder.md`
+     "Tests" still say capture cannot run in CI.
+   - Not covered anywhere: real USB re-enumeration, the lid, Bluetooth,
+     power loss. A VM on the owner's Mac (Tart, not Parallels) only if
+     needed later; it has no hardware encoder.
+3. **Simplification** (the Fable review of 2026-11-15; the owner: yes
+   to all four questions, 2026-11-16): `unpack-app` uses the standard
+   library's `filter="data"`; the run-loop hold goes; `recording.json`
+   leaves out null keys; `end-to-end-tests.md` stays. Findings: one
+   display reader (`ConnectedDisplay` with a `pixelSize`, one
+   `leftToRight`); settings flags validated once; quit handling in
+   `RecordingSession`; no double end path (`stop()` returns nil when
+   already finishing); `sign-app`'s `version_form` goes; the smoke test
+   trimmed; doc-prose and test-the-compiler tests deleted, duplicate
+   tests merged; `Recorder` tests through a `DisplayCapture` stand-in;
+   missing `DisplayTracker`, `DisplayFileTicker` and `TickLoop` tests;
+   the test inventory in `recorder.md` cut to a few lines; the review's
+   NITs 12 to 16; finding 17 (`StreamLifecycle`) is the owner's call;
+   findings 3 and 6 on audio code now apply. Plus B2's leftover NITs:
+   a drain error labelled as a writer timeout in `guideTracksCut`; no
+   test for a gap after real data in a guide track's last mix; an
+   unlocked test flag in `DisplayFileTickerTests`.
+4. **Drift correction** (D49 measured it, the correction was left for
+   later): needed. The one-hour run of 2026-11-16 measured the Razer at
+   −116 ppm (its file 0.42 s short after an hour, about 70 ms after
+   10 minutes against the video) and the CalDigit at +50 ppm; system
+   audio, the BRIO and the MacBook microphone under 6 ppm. Try an
+   aggregate device with drift correction first. The drift estimate
+   itself (first and latest buffer arrival) mostly measures arrival
+   jitter on short files; a least-squares slope, null under about
+   30 s, fixes that.
+5. **CPU**: our process averaged 56 % of one core over an hour (two
+   displays, five audio sources) and peaks at 165 to 386 % at start.
+   A profile of 2026-11-16 is being analysed; measure before changing.
+6. **Audio after v0** (D12, D18): AGC, in its own PR, with its own
    design, its column in the window's table and the HDMI test.
    What AGC does is open (D34). Recording all audio inputs is no
    longer here: auto mode brings it (D34).
-4. **v1 gate:** acceptance tests on the owner's Mac (M3 Pro, macOS 26):
+7. **v1 gate:** acceptance tests on the owner's Mac (M3 Pro, macOS 26):
    - Timing by content: record a full-screen clock showing
      milliseconds; across a still period of at least 60 s followed by a
      change, each sampled frame shows the time of its timestamp within
@@ -102,32 +148,43 @@ Still open from D34: what AGC does and whether it is on in auto mode;
      decides whether the joining command below is needed.
    - A snapshot release installed over an earlier one keeps both
      permissions, with the app started from Finder (D5).
-5. **Automated end-to-end tests on the owner's Mac** (D34), their
-   first slice its own PR after B1, testing the display events (the
-   architect's sequencing, 2026-11-15; before D45 they were part of the
-   recorder PR). The
-   agreed design (D37) is
-   [docs/design/end-to-end-tests.md](docs/design/end-to-end-tests.md):
-   tests by error class, what the recorder design must
-   provide for them, the experiments that settle its unknowns, and its
-   open questions. It is agreed with D35's rulings (D37). Nothing
-   of it is built; of its experiments, those on virtual displays and
-   the audio drift have run (2026-11-13, 2026-11-15); the audio ones
-   (aggregate device, BlackHole drivers, a tone in system audio),
-   BetterDisplay's command line and the clock have not. Agents may now
-   run them on the owner's Mac (D48, with B2).
-6. **App icon, what is left** after PR #7 (classic `.icns` rendered
+8. **Audio files in editors**: Resolve shows the audio files' timecode
+   but no reel name or camera number (the owner, 2026-11-16), though
+   they carry the same items as the display files; the owner wants
+   "meaningful metadata for resolve and others". Research found no
+   documented route for audio-only clips; Final Cut Pro reads iXML
+   `TAPE` from WAV. Five test variants (QuickTime user data, XMP, a
+   black video track, Broadcast WAV with iXML, a Resolve metadata CSV)
+   wait for the owner's check in Resolve; they were made by throwaway
+   scripts in a session scratchpad, so remake them if gone. A WAV copy
+   derived at Stop or a CSV per recording are the candidates; the
+   recording itself stays a fragmented `.mov`. Design first.
+9. **An input that delivers only zeros** (from the live runs,
+   2026-11-16): a broken BRIO and, during USB re-enumeration, every USB
+   input and the system-audio capture delivered exact zeros for 4 to
+   10 s, with no event (macOS's doing; the speakers kept playing). Tell
+   it as an event and a problem when an input delivers exact zeros for
+   2 s or more (system audio excluded, silence is normal there).
+   Design first.
+10. **Cameras** (the owner, 2026-11-16: "we'll have to add a feature to
+   record cameras, same slider: none, default, all, all + virtual. Auto
+   defaults to default camera if available"). Design first.
+11. **App icon, what is left** after PR #7 (classic `.icns` rendered
    from `assets/icon/app-icon.svg`): the macOS 26 layered icon format
    from the SVG's layers, if a plain package build can compile it; a
    simplified drawing below 32 px (two displays and a larger dot), from
    the owner's choice of 2026-11-12. Revisit when the owner finds the
    Dock or Finder icon lacking.
-7. **Homepage** (D7): the branch name and how changes reach it
+12. **Homepage** (D7): the branch name and how changes reach it
    (architect); the DNS entry for `multiscreenrecorder.schapiro.org`
    (owner).
 
 ## Deliberately deferred
 
+- **Skipping the MacBook microphone while the lid is closed**: Apple
+  silicon MacBooks disconnect it in hardware then, so its file holds
+  only zeros (seen 2026-11-16). Harmless; revisit with item 9 (an input
+  that delivers only zeros) or if the files bother the owner.
 - **Developer ID signing and notarization** (D5). Deferred because the
   Apple Developer Program costs €99 a year and the owner can work with
   a self-signed build. Revisit when users beyond the owner need to
