@@ -55,8 +55,13 @@ public final class GuideTrackFeed: Sendable {
         }
     }
 
-    func stopListening(_ id: Int) {
-        _ = state.withLock { $0.listeners.removeValue(forKey: id) }
+    /// The listener stops; returns the mixes as they are now, for the
+    /// file's last mix: they start where its last hand-over ended.
+    func stopListening(_ id: Int) -> [GuideTrackMix] {
+        state.withLock { state in
+            state.listeners.removeValue(forKey: id)
+            return tracks.compactMap { state.mixes[$0] }
+        }
     }
 
     /// An audio source joins its guide track, if the recording has it.

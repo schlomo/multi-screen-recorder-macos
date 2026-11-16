@@ -121,13 +121,22 @@ public final class DisplayFileTicker {
 
     /// Ends the file: writes the ticks due by `now` and, with
     /// `writeWaitingTicks`, those still waiting, for at most the drain
-    /// timeout on a clock that does not count sleep; then always finalizes.
-    /// Nil when no file had started.
-    public func finish(now: Int64, writeWaitingTicks: Bool) async -> DisplayFileEnd? {
+    /// timeout on a clock that does not count sleep, and the guide tracks
+    /// up to the video's end, from `finalGuides`, the mixes of what the
+    /// sources delivered, starting where the last hand-over ended; then
+    /// always finalizes. Nil when no file had started.
+    public func finish(now: Int64, writeWaitingTicks: Bool, finalGuides: [GuideTrackMix] = []) async -> DisplayFileEnd? {
         guard let writer, var file = entry else { return nil }
         if writerError == nil, writeWaitingTicks {
             _ = tick(now: now)
             if writerError == nil { await drain(writer) }
+            if writerError == nil, let lastTick = ticks.lastWrittenTick {
+                let videoEnd = (lastTick + 1) * Int64(RecorderValues.audioSampleRate) / Int64(ticks.grid.framesPerSecond)
+                for var mix in finalGuides {
+                    let start = mix.mixedUpTo
+                    _ = receiveGuide(mix.track, mix.mix(upTo: videoEnd), positionFromStart: start)
+                }
+            }
             if writerError == nil { _ = writeGuides(writer) }
         }
         waitingGuides = []

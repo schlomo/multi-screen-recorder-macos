@@ -76,7 +76,12 @@ public struct GuideTrackMix: Sendable {
     /// Mixes every sample up to `delay` before `now`, one array per output
     /// channel; they start at the `mixedUpTo` of before the call.
     public mutating func mix(until now: Int64) -> [[Float]] {
-        let end = position(of: now - delay)
+        mix(upTo: position(of: now - delay))
+    }
+
+    /// Mixes every sample before the sample position `end`, as `mix(until:)`
+    /// does; at a display file's end, its last mix up to the video's end.
+    public mutating func mix(upTo end: Int64) -> [[Float]] {
         guard end > mixedUpTo else { return Array(repeating: [], count: track.channelCount) }
         let count = Int(end - mixedUpTo)
         let scale: Float = switch track {

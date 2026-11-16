@@ -823,10 +823,9 @@ the metadata items (see "Output on disk").
   is missing is silence in its guide track. The mix is handed to every
   open display file every 100 ms (*data*); a display file's guide tracks
   cover exactly its own time, so a frame size change gives them the
-  same gap as the video. A display file's guide tracks may end up to
-  300 ms early, the 200 ms delay plus up to one 100 ms hand-over: the
-  samples not yet handed over when it ends. The audio files themselves
-  are complete.
+  same gap as the video. When a display file ends, one last mix of
+  everything the sources delivered goes up to the end of its video, so
+  its guide tracks end with the video (D51).
 
 **Display identity.** A display is known by the UUID macOS gives it
 (`CGDisplayCreateUUIDFromDisplayID`), never by its display ID, which
@@ -922,7 +921,9 @@ the event and its display, and the details it has, such as
 `22:15:32 +61.3s display stream failed: LG (-3811)`. `--debug` (for
 `msr record` and `msr check`) adds detail lines (the tracker's actions,
 the displays as read, files started and ended, the ready check's facts)
-on standard error and at `.debug` in the log. The log of the last 2
+on standard error and at `.debug` in the log; while a recording runs,
+each line on standard error carries the time since its start as the
+event lines do, such as `debug recorder: +27.9s start Display 3 - LG`. The log of the last 2
 hours, of the app and `msr` only (the tests log under the same
 subsystem on a developer's Mac):
 
@@ -1156,8 +1157,8 @@ recorded`; an audio input is recorded only when Core Audio gives its
 UID, which `AVCaptureDevice` opens it by; the beginning of a recording
 tells no `default microphone changed` or `audio input connected` events;
 the system audio's stream asks for 2×2 pixels at 1 frame per second and
-drops them; a display file's guide tracks may end up to 300 ms before
-its last tick; the video track's name is written as QuickTime user data
+drops them; a display file's guide tracks end with its video, by a
+last mix at its end (D51); the video track's name is written as QuickTime user data
 `©nam`, which ffprobe shows as `title` (track-level metadata items do
 not show and are not written; the file-level items are); `msr record`'s
 summary ends with the line `CPU N % on average, N % at the peak, of one

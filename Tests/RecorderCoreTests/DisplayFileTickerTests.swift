@@ -94,6 +94,26 @@ import Testing
         #expect(made.guides.map(\.2) == [4800 - 2 * samplesPerTick, 4800])
     }
 
+    /// At the end, one final mix of what the sources delivered: the guide
+    /// tracks end with the video, not the mix's delay early.
+    @Test func theGuideTracksEndWithTheVideo() async throws {
+        let (ticker, writer) = ticker()
+        _ = ticker.receive(frame, capturedAt: 0)
+        let made = try #require(writer())
+        let videoSamples = 31 * RecorderValues.audioSampleRate / RecorderValues.framesPerSecond
+        let buffer = 512
+        var mix = GuideTrackMix(.microphones)
+        mix.add(source: "A", channelCount: 1)
+        mix.receive([[Float](repeating: 0.25, count: videoSamples + buffer)], from: "A", at: 0)
+        // Handed over every 100 ms, 200 ms behind: the last 0.2 s are not handed over yet.
+        let handedOver = mix.mix(upTo: Int64(videoSamples - 9600))
+        _ = ticker.receiveGuide(.microphones, handedOver, positionFromStart: 0)
+        #expect(ticker.tick(now: grid.time(ofTick: 30)) == nil)
+        _ = try #require(await ticker.finish(now: grid.time(ofTick: 30), writeWaitingTicks: true, finalGuides: [mix]))
+        let written = made.guides.filter { $0.0 == .microphones }.map(\.2).reduce(0, +)
+        #expect(abs(written - videoSamples) <= buffer, "\(written) guide samples for \(videoSamples) of video")
+    }
+
     @Test func aWriterErrorReachesTheFileEnd() async throws {
         let (ticker, writer) = ticker()
         _ = ticker.receive(frame, capturedAt: 0)

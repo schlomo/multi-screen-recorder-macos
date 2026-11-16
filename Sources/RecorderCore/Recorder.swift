@@ -101,6 +101,8 @@ public final class Recorder {
         activity = ProcessInfo.processInfo.beginActivity(
             options: [.idleSystemSleepDisabled, .idleDisplaySleepDisabled, .userInitiated],
             reason: "Multi Screen Recorder is recording")
+        let context = context
+        RecorderLog.timeDetail(since: { Double(context.now()) / 1_000_000_000 })
         registerForChanges()
         context.update(displays, lastDisplayChange: nil)
         guides.start()
@@ -179,6 +181,7 @@ public final class Recorder {
                 // Told by `writeManifest`; the file on disk keeps no `ended`.
                 finalManifestWritten = false
             }
+            RecorderLog.timeDetail(since: nil)
             if let activity { ProcessInfo.processInfo.endActivity(activity) }
             activity = nil
         }

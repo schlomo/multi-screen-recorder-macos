@@ -1389,3 +1389,15 @@ architect's reading.
   the output device's drift as steady gaps of about 32 ms, stays open
   for the owner's live run.
 - **Evidence:** [design/recorder.md](design/recorder.md), "Build state".
+
+## D51: The guide tracks end with the video (2026-11-16)
+
+- **Status:** in force; the architect's call. Supersedes D50's guide
+  track bound of up to 300 ms.
+- **Context:** The owner, after the live runs of the PR "Recording core
+  B2", asked why the guide tracks end early.
+- **Decision:** When a display file ends, one last mix of everything
+  the sources delivered goes up to the end of its video, so its guide
+  tracks end with the video.
+- **Evidence:** [design/recorder.md](design/recorder.md), "Audio",
+  "Guide tracks".

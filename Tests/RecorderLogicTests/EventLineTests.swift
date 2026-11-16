@@ -34,4 +34,10 @@ import Testing
         gap.length = 0.25
         #expect(EventLine.text(gap, started: start, timeZone: berlin).hasSuffix("audio input gap: Razer Seiren V3 Mini 0.250s"))
     }
+
+    @Test func aDebugLineCarriesTheTimeSinceTheStartAsAnEventLineDoes() {
+        #expect(EventLine.debugText("start Display 3 - LG", category: "recorder", seconds: 27.94)
+            == "debug recorder: +27.9s start Display 3 - LG")
+        #expect(EventLine.debugText("probe", category: "ready check", seconds: nil) == "debug ready check: probe")
+    }
 }
