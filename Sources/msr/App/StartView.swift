@@ -8,13 +8,14 @@ struct StartView: View {
     let start: () -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            AppHeader()
+        WidthSettingStack(spacing: 16) {
+            AppHeader().setsTheWidth()
             Divider()
             if let section = model.whatWillBeRecorded {
                 WhatWillBeRecordedView(section: section, outputFolder: model.settings.outputFolder) {
                     openOutputFolder()
                 }
+                .setsTheWidth()
             }
             Divider()
             SettingsForm(model: model)
@@ -33,7 +34,6 @@ struct StartView: View {
             }
         }
         .padding(TableLayout.windowPadding)
-        .frame(width: TableLayout.windowWidth)
     }
 
     private func openOutputFolder() {
@@ -62,7 +62,7 @@ struct AppHeader: View {
                 Link(Homepage.url.host() ?? Homepage.url.absoluteString, destination: Homepage.url)
             }
             Spacer(minLength: 12)
-            // Each line whole: the window is wide enough for both.
+            // Each line whole: the header sets the window's width when it is wider than the table.
             VStack(alignment: .trailing, spacing: 2) {
                 ForEach(Tagline.lines, id: \.self) { line in
                     Text(line).fixedSize()
@@ -176,7 +176,7 @@ struct WhatWillBeRecordedView: View {
     let openOutputFolder: () -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        WidthSettingStack(spacing: 6) {
             Text("What will be recorded").font(.headline)
             if let error = section.screensError { errorLabel(error) }
             if let error = section.audioError { errorLabel(error) }
@@ -202,9 +202,9 @@ struct WhatWillBeRecordedView: View {
                     row(totalRow, boldSource: true)
                 }
             }
-            .frame(width: TableLayout.tableWidth)
             .clipShape(RoundedRectangle(cornerRadius: 6))
             .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(.separator))
+            .setsTheWidth()
             if let need = section.total?.need { Text(need) }
             HStack(spacing: 4) {
                 Text("Files go to")
@@ -216,6 +216,10 @@ struct WhatWillBeRecordedView: View {
             }
             Text(section.continuity).foregroundStyle(.secondary)
         }
+    }
+
+    private var sourceWidth: CGFloat {
+        TableLayout.sourceWidth(names: (section.screenRows + section.audioRows).compactMap { $0.source?.name })
     }
 
     private func stripe(_ index: Int) -> Color {
@@ -248,7 +252,7 @@ struct WhatWillBeRecordedView: View {
                                 .lineLimit(1)
                         }
                     }
-                    .frame(width: TableLayout.sourceWidth, alignment: .leading)
+                    .frame(minWidth: sourceWidth, maxWidth: .infinity, alignment: .leading)
                 } else {
                     Text(cell)
                         .lineLimit(1)

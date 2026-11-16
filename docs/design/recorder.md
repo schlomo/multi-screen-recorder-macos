@@ -26,7 +26,7 @@ signature); if that fails it exits 71 (`EX_OSERR`).
 |---|---|---|
 | `msr list` | Shows screens, audio inputs and system audio | 0, 1 when the screens, the audio inputs or an audio input the settings record cannot be read |
 | `msr check [flags] [--debug]` | Prints "What will be recorded", then runs the ready check and prints each item; `--debug` adds detail on standard error and in the log | 0 ready, 1 not ready |
-| `msr record [flags] [--duration 1h30m] [--debug]` | Records the screens and the audio sources (the recording core, D45, D49). Without flags it does what Start in the window does, with the same settings file; it prints "What will be recorded" at its start, then runs the ready check, records until Ctrl-C, SIGTERM, SIGHUP, the duration or Stop in the status window (below), and prints the recording folder at the start and a summary at the end: every file with its state and our process's CPU use, average and peak. It runs as a full AppKit app without a Dock icon (the `accessory` activation policy) until the ready check passed and the recording starts, then shows the icon; a run that is not ready shows none, and an icon macOS refuses is a problem, and the recording goes on (Ctrl-C stops it); while it records, the icon shows with its badge, and clicking it or Quit opens the status window as in the app (D45, D46). When it stops, for any reason, it first prints `Stopping the recording and finalizing the files…` on standard error, then finalizes and prints the summary; a Ctrl-C while it finalizes prints `Still finalizing the files…` and does nothing more. It prints every event of the recording manifest as one line on standard error (see "Logging"). `--debug` adds detail on standard error and in the log. `--duration` takes hours, minutes and seconds (`1h30m`, `45m`, `90s`); a number without a suffix is minutes (`90` is 90 minutes) | 0 ok (every file finalized, no file ended by a failure, D47), 1 not ready, 3 when the recording manifest's `result` is `problems`, the finalized manifest could not be written, or the recording could not start |
+| `msr record [flags] [--duration 1h30m] [--debug]` | Records the screens and the audio sources (the recording core, D45, D49). Without flags it does what Start in the window does, with the same settings file; it prints the banner (as `msr check`) and "What will be recorded" at its start, then runs the ready check, records until Ctrl-C, SIGTERM, SIGHUP, the duration or Stop in the status window (below), and prints the recording folder at the start and a summary at the end: every file with its state and our process's CPU use, average and peak. It runs as a full AppKit app without a Dock icon (the `accessory` activation policy) until the ready check passed and the recording starts, then shows the icon; a run that is not ready shows none, and an icon macOS refuses is a problem, and the recording goes on (Ctrl-C stops it); while it records, the icon shows with its badge, and clicking it or Quit opens the status window as in the app (D45, D46). When it stops, for any reason, it first prints `Stopping the recording and finalizing the files…` on standard error, then finalizes and prints the summary; a Ctrl-C while it finalizes prints `Still finalizing the files…` and does nothing more. It prints every event of the recording manifest as one line on standard error (see "Logging"). `--debug` adds detail on standard error and in the log. `--duration` takes hours, minutes and seconds (`1h30m`, `45m`, `90s`); a number without a suffix is minutes (`90` is 90 minutes) | 0 ok (every file finalized, no file ended by a failure, D47), 1 not ready, 3 when the recording manifest's `result` is `problems`, the finalized manifest could not be written, or the recording could not start |
 | `msr settings [flags]` | Without flags prints the effective settings as JSON (show); with any settings flag, `--auto` included, saves the run's effective settings into the settings file and prints them (change). The only command that writes the file; the window also writes it | 0, 1 when it cannot write the file |
 | `msr version` | Prints the version and commit | 0 |
 
@@ -507,11 +507,17 @@ checked, reported or rewritten at the next start (D47).
   the columns after Source are measured at runtime from the widest
   possible content in the table's font ("8888×8888", "cannot be read",
   "888.8" and so on, and the header), never from what is
-  connected, so no column moves when auto mode, a slider or the devices
-  change; Source takes the rest of the window, which is as wide as the
-  table, holds the kind's icon and "88 MacBook Pro Microphone (default)"
-  and truncates a longer name in the middle (its tooltip is the label,
-  with "(default)" after it for the default input).
+  connected, so no column moves when auto mode or a slider change.
+  Source is as wide as the kind's icon and the longest name connected
+  now, each measured with the number "88", so that a setting that
+  numbers a source or not moves nothing; no cell wraps or is cut (its
+  tooltip is the label, with "(default)" after it for the default
+  input). The window is as wide as the table, or as the tagline header
+  when that is wider, and Source then takes the rest; it is never
+  narrower than the controls below need, and the text below the table,
+  such as the audio mode's explanation, wraps to that width instead of
+  widening the window. So the window's width follows the devices'
+  names, not the settings.
   - Source shows each source as an SF Symbol for its kind (`display` for
     a screen, `mic` for an audio input, `speaker.wave.2` for the system
     audio), then its number and its name, as its label numbers it (D55):
@@ -633,7 +639,9 @@ checked, reported or rewritten at the next start (D47).
   processes (VTEncoderXPCService, replayd, WindowServer), which this
   number does not include."; the problems in red, with the command for
   the log (see "Logging"); and, in the lower right corner, Continue and
-  Stop, Stop on the right in blue as the call to action. Esc presses
+  Stop, Stop on the right in blue as the call to action. The window is
+  as wide as its table, no cell wrapping or cut, and the text below,
+  such as the CPU line's explanation, wraps to that width. Esc presses
   Continue; Return presses Stop. It refreshes every second
   while open; Continue closes it. A screen file whose size cannot be
   read makes its screen's Written `?`, and the line's data written

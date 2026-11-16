@@ -52,13 +52,13 @@ final class StatusWindow {
     }
 }
 
-private struct StatusView: View {
+struct StatusView: View {
     let model: StatusModel
     let stop: () -> Void
     let continueRecording: () -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        WidthSettingStack(spacing: 12) {
             Grid(alignment: .leading, horizontalSpacing: 16, verticalSpacing: 4) {
                 GridRow {
                     ForEach(RecordingStatusTable.columns, id: \.self) { Text($0).font(.headline) }
@@ -76,6 +76,7 @@ private struct StatusView: View {
                     }
                 }
             }
+            .setsTheWidth()
             Text(model.line).monospacedDigit()
             if !model.cpu.isEmpty {
                 VStack(alignment: .leading, spacing: 2) {
@@ -104,7 +105,6 @@ private struct StatusView: View {
                 Button("Stop", action: stop).buttonStyle(.borderedProminent).keyboardShortcut(.defaultAction)
             }
         }
-        .padding(20)
-        .frame(minWidth: 560)
+        .padding(TableLayout.windowPadding)
     }
 }
