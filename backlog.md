@@ -32,8 +32,24 @@ Still open from D34: what AGC does and whether it is on in auto mode;
   default-microphone changes, a microphone unplugged and replugged,
   display and main-display changes, the system-audio guide equal to its
   file, timecode in Resolve, one hour with `result: ok` and no late
-  frame. Not yet live: the changes after `7ad0b6b` (the D52 mix, the
-  guide-track ends, debug times).
+  frame. On build `12f846a` (the owner, 2026-11-16): the D52 mix keeps
+  each voice at its own level, guide tracks as long as the video, debug
+  lines carry their time.
+  - **Open, found on `12f846a`:** in the owner's app recording
+    (`2026-11-16 12.24.51`), the DELL's file writer fell behind twice,
+    within about 3 s after the Wacom changed USB-C port and the built-in
+    display came and went: its files end at 33.0 and 68.6 s and the next
+    start at 38.0 and 75.3 s, so the main display lost 5 and 7 s.
+    Not seen with a virtual screen on the same build, nor in the
+    owner's Wacom replugs on `7ad0b6b`. The recorder gives a writer 2 s
+    before it ends the file. To settle with a `--debug` run during a
+    Wacom port change: whether it is the hardware encoder stalling
+    through macOS's display and USB reconfiguration, and whether a
+    longer allowance (frames held, not dropped) keeps the file.
+  - Guide tracks end with about 0.3 s of zeros at Stop although the
+    microphones recorded sound then (`2026-11-16 12.29.59`): the audio
+    sources stop at the same moment as the display files' last mix.
+    Stop the audio sources after the display files' last mix.
 
 ## Queued
 
@@ -212,14 +228,19 @@ Still open from D34: what AGC does and whether it is on in auto mode;
    internal mic is off on lid closed. Hardware muted mic would probably
    be the same, we can test that with my razer". So such an input is
    not written while it delivers only zeros (and is told), which also
-   covers the closed lid; to test: what a hardware-muted Razer
-   delivers. Design first.
+   covers the closed lid. Tested 2026-11-16: the Razer's hardware mute
+   delivers exact zeros, the same case. The status window shows per
+   input whether sound arrives, a level meter if cheap (the owner,
+   2026-11-16: "doesn't need to be a meter (would be nice though), but
+   some visual indicator"). A device that delivers broken audio sends a
+   storm of gap events (the BRIO, 28 in 5 s, 2026-11-16): tell one
+   event per episode. Design first.
 10. **Cameras** (the owner, 2026-11-16: "we'll have to add a feature to
    record cameras, same slider: none, default, all, all + virtual. Auto
    defaults to default camera if available"). A camera's file carries
    audio too ("Later for webcam we'll have more combined files as we of
    course want have audio there as well", 2026-11-16). Design first.
-11. **A live status line for `msr record` in a terminal** (the owner,
+11. **Presentation: the window and the terminal output** (the owner,
    2026-11-16: "if running in a terminal (try) then show the running
    status as persistent last line, recording time, CPU, recording size
    etc."). Signed off on 2026-11-16, with the owner's additions ("a
@@ -245,6 +266,14 @@ Still open from D34: what AGC does and whether it is on in auto mode;
      repository until the homepage, D7, is live).
    - Check the other commands (`check`, `list`, `settings`, `version`)
      against the same split.
+   - The window, with the owner's feedback of 2026-11-16 on `12f846a`:
+     the app icon, the version and a link (as the banner); a Cancel
+     button in the lower right corner; the table as a real table, the
+     total in the GB/h column; the output folder a clickable link. The
+     status window shows sizes below 1 GB in MB (it showed 0.0 GB for
+     everything after 1.5 minutes). The GB/h estimate is about twice
+     what one hour wrote (4.0 GB/h estimated, 1.7 GB in the hour run):
+     calibrate it with the v1 gate's hour run.
 12. **App icon, what is left** after PR #7 (classic `.icns` rendered
    from `assets/icon/app-icon.svg`): the macOS 26 layered icon format
    from the SVG's layers, if a plain package build can compile it; a
