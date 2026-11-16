@@ -150,8 +150,9 @@ arrived (an optional extra, D43); only the owner merges (D8, D39). AI-written co
 
 ### Environments
 
-The user's Mac only; the homepage on GitHub Pages at
-`multiscreenrecorder.schapiro.org`, built from a separate branch (D7).
+The user's Mac only; the homepage at
+`multiscreenrecorder.schapiro.org`, a Hugo site in `homepage/` on
+`main`, built and served by Cloudflare Workers Builds (D7, D53).
 
 ## 4. Open questions
 
