@@ -37,7 +37,7 @@ import Testing
         #expect(told.add(problem(11), kind: .freeSpaceNotRead, to: &manifest) == .alreadyTold)
         #expect(manifest.problems == [problem(1)])
         // Another kind is told meanwhile.
-        #expect(told.add(problem(12, "The displays cannot be read"), kind: .displaysNotRead, to: &manifest) == .tell(writeManifest: true))
+        #expect(told.add(problem(12, "The screens cannot be read"), kind: .screensNotRead, to: &manifest) == .tell(writeManifest: true))
         told.cleared(.freeSpaceNotRead)
         #expect(told.add(problem(20), kind: .freeSpaceNotRead, to: &manifest) == .tell(writeManifest: true))
         #expect(manifest.problems.count == 3)

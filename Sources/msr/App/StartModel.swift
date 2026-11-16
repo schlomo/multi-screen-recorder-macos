@@ -32,7 +32,7 @@ final class StartModel {
     @ObservationIgnored private var refreshTask: Task<Void, Never>?
 
     /// How long the devices get to settle before they are read again: one
-    /// change of a display or an audio device arrives as a burst of notices.
+    /// change of a screen or an audio device arrives as a burst of notices.
     static let deviceChangeSettleTime = Duration.milliseconds(300)
 
     init(
@@ -64,7 +64,7 @@ final class StartModel {
         } catch {
             saveError = error.description
         }
-        check(proof: .listDisplays)
+        check(proof: .listScreens)
     }
 
     func chooseOutputFolder(_ folder: URL) {
@@ -78,7 +78,7 @@ final class StartModel {
         refreshSoon()
     }
 
-    /// A display came, went or changed, an audio device came or went, or the
+    /// A screen came, went or changed, an audio device came or went, or the
     /// default audio input changed.
     func devicesChanged() {
         guard !isRecording else { return }
@@ -108,7 +108,7 @@ final class StartModel {
             guard !Task.isCancelled else { return }
             whenContentMayChange {
                 guard number == self.refreshNumber, !self.isRecording else { return }
-                self.check(proof: .listDisplays)
+                self.check(proof: .listScreens)
             }
         }
     }
@@ -135,7 +135,7 @@ final class StartModel {
     private func check(proof: ScreenRecordingProof) {
         guard !isRecording else { return }
         whatWillBeRecorded = WhatWillBeRecorded(
-            settings: settings, displays: probes.displays(), audioInputs: probes.audioInputs(), outputFolder: nil)
+            settings: settings, screens: probes.screens(), audioInputs: probes.audioInputs(), outputFolder: nil)
         checkNumber += 1
         isChecking = true
         let number = checkNumber

@@ -1,13 +1,13 @@
 import Foundation
 
-/// Decides, for every display a recording has seen, when its stream starts
-/// and when its display file ends, and which events go into the recording
-/// manifest (recorder.md, "Displays coming and going", "Frame size",
-/// "Display check"). It holds no stream and no file: the recorder carries
+/// Decides, for every screen a recording has seen, when its stream starts
+/// and when its screen file ends, and which events go into the recording
+/// manifest (recorder.md, "Screens coming and going", "Frame size",
+/// "Screen check"). It holds no stream and no file: the recorder carries
 /// out its actions and reports back what happened. Times are nanoseconds
 /// from t0 on the shared clock.
-public struct DisplayTracker: Sendable {
-    /// Why a display file ends.
+public struct ScreenTracker: Sendable {
+    /// Why a screen file ends.
     public enum Ending: Equatable, Sendable {
         case disconnected
         case frameSizeChanged
@@ -16,24 +16,24 @@ public struct DisplayTracker: Sendable {
         case stop
     }
 
-    /// What the recorder does for a display.
+    /// What the recorder does for a screen.
     public enum Action: Equatable, Sendable {
-        /// Start a stream on the display and a display file once its first frame passes the display check.
+        /// Start a stream on the screen and a screen file once its first frame passes the screen check.
         case start(uuid: String, displayID: UInt32, frameSize: FrameSize, number: Int, name: String)
-        /// End the display's stream and finalize its display file.
+        /// End the screen's stream and finalize its screen file.
         case stop(uuid: String, ending: Ending)
     }
 
     /// Why a stream ended by itself; the recorder reports it.
     public enum StreamEnd: Equatable, Sendable {
         case streamFailed(String)
-        /// The display the stream captured is gone, as on an unplug, often
-        /// seconds before macOS's display-change notice: no failure (F4).
+        /// The screen the stream captured is gone, as on an unplug, often
+        /// seconds before macOS's screen-change notice: no failure (F4).
         case captureSourceGone
         case writerFailed(String)
         case writerFellBehind
         case diskFull
-        case showsAnotherDisplay
+        case showsAnotherScreen
     }
 
     public struct Step: Equatable, Sendable {
@@ -56,8 +56,8 @@ public struct DisplayTracker: Sendable {
         case idle
         case recording(frameSize: FrameSize)
         case waitingToRestart(notBefore: Int64)
-        /// Tried again only after the display's next change.
-        case showsAnotherDisplay(since: Int64)
+        /// Tried again only after the screen's next change.
+        case showsAnotherScreen(since: Int64)
         case waitingForRoom
     }
 
@@ -65,14 +65,14 @@ public struct DisplayTracker: Sendable {
         var number: Int?
         var name: String?
         var phase: Phase = .idle
-        /// As last read; nil while the display is gone.
-        var reading: ConnectedDisplay?
+        /// As last read; nil while the screen is gone.
+        var reading: ConnectedScreen?
         /// When it last appeared, went or changed.
         var changedAt: Int64
         var restartDelay: Duration
         /// Whether its stream may end once with the capture source gone
         /// without a failure: until it does, and again after each
-        /// display-change notice for it (N-A).
+        /// screen-change notice for it (N-A).
         var mayLoseCaptureSource = true
     }
 
@@ -81,13 +81,13 @@ public struct DisplayTracker: Sendable {
     public let firstRestartDelay: Duration
     public let longestRestartDelay: Duration
 
-    private var displays: [String: Tracked] = [:]
+    private var screens: [String: Tracked] = [:]
     private var nextNumber = 1
     private var mainUUID: String?
     private var isAsleep = false
-    /// The newest change of any display: the display check does not count
+    /// The newest change of any screen: the screen check does not count
     /// failing frames within the settle time after it.
-    public private(set) var lastDisplayChange: Int64?
+    public private(set) var lastScreenChange: Int64?
 
     public init(
         resolution: RecordingResolution,
@@ -101,113 +101,113 @@ public struct DisplayTracker: Sendable {
         self.longestRestartDelay = longestRestartDelay
     }
 
-    /// The displays connected at the start: each gets its stream at once.
-    /// Display 1 is the main display, the others are numbered left to right.
-    public mutating func begin(_ connected: [ConnectedDisplay], at now: Int64) -> Step {
-        for display in connected {
-            displays[display.uuid] = Tracked(
-                name: display.name, reading: display, changedAt: Int64.min / 2, restartDelay: firstRestartDelay)
+    /// The screens connected at the start: each gets its stream at once.
+    /// Screen 1 is the main screen, the others are numbered left to right.
+    public mutating func begin(_ connected: [ConnectedScreen], at now: Int64) -> Step {
+        for screen in connected {
+            screens[screen.uuid] = Tracked(
+                name: screen.name, reading: screen, changedAt: Int64.min / 2, restartDelay: firstRestartDelay)
         }
         mainUUID = connected.first(where: \.isMain)?.uuid
         var step = Step()
-        for display in Self.leftToRight(connected.filter { !$0.isMirroring }) {
-            step.actions.append(start(display.uuid, at: now))
+        for screen in Self.leftToRight(connected.filter { !$0.isMirroring }) {
+            step.actions.append(start(screen.uuid, at: now))
         }
         return step
     }
 
-    /// The display file of `uuid` started: its restart delay starts over.
+    /// The screen file of `uuid` started: its restart delay starts over.
     public mutating func fileStarted(_ uuid: String) {
-        displays[uuid]?.restartDelay = firstRestartDelay
+        screens[uuid]?.restartDelay = firstRestartDelay
     }
 
-    /// The displays as read after macOS reported a change. A display that
+    /// The screens as read after macOS reported a change. A screen that
     /// went or started mirroring ends its file at once; one that came, came
     /// back or changed starts after the settle time (`due(at:)`).
-    public mutating func observe(_ connected: [ConnectedDisplay], at now: Int64) -> Step {
+    public mutating func observe(_ connected: [ConnectedScreen], at now: Int64) -> Step {
         var step = Step()
         let byUUID = Dictionary(connected.map { ($0.uuid, $0) }, uniquingKeysWith: { first, _ in first })
-        for (uuid, tracked) in displays.sorted(by: { $0.key < $1.key }) where tracked.reading != nil && byUUID[uuid] == nil {
-            displays[uuid]?.reading = nil
-            displays[uuid]?.changedAt = now
-            displays[uuid]?.mayLoseCaptureSource = true
-            lastDisplayChange = now
+        for (uuid, tracked) in screens.sorted(by: { $0.key < $1.key }) where tracked.reading != nil && byUUID[uuid] == nil {
+            screens[uuid]?.reading = nil
+            screens[uuid]?.changedAt = now
+            screens[uuid]?.mayLoseCaptureSource = true
+            lastScreenChange = now
             if !(tracked.reading?.isMirroring ?? false) {
-                step.events.append(event(.displayDisconnected, uuid, at: now))
+                step.events.append(event(.screenDisconnected, uuid, at: now))
             }
             if case .recording = tracked.phase { step.actions.append(.stop(uuid: uuid, ending: .disconnected)) }
-            if tracked.phase != .waitingForRoom { displays[uuid]?.phase = .idle }
+            if tracked.phase != .waitingForRoom { screens[uuid]?.phase = .idle }
         }
-        for display in Self.leftToRight(connected) {
-            guard var tracked = displays[display.uuid] else {
-                displays[display.uuid] = Tracked(
-                    name: display.name, reading: display, changedAt: now, restartDelay: firstRestartDelay)
-                lastDisplayChange = now
-                if !display.isMirroring { step.events.append(event(.displayConnected, display.uuid, at: now)) }
+        for screen in Self.leftToRight(connected) {
+            guard var tracked = screens[screen.uuid] else {
+                screens[screen.uuid] = Tracked(
+                    name: screen.name, reading: screen, changedAt: now, restartDelay: firstRestartDelay)
+                lastScreenChange = now
+                if !screen.isMirroring { step.events.append(event(.screenConnected, screen.uuid, at: now)) }
                 continue
             }
             let previous = tracked.reading
-            guard previous != display else { continue }
-            tracked.reading = display
+            guard previous != screen else { continue }
+            tracked.reading = screen
             tracked.changedAt = now
             tracked.mayLoseCaptureSource = true
-            if tracked.name == nil { tracked.name = display.name }
-            displays[display.uuid] = tracked
-            lastDisplayChange = now
+            if tracked.name == nil { tracked.name = screen.name }
+            screens[screen.uuid] = tracked
+            lastScreenChange = now
             if previous == nil {
-                if !display.isMirroring { step.events.append(event(.displayConnected, display.uuid, at: now)) }
-            } else if let previous, !previous.isMirroring, display.isMirroring {
-                var started = event(.displayMirroringStarted, display.uuid, at: now)
-                started.mirrors = display.mirrorsUUID.flatMap { name(of: $0) }
+                if !screen.isMirroring { step.events.append(event(.screenConnected, screen.uuid, at: now)) }
+            } else if let previous, !previous.isMirroring, screen.isMirroring {
+                var started = event(.screenMirroringStarted, screen.uuid, at: now)
+                started.mirrors = screen.mirrorsUUID.flatMap { name(of: $0) }
                 step.events.append(started)
                 if case .recording = tracked.phase {
-                    step.actions.append(.stop(uuid: display.uuid, ending: .mirroringStarted))
-                    displays[display.uuid]?.phase = .idle
+                    step.actions.append(.stop(uuid: screen.uuid, ending: .mirroringStarted))
+                    screens[screen.uuid]?.phase = .idle
                 }
-            } else if let previous, previous.isMirroring, !display.isMirroring {
-                step.events.append(event(.displayMirroringStopped, display.uuid, at: now))
+            } else if let previous, previous.isMirroring, !screen.isMirroring {
+                step.events.append(event(.screenMirroringStopped, screen.uuid, at: now))
             }
         }
         let newMain = connected.first(where: \.isMain)?.uuid
         if let newMain, newMain != mainUUID {
-            if mainUUID != nil { step.events.append(event(.mainDisplayChanged, newMain, at: now)) }
+            if mainUUID != nil { step.events.append(event(.mainScreenChanged, newMain, at: now)) }
             mainUUID = newMain
         }
         return step
     }
 
-    /// What is due at `now`: displays unchanged for the settle time start,
+    /// What is due at `now`: screens unchanged for the settle time start,
     /// and one whose frame size changed ends its file and starts a new one.
     public mutating func due(at now: Int64) -> Step {
         guard !isAsleep else { return Step() }
         var step = Step()
-        let settled = displays.filter { _, tracked in
+        let settled = screens.filter { _, tracked in
             guard let reading = tracked.reading, !reading.isMirroring else { return false }
             return now - tracked.changedAt >= settleTime.nanoseconds
         }
         let ordered = Self.leftToRight(settled.values.compactMap(\.reading))
-        for display in ordered {
-            guard let tracked = displays[display.uuid] else { continue }
-            let frameSize = resolution.frameSize(forLooksLike: display.pointSize)
+        for screen in ordered {
+            guard let tracked = screens[screen.uuid] else { continue }
+            let frameSize = resolution.frameSize(forLooksLike: screen.pointSize)
             switch tracked.phase {
             case .recording(let current) where current != frameSize:
-                var changed = event(.displayFrameSizeChanged, display.uuid, at: now)
+                var changed = event(.screenFrameSizeChanged, screen.uuid, at: now)
                 changed.from = [current.width, current.height]
                 changed.to = [frameSize.width, frameSize.height]
                 step.events.append(changed)
-                step.actions.append(.stop(uuid: display.uuid, ending: .frameSizeChanged))
-                step.actions.append(start(display.uuid, at: now))
+                step.actions.append(.stop(uuid: screen.uuid, ending: .frameSizeChanged))
+                step.actions.append(start(screen.uuid, at: now))
             case .recording, .waitingForRoom:
                 break
             case .idle:
-                step.actions.append(start(display.uuid, at: now))
+                step.actions.append(start(screen.uuid, at: now))
             case .waitingToRestart(let notBefore) where notBefore <= now:
-                step.actions.append(start(display.uuid, at: now))
+                step.actions.append(start(screen.uuid, at: now))
             case .waitingToRestart:
                 break
-            case .showsAnotherDisplay(let since) where tracked.changedAt > since:
-                step.actions.append(start(display.uuid, at: now))
-            case .showsAnotherDisplay:
+            case .showsAnotherScreen(let since) where tracked.changedAt > since:
+                step.actions.append(start(screen.uuid, at: now))
+            case .showsAnotherScreen:
                 break
             }
         }
@@ -217,7 +217,7 @@ public struct DisplayTracker: Sendable {
     /// The next time `due(at:)` may have something to do, if any.
     public func nextDueTime() -> Int64? {
         guard !isAsleep else { return nil }
-        return displays.values.compactMap { tracked -> Int64? in
+        return screens.values.compactMap { tracked -> Int64? in
             guard let reading = tracked.reading, !reading.isMirroring else { return nil }
             let settled = tracked.changedAt + settleTime.nanoseconds
             switch tracked.phase {
@@ -225,39 +225,39 @@ public struct DisplayTracker: Sendable {
             case .recording(let current):
                 return resolution.frameSize(forLooksLike: reading.pointSize) == current ? nil : settled
             case .waitingToRestart(let notBefore): return max(settled, notBefore)
-            case .showsAnotherDisplay(let since): return tracked.changedAt > since ? settled : nil
+            case .showsAnotherScreen(let since): return tracked.changedAt > since ? settled : nil
             case .waitingForRoom: return nil
             }
         }.min()
     }
 
-    /// A stream ended by itself; `connected` is the displays as read now.
+    /// A stream ended by itself; `connected` is the screens as read now.
     /// A failing writer and a full disk have their event from the recorder,
     /// once per capture end, also when the tracker no longer follows it.
-    public mutating func streamEnded(_ uuid: String, _ end: StreamEnd, connected: [ConnectedDisplay], at now: Int64) -> Step {
-        guard let tracked = displays[uuid], case .recording = tracked.phase else { return Step() }
+    public mutating func streamEnded(_ uuid: String, _ end: StreamEnd, connected: [ConnectedScreen], at now: Int64) -> Step {
+        guard let tracked = screens[uuid], case .recording = tracked.phase else { return Step() }
         var step = Step()
         let isPresent = connected.contains { $0.uuid == uuid && !$0.isMirroring }
         switch end {
-        case .showsAnotherDisplay:
-            step.events.append(event(.displayShowsAnotherDisplaysPicture, uuid, at: now))
-            displays[uuid]?.phase = .showsAnotherDisplay(since: now)
+        case .showsAnotherScreen:
+            step.events.append(event(.screenShowsAnotherScreensPicture, uuid, at: now))
+            screens[uuid]?.phase = .showsAnotherScreen(since: now)
         case .diskFull:
-            displays[uuid]?.phase = .waitingForRoom
+            screens[uuid]?.phase = .waitingForRoom
         case .captureSourceGone where tracked.mayLoseCaptureSource:
-            // Ends as a disconnect; `display disconnected` comes with the
+            // Ends as a disconnect; `screen disconnected` comes with the
             // notice. Still listed after the settle time: a new stream.
-            displays[uuid]?.phase = .idle
-            displays[uuid]?.changedAt = now
-            displays[uuid]?.mayLoseCaptureSource = false
+            screens[uuid]?.phase = .idle
+            screens[uuid]?.changedAt = now
+            screens[uuid]?.mayLoseCaptureSource = false
         case .captureSourceGone:
             step.append(streamFailed(
                 uuid, error: Self.captureSourceGoneAgain, isPresent: isPresent, at: now))
         case .writerFellBehind:
-            step.events.append(event(.displayFileWriterFellBehind, uuid, at: now))
+            step.events.append(event(.screenFileWriterFellBehind, uuid, at: now))
             scheduleRestart(uuid, at: now)
         case .writerFailed:
-            if isPresent { scheduleRestart(uuid, at: now) } else { displays[uuid]?.phase = .idle }
+            if isPresent { scheduleRestart(uuid, at: now) } else { screens[uuid]?.phase = .idle }
         case .streamFailed(let error):
             step.append(streamFailed(uuid, error: error, isPresent: isPresent, at: now))
         }
@@ -265,95 +265,95 @@ public struct DisplayTracker: Sendable {
         return step
     }
 
-    /// There is room on the disk again: displays stopped by a full disk start again.
+    /// There is room on the disk again: screens stopped by a full disk start again.
     public mutating func roomAgain() {
-        for (uuid, tracked) in displays where tracked.phase == .waitingForRoom {
-            displays[uuid]?.phase = .idle
+        for (uuid, tracked) in screens where tracked.phase == .waitingForRoom {
+            screens[uuid]?.phase = .idle
         }
     }
 
-    /// Whether a display file waits for room on the disk.
-    public var isWaitingForRoom: Bool { displays.values.contains { $0.phase == .waitingForRoom } }
+    /// Whether a screen file waits for room on the disk.
+    public var isWaitingForRoom: Bool { screens.values.contains { $0.phase == .waitingForRoom } }
 
-    /// At sleep every display file ends.
+    /// At sleep every screen file ends.
     public mutating func sleep(at now: Int64) -> Step {
         isAsleep = true
         var step = Step(events: [RecordingEvent(at: now, event: .sleep)])
-        for (uuid, tracked) in displays.sorted(by: { $0.key < $1.key }) {
+        for (uuid, tracked) in screens.sorted(by: { $0.key < $1.key }) {
             if case .recording = tracked.phase { step.actions.append(.stop(uuid: uuid, ending: .sleep)) }
-            if tracked.phase != .waitingForRoom { displays[uuid]?.phase = .idle }
+            if tracked.phase != .waitingForRoom { screens[uuid]?.phase = .idle }
         }
         return step
     }
 
-    /// At wake the displays start again after the settle time, as read now.
-    public mutating func wake(_ connected: [ConnectedDisplay], at now: Int64) -> Step {
+    /// At wake the screens start again after the settle time, as read now.
+    public mutating func wake(_ connected: [ConnectedScreen], at now: Int64) -> Step {
         isAsleep = false
         var step = Step(events: [RecordingEvent(at: now, event: .wake)])
         step.append(observe(connected, at: now))
-        for uuid in displays.keys where displays[uuid]?.reading != nil {
-            displays[uuid]?.changedAt = now
+        for uuid in screens.keys where screens[uuid]?.reading != nil {
+            screens[uuid]?.changedAt = now
         }
-        lastDisplayChange = now
+        lastScreenChange = now
         return step
     }
 
-    /// At Stop every display file ends.
+    /// At Stop every screen file ends.
     public mutating func stopAll() -> [Action] {
         var actions: [Action] = []
-        for (uuid, tracked) in displays.sorted(by: { $0.key < $1.key }) {
+        for (uuid, tracked) in screens.sorted(by: { $0.key < $1.key }) {
             if case .recording = tracked.phase { actions.append(.stop(uuid: uuid, ending: .stop)) }
-            displays[uuid]?.phase = .idle
+            screens[uuid]?.phase = .idle
         }
         isAsleep = true
         return actions
     }
 
-    /// Whether a display's file ended because it showed another display's picture and it was not tried again since.
-    public var showsAnotherDisplaysPicture: Bool {
-        displays.values.contains { if case .showsAnotherDisplay = $0.phase { true } else { false } }
+    /// Whether a screen's file ended because it showed another screen's picture and it was not tried again since.
+    public var showsAnotherScreensPicture: Bool {
+        screens.values.contains { if case .showsAnotherScreen = $0.phase { true } else { false } }
     }
 
     // MARK: -
 
     private mutating func start(_ uuid: String, at now: Int64) -> Action {
-        var tracked = displays[uuid]!
+        var tracked = screens[uuid]!
         let reading = tracked.reading!
         if tracked.number == nil {
             tracked.number = nextNumber
             nextNumber += 1
         }
-        let name = tracked.name ?? reading.name ?? "Display \(tracked.number!)"
+        let name = tracked.name ?? reading.name ?? "Screen \(tracked.number!)"
         tracked.name = name
         let frameSize = resolution.frameSize(forLooksLike: reading.pointSize)
         tracked.phase = .recording(frameSize: frameSize)
-        displays[uuid] = tracked
+        screens[uuid] = tracked
         return .start(uuid: uuid, displayID: reading.displayID, frameSize: frameSize, number: tracked.number!, name: name)
     }
 
     /// The error of a stream that lost its capture source again without a
-    /// display-change notice in between: a failure (N-A).
+    /// screen-change notice in between: a failure (N-A).
     public static let captureSourceGoneAgain =
-        "ScreenCaptureKit lost the display again without a display change (noCaptureSource, -3815)"
+        "ScreenCaptureKit lost the screen again without a screen change (noCaptureSource, -3815)"
 
     private mutating func streamFailed(_ uuid: String, error: String, isPresent: Bool, at now: Int64) -> Step {
         guard isPresent else {
-            displays[uuid]?.phase = .idle
+            screens[uuid]?.phase = .idle
             return Step()
         }
-        var failed = event(.displayStreamFailed, uuid, at: now)
+        var failed = event(.screenStreamFailed, uuid, at: now)
         failed.error = error
         scheduleRestart(uuid, at: now)
         return Step(events: [failed])
     }
 
     private mutating func scheduleRestart(_ uuid: String, at now: Int64) {
-        guard let delay = displays[uuid]?.restartDelay else { return }
-        displays[uuid]?.phase = .waitingToRestart(notBefore: now + delay.nanoseconds)
-        displays[uuid]?.restartDelay = min(delay * 2, longestRestartDelay)
+        guard let delay = screens[uuid]?.restartDelay else { return }
+        screens[uuid]?.phase = .waitingToRestart(notBefore: now + delay.nanoseconds)
+        screens[uuid]?.restartDelay = min(delay * 2, longestRestartDelay)
     }
 
-    /// Every display the recording has seen, as the status window shows it.
+    /// Every screen the recording has seen, as the status window shows it.
     public struct Source: Equatable, Sendable {
         public enum State: Equatable, Sendable {
             case recording(FrameSize)
@@ -361,7 +361,7 @@ public struct DisplayTracker: Sendable {
             case waiting
             /// Its file ended with an error; it starts again after the back-off.
             case failedRetrying
-            case showsAnotherDisplay
+            case showsAnotherScreen
             case diskFull
             case mirroring
             case disconnected
@@ -374,13 +374,13 @@ public struct DisplayTracker: Sendable {
         public var state: State
     }
 
-    /// The displays in their numbers' order, those without a number last.
+    /// The screens in their numbers' order, those without a number last.
     public var sources: [Source] {
-        displays.map { uuid, tracked in
+        screens.map { uuid, tracked in
             let state: Source.State = switch tracked.phase {
             case .recording(let frameSize): .recording(frameSize)
             case .waitingToRestart: .failedRetrying
-            case .showsAnotherDisplay: .showsAnotherDisplay
+            case .showsAnotherScreen: .showsAnotherScreen
             case .waitingForRoom: .diskFull
             case .idle where tracked.reading == nil: .disconnected
             case .idle where tracked.reading?.isMirroring == true: .mirroring
@@ -393,15 +393,15 @@ public struct DisplayTracker: Sendable {
     }
 
     private func name(of uuid: String) -> String? {
-        displays[uuid]?.name ?? displays[uuid]?.reading?.name
+        screens[uuid]?.name ?? screens[uuid]?.reading?.name
     }
 
     private func event(_ kind: RecordingEvent.Kind, _ uuid: String, at now: Int64) -> RecordingEvent {
-        RecordingEvent(at: now, event: kind, display: name(of: uuid))
+        RecordingEvent(at: now, event: kind, screen: name(of: uuid))
     }
 
-    /// Main display first, then left to right, then top to bottom.
-    static func leftToRight(_ connected: [ConnectedDisplay]) -> [ConnectedDisplay] {
+    /// Main screen first, then left to right, then top to bottom.
+    static func leftToRight(_ connected: [ConnectedScreen]) -> [ConnectedScreen] {
         connected.sorted { lhs, rhs in
             if lhs.isMain != rhs.isMain { return lhs.isMain }
             if lhs.bounds.x != rhs.bounds.x { return lhs.bounds.x < rhs.bounds.x }

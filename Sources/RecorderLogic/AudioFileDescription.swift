@@ -27,7 +27,7 @@ public struct AudioInputNames: Sendable {
 
 /// What an audio file holds and says about itself (D46, D49): its audio
 /// tracks, the reel name in its timecode track and its metadata items, as a
-/// display file's (`DisplayFileMetadata`).
+/// screen file's (`ScreenFileMetadata`).
 public struct AudioFileDescription: Equatable, Sendable {
     public enum Source: Equatable, Sendable {
         /// An audio input under its unique name (`AudioInputNames`).
@@ -107,8 +107,8 @@ public struct AudioFileDescription: Equatable, Sendable {
     }
 
     /// Each metadata item's full key and value: under
-    /// `DisplayFileMetadata.keyPrefix` as the manifest names them, the app
-    /// and the reel name also under the standard keys a display file uses.
+    /// `ScreenFileMetadata.keyPrefix` as the manifest names them, the app
+    /// and the reel name also under the standard keys a screen file uses.
     public var items: [(key: String, value: String)] {
         var own = [("audioSource", sourceName)]
         if let coreAudioUID { own.append(("audioSourceUID", coreAudioUID)) }
@@ -117,9 +117,9 @@ public struct AudioFileDescription: Equatable, Sendable {
         case .stereo: "stereo"
         }
         own += [("channels", channelsText), ("recordingStarted", recordingStarted), ("app", app)]
-        return own.map { (DisplayFileMetadata.keyPrefix + $0.0, $0.1) } + [
-            (DisplayFileMetadata.softwareKey, app), (DisplayFileMetadata.reelKey, reelName),
-            (DisplayFileMetadata.cameraNameKey, reelName),
+        return own.map { (ScreenFileMetadata.keyPrefix + $0.0, $0.1) } + [
+            (ScreenFileMetadata.softwareKey, app), (ScreenFileMetadata.reelKey, reelName),
+            (ScreenFileMetadata.cameraNameKey, reelName),
         ]
     }
 }

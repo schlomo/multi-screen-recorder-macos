@@ -1,6 +1,6 @@
 #!/usr/bin/env -S python3 -I
 """Runs the bundled msr from scripts/build-app with a scratch HOME: only
-commands that need no permission, display or microphone. Each check is a
+commands that need no permission, screen or microphone. Each check is a
 command and its expected exit code and output.
 """
 

@@ -2,17 +2,17 @@ import AppKit
 import CoreGraphics
 import RecorderLogic
 
-/// The displays macOS reports now, each known by its UUID, the ones that
+/// The screens macOS reports now, each known by its UUID, the ones that
 /// mirror another included. Needs no permission.
 @MainActor
-public func connectedDisplays() throws(DeviceReadError) -> [ConnectedDisplay] {
+public func connectedScreens() throws(DeviceReadError) -> [ConnectedScreen] {
     var count: UInt32 = 0
     guard CGGetOnlineDisplayList(0, nil, &count) == .success else {
-        throw DeviceReadError("the list of displays cannot be read")
+        throw DeviceReadError("the list of screens cannot be read")
     }
     var ids = [CGDirectDisplayID](repeating: 0, count: Int(count))
     guard CGGetOnlineDisplayList(count, &ids, &count) == .success else {
-        throw DeviceReadError("the list of displays cannot be read")
+        throw DeviceReadError("the list of screens cannot be read")
     }
     let names = Dictionary(
         NSScreen.screens.compactMap { screen -> (CGDirectDisplayID, String)? in
@@ -24,11 +24,11 @@ public func connectedDisplays() throws(DeviceReadError) -> [ConnectedDisplay] {
     let uuids = Dictionary(uniqueKeysWithValues: try online.map { id throws(DeviceReadError) in (id, try uuid(of: id)) })
     return try online.map { id throws(DeviceReadError) in
         guard let mode = CGDisplayCopyDisplayMode(id) else {
-            throw DeviceReadError("the display \(names[id] ?? String(id)) does not report its display mode")
+            throw DeviceReadError("the screen \(names[id] ?? String(id)) does not report its screen mode")
         }
         let bounds = CGDisplayBounds(id)
         let mirrored = CGDisplayMirrorsDisplay(id)
-        return ConnectedDisplay(
+        return ConnectedScreen(
             uuid: uuids[id]!, displayID: id, name: names[id],
             pointSize: FrameSize(width: mode.width, height: mode.height),
             bounds: ScreenRect(bounds),
@@ -40,7 +40,7 @@ public func connectedDisplays() throws(DeviceReadError) -> [ConnectedDisplay] {
 private func uuid(of id: CGDirectDisplayID) throws(DeviceReadError) -> String {
     guard let uuid = CGDisplayCreateUUIDFromDisplayID(id)?.takeRetainedValue(),
           let text = CFUUIDCreateString(nil, uuid) as String?
-    else { throw DeviceReadError("the display \(id) does not report its UUID") }
+    else { throw DeviceReadError("the screen \(id) does not report its UUID") }
     return text
 }
 

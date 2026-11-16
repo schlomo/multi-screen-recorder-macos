@@ -1,6 +1,6 @@
 import Foundation
 
-/// The status window of a running recording (D46): a row per display and
+/// The status window of a running recording (D46): a row per screen and
 /// per audio source with its files, the data written and its state, and a
 /// line with the elapsed time, the data, the files and the free space.
 public enum RecordingStatusTable {
@@ -31,11 +31,11 @@ public enum RecordingStatusTable {
         public var cells: [String] { [source, recordsAt, String(files), written, state] }
     }
 
-    /// `bytes`: each display file's size on disk, by its name; a file
-    /// without one makes its display's Written "?".
-    public static func rows(sources: [DisplayTracker.Source], files: [RecordingManifest.DisplayFile], bytes: [String: Int64]) -> [Row] {
+    /// `bytes`: each screen file's size on disk, by its name; a file
+    /// without one makes its screen's Written "?".
+    public static func rows(sources: [ScreenTracker.Source], files: [RecordingManifest.ScreenFile], bytes: [String: Int64]) -> [Row] {
         sources.map { source in
-            let own = files.filter { $0.displayUUID == source.uuid }
+            let own = files.filter { $0.screenUUID == source.uuid }
             let sizes = own.map { bytes[$0.name] }
             let written = writtenText(sizes)
             let frameSize: FrameSize? = if case .recording(let size) = source.state { size } else {
@@ -50,7 +50,7 @@ public enum RecordingStatusTable {
         }
     }
 
-    /// The audio sources' rows, below the displays': Records at is the
+    /// The audio sources' rows, below the screens': Records at is the
     /// channels of the source's newest audio file.
     public static func audioRows(sources: [AudioTracker.Source], files: [RecordingManifest.AudioFile], bytes: [String: Int64]) -> [Row] {
         sources.map { source in
@@ -88,12 +88,12 @@ public enum RecordingStatusTable {
         }
     }
 
-    static func text(_ state: DisplayTracker.Source.State) -> String {
+    static func text(_ state: ScreenTracker.Source.State) -> String {
         switch state {
         case .recording: "recording"
         case .waiting: "waiting"
         case .failedRetrying: "failed, retrying"
-        case .showsAnotherDisplay: "shows another display"
+        case .showsAnotherScreen: "shows another screen"
         case .diskFull: "disk full"
         case .mirroring: "mirroring"
         case .disconnected: "disconnected"

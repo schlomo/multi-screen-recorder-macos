@@ -85,7 +85,7 @@ One row per entry, the error text exactly as in the entry.
   `<NSPopupMenuWindow …>`, preceded by "-layoutSubtreeIfNeeded for
   <NSTableRowView …> has continued for 300 iterations".
 - **Symptom:** the app quits (`EXC_CRASH (SIGABRT)`) 1 to 7 s after a
-  display's HiDPI (backing scale) mode was switched, with a popup menu
+  screen's HiDPI (backing scale) mode was switched, with a popup menu
   of the start window open or opened. The `.ips` crash report does not
   carry the text; read it with
   `log show --predicate 'process == "msr"'`.
@@ -97,7 +97,7 @@ One row per entry, the error text exactly as in the entry.
   change [ASSUMED]; an AppKit or SwiftUI bug [CONJECTURE] (D41).
 - **Fix:** no popup menus in the start window: the audio mode and the
   recording resolution are sliders (D41, D44).
-- **Verify:** switch a display's HiDPI mode with the start window open;
+- **Verify:** switch a screen's HiDPI mode with the start window open;
   the app keeps running. The owner tried on 2026-11-15 ("I couldn't
   provoke the crash"), which is evidence, not proof.
 - **Observed:** 2026-11-14 and 2026-11-15, macOS 26 on the owner's

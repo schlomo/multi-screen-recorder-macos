@@ -118,8 +118,8 @@ public struct GuideTrackMix: Sendable {
     }
 
     /// The samples waiting from `mixedUpTo` up to the sample position `end`,
-    /// mixed as `mix(upTo:)` would, without taking them: a display file's
-    /// last mix, while other display files go on with the same mix.
+    /// mixed as `mix(upTo:)` would, without taking them: a screen file's
+    /// last mix, while other screen files go on with the same mix.
     public func peek(upTo end: Int64) -> (start: Int64, channels: [[Float]]) {
         (mixedUpTo, end > mixedUpTo ? mixed(count: Int(end - mixedUpTo)) : Array(repeating: [], count: track.channelCount))
     }

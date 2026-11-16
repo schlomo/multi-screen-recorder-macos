@@ -1,7 +1,7 @@
 import RecorderLogic
 
-/// What a display file's end, or the end of a capture that started none,
-/// tells: its event (`display file writer failed` or `disk full`), and
+/// What a screen file's end, or the end of a capture that started none,
+/// tells: its event (`screen file writer failed` or `disk full`), and
 /// the problem for the person. A failing writer and a full disk are always
 /// a problem, file or no file. The tracker writes neither event: this is
 /// the one place.
@@ -22,26 +22,26 @@ struct FileEndReport: Equatable {
 
     /// `reason` is nil when the recorder stopped the capture; `now` is the
     /// time on the shared clock, the time of the report when no file ended.
-    init(reason: DisplayTracker.StreamEnd?, end: DisplayFileEnd?, display: String, at now: Int64) {
+    init(reason: ScreenTracker.StreamEnd?, end: ScreenFileEnd?, screen: String, at now: Int64) {
         let reasonError: String? = switch reason {
         case .writerFailed(let error): error
         case .diskFull: "the disk is full"
-        case .streamFailed, .captureSourceGone, .writerFellBehind, .showsAnotherDisplay, nil: nil
+        case .streamFailed, .captureSourceGone, .writerFellBehind, .showsAnotherScreen, nil: nil
         }
         let fileError = end?.error
         guard let error = fileError?.description ?? reasonError else {
             if let end, !end.guideTracksCut.isEmpty {
                 problem = RecordingProblem(
-                    at: Int64(((end.file.end ?? end.file.start) * 1_000_000_000).rounded()), problem: "Display file \(end.file.name)",
+                    at: Int64(((end.file.end ?? end.file.start) * 1_000_000_000).rounded()), problem: "Screen file \(end.file.name)",
                     error: Self.guideTracksCut(end.guideTracksCut))
             }
             return
         }
         let time = end.map { Int64((($0.file.end ?? $0.file.start) * 1_000_000_000).rounded()) } ?? now
-        let what = if let end, fileError != nil { "Display file \(end.file.name)" } else { "Display \(display)" }
+        let what = if let end, fileError != nil { "Screen file \(end.file.name)" } else { "Screen \(screen)" }
         problem = RecordingProblem(at: time, problem: what, error: error)
         let isDiskFull = reason == .diskFull || fileError?.isDiskFull == true
-        var event = RecordingEvent(at: time, event: isDiskFull ? .diskFull : .displayFileWriterFailed, display: display)
+        var event = RecordingEvent(at: time, event: isDiskFull ? .diskFull : .screenFileWriterFailed, screen: screen)
         if !isDiskFull { event.error = error }
         self.event = event
     }
@@ -57,7 +57,7 @@ struct CaptureEndReports {
     /// end of capture `captureNumber` unless it was told; the problem to
     /// tell the person, if any.
     mutating func record(
-        captureNumber: Int, reason: DisplayTracker.StreamEnd?, end: DisplayFileEnd?, display: String, at now: Int64,
+        captureNumber: Int, reason: ScreenTracker.StreamEnd?, end: ScreenFileEnd?, screen: String, at now: Int64,
         into manifest: inout RecordingManifest
     ) -> RecordingProblem? {
         if let end {
@@ -67,7 +67,7 @@ struct CaptureEndReports {
                 manifest.files.append(end.file)
             }
         }
-        let report = FileEndReport(reason: reason, end: end, display: display, at: now)
+        let report = FileEndReport(reason: reason, end: end, screen: screen, at: now)
         guard report.event != nil || report.problem != nil, told.insert(captureNumber).inserted else { return nil }
         if let event = report.event { manifest.events.append(event) }
         if let problem = report.problem { manifest.problems.append(problem) }

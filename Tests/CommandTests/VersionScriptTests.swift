@@ -151,7 +151,7 @@ import Testing
         #expect(outcome.errors.contains("scripts/version: a snapshot needs a checkout with no uncommitted changes to tracked files"))
     }
 
-    @Test func aConfiguredSignatureDisplayDoesNotBreakTheDate() throws {
+    @Test func aConfiguredSignatureScreenDoesNotBreakTheDate() throws {
         defer { scratch.remove() }
         let work = try clone()
         try git("config", "gpg.program", try scratch.installFakeGPG().path(percentEncoded: false), in: work)

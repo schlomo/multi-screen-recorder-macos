@@ -1,7 +1,7 @@
 import Foundation
 
 /// A recording event as one line, as `msr record` prints it on standard
-/// error and the unified log has it: "22:14:40 +9.2s display connected:
+/// error and the unified log has it: "22:14:40 +9.2s screen connected:
 /// Wacom One 13T" (D46).
 public enum EventLine {
     public static func text(_ event: RecordingEvent, started: Date, timeZone: TimeZone) -> String {
@@ -22,7 +22,7 @@ public enum EventLine {
 
     /// A `--debug` line on standard error, with the time since the start
     /// as an event line has it while a recording runs: "debug recorder:
-    /// +27.9s start Display 3 - LG".
+    /// +27.9s start Screen 3 - LG".
     public static func debugText(_ message: String, category: String, seconds: Double?) -> String {
         "debug \(category): " + (seconds.map { elapsed($0) + " " } ?? "") + message
     }

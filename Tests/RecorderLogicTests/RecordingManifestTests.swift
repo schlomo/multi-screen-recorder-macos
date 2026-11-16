@@ -20,8 +20,8 @@ import Testing
     @Test func aFileBeingWrittenHasANullEndAndKeysAreSorted() throws {
         var manifest = manifest()
         manifest.files.append(.init(
-            name: "2026-11-12 14.03.05 Display 1 - Built-in Retina Display.mov", display: "Built-in Retina Display",
-            displayUUID: "37D8832A-2D66-02CA-B9F7-8F30A301B230", frameSize: FrameSize(width: 1670, height: 1080), start: 0,
+            name: "2026-11-12 14.03.05 Screen 1 - Built-in Retina Display.mov", screen: "Built-in Retina Display",
+            screenUUID: "37D8832A-2D66-02CA-B9F7-8F30A301B230", frameSize: FrameSize(width: 1670, height: 1080), start: 0,
             timecode: "14:03:05:04"))
         let text = String(decoding: try manifest.jsonData(), as: UTF8.self)
         #expect(text.contains(#""end" : null"#))
@@ -45,22 +45,22 @@ import Testing
         #expect(manifest.result == .ok)
     }
 
-    /// D47: the result is ok when every file is finalized and no display
+    /// D47: the result is ok when every file is finalized and no screen
     /// file was ended by a failure; a problem told alone does not change it.
     @Test(arguments: [
-        RecordingEvent.Kind.displayStreamFailed, .displayFileWriterFailed, .diskFull, .displayFileWriterFellBehind,
-        .displayShowsAnotherDisplaysPicture,
+        RecordingEvent.Kind.screenStreamFailed, .screenFileWriterFailed, .diskFull, .screenFileWriterFellBehind,
+        .screenShowsAnotherScreensPicture,
     ])
-    func aDisplayFileEndedByAFailureMakesTheResultProblems(failure: RecordingEvent.Kind) {
+    func aScreenFileEndedByAFailureMakesTheResultProblems(failure: RecordingEvent.Kind) {
         var manifest = manifest()
-        manifest.events.append(RecordingEvent(at: 0, event: failure, display: "A"))
+        manifest.events.append(RecordingEvent(at: 0, event: failure, screen: "A"))
         manifest.finalize(ended: start + 60, timeZone: berlin)
         #expect(manifest.result == .problems)
     }
 
     @Test func aFileNotFinalizedMakesTheResultProblems() {
         var manifest = manifest()
-        manifest.files.append(.init(name: "a.mov", display: "A", displayUUID: "A", frameSize: FrameSize(width: 2, height: 2),
+        manifest.files.append(.init(name: "a.mov", screen: "A", screenUUID: "A", frameSize: FrameSize(width: 2, height: 2),
                                     start: 0, timecode: "00:00:00:00"))
         manifest.finalize(ended: start + 60, timeZone: berlin)
         #expect(manifest.result == .problems)
@@ -68,9 +68,9 @@ import Testing
 
     @Test func aProblemToldOrAnEventThatIsNoFailureLeavesTheResultOk() {
         var manifest = manifest()
-        manifest.problems.append(RecordingProblem(at: 2_000_000_000, problem: "The displays cannot be read", error: "denied"))
+        manifest.problems.append(RecordingProblem(at: 2_000_000_000, problem: "The screens cannot be read", error: "denied"))
         for kind in RecordingEvent.Kind.allCases where !kind.isFailure {
-            manifest.events.append(RecordingEvent(at: 0, event: kind, display: "A"))
+            manifest.events.append(RecordingEvent(at: 0, event: kind, screen: "A"))
         }
         manifest.finalize(ended: start + 60, timeZone: berlin)
         #expect(manifest.result == .ok)
@@ -79,7 +79,7 @@ import Testing
 
     @Test func theFailuresAreTheWaysAFileEndsBadly() {
         #expect(RecordingEvent.Kind.allCases.filter(\.isFailure) == [
-            .displayStreamFailed, .displayShowsAnotherDisplaysPicture, .displayFileWriterFellBehind, .displayFileWriterFailed, .diskFull,
+            .screenStreamFailed, .screenShowsAnotherScreensPicture, .screenFileWriterFellBehind, .screenFileWriterFailed, .diskFull,
             .audioInputFailed, .systemAudioFailed, .audioFileWriterFailed, .audioFileWriterFellBehind,
         ])
     }
@@ -101,28 +101,28 @@ import Testing
     func aFailureNotToldGivesOneProblemAtTheEnd(failure: RecordingEvent.Kind) {
         var manifest = manifest()
         let isAudio = failure.rawValue.contains("audio")
-        var event = RecordingEvent(at: 36_778_000_000, event: failure, display: isAudio ? nil : "DELL", audioSource: isAudio ? "BRIO" : nil)
+        var event = RecordingEvent(at: 36_778_000_000, event: failure, screen: isAudio ? nil : "DELL", audioSource: isAudio ? "BRIO" : nil)
         event.error = "it broke"
         manifest.events.append(event)
         manifest.finalize(ended: start + 60, timeZone: berlin)
         #expect(manifest.result == .problems)
         #expect(manifest.problems == [RecordingProblem(
             at: 36_778_000_000, problem: "A failure was not told while recording",
-            error: "\(isAudio ? "Audio source BRIO" : "Display DELL"): \(failure.rawValue): it broke (1 failure event, see events)")])
+            error: "\(isAudio ? "Audio source BRIO" : "Screen DELL"): \(failure.rawValue): it broke (1 failure event, see events)")])
     }
 
-    /// The recording `2026-11-16 12.24.51`: two `display file writer fell
+    /// The recording `2026-11-16 12.24.51`: two `screen file writer fell
     /// behind` and no problem told: exactly one problem.
     @Test func theRecordingWithFailuresAndNothingToldGetsExactlyOneProblem() {
         var manifest = manifest()
-        manifest.events.append(RecordingEvent(at: 36_778_000_000, event: .displayFileWriterFellBehind, display: "DELL P3421W"))
+        manifest.events.append(RecordingEvent(at: 36_778_000_000, event: .screenFileWriterFellBehind, screen: "DELL P3421W"))
         manifest.events.append(RecordingEvent(at: 49_618_000_000, event: .audioInputDisconnected, audioSource: "Razer"))
-        manifest.events.append(RecordingEvent(at: 72_098_000_000, event: .displayFileWriterFellBehind, display: "DELL P3421W"))
+        manifest.events.append(RecordingEvent(at: 72_098_000_000, event: .screenFileWriterFellBehind, screen: "DELL P3421W"))
         manifest.finalize(ended: start + 60, timeZone: berlin)
         #expect(manifest.result == .problems)
         #expect(manifest.problems == [RecordingProblem(
             at: 36_778_000_000, problem: "A failure was not told while recording",
-            error: "Display DELL P3421W: display file writer fell behind (2 failure events, see events)")])
+            error: "Screen DELL P3421W: screen file writer fell behind (2 failure events, see events)")])
     }
 
     @Test func repeatedSystemAudioFailuresToldLiveAddNothing() {
@@ -141,24 +141,24 @@ import Testing
 
     /// A name with `/` or `:` is written with `-` in file names; the net
     /// does not depend on how a problem spells it.
-    @Test func repeatedFailuresOfADisplayWithSlashAndColonToldLiveAddNothing() {
+    @Test func repeatedFailuresOfAScreenWithSlashAndColonToldLiveAddNothing() {
         var manifest = manifest()
         let told = RecordingProblem(
-            at: 10_000_000_000, problem: "Display file 2026-11-16 12.24.51 Display 1 - A-B- Screen.mov", error: "cannot finalize")
+            at: 10_000_000_000, problem: "Screen file 2026-11-16 12.24.51 Screen 1 - A-B- Screen.mov", error: "cannot finalize")
         manifest.problems = [told]
-        manifest.events.append(RecordingEvent(at: 10_000_000_000, event: .displayFileWriterFailed, display: "A/B: Screen"))
-        manifest.events.append(RecordingEvent(at: 20_000_000_000, event: .displayFileWriterFellBehind, display: "A/B: Screen"))
+        manifest.events.append(RecordingEvent(at: 10_000_000_000, event: .screenFileWriterFailed, screen: "A/B: Screen"))
+        manifest.events.append(RecordingEvent(at: 20_000_000_000, event: .screenFileWriterFellBehind, screen: "A/B: Screen"))
         manifest.finalize(ended: start + 60, timeZone: berlin)
         #expect(manifest.problems == [told])
     }
 
-    @Test func aDisplayFileNotFinalizedWithNothingToldGetsOneProblemNamingIt() {
+    @Test func aScreenFileNotFinalizedWithNothingToldGetsOneProblemNamingIt() {
         var manifest = manifest()
-        var display = RecordingManifest.DisplayFile(
-            name: "d.mov", display: "LG", displayUUID: "U", frameSize: FrameSize(width: 2, height: 2), start: 1, timecode: "t")
-        display.end = 5
-        display.state = .notFinalized
-        manifest.files = [display]
+        var screen = RecordingManifest.ScreenFile(
+            name: "d.mov", screen: "LG", screenUUID: "U", frameSize: FrameSize(width: 2, height: 2), start: 1, timecode: "t")
+        screen.end = 5
+        screen.state = .notFinalized
+        manifest.files = [screen]
         manifest.finalize(ended: start + 60, timeZone: berlin)
         #expect(manifest.result == .problems)
         #expect(manifest.problems == [RecordingProblem(
@@ -172,11 +172,11 @@ import Testing
             name: "a.mov", audioSource: "Mic", audioSourceUID: "uid", channels: .mono(1), start: 2, timecode: "t")
         audio.state = .notFinalized
         manifest.audioFiles = [audio]
-        manifest.events.append(RecordingEvent(at: 30_000_000_000, event: .displayFileWriterFellBehind, display: "DELL"))
+        manifest.events.append(RecordingEvent(at: 30_000_000_000, event: .screenFileWriterFellBehind, screen: "DELL"))
         manifest.finalize(ended: start + 60, timeZone: berlin)
         #expect(manifest.problems == [RecordingProblem(
             at: 30_000_000_000, problem: "A failure was not told while recording",
-            error: "Display DELL: display file writer fell behind (1 failure event, see events)")])
+            error: "Screen DELL: screen file writer fell behind (1 failure event, see events)")])
     }
 
     @Test func aFileNotFinalizedAddsNothingWhenAProblemWasTold() {
@@ -206,8 +206,8 @@ import Testing
 
     @Test func filesAreWrittenInTheOrderOfTheirStartAndReadBackByKind() throws {
         var manifest = manifest()
-        manifest.files = [RecordingManifest.DisplayFile(
-            name: "d.mov", display: "LG", displayUUID: "U", frameSize: FrameSize(width: 2, height: 2), start: 3, timecode: "t")]
+        manifest.files = [RecordingManifest.ScreenFile(
+            name: "d.mov", screen: "LG", screenUUID: "U", frameSize: FrameSize(width: 2, height: 2), start: 3, timecode: "t")]
         manifest.audioFiles = [
             RecordingManifest.AudioFile(name: "s.mov", audioSource: "System audio", audioSourceUID: nil, channels: .stereo, start: 1, timecode: "t"),
             RecordingManifest.AudioFile(name: "m.mov", audioSource: "Mic", audioSourceUID: "uid", channels: .mono(2), start: 5, timecode: "t"),
@@ -265,14 +265,14 @@ import Testing
         #expect(text.contains(#""from" : "Mic""#))
         let gapText = String(decoding: try prettyJSON(gap), as: UTF8.self)
         #expect(gapText.contains(#""audioSource" : "Mic""#))
-        #expect(!gapText.contains(#""display""#))
+        #expect(!gapText.contains(#""screen""#))
     }
 
     @Test func aProblemHasItsTimeAndFullError() throws {
-        let problem = RecordingProblem(at: 1_446_200_400_000, problem: "Display file a.mov", error: "The operation could not be completed")
+        let problem = RecordingProblem(at: 1_446_200_400_000, problem: "Screen file a.mov", error: "The operation could not be completed")
         #expect(problem.at == 1446.2)
-        #expect(problem.text == "Display file a.mov: The operation could not be completed")
-        #expect(RecordingProblem(at: 0, problem: "The displays cannot be read", error: nil).text == "The displays cannot be read")
+        #expect(problem.text == "Screen file a.mov: The operation could not be completed")
+        #expect(RecordingProblem(at: 0, problem: "The screens cannot be read", error: nil).text == "The screens cannot be read")
         let text = String(decoding: try prettyJSON(RecordingProblem(at: 0, problem: "p", error: nil)), as: UTF8.self)
         #expect(text.contains(#""error" : null"#))
     }
@@ -281,7 +281,7 @@ import Testing
         var manifest = manifest()
         manifest.events = [
             RecordingEvent(at: 5_000_000_000, event: .wake), RecordingEvent(at: 2_000_000_000, event: .sleep),
-            RecordingEvent(at: 2_000_000_000, event: .diskFull, display: "A"),
+            RecordingEvent(at: 2_000_000_000, event: .diskFull, screen: "A"),
         ]
         manifest.problems = [
             RecordingProblem(at: 3_000_000_000, problem: "late", error: nil), RecordingProblem(at: 1_000_000_000, problem: "early", error: nil),
@@ -302,23 +302,23 @@ import Testing
     @Test func theEventsAreThoseTheDesignLists() throws {
         let text = try design()
         let start = try #require(text.range(of: "The events: ")).upperBound
-        let end = try #require(text[start...].range(of: "each names its display")).lowerBound
+        let end = try #require(text[start...].range(of: "each names its screen")).lowerBound
         let listed = text[start..<end].replacingOccurrences(of: "\n", with: " ")
             .matches(of: /`([^`]+)`/).map { String($0.output.1) }
         #expect(listed == RecordingEvent.Kind.allCases.map(\.rawValue))
     }
 
-    @Test func theExamplesDisplayFilesReadAsTheManifestWritesThem() throws {
+    @Test func theExamplesScreenFilesReadAsTheManifestWritesThem() throws {
         let text = try design()
         let start = try #require(text.range(of: "```json\n{\n  \"app\"")).upperBound
         let json = "{\n  \"app\"" + text[start...].prefix { _ in true }.split(separator: "```").first!
         let object = try #require(try JSONSerialization.jsonObject(with: Data(json.utf8)) as? [String: Any])
         let files = try #require(object["files"] as? [[String: Any]])
-        let displayFiles = files.filter { $0["display"] != nil }
-        #expect(displayFiles.count == 4)
-        for file in displayFiles {
+        let screenFiles = files.filter { $0["screen"] != nil }
+        #expect(screenFiles.count == 4)
+        for file in screenFiles {
             let data = try JSONSerialization.data(withJSONObject: file)
-            let decoded = try JSONDecoder().decode(RecordingManifest.DisplayFile.self, from: data)
+            let decoded = try JSONDecoder().decode(RecordingManifest.ScreenFile.self, from: data)
             let encoded = try #require(try JSONSerialization.jsonObject(with: prettyJSON(decoded)) as? [String: Any])
             #expect(Set(encoded.keys) == Set(file.keys))
             #expect(decoded.name == file["name"] as? String)
@@ -346,8 +346,8 @@ import Testing
     @Test func theExamplesFileNamesAreTheNamesTheRecorderGives() throws {
         let start = self.start
         #expect(RecordingNames.recordingFolder(start: start, timeZone: berlin) == "2026-11-12 14.03.05")
-        let first = RecordingNames.displayFile(start: start, timeZone: berlin, number: 1, display: "Built-in Retina Display")
-        let back = RecordingNames.displayFile(start: start + 1476, timeZone: berlin, number: 2, display: "LG HDR 4K")
+        let first = RecordingNames.screenFile(start: start, timeZone: berlin, number: 1, screen: "Built-in Retina Display")
+        let back = RecordingNames.screenFile(start: start + 1476, timeZone: berlin, number: 2, screen: "LG HDR 4K")
         let text = try design()
         #expect(text.contains("\n  \(first)\n"))
         #expect(text.contains("\n  \(back)    ← back after a reconnect"))
@@ -359,10 +359,10 @@ import Testing
 @Suite struct RecordingNamesTests {
     private let utc = TimeZone(identifier: "UTC")!
 
-    /// A name never stops a display from recording: `/` and `:` become `-`.
+    /// A name never stops a screen from recording: `/` and `:` become `-`.
     @Test func charactersAFileNameCannotHoldBecomeDashes() {
-        let name = RecordingNames.displayFile(start: Date(timeIntervalSince1970: 0), timeZone: utc, number: 3, display: "Dell U2720Q/2: left")
-        #expect(name == "1970-01-01 00.00.00 Display 3 - Dell U2720Q-2- left.mov")
+        let name = RecordingNames.screenFile(start: Date(timeIntervalSince1970: 0), timeZone: utc, number: 3, screen: "Dell U2720Q/2: left")
+        #expect(name == "1970-01-01 00.00.00 Screen 3 - Dell U2720Q-2- left.mov")
     }
 
     @Test func anAudioFileIsNamedByItsSource() {
@@ -377,14 +377,14 @@ import Testing
 
     @Test func aTakenNameGetsANumber() {
         let start = Date(timeIntervalSince1970: 0)
-        let name = RecordingNames.displayFile(start: start, timeZone: utc, number: 2, display: "LG HDR 4K")
-        #expect(name == "1970-01-01 00.00.00 Display 2 - LG HDR 4K.mov")
-        #expect(RecordingNames.displayFile(start: start, timeZone: utc, number: 2, display: "LG HDR 4K", taken: [name])
-            == "1970-01-01 00.00.00 Display 2 - LG HDR 4K (2).mov")
-        #expect(RecordingNames.displayFile(
-            start: start, timeZone: utc, number: 2, display: "LG HDR 4K",
-            taken: [name, "1970-01-01 00.00.00 Display 2 - LG HDR 4K (2).mov"])
-            == "1970-01-01 00.00.00 Display 2 - LG HDR 4K (3).mov")
+        let name = RecordingNames.screenFile(start: start, timeZone: utc, number: 2, screen: "LG HDR 4K")
+        #expect(name == "1970-01-01 00.00.00 Screen 2 - LG HDR 4K.mov")
+        #expect(RecordingNames.screenFile(start: start, timeZone: utc, number: 2, screen: "LG HDR 4K", taken: [name])
+            == "1970-01-01 00.00.00 Screen 2 - LG HDR 4K (2).mov")
+        #expect(RecordingNames.screenFile(
+            start: start, timeZone: utc, number: 2, screen: "LG HDR 4K",
+            taken: [name, "1970-01-01 00.00.00 Screen 2 - LG HDR 4K (2).mov"])
+            == "1970-01-01 00.00.00 Screen 2 - LG HDR 4K (3).mov")
     }
 }
 
@@ -396,9 +396,9 @@ import Testing
         status.isLowOnDisk = true
         #expect(status.badge == "!")
         status.isLowOnDisk = false
-        status.displayShowingAnotherDisplaysPicture = "LG"
+        status.screenShowingAnotherScreensPicture = "LG"
         #expect(status.badge == "!")
-        status.displayShowingAnotherDisplaysPicture = nil
+        status.screenShowingAnotherScreensPicture = nil
         status.problems.append("Cannot write the recording manifest: full")
         #expect(status.badge == "!")
     }
@@ -420,8 +420,8 @@ import Testing
     private func manifest(_ states: [RecordingManifest.State], events: [RecordingEvent] = []) -> RecordingManifest {
         var manifest = RecordingManifest(app: "x", started: Date(), timeZone: .current, settings: .defaults)
         for (index, state) in states.enumerated() {
-            var file = RecordingManifest.DisplayFile(
-                name: "f\(index).mov", display: "D", displayUUID: "U", frameSize: FrameSize(width: 2, height: 2), start: 0,
+            var file = RecordingManifest.ScreenFile(
+                name: "f\(index).mov", screen: "D", screenUUID: "U", frameSize: FrameSize(width: 2, height: 2), start: 0,
                 timecode: "00:00:00:00")
             file.state = state
             manifest.files.append(file)
@@ -438,13 +438,13 @@ import Testing
 
     @Test func aFileNotFinalizedOrAnErrorEventIsAnError() {
         #expect(RecordingSummary(manifest: manifest([.notFinalized]), recordingFolder: "/r", seconds: 1, manifestWritten: true).endedWithError)
-        var failed = RecordingEvent(at: 65_000_000_000, event: .displayStreamFailed, display: "LG")
+        var failed = RecordingEvent(at: 65_000_000_000, event: .screenStreamFailed, screen: "LG")
         failed.error = "-3811"
         let summary = RecordingSummary(
             manifest: manifest([.finalized, .finalized], events: [failed, RecordingEvent(at: 0, event: .sleep)]),
             recordingFolder: "/r", seconds: 70, manifestWritten: true)
         #expect(summary.endedWithError)
-        #expect(summary.text.hasSuffix("Error at 1m05s: display stream failed, LG (-3811)\n"))
+        #expect(summary.text.hasSuffix("Error at 1m05s: screen stream failed, LG (-3811)\n"))
     }
 
     /// F3: the final manifest not written is a failure; the file on disk has no `ended`.
@@ -457,10 +457,10 @@ import Testing
 
     @Test func aProblemIsListedWithItsTimeAndIsNoErrorByItself() {
         var told = manifest([.finalized])
-        told.problems = [RecordingProblem(at: 65_000_000_000, problem: "The displays cannot be read", error: "denied")]
+        told.problems = [RecordingProblem(at: 65_000_000_000, problem: "The screens cannot be read", error: "denied")]
         let summary = RecordingSummary(manifest: told, recordingFolder: "/r", seconds: 70, manifestWritten: true)
         #expect(!summary.endedWithError)
-        #expect(summary.text.hasSuffix("Problem at 1m05s: The displays cannot be read: denied\n"))
+        #expect(summary.text.hasSuffix("Problem at 1m05s: The screens cannot be read: denied\n"))
     }
 
     @Test func theSummaryListsTheAudioFilesAndTheCPUUse() {
@@ -475,10 +475,10 @@ import Testing
     }
 
     @Test func aWriterThatFailedIsAnError() {
-        var failed = RecordingEvent(at: 0, event: .displayFileWriterFailed, display: "LG")
+        var failed = RecordingEvent(at: 0, event: .screenFileWriterFailed, screen: "LG")
         failed.error = "cannot write"
         let summary = RecordingSummary(manifest: manifest([.finalized], events: [failed]), recordingFolder: "/r", seconds: 1, manifestWritten: true)
         #expect(summary.endedWithError)
-        #expect(summary.text.contains("display file writer failed, LG (cannot write)"))
+        #expect(summary.text.contains("screen file writer failed, LG (cannot write)"))
     }
 }

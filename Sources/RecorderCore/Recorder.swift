@@ -9,9 +9,9 @@ import RecorderLogic
 public protocol RecorderObserver: AnyObject {
     /// Free space below the low disk warning threshold, or back above it.
     func recorder(_ recorder: Recorder, lowDiskSpace: Bool)
-    /// A display's file ended because it showed another display's picture,
-    /// or (nil) no display is in that state any more.
-    func recorder(_ recorder: Recorder, displayShowsAnotherDisplaysPicture display: String?)
+    /// A screen's file ended because it showed another screen's picture,
+    /// or (nil) no screen is in that state any more.
+    func recorder(_ recorder: Recorder, screenShowsAnotherScreensPicture screen: String?)
     /// A problem, also listed in the recording manifest's `problems`.
     func recorder(_ recorder: Recorder, problem: RecordingProblem)
     /// An event of the recording manifest, as one line (`EventLine`).
@@ -23,10 +23,10 @@ public struct RecorderStartError: Error, CustomStringConvertible {
 }
 
 /// One recording: claims its recording folder, keeps its recording
-/// manifest, keeps the Mac awake, follows the displays as they come, go
-/// and change, with one display capture per display file, and the audio
+/// manifest, keeps the Mac awake, follows the screens as they come, go
+/// and change, with one screen capture per screen file, and the audio
 /// sources, with one audio capture per source, and its guide tracks.
-/// Needs the AppKit event loop: macOS reports display changes only to a
+/// Needs the AppKit event loop: macOS reports screen changes only to a
 /// process running `NSApplication.run()`.
 @MainActor
 public final class Recorder {
@@ -35,9 +35,9 @@ public final class Recorder {
     private let settings: Settings
     private weak var observer: (any RecorderObserver)?
     private var manifest: RecordingManifest
-    private var tracker: DisplayTracker
-    /// The running capture of each display, with its number among all captures of the recording.
-    private var captures: [String: (Int, DisplayCapture)] = [:]
+    private var tracker: ScreenTracker
+    /// The running capture of each screen, with its number among all captures of the recording.
+    private var captures: [String: (Int, ScreenCapture)] = [:]
     private var captureCount = 0
     private var endReports = CaptureEndReports()
     private var problemsTold = ProblemsTold()
@@ -50,7 +50,7 @@ public final class Recorder {
     private var notificationTokens: [any NSObjectProtocol] = []
     private var isLowOnDisk = false
     private var isStopped = false
-    private var displayChangePending = false
+    private var screenChangePending = false
     private var audioTracker: AudioTracker
     /// The running capture of each audio source, with its number among all audio captures.
     private var audioCaptures: [AudioTracker.SourceID: (Int, AudioCapture)] = [:]
@@ -64,11 +64,11 @@ public final class Recorder {
 
     /// Starts a recording into a new recording folder in the settings' output folder.
     public init(settings: Settings, homeFolder: URL, app: String, observer: any RecorderObserver) throws(RecorderStartError) {
-        let displays: [ConnectedDisplay]
+        let screens: [ConnectedScreen]
         do {
-            displays = try connectedDisplays()
+            screens = try connectedScreens()
         } catch {
-            throw RecorderStartError(description: "The displays cannot be read: \(error)")
+            throw RecorderStartError(description: "The screens cannot be read: \(error)")
         }
         let reading = readClocks()
         let started = Date()
@@ -87,7 +87,7 @@ public final class Recorder {
         self.settings = settings
         self.observer = observer
         manifest = RecordingManifest(app: app, started: started, timeZone: timeZone, settings: settings)
-        tracker = DisplayTracker(resolution: settings.effectiveResolution)
+        tracker = ScreenTracker(resolution: settings.effectiveResolution)
         audioTracker = AudioTracker(settings: settings)
         guides = GuideTrackFeed(tracks: GuideTrack.tracks(for: settings), now: { [context] in context.now() })
         do {
@@ -104,12 +104,12 @@ public final class Recorder {
         let context = context
         RecorderLog.timeDetail(since: { Double(context.now()) / 1_000_000_000 })
         registerForChanges()
-        context.update(displays, lastDisplayChange: nil)
+        context.update(screens, lastScreenChange: nil)
         guides.start()
-        apply(tracker.begin(displays, at: context.now()))
+        apply(tracker.begin(screens, at: context.now()))
         applyAudio(audioTracker.begin(
-            inputs: readAudioInputs() ?? [], mainDisplayID: displays.first(where: \.isMain)?.displayID,
-            displays: Set(displays.map(\.displayID)), at: context.now()))
+            inputs: readAudioInputs() ?? [], mainDisplayID: screens.first(where: \.isMain)?.displayID,
+            screens: Set(screens.map(\.displayID)), at: context.now()))
         freeSpaceTask = Task { [weak self] in
             while !Task.isCancelled {
                 try? await Task.sleep(for: RecorderValues.freeSpaceCheckInterval)
@@ -159,7 +159,7 @@ public final class Recorder {
             cpu.text)
     }
 
-    /// Ends every display file and finalizes the recording manifest.
+    /// Ends every screen file and finalizes the recording manifest.
     public func stop() async -> RecordingSummary {
         if !isStopped {
             isStopped = true
@@ -170,7 +170,7 @@ public final class Recorder {
             sampleCPU()
             unregisterForChanges()
             for action in tracker.stopAll() { perform(action) }
-            // The audio sources stop after the display files' last mix, so
+            // The audio sources stop after the screen files' last mix, so
             // their guide tracks hold the sound up to the video's end (D51).
             for task in stopping { await task.value }
             for action in audioTracker.stopAll() { performAudio(action) }
@@ -193,10 +193,10 @@ public final class Recorder {
             manifestWritten: finalManifestWritten)
     }
 
-    // MARK: Display changes
+    // MARK: Screen changes
 
     private func registerForChanges() {
-        CGDisplayRegisterReconfigurationCallback(displayReconfigured, Unmanaged.passUnretained(self).toOpaque())
+        CGDisplayRegisterReconfigurationCallback(screenReconfigured, Unmanaged.passUnretained(self).toOpaque())
         let center = NSWorkspace.shared.notificationCenter
         notificationTokens = [
             center.addObserver(forName: NSWorkspace.willSleepNotification, object: nil, queue: .main) { [weak self] _ in
@@ -214,34 +214,34 @@ public final class Recorder {
     }
 
     private func unregisterForChanges() {
-        CGDisplayRemoveReconfigurationCallback(displayReconfigured, Unmanaged.passUnretained(self).toOpaque())
+        CGDisplayRemoveReconfigurationCallback(screenReconfigured, Unmanaged.passUnretained(self).toOpaque())
         for token in notificationTokens { NSWorkspace.shared.notificationCenter.removeObserver(token) }
         notificationTokens = []
         audioWatch?.cancel()
         audioWatch = nil
     }
 
-    /// macOS reported a display change: read the displays on the next pass of the main loop, once for a burst.
-    fileprivate func displaysReconfigured() {
-        guard !displayChangePending, !isStopped else { return }
-        displayChangePending = true
+    /// macOS reported a screen change: read the screens on the next pass of the main loop, once for a burst.
+    fileprivate func screensReconfigured() {
+        guard !screenChangePending, !isStopped else { return }
+        screenChangePending = true
         DispatchQueue.main.async {
             MainActor.assumeIsolated {
-                self.displayChangePending = false
-                guard !self.isStopped, let displays = self.readDisplays() else { return }
+                self.screenChangePending = false
+                guard !self.isStopped, let screens = self.readScreens() else { return }
                 let now = self.context.now()
-                let step = self.tracker.observe(displays, at: now)
-                self.context.update(displays, lastDisplayChange: self.tracker.lastDisplayChange)
+                let step = self.tracker.observe(screens, at: now)
+                self.context.update(screens, lastScreenChange: self.tracker.lastScreenChange)
                 self.apply(step)
-                self.displaysForAudio(displays)
+                self.screensForAudio(screens)
             }
         }
     }
 
-    /// The system audio's stream follows the main display.
-    private func displaysForAudio(_ displays: [ConnectedDisplay]) {
-        applyAudio(audioTracker.observeDisplays(
-            mainDisplayID: displays.first(where: \.isMain)?.displayID, connected: Set(displays.map(\.displayID)),
+    /// The system audio's stream follows the main screen.
+    private func screensForAudio(_ screens: [ConnectedScreen]) {
+        applyAudio(audioTracker.observeScreens(
+            mainDisplayID: screens.first(where: \.isMain)?.displayID, connected: Set(screens.map(\.displayID)),
             at: context.now()))
     }
 
@@ -261,14 +261,14 @@ public final class Recorder {
         applyAudio(audioTracker.observe(inputs, at: context.now()))
     }
 
-    private func readDisplays() -> [ConnectedDisplay]? {
+    private func readScreens() -> [ConnectedScreen]? {
         do {
-            let displays = try connectedDisplays()
-            RecorderLog.detail("displays: \(DebugLine.displays(displays))", category: "recorder")
-            problemsTold.cleared(.displaysNotRead)
-            return displays
+            let screens = try connectedScreens()
+            RecorderLog.detail("screens: \(DebugLine.screens(screens))", category: "recorder")
+            problemsTold.cleared(.screensNotRead)
+            return screens
         } catch {
-            tell("The displays cannot be read", error: "\(error)", kind: .displaysNotRead)
+            tell("The screens cannot be read", error: "\(error)", kind: .screensNotRead)
             return nil
         }
     }
@@ -283,18 +283,18 @@ public final class Recorder {
     private func didWake() {
         guard !isStopped else { return }
         context.rereadClocks()
-        guard let displays = readDisplays() else { return }
-        let step = tracker.wake(displays, at: context.now())
-        context.update(displays, lastDisplayChange: tracker.lastDisplayChange)
+        guard let screens = readScreens() else { return }
+        let step = tracker.wake(screens, at: context.now())
+        context.update(screens, lastScreenChange: tracker.lastScreenChange)
         apply(step)
-        displaysForAudio(displays)
+        screensForAudio(screens)
         applyAudio(audioTracker.wake(readAudioInputs() ?? [], at: context.now()))
     }
 
     // MARK: Actions
 
     /// Records the events, carries out the actions, and waits for what is due next.
-    private func apply(_ step: DisplayTracker.Step) {
+    private func apply(_ step: ScreenTracker.Step) {
         guard !isStopped else { return }
         manifest.events += step.events
         if !step.events.isEmpty { try? writeManifest() }
@@ -319,53 +319,53 @@ public final class Recorder {
         }
     }
 
-    private func perform(_ action: DisplayTracker.Action) {
+    private func perform(_ action: ScreenTracker.Action) {
         RecorderLog.detail(
-            DebugLine.action(action, names: captures.mapValues { "Display \($0.1.number) \($0.1.name)" }), category: "recorder")
+            DebugLine.action(action, names: captures.mapValues { "Screen \($0.1.number) \($0.1.name)" }), category: "recorder")
         switch action {
         case .start(let uuid, let displayID, let frameSize, let number, let name):
             captureCount += 1
             let captureNumber = captureCount
-            let capture = DisplayCapture(
+            let capture = ScreenCapture(
                 uuid: uuid, displayID: displayID, number: number, name: name, frameSize: frameSize, context: context,
                 guides: guides,
                 onFileStarted: { [weak self] file in
                     Task { @MainActor in self?.fileStarted(file, uuid: uuid) }
                 },
                 onEnded: { [weak self] reason, file in
-                    Task { @MainActor in self?.captureEnded(uuid: uuid, captureNumber: captureNumber, display: name, reason: reason, file: file) }
+                    Task { @MainActor in self?.captureEnded(uuid: uuid, captureNumber: captureNumber, screen: name, reason: reason, file: file) }
                 })
             captures[uuid] = (captureNumber, capture)
             capture.start()
-            if tracker.showsAnotherDisplaysPicture == false { observer?.recorder(self, displayShowsAnotherDisplaysPicture: nil) }
+            if tracker.showsAnotherScreensPicture == false { observer?.recorder(self, screenShowsAnotherScreensPicture: nil) }
         case .stop(let uuid, _):
             guard let (captureNumber, capture) = captures.removeValue(forKey: uuid) else { return }
             stopping.append(Task { [weak self] in
                 let file = await capture.stop()
-                self?.fileEnded(file, captureNumber: captureNumber, display: capture.name, reason: nil)
+                self?.fileEnded(file, captureNumber: captureNumber, screen: capture.name, reason: nil)
             })
         }
     }
 
     /// The manifest lists a file from its start; a start reported after
     /// the file's end changes nothing.
-    private func fileStarted(_ file: RecordingManifest.DisplayFile, uuid: String) {
+    private func fileStarted(_ file: RecordingManifest.ScreenFile, uuid: String) {
         RecorderLog.detail("file started: \(file.name)", category: "recorder")
         tracker.fileStarted(uuid)
-        problemsTold.cleared(.displayNotCaptured(uuid))
+        problemsTold.cleared(.screenNotCaptured(uuid))
         guard !manifest.files.contains(where: { $0.name == file.name }) else { return }
         manifest.files.append(file)
         try? writeManifest()
     }
 
-    /// A display file ended, or a capture without one; its end carries its
+    /// A screen file ended, or a capture without one; its end carries its
     /// entry, so the file is listed even when its start was not reported
     /// yet. Its event and problem are recorded once per capture, also when
     /// the capture ended by itself while the recorder stopped it.
-    private func fileEnded(_ end: DisplayFileEnd?, captureNumber: Int, display: String, reason: DisplayTracker.StreamEnd?) {
+    private func fileEnded(_ end: ScreenFileEnd?, captureNumber: Int, screen: String, reason: ScreenTracker.StreamEnd?) {
         let before = manifest
         let problem = endReports.record(
-            captureNumber: captureNumber, reason: reason, end: end, display: display, at: context.now(), into: &manifest)
+            captureNumber: captureNumber, reason: reason, end: end, screen: screen, at: context.now(), into: &manifest)
         if manifest != before { try? writeManifest() }
         told(Array(manifest.events.dropFirst(before.events.count)))
         if let problem { told(problem) }
@@ -376,28 +376,28 @@ public final class Recorder {
     }
 
     private func captureEnded(
-        uuid: String, captureNumber: Int, display: String, reason: DisplayTracker.StreamEnd, file: DisplayFileEnd?
+        uuid: String, captureNumber: Int, screen: String, reason: ScreenTracker.StreamEnd, file: ScreenFileEnd?
     ) {
-        fileEnded(file, captureNumber: captureNumber, display: display, reason: reason)
+        fileEnded(file, captureNumber: captureNumber, screen: screen, reason: reason)
         // One the recorder already stopped, or replaced, changes nothing more.
         guard !isStopped, let (current, capture) = captures[uuid], current == captureNumber else { return }
         captures[uuid] = nil
-        if reason == .showsAnotherDisplay { observer?.recorder(self, displayShowsAnotherDisplaysPicture: capture.name) }
-        let displays = readDisplays() ?? []
-        let step = tracker.streamEnded(uuid, reason, connected: displays, at: context.now())
-        context.update(displays, lastDisplayChange: tracker.lastDisplayChange)
+        if reason == .showsAnotherScreen { observer?.recorder(self, screenShowsAnotherScreensPicture: capture.name) }
+        let screens = readScreens() ?? []
+        let step = tracker.streamEnded(uuid, reason, connected: screens, at: context.now())
+        context.update(screens, lastScreenChange: tracker.lastScreenChange)
         apply(step)
-        displaysForAudio(displays)
-        // A display file ended by a failure is told at the failure's time,
-        // so the recording manifest lists it once (D47); a display that
+        screensForAudio(screens)
+        // A screen file ended by a failure is told at the failure's time,
+        // so the recording manifest lists it once (D47); a screen that
         // stays listed but cannot be captured is never left unrecorded silently (N-A).
         for failure in step.events where failure.event.isFailure {
             var problem = failure.problem
-            if reason == .captureSourceGone, failure.event == .displayStreamFailed {
-                problem.problem = "Display \(display) cannot be captured"
-                problem.error = DisplayTracker.captureSourceGoneAgain
+            if reason == .captureSourceGone, failure.event == .screenStreamFailed {
+                problem.problem = "Screen \(screen) cannot be captured"
+                problem.error = ScreenTracker.captureSourceGoneAgain
             }
-            tell(problem, kind: .displayNotCaptured(uuid))
+            tell(problem, kind: .screenNotCaptured(uuid))
         }
     }
 
@@ -568,7 +568,7 @@ public final class Recorder {
         }
         if tracker.isWaitingForRoom, !isLow {
             tracker.roomAgain()
-            apply(DisplayTracker.Step())
+            apply(ScreenTracker.Step())
         }
         if audioTracker.isWaitingForRoom, !isLow {
             audioTracker.roomAgain()
@@ -577,12 +577,12 @@ public final class Recorder {
     }
 
     /// The low disk warning threshold: `lowDiskWarningMinutes` of every
-    /// display's newest display file and every audio source's newest audio
+    /// screen's newest screen file and every audio source's newest audio
     /// file at the encoding rate.
     private func lowDiskWarningBytes() -> Double {
         var newestFrameSize: [String: FrameSize] = [:]
         for file in manifest.files {
-            newestFrameSize[file.displayUUID] = FrameSize(width: file.frameSize[0], height: file.frameSize[1])
+            newestFrameSize[file.screenUUID] = FrameSize(width: file.frameSize[0], height: file.frameSize[1])
         }
         var newestChannels: [String: RecordingManifest.AudioFile.Channels] = [:]
         for file in manifest.audioFiles { newestChannels[file.audioSource] = file.channels }
@@ -593,7 +593,7 @@ public final class Recorder {
             }
         }
         let bytesPerHour = newestFrameSize.values.reduce(audioBytesPerHour) {
-            $0 + DiskEstimate.displayFileBytesPerHour(frameSize: $1, settings: settings)
+            $0 + DiskEstimate.screenFileBytesPerHour(frameSize: $1, settings: settings)
         }
         return bytesPerHour * settings.lowDiskWarningMinutes / 60
     }
@@ -638,11 +638,11 @@ public final class Recorder {
     }
 }
 
-/// Called by macOS on the main thread, under `NSApplication.run()`, for every display change.
-private func displayReconfigured(
-    _ display: CGDirectDisplayID, _ flags: CGDisplayChangeSummaryFlags, _ userInfo: UnsafeMutableRawPointer?
+/// Called by macOS on the main thread, under `NSApplication.run()`, for every screen change.
+private func screenReconfigured(
+    _ screen: CGDirectDisplayID, _ flags: CGDisplayChangeSummaryFlags, _ userInfo: UnsafeMutableRawPointer?
 ) {
     guard let userInfo, !flags.contains(.beginConfigurationFlag) else { return }
     let recorder = Unmanaged<Recorder>.fromOpaque(userInfo).takeUnretainedValue()
-    MainActor.assumeIsolated { recorder.displaysReconfigured() }
+    MainActor.assumeIsolated { recorder.screensReconfigured() }
 }

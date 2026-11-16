@@ -66,9 +66,9 @@ enum EntryRoute {
 }
 
 /// The AppKit event loop of the app and of `msr record`: macOS reports
-/// display changes only under `NSApplication.run()` (D45). Started from
+/// screen changes only under `NSApplication.run()` (D45). Started from
 /// `main` itself: inside a main-queue job the loop would never drain the
-/// main queue, so no task, signal source or display callback would run.
+/// main queue, so no task, signal source or screen callback would run.
 @MainActor
 enum EventLoop {
     static func run(_ delegate: some NSApplicationDelegate, activationPolicy: NSApplication.ActivationPolicy) {

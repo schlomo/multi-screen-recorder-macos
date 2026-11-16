@@ -17,7 +17,7 @@ import Testing
 }
 
 @Suite struct FrameSizeTests {
-    /// The built-in display: looks like 1728×1117, drawn at 3456×2234.
+    /// The built-in screen: looks like 1728×1117, drawn at 3456×2234.
     private let builtIn = FrameSize(width: 1728, height: 1117)
     private let uhd = FrameSize(width: 3840, height: 2160)
     private let wuxga = FrameSize(width: 1920, height: 1200)
@@ -34,7 +34,7 @@ import Testing
         (.p1080, FrameSize(width: 1670, height: 1080)),
         (.p720, FrameSize(width: 1112, height: 720)),
     ])
-    func builtInDisplayInEveryResolution(resolution: RecordingResolution, expected: FrameSize) {
+    func builtInScreenInEveryResolution(resolution: RecordingResolution, expected: FrameSize) {
         #expect(resolution.frameSize(forLooksLike: builtIn) == expected)
     }
 
@@ -58,7 +58,7 @@ import Testing
         (.p1080, FrameSize(width: 1920, height: 1080)),
         (.p720, FrameSize(width: 1280, height: 720)),
     ])
-    func uhdDisplayInEveryResolution(resolution: RecordingResolution, expected: FrameSize) {
+    func uhdScreenInEveryResolution(resolution: RecordingResolution, expected: FrameSize) {
         #expect(resolution.frameSize(forLooksLike: uhd) == expected)
     }
 
@@ -87,12 +87,12 @@ import Testing
         (.p1080, FrameSize(width: 1080, height: 1920)),
         (.p720, FrameSize(width: 720, height: 1280)),
     ])
-    func aPortraitDisplayIsShrunkIntoTheRotatedBox(resolution: RecordingResolution, expected: FrameSize) {
+    func aPortraitScreenIsShrunkIntoTheRotatedBox(resolution: RecordingResolution, expected: FrameSize) {
         let portrait = FrameSize(width: 2160, height: 3840)
         #expect(resolution.frameSize(forLooksLike: portrait) == expected)
     }
 
-    @Test func aSquareDisplayUsesTheLandscapeBox() {
+    @Test func aSquareScreenUsesTheLandscapeBox() {
         let square = FrameSize(width: 2000, height: 2000)
         #expect(RecordingResolution.p1080.frameSize(forLooksLike: square) == FrameSize(width: 1080, height: 1080))
     }
@@ -100,14 +100,14 @@ import Testing
     @Test func keepsProportionsWithinRounding() {
         for resolution in RecordingResolution.allCases {
             let frame = resolution.frameSize(forLooksLike: builtIn)
-            let displayRatio = Double(builtIn.width) / Double(builtIn.height)
+            let screenRatio = Double(builtIn.width) / Double(builtIn.height)
             let frameRatio = Double(frame.width) / Double(frame.height)
-            #expect(abs(displayRatio - frameRatio) < 0.01)
+            #expect(abs(screenRatio - frameRatio) < 0.01)
         }
     }
 }
 
-/// A display file continues while the display's frame size, from its looks-like
+/// A screen file continues while the screen's frame size, from its looks-like
 /// size, stays the same; when it changes, the file ends and a new one starts (D30).
 @Suite struct FrameSizeChangeTests {
     private let uhd = FrameSize(width: 3840, height: 2160)
@@ -123,26 +123,26 @@ import Testing
     }
 
     @Test func atNativeEveryLooksLikeSizeChangeStartsANewFile() {
-        #expect(RecordingResolution.native.displayFileContinues(from: uhd, to: fiveK) == false)
-        #expect(RecordingResolution.native.displayFileContinues(from: ultrawide, to: fullHD) == false)
+        #expect(RecordingResolution.native.screenFileContinues(from: uhd, to: fiveK) == false)
+        #expect(RecordingResolution.native.screenFileContinues(from: ultrawide, to: fullHD) == false)
     }
 
     @Test func at1080pTheSameFittedFrameSizeContinuesTheFile() {
-        #expect(RecordingResolution.p1080.displayFileContinues(from: uhd, to: fiveK))
+        #expect(RecordingResolution.p1080.screenFileContinues(from: uhd, to: fiveK))
     }
 
     @Test func at1080pAnotherFittedFrameSizeStartsANewFile() {
-        #expect(RecordingResolution.p1080.displayFileContinues(from: ultrawide, to: fullHD) == false)
+        #expect(RecordingResolution.p1080.screenFileContinues(from: ultrawide, to: fullHD) == false)
     }
 
     @Test func anUnchangedLooksLikeSizeContinuesTheFile() {
         for resolution in RecordingResolution.allCases {
-            #expect(resolution.displayFileContinues(from: ultrawide, to: ultrawide))
+            #expect(resolution.screenFileContinues(from: ultrawide, to: ultrawide))
         }
     }
 
-    @Test func turningADisplayToPortraitStartsANewFile() {
-        #expect(RecordingResolution.p1080.displayFileContinues(
+    @Test func turningAScreenToPortraitStartsANewFile() {
+        #expect(RecordingResolution.p1080.screenFileContinues(
             from: uhd, to: FrameSize(width: 2160, height: 3840)) == false)
     }
 }

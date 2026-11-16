@@ -2,7 +2,7 @@
 /// starts and ends, and which events go into the recording manifest
 /// (recorder.md, "Audio"; D49). Audio inputs follow the audio mode and the
 /// default microphone; the system audio comes from a stream on the main
-/// display and moves with it. It holds no capture and no file: the recorder
+/// screen and moves with it. It holds no capture and no file: the recorder
 /// carries out its actions and reports back. Times are nanoseconds from t0
 /// on the shared clock.
 public struct AudioTracker: Sendable {
@@ -15,8 +15,8 @@ public struct AudioTracker: Sendable {
     public enum Action: Equatable, Sendable {
         /// Capture the audio input into audio files under its unique name.
         case startInput(uid: String, name: String)
-        /// Capture the system audio through a stream on the main display as
-        /// read when it starts; the recorder reports the display back.
+        /// Capture the system audio through a stream on the main screen as
+        /// read when it starts; the recorder reports the screen back.
         case startSystemAudio
         /// End the source's capture and finalize its audio file.
         case stop(SourceID)
@@ -24,7 +24,7 @@ public struct AudioTracker: Sendable {
 
     /// Why a capture ended by itself; the recorder reports it.
     public enum CaptureEnd: Equatable, Sendable {
-        /// The audio input was unplugged, or the system audio's display went: no failure.
+        /// The audio input was unplugged, or the system audio's screen went: no failure.
         case disconnected
         case captureFailed(String)
         case writerFailed(String)
@@ -77,7 +77,7 @@ public struct AudioTracker: Sendable {
         /// Its capture saw it disconnect, which was told; the device list may follow.
         var disconnectTold = false
         /// A capture may end as disconnected without a failure: true until
-        /// one did, and again once the device list or the displays changed.
+        /// one did, and again once the device list or the screens changed.
         var mayLoseCaptureSource = true
     }
 
@@ -92,9 +92,9 @@ public struct AudioTracker: Sendable {
     /// The audio inputs listed as last read, by UID.
     private var listedBefore: Set<String> = []
     private var mainDisplayID: UInt32?
-    /// The displays as last read, to tell a display change.
-    private var connectedDisplays: Set<UInt32> = []
-    /// The display the system audio's stream captures, while it runs.
+    /// The screens as last read, to tell a screen change.
+    private var connectedScreens: Set<UInt32> = []
+    /// The screen the system audio's stream captures, while it runs.
     private var systemAudioDisplayID: UInt32?
     private var isAsleep = false
 
@@ -110,9 +110,9 @@ public struct AudioTracker: Sendable {
         self.longestRestartDelay = longestRestartDelay
     }
 
-    /// The audio inputs, the main display and the displays connected at the
+    /// The audio inputs, the main screen and the screens connected at the
     /// start: what is recorded starts at once.
-    public mutating func begin(inputs: [AudioInputInfo], mainDisplayID: UInt32?, displays: Set<UInt32>, at now: Int64) -> Step {
+    public mutating func begin(inputs: [AudioInputInfo], mainDisplayID: UInt32?, screens: Set<UInt32>, at now: Int64) -> Step {
         var step = observe(inputs, at: now, isBeginning: true)
         if settings.systemAudio {
             sources[.systemAudio] = Tracked(
@@ -120,7 +120,7 @@ public struct AudioTracker: Sendable {
                 restartDelay: firstRestartDelay)
         }
         self.mainDisplayID = mainDisplayID
-        connectedDisplays = displays
+        connectedScreens = screens
         step.append(due(at: now))
         return step
     }
@@ -136,8 +136,8 @@ public struct AudioTracker: Sendable {
         let newDefault = inputs.first(where: \.isDefault).flatMap { input in input.uid.map { ($0, input.name) } }
         if !isBeginning, settings.effectiveAudioMode != .none, newDefault?.0 != defaultInput?.uid {
             var changed = RecordingEvent(at: now, event: .defaultMicrophoneChanged)
-            changed.from = defaultInput.map { .name(displayName($0.uid, fallback: $0.name)) }
-            changed.to = newDefault.map { .name(displayName($0.0, fallback: $0.1)) }
+            changed.from = defaultInput.map { .name(shownName($0.uid, fallback: $0.name)) }
+            changed.to = newDefault.map { .name(shownName($0.0, fallback: $0.1)) }
             step.events.append(changed)
         }
         defaultInput = newDefault.map { (uid: $0.0, name: $0.1) }
@@ -199,14 +199,14 @@ public struct AudioTracker: Sendable {
         return step
     }
 
-    /// The main display and the displays connected, as read after a display
-    /// change: the system audio's stream moves to the new main display when
-    /// its display goes.
-    public mutating func observeDisplays(mainDisplayID: UInt32?, connected: Set<UInt32>, at now: Int64) -> Step {
-        if connectedDisplays != connected || self.mainDisplayID != mainDisplayID {
+    /// The main screen and the screens connected, as read after a screen
+    /// change: the system audio's stream moves to the new main screen when
+    /// its screen goes.
+    public mutating func observeScreens(mainDisplayID: UInt32?, connected: Set<UInt32>, at now: Int64) -> Step {
+        if connectedScreens != connected || self.mainDisplayID != mainDisplayID {
             sources[.systemAudio]?.mayLoseCaptureSource = true
         }
-        connectedDisplays = connected
+        connectedScreens = connected
         self.mainDisplayID = mainDisplayID
         guard let tracked = sources[.systemAudio], tracked.phase == .recording, let current = systemAudioDisplayID,
               !connected.contains(current) else { return Step() }
@@ -217,16 +217,16 @@ public struct AudioTracker: Sendable {
                     actions: [.stop(.systemAudio)])
     }
 
-    /// The system audio's stream captures this display, read as it started.
+    /// The system audio's stream captures this screen, read as it started.
     public mutating func systemAudioCaptures(displayID: UInt32) {
         guard sources[.systemAudio]?.phase == .recording else { return }
         systemAudioDisplayID = displayID
     }
 
-    /// The error of a capture lost again with no change of the devices or displays.
+    /// The error of a capture lost again with no change of the devices or screens.
     public static func sourceLostAgain(_ id: SourceID) -> String {
         id == .systemAudio
-            ? "ScreenCaptureKit lost the system audio's display again without a display change"
+            ? "ScreenCaptureKit lost the system audio's screen again without a screen change"
             : "AVFoundation lost the audio input again without a change of the audio devices"
     }
 
@@ -242,7 +242,7 @@ public struct AudioTracker: Sendable {
         var step = Step()
         switch end {
         case .disconnected where !tracked.mayLoseCaptureSource && tracked.isPresent && tracked.isWanted:
-            // Lost again with no notice that it went: a failure, as for a display.
+            // Lost again with no notice that it went: a failure, as for a screen.
             var failed = RecordingEvent(at: now, event: id == .systemAudio ? .systemAudioFailed : .audioInputFailed, audioSource: tracked.name)
             failed.error = Self.sourceLostAgain(id)
             step.events.append(failed)
@@ -252,7 +252,7 @@ public struct AudioTracker: Sendable {
             step.events.append(RecordingEvent(
                 at: now, event: id == .systemAudio ? .systemAudioStopped : .audioInputDisconnected, audioSource: tracked.name))
             if id == .systemAudio {
-                // The display went: the stream starts again on the main display.
+                // The screen went: the stream starts again on the main screen.
                 sources[id]?.phase = .idle
                 sources[id]?.changedAt = now
             } else {
@@ -292,7 +292,7 @@ public struct AudioTracker: Sendable {
                 guard tracked.isPresent else { continue }
                 step.actions.append(.startInput(uid: uid, name: tracked.name))
             case .systemAudio:
-                // A display to capture is known; the stream reads the main one as it starts.
+                // A screen to capture is known; the stream reads the main one as it starts.
                 guard mainDisplayID != nil else { continue }
                 if tracked.wasRecorded {
                     step.events.append(RecordingEvent(at: now, event: .systemAudioStarted, audioSource: tracked.name))
@@ -372,7 +372,7 @@ public struct AudioTracker: Sendable {
         sources[id]?.restartDelay = min(delay * 2, longestRestartDelay)
     }
 
-    private func displayName(_ uid: String, fallback: String) -> String {
+    private func shownName(_ uid: String, fallback: String) -> String {
         sources[.input(uid)]?.name ?? RecordingNames.fileNamePart(fallback)
     }
 

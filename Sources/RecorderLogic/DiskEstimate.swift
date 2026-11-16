@@ -1,10 +1,10 @@
 import Foundation
 
-/// How much disk space a recording needs per hour, file by file: a display
+/// How much disk space a recording needs per hour, file by file: a screen
 /// file is its video plus its guide tracks, an audio file its tracks, all at
 /// the rates in `Encoding`.
 public enum DiskEstimate {
-    public static func displayFileBytesPerHour(frameSize: FrameSize, settings: Settings) -> Double {
+    public static func screenFileBytesPerHour(frameSize: FrameSize, settings: Settings) -> Double {
         let video = Encoding.videoBytesPerHour(frameSize: frameSize)
         return video + bytesPerHour(bitRate: GuideTrack.tracks(for: settings).map(\.bitRate).reduce(0, +))
     }
@@ -17,9 +17,9 @@ public enum DiskEstimate {
 
     /// Every file a recording with these settings and devices writes; nil
     /// when the channels of an audio input it records cannot be read.
-    public static func bytesPerHour(settings: Settings, displays: [DisplayInfo], audioInputs: [AudioInputInfo]) -> Double? {
-        let displayFiles = displays.map {
-            displayFileBytesPerHour(
+    public static func bytesPerHour(settings: Settings, screens: [ScreenInfo], audioInputs: [AudioInputInfo]) -> Double? {
+        let screenFiles = screens.map {
+            screenFileBytesPerHour(
                 frameSize: settings.effectiveResolution.frameSize(forLooksLike: $0.pointSize), settings: settings)
         }
         var audioInputFiles: [Double] = []
@@ -28,7 +28,7 @@ public enum DiskEstimate {
             audioInputFiles.append(audioInputFileBytesPerHour(channelCount: channelCount))
         }
         let systemAudioFile = settings.systemAudio ? systemAudioFileBytesPerHour : 0
-        return (displayFiles + audioInputFiles).reduce(systemAudioFile, +)
+        return (screenFiles + audioInputFiles).reduce(systemAudioFile, +)
     }
 
     private static func bytesPerHour(bitRate: Int) -> Double {

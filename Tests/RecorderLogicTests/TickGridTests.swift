@@ -80,10 +80,10 @@ import Testing
         #expect(ticks.framesRepeatedForLateness == 2)
     }
 
-    /// A display file's writer may fall 6 s behind, also at the file's end;
+    /// A screen file's writer may fall 6 s behind, also at the file's end;
     /// the guide track wait and the audio drain keep 2 s.
-    @Test func theDisplayFileMayFallSixSecondsBehind() {
-        #expect(RecorderValues.displayFileLateTickSeconds == 6)
+    @Test func theScreenFileMayFallSixSecondsBehind() {
+        #expect(RecorderValues.screenFileLateTickSeconds == 6)
         #expect(RecorderValues.lateTickBound == 6 * RecorderValues.framesPerSecond)
         #expect(TickLoop<String>().lateTickBound == 6 * RecorderValues.framesPerSecond)
         #expect(RecorderValues.audioWaitBoundSeconds == 2)
@@ -91,9 +91,9 @@ import Testing
 
     @Test(arguments: [RecorderValues.framesPerSecond, 60])
     func moreThanTheBoundOfWaitingTicksMeansTheWriterFellBehind(rate: Int) {
-        var ticks = loop(rate: rate, bound: RecorderValues.displayFileLateTickSeconds * rate)
+        var ticks = loop(rate: rate, bound: RecorderValues.screenFileLateTickSeconds * rate)
         ticks.receive("a", capturedAt: 0)
-        let bound = Int64(RecorderValues.displayFileLateTickSeconds * rate)
+        let bound = Int64(RecorderValues.screenFileLateTickSeconds * rate)
         // Ticks 0 to bound - 1 wait: exactly the bound.
         #expect(ticks.advance(to: ticks.grid.time(ofTick: bound - 1)) { _, _ in false } == .running)
         #expect(ticks.advance(to: ticks.grid.time(ofTick: bound)) { _, _ in false } == .writerFellBehind)
@@ -169,7 +169,7 @@ import Testing
         // recorder.md: started 14:03:05.120, timecode 14:03:05:04.
         let timecode = Timecode(start: try date("2026-11-12T13:03:05.120Z"), timeZone: berlin)
         #expect(timecode.text(ofTick: 0) == "14:03:05:04")
-        // 1476 s later, 14:27:41:04 (the display file that came back).
+        // 1476 s later, 14:27:41:04 (the screen file that came back).
         #expect(timecode.text(ofTick: 1476 * Int64(RecorderValues.framesPerSecond)) == "14:27:41:04")
     }
 

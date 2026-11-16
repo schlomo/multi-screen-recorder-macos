@@ -1,11 +1,11 @@
-/// A display as the system reports it, before it gets its number.
-public struct DisplayInfo: Equatable, Sendable {
+/// A screen as the system reports it, before it gets its number.
+public struct ScreenInfo: Equatable, Sendable {
     public var name: String
     public var pixelSize: FrameSize
     /// What macOS calls "looks like": the size in points.
     public var pointSize: FrameSize
     public var isMain: Bool
-    /// The top-left corner in the global display space, for numbering left to right.
+    /// The top-left corner in the global screen space, for numbering left to right.
     public var originX: Double
     public var originY: Double
 
@@ -19,13 +19,13 @@ public struct DisplayInfo: Equatable, Sendable {
     }
 
     /// "3440×1440", or "looks like 3440×1440, drawn at 6880×2880" when the
-    /// display draws more pixels than its points.
+    /// screen draws more pixels than its points.
     public var sizeText: String {
         pointSize == pixelSize ? pixelSize.description : "looks like \(pointSize), drawn at \(pixelSize)"
     }
 }
 
-/// A display or audio input the system lists but does not fully describe.
+/// A screen or audio input the system lists but does not fully describe.
 public struct DeviceReadError: Error, Equatable, Sendable, CustomStringConvertible {
     public let description: String
 
@@ -34,21 +34,21 @@ public struct DeviceReadError: Error, Equatable, Sendable, CustomStringConvertib
     }
 }
 
-public struct NumberedDisplay: Equatable, Sendable {
+public struct NumberedScreen: Equatable, Sendable {
     public var number: Int
-    public var display: DisplayInfo
+    public var screen: ScreenInfo
 }
 
-/// Display 1 is the main display; the others are numbered left to right.
-public func numberDisplays(_ displays: [DisplayInfo]) -> [NumberedDisplay] {
-    displays
+/// Screen 1 is the main screen; the others are numbered left to right.
+public func numberScreens(_ screens: [ScreenInfo]) -> [NumberedScreen] {
+    screens
         .sorted { lhs, rhs in
             if lhs.isMain != rhs.isMain { return lhs.isMain }
             if lhs.originX != rhs.originX { return lhs.originX < rhs.originX }
             return lhs.originY < rhs.originY
         }
         .enumerated()
-        .map { NumberedDisplay(number: $0.offset + 1, display: $0.element) }
+        .map { NumberedScreen(number: $0.offset + 1, screen: $0.element) }
 }
 
 public struct AudioInputInfo: Equatable, Sendable {
@@ -110,25 +110,25 @@ public func audioInputsToJudge(
 
 /// The text `msr list` prints.
 public func renderList(
-    displays: [NumberedDisplay],
+    screens: [NumberedScreen],
     resolution: RecordingResolution,
     audioInputs: [AudioInputInfo],
     systemAudioAvailable: Bool
 ) -> String {
-    var lines = ["Displays"]
-    if displays.isEmpty {
+    var lines = ["Screens"]
+    if screens.isEmpty {
         lines.append("  none")
     } else {
-        let numbers = displays.map { String($0.number) }
-        let sizes = displays.map(\.display.sizeText)
+        let numbers = screens.map { String($0.number) }
+        let sizes = screens.map(\.screen.sizeText)
         let numberWidth = numbers.map(\.count).max() ?? 0
-        let nameWidth = displays.map(\.display.name.count).max() ?? 0
+        let nameWidth = screens.map(\.screen.name.count).max() ?? 0
         let sizeWidth = sizes.map(\.count).max() ?? 0
-        for (index, numbered) in displays.enumerated() {
-            let frame = resolution.frameSize(forLooksLike: numbered.display.pointSize)
+        for (index, numbered) in screens.enumerated() {
+            let frame = resolution.frameSize(forLooksLike: numbered.screen.pointSize)
             lines.append(
                 "  " + padded(numbers[index], numberWidth)
-                    + "  " + padded(numbered.display.name, nameWidth)
+                    + "  " + padded(numbered.screen.name, nameWidth)
                     + "   " + padded(sizes[index], sizeWidth)
                     + "  records at \(frame)")
         }

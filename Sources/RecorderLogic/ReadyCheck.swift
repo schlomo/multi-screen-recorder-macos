@@ -26,20 +26,20 @@ public struct ReadyCheckFacts: Sendable {
     /// Whether the Microphone permission is granted; nil when the recording
     /// records no audio input, so it was not asked.
     public var microphoneGranted: Bool?
-    public var displays: Result<[DisplayInfo], DeviceReadError>
+    public var screens: Result<[ScreenInfo], DeviceReadError>
     public var audioInputs: Result<[AudioInputInfo], DeviceReadError>
     public var outputFolder: OutputFolderProbe
 
     public init(
         screenRecording: PermissionProbe,
         microphoneGranted: Bool?,
-        displays: Result<[DisplayInfo], DeviceReadError>,
+        screens: Result<[ScreenInfo], DeviceReadError>,
         audioInputs: Result<[AudioInputInfo], DeviceReadError>,
         outputFolder: OutputFolderProbe
     ) {
         self.screenRecording = screenRecording
         self.microphoneGranted = microphoneGranted
-        self.displays = displays
+        self.screens = screens
         self.audioInputs = audioInputs
         self.outputFolder = outputFolder
     }
@@ -93,19 +93,19 @@ public enum ReadyCheck {
     }
 
     /// One item per cause: a free disk space item appears only when the
-    /// displays and the audio inputs a recording records could be read and
+    /// screens and the audio inputs a recording records could be read and
     /// the output folder is usable.
     public static func evaluate(_ facts: ReadyCheckFacts, settings: Settings) -> ReadyCheckResult {
         var items = [screenRecordingItem(facts.screenRecording)]
         if recordsAudioInput(facts.audioInputs, settings: settings) {
             items.append(microphoneItem(granted: facts.microphoneGranted ?? false))
         }
-        items.append(displaysItem(facts.displays))
+        items.append(screensItem(facts.screens))
         items.append(audioItem(facts.audioInputs, settings: settings))
         items.append(outputFolderItem(facts.outputFolder, settings: settings))
-        if case .success(let displays) = facts.displays, case .usable(let freeSpace) = facts.outputFolder,
+        if case .success(let screens) = facts.screens, case .usable(let freeSpace) = facts.outputFolder,
            case .success(let audioInputs) = audioInputsToJudge(facts.audioInputs, settings: settings),
-           let bytesPerHour = DiskEstimate.bytesPerHour(settings: settings, displays: displays, audioInputs: audioInputs) {
+           let bytesPerHour = DiskEstimate.bytesPerHour(settings: settings, screens: screens, audioInputs: audioInputs) {
             items.append(diskItem(freeSpace, bytesPerHour: bytesPerHour, settings: settings))
         }
         return ReadyCheckResult(items: items)
@@ -118,7 +118,7 @@ public enum ReadyCheck {
         case .granted: ReadyCheckItem(title: screenRecordingTitle, passed: true, fix: nil)
         case .notGranted: ReadyCheckItem(title: screenRecordingTitle, passed: false, fix: fix)
         case .failed(let reason):
-            ReadyCheckItem(title: "\(screenRecordingTitle): the display list could not be read (\(reason))",
+            ReadyCheckItem(title: "\(screenRecordingTitle): the screen list could not be read (\(reason))",
                            passed: false, fix: fix)
         }
     }
@@ -130,13 +130,13 @@ public enum ReadyCheck {
                 + restartNote + terminalNote)
     }
 
-    private static func displaysItem(_ displays: Result<[DisplayInfo], DeviceReadError>) -> ReadyCheckItem {
-        switch displays {
-        case .success(let displays):
-            ReadyCheckItem(title: "Displays: \(displays.count)", passed: !displays.isEmpty, fix: "connect a display")
+    private static func screensItem(_ screens: Result<[ScreenInfo], DeviceReadError>) -> ReadyCheckItem {
+        switch screens {
+        case .success(let screens):
+            ReadyCheckItem(title: "Screens: \(screens.count)", passed: !screens.isEmpty, fix: "connect a screen")
         case .failure(let error):
-            ReadyCheckItem(title: "Displays: cannot be read (\(error))", passed: false,
-                           fix: "reconnect the displays, then check again")
+            ReadyCheckItem(title: "Screens: cannot be read (\(error))", passed: false,
+                           fix: "reconnect the screens, then check again")
         }
     }
 
@@ -156,7 +156,7 @@ public enum ReadyCheck {
             return cannotBeRead(error)
         }
         var sources = audioInputs.filter(settings.records).map(\.label)
-        // A Mac without an audio input is ready in every audio mode: the displays and the system audio are recorded.
+        // A Mac without an audio input is ready in every audio mode: the screens and the system audio are recorded.
         let noMicrophone = settings.effectiveAudioMode != .none && sources.isEmpty
         if noMicrophone { sources.append("no microphone") }
         if settings.systemAudio {

@@ -1,7 +1,7 @@
 # AGENTS.md
 
 Multi Screen Recorder: a reliable multi-source screen and audio
-recorder for macOS. It captures every display and audio source, never
+recorder for macOS. It captures every screen and audio source, never
 loses a recording, and keeps going when screens, resolutions or audio
 sources change.
 
@@ -261,7 +261,7 @@ hoc, for a local check only).
   an older one); see [delivery.md](docs/design/delivery.md).
 - `msr` without arguments starts the app, and the app, `msr check` and
   `msr record` run the ready check, which requests any never-asked
-  permission and captures one frame of a display, so macOS shows a
+  permission and captures one frame of a screen, so macOS shows a
   prompt on the person's screen, and
   creates the output folder if it is missing; `msr record` and Start
   in the app record the screens; `msr list` reads the devices. An agent

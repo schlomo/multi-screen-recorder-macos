@@ -4,7 +4,7 @@ locale = "en-US"
 disableKinds = ["taxonomy", "term", "section", "rss", "404"]
 
 [params]
-  description = "A reliable multi-source screen and audio recorder for macOS. It captures every display and audio source, never loses a recording, and keeps going when screens, resolutions or audio sources change."
+  description = "A reliable multi-source screen and audio recorder for macOS. It captures every screen and audio source, never loses a recording, and keeps going when screens, resolutions or audio sources change."
   repositoryURL = "https://github.com/schlomo/multi-screen-recorder-macos"
   # The release asset's name contains the version, so the page links to the
   # latest release, never to a file.
@@ -14,7 +14,7 @@ disableKinds = ["taxonomy", "term", "section", "rss", "404"]
   legalNoticeURL = "https://schapiro.org/impressum/"
 
 # The site's colours: the project palette of assets/icon/README.md (graphite,
-# cool white, red) and the app icon's display colours. Single source of truth:
+# cool white, red) and the app icon's screen colours. Single source of truth:
 # layouts/_partials/head.html emits every entry as a CSS custom property
 # (primary -> --primary). Never hard-code a colour anywhere else.
 [params.colors]

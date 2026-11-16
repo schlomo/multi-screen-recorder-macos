@@ -10,8 +10,8 @@ rather than letting the definition imply it already exists. Built so
 far: auto mode, the recording resolution, audio mode and system audio as
 settings, the ready check, the pipeline for snapshot releases and
 releases, and the recording core (recording, recording folder,
-recording manifest, problem, status window, display file, display
-identity, settle time, display check, tick, timecode, audio track,
+recording manifest, problem, status window, screen file, screen
+identity, settle time, screen check, tick, timecode, audio track,
 audio file, guide track, clock drift; D45, D49).
 
 ## Multi Screen Recorder
@@ -33,7 +33,7 @@ code is written from scratch (D1).
 
 ## Recording
 
-Everything captured between Start and Stop: one or more display files
+Everything captured between Start and Stop: one or more screen files
 and audio files, in one recording folder.
 
 ## Recording folder
@@ -79,47 +79,47 @@ apart from the settings file because the person never edits it (D40).
 The end-to-end driver's file of what a run changed, read by `restore`;
 called "state file" in D38.
 
-## Display file
+## Screen file
 
-The video file for one display, with its timecode and its guide tracks
+The video file for one screen, with its timecode and its guide tracks
 (D31).
-A display that disappears or whose stream fails ends its display file;
-a new one begins when it is back. A display whose frame size changes
+A screen that disappears or whose stream fails ends its screen file;
+a new one begins when it is back. A screen whose frame size changes
 also ends its file, and a new one begins after the settle time (D30,
-D45). Sleep, mirroring, a writer too far behind and the display check
+D45). Sleep, mirroring, a writer too far behind and the screen check
 end it too.
 
-## Display identity
+## Screen identity
 
-What a recording knows a display by: the UUID macOS gives it, never
+What a recording knows a screen by: the UUID macOS gives it, never
 its display ID or its name (D45).
 
 ## Settle time
 
-How long a display must stay unchanged before its stream starts or
-starts again, so that quick mode changes make no burst of short display
+How long a screen must stay unchanged before its stream starts or
+starts again, so that quick mode changes make no burst of short screen
 files (D45).
 
-## Display check
+## Screen check
 
-The check of every frame that it shows its own display, by the screen
+The check of every frame that it shows its own screen, by the screen
 rectangle ScreenCaptureKit attaches to it; a frame that fails is never
 written (D45).
 
 ## Frame size
 
-The size a display file is recorded at: the display's looks-like size
+The size a screen file is recorded at: the screen's looks-like size
 fitted into the recording resolution box, each side rounded down to an
 even number (D11, D25, D30, D44).
 
 ## Tick
 
 One of the instants, 1/30 s apart from the recording's start, at which
-every display file gets a frame (D11, D21).
+every screen file gets a frame (D11, D21).
 
 ## Timecode
 
-The time-of-day track in every display file and every audio file, by
+The time-of-day track in every screen file and every audio file, by
 which an editor places files on a timeline (D21, D31).
 
 ## Audio track
@@ -155,7 +155,7 @@ audio mode, and the default (D44).
 
 ## Auto mode
 
-The setting `auto`, on by default: every display is recorded at Native
+The setting `auto`, on by default: every screen is recorded at Native
 and the audio mode is Wired, whatever the two sliders (`resolution`,
 `audioMode`) say; system audio, the output folder and the rest stay as
 set. The sliders' defaults are auto mode's choices, so turning auto mode
@@ -165,7 +165,7 @@ grays out the sliders, which then show Native and Wired; on the command line `--
 
 ## Audio file
 
-The file for one audio source, beside the display files: a recorded
+The file for one audio source, beside the screen files: a recorded
 audio input's audio tracks, one per channel, or the system audio's one
 audio track, with its timecode. It starts when the source appears and
 ends when it disappears or its channel count changes, which starts a new
@@ -175,12 +175,12 @@ starts a new one (D31, D46, D49).
 
 ## Guide track
 
-A track in a display file for playback and waveform sync only:
+A track in a screen file for playback and waveform sync only:
 "Microphones", one mono mix of the recorded audio inputs (each averaged
 to mono, summed at unity gain, through a soft limiter; D52), or
 "System audio", stereo; the two are never mixed together. Which ones a
-display file has follows from the settings alone; a missing source is
-silence in its guide track (D31). It ends with its display file's video
+screen file has follows from the settings alone; a missing source is
+silence in its guide track (D31). It ends with its screen file's video
 (D51), unless the file ended by a failure, or the samples for its last
 mix were no longer there or the writer did not take them in time,
 which is told as a problem.
@@ -195,28 +195,28 @@ corrected yet (D49).
 
 ## Recording resolution
 
-The maximum box a display's looks-like size is shrunk to fit: 4K,
-1440p, 1200p, 1080p or 720p, turned upright for a portrait display, or
+The maximum box a screen's looks-like size is shrunk to fit: 4K,
+1440p, 1200p, 1080p or 720p, turned upright for a portrait screen, or
 Native, which has no box. It never enlarges the picture (D11, D25, D44).
 
 ## Native
 
 The recording resolution without a box: the size macOS shows as "looks
-like" for the display, never the size it is drawn at (D44).
+like" for the screen, never the size it is drawn at (D44).
 
 ## Looks like
 
-macOS's word for a display's size in points, as in System Settings ›
-Displays; a column of the table. What Native records (D44).
+macOS's word for a screen's size in points, as in System Settings ›
+Screens; a column of the table. What Native records (D44).
 
 ## Drawn at
 
-The display's size in pixels, which a HiDPI mode makes larger than its
+The screen's size in pixels, which a HiDPI mode makes larger than its
 looks-like size; a column of the table. Never recorded (D44).
 
 ## Ready check
 
-The check before Start: the permissions, the displays (at least one,
+The check before Start: the permissions, the screens (at least one,
 each readable), the chosen audio sources, the output folder (created
 if missing, and written to), and free disk space there for the
 required recording hours (D14, D28).
@@ -255,7 +255,7 @@ replaces D7's GitHub Pages branch).
 ## End-to-end test
 
 An automated test that runs the built app through a recording on a Mac
-while displays and audio inputs change, and examines the recording
+while screens and audio inputs change, and examines the recording
 folder afterwards. Designed in
 [design/end-to-end-tests.md](design/end-to-end-tests.md) (D37). Not an
 acceptance test, which a person carries out for the v1 gate.

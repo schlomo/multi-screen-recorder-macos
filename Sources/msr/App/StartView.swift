@@ -78,7 +78,7 @@ private struct SettingsForm: View {
             Form {
                 Toggle("Auto", isOn: binding(\.auto))
                 // Always shown, so that turning Auto on or off shifts nothing; Auto on disables the sliders.
-                Text("Every display at Native, the audio mode Wired.")
+                Text("Every screen at Native, the audio mode Wired.")
                     .font(.callout)
                     .foregroundStyle(.secondary)
                     .opacity(model.settings.auto ? 1 : 0)
@@ -157,7 +157,7 @@ private struct SettingsForm: View {
     }
 }
 
-/// One table with a header, striped rows and a border: the displays, the
+/// One table with a header, striped rows and a border: the screens, the
 /// audio sources and the total.
 private struct WhatWillBeRecordedView: View {
     let section: WhatWillBeRecorded
@@ -168,7 +168,7 @@ private struct WhatWillBeRecordedView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             Text("What will be recorded").font(.headline)
-            if let error = section.displaysError { errorLabel(error) }
+            if let error = section.screensError { errorLabel(error) }
             if let error = section.audioError { errorLabel(error) }
             VStack(spacing: 0) {
                 row(WhatWillBeRecorded.columns)
@@ -176,14 +176,14 @@ private struct WhatWillBeRecordedView: View {
                     .foregroundStyle(.secondary)
                     .background(.quaternary.opacity(0.5))
                 Divider()
-                ForEach(Array(section.displayRows.enumerated()), id: \.offset) { index, displayRow in
-                    row(displayRow.cells).background(stripe(index))
+                ForEach(Array(section.screenRows.enumerated()), id: \.offset) { index, screenRow in
+                    row(screenRow.cells).background(stripe(index))
                 }
-                if !section.displayRows.isEmpty { Divider() }
+                if !section.screenRows.isEmpty { Divider() }
                 ForEach(Array(section.audioRows.enumerated()), id: \.offset) { index, audioRow in
                     row(audioRow.cells)
                         .foregroundStyle(audioRow.isRecorded ? .primary : .tertiary)
-                        .background(stripe(section.displayRows.count + index))
+                        .background(stripe(section.screenRows.count + index))
                 }
                 if let totalRow = section.totalRow {
                     Divider()

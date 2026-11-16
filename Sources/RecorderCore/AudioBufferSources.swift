@@ -129,7 +129,7 @@ final class MicrophoneSource: NSObject, AudioBufferSource, AVCaptureAudioDataOut
 }
 
 /// The system audio's buffers: a ScreenCaptureKit stream with
-/// `capturesAudio` and our own process's audio excluded, on the main display
+/// `capturesAudio` and our own process's audio excluded, on the main screen
 /// as read when it starts, which `capturing` is told; its video at the
 /// smallest size and rate and dropped (D49).
 final class SystemAudioSource: NSObject, AudioBufferSource, SCStreamOutput, SCStreamDelegate, @unchecked Sendable {
@@ -166,7 +166,7 @@ final class SystemAudioSource: NSObject, AudioBufferSource, SCStreamOutput, SCSt
             do {
                 let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
                 let mainDisplayID = CGMainDisplayID()
-                guard let display = content.displays.first(where: { $0.displayID == mainDisplayID }) else {
+                guard let screen = content.displays.first(where: { $0.displayID == mainDisplayID }) else {
                     endOnce(.disconnected)
                     return
                 }
@@ -181,7 +181,7 @@ final class SystemAudioSource: NSObject, AudioBufferSource, SCStreamOutput, SCSt
                 configuration.minimumFrameInterval = CMTime(value: 1, timescale: 1)
                 configuration.queueDepth = 3
                 configuration.showsCursor = false
-                let stream = SCStream(filter: SCContentFilter(display: display, excludingWindows: []),
+                let stream = SCStream(filter: SCContentFilter(display: screen, excludingWindows: []),
                                       configuration: configuration, delegate: self)
                 let proceed = withState { state -> Bool in
                     guard !state.isStopped else { return false }
@@ -199,7 +199,7 @@ final class SystemAudioSource: NSObject, AudioBufferSource, SCStreamOutput, SCSt
         }
     }
 
-    /// The display gone (`noCaptureSource`) is no failure.
+    /// The screen gone (`noCaptureSource`) is no failure.
     static func captureEnd(for error: any Error) -> AudioTracker.CaptureEnd {
         let nsError = error as NSError
         if nsError.domain == SCStreamErrorDomain, nsError.code == SCStreamError.Code.noCaptureSource.rawValue {

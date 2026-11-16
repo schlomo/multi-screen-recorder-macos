@@ -5,9 +5,9 @@ import RecorderLogic
 @preconcurrency import ScreenCaptureKit
 import Synchronization
 
-/// What every display capture of a recording shares: the recording folder,
-/// the clock, the timecode, and the displays' bounds as last read, which
-/// the recorder updates whenever the displays change.
+/// What every screen capture of a recording shares: the recording folder,
+/// the clock, the timecode, and the screens' bounds as last read, which
+/// the recorder updates whenever the screens change.
 public final class RecordingContext: Sendable {
     public let folder: URL
     public let started: Date
@@ -21,7 +21,7 @@ public final class RecordingContext: Sendable {
     private struct State {
         var clock: SharedClock
         var bounds: [String: ScreenRect] = [:]
-        var lastDisplayChange: Int64?
+        var lastScreenChange: Int64?
         var takenNames: Set<String> = []
     }
 
@@ -46,21 +46,21 @@ public final class RecordingContext: Sendable {
         clock.sinceStart(continuous: continuousNow())
     }
 
-    func update(_ displays: [ConnectedDisplay], lastDisplayChange: Int64?) {
+    func update(_ screens: [ConnectedScreen], lastScreenChange: Int64?) {
         state.withLock {
-            for display in displays { $0.bounds[display.uuid] = display.bounds }
-            $0.lastDisplayChange = lastDisplayChange
+            for screen in screens { $0.bounds[screen.uuid] = screen.bounds }
+            $0.lastScreenChange = lastScreenChange
         }
     }
 
     func bounds(of uuid: String) -> (ScreenRect?, Int64?) {
-        state.withLock { ($0.bounds[uuid], $0.lastDisplayChange) }
+        state.withLock { ($0.bounds[uuid], $0.lastScreenChange) }
     }
 
-    /// The display file's name for a file starting at `tick`, never one already used.
-    func claimFileName(tick: Int64, number: Int, display: String) -> String {
+    /// The screen file's name for a file starting at `tick`, never one already used.
+    func claimFileName(tick: Int64, number: Int, screen: String) -> String {
         claimName(tick: tick) { start, taken in
-            RecordingNames.displayFile(start: start, timeZone: timeZone, number: number, display: display, taken: taken)
+            RecordingNames.screenFile(start: start, timeZone: timeZone, number: number, screen: screen, taken: taken)
         }
     }
 
@@ -84,11 +84,11 @@ public final class RecordingContext: Sendable {
 
 extension SCStream: CaptureStream {}
 
-/// One display's stream and its display file: frames pass the display
-/// check and go to the display file's ticker. A capture has at most one
-/// display file; a new file needs a new capture. Everything runs on its own
+/// One screen's stream and its screen file: frames pass the screen
+/// check and go to the screen file's ticker. A capture has at most one
+/// screen file; a new file needs a new capture. Everything runs on its own
 /// queue until the capture ends.
-public final class DisplayCapture: NSObject, @unchecked Sendable, SCStreamOutput, SCStreamDelegate {
+public final class ScreenCapture: NSObject, @unchecked Sendable, SCStreamOutput, SCStreamDelegate {
     public let uuid: String
     public let number: Int
     public let name: String
@@ -101,14 +101,14 @@ public final class DisplayCapture: NSObject, @unchecked Sendable, SCStreamOutput
     private let guides: GuideTrackFeed
 
     /// The file started; reports its manifest entry.
-    private let onFileStarted: @Sendable (RecordingManifest.DisplayFile) -> Void
+    private let onFileStarted: @Sendable (RecordingManifest.ScreenFile) -> Void
     /// The capture ended by itself, after its file was ended.
-    private let onEnded: @Sendable (DisplayTracker.StreamEnd, DisplayFileEnd?) -> Void
+    private let onEnded: @Sendable (ScreenTracker.StreamEnd, ScreenFileEnd?) -> Void
 
     // Confined to `queue`.
     private var stream: SCStream?
-    private var check = DisplayCheck()
-    private var ticker: DisplayFileTicker?
+    private var check = ScreenCheck()
+    private var ticker: ScreenFileTicker?
     private var timer: DispatchSourceTimer?
     /// No frame and no tick is taken any more.
     private var isEnding = false
@@ -117,14 +117,14 @@ public final class DisplayCapture: NSObject, @unchecked Sendable, SCStreamOutput
     /// The guide tracks handed over while ending, for the file's last mix.
     private var endingGuides: [GuideLastMix.Chunk] = []
     /// Finishing the file, by the capture itself or at the recorder's request; set once.
-    private var finishTask: Task<DisplayFileEnd?, Never>?
+    private var finishTask: Task<ScreenFileEnd?, Never>?
     private static let queueKey = DispatchSpecificKey<Int>()
 
     init(
         uuid: String, displayID: UInt32, number: Int, name: String, frameSize: FrameSize, context: RecordingContext,
         guides: GuideTrackFeed,
-        onFileStarted: @escaping @Sendable (RecordingManifest.DisplayFile) -> Void,
-        onEnded: @escaping @Sendable (DisplayTracker.StreamEnd, DisplayFileEnd?) -> Void
+        onFileStarted: @escaping @Sendable (RecordingManifest.ScreenFile) -> Void,
+        onEnded: @escaping @Sendable (ScreenTracker.StreamEnd, ScreenFileEnd?) -> Void
     ) {
         self.uuid = uuid
         self.displayID = displayID
@@ -135,21 +135,21 @@ public final class DisplayCapture: NSObject, @unchecked Sendable, SCStreamOutput
         self.guides = guides
         self.onFileStarted = onFileStarted
         self.onEnded = onEnded
-        queue = DispatchQueue(label: "msr.display.\(number)", qos: .userInteractive)
+        queue = DispatchQueue(label: "msr.screen.\(number)", qos: .userInteractive)
         super.init()
         queue.setSpecific(key: Self.queueKey, value: ObjectIdentifier(self).hashValue)
         let started = context.now()
-        ticker = DisplayFileTicker(captureStart: started) { [context, uuid, number, name, frameSize, guides] firstTick throws(DisplayFileWriterError) in
-            let fileName = context.claimFileName(tick: firstTick, number: number, display: name)
-            let writer = try DisplayFileWriter(
+        ticker = ScreenFileTicker(captureStart: started) { [context, uuid, number, name, frameSize, guides] firstTick throws(ScreenFileWriterError) in
+            let fileName = context.claimFileName(tick: firstTick, number: number, screen: name)
+            let writer = try ScreenFileWriter(
                 url: context.folder.appending(path: fileName), frameSize: frameSize, firstTick: firstTick,
                 timecode: context.timecode,
-                metadata: DisplayFileMetadata(
-                    displayUUID: uuid, displayNumber: number, displayName: name, frameSize: frameSize,
+                metadata: ScreenFileMetadata(
+                    screenUUID: uuid, screenNumber: number, screenName: name, frameSize: frameSize,
                     recordingStarted: context.startedText, app: context.app),
                 guideTracks: guides.tracks)
-            return (writer, RecordingManifest.DisplayFile(
-                name: fileName, display: name, displayUUID: uuid, frameSize: frameSize,
+            return (writer, RecordingManifest.ScreenFile(
+                name: fileName, screen: name, screenUUID: uuid, frameSize: frameSize,
                 start: TickGrid.recording.seconds(ofTick: firstTick), timecode: context.timecode.text(ofTick: firstTick),
                 guideTracks: guides.tracks.map(\.name)))
         }
@@ -160,8 +160,8 @@ public final class DisplayCapture: NSObject, @unchecked Sendable, SCStreamOutput
         Task {
             do {
                 let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
-                guard let display = content.displays.first(where: { $0.displayID == displayID }) else {
-                    throw CaptureError("ScreenCaptureKit does not list the display")
+                guard let screen = content.displays.first(where: { $0.displayID == displayID }) else {
+                    throw CaptureError("ScreenCaptureKit does not list the screen")
                 }
                 let configuration = SCStreamConfiguration()
                 configuration.width = frameSize.width
@@ -172,7 +172,7 @@ public final class DisplayCapture: NSObject, @unchecked Sendable, SCStreamOutput
                 // The mouse pointer is recorded.
                 configuration.showsCursor = true
                 configuration.scalesToFit = true
-                let stream = SCStream(filter: SCContentFilter(display: display, excludingWindows: []),
+                let stream = SCStream(filter: SCContentFilter(display: screen, excludingWindows: []),
                                       configuration: configuration, delegate: self)
                 let stillWanted = queue.sync { () -> Bool in
                     guard !isEnding else { return false }
@@ -189,8 +189,8 @@ public final class DisplayCapture: NSObject, @unchecked Sendable, SCStreamOutput
     }
 
     /// A stream's error as the end of its capture: ScreenCaptureKit's
-    /// `noCaptureSource` (-3815), the display gone, is no failure (F4).
-    static func streamEnd(for error: any Error) -> DisplayTracker.StreamEnd {
+    /// `noCaptureSource` (-3815), the screen gone, is no failure (F4).
+    static func streamEnd(for error: any Error) -> ScreenTracker.StreamEnd {
         let nsError = error as NSError
         if nsError.domain == SCStreamErrorDomain, nsError.code == SCStreamError.Code.noCaptureSource.rawValue {
             return .captureSourceGone
@@ -220,13 +220,13 @@ public final class DisplayCapture: NSObject, @unchecked Sendable, SCStreamOutput
               CFGetTypeID(rectDictionary) == CFDictionaryGetTypeID(),
               let screenRect = CGRect(dictionaryRepresentation: rectDictionary as! CFDictionary),
               // When the frame was shown, in mach absolute time: the host clock.
-              let displayTime = (attachments[.displayTime] as? NSNumber)?.uint64Value
+              let screenTime = (attachments[.displayTime] as? NSNumber)?.uint64Value
         else { return }
-        let capturedAt = context.clock.sinceStart(host: nanoseconds(machTicks: displayTime))
+        let capturedAt = context.clock.sinceStart(host: nanoseconds(machTicks: screenTime))
         let (bounds, lastChange) = context.bounds(of: uuid)
         guard let bounds else { return }
-        switch check.judge(frameRect: ScreenRect(screenRect), displayBounds: bounds, capturedAt: capturedAt,
-                           lastDisplayChange: lastChange) {
+        switch check.judge(frameRect: ScreenRect(screenRect), screenBounds: bounds, capturedAt: capturedAt,
+                           lastScreenChange: lastChange) {
         case .passes:
             switch ticker.receive(pixelBuffer, capturedAt: capturedAt) {
             case .none: break
@@ -248,8 +248,8 @@ public final class DisplayCapture: NSObject, @unchecked Sendable, SCStreamOutput
             }
         case .fails:
             break
-        case .showsAnotherDisplay:
-            end(.showsAnotherDisplay)
+        case .showsAnotherScreen:
+            end(.showsAnotherScreen)
         }
     }
 
@@ -274,7 +274,7 @@ public final class DisplayCapture: NSObject, @unchecked Sendable, SCStreamOutput
     // MARK: Ending
 
     /// Ends the capture by itself, then reports why; unless the recorder stopped it first.
-    private func end(_ reason: DisplayTracker.StreamEnd) {
+    private func end(_ reason: ScreenTracker.StreamEnd) {
         guard !isEnding else { return }
         guard let finishing = beginFinishing(writeWaitingTicks: reason != .writerFellBehind) else { return }
         Task { onEnded(reason, await finishing.value) }
@@ -282,14 +282,14 @@ public final class DisplayCapture: NSObject, @unchecked Sendable, SCStreamOutput
 
     /// Stops the capture at the recorder's request and finalizes its file;
     /// if the capture is already ending by itself, waits for that.
-    func stop() async -> DisplayFileEnd? {
+    func stop() async -> ScreenFileEnd? {
         let finishing = beginFinishing(writeWaitingTicks: true) ?? queue.sync { finishTask }
         return await finishing?.value
     }
 
     /// Starts finishing the file once; nil when that has begun already.
-    private func beginFinishing(writeWaitingTicks: Bool) -> Task<DisplayFileEnd?, Never>? {
-        let begin = { () -> Task<DisplayFileEnd?, Never>? in
+    private func beginFinishing(writeWaitingTicks: Bool) -> Task<ScreenFileEnd?, Never>? {
+        let begin = { () -> Task<ScreenFileEnd?, Never>? in
             guard self.finishTask == nil else { return nil }
             self.isEnding = true
             self.timer?.cancel()
@@ -303,7 +303,7 @@ public final class DisplayCapture: NSObject, @unchecked Sendable, SCStreamOutput
 
     /// Stops the stream, finalizes the file and lets go of the stream, the
     /// writer and the frames it held.
-    private func finish(writeWaitingTicks: Bool) async -> DisplayFileEnd? {
+    private func finish(writeWaitingTicks: Bool) async -> ScreenFileEnd? {
         await lifecycle.stop()
         let (stream, ticker, listener) = queue.sync { (self.stream, self.ticker, self.guideListener) }
         if let stream { try? stream.removeStreamOutput(self, type: .screen) }

@@ -34,7 +34,7 @@ public enum Encoding {
     }
 }
 
-/// A guide track: a track in every display file for playback and waveform
+/// A guide track: a track in every screen file for playback and waveform
 /// sync only; the audio files hold the sources themselves.
 public enum GuideTrack: Hashable, Sendable {
     case microphones
@@ -62,7 +62,7 @@ public enum GuideTrack: Hashable, Sendable {
         }
     }
 
-    /// The guide tracks a display file has follow from the settings alone: a
+    /// The guide tracks a screen file has follow from the settings alone: a
     /// source that is missing is silence in its guide track.
     public static func tracks(for settings: Settings) -> [GuideTrack] {
         (settings.effectiveAudioMode == .none ? [] : [.microphones]) + (settings.systemAudio ? [.systemAudio] : [])

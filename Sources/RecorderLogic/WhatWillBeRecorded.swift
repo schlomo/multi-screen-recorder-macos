@@ -1,6 +1,6 @@
 /// The window's section "What will be recorded", from the settings, the
 /// devices connected now and the free space in the output folder, as data
-/// the view renders: one table, the display rows then the audio rows with
+/// the view renders: one table, the screen rows then the audio rows with
 /// the system audio last and the total row, and a line of what the
 /// required recording hours need. GB/h max is the encoder's ceiling, the
 /// most a source can write (D53).
@@ -12,7 +12,7 @@ public struct WhatWillBeRecorded: Equatable, Sendable {
     static let unknown = "?"
     static let cannotBeRead = "cannot be read"
 
-    public struct Display: Equatable, Sendable {
+    public struct Screen: Equatable, Sendable {
         public var number: Int
         public var name: String
         public var looksLike: String
@@ -44,23 +44,23 @@ public struct WhatWillBeRecorded: Equatable, Sendable {
         public var need: String
     }
 
-    /// Set when the displays cannot be read; it stands in place of the Displays table.
-    public var displaysError: String?
-    public var displays: [Display]
+    /// Set when the screens cannot be read; it stands in place of the Screens table.
+    public var screensError: String?
+    public var screens: [Screen]
     /// Set when the audio inputs cannot be read; the Audio table then has no row for them.
     public var audioError: String?
     public var audio: [Audio]
-    /// Nil unless the displays and the audio inputs the recording records can be read.
+    /// Nil unless the screens and the audio inputs the recording records can be read.
     public var total: Total?
     public var outputFolder: String
     public var continuity: String
 
     public init(
-        displaysError: String?, displays: [Display], audioError: String?, audio: [Audio], total: Total?,
+        screensError: String?, screens: [Screen], audioError: String?, audio: [Audio], total: Total?,
         outputFolder: String, continuity: String
     ) {
-        self.displaysError = displaysError
-        self.displays = displays
+        self.screensError = screensError
+        self.screens = screens
         self.audioError = audioError
         self.audio = audio
         self.total = total
@@ -72,24 +72,24 @@ public struct WhatWillBeRecorded: Equatable, Sendable {
     /// without a usable folder and its free space the total leaves the free space out.
     public init(
         settings: Settings,
-        displays readDisplays: Result<[DisplayInfo], DeviceReadError>,
+        screens readScreens: Result<[ScreenInfo], DeviceReadError>,
         audioInputs readAudioInputs: Result<[AudioInputInfo], DeviceReadError>,
         outputFolder: OutputFolderProbe?
     ) {
         self.init(
-            displaysError: nil, displays: [], audioError: nil, audio: [], total: nil,
+            screensError: nil, screens: [], audioError: nil, audio: [], total: nil,
             outputFolder: "Files go to \(settings.outputFolder)",
-            continuity: "Recording continues when displays or audio sources change.")
-        switch readDisplays {
-        case .success(let displayInfos):
-            displays = numberDisplays(displayInfos).map { Self.display($0, settings: settings) }
+            continuity: "Recording continues when screens or audio sources change.")
+        switch readScreens {
+        case .success(let screenInfos):
+            screens = numberScreens(screenInfos).map { Self.screen($0, settings: settings) }
             if case .success(let audioInputs) = audioInputsToJudge(readAudioInputs, settings: settings),
                let bytesPerHour = DiskEstimate.bytesPerHour(
-                settings: settings, displays: displayInfos, audioInputs: audioInputs) {
+                settings: settings, screens: screenInfos, audioInputs: audioInputs) {
                 total = Self.total(bytesPerHour, settings: settings, outputFolder: outputFolder)
             }
         case .failure(let error):
-            displaysError = "The displays cannot be read: \(error)"
+            screensError = "The screens cannot be read: \(error)"
         }
         switch readAudioInputs {
         case .success(let audioInputs):
@@ -106,7 +106,7 @@ public struct WhatWillBeRecorded: Equatable, Sendable {
     /// What the ready check's probes found, as the window and `msr check` show it.
     public init(settings: Settings, facts: ReadyCheckFacts) {
         self.init(
-            settings: settings, displays: facts.displays, audioInputs: facts.audioInputs,
+            settings: settings, screens: facts.screens, audioInputs: facts.audioInputs,
             outputFolder: facts.outputFolder)
     }
 
@@ -125,14 +125,14 @@ public struct WhatWillBeRecorded: Equatable, Sendable {
         }
     }
 
-    private static func display(_ numbered: NumberedDisplay, settings: Settings) -> Display {
-        let frameSize = settings.effectiveResolution.frameSize(forLooksLike: numbered.display.pointSize)
-        return Display(
-            number: numbered.number, name: numbered.display.name,
-            looksLike: "\(numbered.display.pointSize)", drawnAt: "\(numbered.display.pixelSize)",
+    private static func screen(_ numbered: NumberedScreen, settings: Settings) -> Screen {
+        let frameSize = settings.effectiveResolution.frameSize(forLooksLike: numbered.screen.pointSize)
+        return Screen(
+            number: numbered.number, name: numbered.screen.name,
+            looksLike: "\(numbered.screen.pointSize)", drawnAt: "\(numbered.screen.pixelSize)",
             recordsAt: "\(frameSize)",
             gigabytesPerHour: DiskEstimate.gigabytesPerHour(
-                DiskEstimate.displayFileBytesPerHour(frameSize: frameSize, settings: settings)))
+                DiskEstimate.screenFileBytesPerHour(frameSize: frameSize, settings: settings)))
     }
 
     /// "2.2" and "2 hours need 4.3 GB, 3.1 GB free."
@@ -144,9 +144,9 @@ public struct WhatWillBeRecorded: Equatable, Sendable {
         return Total(gigabytesPerHour: DiskEstimate.gigabytesPerHour(bytesPerHour), need: "\(needed)\(free).")
     }
 
-    /// The display rows of the table; none when the displays cannot be read.
-    public var displayRows: [Row] {
-        displays.map {
+    /// The screen rows of the table; none when the screens cannot be read.
+    public var screenRows: [Row] {
+        screens.map {
             Row(cells: ["\($0.number) \($0.name)", $0.looksLike, $0.drawnAt, $0.recordsAt, $0.gigabytesPerHour],
                 isRecorded: true)
         }
@@ -170,9 +170,9 @@ public struct WhatWillBeRecorded: Equatable, Sendable {
     /// line above the table.
     public var text: String {
         var lines = ["What will be recorded"]
-        if let displaysError { lines.append("  \(displaysError)") }
+        if let screensError { lines.append("  \(screensError)") }
         if let audioError { lines.append("  \(audioError)") }
-        let rows = (displayRows + audioRows + [totalRow].compactMap(\.self)).map(\.cells)
+        let rows = (screenRows + audioRows + [totalRow].compactMap(\.self)).map(\.cells)
         let widths = Self.columns.indices.map { column in ([Self.columns] + rows).map { $0[column].count }.max() ?? 0 }
         func line(_ cells: [String]) -> String {
             let last = cells.count - 1
@@ -185,8 +185,8 @@ public struct WhatWillBeRecorded: Equatable, Sendable {
         }
         lines.append(line(Self.columns))
         let rule = "  " + String(repeating: "─", count: widths.reduce(0, +) + 2 * (widths.count - 1))
-        lines += displayRows.map { line($0.cells) }
-        if !displayRows.isEmpty { lines.append(rule) }
+        lines += screenRows.map { line($0.cells) }
+        if !screenRows.isEmpty { lines.append(rule) }
         lines += audioRows.map { line($0.cells) }
         if let total, let totalRow {
             lines += [rule, line(totalRow.cells), "  \(total.need)"]

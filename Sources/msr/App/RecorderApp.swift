@@ -29,7 +29,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             NSApp.terminate(nil)
             return
         }
-        // Posted when a display comes or goes or changes its resolution.
+        // Posted when a screen comes or goes or changes its resolution.
         _ = NotificationCenter.default.addObserver(
             forName: NSApplication.didChangeScreenParametersNotification, object: nil, queue: .main
         ) { _ in
@@ -133,7 +133,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func makeWindow(title: String, content: some View) -> NSWindow {
         // The window takes its size from the content's preferred size. The
-        // crash after a display's HiDPI switch was a layout loop in a popup
+        // crash after a screen's HiDPI switch was a layout loop in a popup
         // menu's own window, not in this one; the start window has no popup
         // menu (D41), see `StartModel.checkAgain`.
         let hosting = NSHostingController(rootView: content)

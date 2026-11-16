@@ -5,16 +5,16 @@ import RecorderLogic
 import Testing
 @testable import RecorderCore
 
-/// Writes display files from synthetic frames and reads them back with
+/// Writes screen files from synthetic frames and reads them back with
 /// AVFoundation: no screen, no permission.
-@Suite(.serialized) struct DisplayFileWriterTests {
+@Suite(.serialized) struct ScreenFileWriterTests {
     private let scratch: URL
     private let frameSize = FrameSize(width: 320, height: 180)
     private let berlin = TimeZone(identifier: "Europe/Berlin")!
 
     init() throws {
         scratch = FileManager.default.temporaryDirectory
-            .appending(path: "DisplayFileWriterTests-\(UUID().uuidString)", directoryHint: .isDirectory)
+            .appending(path: "ScreenFileWriterTests-\(UUID().uuidString)", directoryHint: .isDirectory)
         try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
     }
 
@@ -43,9 +43,9 @@ import Testing
     }
 
     /// Writes `seconds` of ticks from `firstTick` on, waiting for the writer as a late tick would.
-    private func write(rate: Int, firstTick: Int64, seconds: Int, timecode: Timecode, finish: Bool = true) async throws -> (URL, DisplayFileWriter) {
-        let url = scratch.appending(path: "Display 1 - Test \(rate).mov")
-        let writer = try DisplayFileWriter(
+    private func write(rate: Int, firstTick: Int64, seconds: Int, timecode: Timecode, finish: Bool = true) async throws -> (URL, ScreenFileWriter) {
+        let url = scratch.appending(path: "Screen 1 - Test \(rate).mov")
+        let writer = try ScreenFileWriter(
             url: url, frameSize: frameSize, firstTick: firstTick, timecode: timecode, metadata: metadata,
             grid: TickGrid(framesPerSecond: rate))
         let frames = try (0..<4).map { try frame(brightness: UInt8(40 + 50 * $0)) }
@@ -59,8 +59,8 @@ import Testing
         return (url, writer)
     }
 
-    private let metadata = DisplayFileMetadata(
-        displayUUID: "1E6E43E3-6E7B-4C2A-9F6B-2B0F4C1A9D11", displayNumber: 2, displayName: "LG HDR 4K",
+    private let metadata = ScreenFileMetadata(
+        screenUUID: "1E6E43E3-6E7B-4C2A-9F6B-2B0F4C1A9D11", screenNumber: 2, screenName: "LG HDR 4K",
         frameSize: FrameSize(width: 320, height: 180), recordingStarted: "2026-11-12T14:03:05.120+01:00",
         app: "Multi Screen Recorder 0.20261115.4 (a1b2c3d)")
 
@@ -93,25 +93,25 @@ import Testing
     }
 
     /// The video track's name, as `ffprobe` shows it: the stream's title.
-    private let trackNames = [AVMetadataIdentifier.quickTimeUserDataFullName.rawValue: "Display 2 - LG HDR 4K"]
+    private let trackNames = [AVMetadataIdentifier.quickTimeUserDataFullName.rawValue: "Screen 2 - LG HDR 4K"]
 
-    @Test func aDisplayFileCarriesItsReelNameAndMetadata() async throws {
+    @Test func aScreenFileCarriesItsReelNameAndMetadata() async throws {
         defer { removeScratch() }
         let timecode = Timecode(start: try startDate(), timeZone: berlin)
         let (url, _) = try await write(rate: RecorderValues.framesPerSecond, firstTick: 0, seconds: 1, timecode: timecode)
         let asset = AVURLAsset(url: url)
-        #expect(try await reelName(of: asset) == "Display 2 - LG HDR 4K")
+        #expect(try await reelName(of: asset) == "Screen 2 - LG HDR 4K")
         let items = try await metadataItems(of: asset)
         #expect(items == [
-            "org.schapiro.multiscreenrecorder.displayUUID": "1E6E43E3-6E7B-4C2A-9F6B-2B0F4C1A9D11",
-            "org.schapiro.multiscreenrecorder.displayNumber": "2",
-            "org.schapiro.multiscreenrecorder.displayName": "LG HDR 4K",
+            "org.schapiro.multiscreenrecorder.screenUUID": "1E6E43E3-6E7B-4C2A-9F6B-2B0F4C1A9D11",
+            "org.schapiro.multiscreenrecorder.screenNumber": "2",
+            "org.schapiro.multiscreenrecorder.screenName": "LG HDR 4K",
             "org.schapiro.multiscreenrecorder.frameSize": "320x180",
             "org.schapiro.multiscreenrecorder.recordingStarted": "2026-11-12T14:03:05.120+01:00",
             "org.schapiro.multiscreenrecorder.app": "Multi Screen Recorder 0.20261115.4 (a1b2c3d)",
             "com.apple.quicktime.software": "Multi Screen Recorder 0.20261115.4 (a1b2c3d)",
-            "com.apple.proapps.reel": "Display 2 - LG HDR 4K",
-            "com.apple.proapps.cameraName": "Display 2 - LG HDR 4K",
+            "com.apple.proapps.reel": "Screen 2 - LG HDR 4K",
+            "com.apple.proapps.cameraName": "Screen 2 - LG HDR 4K",
         ])
         #expect(try await videoTrackItems(of: asset) == trackNames)
     }
@@ -121,7 +121,7 @@ import Testing
     }
 
     @Test(arguments: [RecorderValues.framesPerSecond, 60])
-    func aDisplayFileHasAConstantFrameRateTheTimecodeAndBT709(rate: Int) async throws {
+    func aScreenFileHasAConstantFrameRateTheTimecodeAndBT709(rate: Int) async throws {
         defer { removeScratch() }
         let timecode = Timecode(start: try startDate(), timeZone: berlin, framesPerSecond: rate)
         let firstTick = Int64(rate) * 3 / 2
@@ -156,13 +156,13 @@ import Testing
         #expect(associated.count == 1)
     }
 
-    /// A display file's guide tracks, "Microphones" mono and "System audio"
+    /// A screen file's guide tracks, "Microphones" mono and "System audio"
     /// stereo, cover its time, written as the guide track feed does.
-    @Test func aDisplayFileCarriesItsGuideTracks() async throws {
+    @Test func aScreenFileCarriesItsGuideTracks() async throws {
         defer { removeScratch() }
         let rate = RecorderValues.framesPerSecond
         let url = scratch.appending(path: "guide.mov")
-        let writer = try DisplayFileWriter(
+        let writer = try ScreenFileWriter(
             url: url, frameSize: frameSize, firstTick: 0, timecode: Timecode(start: try startDate(), timeZone: berlin),
             metadata: metadata, guideTracks: [.microphones, .systemAudio])
         let image = try frame(brightness: 90)
@@ -191,7 +191,7 @@ import Testing
 
     /// A file the process never finalized, as after a crash, is readable up
     /// to its last fragment of 2 s.
-    @Test func anUnfinalizedDisplayFileIsReadableUpToItsLastFragment() async throws {
+    @Test func anUnfinalizedScreenFileIsReadableUpToItsLastFragment() async throws {
         defer { removeScratch() }
         let rate = RecorderValues.framesPerSecond
         // The writer is kept, never finished: the process "crashed".
@@ -212,10 +212,10 @@ import Testing
         // The one timecode sample of the file is in it before the file is finalized.
         let timecodeTrack = try #require(try await asset.loadTracks(withMediaType: .timecode).first)
         #expect(try readFirstTimecodeFrame(of: timecodeTrack, asset: asset) == Int32(timecode.frame(ofTick: 0)))
-        #expect(try await reelName(of: asset) == "Display 2 - LG HDR 4K")
+        #expect(try await reelName(of: asset) == "Screen 2 - LG HDR 4K")
         let items = try await metadataItems(of: asset)
-        #expect(items["com.apple.proapps.reel"] == "Display 2 - LG HDR 4K")
-        #expect(items["com.apple.proapps.cameraName"] == "Display 2 - LG HDR 4K")
+        #expect(items["com.apple.proapps.reel"] == "Screen 2 - LG HDR 4K")
+        #expect(items["com.apple.proapps.cameraName"] == "Screen 2 - LG HDR 4K")
         #expect(try await videoTrackItems(of: asset) == trackNames)
         withExtendedLifetime(writer) {}
     }
@@ -264,7 +264,7 @@ import Testing
 }
 
 @Suite struct ClockTests {
-    /// ScreenCaptureKit stamps a frame's display time in mach absolute time;
+    /// ScreenCaptureKit stamps a frame's screen time in mach absolute time;
     /// the shared clock reads the host clock as the same.
     @Test func theHostClockIsMachAbsoluteTime() {
         let before = readClocks().host

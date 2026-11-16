@@ -49,7 +49,7 @@ public enum SettingKey: String, CaseIterable, Sendable {
 }
 
 public struct Settings: Equatable, Sendable, Encodable {
-    /// Auto mode: every display at Native and the audio mode Wired,
+    /// Auto mode: every screen at Native and the audio mode Wired,
     /// whatever `resolution` and `audioMode` say.
     public var auto: Bool
     public var resolution: RecordingResolution

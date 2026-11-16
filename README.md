@@ -2,34 +2,34 @@
 <img src="assets/icon/app-icon-fancy-256.jpeg" alt="Multi Screen Recorder app icon" width="96" align="right">
 
 A reliable multi-source screen and audio recorder for macOS. It
-captures every display and audio source, never loses a recording, and
+captures every screen and audio source, never loses a recording, and
 keeps going when screens, resolutions or audio sources change.
 
-**Status:** in development. Builds record every display and audio
+**Status:** in development. Builds record every screen and audio
 source. The app shows its settings and the ready check and records with
-Start, and the command line lists displays and audio inputs, runs the
+Start, and the command line lists screens and audio inputs, runs the
 ready check, records and manages the settings. An audio input with its
-own clock still drifts against the display files (measured, not yet
+own clock still drifts against the screen files (measured, not yet
 corrected).
 
 ## What it does
 
-- **Every display, as displays come and go.** Each display gets its own
+- **Every screen, as screens come and go.** Each screen gets its own
   video file. Plugging in a projector, removing it, or switching
   mirroring does not stop the recording.
 - **Every audio source in its own file.** No audio, the default
   microphone, the wired audio inputs, or all audio inputs, plus the
   system audio if you want it.
   Each source gets an audio file of its own, each channel its own
-  track; every display file also carries two guide tracks, the
+  track; every screen file also carries two guide tracks, the
   microphones and the system audio, for playback and for syncing by
   waveform with a separate recording.
 - **Edit-ready video.** A constant 30 frames per second, with a fixed
   frame size per file and a recording resolution you choose (Native,
   4K, 1440p, 1200p, 1080p or 720p), only ever scaled down. Native is the
-  size macOS shows as "looks like" for the display, not the size it is
+  size macOS shows as "looks like" for the screen, not the size it is
   drawn at.
-- **Auto mode.** On by default: every display at Native and the wired
+- **Auto mode.** On by default: every screen at Native and the wired
   audio inputs plus the default microphone, so you get a recording that
   is safe to sort out in the editor, at the expense of disk space.
   Switch it off to choose the resolution and the audio mode yourself.
@@ -65,7 +65,7 @@ A Mac with Apple silicon (M1 or later) and macOS 26 or later.
    scroll to "Multi Screen Recorder was blocked", click **Open Anyway**
    and confirm.
 4. Grant the two permissions when macOS asks: **Screen & System Audio
-   Recording** (for the displays and the system audio) and
+   Recording** (for the screens and the system audio) and
    **Microphone** (asked only when a microphone is recorded: not on a
    Mac without an audio input, nor with the audio mode None). Both are in
    System Settings › Privacy & Security.
@@ -80,7 +80,7 @@ confirmed yet.
 ### Known limits
 
 - **CPU:** recording takes about half of one CPU core over an hour,
-  with two displays and five audio sources.
+  with two screens and five audio sources.
 - **Audio drift:** some USB audio devices drift against the video, by
   up to about 0.4 s per hour. A correction is planned.
 - **USB docks:** plugging a USB device into a dock while recording can
@@ -102,7 +102,7 @@ share.
 
 Start the app from Finder: its window shows the app's icon, version
 and homepage, then what will be recorded (one
-table: the displays, with what each looks like, the size it is drawn at
+table: the screens, with what each looks like, the size it is drawn at
 and the size it records at, then the audio inputs and system audio, the
 ones not recorded dimmed; each row with the most disk space it can write
 per hour, "GB/h max", usually more than it writes; the total as the
@@ -113,22 +113,22 @@ microphone, Wired or All, with a note under it on Bluetooth and virtual
 microphones), system audio, the output folder and the ready check:
 "Ready to record" when every item passes, otherwise each item with a
 fix for each failing one. Every change is saved at once; the ready check runs again after each change,
-when you come back to the app, when a display is plugged in, removed
+when you come back to the app, when a screen is plugged in, removed
 or changed, when an audio device is plugged in or removed, when the
 default audio input changes, and on "Check again". Cancel, in the
 lower right corner beside Start, quits without recording.
 
 Click Start: the window closes; the Dock icon shows a "!" badge when
-the disk runs low, a display shows another display's picture or
+the disk runs low, a screen shows another screen's picture or
 something went wrong. Click the Dock icon or quit to open the status
-window: each display and audio source with its files, the data written
+window: each screen and audio source with its files, the data written
 and its state, the time recorded (`h:mm:ss`, every second), data and
 free space, the CPU use of Multi Screen Recorder itself (encoding and
 capture also run in macOS's own processes, which it does not include),
 and any problems in red. Stop there finalizes the files, opens the
 recording folder in Finder and quits; Continue keeps recording. The
-recording folder holds a video file per display, a new one each time a
-display comes back or changes its frame size, an audio file per audio
+recording folder holds a video file per screen, a new one each time a
+screen comes back or changes its frame size, an audio file per audio
 source (a microphone unplugged and plugged in again gets a new one),
 and `recording.json`, which lists every file, what happened and every
 problem, and says how the recording ended.
@@ -147,7 +147,7 @@ so it shows the app's version and runs with its signature.
 
 | Command | Does |
 |---|---|
-| `msr list` | Shows displays, audio inputs and system audio |
+| `msr list` | Shows screens, audio inputs and system audio |
 | `msr check [flags] [--debug]` | Prints what will be recorded, then runs the ready check; exits 0 when ready, 1 when not; creates the output folder if it is missing |
 | `msr record [flags] [--duration 1h30m] [--debug]` | Prints what will be recorded and runs the ready check, then records until Ctrl-C, the duration or Stop in the status window (click the Dock icon); shows the app's Dock icon while it records and prints each event on standard error; `--duration` without a suffix is minutes; exits 0 when every file is finalized and no file was ended by a failure (a problem told alone, an unplugged microphone or a gap is listed but still exits 0), 1 when not ready, 3 when a file is not finalized, a file was ended by a failure, the recording manifest could not be written at the end, or the recording could not start |
 | `msr settings [flags]` | Without flags prints the effective settings as JSON; with a settings flag saves the effective settings into the settings file and prints them, the only way a command writes it |
