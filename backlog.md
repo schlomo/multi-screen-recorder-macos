@@ -134,6 +134,22 @@ Still open from D34: what AGC does and whether it is on in auto mode;
    setting is welcome if files grow only 10 to 20 % "without quality
    loss", and redundant work goes "where obviously not needed"; the
    optimisations come later, research first.
+   Encoder benchmark (2026-11-16, a replica of the audio path with the
+   recorder's own code, real-time paced, M3 Pro; relative numbers): the
+   encoder is not the main cost, the 94 appends a second are. Batching
+   the audio files' appends to about 100 ms (as the guides already do)
+   gives bit-identical files and saves about 1.9 % of a core per input
+   (microphone path 6.4 % → 3.8 %). Today: AAC-LC, 48 kHz, quality
+   medium (the default), 128k per mono track, 192k system audio, guides
+   64k and 96k. AAC quality "min" at 160k: +19 % size, SNR −1.4 dB,
+   about −0.5 % per track (the owner's "cheaper encoder" compromise; a
+   listening test decides). Opus writes into `.mov` but costs more CPU
+   than AAC; ALAC and PCM are 5 to 11 times the size; the bit-rate
+   strategy changes nothing. A silent (all-zero) input still costs
+   about 3 % in the writer. One mono input's live 9.1 %: about 2.7 %
+   capture session (by subtraction), 2.1 % writer appends, 1.7 % its
+   guides in two display files, 1.3 % encoder, 1.1 % our queue, split
+   and mix. Scripts were in the session scratchpad.
 6. **Audio after v0** (D12, D18): AGC, in its own PR, with its own
    design, its column in the window's table and the HDMI test.
    What AGC does is open (D34). Recording all audio inputs is no
