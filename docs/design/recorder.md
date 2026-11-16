@@ -484,9 +484,10 @@ checked, reported or rewritten at the next start (D47).
 
 - **Start:** a small window. At the top, the app icon, the name, the
   version and a link to the homepage (`Homepage.url`, defined once),
-  and on the right the claim, "Every screen, all audio. Keeps going
-  when things change." (`Claim.text`, defined once; the homepage's
-  tagline too), in italics and the secondary text colour (D55).
+  and on the right the claim in two lines, "Every screen, all audio."
+  and "Keeps going when things change." (`Claim.lines`, defined once;
+  the homepage's tagline too, in the same two lines), right-aligned,
+  in italics and the secondary text colour; neither line wraps (D55).
   Then a section "What will be recorded", built from the settings and
   the devices connected now and
   refreshed whenever the ready check runs (D33): one table, with a

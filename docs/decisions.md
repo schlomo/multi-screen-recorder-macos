@@ -1534,12 +1534,15 @@ architect's reading.
      `speaker.wave.2`), then the number and the name; a source not
      recorded stays dimmed and has no number. `msr check` prints the
      label as text.
-  5. The claim "Every screen, all audio. Keeps going when things
-     change." stands in the start window's header, right-aligned, in
+  5. The claim stands in the start window's header, right-aligned, in
      italics and the secondary text colour, and is the homepage's
      tagline, the longer description a paragraph below it. It is
-     defined once, `Claim.text`, and a test ties `homepage/hugo.toml`
-     to it.
+     always two lines, the owner after seeing the first render: "the
+     claim needs to break the line after audio and start the 2nd line
+     from Keeps": "Every screen, all audio." and "Keeps going when
+     things change."; neither line wraps in the window. It is defined
+     once, `Claim.lines`, joined by a space where one line is needed
+     (`Claim.text`), and a test ties `homepage/hugo.toml` to it.
   6. The buttons stay as they are.
 - **Consequences:** No settings or state migration: neither holds a
   changed key, and no code reads a recording manifest back. A manifest

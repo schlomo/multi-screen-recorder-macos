@@ -22,9 +22,10 @@ This product: the app and its command line for macOS. The repository is
 
 ## Claim
 
-The product's one-line promise: "Every screen, all audio. Keeps going
-when things change." Shown in the app's header and as the homepage's
-tagline (D55).
+The product's promise, always shown as two lines: "Every screen, all
+audio." and "Keeps going when things change." Shown in the app's
+header and as the homepage's tagline; where one line is needed, the two
+joined by a space (D55).
 
 ## Former upstream
 

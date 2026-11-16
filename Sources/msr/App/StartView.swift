@@ -62,11 +62,15 @@ struct AppHeader: View {
                 Link(Homepage.url.host() ?? Homepage.url.absoluteString, destination: Homepage.url)
             }
             Spacer(minLength: 12)
-            Text(Claim.text)
-                .italic()
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.trailing)
-                .fixedSize(horizontal: false, vertical: true)
+            // Each line whole: the window is wide enough for both.
+            VStack(alignment: .trailing, spacing: 2) {
+                ForEach(Claim.lines, id: \.self) { line in
+                    Text(line).fixedSize()
+                }
+            }
+            .italic()
+            .foregroundStyle(.secondary)
+            .accessibilityElement(children: .combine)
         }
     }
 }
