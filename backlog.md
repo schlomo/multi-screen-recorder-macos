@@ -5,8 +5,8 @@
 PR #12 (B2, the audio) merged 2026-11-16; release `v0.20261116.33`.
 The owner's goal now (2026-11-16): "I'd like to come to a working app
 I can share with friendly testers ASAP and then keep optimizing". The
-architect's order: queued item 1, the first tester release (its design
-waits for the owner's sign-off and the signing question); then item 3,
+architect's order: queued item 1, the first tester release (signed off
+2026-11-16; the owner started it in a new session); then item 3,
 the end-to-end tests; item 4, the simplification; item 7, auto-recovery
 from disturbances; item 6, CPU; item 5, drift correction. Agents may
 run `msr record` on the owner's Mac (D48; the owner's go-ahead in the
@@ -32,8 +32,9 @@ Nothing.
 
 1. **First tester release** (the owner, 2026-11-16: "I'd like to come
    to a working app I can share with friendly testers ASAP and then keep
-   optimizing"). One small PR; the design waits for the owner's sign-off
-   as text:
+   optimizing"). One small PR; the owner signed off the design below on
+   2026-11-16 ("I agree with your proposal"), self-signed signing
+   included:
    - Fixes: a recording with `result: problems` but `problems: []`
      (`2026-11-16 12.24.51`, against D47); the guide tracks' 0.3 s of
      zeros at Stop (Done, PR #12's leftovers); the writer's allowance
@@ -46,10 +47,13 @@ Nothing.
      the two permissions, known limits (CPU, drift, USB disturbances),
      and how to report: a GitHub Issue form asking for `msr version`,
      the recording's `recording.json` and what happened.
-   - Open, the owner's: signing for testers. Recommended: keep the
-     self-signed certificate (D5), testers click "Open Anyway" once;
-     Developer ID (99 USD a year, Apple's notarization) when testers
-     beyond friends come.
+   - Signing for testers: the self-signed certificate (D5), testers
+     click "Open Anyway" once; Developer ID (99 USD a year, Apple's
+     notarization) when testers beyond friends come. The PR records
+     this in the decisions log.
+   - `lateTickBoundSeconds` also bounds the guide-track wait and the
+     audio drain; raising it for display files must not lengthen those
+     unasked: give the display file's allowance its own value.
 2. **Toolchain catch-up** (D28): the pipeline builds with Xcode 26.6,
    Swift 6.3 and Python 3.15, the newest on GitHub's generally
    available runner image (D32 for Python), while the owner's Mac has
@@ -211,9 +215,11 @@ Nothing.
    - Advice for the owner [ASSUMED, from the mechanism]: the Wacom
      straight into a Mac port avoids the pause; check with one replug
      and `log show` for "pci pause".
-   - Open, the owner's: was system audio playing in `12.41.06` and
-     `12.50.45` (exact zeros throughout, while ScreenCaptureKit
-     delivered buffers)? Is the dock's Ethernet in use? App-against-CLI
+   - The owner, 2026-11-16: in `12.41.06` and `12.50.45` nothing played
+     through the Mac (the radio was in the room), so their system-audio
+     zeros are right; the dock's Ethernet is in use, so it cannot be
+     switched off to shorten the pause. The owner will repeat the
+     Wacom replug with the Wacom on a Mac port. Open: app-against-CLI
      repeat runs with `--debug` to settle whether the app's front end
      adds to the stall (msr logged "skipping cycle due to overload" only
      in the app run).
