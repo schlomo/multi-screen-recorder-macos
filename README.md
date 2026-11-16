@@ -90,25 +90,32 @@ confirmed yet.
 ### What to test and send
 
 1. Make one recording of about an hour with your normal setup: your
-   usual screens, microphone or headset, and dock.
+   usual screens, microphone or headset, and dock. Start the app and
+   click Start; at the end, click the app's Dock icon, then Stop: the
+   files are finished and the recording folder opens in Finder.
 2. During it, change things as you normally would: plug in or unplug a
-   screen or headset, switch audio devices, close and open the lid.
+   screen or headset, switch audio inputs, close and open the lid.
 3. If you use a video editor (Final Cut Pro, DaVinci Resolve,
    Premiere Pro…), try putting the files together there.
 
 Then send the person who asked you to test:
 
-- the output of these two commands in Terminal (`list` only reads
-  your screens and audio devices; it records nothing):
+- the output of `msr version` and `msr list`, run in Terminal by the
+  app's full path as below. `msr list` only reads your screens and
+  audio inputs and records nothing; its "System audio" line says
+  whether Terminal has the Screen & System Audio Recording permission,
+  not whether the app has it.
 
   ```sh
   "/Applications/Multi Screen Recorder.app/Contents/MacOS/msr" version
   "/Applications/Multi Screen Recorder.app/Contents/MacOS/msr" list
   ```
 
-- `recording.json` from the folder of every recording you made, the
-  ones that went fine too (in `~/Movies/Multi Screen Recorder/`, one
-  folder per recording);
+- `recording.json` from the recording folder of every recording you
+  made, the ones that went fine too: it shows how far each audio input
+  drifted and everything that happened. The recording folders are in
+  the output folder the app's window shows, by default
+  `~/Movies/Multi Screen Recorder/`, one folder per recording;
 - a few sentences: where installing or the first start was confusing
   or got stuck; whether the files worked in your editor; anything odd,
   such as fan noise, battery drain, gaps or echoes in the audio, or a
@@ -116,9 +123,13 @@ Then send the person who asked you to test:
 
 Please don't send the recordings themselves: they show whatever was
 on your screens. The output of `msr list` names your screens and audio
-devices; `recording.json` names them too, with the identifiers macOS
-gives them, which can hold a device's serial number. Remove or replace
-anything you don't want to share.
+inputs. `recording.json` holds what the
+[problem report form](https://github.com/schlomo/multi-screen-recorder-macos/issues/new?template=problem-report.yml)
+lists: the names of your screens and audio inputs and the identifiers
+macOS gives them (which can hold a device's serial number), the start
+and end time with your time zone, and folder paths that can contain
+your Mac's user name. Remove or replace anything you don't want to
+share.
 
 If something clearly breaks (a crash, a lost or broken file), please
 also report it as below.
