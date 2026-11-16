@@ -1,7 +1,7 @@
 # Multi Screen Recorder — architecture (current state)
 
 A reliable multi-source screen and audio recorder for macOS. It
-captures every display and audio source, never loses a recording, and
+captures every screen and audio source, never loses a recording, and
 keeps going when screens, resolutions or audio sources change. It is
 built for recording talks: one click to start, edit-ready files
 afterwards.
@@ -28,14 +28,14 @@ credited for the reference implementation.
 ## 1. Guiding principles
 
 - **Never lose a recording.** Every failure mode (a crash, a full disk,
-  a failed stream, a display or audio source that disappears) leaves
-  readable display files and audio files and, where possible, keeps
+  a failed stream, a screen or audio source that disappears) leaves
+  readable screen files and audio files and, where possible, keeps
   recording (D14, D31).
 - **Correct by content, not by timestamp.** A frame shows what was on
   the screen at its time; this is verified by looking at the picture,
   because a recorder whose timestamps looked right was off by up to
   76 s in content (D11).
-- **Edit-ready output.** Constant 30 fps, one frame size per display
+- **Edit-ready output.** Constant 30 fps, one frame size per screen
   file, each audio source in its own audio file with every channel on
   its own track, and timecode in every file, so the files drop into a
   30 fps editing timeline and line up (D11, D21, D30, D31).
@@ -45,7 +45,7 @@ credited for the reference implementation.
 
 The skeleton is built (the app window with the ready check and the
 table of what will be recorded, auto mode, the command line without `record`, the
-pipeline), and so is recording the displays (PR #11) and the audio
+pipeline), and so is recording the screens (PR #11) and the audio
 (PR #12). The designs:
 [design/recorder.md](design/recorder.md) and
 [design/delivery.md](design/delivery.md); how the recorder is tested
@@ -53,13 +53,13 @@ end to end on a Mac: [design/end-to-end-tests.md](design/end-to-end-tests.md)
 (D35, D37).
 
 - **Recorder core:** one capture stream and one file writer per
-  display, plus the audio sources; it watches displays and audio
+  screen, plus the audio sources; it watches screens and audio
   sources as they come and go.
 - **Two front ends** over the same core, in one executable: the app
   (window, Dock icon) and the command line (D13, D19).
 - **Settings:** one JSON file shared by both front ends (D13).
-- **Output:** a recording folder per recording, holding the display
-  files of each display, the audio files of each audio source, and the
+- **Output:** a recording folder per recording, holding the screen
+  files of each screen, the audio files of each audio source, and the
   recording manifest (D20, D31).
 
 ## 3. Decisions in force
@@ -80,12 +80,12 @@ D28).
 
 - Video: constant 30 fps on the host clock, hardware encoding, and a
   recording resolution that only ever shrinks the picture and turns
-  with a portrait display (D11, D25); a display whose frame size
-  changes gets a new display file (D30); HEVC in `.mov`, no tick ever
+  with a portrait screen (D11, D25); a screen whose frame size
+  changes gets a new screen file (D30); HEVC in `.mov`, no tick ever
   dropped, a timecode track in every file (D21, D31); always SDR (D24).
-- Displays (built in PR #11, D45, D46, D47): a display is known by its
+- Screens (built in PR #11, D45, D46, D47): a screen is known by its
   UUID; a stream starts only after a settle time; every frame is
-  checked against its display and a display showing another display's
+  checked against its screen and a screen showing another screen's
   picture ends its file loudly; every file ends at sleep, on a clock
   that counts sleep. `msr record` shows the app's Dock icon and can be
   stopped there through the status window; the app quits after Stop.
@@ -99,14 +99,14 @@ D28).
 - Audio: none, the default microphone, wired (the default microphone
   plus every built-in and wired input) or all inputs, with system audio
   and AGC as separate switches (D12, D44); one audio file per source, every
-  input channel its own mono track (D22, D31); each display file
+  input channel its own mono track (D22, D31); each screen file
   carries two guide tracks, microphones and system audio, for playback
   and syncing (D31).
-- Built (PR #9, D44): auto mode, on by default, records every display
+- Built (PR #9, D44): auto mode, on by default, records every screen
   at Native (its "looks like" size; the drawn-at size is never
   recorded) with the audio mode wired; a Bluetooth or virtual input
   only under "all inputs" or as the default microphone; a Mac without
-  a microphone records displays and system audio. The settings file is
+  a microphone records screens and system audio. The settings file is
   only read, never refused or repaired, and written only by the window
   and by `msr settings` with flags. A recording follows a change of
   the default microphone (D34, built in PR #12). What AGC does is
@@ -116,7 +116,7 @@ D28).
 - Safeguards: a ready check before Start, low-disk warnings,
   crash-safe fragmented files, keeping the Mac awake (D14). The window
   shows what will be recorded and what it costs in disk space (D26,
-  D33), and follows displays and audio inputs as they change (D36).
+  D33), and follows screens and audio inputs as they change (D36).
 - No network connections; feedback goes to GitHub Issues (D15).
 
 ### Front ends
