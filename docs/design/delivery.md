@@ -168,8 +168,11 @@ push trigger ignores `homepage/**`, so a push to `main` that changes
 only the homepage makes no release; the pull request trigger has no
 such filter, so a PR's snapshot release is made as for any PR. Cloudflare
 builds every push that changes `homepage/` (production from `main`,
-indexable; a preview otherwise, `noindex`) [ASSUMED: by the build
-watch path `homepage/*`, a dashboard setting nobody has checked yet]. `homepage/wrangler.jsonc`
+indexable; a preview otherwise, `noindex`), by its build watch path
+`homepage/**`. The header image is mounted from `assets/icon/`, so the
+build needs the whole repository, not only `homepage/` [ASSUMED:
+Workers Builds clones the whole repository and builds in the root
+directory; seen to hold once its first build succeeds]. `homepage/wrangler.jsonc`
 holds the deploy; the dashboard settings that cannot live in the
 repository, and connecting the Worker, are the owner's
 ([homepage/README.md](../../homepage/README.md)). Its cost: Cloudflare

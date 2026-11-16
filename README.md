@@ -257,3 +257,11 @@ implementation.
 ## License
 
 GNU General Public License version 3, see [LICENSE](LICENSE).
+
+### Contributing
+
+By submitting a contribution (pull request, patch or other material) you confirm that you have the right to do so. You grant Schlomo Schapiro a simple (non-exclusive), irrevocable, royalty-free right of use, unlimited in time and place, transferable and sublicensable, to use the contribution in all ways known today, in particular to reproduce, edit, distribute and make it publicly available, under the GPLv3 and under other licence terms, including paid distribution such as the Mac App Store. Everyone else receives your contribution under the GPLv3. Your moral rights (Urheberpersönlichkeitsrechte) are unaffected; German law applies.
+
+### Licensing
+
+Multi Screen Recorder is free software under the GPLv3. The author may also distribute builds under other terms, for example through the Mac App Store, whose terms the GPLv3 doesn't allow. The source stays GPLv3 and free to build.

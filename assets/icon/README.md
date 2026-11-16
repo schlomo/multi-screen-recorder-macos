@@ -4,7 +4,7 @@
 |---|---|
 | `app-icon.svg` | The app icon source: a vector drawing, 300 units wide, layers tile, displays (back, middle, front with stand) and dot; the viewBox is widened to 372.82 units so the tile is 824 px of a 1024 px canvas, the margin of the macOS icon grid |
 | `app-icon.png` | 1024 x 1024 PNG with alpha, derived from `app-icon.svg`; committed, because CI does not render it. `scripts/build-app` builds `AppIcon.icns` from it |
-| `app-icon-fancy.jpeg` | Artwork: glossy 2048 x 2048 image from Gemini (Nano Banana), for the root `README.md` and later the homepage |
+| `app-icon-fancy.jpeg` | Artwork: glossy 2048 x 2048 image from Gemini (Nano Banana), for the root `README.md` and the homepage's header, which mounts it (`homepage/hugo.toml`, `[module]`) and has Hugo resize it to a 256 px WebP at build time |
 | `app-icon-fancy-256.jpeg` | 256 px rendition of the fancy artwork, derived, which the root `README.md` shows |
 | `app-icon-flat.jpeg` | Artwork: the flat 2048 x 2048 Gemini image, the same composition as the SVG; kept for reference |
 | `msr-icon-sizes.svg` | A snapshot of the drawing at five sizes; it is not kept in step with `app-icon.svg` |

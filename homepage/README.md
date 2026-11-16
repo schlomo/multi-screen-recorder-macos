@@ -21,11 +21,14 @@ report form and the repository.
   fonts; inlined into each page)
 - **Colours:** `[params.colors]` in `hugo.toml`, the only place colours are
   defined
+- **Header image:** the app icon artwork `../assets/icon/app-icon-fancy.jpeg`,
+  mounted by `[module]` in `hugo.toml` (never copied here) and resized by
+  Hugo to a 256 px WebP in `layouts/baseof.html`.
 - **Favicons:** `static/favicon*` and `static/apple-touch-icon.png`, rendered
   from `assets/icon/app-icon.svg` by `scripts/render-app-icon`; never edit them
   by hand.
 
-Templates: `layouts/baseof.html` wraps every page (head, icon and name,
+Templates: `layouts/baseof.html` wraps every page (head, header image and name,
 footer); `layouts/home.html` renders the home page; `layouts/page.html` renders
 every other page from `content/`.
 
@@ -50,17 +53,16 @@ release (`.github/workflows/ci.yml`).
 ### Cloudflare dashboard settings
 
 The Workers project `multiscreenrecorder-homepage` is connected to this
-repository by the owner. These settings can't live in this repo:
+repository by the owner. These settings can't live in this repo (as the owner
+set them, 2026-11-16):
 
-- **Root directory:** `homepage` [ASSUMED: nobody has checked this setting in
-  the dashboard yet]
-- **Build watch paths:** include `homepage/*` [ASSUMED: nobody has checked this
-  setting in the dashboard yet], so changes outside the homepage build nothing
 - **Build command:** `./build.sh`
 - **Deploy command:** `npx wrangler deploy`
-- **Preview command:** `npx wrangler versions upload`
-  (uploads a preview version and posts its URL on the PR; it never touches
-  production)
-- **Production branch:** `main`, **Enable Preview builds:** on
-- **Build variable:** `HUGO_VERSION` = `0.170.0`. Cloudflare's build image
-  installs this Hugo version; bump it here when you upgrade Hugo locally.
+- **Version command:** `npx wrangler versions upload`
+  (uploads a preview version; it never touches production)
+- **Root directory:** `/homepage`
+- **Build watch paths:** include `homepage/**`, exclude none, so changes
+  outside the homepage build nothing
+- **API token:** "multiscreenrecorder-homepage build token"
+- **Variable:** `HUGO_VERSION` = `0.170.0`. Cloudflare's build image installs
+  this Hugo version; bump it here when you upgrade Hugo locally.

@@ -56,7 +56,7 @@ architect's reading.
 
 ## D2: Licence GPLv3 (2026-11-12)
 
-- **Status:** in force
+- **Status:** in force, extended by D54
 - **Context:** The owner chose GPLv3 for the new repository.
 - **Decision:** The project is licensed under the GNU GPL version 3
   (`LICENSE`, the text from gnu.org).
@@ -1452,7 +1452,10 @@ architect's reading.
      notarization (99 USD a year) come when testers beyond friends do.
   4. A display file's writer may fall 6 s behind before the file ends
      (`RecorderValues.displayFileLateTickSeconds`), up from 2 s; the
-     guide track wait and the drains at a file's end keep 2 s.
+     display file's end waits as long for its writer; the guide track
+     wait and the audio drain keep 2 s
+     (`RecorderValues.audioWaitBoundSeconds`). Stop can take up to 6 s
+     longer, but only when the encoder is behind.
 - **Consequences:** The homepage no longer needs a second long-lived
   branch; it depends on the owner's Cloudflare account. The disk checks
   ask for about twice the space an hour usually takes. A tester who
@@ -1461,3 +1464,26 @@ architect's reading.
 - **Evidence:** the PR "First tester release";
   [design/delivery.md](design/delivery.md), "Homepage";
   [design/recorder.md](design/recorder.md), "The app".
+
+## D54: Contributions grant the author a licence; App Store builds may be dual-licensed (2026-11-16)
+
+- **Status:** in force; extends D2.
+- **Context:** The owner wants to sell the app through the Mac App
+  Store at about 5 to 10 € while it stays free through Homebrew; the
+  GPLv3 conflicts with the App Store's terms. The owner is the sole
+  rights holder so far. The owner, 2026-11-16: "let's keep it simple
+  and add the contributor clause suitable for Germany and a hint about
+  dual licensing for potential app store distribution to the readme so
+  that we are future proof", and "sandbox then comes after the
+  optimizations".
+- **Decision:** Keep the GPLv3. The root `README.md`'s License section
+  gets a contributor clause ("Contributing") and a licensing note
+  ("Licensing"). The clause grants a simple usage right, because
+  copyright cannot be transferred under German law (§29 UrhG), and it
+  leaves out unknown types of use, because §31a UrhG requires written
+  form for those.
+- **Consequences:** The App Store work itself is backlog item 16, after
+  the optimizations. A lawyer should check the clause, notably the
+  claim to fair pay under §32 UrhG.
+- **Evidence:** [README.md](../README.md), "License"; the PR "First
+  tester release".

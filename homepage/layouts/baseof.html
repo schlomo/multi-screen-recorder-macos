@@ -5,7 +5,10 @@
   </head>
   <body>
     <header>
-      <a href="/"><img src="/favicon.svg" alt="" width="128" height="128" /></a>
+      {{- /* The app icon artwork at 2x its 8rem display width */}}
+      {{- with (resources.Get "images/app-icon-fancy.jpeg").Resize "256x webp q85" }}
+      <a href="/"><img src="{{ .RelPermalink }}" alt="" width="128" height="128" fetchpriority="high" /></a>
+      {{- end }}
       <h1>{{ site.Title }}</h1>
     </header>
     <main>

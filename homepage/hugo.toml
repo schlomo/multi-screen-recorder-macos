@@ -26,3 +26,14 @@ disableKinds = ["taxonomy", "term", "section", "rss", "404"]
   background = "#E9EEF7"  # cool white: page background
   surface = "#FFFFFF"     # the download button's text, boxes
   rule = "#D5DAE6"        # footer rule
+
+# The header shows the app icon artwork from the repository's assets/icon/,
+# resized by Hugo; the source is never copied into homepage/. Defining a mount
+# for assets replaces the default one, so assets/ is mounted again.
+[module]
+  [[module.mounts]]
+    source = "assets"
+    target = "assets"
+  [[module.mounts]]
+    source = "../assets/icon/app-icon-fancy.jpeg"
+    target = "assets/images/app-icon-fancy.jpeg"
