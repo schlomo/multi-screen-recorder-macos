@@ -1,9 +1,10 @@
 {{- /* A window screenshot from assets/images/, shown at the window's size in points
-       and never wider than the page. Arguments: src, alt and caption. A file named
-       with macOS's "@2x" (taken on a Retina screen) has 2 pixels per point and also
-       gets a 1x version for screens that need no more. */}}
+       and never wider than the page. Arguments: src, alt and caption. A file whose
+       name ends in "-2x.png" (taken on a Retina screen) has 2 pixels per point and
+       also gets a 1x version for screens that need no more. No "@2x": Cloudflare
+       redirects a URL with "@" to its encoded form. */}}
 {{- $image := resources.Get .src }}
-{{- $scale := cond (strings.Contains .src "@2x") 2 1 }}
+{{- $scale := cond (strings.HasSuffix .src "-2x.png") 2 1 }}
 {{- $width := div $image.Width $scale }}
 {{- $height := div $image.Height $scale }}
 {{- $full := $image.Process "webp q90 text" }}

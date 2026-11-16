@@ -30,9 +30,10 @@ to the tester guide, the problem report form and the repository.
   taken with macOS's screenshot tool, placed in `layouts/home.html` and shown
   by `layouts/_partials/screenshot.html` as WebP at the window's size in
   points and never wider than the page. A screenshot taken on a Retina
-  screen has 2 pixels per point and its name ends in `@2x.png`, as macOS
-  names such files; any other has 1. To update one, replace the file, and
-  rename it (in `home.html` too) if its pixels per point changed.
+  screen has 2 pixels per point; rename it to end in `-2x.png` (not macOS's
+  `@2x`, which Cloudflare redirects). Any other has 1. To update one,
+  replace the file, and rename it (in `home.html` too) if its pixels per
+  point changed.
 - **Favicons:** `static/favicon*` and `static/apple-touch-icon.png`, rendered
   from `assets/icon/app-icon.svg` by `scripts/render-app-icon`; never edit them
   by hand.
