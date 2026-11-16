@@ -46,7 +46,8 @@ public final class GuideTrackFeed: Sendable {
         timer.cancel()
     }
 
-    /// A display file's ticker listens from now on, until it is removed.
+    /// A display file's ticker listens from now on, until it stops; the
+    /// listener runs under the feed's lock, so it only queues the samples.
     func listen(_ listener: @escaping Listener) -> Int {
         state.withLock { state in
             state.nextListener += 1
@@ -55,15 +56,18 @@ public final class GuideTrackFeed: Sendable {
         }
     }
 
-    func stopListening(_ id: Int) {
-        _ = state.withLock { $0.listeners.removeValue(forKey: id) }
-    }
-
-    /// A display file's last mix, read now: the guide track from sample
-    /// position `start` up to `end`, the recent mix and then what the
-    /// sources delivered so far; nil when the recording has no such track.
-    func read(_ guide: GuideTrack, from start: Int64, upTo end: Int64) -> [[Float]]? {
-        state.withLock { $0.mixes[guide]?.read(from: start, upTo: end) }
+    /// The listener stops, in one step with a peek at every guide track's
+    /// samples not mixed yet up to the sample position `end`: every
+    /// hand-over before it reached the listener, so the peeks start where
+    /// those ended. Without `end`, no peek.
+    func stopListening(_ id: Int, peekingUpTo end: Int64?) -> [GuideTrack: GuideLastMix.Peek] {
+        state.withLock { state in
+            guard state.listeners.removeValue(forKey: id) != nil, let end else { return [:] }
+            return state.mixes.mapValues { mix in
+                let peek = mix.peek(upTo: end)
+                return GuideLastMix.Peek(start: peek.start, channels: peek.channels)
+            }
+        }
     }
 
     /// An audio source joins its guide track, if the recording has it.
@@ -88,21 +92,19 @@ public final class GuideTrackFeed: Sendable {
         }
     }
 
+    /// Mixes and hands over under the lock, so a listener that stops
+    /// listening has every hand-over before it; a listener only queues.
     private func handOver() {
         let now = now()
-        let (mixed, listeners) = state.withLock { state -> ([(GuideTrack, [[Float]], Int64)], [Listener]) in
-            var mixed: [(GuideTrack, [[Float]], Int64)] = []
+        state.withLock { state in
             for track in tracks {
                 guard var mix = state.mixes[track] else { continue }
                 let start = mix.mixedUpTo
                 let channels = mix.mix(until: now)
                 state.mixes[track] = mix
-                if channels.first?.isEmpty == false { mixed.append((track, channels, start)) }
+                guard channels.first?.isEmpty == false else { continue }
+                for listener in state.listeners.values { listener(track, channels, start) }
             }
-            return (mixed, Array(state.listeners.values))
-        }
-        for (track, channels, start) in mixed {
-            for listener in listeners { listener(track, channels, start) }
         }
     }
 }

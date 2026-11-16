@@ -7,8 +7,8 @@ import Foundation
 /// mono, the inputs summed at unity gain, through a soft limiter
 /// (`limit`). "System audio" carries the system audio's two channels as
 /// they are, clamped to ±1. Times are nanoseconds from t0 on the shared
-/// clock; positions are samples from t0. The mix keeps its recent output
-/// (`historySeconds`) so a display file's last mix can read it again.
+/// clock; positions are samples from t0. A sample that is not finite is
+/// silence.
 public struct GuideTrackMix: Sendable {
     public let track: GuideTrack
     public let sampleRate: Int
@@ -23,21 +23,16 @@ public struct GuideTrackMix: Sendable {
     }
 
     private var sources: [String: Source] = [:]
-    /// The latest mixed output, per output channel, ending at `mixedUpTo`.
-    private var recent: [[Float]]
-    private let historyLength: Int
 
     public init(
         _ track: GuideTrack, startingAt start: Int64 = 0, sampleRate: Int = RecorderValues.audioSampleRate,
-        delay: Duration = RecorderValues.guideTrackDelay, historySeconds: Int = RecorderValues.guideTrackHistorySeconds
+        delay: Duration = RecorderValues.guideTrackDelay
     ) {
         precondition(sampleRate > 0, "a guide track needs a positive sample rate")
         self.track = track
         mixedUpTo = start
         self.sampleRate = sampleRate
         self.delay = delay.nanoseconds
-        historyLength = historySeconds * sampleRate
-        recent = Array(repeating: [], count: track.channelCount)
     }
 
     /// Up to this level, the "Microphones" mix passes unchanged: −6 dBFS.
@@ -45,8 +40,10 @@ public struct GuideTrackMix: Sendable {
 
     /// The soft limiter of "Microphones": unchanged up to the knee, above it
     /// `knee + (1 − knee) · tanh((|x| − knee) / (1 − knee))`, which starts
-    /// with slope 1 and approaches ±1 without reaching beyond it.
+    /// with slope 1 and approaches ±1 without reaching beyond it. A sample
+    /// that is not finite (NaN, ±infinity) becomes 0.
     public static func limit(_ sample: Float) -> Float {
+        guard sample.isFinite else { return 0 }
         let level = abs(sample)
         guard level > limiterKnee else { return sample }
         let headroom = 1 - limiterKnee
@@ -110,28 +107,15 @@ public struct GuideTrackMix: Sendable {
                 sources[name]!.queued[output].removeFirst(min(count, sources[name]!.queued[output].count))
             }
         }
-        for output in mixed.indices {
-            recent[output] += mixed[output]
-            recent[output].removeFirst(max(0, recent[output].count - historyLength))
-        }
         mixedUpTo = end
         return mixed
     }
 
-    /// The mix from sample position `start` up to `end`, without taking
-    /// anything: the recent output before `mixedUpTo`, then what the
-    /// sources delivered so far; silence where neither reaches.
-    public func read(from start: Int64, upTo end: Int64) -> [[Float]] {
-        guard end > start else { return Array(repeating: [], count: track.channelCount) }
-        let recentStart = mixedUpTo - Int64(recent[0].count)
-        let waiting = end > mixedUpTo ? mixed(count: Int(end - mixedUpTo)) : Array(repeating: [], count: track.channelCount)
-        return (0..<track.channelCount).map { output in
-            (start..<end).map { position -> Float in
-                if position >= mixedUpTo { return waiting[output][Int(position - mixedUpTo)] }
-                if position >= recentStart { return recent[output][Int(position - recentStart)] }
-                return 0
-            }
-        }
+    /// The samples waiting from `mixedUpTo` up to the sample position `end`,
+    /// mixed as `mix(upTo:)` would, without taking them: a display file's
+    /// last mix, while other display files go on with the same mix.
+    public func peek(upTo end: Int64) -> (start: Int64, channels: [[Float]]) {
+        (mixedUpTo, end > mixedUpTo ? mixed(count: Int(end - mixedUpTo)) : Array(repeating: [], count: track.channelCount))
     }
 
     /// The first `count` samples waiting, mixed, per output channel.
@@ -145,7 +129,7 @@ public struct GuideTrackMix: Sendable {
         }
         return switch track {
         case .microphones: mixed.map { $0.map(Self.limit) }
-        case .systemAudio: mixed.map { $0.map { min(1, max(-1, $0)) } }
+        case .systemAudio: mixed.map { $0.map { $0.isFinite ? min(1, max(-1, $0)) : 0 } }
         }
     }
 

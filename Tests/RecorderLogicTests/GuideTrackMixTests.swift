@@ -89,17 +89,32 @@ import Testing
         for (sample, want) in zip(mixed, expected) { #expect(abs(sample - want) < 1e-6, "\(mixed)") }
     }
 
-    @Test func aMixReadsWhatIsMixedAndWhatWaitsWithoutTakingIt() {
+    @Test func aPeekMixesWhatWaitsWithoutTakingIt() {
         var guide = mix(delay: .milliseconds(2))
         guide.add(source: "A", channelCount: 1)
         guide.receive([[0.1, 0.2, 0.3, 0.4, 0.5]], from: "A", at: 0)
         #expect(guide.mix(until: 4 * millisecond)[0] == [0.1, 0.2])
-        // From before what is mixed, up past it: the recent mix, then what waits.
-        #expect(guide.read(from: 1, upTo: 5)[0] == [0.2, 0.3, 0.4, 0.5])
+        let peeked = guide.peek(upTo: 6)
+        #expect(peeked.start == 2)
+        #expect(peeked.channels[0] == [0.3, 0.4, 0.5, 0])
+        #expect(guide.peek(upTo: 1).channels[0].isEmpty)
+        // Nothing was taken: the next mix still has it.
         #expect(guide.mixedUpTo == 2)
         #expect(guide.mix(until: 7 * millisecond)[0] == [0.3, 0.4, 0.5])
-        // Older than the history kept: silence.
-        #expect(guide.read(from: -2, upTo: 1)[0] == [0, 0, 0.1])
+    }
+
+    @Test func aSampleThatIsNotFiniteBecomesSilence() {
+        #expect(GuideTrackMix.limit(.nan) == 0)
+        #expect(GuideTrackMix.limit(.infinity) == 0)
+        #expect(GuideTrackMix.limit(-.infinity) == 0)
+        var guide = mix()
+        guide.add(source: "A", channelCount: 1)
+        guide.receive([[.nan, .infinity, 0.25]], from: "A", at: 0)
+        #expect(guide.mix(until: 3 * millisecond)[0] == [0, 0, 0.25])
+        var system = GuideTrackMix(.systemAudio, sampleRate: 1000, delay: .zero)
+        system.add(source: "System audio", channelCount: 2)
+        system.receive([[.nan], [-.infinity]], from: "System audio", at: 0)
+        #expect(system.mix(until: 1 * millisecond) == [[0], [0]])
     }
 
     @Test func aBufferWhollyBeforeWhatIsMixedIsDropped() {

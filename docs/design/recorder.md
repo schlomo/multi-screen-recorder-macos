@@ -827,13 +827,16 @@ the metadata items (see "Output on disk").
   silence in its guide track. The mix is handed to every open display
   file every 100 ms (*data*); a display file's guide tracks cover
   exactly its own time, so a frame size change gives them the same gap
-  as the video. When a display file ends, one last mix reads the guide
-  tracks from where the file received them up to the end of its video,
-  from the mix's recent output (it keeps 5 s, *data*) and what the
-  sources delivered by then, and waits for the writer as long as its
-  ticks do, so its guide tracks end with the video (D51). A file ended
-  by a failure (its writer failed or fell behind) gets no last mix, so
-  its guide tracks may end early.
+  as the video. A display file listens to the mix until its last mix:
+  stopping hands it every mix handed over before, and its last mix
+  takes, from the samples the sources delivered and not mixed yet, the
+  rest up to the end of its video, without taking them from the other
+  display files. It waits for the writer as long as its ticks do, so its
+  guide tracks end with the video (D51). Should the samples not mixed
+  yet start after what the file received, it writes nothing more and
+  tells it as a problem at the file's end, never silence in their
+  place. A file ended by a failure (its writer failed or fell behind)
+  gets no last mix, so its guide tracks may end early.
 
 **Display identity.** A display is known by the UUID macOS gives it
 (`CGDisplayCreateUUIDFromDisplayID`), never by its display ID, which
@@ -1151,7 +1154,21 @@ the low disk warning threshold; our process's CPU use in the status
 window, the summary and the manifest. Tested without a microphone or a
 screen: the logic by unit tests, audio captures with a stand-in source
 and writer, audio files and guide tracks written from synthetic PCM and
-read back. Live audio capture is UNVERIFIED until the owner's run.
+read back. Verified live on the owner's Mac on 2026-11-16, build
+`7ad0b6b`, in two runs by the owner and five by the architect: capture
+from 4 audio inputs and the system audio into finalized files; default
+microphone changes; a USB microphone unplugged and replugged, ending
+its audio file and starting a new one; displays connected and
+disconnected, a virtual screen and main display changes among them;
+the "System audio" guide track equal to `System audio.mov` at 0
+samples of lag; the timecode aligned in DaVinci Resolve; the
+"Microphones" gain of 1/√6 of that build, the rule D52 replaced,
+measured. Seen there, and not the
+recorder's: while USB devices re-enumerated, macOS delivered zeros on
+the USB inputs and on the system audio for 4 to 10 s. Not verified
+live: everything after `7ad0b6b` (the soft limiter of D52, the guide
+tracks' end, the debug times), drift over an hour, and DaVinci
+Resolve's reading of the audio files' metadata.
 
 Built in B2 where this document leaves the detail open, decided by the
 architect on review (D50): the failure events are named `audio input

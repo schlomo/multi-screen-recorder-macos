@@ -11,6 +11,12 @@ struct FileEndReport: Equatable {
 
     /// `reason` is nil when the recorder stopped the capture; `now` is the
     /// time on the shared clock, the time of the report when no file ended.
+    /// The problem's text for guide tracks whose last mix was not written.
+    static func guideTracksCut(_ guides: [GuideTrack]) -> String {
+        "the guide tracks " + guides.map { "\"\($0.name)\"" }.joined(separator: " and ")
+            + " end before the video: the samples of their last mix were no longer there"
+    }
+
     init(reason: DisplayTracker.StreamEnd?, end: DisplayFileEnd?, display: String, at now: Int64) {
         let reasonError: String? = switch reason {
         case .writerFailed(let error): error
@@ -18,7 +24,14 @@ struct FileEndReport: Equatable {
         case .streamFailed, .captureSourceGone, .writerFellBehind, .showsAnotherDisplay, nil: nil
         }
         let fileError = end?.error
-        guard let error = fileError?.description ?? reasonError else { return }
+        guard let error = fileError?.description ?? reasonError else {
+            if let end, !end.guideTracksCut.isEmpty {
+                problem = RecordingProblem(
+                    at: Int64(((end.file.end ?? end.file.start) * 1_000_000_000).rounded()), problem: "Display file \(end.file.name)",
+                    error: Self.guideTracksCut(end.guideTracksCut))
+            }
+            return
+        }
         let time = end.map { Int64((($0.file.end ?? $0.file.start) * 1_000_000_000).rounded()) } ?? now
         let what = if let end, fileError != nil { "Display file \(end.file.name)" } else { "Display \(display)" }
         problem = RecordingProblem(at: time, problem: what, error: error)

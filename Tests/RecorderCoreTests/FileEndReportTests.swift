@@ -24,6 +24,19 @@ private func failedEvent(at seconds: Double, error: String) -> RecordingEvent {
 /// What the manifest and the person are told when a display file, or a
 /// capture without one, ends.
 @Suite struct FileEndReportTests {
+    @Test func guideTracksCutAtTheEndAreAProblemWithoutAnEvent() {
+        var end = fileEnd(nil)
+        end.guideTracksCut = [.microphones]
+        let report = FileEndReport(reason: nil, end: end, display: "LG", at: 3 * second)
+        #expect(report.event == nil)
+        #expect(report.problem == RecordingProblem(
+            at: 12_500_000_000, problem: "Display file f.mov", error: FileEndReport.guideTracksCut([.microphones])))
+        // A writer's error says more and wins.
+        var failed = fileEnd(writerError("cannot write f.mov: no luck"))
+        failed.guideTracksCut = [.microphones]
+        #expect(FileEndReport(reason: nil, end: failed, display: "LG", at: 3 * second).problem?.error == "cannot write f.mov: no luck")
+    }
+
     @Test func aWriterThatCouldNotBeCreatedIsAnEventNowAndAProblem() {
         let report = FileEndReport(reason: .writerFailed("cannot create f.mov"), end: nil, display: "LG", at: 3 * second)
         #expect(report.problem == RecordingProblem(at: 3 * second, problem: "Display LG", error: "cannot create f.mov"))

@@ -15,10 +15,47 @@ public protocol DisplayFileWriting: AnyObject {
 }
 
 /// How a display file ended, for the recording manifest: its entry with
-/// its end, state and late frames, and the writer's error, if any.
+/// its end, state and late frames, the writer's error, if any, and the
+/// guide tracks whose last mix could not be written.
 public struct DisplayFileEnd: Equatable, Sendable {
     public var file: RecordingManifest.DisplayFile
     public var error: DisplayFileWriterError?
+    public var guideTracksCut: [GuideTrack] = []
+}
+
+/// A display file's last mix: the hand-overs that reached it while it
+/// ended, then a peek per guide track at the samples the feed has not
+/// mixed yet, up to the end of its video.
+public struct GuideLastMix: Sendable {
+    public struct Chunk: Sendable {
+        public var guide: GuideTrack
+        public var channels: [[Float]]
+        public var positionFromStart: Int64
+
+        public init(guide: GuideTrack, channels: [[Float]], positionFromStart: Int64) {
+            self.guide = guide
+            self.channels = channels
+            self.positionFromStart = positionFromStart
+        }
+    }
+
+    public struct Peek: Sendable {
+        public var start: Int64
+        public var channels: [[Float]]
+
+        public init(start: Int64, channels: [[Float]]) {
+            self.start = start
+            self.channels = channels
+        }
+    }
+
+    public var pending: [Chunk]
+    public var peeks: [GuideTrack: Peek]
+
+    public init(pending: [Chunk], peeks: [GuideTrack: Peek]) {
+        self.pending = pending
+        self.peeks = peeks
+    }
 }
 
 /// One display file's ticks: frames that passed the display check go in,
@@ -125,25 +162,35 @@ public final class DisplayFileTicker {
     /// Ends the file: writes the ticks due by `now` and, with
     /// `writeWaitingTicks`, those still waiting, for at most the drain
     /// timeout on a clock that does not count sleep, and the guide tracks
-    /// from where they were received up to the video's end, as `lastMix`
-    /// reads the guide track (nil: not in the recording) now, waiting for
-    /// the writer as long again; then always finalizes. A file ended by a
-    /// failure gets neither. Nil when no file had started.
+    /// up to the video's end from `lastMix`, given that end, waiting for
+    /// the writer as long again; then always finalizes. A guide track whose
+    /// peek starts after what the file received is not written further:
+    /// `guideTracksCut`, never silence. A file ended by a failure gets no
+    /// last mix. Nil when no file had started.
     public func finish(
         now: Int64, writeWaitingTicks: Bool,
-        lastMix: (_ guide: GuideTrack, _ from: Int64, _ upTo: Int64) -> [[Float]]? = { _, _, _ in nil }
+        lastMix: (_ videoEnd: Int64) -> GuideLastMix = { _ in GuideLastMix(pending: [], peeks: [:]) }
     ) async -> DisplayFileEnd? {
         guard let writer, var file = entry else { return nil }
+        var cut: [GuideTrack] = []
         if writerError == nil, writeWaitingTicks {
             _ = tick(now: now)
             if writerError == nil { await drain(writer) }
             if writerError == nil, let lastTick = ticks.lastWrittenTick {
                 let perTick = Int64(RecorderValues.audioSampleRate) / Int64(ticks.grid.framesPerSecond)
-                let videoEnd = (lastTick + 1) * perTick
+                let last = lastMix((lastTick + 1) * perTick)
+                for chunk in last.pending {
+                    _ = receiveGuide(chunk.guide, chunk.channels, positionFromStart: chunk.positionFromStart)
+                }
                 for guide in [GuideTrack.microphones, .systemAudio] {
+                    guard let peek = last.peeks[guide], let count = peek.channels.first?.count else { continue }
                     let from = guidesReceivedUpTo[guide] ?? writer.firstTick * perTick
-                    guard let channels = lastMix(guide, from, videoEnd) else { continue }
-                    _ = receiveGuide(guide, channels, positionFromStart: from)
+                    guard peek.start <= from else {
+                        cut.append(guide)
+                        continue
+                    }
+                    let skip = Int(min(Int64(count), from - peek.start))
+                    _ = receiveGuide(guide, peek.channels.map { Array($0[skip...]) }, positionFromStart: from)
                 }
             }
             if writerError == nil { await drainGuides(writer) }
@@ -160,7 +207,7 @@ public final class DisplayFileTicker {
         file.framesRepeatedForLateness = ticks.framesRepeatedForLateness
         self.writer = nil
         ticks = TickLoop(notBefore: ticks.notBefore)
-        return DisplayFileEnd(file: file, error: writerError)
+        return DisplayFileEnd(file: file, error: writerError, guideTracksCut: cut)
     }
 
     private func drainGuides(_ writer: any DisplayFileWriting) async {

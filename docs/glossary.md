@@ -181,7 +181,8 @@ to mono, summed at unity gain, through a soft limiter; D52), or
 "System audio", stereo; the two are never mixed together. Which ones a
 display file has follows from the settings alone; a missing source is
 silence in its guide track (D31). It ends with its display file's video
-(D51), unless the file ended by a failure.
+(D51), unless the file ended by a failure or the samples for its last
+mix were no longer there, which is told as a problem.
 
 ## Clock drift
 

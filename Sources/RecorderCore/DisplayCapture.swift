@@ -99,7 +99,6 @@ public final class DisplayCapture: NSObject, @unchecked Sendable, SCStreamOutput
     private let grid = TickGrid.recording
     private let lifecycle = StreamLifecycle()
     private let guides: GuideTrackFeed
-    private var guideListener: Int?
 
     /// The file started; reports its manifest entry.
     private let onFileStarted: @Sendable (RecordingManifest.DisplayFile) -> Void
@@ -113,6 +112,10 @@ public final class DisplayCapture: NSObject, @unchecked Sendable, SCStreamOutput
     private var timer: DispatchSourceTimer?
     /// No frame and no tick is taken any more.
     private var isEnding = false
+    /// Listens to the guide tracks until the file's last mix.
+    private var guideListener: Int?
+    /// The guide tracks handed over while ending, for the file's last mix.
+    private var endingGuides: [GuideLastMix.Chunk] = []
     /// Finishing the file, by the capture itself or at the recorder's request; set once.
     private var finishTask: Task<DisplayFileEnd?, Never>?
     private static let queueKey = DispatchSpecificKey<Int>()
@@ -233,8 +236,11 @@ public final class DisplayCapture: NSObject, @unchecked Sendable, SCStreamOutput
                 guideListener = guides.listen { [weak self] guide, channels, position in
                     guard let self else { return }
                     queue.async {
-                        // Once ending, the file's last mix reads these samples again.
-                        guard !self.isEnding, let reason = self.ticker?.receiveGuide(guide, channels, positionFromStart: position) else { return }
+                        guard !self.isEnding else {
+                            self.endingGuides.append(GuideLastMix.Chunk(guide: guide, channels: channels, positionFromStart: position))
+                            return
+                        }
+                        guard let reason = self.ticker?.receiveGuide(guide, channels, positionFromStart: position) else { return }
                         self.end(reason)
                     }
                 }
@@ -288,8 +294,6 @@ public final class DisplayCapture: NSObject, @unchecked Sendable, SCStreamOutput
             self.isEnding = true
             self.timer?.cancel()
             self.timer = nil
-            if let listener = self.guideListener { self.guides.stopListening(listener) }
-            self.guideListener = nil
             let task = Task { await self.finish(writeWaitingTicks: writeWaitingTicks) }
             self.finishTask = task
             return task
@@ -301,16 +305,24 @@ public final class DisplayCapture: NSObject, @unchecked Sendable, SCStreamOutput
     /// writer and the frames it held.
     private func finish(writeWaitingTicks: Bool) async -> DisplayFileEnd? {
         await lifecycle.stop()
-        let (stream, ticker) = queue.sync { (self.stream, self.ticker) }
+        let (stream, ticker, listener) = queue.sync { (self.stream, self.ticker, self.guideListener) }
         if let stream { try? stream.removeStreamOutput(self, type: .screen) }
-        // The last mix reads the guide tracks from where this file received
-        // them, so a hand-over it no longer took leaves no hole.
-        let file = await ticker?.finish(now: context.now(), writeWaitingTicks: writeWaitingTicks) { [guides] guide, from, upTo in
-            guides.read(guide, from: from, upTo: upTo)
+        // The file listens until its last mix: stopping hands it every
+        // hand-over before, queued here, and peeks at what comes after.
+        let file = await ticker?.finish(now: context.now(), writeWaitingTicks: writeWaitingTicks) { [guides, queue] videoEnd in
+            let peeks = listener.map { guides.stopListening($0, peekingUpTo: videoEnd) } ?? [:]
+            let pending = queue.sync {
+                defer { self.endingGuides = [] }
+                return self.endingGuides
+            }
+            return GuideLastMix(pending: pending, peeks: peeks)
         }
+        if let listener { _ = guides.stopListening(listener, peekingUpTo: nil) }
         queue.sync {
             self.stream = nil
             self.ticker = nil
+            self.guideListener = nil
+            self.endingGuides = []
         }
         return file
     }

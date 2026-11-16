@@ -16,9 +16,6 @@ extension RecorderValues {
     public static let guideTrackDelay = Duration.milliseconds(200)
     /// How often the guide tracks are mixed and handed to the display files.
     public static let guideTrackInterval = Duration.milliseconds(100)
-    /// How much of its recent output a guide track mix keeps, for a display
-    /// file's last mix at its end: above the drain timeout of its ticks.
-    public static let guideTrackHistorySeconds = 5
     /// How often the CPU use of our process is sampled.
     public static let cpuSampleInterval = Duration.seconds(1)
 }
