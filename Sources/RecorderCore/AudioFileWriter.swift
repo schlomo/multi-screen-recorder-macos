@@ -92,8 +92,10 @@ public final class AudioFileWriter {
     /// sample at `position` samples from the file's first tick; false when
     /// the writer is not ready, so the buffer waits.
     public func append(_ channels: [[Float]], at position: Int64) throws(AudioFileWriterError) -> Bool {
-        precondition(channels.count == description.channelCount,
-                     "\(description.sourceName) has \(description.channelCount) channels, not \(channels.count)")
+        guard channels.count == description.channelCount else {
+            throw AudioFileWriterError(
+                nil, while: "\(description.sourceName) came with \(channels.count) channels, not the file's \(description.channelCount)")
+        }
         let frameCount = channels[0].count
         precondition(channels.allSatisfy { $0.count == frameCount }, "every channel of a buffer has as many samples")
         try checkStatus()
@@ -123,7 +125,7 @@ public final class AudioFileWriter {
         return true
     }
 
-    /// Writes `count` samples of silence at `position`, as for a filled gap.
+    /// Writes `count` samples of silence at `position`: a filled gap.
     public func appendSilence(_ count: Int64, at position: Int64) throws(AudioFileWriterError) -> Bool {
         let silence = [Float](repeating: 0, count: Int(count))
         return try append(Array(repeating: silence, count: description.channelCount), at: position)

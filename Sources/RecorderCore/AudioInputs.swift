@@ -66,23 +66,8 @@ private func audioDeviceTransportType(_ id: AudioObjectID) -> UInt32? {
     return status == noErr ? value : nil
 }
 
-/// Calls `changed` on the main actor whenever an audio device comes or goes
-/// or the default audio input changes, for the rest of the process's life.
-public func watchAudioInputs(changed: @escaping @MainActor @Sendable () -> Void) throws(DeviceReadError) {
-    for selector in [kAudioHardwarePropertyDevices, kAudioHardwarePropertyDefaultInputDevice] {
-        var address = address(selector)
-        let status = AudioObjectAddPropertyListenerBlock(systemObject, &address, .main) { _, _ in
-            Task { @MainActor in changed() }
-        }
-        guard status == noErr else {
-            throw DeviceReadError("changes of the audio devices cannot be watched (Core Audio error \(status))")
-        }
-    }
-}
-
-/// Watches the audio devices and the default audio input while a recording
-/// runs: `changed` is called on the main actor for every change, until
-/// `cancel`.
+/// Watches the audio devices and the default audio input: `changed` is
+/// called on the main actor for every change, until `cancel`.
 public final class AudioInputWatch {
     private var listeners: [(AudioObjectPropertyAddress, AudioObjectPropertyListenerBlock)] = []
 

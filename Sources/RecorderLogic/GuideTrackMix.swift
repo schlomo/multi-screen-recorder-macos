@@ -58,6 +58,7 @@ public struct GuideTrackMix: Sendable {
         let frameCount = channels.first?.count ?? 0
         let offset = position(of: time) - mixedUpTo
         let end = offset + Int64(frameCount)
+        guard end > 0 else { return }
         for output in source.queued.indices where end > Int64(source.queued[output].count) {
             source.queued[output].append(contentsOf: repeatElement(0, count: Int(end) - source.queued[output].count))
         }

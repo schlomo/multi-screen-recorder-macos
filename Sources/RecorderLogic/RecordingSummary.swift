@@ -35,7 +35,7 @@ public struct RecordingSummary: Equatable, Sendable {
         }
         for event in errors {
             lines.append("Error at \(Self.elapsed(seconds: event.at)): \(event.event.rawValue)"
-                + (event.display.map { ", \($0)" } ?? "") + (event.error.map { " (\($0))" } ?? ""))
+                + (event.subject.map { ", \($0)" } ?? "") + (event.error.map { " (\($0))" } ?? ""))
         }
         for problem in manifest.problems {
             lines.append("Problem at \(Self.elapsed(seconds: problem.at)): \(problem.text)")

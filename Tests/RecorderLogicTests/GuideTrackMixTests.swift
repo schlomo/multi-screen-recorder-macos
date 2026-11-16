@@ -44,6 +44,15 @@ import Testing
         for (sample, want) in zip(mixed, expected) { #expect(abs(sample - want) < 1e-6, "\(mixed)") }
     }
 
+    @Test func aBufferWhollyBeforeWhatIsMixedIsDropped() {
+        var guide = mix()
+        guide.add(source: "A", channelCount: 1)
+        _ = guide.mix(until: 1000 * millisecond)
+        guide.receive([[Float](repeating: 0.5, count: 512)], from: "A", at: 0)
+        guide.receive([[0.25]], from: "A", at: 1000 * millisecond)
+        #expect(guide.mix(until: 1001 * millisecond)[0] == [0.25])
+    }
+
     @Test func theMixRunsTheDelayBehindRealTime() {
         var guide = mix(delay: .milliseconds(200))
         guide.add(source: "A", channelCount: 1)

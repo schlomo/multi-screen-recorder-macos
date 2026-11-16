@@ -14,10 +14,11 @@ public struct AudioFileEnd: Equatable, Sendable {
 /// What an audio capture tells the recorder; each is called on the capture's queue.
 struct AudioCaptureReports: Sendable {
     var fileStarted: @Sendable (RecordingManifest.AudioFile) -> Void
+    /// A file ended while the capture goes on: a long gap or a new channel count.
     var fileEnded: @Sendable (AudioFileEnd) -> Void
     var event: @Sendable (RecordingEvent) -> Void
-    /// The capture ended by itself, after its last file ended.
-    var ended: @Sendable (AudioTracker.CaptureEnd) -> Void
+    /// The capture ended by itself, with the ends of all its files.
+    var ended: @Sendable (AudioTracker.CaptureEnd, [AudioFileEnd]) -> Void
 }
 
 /// Where an audio capture's buffers come from: an audio input's
@@ -30,12 +31,25 @@ protocol AudioBufferSource: AnyObject, Sendable {
     func stop() async
 }
 
+/// What an audio capture needs of an audio file's writer; `AudioFileWriter` in a recording.
+protocol AudioFileWriting: AnyObject {
+    /// False when the writer is not ready, so the samples wait.
+    func append(_ channels: [[Float]], at position: Int64) throws(AudioFileWriterError) -> Bool
+    func appendSilence(_ count: Int64, at position: Int64) throws(AudioFileWriterError) -> Bool
+    func finish(endPosition: Int64?) async throws(AudioFileWriterError)
+}
+
+extension AudioFileWriter: AudioFileWriting {}
+
 /// One audio source's capture and its audio files: buffers are placed on
-/// the tick grid by `AudioFileTimeline`, written by `AudioFileWriter`, and
-/// handed to the source's guide track. A gap over the longest filled gap
-/// or a change of the channel count ends the file and starts a new one, in
-/// the same capture. Everything runs on its own queue.
+/// the tick grid by `AudioFileTimeline`, written by an `AudioFileWriting`,
+/// and handed to the source's guide track. A gap over the longest filled
+/// gap or a change of the channel count ends the file and starts a new
+/// one, in the same capture. Everything runs on its own queue.
 final class AudioCapture: @unchecked Sendable {
+    typealias MakeWriter = @Sendable (_ url: URL, _ description: AudioFileDescription, _ firstTick: Int64)
+        throws(AudioFileWriterError) -> any AudioFileWriting
+
     let id: AudioTracker.SourceID
     let name: String
     private let context: RecordingContext
@@ -43,6 +57,8 @@ final class AudioCapture: @unchecked Sendable {
     private let guide: GuideTrack
     private let source: any AudioBufferSource
     private let reports: AudioCaptureReports
+    private let makeWriter: MakeWriter
+    private let drainTimeout: Duration
     private let queue: DispatchQueue
 
     // Confined to `queue`.
@@ -51,20 +67,52 @@ final class AudioCapture: @unchecked Sendable {
     private var channelCount = 0
     /// The current file, from its first sample after its first tick on.
     private var open: OpenFile?
-    private var finishing: [Task<Void, Never>] = []
+    /// Every file's end, in the order the files started.
+    private var finishing: [Task<AudioFileEnd, Never>] = []
     private var isEnding = false
     private var guideChannels: Int?
 
+    private enum Chunk {
+        case samples([[Float]])
+        case silence(Int64)
+
+        var count: Int64 {
+            switch self {
+            case .samples(let channels): Int64(channels.first?.count ?? 0)
+            case .silence(let count): count
+            }
+        }
+    }
+
     private struct OpenFile {
-        var writer: AudioFileWriter
+        var writer: any AudioFileWriting
         var entry: RecordingManifest.AudioFile
         /// Silence or samples waiting for the writer, in order.
-        var waiting: [(channels: [[Float]], position: Int64)] = []
+        var waiting: [(chunk: Chunk, position: Int64)] = []
+        /// The end of what the writer took, in samples from the file's first tick.
+        var written: Int64 = 0
+
+        var waitingSamples: Int64 { waiting.reduce(0) { $0 + $1.chunk.count } }
+
+        /// Hands the waiting chunks to the writer while it takes them.
+        mutating func write() throws(AudioFileWriterError) {
+            while let first = waiting.first {
+                let taken = switch first.chunk {
+                case .samples(let channels): try writer.append(channels, at: first.position)
+                case .silence(let count): try writer.appendSilence(count, at: first.position)
+                }
+                guard taken else { return }
+                waiting.removeFirst()
+                written = first.position + first.chunk.count
+            }
+        }
     }
 
     init(
         id: AudioTracker.SourceID, name: String, source: any AudioBufferSource, context: RecordingContext,
-        guides: GuideTrackFeed, reports: AudioCaptureReports
+        guides: GuideTrackFeed, reports: AudioCaptureReports,
+        drainTimeout: Duration = .seconds(RecorderValues.lateTickBoundSeconds),
+        makeWriter: MakeWriter? = nil
     ) {
         self.id = id
         self.name = name
@@ -73,7 +121,17 @@ final class AudioCapture: @unchecked Sendable {
         self.guides = guides
         guide = id == .systemAudio ? .systemAudio : .microphones
         self.reports = reports
+        self.drainTimeout = drainTimeout
+        self.makeWriter = makeWriter ?? Self.audioFileWriter(timecode: context.timecode)
         queue = DispatchQueue(label: "msr.audio.\(name)", qos: .userInteractive)
+    }
+
+    /// The writer of a recording: an `AudioFileWriter`.
+    private static func audioFileWriter(timecode: Timecode) -> MakeWriter {
+        let make: MakeWriter = { url, description, firstTick throws(AudioFileWriterError) in
+            try AudioFileWriter(url: url, description: description, firstTick: firstTick, timecode: timecode)
+        }
+        return make
     }
 
     func start() {
@@ -85,16 +143,19 @@ final class AudioCapture: @unchecked Sendable {
             })
     }
 
-    /// Stops the capture at the recorder's request and finalizes its file.
-    func stop() async {
+    /// Stops the capture at the recorder's request and finalizes its file;
+    /// the ends of all its files, also those ended before.
+    func stop() async -> [AudioFileEnd] {
         await source.stop()
-        let tasks = queue.sync { () -> [Task<Void, Never>] in
+        let tasks = queue.sync { () -> [Task<AudioFileEnd, Never>] in
             isEnding = true
             finishFile()
             leaveGuide()
             return finishing
         }
-        for task in tasks { await task.value }
+        var ends: [AudioFileEnd] = []
+        for task in tasks { ends.append(await task.value) }
+        return ends
     }
 
     /// Ends the capture by itself: its file ends, then it says why.
@@ -107,8 +168,9 @@ final class AudioCapture: @unchecked Sendable {
         let reports = reports
         Task {
             await self.source.stop()
-            for task in tasks { await task.value }
-            reports.ended(reason)
+            var ends: [AudioFileEnd] = []
+            for task in tasks { ends.append(await task.value) }
+            reports.ended(reason, ends)
         }
     }
 
@@ -125,6 +187,10 @@ final class AudioCapture: @unchecked Sendable {
             return
         }
         guard let count = channels.first?.count, count > 0 else { return }
+        if id == .systemAudio, channels.count != GuideTrack.systemAudio.channelCount {
+            end(.captureFailed("the system audio came with \(channels.count) channels instead of \(GuideTrack.systemAudio.channelCount)"))
+            return
+        }
         let pts = CMTimeConvertScale(CMSampleBufferGetPresentationTimeStamp(buffer), timescale: 1_000_000_000, method: .roundHalfAwayFromZero)
         let time = context.clock.sinceStart(host: UInt64(max(0, pts.value)))
 
@@ -148,35 +214,26 @@ final class AudioCapture: @unchecked Sendable {
         if open == nil {
             guard openFile(firstTick: timeline!.firstTick!) else { return }
         }
-        if silence > 0 {
-            open!.waiting.append((Array(repeating: [Float](repeating: 0, count: Int(silence)), count: channels.count), position - silence))
-        }
-        open!.waiting.append((firstSample == 0 ? channels : channels.map { Array($0[firstSample...]) }, position))
+        if silence > 0 { open!.waiting.append((.silence(silence), position - silence)) }
+        open!.waiting.append((.samples(firstSample == 0 ? channels : channels.map { Array($0[firstSample...]) }), position))
         writeWaiting()
     }
 
     private func gapEvent(_ gap: AudioGap, at time: Int64) -> RecordingEvent {
-        var event = RecordingEvent(at: time, event: .audioInputGap, display: name)
+        var event = RecordingEvent(at: time, event: .audioInputGap, audioSource: name)
         event.length = (Double(gap.length) / 1_000_000).rounded() / 1000
         return event
     }
 
     private func writeWaiting() {
-        guard var file = open else { return }
         do {
-            while let first = file.waiting.first {
-                guard try file.writer.append(first.channels, at: first.position) else { break }
-                file.waiting.removeFirst()
-            }
+            try open?.write()
         } catch {
-            open = file
             fail(error)
             return
         }
-        let waitingSamples = file.waiting.reduce(0) { $0 + ($1.channels.first?.count ?? 0) }
-        open = file
-        if waitingSamples > RecorderValues.lateTickBoundSeconds * RecorderValues.audioSampleRate {
-            fail(AudioFileWriterError(nil, while: "the writer took none of the last \(RecorderValues.lateTickBoundSeconds) s of \(name)"))
+        if let waiting = open?.waitingSamples, waiting > Int64(RecorderValues.lateTickBoundSeconds * RecorderValues.audioSampleRate) {
+            end(.writerFellBehind)
         }
     }
 
@@ -198,9 +255,7 @@ final class AudioCapture: @unchecked Sendable {
         }
         let fileName = context.claimAudioFileName(tick: firstTick, source: description.source)
         do {
-            let writer = try AudioFileWriter(
-                url: context.folder.appending(path: fileName), description: description, firstTick: firstTick,
-                timecode: context.timecode)
+            let writer = try makeWriter(context.folder.appending(path: fileName), description, firstTick)
             let entry = RecordingManifest.AudioFile(
                 name: fileName, audioSource: description.sourceName, audioSourceUID: description.coreAudioUID,
                 channels: description.channels, start: TickGrid.recording.seconds(ofTick: firstTick),
@@ -214,28 +269,61 @@ final class AudioCapture: @unchecked Sendable {
         }
     }
 
-    /// Ends the current file, if any; its end is reported once it is finalized.
+    /// Ends the current file, if any: the samples still waiting are written
+    /// for at most the drain timeout, then it is finalized. Its end counts
+    /// only what the writer took; the rest is told as lost.
     private func finishFile() {
-        let written = timeline?.writtenSamples ?? 0
         let drift = timeline?.clockDriftPpm
         timeline = nil
         guard let file = open else { return }
         open = nil
         let reports = reports
+        let isLast = isEnding
+        let drainTimeout = drainTimeout
+        let name = name
         finishing.append(Task {
+            // No longer open: only this task uses the writer from here on.
+            var file = file
+            var failure = await Self.drain(&file, timeout: drainTimeout, name: name)
             var entry = file.entry
-            var failure: AudioFileWriterError?
             do throws(AudioFileWriterError) {
-                try await file.writer.finish(endPosition: written > 0 ? written : nil)
+                try await file.writer.finish(endPosition: file.written > 0 ? file.written : nil)
                 entry.state = .finalized
             } catch {
-                failure = error
+                failure = failure ?? error
                 entry.state = .notFinalized
             }
-            entry.end = entry.start + Double(written) / Double(RecorderValues.audioSampleRate)
+            entry.end = entry.start + Double(file.written) / Double(RecorderValues.audioSampleRate)
             entry.clockDriftPpm = drift.map { ($0 * 10).rounded() / 10 }
-            reports.fileEnded(AudioFileEnd(file: entry, error: failure))
+            let end = AudioFileEnd(file: entry, error: failure)
+            if !isLast { reports.fileEnded(end) }
+            return end
         })
+    }
+
+    /// Writes the waiting samples, waiting for the writer for at most
+    /// `timeout` on a clock that does not count sleep; an error when the
+    /// writer failed or samples are left, which are lost.
+    private static func drain(_ file: inout OpenFile, timeout: Duration, name: String) async -> AudioFileWriterError? {
+        let clock = SuspendingClock()
+        let deadline = clock.now + timeout
+        while true {
+            do {
+                try file.write()
+            } catch {
+                file.waiting = []
+                return error
+            }
+            let left = file.waitingSamples
+            if left == 0 { return nil }
+            if clock.now >= deadline {
+                file.waiting = []
+                let seconds = Double(left) / Double(RecorderValues.audioSampleRate)
+                return AudioFileWriterError(nil, while: "the writer took none of the last \(left) samples ("
+                    + String(format: "%.3f", seconds) + " s) of \(name) within \(timeout); they are lost")
+            }
+            try? await clock.sleep(for: .milliseconds(5))
+        }
     }
 
     // MARK: Guide track
@@ -243,7 +331,6 @@ final class AudioCapture: @unchecked Sendable {
     private func joinGuide(channelCount: Int) {
         guard guideChannels != channelCount else { return }
         if guideChannels != nil { guides.remove(source: name, from: guide) }
-        if guide == .systemAudio, channelCount != GuideTrack.systemAudio.channelCount { return }
         guides.add(source: name, channelCount: channelCount, to: guide)
         guideChannels = channelCount
     }

@@ -128,11 +128,12 @@ final class MicrophoneSource: NSObject, AudioBufferSource, AVCaptureAudioDataOut
     }
 }
 
-/// The system audio's buffers: a ScreenCaptureKit stream on a display with
-/// `capturesAudio` and our own process's audio excluded, its video at the
+/// The system audio's buffers: a ScreenCaptureKit stream with
+/// `capturesAudio` and our own process's audio excluded, on the main display
+/// as read when it starts, which `capturing` is told; its video at the
 /// smallest size and rate and dropped (D49).
 final class SystemAudioSource: NSObject, AudioBufferSource, SCStreamOutput, SCStreamDelegate, @unchecked Sendable {
-    let displayID: CGDirectDisplayID
+    private let capturing: @Sendable (CGDirectDisplayID) -> Void
     private let lifecycle = StreamLifecycle()
     private let lock = NSLock()
     /// Guarded by `lock`.
@@ -145,8 +146,8 @@ final class SystemAudioSource: NSObject, AudioBufferSource, SCStreamOutput, SCSt
         var isStopped = false
     }
 
-    init(displayID: CGDirectDisplayID) {
-        self.displayID = displayID
+    init(capturing: @escaping @Sendable (CGDirectDisplayID) -> Void) {
+        self.capturing = capturing
     }
 
     private func withState<Result>(_ body: (inout State) -> Result) -> Result {
@@ -164,7 +165,8 @@ final class SystemAudioSource: NSObject, AudioBufferSource, SCStreamOutput, SCSt
         Task {
             do {
                 let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
-                guard let display = content.displays.first(where: { $0.displayID == displayID }) else {
+                let mainDisplayID = CGMainDisplayID()
+                guard let display = content.displays.first(where: { $0.displayID == mainDisplayID }) else {
                     endOnce(.disconnected)
                     return
                 }
@@ -189,6 +191,7 @@ final class SystemAudioSource: NSObject, AudioBufferSource, SCStreamOutput, SCSt
                 guard proceed else { return }
                 try stream.addStreamOutput(self, type: .audio, sampleHandlerQueue: queue)
                 try stream.addStreamOutput(self, type: .screen, sampleHandlerQueue: queue)
+                capturing(mainDisplayID)
                 try await lifecycle.start(stream)
             } catch {
                 endOnce(Self.captureEnd(for: error))

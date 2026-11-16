@@ -418,12 +418,22 @@ public final class Recorder {
         switch action {
         case .startInput(let uid, let name):
             startAudio(.input(uid), name: name, source: MicrophoneSource(uid: uid))
-        case .startSystemAudio(let displayID):
-            startAudio(.systemAudio, name: AudioFileDescription.systemAudioName, source: SystemAudioSource(displayID: displayID))
+        case .startSystemAudio:
+            let number = audioCaptureCount + 1
+            startAudio(.systemAudio, name: AudioFileDescription.systemAudioName, source: SystemAudioSource { [weak self] displayID in
+                Task { @MainActor in self?.systemAudioCaptures(displayID: displayID, number: number) }
+            })
         case .stop(let id):
             guard let (_, capture) = audioCaptures.removeValue(forKey: id) else { return }
-            stopping.append(Task { await capture.stop() })
+            stopping.append(Task { [weak self] in
+                for end in await capture.stop() { self?.audioFileEnded(end) }
+            })
         }
+    }
+
+    private func systemAudioCaptures(displayID: UInt32, number: Int) {
+        guard !isStopped, let (current, _) = audioCaptures[.systemAudio], current == number else { return }
+        audioTracker.systemAudioCaptures(displayID: displayID)
     }
 
     private func startAudio(_ id: AudioTracker.SourceID, name: String, source: any AudioBufferSource) {
@@ -433,13 +443,16 @@ public final class Recorder {
             fileStarted: { [weak self] file in Task { @MainActor in self?.audioFileStarted(file, id: id, name: name) } },
             fileEnded: { [weak self] end in Task { @MainActor in self?.audioFileEnded(end) } },
             event: { [weak self] event in Task { @MainActor in self?.audioEvent(event) } },
-            ended: { [weak self] reason in Task { @MainActor in self?.audioCaptureEnded(id, number: number, name: name, reason: reason) } })
+            ended: { [weak self] reason, ends in
+                Task { @MainActor in self?.audioCaptureEnded(id, number: number, name: name, reason: reason, ends: ends) }
+            })
         let capture = AudioCapture(id: id, name: name, source: source, context: context, guides: guides, reports: reports)
         audioCaptures[id] = (number, capture)
         capture.start()
     }
 
     private func audioFileStarted(_ file: RecordingManifest.AudioFile, id: AudioTracker.SourceID, name: String) {
+        guard manifest.state != .finalized else { return }
         RecorderLog.detail("file started: \(file.name)", category: "recorder")
         audioTracker.fileStarted(id)
         problemsTold.cleared(.audioSourceFailed(name))
@@ -449,6 +462,8 @@ public final class Recorder {
     }
 
     private func audioFileEnded(_ end: AudioFileEnd) {
+        // Once finalized, the manifest changes no more; the stop gave every file's end.
+        guard manifest.state != .finalized else { return }
         RecorderLog.detail("file ended: \(end.file.name), \(end.file.state.rawValue)", category: "recorder")
         if let index = manifest.audioFiles.firstIndex(where: { $0.name == end.file.name }) {
             manifest.audioFiles[index] = end.file
@@ -467,7 +482,10 @@ public final class Recorder {
         told([event])
     }
 
-    private func audioCaptureEnded(_ id: AudioTracker.SourceID, number: Int, name: String, reason: AudioTracker.CaptureEnd) {
+    private func audioCaptureEnded(
+        _ id: AudioTracker.SourceID, number: Int, name: String, reason: AudioTracker.CaptureEnd, ends: [AudioFileEnd]
+    ) {
+        for end in ends { audioFileEnded(end) }
         guard !isStopped, let (current, _) = audioCaptures[id], current == number else { return }
         audioCaptures[id] = nil
         switch reason {
@@ -476,12 +494,20 @@ public final class Recorder {
                  kind: .audioSourceFailed(name))
         case .writerFailed(let error):
             tell("The audio file of \(name) failed", error: error, kind: .audioSourceFailed(name))
+        case .writerFellBehind:
+            tell("The audio file of \(name) ended", error: "its writer fell behind", kind: .audioSourceFailed(name))
         case .diskFull:
             tell("The audio file of \(name) ended", error: "the disk is full", kind: .audioSourceFailed(name))
         case .disconnected:
             break
         }
-        applyAudio(audioTracker.captureEnded(id, reason, at: context.now()))
+        let step = audioTracker.captureEnded(id, reason, at: context.now())
+        applyAudio(step)
+        // A source that stays listed but is lost again and again is never left unrecorded silently.
+        if reason == .disconnected, step.events.contains(where: \.event.isFailure) {
+            tell(id == .systemAudio ? "The system audio cannot be captured" : "The audio input \(name) cannot be captured",
+                 error: AudioTracker.sourceLostAgain(id), kind: .audioSourceFailed(name))
+        }
     }
 
     // MARK: Disk

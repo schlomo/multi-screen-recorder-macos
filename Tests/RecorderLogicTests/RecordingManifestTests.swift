@@ -80,7 +80,7 @@ import Testing
     @Test func theFailuresAreTheWaysAFileEndsBadly() {
         #expect(RecordingEvent.Kind.allCases.filter(\.isFailure) == [
             .displayStreamFailed, .displayShowsAnotherDisplaysPicture, .displayFileWriterFellBehind, .displayFileWriterFailed, .diskFull,
-            .audioInputFailed, .systemAudioFailed, .audioFileWriterFailed,
+            .audioInputFailed, .systemAudioFailed, .audioFileWriterFailed, .audioFileWriterFellBehind,
         ])
     }
 
@@ -123,7 +123,7 @@ import Testing
     }
 
     @Test func aGapAndADefaultMicrophoneChangeCarryTheirFields() throws {
-        var gap = RecordingEvent(at: 0, event: .audioInputGap, display: "Mic")
+        var gap = RecordingEvent(at: 0, event: .audioInputGap, audioSource: "Mic")
         gap.length = 0.25
         var changed = RecordingEvent(at: 0, event: .defaultMicrophoneChanged)
         changed.from = "Mic"
@@ -133,6 +133,9 @@ import Testing
         }
         let text = String(decoding: try prettyJSON(changed), as: UTF8.self)
         #expect(text.contains(#""from" : "Mic""#))
+        let gapText = String(decoding: try prettyJSON(gap), as: UTF8.self)
+        #expect(gapText.contains(#""audioSource" : "Mic""#))
+        #expect(!gapText.contains(#""display""#))
     }
 
     @Test func aProblemHasItsTimeAndFullError() throws {

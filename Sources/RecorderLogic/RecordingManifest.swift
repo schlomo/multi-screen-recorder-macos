@@ -341,6 +341,7 @@ public struct RecordingEvent: Codable, Equatable, Sendable {
         case audioInputFailed = "audio input failed"
         case systemAudioFailed = "system audio failed"
         case audioFileWriterFailed = "audio file writer failed"
+        case audioFileWriterFellBehind = "audio file writer fell behind"
 
         /// The events of a file ended by a failure, which make the result
         /// `problems` and `msr record` exit 3 (D47). An audio input that
@@ -348,7 +349,8 @@ public struct RecordingEvent: Codable, Equatable, Sendable {
         public var isFailure: Bool {
             switch self {
             case .displayStreamFailed, .displayShowsAnotherDisplaysPicture, .displayFileWriterFellBehind,
-                 .displayFileWriterFailed, .diskFull, .audioInputFailed, .systemAudioFailed, .audioFileWriterFailed: true
+                 .displayFileWriterFailed, .diskFull, .audioInputFailed, .systemAudioFailed, .audioFileWriterFailed,
+                 .audioFileWriterFellBehind: true
             default: false
             }
         }
@@ -391,8 +393,10 @@ public struct RecordingEvent: Codable, Equatable, Sendable {
     /// Seconds from the recording's start, to the millisecond.
     public var at: Double
     public var event: Kind
-    /// The display or audio source the event is about, where it has one.
+    /// The display the event is about, where it is about one.
     public var display: String?
+    /// The audio source the event is about, where it is about one.
+    public var audioSource: String?
     /// For `display frame size changed`: the old and the new frame size;
     /// for `default microphone changed`: the old and the new default
     /// microphone, absent where there was or is none.
@@ -406,11 +410,15 @@ public struct RecordingEvent: Codable, Equatable, Sendable {
     /// like) and a failing writer: why.
     public var error: String?
 
-    public init(at nanoseconds: Int64, event: Kind, display: String? = nil) {
+    public init(at nanoseconds: Int64, event: Kind, display: String? = nil, audioSource: String? = nil) {
         at = (Double(nanoseconds) / 1_000_000).rounded() / 1000
         self.event = event
         self.display = display
+        self.audioSource = audioSource
     }
+
+    /// The display or audio source the event is about, if any.
+    public var subject: String? { display ?? audioSource }
 }
 
 /// A problem told to the person (the Dock badge's "!", the status window,

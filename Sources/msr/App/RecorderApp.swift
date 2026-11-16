@@ -12,13 +12,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var session: RecordingSession?
     /// Stop in progress, for a logout that comes meanwhile to wait for.
     private var stopping: Task<Void, Never>?
+    /// For the rest of the process's life.
+    private var audioWatch: AudioInputWatch?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.mainMenu = makeMainMenu()
         let model: StartModel
         do {
             model = StartModel(homeFolder: try homeFolder())
-            try watchAudioInputs { model.devicesChanged() }
+            audioWatch = try AudioInputWatch { model.devicesChanged() }
         } catch {
             let alert = NSAlert()
             alert.messageText = "Multi Screen Recorder cannot start"

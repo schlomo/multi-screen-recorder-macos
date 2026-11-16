@@ -116,6 +116,18 @@ import Testing
         #expect(try await metadataValues(asset)[prefix + "audioSourceUID"] == nil)
     }
 
+    /// Samples with another channel count than the file's are an error, never a trap.
+    @Test func aBufferWithAnotherChannelCountIsAnError() async throws {
+        defer { removeScratch() }
+        let url = scratch.appending(path: "channels.mov")
+        let writer = try AudioFileWriter(url: url, description: microphone(channels: 1), firstTick: 0, timecode: Timecode(start: start, timeZone: berlin))
+        let error = #expect(throws: AudioFileWriterError.self) {
+            _ = try writer.append([[0.1], [0.1]], at: 0)
+        }
+        #expect(error?.description.contains("2 channels") == true)
+        try? await writer.finish(endPosition: nil)
+    }
+
     /// A filled gap is silence of exactly its length at its place.
     @Test func silenceFillsAGapAtItsPosition() async throws {
         defer { removeScratch() }

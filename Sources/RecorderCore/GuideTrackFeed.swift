@@ -30,13 +30,15 @@ public final class GuideTrackFeed: Sendable {
             return (track, mix)
         })))
         timer = DispatchSource.makeTimerSource(queue: DispatchQueue(label: "msr.guide-tracks", qos: .userInitiated))
+        // Active from the start, so a feed never started can be released;
+        // it fires only once `start` schedules it.
+        timer.activate()
     }
 
     func start() {
         let interval = DispatchTimeInterval.nanoseconds(Int(RecorderValues.guideTrackInterval.nanoseconds))
-        timer.schedule(deadline: .now() + interval, repeating: interval, leeway: .milliseconds(5))
         timer.setEventHandler { [weak self] in self?.handOver() }
-        timer.resume()
+        timer.schedule(deadline: .now() + interval, repeating: interval, leeway: .milliseconds(5))
     }
 
     func stop() {

@@ -10,7 +10,7 @@ public enum EventLine {
         let time = calendar.dateComponents([.hour, .minute, .second], from: started + event.at)
         var line = String(format: "%02d:%02d:%02d +%.1fs %@", time.hour ?? 0, time.minute ?? 0, time.second ?? 0,
                           event.at, event.event.rawValue)
-        if let display = event.display { line += ": \(display)" }
+        if let subject = event.subject { line += ": \(subject)" }
         if event.from != nil || event.to != nil {
             line += " \(event.from?.text ?? "none") → \(event.to?.text ?? "none")"
         }

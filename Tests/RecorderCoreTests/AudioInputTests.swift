@@ -145,7 +145,8 @@ import Testing
 
     /// Registers the listener; that a change calls it is seen only on a Mac
     /// where a device is plugged in or out.
-    @Test func aListenerForChangesOfThisMacsAudioDevicesCanBeRegistered() throws {
-        try watchAudioInputs {}
+    @Test func aListenerForChangesOfThisMacsAudioDevicesCanBeRegisteredAndCancelled() throws {
+        let watch = try AudioInputWatch {}
+        watch.cancel()
     }
 }

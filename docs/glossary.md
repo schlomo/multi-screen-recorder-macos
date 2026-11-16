@@ -179,8 +179,9 @@ A track in a display file for playback and waveform sync only:
 "Microphones", one mono mix of all recorded microphone channels, or
 "System audio", stereo; the two are never mixed together. Which ones a
 display file has follows from the settings alone; a missing source is
-silence in its guide track (D31). It lags real time by 200 ms, so it
-may end up to 200 ms before its display file (D49).
+silence in its guide track (D31). It lags real time by 200 ms and is
+handed over every 100 ms, so it may end up to 300 ms before its display
+file (D49).
 
 ## Clock drift
 

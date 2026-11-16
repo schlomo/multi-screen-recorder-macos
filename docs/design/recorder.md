@@ -359,7 +359,7 @@ every change:
     }
   ],
   "events": [
-    { "at": 812.4, "event": "audio input gap", "display": "MacBook Pro Microphone", "length": 0.25 },
+    { "at": 812.4, "event": "audio input gap", "audioSource": "MacBook Pro Microphone", "length": 0.25 },
     { "at": 1446.2, "event": "display disconnected", "display": "LG HDR 4K" },
     { "at": 2285.0, "event": "display frame size changed", "display": "Built-in Retina Display",
       "from": [1670, 1080], "to": [1662, 1080] }
@@ -381,9 +381,11 @@ started`, `display mirroring stopped`, `main display changed`,
 full`, `sleep`, `wake`, and for audio `audio input connected`, `audio
 input disconnected`, `system audio started`, `system audio stopped`,
 `default microphone changed`, `audio input gap`, `audio input failed`,
-`system audio failed`, `audio file writer failed`;
-each names its display or audio source where it has one (`display`).
-Their fields: `at`, `event`, `display`; `from` and `to` (the old and
+`system audio failed`, `audio file writer failed`, `audio file writer
+fell behind`;
+each names its display (`display`) or its audio source (`audioSource`)
+where it is about one; `display` always means a display.
+Their fields: `at`, `event`, `display` or `audioSource`; `from` and `to` (the old and
 the new frame size) for `display frame size changed`, and the old and
 the new default microphone for `default microphone changed` (either
 absent where there was or is none); `mirrors` (the display mirrored)
@@ -398,7 +400,8 @@ every file is finalized and no file was ended by a failure (`display
 stream failed`, `display file writer failed`, `disk full`, `display
 file writer fell behind`, `display shows another display's picture`,
 `audio input failed`, `system audio failed`, `audio file writer
-failed`; an unplugged audio input and a gap are none), otherwise
+failed`, `audio file writer fell behind`; an unplugged audio input and
+a gap are none), otherwise
 `problems` (D47); `cpu` is our process's CPU use over the recording,
 `averagePercent` and `peakPercent` in percent of one core as Activity
 Monitor shows it, sampled every second, to one decimal (encoding and
@@ -734,9 +737,10 @@ the metadata items (see "Output on disk").
   stream of its own on the main display, with `capturesAudio`, our own
   process's audio excluded, its video at 2×2 pixels and one frame a
   second and dropped, so a failing display stream never takes the
-  audio with it. When the system audio's display goes, its stream
-  starts again on the new main display, with the events `system audio
-  stopped` and `system audio started`. Which audio inputs are recorded
+  audio with it. The stream reads the main display each time it
+  starts, never an older reading. When the system audio's display goes,
+  its stream starts again on the new main display, with the events
+  `system audio stopped` and `system audio started`. Which audio inputs are recorded
   follows the audio mode (D44): `none` none, `default-microphone` the
   default one, `wired` the default one plus every built-in and wired one
   (transport type built-in, USB, FireWire, PCI, Thunderbolt, HDMI,
@@ -790,11 +794,19 @@ the metadata items (see "Output on disk").
 - **Failures.** A failing audio capture or writer and a full disk are
   handled for an audio file as for a display file (below): the file
   ends, the event (`audio input failed`, `system audio failed`, `audio
-  file writer failed` with its `error`, or `disk full`) and a problem
-  are told, the capture is started again with the same back-off, and
-  after a full disk a new audio file starts once there is room. Such
-  an end makes the recording's `result` `problems` (D47); an unplug
-  and a gap do not.
+  file writer failed` with its `error`, `audio file writer fell behind`
+  when the writer took none of the last 2 s of samples, or `disk full`)
+  and a problem are told, the capture is started again with the same
+  back-off, and after a full disk a new audio file starts once there is
+  room. Such an end makes the recording's `result` `problems` (D47); an
+  unplug and a gap do not. As for a display, a source lost a second
+  time while it is still listed and recorded, with no change of the
+  audio devices (an audio input) or of the displays (the system audio)
+  in between, is a failure: `audio input failed` or `system audio
+  failed` with that as its `error`, a problem and the back-off. When an
+  audio file ends, the samples still waiting for its writer are
+  written for at most 2 s; its `end` counts only what the writer took,
+  and samples left over are told as lost in a problem.
 - **Guide tracks.** For playback and waveform sync, every display file
   also carries guide tracks: "Microphones", one mono mix of all recorded
   audio input channels, their sum divided by √n for n channels, clamped
@@ -806,7 +818,9 @@ the metadata items (see "Output on disk").
   open display file every 100 ms (*data*); a display file's guide tracks
   cover exactly its own time, so a frame size change gives them the
   same gap as the video. A display file's guide tracks may end up to
-  200 ms early: the samples not yet mixed when it ends.
+  300 ms early, the 200 ms delay plus up to one 100 ms hand-over: the
+  samples not yet handed over when it ends. The audio files themselves
+  are complete.
 
 **Display identity.** A display is known by the UUID macOS gives it
 (`CGDisplayCreateUUIDFromDisplayID`), never by its display ID, which
@@ -1118,27 +1132,35 @@ a ScreenCaptureKit stream on the main display, moving with it; audio
 files placed on the tick grid, gaps up to 1 s filled with silence, a
 longer one ending the file; `clockDriftPpm` per audio file; the guide
 tracks "Microphones" and "System audio" in every display file; audio
-sources in the status window, the summary and the disk estimate; our
-process's CPU use in the status window, the summary and the manifest.
-Tested without a microphone or a screen: the logic by unit tests, audio
-files and guide tracks written from synthetic PCM and read back. Live
-capture is verified on the owner's Mac.
+sources in the status window and the summary; audio files counted in
+the low disk warning threshold; our process's CPU use in the status
+window, the summary and the manifest. Tested without a microphone or a
+screen: the logic by unit tests, audio captures with a stand-in source
+and writer, audio files and guide tracks written from synthetic PCM and
+read back. Live audio capture is UNVERIFIED until the owner's run.
 
-Built in B2 where this document leaves the detail open, provisional and
-for the architect to settle: the failure events are named `audio input
-failed`, `system audio failed` and `audio file writer failed`, and a
-gap's event `audio input gap` names the source in the `display` field;
-an audio source the audio mode records but that has no file yet shows
-the state `not recorded`; an audio input is recorded only when Core
-Audio gives its UID, which `AVCaptureDevice` opens it by; the beginning
-of a recording tells no `default microphone changed` or `audio input
-connected` events; the system audio's stream asks for 2×2 pixels at 1
-frame per second and drops them; the guide tracks lag real time by
-200 ms, so they may end up to 200 ms before a display file's last tick;
-the track names are written as QuickTime user data `©nam`, which
-ffprobe shows as `title` (track-level metadata items do not show and
-are not written); `msr record`'s summary ends with the line `CPU N % on
-average, N % at the peak, of one core (this process only)`.
+Built in B2 where this document leaves the detail open, decided by the
+architect on review: the failure events are named `audio input failed`,
+`system audio failed`, `audio file writer failed` and `audio file
+writer fell behind`; an event about an audio source names it in
+`audioSource`, never in `display`; an audio source the audio mode
+records but that has no file yet shows the state `not recorded`; an
+audio input is recorded only when Core Audio gives its UID, which
+`AVCaptureDevice` opens it by; the beginning of a recording tells no
+`default microphone changed` or `audio input connected` events; the
+system audio's stream asks for 2×2 pixels at 1 frame per second and
+drops them; a display file's guide tracks may end up to 300 ms before
+its last tick; the video track's name is written as QuickTime user
+data `©nam`, which ffprobe shows as `title` (track-level metadata items
+do not show and are not written; the file-level items are); `msr
+record`'s summary ends with the line `CPU N % on average, N % at the
+peak, of one core (this process only)`.
+
+Open, for the owner's live run to answer: the system audio's timestamps
+may follow the host clock rather than its sample count; then the
+output device's clock drift would show as `audio input gap` events of
+about 32 ms at a steady interval, each filled with silence. The gap
+events of the run show whether it does.
 
 Details the design left open, as built and confirmed by the owner
 (D25, D28, D44): a key missing from the settings file takes its default;
