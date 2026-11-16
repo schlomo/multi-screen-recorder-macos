@@ -3,6 +3,15 @@
 <p class="description">{{ site.Params.description }}</p>
 <p class="download"><a class="button" href="{{ site.Params.downloadURL }}">Download the latest release</a></p>
 
+{{ partial "screenshot.html" (dict
+  "src" "images/start-window.png"
+  "alt" "The start window: a table of the screens and audio sources that will be recorded, with their resolution or channels and gigabytes per hour, the settings, the ready check, and the Cancel and Start buttons."
+  "caption" "Before you start: every screen and audio source that will be recorded, and the space it needs.") }}
+{{ partial "screenshot.html" (dict
+  "src" "images/status-window-2x.png"
+  "alt" "The status window while recording: each screen and audio source with its resolution or channels, its files, the megabytes written and its state, then the recording time, the free space and the CPU use, and the Continue and Stop buttons."
+  "caption" "While it records: every source, its files and what it has written.") }}
+
 <h2>Requirements</h2>
 <p>A Mac with Apple silicon and macOS 26 or later.</p>
 

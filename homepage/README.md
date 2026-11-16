@@ -3,8 +3,8 @@
 The homepage at <https://multiscreenrecorder.schapiro.org/>: a small
 [Hugo](https://gohugo.io/) site deployed to Cloudflare Workers static assets by
 Cloudflare Workers Builds. One page, in English: what the app is, the
-requirements, the download link and the links to the tester guide, the problem
-report form and the repository.
+requirements, the download link, screenshots of its two windows and the links
+to the tester guide, the problem report form and the repository.
 
 ## Editing
 
@@ -26,6 +26,14 @@ report form and the repository.
   Hugo to a 256 px WebP in `layouts/baseof.html`. Changing that file
   triggers no homepage build (it is outside the watch path); the next
   homepage change picks it up.
+- **Screenshots:** the start and status windows, `assets/images/*.png` as
+  taken with macOS's screenshot tool, placed in `layouts/home.html` and shown
+  by `layouts/_partials/screenshot.html` as WebP at the window's size in
+  points and never wider than the page. A screenshot taken on a Retina
+  screen has 2 pixels per point; rename it to end in `-2x.png` (not macOS's
+  `@2x`, which Cloudflare redirects). Any other has 1. To update one,
+  replace the file, and rename it (in `home.html` too) if its pixels per
+  point changed.
 - **Favicons:** `static/favicon*` and `static/apple-touch-icon.png`, rendered
   from `assets/icon/app-icon.svg` by `scripts/render-app-icon`; never edit them
   by hand.
