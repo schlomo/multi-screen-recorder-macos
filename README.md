@@ -87,6 +87,42 @@ confirmed yet.
   cause a few seconds of silence or repeated audio in the USB audio
   inputs.
 
+### What to test and send
+
+1. Make one recording of about an hour with your normal setup: your
+   usual screens, microphone or headset, and dock.
+2. During it, change things as you normally would: plug in or unplug a
+   screen or headset, switch audio devices, close and open the lid.
+3. If you use a video editor (Final Cut Pro, DaVinci Resolve,
+   Premiere Pro…), try putting the files together there.
+
+Then send the person who asked you to test:
+
+- the output of these two commands in Terminal (`list` only reads
+  your screens and audio devices; it records nothing):
+
+  ```sh
+  "/Applications/Multi Screen Recorder.app/Contents/MacOS/msr" version
+  "/Applications/Multi Screen Recorder.app/Contents/MacOS/msr" list
+  ```
+
+- `recording.json` from the folder of every recording you made, the
+  ones that went fine too (in `~/Movies/Multi Screen Recorder/`, one
+  folder per recording);
+- a few sentences: where installing or the first start was confusing
+  or got stuck; whether the files worked in your editor; anything odd,
+  such as fan noise, battery drain, gaps or echoes in the audio, or a
+  missing screen.
+
+Please don't send the recordings themselves: they show whatever was
+on your screens. The output of `msr list` names your screens and audio
+devices; `recording.json` names them too, with the identifiers macOS
+gives them, which can hold a device's serial number. Remove or replace
+anything you don't want to share.
+
+If something clearly breaks (a crash, a lost or broken file), please
+also report it as below.
+
 ### Reporting a problem
 
 Use the
