@@ -40,14 +40,24 @@ corrected).
   command line, for scripting.
 - **Nothing leaves your Mac.** The app makes no network connections.
 
-It runs on macOS 26 and later, on Apple silicon.
+It runs on macOS 26 and later, on Apple silicon. The homepage is
+<https://multiscreenrecorder.schapiro.org>.
 
-## Installation
+## Tester guide
+
+Multi Screen Recorder is in testing. Thank you for trying it!
+
+### Requirements
+
+A Mac with Apple silicon (M1 or later) and macOS 26 or later.
+
+### Installation
 
 1. Download the zip from the
-   [releases](https://github.com/schlomo/multi-screen-recorder-macos/releases):
-   the latest release, or the snapshot release of a pull request
-   (`Snapshot PR #<n>`) to try a change before it is merged.
+   [latest release](https://github.com/schlomo/multi-screen-recorder-macos/releases/latest)
+   (or, to try a change before it is merged, the snapshot release of a
+   pull request, `Snapshot PR #<n>`, from the
+   [releases](https://github.com/schlomo/multi-screen-recorder-macos/releases)).
 2. Unzip it and move `Multi Screen Recorder.app` to `/Applications`.
 3. Start it from Finder. The app is signed with the project's own
    certificate, not by an Apple-registered developer, so macOS refuses
@@ -67,13 +77,37 @@ Every build is signed with the same certificate, so a newer build
 installed over an older one should keep both permissions; this is not
 confirmed yet.
 
+### Known limits
+
+- **CPU:** recording takes about half of one CPU core over an hour,
+  with two displays and five audio sources.
+- **Audio drift:** some USB audio devices drift against the video, by
+  up to about 0.4 s per hour. A correction is planned.
+- **USB docks:** plugging a USB device into a dock while recording can
+  cause a few seconds of silence or repeated audio in the USB audio
+  inputs.
+
+### Reporting a problem
+
+Use the
+[problem report form](https://github.com/schlomo/multi-screen-recorder-macos/issues/new?template=problem-report.yml)
+(a GitHub account is needed). It asks for the output of `msr version`
+(see "Command line" below; About Multi Screen Recorder in the app's
+menu shows the same), what happened and what you expected, and the
+recording's `recording.json`. Issues are public: the form says what
+`recording.json` contains, so you can remove what you don't want to
+share.
+
 ## Usage
 
-Start the app from Finder: its window shows what will be recorded (one
+Start the app from Finder: its window shows the app's icon, version
+and homepage, then what will be recorded (one
 table: the displays, with what each looks like, the size it is drawn at
 and the size it records at, then the audio inputs and system audio, the
-ones not recorded dimmed; each row with the disk space it needs per
-hour; the total and the free space below; the output folder), then the switch "Auto" (on, the two sliders are grayed out and show Native and Wired; off,
+ones not recorded dimmed; each row with the most disk space it can write
+per hour, "GB/h max", usually more than it writes; the total as the
+last row; below it the space the required hours need and the free
+space; the output folder, a link that opens it in Finder), then the switch "Auto" (on, the two sliders are grayed out and show Native and Wired; off,
 they are enabled and show the recording resolution and the audio mode: None, Default
 microphone, Wired or All, with a note under it on Bluetooth and virtual
 microphones), system audio, the output folder and the ready check:
@@ -81,7 +115,8 @@ microphones), system audio, the output folder and the ready check:
 fix for each failing one. Every change is saved at once; the ready check runs again after each change,
 when you come back to the app, when a display is plugged in, removed
 or changed, when an audio device is plugged in or removed, when the
-default audio input changes, and on "Check again".
+default audio input changes, and on "Check again". Cancel, in the
+lower right corner beside Start, quits without recording.
 
 Click Start: the window closes; the Dock icon shows a "!" badge when
 the disk runs low, a display shows another display's picture or
@@ -191,7 +226,9 @@ fit together is in [docs/design/delivery.md](docs/design/delivery.md).
 
 ## Feedback
 
-Please report problems and ideas as
+Please report problems with the
+[problem report form](https://github.com/schlomo/multi-screen-recorder-macos/issues/new?template=problem-report.yml)
+(see "Reporting a problem" above), and ideas as
 [GitHub issues](https://github.com/schlomo/multi-screen-recorder-macos/issues).
 If the app quit unexpectedly, it offers to report the crash report on
 your next start: your browser opens a new issue (a GitHub account is

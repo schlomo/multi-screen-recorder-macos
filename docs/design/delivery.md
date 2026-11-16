@@ -3,8 +3,8 @@
 ## What this covers
 
 How a change becomes something a person can install: the scripts, the
-pipeline that wires them, version numbers, signing, and the one-time
-developer setup. What the app does is in [recorder.md](recorder.md).
+pipeline that wires them, version numbers, signing, the homepage's
+delivery, and the one-time developer setup. What the app does is in [recorder.md](recorder.md).
 
 ## The decision
 
@@ -48,7 +48,7 @@ jobs so the key never meets compiled code (D29):
 |---|---|
 | Every push to a PR | `test-and-build`, then `snapshot-release` |
 | A PR is closed | `remove-snapshot-release` |
-| A push to `main` that changes more than Markdown files | `test-and-build`, then `release` |
+| A push to `main` that changes more than Markdown files and the homepage (`homepage/`) | `test-and-build`, then `release` |
 | A PR from a fork or from Dependabot | `test-and-build` only: tested, built and smoke-tested, never signed or published |
 
 Three things cross from `test-and-build` into a signing job, and the
@@ -91,7 +91,7 @@ waiting `remove-snapshot-release`
 **Release:** releases are signed and published one at a time, each
 waiting in turn (`queue: max` on the `release` job's concurrency group,
 up to 100 waiting), so every push to `main` that changes more than
-Markdown files gets its release. They wait in the order their builds
+Markdown files and the homepage gets its release. They wait in the order their builds
 finish, not the order of the pushes (see "Accepted risks").
 
 `test-and-build` stops after 20 minutes (a run takes about 2), so a
@@ -158,6 +158,23 @@ a preview image; revisited when a newer runner image is generally
 available. A developer's Mac may run a newer Xcode; the package must
 still build with the runner's. Dependabot proposes updates of the
 GitHub Actions and Swift packages in use.
+
+## Homepage
+
+The homepage is a Hugo site in `homepage/` on `main` (D53), built and
+served by Cloudflare Workers Builds at
+`multiscreenrecorder.schapiro.org`, apart from this pipeline: the
+push trigger ignores `homepage/**`, so a push to `main` that changes
+only the homepage makes no release; the pull request trigger has no
+such filter, so a PR's snapshot release is made as for any PR. Cloudflare
+builds every push that changes `homepage/` (production from `main`,
+indexable; a preview otherwise, `noindex`) [ASSUMED: by the build
+watch path `homepage/*`, a dashboard setting nobody has checked yet]. `homepage/wrangler.jsonc`
+holds the deploy; the dashboard settings that cannot live in the
+repository, and connecting the Worker, are the owner's
+([homepage/README.md](../../homepage/README.md)). Its cost: Cloudflare
+Workers' free tier for static assets [ASSUMED: the owner's Cloudflare
+account and plan were not checked].
 
 ## Developer setup, once
 
@@ -240,4 +257,4 @@ GitHub Actions and Swift packages in use.
 
 ## Open questions
 
-None; the homepage's delivery is a separate backlog item.
+None.

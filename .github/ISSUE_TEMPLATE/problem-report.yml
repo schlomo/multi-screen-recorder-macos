@@ -1,0 +1,37 @@
+name: Problem report
+description: Something went wrong while recording or with the app
+title: "Problem: "
+body:
+  - type: textarea
+    id: version
+    attributes:
+      label: Output of msr version
+      description: "In Terminal, run the command below and paste its output here. Without the msr link, run \"/Applications/Multi Screen Recorder.app/Contents/MacOS/msr\" version."
+      placeholder: msr version
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect?
+    validations:
+      required: true
+  - type: markdown
+    attributes:
+      value: |
+        **Issues are public.** The recording's `recording.json` below names your displays and audio devices (in the file names, `display`, `audioSource` and the events), and the identifiers macOS gives them (`displayUUID`, and `audioSourceUID`, which can hold a device's serial number). It also holds the date and time the recording started and ended, with your time zone's offset, and its problems, whose text can name a folder with your Mac's user name in its path. Remove or replace anything you don't want to share before you submit.
+  - type: textarea
+    id: recording-json
+    attributes:
+      label: recording.json
+      description: "The recording folder's recording.json: open it in TextEdit, copy its content and paste it here."
+      render: json
+    validations:
+      required: false

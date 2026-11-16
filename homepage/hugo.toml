@@ -1,0 +1,28 @@
+baseURL = "https://multiscreenrecorder.schapiro.org/"
+title = "Multi Screen Recorder"
+locale = "en-US"
+disableKinds = ["taxonomy", "term", "section", "rss", "404"]
+
+[params]
+  description = "A reliable multi-source screen and audio recorder for macOS. It captures every display and audio source, never loses a recording, and keeps going when screens, resolutions or audio sources change."
+  repositoryURL = "https://github.com/schlomo/multi-screen-recorder-macos"
+  # The release asset's name contains the version, so the page links to the
+  # latest release, never to a file.
+  downloadURL = "https://github.com/schlomo/multi-screen-recorder-macos/releases/latest"
+  testerGuideURL = "https://github.com/schlomo/multi-screen-recorder-macos#tester-guide"
+  problemReportURL = "https://github.com/schlomo/multi-screen-recorder-macos/issues/new?template=problem-report.yml"
+  legalNoticeURL = "https://schapiro.org/impressum/"
+
+# The site's colours: the project palette of assets/icon/README.md (graphite,
+# cool white, red) and the app icon's display colours. Single source of truth:
+# layouts/_partials/head.html emits every entry as a CSS custom property
+# (primary -> --primary). Never hard-code a colour anywhere else.
+[params.colors]
+  primary = "#1E2330"     # graphite: headings, the download button
+  accent = "#FF3B30"      # red: the record dot, the bar under headings
+  link = "#415070"        # link text
+  text = "#1E2330"        # body text
+  text-light = "#415070"  # the tagline, the footer
+  background = "#E9EEF7"  # cool white: page background
+  surface = "#FFFFFF"     # the download button's text, boxes
+  rule = "#D5DAE6"        # footer rule

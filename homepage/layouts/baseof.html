@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    {{ partial "head.html" . }}
+  </head>
+  <body>
+    <header>
+      <a href="/"><img src="/favicon.svg" alt="" width="128" height="128" /></a>
+      <h1>{{ site.Title }}</h1>
+    </header>
+    <main>
+      {{ block "main" . }}{{ end }}
+    </main>
+    <footer>
+      <a href="{{ site.Params.legalNoticeURL }}">Legal notice &amp; privacy policy</a>
+      &middot;
+      <a href="{{ site.Params.repositoryURL }}">Source on GitHub</a>
+    </footer>
+  </body>
+</html>

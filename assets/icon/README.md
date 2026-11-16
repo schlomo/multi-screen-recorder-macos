@@ -25,7 +25,10 @@ The SVG uses its own colours, none of them in the palette: back display `#415070
 
 Run `scripts/render-app-icon` (needs `rsvg-convert` from librsvg,
 `brew install librsvg`; `sips` is part of macOS) after editing
-`app-icon.svg` or `app-icon-fancy.jpeg`, and commit both derived images.
+`app-icon.svg` or `app-icon-fancy.jpeg`, and commit the derived images:
+the two here and the homepage's favicons in `homepage/static/`
+(`favicon.svg`, a copy of `app-icon.svg`, and the PNGs and the `.ico`
+rendered from it).
 
 Known limitation: CI cannot re-render the SVG (no `rsvg-convert` on the
 runner), so nothing checks that `app-icon.png` still matches

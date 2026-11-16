@@ -1,0 +1,5 @@
+# The icons keep their names, so browsers revalidate them after a day.
+/favicon*
+  Cache-Control: public, max-age=86400
+/apple-touch-icon.png
+  Cache-Control: public, max-age=86400

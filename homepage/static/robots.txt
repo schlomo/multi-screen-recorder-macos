@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://multiscreenrecorder.schapiro.org/sitemap.xml

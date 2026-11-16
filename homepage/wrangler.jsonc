@@ -1,0 +1,24 @@
+{
+  // Cloudflare Workers static assets deploy for multiscreenrecorder.schapiro.org.
+  // This file is the source of truth for the deploy; the Cloudflare dashboard
+  // only holds the Git connection and the build settings listed in README.md.
+  "name": "multiscreenrecorder-homepage",
+  "compatibility_date": "2026-11-16",
+
+  // The schapiro.org zone is on Cloudflare, so deploy provisions the DNS
+  // record and the certificate.
+  "routes": [
+    { "pattern": "multiscreenrecorder.schapiro.org", "custom_domain": true }
+  ],
+
+  // No plain *.workers.dev production duplicate, but keep per-version
+  // preview URLs for PR builds (npx wrangler versions upload).
+  "workers_dev": false,
+  "preview_urls": true,
+
+  // Static site only, no Worker script. Missing paths get public/404.html.
+  "assets": {
+    "directory": "public",
+    "not_found_handling": "404-page"
+  }
+}
