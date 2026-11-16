@@ -34,6 +34,7 @@ import Testing
 
     @Test func theWindowIsAsWideAsTheTable() {
         let spacing = TableLayout.columnSpacing * CGFloat(WhatWillBeRecorded.columns.count - 1)
-        #expect(TableLayout.tableWidth == TableLayout.sourceWidth + TableLayout.fixedColumnWidths.reduce(0, +) + spacing)
+        #expect(TableLayout.tableWidth == TableLayout.sourceWidth + TableLayout.fixedColumnWidths.reduce(0, +) + spacing
+            + 2 * TableLayout.cellPadding)
     }
 }

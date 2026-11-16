@@ -1,4 +1,5 @@
 import AppKit
+import RecorderCore
 import RecorderLogic
 import SwiftUI
 
@@ -8,18 +9,58 @@ struct StartView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            if let section = model.whatWillBeRecorded { WhatWillBeRecordedView(section: section) }
+            AppHeader()
+            Divider()
+            if let section = model.whatWillBeRecorded {
+                WhatWillBeRecordedView(section: section, outputFolder: model.settings.outputFolder) {
+                    openOutputFolder()
+                }
+            }
             Divider()
             SettingsForm(model: model)
             Divider()
             ReadyCheckView(result: model.readyCheck, isChecking: model.isChecking) { model.checkAgain() }
             Divider()
-            Button("Start", action: start)
-                .keyboardShortcut(.defaultAction)
-                .disabled(!model.canStart)
+            HStack {
+                Spacer()
+                // Quits without recording, as Cmd-Q does.
+                Button("Cancel") { NSApp.terminate(nil) }
+                    .keyboardShortcut(.cancelAction)
+                Button("Start", action: start)
+                    .keyboardShortcut(.defaultAction)
+                    .disabled(!model.canStart)
+            }
         }
-        .padding(20)
+        .padding(TableLayout.windowPadding)
         .frame(width: TableLayout.windowWidth)
+    }
+
+    private func openOutputFolder() {
+        let folder = model.settings.outputFolderURL(homeFolder: model.homeFolder)
+        guard !NSWorkspace.shared.open(folder) else { return }
+        let alert = NSAlert()
+        alert.messageText = "Cannot open the output folder"
+        alert.informativeText = "Finder cannot open \(folder.path(percentEncoded: false))."
+        alert.runModal()
+    }
+}
+
+/// The app icon, the name, the version and the homepage.
+private struct AppHeader: View {
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(nsImage: NSApp.applicationIconImage)
+                .resizable()
+                .frame(width: 48, height: 48)
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Multi Screen Recorder").font(.title2.bold())
+                Text(runningVersion.description)
+                    .foregroundStyle(.secondary)
+                    .textSelection(.enabled)
+                Link(Homepage.url.host() ?? Homepage.url.absoluteString, destination: Homepage.url)
+            }
+        }
     }
 }
 
@@ -115,28 +156,57 @@ private struct SettingsForm: View {
     }
 }
 
+/// One table with a header, striped rows and a border: the displays, the
+/// audio sources and the total.
 private struct WhatWillBeRecordedView: View {
     let section: WhatWillBeRecorded
+    /// The output folder as the settings name it, a link that opens it in Finder.
+    let outputFolder: String
+    let openOutputFolder: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             Text("What will be recorded").font(.headline)
             if let error = section.displaysError { errorLabel(error) }
             if let error = section.audioError { errorLabel(error) }
-            Grid(alignment: .leading, horizontalSpacing: TableLayout.columnSpacing, verticalSpacing: 2) {
-                row(WhatWillBeRecorded.columns).font(.caption).foregroundStyle(.secondary)
-                ForEach(Array(section.displayRows.enumerated()), id: \.offset) { _, displayRow in
-                    row(displayRow.cells)
+            VStack(spacing: 0) {
+                row(WhatWillBeRecorded.columns)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                    .background(.quaternary.opacity(0.5))
+                Divider()
+                ForEach(Array(section.displayRows.enumerated()), id: \.offset) { index, displayRow in
+                    row(displayRow.cells).background(stripe(index))
                 }
                 if !section.displayRows.isEmpty { Divider() }
-                ForEach(Array(section.audioRows.enumerated()), id: \.offset) { _, audioRow in
-                    row(audioRow.cells).foregroundStyle(audioRow.isRecorded ? .primary : .tertiary)
+                ForEach(Array(section.audioRows.enumerated()), id: \.offset) { index, audioRow in
+                    row(audioRow.cells)
+                        .foregroundStyle(audioRow.isRecorded ? .primary : .tertiary)
+                        .background(stripe(section.displayRows.count + index))
+                }
+                if let totalRow = section.totalRow {
+                    Divider()
+                    row(totalRow.cells).fontWeight(.semibold)
                 }
             }
-            if let total = section.total { Text(total) }
-            Text(section.outputFolder)
+            .frame(width: TableLayout.tableWidth)
+            .clipShape(RoundedRectangle(cornerRadius: 6))
+            .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(.separator))
+            if let need = section.total?.need { Text(need) }
+            HStack(spacing: 4) {
+                Text("Files go to")
+                Button(outputFolder, action: openOutputFolder)
+                    .buttonStyle(.link)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                    .help("Open in Finder")
+            }
             Text(section.continuity).foregroundStyle(.secondary)
         }
+    }
+
+    private func stripe(_ index: Int) -> Color {
+        Color(nsColor: NSColor.alternatingContentBackgroundColors[index % NSColor.alternatingContentBackgroundColors.count])
     }
 
     private func errorLabel(_ message: String) -> some View {
@@ -146,7 +216,7 @@ private struct WhatWillBeRecordedView: View {
     }
 
     private func row(_ cells: [String]) -> some View {
-        GridRow {
+        HStack(spacing: TableLayout.columnSpacing) {
             ForEach(Array(cells.enumerated()), id: \.offset) { column, cell in
                 if column == 0 {
                     Text(cell)
@@ -162,6 +232,8 @@ private struct WhatWillBeRecordedView: View {
                 }
             }
         }
+        .padding(.horizontal, TableLayout.cellPadding)
+        .padding(.vertical, 3)
     }
 }
 

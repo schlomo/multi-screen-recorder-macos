@@ -26,10 +26,10 @@ import Testing
         let rows = RecordingStatusTable.rows(
             sources: tracker.sources, files: files, bytes: ["a1.mov": 1_000_000_000, "a2.mov": 260_000_000, "b1.mov": 40_000_000])
         #expect(rows == [
-            .init(source: "1 Built-in Retina Display", recordsAt: "1920×1080", files: 2, gigabytesWritten: "1.3", state: "recording"),
-            .init(source: "2 LG HDR 4K", recordsAt: "1920×1080", files: 1, gigabytesWritten: "0.0", state: "disk full"),
+            .init(source: "1 Built-in Retina Display", recordsAt: "1920×1080", files: 2, written: "1.3 GB", state: "recording"),
+            .init(source: "2 LG HDR 4K", recordsAt: "1920×1080", files: 1, written: "40 MB", state: "disk full"),
         ])
-        #expect(RecordingStatusTable.columns == ["Source", "Records at", "Files", "GB written", "State"])
+        #expect(RecordingStatusTable.columns == ["Source", "Records at", "Files", "Written", "State"])
     }
 
     @Test func aDisplayWaitingGoneOrFailingSaysSo() {
@@ -61,7 +61,7 @@ import Testing
         _ = tracker.begin([display("A", "Built-in", main: true)], at: 0)
         let files = [file("a1.mov", uuid: "A", display: "Built-in"), file("a2.mov", uuid: "A", display: "Built-in")]
         let rows = RecordingStatusTable.rows(sources: tracker.sources, files: files, bytes: ["a1.mov": 1_000_000_000])
-        #expect(rows.map(\.gigabytesWritten) == ["?"])
+        #expect(rows.map(\.written) == ["?"])
         #expect(rows.map(\.files) == [2])
     }
 
@@ -75,7 +75,10 @@ import Testing
         #expect(RecordingStatusTable.line(elapsedSeconds: 4020, bytesWritten: 1_260_000_000, files: 3, freeBytes: 120_400_000_000)
             == "Recording 1:07:00 · 1.3 GB in 3 files · 120.4 GB free")
         #expect(RecordingStatusTable.line(elapsedSeconds: 5, bytesWritten: 0, files: 1, freeBytes: nil)
-            == "Recording 0:00:05 · 0.0 GB in 1 file")
+            == "Recording 0:00:05 · 0 MB in 1 file")
+        // Below 1 GB in MB, so the first minutes do not show 0.0 GB.
+        #expect(RecordingStatusTable.line(elapsedSeconds: 90, bytesWritten: 350_400_000, files: 7, freeBytes: 800_000_000)
+            == "Recording 0:01:30 · 350 MB in 7 files · 800 MB free")
         // A size that cannot be read: the data written is not undercounted.
         #expect(RecordingStatusTable.line(elapsedSeconds: 5, bytesWritten: nil, files: 2, freeBytes: 1_000_000_000)
             == "Recording 0:00:05 · ? GB in 2 files · 1.0 GB free")

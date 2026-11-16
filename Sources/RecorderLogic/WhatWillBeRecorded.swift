@@ -1,12 +1,14 @@
 /// The window's section "What will be recorded", from the settings, the
 /// devices connected now and the free space in the output folder, as data
 /// the view renders: one table, the display rows then the audio rows with
-/// the system audio last, and a total line.
+/// the system audio last and the total row, and a line of what the
+/// required recording hours need. GB/h max is the encoder's ceiling, the
+/// most a source can write (D53).
 public struct WhatWillBeRecorded: Equatable, Sendable {
-    public static let columns = ["Source", "Looks like", "Drawn at", "Records at", "GB/h"]
-    /// GB/h of a source not recorded, shown dimmed.
+    public static let columns = ["Source", "Looks like", "Drawn at", "Records at", "GB/h max"]
+    /// GB/h max of a source not recorded, shown dimmed.
     static let notRecorded = "0"
-    /// GB/h of a recorded source whose rate cannot be told.
+    /// GB/h max of a recorded source whose rate cannot be told.
     static let unknown = "?"
     static let cannotBeRead = "cannot be read"
 
@@ -35,6 +37,13 @@ public struct WhatWillBeRecorded: Equatable, Sendable {
         public var gigabytesPerHour: String
     }
 
+    /// The total GB/h max, and what the required recording hours need.
+    public struct Total: Equatable, Sendable {
+        public var gigabytesPerHour: String
+        /// "2 hours need 4.3 GB, 3.1 GB free."
+        public var need: String
+    }
+
     /// Set when the displays cannot be read; it stands in place of the Displays table.
     public var displaysError: String?
     public var displays: [Display]
@@ -42,12 +51,12 @@ public struct WhatWillBeRecorded: Equatable, Sendable {
     public var audioError: String?
     public var audio: [Audio]
     /// Nil unless the displays and the audio inputs the recording records can be read.
-    public var total: String?
+    public var total: Total?
     public var outputFolder: String
     public var continuity: String
 
     public init(
-        displaysError: String?, displays: [Display], audioError: String?, audio: [Audio], total: String?,
+        displaysError: String?, displays: [Display], audioError: String?, audio: [Audio], total: Total?,
         outputFolder: String, continuity: String
     ) {
         self.displaysError = displaysError
@@ -101,7 +110,7 @@ public struct WhatWillBeRecorded: Equatable, Sendable {
             outputFolder: facts.outputFolder)
     }
 
-    /// An input whose channels cannot be read says so; its GB/h is "?" if it is recorded.
+    /// An input whose channels cannot be read says so; its GB/h max is "?" if it is recorded.
     private static func audio(_ input: AudioInputInfo, settings: Settings) -> Audio {
         let isRecorded = settings.records(input)
         return switch input.channelCount {
@@ -126,13 +135,13 @@ public struct WhatWillBeRecorded: Equatable, Sendable {
                 DiskEstimate.displayFileBytesPerHour(frameSize: frameSize, settings: settings)))
     }
 
-    /// "Total 2.2 GB/h. 2 hours need 4.3 GB, 3.1 GB free."
-    private static func total(_ bytesPerHour: Double, settings: Settings, outputFolder: OutputFolderProbe?) -> String {
+    /// "2.2" and "2 hours need 4.3 GB, 3.1 GB free."
+    private static func total(_ bytesPerHour: Double, settings: Settings, outputFolder: OutputFolderProbe?) -> Total {
         let hours = settings.requiredRecordingHours
         let needed = "\(ReadyCheck.hoursText(hours)) \(hours == 1 ? "needs" : "need")"
             + " \(DiskEstimate.gigabytes(bytesPerHour * hours))"
         let free = if case .usable(.bytes(let bytes)) = outputFolder { ", \(DiskEstimate.gigabytes(Double(bytes))) free" } else { "" }
-        return "Total \(DiskEstimate.gigabytesPerHour(bytesPerHour)) GB/h. \(needed)\(free)."
+        return Total(gigabytesPerHour: DiskEstimate.gigabytesPerHour(bytesPerHour), need: "\(needed)\(free).")
     }
 
     /// The display rows of the table; none when the displays cannot be read.
@@ -150,14 +159,20 @@ public struct WhatWillBeRecorded: Equatable, Sendable {
         }
     }
 
-    /// The text `msr check` prints: the window's one table and total line,
-    /// its columns aligned and the GB/h column on the right. An error that
-    /// stands for rows is a line above the table.
+    /// The table's last row: the total GB/h max; nil without a total.
+    public var totalRow: Row? {
+        total.map { Row(cells: ["Total", "", "", "", $0.gigabytesPerHour], isRecorded: true) }
+    }
+
+    /// The text `msr check` prints: the window's one table with its total
+    /// row and the line of what the hours need, its columns aligned and the
+    /// GB/h max column on the right. An error that stands for rows is a
+    /// line above the table.
     public var text: String {
         var lines = ["What will be recorded"]
         if let displaysError { lines.append("  \(displaysError)") }
         if let audioError { lines.append("  \(audioError)") }
-        let rows = (displayRows + audioRows).map(\.cells)
+        let rows = (displayRows + audioRows + [totalRow].compactMap(\.self)).map(\.cells)
         let widths = Self.columns.indices.map { column in ([Self.columns] + rows).map { $0[column].count }.max() ?? 0 }
         func line(_ cells: [String]) -> String {
             let last = cells.count - 1
@@ -169,10 +184,13 @@ public struct WhatWillBeRecorded: Equatable, Sendable {
             return "  " + columns.joined(separator: "  ")
         }
         lines.append(line(Self.columns))
+        let rule = "  " + String(repeating: "─", count: widths.reduce(0, +) + 2 * (widths.count - 1))
         lines += displayRows.map { line($0.cells) }
-        if !displayRows.isEmpty { lines.append("  " + String(repeating: "─", count: widths.reduce(0, +) + 2 * (widths.count - 1))) }
+        if !displayRows.isEmpty { lines.append(rule) }
         lines += audioRows.map { line($0.cells) }
-        if let total { lines.append("  \(total)") }
+        if let total, let totalRow {
+            lines += [rule, line(totalRow.cells), "  \(total.need)"]
+        }
         lines.append("  \(outputFolder)")
         return lines.joined(separator: "\n") + "\n"
     }

@@ -11,6 +11,8 @@ enum TableLayout {
     static var font: NSFont { NSFont.preferredFont(forTextStyle: .body) }
 
     static let columnSpacing: CGFloat = 8
+    /// The space between the table's border and its first and last column.
+    static let cellPadding: CGFloat = 6
 
     /// The longest source name expected, which Source must hold; a longer one is truncated.
     static let longestSourceName = "MacBook Pro Microphone (default)"
@@ -25,13 +27,13 @@ enum TableLayout {
 
     static let sourceWidth = measuredWidth(longestSourceName, WhatWillBeRecorded.columns[0])
 
-    /// Looks like, Drawn at, Records at and GB/h.
+    /// Looks like, Drawn at, Records at and GB/h max.
     static let fixedColumnWidths: [CGFloat] = samples.enumerated().map { offset, samples in
         measuredWidth(samples + [WhatWillBeRecorded.columns[offset + 1]])
     }
 
     static let tableWidth = sourceWidth + fixedColumnWidths.reduce(0, +)
-        + columnSpacing * CGFloat(WhatWillBeRecorded.columns.count - 1)
+        + columnSpacing * CGFloat(WhatWillBeRecorded.columns.count - 1) + 2 * cellPadding
 
     /// The window's width: the table and the window's padding on both sides.
     static let windowWidth = tableWidth + 2 * windowPadding

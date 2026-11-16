@@ -80,7 +80,8 @@ recording resolution the settings choose: Native with auto mode, the
 default.
 
 `msr check` first prints "What will be recorded": the window's one
-table, the total line and "Files go to <output folder>", from the same
+table with its total row, the line of what the required recording
+hours need, and "Files go to <output folder>", from the same
 code (see "The app"; the window's last line, "Recording continues when
 displays or audio sources change.", is not printed), then one line per
 item of the ready check, `ok` or `FAIL`, a fix under each failure, and
@@ -89,14 +90,16 @@ the defaults and 3.1 GB free:
 
 ```
 What will be recorded
-  Source                            Looks like  Drawn at   Records at  GB/h
-  1 Built-in Retina Display         1728×1117   3456×2234  1728×1116    1.0
-  2 LG HDR 4K                       3840×2160   3840×2160  3840×2160    4.1
-  ─────────────────────────────────────────────────────────────────────────
-  MacBook Pro Microphone (default)                         1 channel    0.1
-  RØDE Wireless GO II RX                                   2 channels   0.1
-  System audio                                             stereo       0.1
-  Total 5.3 GB/h. 2 hours need 10.7 GB, 3.1 GB free.
+  Source                            Looks like  Drawn at   Records at  GB/h max
+  1 Built-in Retina Display         1728×1117   3456×2234  1728×1116        1.0
+  2 LG HDR 4K                       3840×2160   3840×2160  3840×2160        4.1
+  ─────────────────────────────────────────────────────────────────────────────
+  MacBook Pro Microphone (default)                         1 channel        0.1
+  RØDE Wireless GO II RX                                   2 channels       0.1
+  System audio                                             stereo           0.1
+  ─────────────────────────────────────────────────────────────────────────────
+  Total                                                                     5.3
+  2 hours need 10.7 GB, 3.1 GB free.
   Files go to ~/Movies/Multi Screen Recorder
 ```
 
@@ -469,11 +472,17 @@ checked, reported or rewritten at the next start (D47).
 
 ## The app
 
-- **Start:** a small window. At the top, a section "What will be
-  recorded", built from the settings and the devices connected now and
-  refreshed whenever the ready check runs (D33): one table and a
-  total line. The columns are Source, "Looks like", "Drawn at", "Records
-  at" and GB/h, the last for every row and right-aligned. The widths of
+- **Start:** a small window. At the top, the app icon, the name, the
+  version and a link to the homepage (`Homepage.url`, defined once).
+  Then a section "What will be recorded", built from the settings and
+  the devices connected now and
+  refreshed whenever the ready check runs (D33): one table, with a
+  header, striped rows and a border, and its total row. The columns are
+  Source, "Looks like", "Drawn at", "Records
+  at" and "GB/h max", the last for every row and right-aligned. GB/h max
+  is the encoder's ceiling (`kVTCompressionPropertyKey_DataRateLimits`),
+  the most a source can write, and the disk checks rely on it; what one
+  hour writes is usually less (D53). The widths of
   the columns after Source are measured at runtime from the widest
   possible content in the table's font ("8888×8888", "cannot be read",
   "888.8" and so on, and the header), never from what is
@@ -483,33 +492,35 @@ checked, reported or rewritten at the next start (D47).
   name in the middle (the full name is its tooltip).
   - Display rows first: the number and name, "Looks like" (the size in
     points), "Drawn at" (the pixel size, shown also where both are
-    equal), "Records at" (the frame size) and GB/h (the display file,
+    equal), "Records at" (the frame size) and GB/h max (the display file,
     its guide tracks included).
   - A thin divider, no second header, then the audio rows: the name of
     each audio input (the default one marked "(default)") in Source,
     Looks like and Drawn at empty, its number of channels in Records
-    at ("1 channel", "2 channels", "cannot be read"), and GB/h (the
+    at ("1 channel", "2 channels", "cannot be read"), and GB/h max (the
     audio file); the last row is "System audio" with "stereo". A source not recorded
-    is dimmed and its GB/h is 0 (D46): every input with the audio
+    is dimmed and its GB/h max is 0 (D46): every input with the audio
     mode `none`; every input but the default one with
     `default-microphone`; with `wired` every input but the default one
     that is not built-in or wired; and the system audio row when it is
     off.
-  - GB/h is numbers only (D46), with one decimal; under 0.05 it shows
+  - GB/h max is numbers only (D46), with one decimal; under 0.05 it shows
     "<0.1", and "?" when the rate cannot be told (an input whose
     channels cannot be read).
-  - The total line: "Total <x> GB/h. <requiredRecordingHours> hours
+  - The total row, after a divider: "Total" in Source and the sum in
+    GB/h max. Below the table the line "<requiredRecordingHours> hours
     need <y> GB, <z> GB free.", without the free part while the free
     space is unknown (the ready check has not finished yet, or its
     output folder item failed).
-  - Below, the output folder and "Recording continues when displays or
-    audio sources change." If the displays cannot be read, that error
+  - Below, "Files go to" and the output folder, a link that opens it in
+    Finder (an alert says so if Finder cannot), and "Recording continues
+    when displays or audio sources change." If the displays cannot be read, that error
     stands as a red line above the table, which then has no display
     rows; if the audio inputs cannot be read, "The audio inputs cannot
     be read: <reason>" stands as a red line above the table too, which
     then has the system audio row only; an audio input whose channels
-    cannot be read shows "cannot be read" in the Records at column (and "?" GB/h if it is recorded). The total line
-    appears only when the displays and every recorded audio input can
+    cannot be read shows "cannot be read" in the Records at column (and "?" GB/h max if it is recorded). The total row
+    and the line below it appear only when the displays and every recorded audio input can
     be read. The ready check's items stay as they are.
 
   Then a switch "Auto", on by default: the two sliders are always shown, so
@@ -525,10 +536,11 @@ checked, reported or rewritten at the next start (D47).
   microphone switches it to call quality, and a virtual microphone
   often carries a copy of other sound." Then system audio and output
   folder, which stay as they are; the ready check, with "Check again";
-  and Start. A change of a choice is saved at once; if the settings file
+  and, in the lower right corner, Cancel and Start. Cancel quits the
+  app without recording, as Cmd-Q does. A change of a choice is saved at once; if the settings file
   cannot be written, a red line says so. The window has no "Reset to
   defaults": a settings file is never refused.
-  The table and the total line are the same data that `msr check`
+  The table and the line below it are the same data that `msr check`
   prints as text.
    All green,
   the ready check is one line, "Ready to record", that expands on click
@@ -537,15 +549,16 @@ checked, reported or rewritten at the next start (D47).
   devices of the `msr list` example, the defaults and the free space
   of the `msr check` example, the section shows:
 
-| Source | Looks like | Drawn at | Records at | GB/h |
+| Source | Looks like | Drawn at | Records at | GB/h max |
 |---|---|---|---|---|
 | 1 Built-in Retina Display | 1728×1117 | 3456×2234 | 1728×1116 | 1.0 |
 | 2 LG HDR 4K | 3840×2160 | 3840×2160 | 3840×2160 | 4.1 |
 | MacBook Pro Microphone (default) |  |  | 1 channel | 0.1 |
 | RØDE Wireless GO II RX |  |  | 2 channels | 0.1 |
 | System audio |  |  | stereo | 0.1 |
+| Total |  |  |  | 5.3 |
 
-Total 5.3 GB/h. 2 hours need 10.7 GB, 3.1 GB free.
+2 hours need 10.7 GB, 3.1 GB free.
 
 - **Recording:** the window closes; the Dock icon has no badge while
   all is well, no timer (D47). Low disk space shows as a "!" badge and a
@@ -561,20 +574,21 @@ Total 5.3 GB/h. 2 hours need 10.7 GB, 3.1 GB free.
   then a row per audio source the recording records or recorded (the
   audio inputs by name, the system audio last), and the columns Source,
   "Records at" (a display's frame size; an audio source's `1 channel`,
-  `2 channels` or `stereo`), Files, "GB written" (its files on disk) and
+  `2 channels` or `stereo`), Files, Written (its files on disk, below
+  1 GB in whole MB, from there in GB with one decimal) and
   State (`recording`, `waiting`, `failed, retrying`, `shows another
   display`, `disk full`, `mirroring`, `disconnected`, `asleep`, and for
   an audio input no longer in the audio mode, such as the default
   microphone before a change, `not recorded`); under it the line
   "Recording 1:07:00 · 1.3 GB in 3 files · 120.4 GB free", the elapsed
-  time as `h:mm:ss` (D47); then "CPU 23 %", our process's CPU use in
+  time as `h:mm:ss` (D47) and the sizes as in Written; then "CPU 23 %", our process's CPU use in
   percent of one core as Activity Monitor shows it, sampled every
   second, with the line "Encoding and capture also run in macOS's own
   processes (VTEncoderXPCService, replayd, WindowServer), which this
   number does not include."; the problems in red, with the command for
   the log (see "Logging"); and [Stop] [Continue]. It refreshes every second
   while open; Continue closes it. A display file whose size cannot be
-  read makes its display's GB written `?`, and the line's data written
+  read makes its display's Written `?`, and the line's data written
   `? GB`. Free space that the volume does not report is a problem as a
   failing read is. A problem goes into the
   recording manifest, which is written at once (unless writing it is

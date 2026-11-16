@@ -89,6 +89,19 @@ import Testing
         #expect(DiskEstimate.gigabytes(bytes) == text)
     }
 
+    /// The status window's sizes: below 1 GB in whole MB, from there as GB.
+    @Test(arguments: [
+        (0.0, "0 MB"),
+        (40_000_000.0, "40 MB"),
+        (350_400_000.0, "350 MB"),
+        (999_499_999.0, "999 MB"),
+        (999_500_000.0, "1.0 GB"),
+        (1_260_000_000.0, "1.3 GB"),
+    ])
+    func sizesBelowOneGigabyteAreMegabytes(bytes: Double, text: String) {
+        #expect(DiskEstimate.megabytesOrGigabytes(bytes) == text)
+    }
+
     @Test(arguments: [
         (1_072_000_000.0, "1.1"),
         (57_600_000.0, "0.1"),

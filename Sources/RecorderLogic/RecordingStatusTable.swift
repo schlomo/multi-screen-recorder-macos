@@ -10,33 +10,34 @@ public enum RecordingStatusTable {
         return String(format: "%d:%02d:%02d", whole / 3600, whole / 60 % 60, whole % 60)
     }
 
-    public static let columns = ["Source", "Records at", "Files", "GB written", "State"]
+    public static let columns = ["Source", "Records at", "Files", "Written", "State"]
 
     public struct Row: Equatable, Sendable {
         public var source: String
         public var recordsAt: String
         public var files: Int
-        public var gigabytesWritten: String
+        /// The size of its files on disk, "350 MB" or "1.3 GB".
+        public var written: String
         public var state: String
 
-        public init(source: String, recordsAt: String, files: Int, gigabytesWritten: String, state: String) {
+        public init(source: String, recordsAt: String, files: Int, written: String, state: String) {
             self.source = source
             self.recordsAt = recordsAt
             self.files = files
-            self.gigabytesWritten = gigabytesWritten
+            self.written = written
             self.state = state
         }
 
-        public var cells: [String] { [source, recordsAt, String(files), gigabytesWritten, state] }
+        public var cells: [String] { [source, recordsAt, String(files), written, state] }
     }
 
     /// `bytes`: each display file's size on disk, by its name; a file
-    /// without one makes its display's GB written "?".
+    /// without one makes its display's Written "?".
     public static func rows(sources: [DisplayTracker.Source], files: [RecordingManifest.DisplayFile], bytes: [String: Int64]) -> [Row] {
         sources.map { source in
             let own = files.filter { $0.displayUUID == source.uuid }
             let sizes = own.map { bytes[$0.name] }
-            let written: String = sizes.contains(nil) ? "?" : String(format: "%.1f", Double(sizes.compactMap(\.self).reduce(0, +)) / 1_000_000_000)
+            let written = writtenText(sizes)
             let frameSize: FrameSize? = if case .recording(let size) = source.state { size } else {
                 own.last.map { FrameSize(width: $0.frameSize[0], height: $0.frameSize[1]) }
             }
@@ -44,7 +45,7 @@ public enum RecordingStatusTable {
                 source: source.number.map { "\($0) \(source.name)" } ?? source.name,
                 recordsAt: frameSize.map { "\($0.width)×\($0.height)" } ?? "",
                 files: own.count,
-                gigabytesWritten: written,
+                written: written,
                 state: text(source.state))
         }
     }
@@ -60,14 +61,19 @@ public enum RecordingStatusTable {
                 }
             }
             let sizes = own.map { bytes[$0.name] }
-            let written: String = sizes.contains(nil) ? "?" : String(format: "%.1f", Double(sizes.compactMap(\.self).reduce(0, +)) / 1_000_000_000)
+            let written = writtenText(sizes)
             let channels: String = switch own.last?.channels {
             case .mono(let count): count == 1 ? "1 channel" : "\(count) channels"
             case .stereo: "stereo"
             case nil: ""
             }
-            return Row(source: source.name, recordsAt: channels, files: own.count, gigabytesWritten: written, state: text(source.state))
+            return Row(source: source.name, recordsAt: channels, files: own.count, written: written, state: text(source.state))
         }
+    }
+
+    /// The files' sizes together; "?" when one cannot be read.
+    private static func writtenText(_ sizes: [Int64?]) -> String {
+        sizes.contains(nil) ? "?" : DiskEstimate.megabytesOrGigabytes(Double(sizes.compactMap(\.self).reduce(0, +)))
     }
 
     static func text(_ state: AudioTracker.Source.State) -> String {
@@ -95,14 +101,15 @@ public enum RecordingStatusTable {
         }
     }
 
-    /// "Recording 1:07:00 · 1.3 GB in 3 files · 120.4 GB free"; "? GB" when
+    /// "Recording 1:07:00 · 1.3 GB in 3 files · 120.4 GB free", below 1 GB
+    /// in MB; "? GB" when
     /// a file's size cannot be read (`bytesWritten` nil), and without the
     /// free space when it cannot be read.
     public static func line(elapsedSeconds: Double, bytesWritten: Int64?, files: Int, freeBytes: Int64?) -> String {
-        let written = bytesWritten.map { DiskEstimate.gigabytes(Double($0)) } ?? "? GB"
+        let written = bytesWritten.map { DiskEstimate.megabytesOrGigabytes(Double($0)) } ?? "? GB"
         var line = "Recording \(elapsed(elapsedSeconds))"
             + " · \(written) in \(files) file\(files == 1 ? "" : "s")"
-        if let freeBytes { line += " · \(DiskEstimate.gigabytes(Double(freeBytes))) free" }
+        if let freeBytes { line += " · \(DiskEstimate.megabytesOrGigabytes(Double(freeBytes))) free" }
         return line
     }
 }
