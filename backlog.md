@@ -227,8 +227,24 @@ Nothing.
    - The owner, 2026-11-16: in `12.41.06` and `12.50.45` nothing played
      through the Mac (the radio was in the room), so their system-audio
      zeros are right; the dock's Ethernet is in use, so it cannot be
-     switched off to shorten the pause. The owner will repeat the
-     Wacom replug with the Wacom on a Mac port. Open: app-against-CLI
+     switched off to shorten the pause.
+   - The Wacom on a Mac port (`msr record --debug`, `13.21.55`,
+     2026-11-16): no PCI pause, no zeros or loops in any USB input, the
+     BRIO stayed alive; the Pebble broke once (system audio 1.8 s of
+     zeros at +124.8). Plugged back into the dock after the run: a
+     4.1 s PCI pause (Ethernet last) and the BRIO dead again. So the
+     cabling advice holds. But the DELL's writer still fell behind
+     (video ends +123.7, new file +128.1, 4.4 s lost) while the Wacom
+     came up on the Mac port: WindowServer logged "failed to send rlfg
+     reply" 0.7 s before the DELL's frames stopped, and msr's own
+     logging went nearly quiet. So the DELL loss comes from macOS
+     reconfiguring the displays, not from USB: designs (a) and (b)
+     are what saves it. The Wacom on another port is a new display
+     to macOS (another UUID), so the recording named it Display 3;
+     the same screen on another port getting a new number is
+     expected but may puzzle people. The run also reproduced
+     `result: problems` with `problems: []` (item 1). Open:
+     app-against-CLI
      repeat runs with `--debug` to settle whether the app's front end
      adds to the stall (msr logged "skipping cycle due to overload" only
      in the app run).
