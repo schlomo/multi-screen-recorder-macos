@@ -34,6 +34,10 @@ to the tester guide, the problem report form and the repository.
   `@2x`, which Cloudflare redirects). Any other has 1. To update one,
   replace the file, and rename it (in `home.html` too) if its pixels per
   point changed.
+- **Link preview image** (Open Graph, `og:image`): 1200 x 630, drawn by Hugo at
+  build time in `layouts/_partials/link-preview-image.html` from the icon
+  artwork, the site's name and the tagline, on the `artwork` colour; the
+  `<meta>` tags are in `layouts/_partials/head.html`.
 - **Favicons:** `static/favicon*` and `static/apple-touch-icon.png`, rendered
   from `assets/icon/app-icon.svg` by `scripts/render-app-icon`; never edit them
   by hand.
