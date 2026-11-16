@@ -8,7 +8,9 @@ I can share with friendly testers ASAP and then keep optimizing". The
 architect's order: queued item 1, the first tester release (signed off
 2026-11-16; in flight, see below); then item 3,
 the end-to-end tests; item 4, the simplification; item 7, auto-recovery
-from disturbances; item 6, CPU; item 5, drift correction. Agents may
+from disturbances; item 6, CPU; item 5, drift correction; then item
+16, the Mac App Store and Homebrew (the owner, 2026-11-16: "sandbox
+then comes after the optimizations"). Agents may
 run `msr record` on the owner's Mac (D48; the owner's go-ahead in the
 session, 2026-11-16), and BetterDisplay's command line with the
 owner's virtual screen "Virtual 16:9".
@@ -381,13 +383,41 @@ Still open from D34: what AGC does and whether it is on in auto mode;
    the owner's. Left: how later changes reach the page, if more than
    the branch.
 
+16. **Mac App Store and Homebrew** (the owner, 2026-11-16: "I'd like
+   to release the app through the Apple Store [...] charge like 5-10€
+   via the app store while still offering the free install via
+   Homebrew"). The licence stays GPLv3; the owner, as the sole
+   rights holder, distributes App Store builds under other terms; the
+   contributor clause and the dual-licensing note come with item 1's
+   PR (D54). Order, from the architect's assessment of 2026-11-16:
+   - A sandbox test on the owner's Mac (about half a day, no cost):
+     our build signed with `com.apple.security.app-sandbox`; check
+     displays, microphones, system audio, writing to `~/Movies`
+     (`assets.movies.read-write`), any other folder (security-scoped
+     bookmark), `msr` from a terminal, settings and `state.json` in
+     the container, the crash-report reader (blocked in the sandbox).
+     Aim: one sandboxed build for every channel (tested = shipped);
+     a second build only for what the sandbox cannot carry.
+   - The owner joins the Apple Developer Program (€99 a year; revives
+     the deferred Developer ID item, D5).
+   - Developer ID signing and notarization, a Homebrew tap
+     (`schlomo/tap`; Homebrew drops casks that fail Gatekeeper
+     [ASSUMED]).
+   - The App Store build (Apple Distribution certificate, installer
+     certificate, provisioning profile, App Store Connect key, all
+     injected), App Review; each submission needs the owner's go-ahead.
+   - The owner's, outside the code: the EU trader details shown on the
+     App Store (address, phone, email; DSA), tax, and a lawyer's look
+     at the contributor clause.
+
 ## Deliberately deferred
 
 - **Skipping the MacBook microphone while the lid is closed**: Apple
   silicon MacBooks disconnect it in hardware then, so its file holds
   only zeros (seen 2026-11-16). Harmless; revisit with item 11 (an input
   that delivers only zeros) or if the files bother the owner.
-- **Developer ID signing and notarization** (D5). Deferred because the
+- **Developer ID signing and notarization** (D5), revived as part of
+  queued item 16 after the optimizations. Deferred because the
   Apple Developer Program costs €99 a year and the owner can work with
   a self-signed build. Revisit when users beyond the owner need to
   install it without "Open Anyway". It then needs an approval step
