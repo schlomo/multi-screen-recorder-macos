@@ -203,13 +203,18 @@ Still open from D34: what AGC does and whether it is on in auto mode;
    defaults to default camera if available"). A camera's file carries
    audio too ("Later for webcam we'll have more combined files as we of
    course want have audio there as well", 2026-11-16). Design first.
-11. **App icon, what is left** after PR #7 (classic `.icns` rendered
+11. **A live status line for `msr record` in a terminal** (the owner,
+   2026-11-16: "if running in a terminal (try) then show the running
+   status as persistent last line, recording time, CPU, recording size
+   etc."). Design first; the architect's proposal is in the session's
+   reply of 2026-11-16.
+12. **App icon, what is left** after PR #7 (classic `.icns` rendered
    from `assets/icon/app-icon.svg`): the macOS 26 layered icon format
    from the SVG's layers, if a plain package build can compile it; a
    simplified drawing below 32 px (two displays and a larger dot), from
    the owner's choice of 2026-11-12. Revisit when the owner finds the
    Dock or Finder icon lacking.
-12. **Homepage** (D7): the branch name and how changes reach it
+13. **Homepage** (D7): the branch name and how changes reach it
    (architect); the DNS entry for `multiscreenrecorder.schapiro.org`
    (owner).
 
