@@ -97,6 +97,16 @@ Still open from D34: what AGC does and whether it is on in auto mode;
    - Not covered anywhere: real USB re-enumeration, the lid, Bluetooth,
      power loss. A VM on the owner's Mac (Tart, not Parallels) only if
      needed later; it has no hardware encoder.
+   - Artifacts for review (the owner, 2026-11-16: "the PR preview
+     builds could actually create some outputs as artifacts to look at,
+     e.g. screenshots or videos"; then "CI screenshots are optimization
+     and part of end-end tests in CI"): each PR run uploads offscreen
+     renders of the start and status windows, drawn from made-up
+     devices by a script CI only wires, and a few seconds of the files
+     the end-to-end run recorded. The same script can then regenerate
+     the homepage screenshot as a derived file. Rendering in a real,
+     invisible window instead of `ImageRenderer` should draw the app
+     icon and the links [ASSUMED].
 4. **Simplification** (the Fable review of 2026-11-15; the owner: yes
    to all four questions, 2026-11-16): `unpack-app` uses the standard
    library's `filter="data"`; the run-loop hold goes; `recording.json`
