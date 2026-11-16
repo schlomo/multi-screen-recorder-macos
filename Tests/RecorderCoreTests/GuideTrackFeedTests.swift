@@ -28,11 +28,13 @@ import Testing
         // delivery much later than 150 ms, and only the outcome counts.
         let received = await feed.waitUntilReceived(upTo: end, bound: .seconds(60))
         #expect(received)
-        await late.value
+        // Peeked right away: a wait that returned before the late samples
+        // came would leave silence at the end.
         let id = feed.listen { _, _, _ in }
         let peek = feed.stopListening(id, peekingUpTo: end)[.microphones]
         #expect(peek.map { $0.channels.first?.count == Int(end - $0.start) } == true)
         #expect(peek?.channels.first?.last == 0.25)
+        late.cancel()
     }
 
     @Test func withoutTheSamplesTheWaitEndsAtItsBound() async {

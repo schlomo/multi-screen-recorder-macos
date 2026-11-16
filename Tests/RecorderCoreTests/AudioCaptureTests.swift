@@ -257,7 +257,7 @@ import Testing
         #expect(files.isEmpty)
     }
 
-    @Test func aWriterThatTakesNothingForTheLateTickBoundFellBehind() async throws {
+    @Test func aWriterThatTakesNothingForTheAudioWaitBoundFellBehind() async throws {
         let capture = capture(drainTimeout: .milliseconds(10))
         writer.isReady = false
         let buffers = RecorderValues.audioWaitBoundSeconds * RecorderValues.audioSampleRate / samplesPerBuffer + 2

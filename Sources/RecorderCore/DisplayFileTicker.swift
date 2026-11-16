@@ -183,7 +183,9 @@ public final class DisplayFileTicker {
     /// Ends the file: writes the ticks due by `now` and, with
     /// `writeWaitingTicks`, those still waiting, for at most the drain
     /// timeout on a clock that does not count sleep, and the guide tracks
-    /// up to the video's end from `lastMix`, given that end, each joined
+    /// up to the video's end from `lastMix`, given that end (the capture's
+    /// `lastMix` first waits up to `audioWaitBoundSeconds` for its sources'
+    /// sound up to that end), each joined
     /// into one buffer that waits for the writer as long again; then always
     /// finalizes. A guide track whose last mix has a hole after what the
     /// file received is written up to the hole, never filled with silence,

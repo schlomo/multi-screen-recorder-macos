@@ -23,7 +23,9 @@ report form and the repository.
   defined
 - **Header image:** the app icon artwork `../assets/icon/app-icon-fancy.jpeg`,
   mounted by `[module]` in `hugo.toml` (never copied here) and resized by
-  Hugo to a 256 px WebP in `layouts/baseof.html`.
+  Hugo to a 256 px WebP in `layouts/baseof.html`. Changing that file
+  triggers no homepage build (it is outside the watch path); the next
+  homepage change picks it up.
 - **Favicons:** `static/favicon*` and `static/apple-touch-icon.png`, rendered
   from `assets/icon/app-icon.svg` by `scripts/render-app-icon`; never edit them
   by hand.

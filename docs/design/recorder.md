@@ -418,11 +418,11 @@ capture in macOS's own processes, `VTEncoderXPCService`, `replayd`,
 recording is finalized. `problems` lists every problem told to the
 person, also those that leave `result` `ok`, each with `at`,
 `problem` (what went wrong) and `error` (the full error text, or null).
-A failure is told at its event's time. When the recording is
-finalized, a failure counts as told when a problem about its display
-or audio source was told at or before its time; one that is not, and a
-file not finalized that no problem names, is listed then, so a
-`result` of `problems` always comes with its problems.
+A failure is told while recording, at its event's time. A `result` of
+`problems` never comes with empty `problems` (D47): should nothing have
+been told, finalizing adds one problem, "A failure was not told while
+recording", naming the first failure and how many failure events there
+were (or, without a failure event, the first file not finalized).
 `events` and `problems` are written in the order of their time.
 An audio file's `audioSource` is the audio input's name (see "Audio
 input names" below) or `System audio`; `audioSourceUID` the input's

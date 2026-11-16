@@ -11,7 +11,8 @@ public enum RecorderValues {
     /// at a display file's end (D53).
     public static let displayFileLateTickSeconds = 6
     /// How long audio waits: guide track samples for a display file's
-    /// writer, and an audio file's samples for its writer, also at its end.
+    /// writer, a display file's last mix for its sources' sound up to the
+    /// video's end, and an audio file's samples for its writer, also at its end.
     public static let audioWaitBoundSeconds = 2
     /// The fragment length of every file: a crash loses at most this much.
     public static let fragmentSeconds = 2

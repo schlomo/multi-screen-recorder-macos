@@ -307,9 +307,8 @@ public struct RecordingManifest: Codable, Equatable, Sendable {
         return true
     }
 
-    /// The recording ends: its end time, its result and its CPU use. What
-    /// makes the result `problems` and was not told is listed in
-    /// `problems` now, so the two never disagree (D47).
+    /// The recording ends: its end time, its result and its CPU use; a
+    /// result of `problems` never comes with empty `problems` (D47).
     public mutating func finalize(ended date: Date, timeZone: TimeZone, cpu: CPU? = nil) {
         state = .finalized
         ended = Self.timestamp(date, timeZone: timeZone)
@@ -318,25 +317,24 @@ public struct RecordingManifest: Codable, Equatable, Sendable {
         self.cpu = cpu
     }
 
-    /// The failures no problem tells, and the files not finalized that no
-    /// problem names. A failure is told by a problem about its display or
-    /// audio source at or before its time, also one listed here for an
-    /// earlier failure; a failure about neither, by a problem at its time.
+    /// D47's rule that `problems` is never empty when the result is
+    /// `problems`: failures are told while recording, so this adds a
+    /// problem only when nothing was told, naming the first failure and
+    /// how many there were, or else the first file not finalized.
     private var untoldProblems: [RecordingProblem] {
-        var told = problems
-        for event in events.sorted(by: { $0.at < $1.at }) where event.event.isFailure {
-            let isTold = told.contains { problem in
-                if let subject = event.subject { problem.at <= event.at && problem.problem.contains(subject) }
-                else { problem.at == event.at }
-            }
-            if !isTold { told.append(event.problem) }
+        guard problems.isEmpty, !endedWell else { return [] }
+        let failures = events.filter(\.event.isFailure).sorted { $0.at < $1.at }
+        if let first = failures.first {
+            let count = failures.count == 1 ? "1 failure event" : "\(failures.count) failure events"
+            return [RecordingProblem(
+                atSeconds: first.at, problem: "A failure was not told while recording",
+                error: "\(first.problem.text) (\(count), see events)")]
         }
-        let named = { (name: String) in told.contains { $0.text.contains(name) } }
-        let displayFiles = files.filter { $0.state != .finalized && !named($0.name) }
-            .map { RecordingProblem(atSeconds: $0.end ?? $0.start, problem: "Display file \($0.name)", error: "not finalized") }
-        let audioFiles = audioFiles.filter { $0.state != .finalized && !named($0.name) }
-            .map { RecordingProblem(atSeconds: $0.end ?? $0.start, problem: "Audio file \($0.name)", error: "not finalized") }
-        return Array(told.dropFirst(problems.count)) + displayFiles + audioFiles
+        let notFinalized = files.filter { $0.state != .finalized }.map { ($0.name, $0.end ?? $0.start) }
+            + audioFiles.filter { $0.state != .finalized }.map { ($0.name, $0.end ?? $0.start) }
+        guard let (name, at) = notFinalized.first else { return [] }
+        return [RecordingProblem(
+            atSeconds: at, problem: "A file was not finalized and nothing was told while recording", error: name)]
     }
 
     /// "2026-11-12T14:03:05.120+01:00".

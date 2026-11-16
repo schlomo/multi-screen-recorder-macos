@@ -159,7 +159,7 @@ private struct SettingsForm: View {
 
 /// One table with a header, striped rows and a border: the displays, the
 /// audio sources and the total.
-struct WhatWillBeRecordedView: View {
+private struct WhatWillBeRecordedView: View {
     let section: WhatWillBeRecorded
     /// The output folder as the settings name it, a link that opens it in Finder.
     let outputFolder: String
