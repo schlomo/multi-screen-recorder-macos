@@ -2,18 +2,20 @@
 
 ## Next session starts here
 
-PR #12 (B2, the audio) merged 2026-11-16; release `v0.20261116.33`.
-The owner's goal now (2026-11-16): "I'd like to come to a working app
+PR #13 (the first tester release) merged 2026-11-16; the homepage is
+live at `multiscreenrecorder.schapiro.org` (Cloudflare Workers Builds,
+D53). The owner's goal (2026-11-16): "I'd like to come to a working app
 I can share with friendly testers ASAP and then keep optimizing". The
-architect's order: queued item 1, the first tester release (signed off
-2026-11-16; in flight, see below); then item 3,
-the end-to-end tests; item 4, the simplification; item 7, auto-recovery
+testers get the build after queued item 1, the naming and window polish
+(in flight), and item 1a, the homepage screenshot. Then: item 3, the
+end-to-end tests; item 4, the simplification; item 7, auto-recovery
 from disturbances; item 6, CPU; item 5, drift correction; then item
 16, the Mac App Store and Homebrew (the owner, 2026-11-16: "sandbox
-then comes after the optimizations"). Agents may
-run `msr record` on the owner's Mac (D48; the owner's go-ahead in the
-session, 2026-11-16), and BetterDisplay's command line with the
-owner's virtual screen "Virtual 16:9".
+then comes after the optimizations"). Agents may run `msr record` on
+the owner's Mac (D48; the owner's go-ahead in the session,
+2026-11-16), and BetterDisplay's command line with the owner's virtual
+screen "Virtual 16:9"; the architect tells the owner before an agent
+records (a tone played unannounced on 2026-11-16).
 
 How the owner wants changes that show in the window or on the command
 line handled (2026-11-15: "what about working locally and letting me
@@ -28,53 +30,32 @@ Still open from D34: what AGC does and whether it is on in auto mode;
 
 ## In flight
 
-- **First tester release** (queued item 1), branch
-  `first-tester-release`, one PR, a builder at work since 2026-11-16.
-  Two of the owner's rulings of 2026-11-16 changed the design, recorded
-  as D53 in the PR: the homepage is a Hugo site in `homepage/` on
-  `main`, built and served by Cloudflare Workers Builds like
-  `schapiro-org/homepage` ("OK, homepage/ on main, all in one PR for
-  the testers"), not a `gh-pages` branch on GitHub Pages; the window's
-  GB/h is labelled a maximum ("GB/h max", the encoder's ceiling, which
-  the disk checks rely on), not calibrated. The architect fixes
-  `docs/architecture.md` on the branch. Next: adversarial review, the
-  owner tries the local build, the owner connects the Cloudflare
-  Worker.
+- **Naming and window polish** (queued item 1), branch
+  `naming-and-window-polish`, one PR, a builder at work since
+  2026-11-16.
 
 ## Queued
 
-1. **First tester release** (the owner, 2026-11-16: "I'd like to come
-   to a working app I can share with friendly testers ASAP and then keep
-   optimizing"). One small PR; the owner signed off the design below on
-   2026-11-16 ("I agree with your proposal"), self-signed signing
-   included:
-   - Fixes: a recording with `result: problems` but `problems: []`
-     (`2026-11-16 12.24.51`, against D47); the guide tracks' 0.3 s of
-     zeros at Stop (Done, PR #12's leftovers); the writer's allowance
-     before a display file ends raised from 2 s to about 6 s
-     (`RecorderValues.lateTickBoundSeconds`, data only; item 7).
-   - The window part of item 13: the version and a link, Cancel, the
-     table, the folder as a link, MB below 1 GB, the GB/h estimate
-     calibrated against the measured 1.7 GB/h.
-   - A basic homepage on the `gh-pages` branch, published by GitHub
-     Pages (the owner, 2026-11-16: "the tester build should also create
-     a basic homepage in a gh-pages branch that we then use to
-     publish"); the owner sets up the DNS entry for
-     `multiscreenrecorder.schapiro.org`. The window, the banner and the
-     tester guide link to it.
-   - A tester guide in the README: download, install, "Open Anyway",
-     the two permissions, known limits (CPU, drift, USB disturbances),
-     and how to report: a GitHub Issue form asking for `msr version`,
-     the recording's `recording.json` and what happened.
-   - The testers all have Apple-silicon MacBooks (the owner,
-     2026-11-16); the guide states macOS 26 as the minimum.
-   - Signing for testers: the self-signed certificate (D5), testers
-     click "Open Anyway" once; Developer ID (99 USD a year, Apple's
-     notarization) when testers beyond friends come. The PR records
-     this in the decisions log.
-   - `lateTickBoundSeconds` also bounds the guide-track wait and the
-     audio drain; raising it for display files must not lengthen those
-     unasked: give the display file's allowance its own value.
+1. **Naming and window polish** (the owner signed off 2026-11-16: "yes
+   to all other points", "I approve the naming change to screen and
+   audio for consistency. the next PR fixes what is left now"), D55:
+   - "Screen" and "audio" are the terms everywhere, code included
+     (Apple's API names stay); the claim "Every screen, all audio.
+     Keeps going when things change." in italics, right-aligned in the
+     window's header, and as the homepage tagline.
+   - Every recorded source is `Screen <n>`, `Audio <n>` (later
+     `Camera <n>`), numbered per kind from 1 in order of appearance,
+     kept for the whole recording (a screen by its UUID, an audio
+     input by its UID; a screen on another port is another screen,
+     the owner: "good as-is"); system audio is `Audio 0 - System`; the
+     " (2)" suffix goes. File names `<start time> <label>.mov`; the
+     reel names use the label.
+   - The window's Source column: an icon for the kind, the number and
+     the name; the terminal prints the label.
+   - Buttons stay at the macOS defaults (the owner, 2026-11-16).
+   - The leftovers of PR #13: see "Done (recent)".
+1a. **Homepage screenshot**: the start window from the release build
+   after item 1 merges, in a homepage-only PR (no app release).
 2. **Toolchain catch-up** (D28): the pipeline builds with Xcode 26.6,
    Swift 6.3 and Python 3.15, the newest on GitHub's generally
    available runner image (D32 for Python), while the owner's Mac has
@@ -378,10 +359,10 @@ Still open from D34: what AGC does and whether it is on in auto mode;
    simplified drawing below 32 px (two displays and a larger dot), from
    the owner's choice of 2026-11-12. Revisit when the owner finds the
    Dock or Finder icon lacking.
-15. **Homepage** (D7): the basic page and the `gh-pages` branch come
-   with item 1; the DNS entry for `multiscreenrecorder.schapiro.org` is
-   the owner's. Left: how later changes reach the page, if more than
-   the branch.
+15. **Homepage** (D7, D53): live since PR #13. Left: preview URLs on
+   PRs (Cloudflare's comment had none before the first production
+   deploy; check on the next homepage PR); the owner's check that
+   `schapiro.org/impressum/` covers the subdomain.
 
 16. **Mac App Store and Homebrew** (the owner, 2026-11-16: "I'd like
    to release the app through the Apple Store [...] charge like 5-10€
@@ -537,6 +518,21 @@ Still open from D34: what AGC does and whether it is on in auto mode;
 
 ## Done (recent)
 
+- 2026-11-16: PR #13 merged by the owner: the first tester release
+  (D53, D54): the fixes, the window, the homepage, the tester guide,
+  the problem report form, the contributor clause. Reviews: one top
+  tier, three delta rounds. Leftovers, kept here until they land:
+  - `Recorder.stopping` is never emptied (harmless; item 4).
+  - Test harness: on GitHub's runner a 150 ms delayed task ran 13 s
+    late, likely `Process.waitUntilExit()` in `CommandTests` holding
+    the cooperative pool [CONJECTURE]; move those waits off the pool
+    (item 4).
+  - The live telling of display and audio failures in `Recorder` has
+    no unit test (`Recorder` is not built in any test); verified only
+    live (item 4's `DisplayCapture` stand-in).
+  - The last mix's wait for the sound is unit-tested only; one live
+    recording on the owner's Mac checks the guide tracks' end (after
+    item 1, announced to the owner).
 - 2026-11-16: PR #12 merged by the owner: B2, the audio, with B1's
   follow-ups (D48 to D52); release `v0.20261116.33`. Leftovers, kept
   here until they land in a later PR:
