@@ -170,6 +170,9 @@ public final class Recorder {
             sampleCPU()
             unregisterForChanges()
             for action in tracker.stopAll() { perform(action) }
+            // The audio sources stop after the display files' last mix, so
+            // their guide tracks hold the sound up to the video's end (D51).
+            for task in stopping { await task.value }
             for action in audioTracker.stopAll() { performAudio(action) }
             for task in stopping { await task.value }
             takeAudioReports()
@@ -385,9 +388,16 @@ public final class Recorder {
         context.update(displays, lastDisplayChange: tracker.lastDisplayChange)
         apply(step)
         displaysForAudio(displays)
-        // A display that stays listed but cannot be captured is never left unrecorded silently (N-A).
-        if reason == .captureSourceGone, step.events.contains(where: { $0.event == .displayStreamFailed }) {
-            tell("Display \(display) cannot be captured", error: DisplayTracker.captureSourceGoneAgain, kind: .displayNotCaptured(uuid))
+        // A display file ended by a failure is told at the failure's time,
+        // so the recording manifest lists it once (D47); a display that
+        // stays listed but cannot be captured is never left unrecorded silently (N-A).
+        for failure in step.events where failure.event.isFailure {
+            var problem = failure.problem
+            if reason == .captureSourceGone, failure.event == .displayStreamFailed {
+                problem.problem = "Display \(display) cannot be captured"
+                problem.error = DisplayTracker.captureSourceGoneAgain
+            }
+            tell(problem, kind: .displayNotCaptured(uuid))
         }
     }
 
@@ -487,8 +497,12 @@ public final class Recorder {
         _ = manifest.record(end.events)
         try? writeManifest()
         told(end.events)
-        if let error = end.error {
-            tell("Audio file \(end.file.name)", error: error.description, kind: .audioFileFailed(end.file.name))
+        // At the file's end, so a lost end (`audio file writer fell behind`) is told once (D47).
+        if end.error != nil || !end.events.isEmpty {
+            let at = Int64(((end.file.end ?? end.file.start) * 1_000_000_000).rounded())
+            tell(RecordingProblem(at: at, problem: "Audio file \(end.file.name)",
+                                  error: end.error?.description ?? "its writer fell behind"),
+                 kind: .audioFileFailed(end.file.name))
         }
     }
 
@@ -503,25 +517,27 @@ public final class Recorder {
     ) {
         guard !isStopped, let (current, _) = audioCaptures[id], current == number else { return }
         audioCaptures[id] = nil
+        // Told at the time of the failure's event, so the recording manifest lists it once (D47).
+        let now = context.now()
         switch reason {
         case .captureFailed(let error):
             tell(id == .systemAudio ? "The system audio failed" : "The audio input \(name) failed", error: error,
-                 kind: .audioSourceFailed(name))
+                 kind: .audioSourceFailed(name), at: now)
         case .writerFailed(let error):
-            tell("The audio file of \(name) failed", error: error, kind: .audioSourceFailed(name))
+            tell("The audio file of \(name) failed", error: error, kind: .audioSourceFailed(name), at: now)
         case .writerFellBehind:
-            tell("The audio file of \(name) ended", error: "its writer fell behind", kind: .audioSourceFailed(name))
+            tell("The audio file of \(name) ended", error: "its writer fell behind", kind: .audioSourceFailed(name), at: now)
         case .diskFull:
-            tell("The audio file of \(name) ended", error: "the disk is full", kind: .audioSourceFailed(name))
+            tell("The audio file of \(name) ended", error: "the disk is full", kind: .audioSourceFailed(name), at: now)
         case .disconnected:
             break
         }
-        let step = audioTracker.captureEnded(id, reason, at: context.now())
+        let step = audioTracker.captureEnded(id, reason, at: now)
         applyAudio(step)
         // A source that stays listed but is lost again and again is never left unrecorded silently.
         if reason == .disconnected, step.events.contains(where: \.event.isFailure) {
             tell(id == .systemAudio ? "The system audio cannot be captured" : "The audio input \(name) cannot be captured",
-                 error: AudioTracker.sourceLostAgain(id), kind: .audioSourceFailed(name))
+                 error: AudioTracker.sourceLostAgain(id), kind: .audioSourceFailed(name), at: now)
         }
     }
 
@@ -597,8 +613,11 @@ public final class Recorder {
     /// A problem for the person and the manifest's `problems`, the manifest
     /// written at once (`ProblemsTold`); one that repeats is told once until
     /// it clears.
-    private func tell(_ problem: String, error: String?, kind: ProblemKind) {
-        let problem = RecordingProblem(at: context.now(), problem: problem, error: error)
+    private func tell(_ problem: String, error: String?, kind: ProblemKind, at time: Int64? = nil) {
+        tell(RecordingProblem(at: time ?? context.now(), problem: problem, error: error), kind: kind)
+    }
+
+    private func tell(_ problem: RecordingProblem, kind: ProblemKind) {
         guard case .tell(let writesManifest) = problemsTold.add(problem, kind: kind, to: &manifest) else { return }
         if writesManifest { try? writeManifest() }
         told(problem)

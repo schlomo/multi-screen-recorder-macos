@@ -307,12 +307,29 @@ public struct RecordingManifest: Codable, Equatable, Sendable {
         return true
     }
 
-    /// The recording ends: its end time, its result and its CPU use.
+    /// The recording ends: its end time, its result and its CPU use. What
+    /// makes the result `problems` and was not told is listed in
+    /// `problems` now, so the two never disagree (D47).
     public mutating func finalize(ended date: Date, timeZone: TimeZone, cpu: CPU? = nil) {
         state = .finalized
         ended = Self.timestamp(date, timeZone: timeZone)
+        problems += untoldProblems
         result = endedWell ? .ok : .problems
         self.cpu = cpu
+    }
+
+    /// The failures no problem at their time tells, and the files not
+    /// finalized that no problem names.
+    private var untoldProblems: [RecordingProblem] {
+        let failures = events.filter { event in
+            event.event.isFailure && !problems.contains { $0.at == event.at }
+        }.map(\.problem)
+        let named = { (name: String) in problems.contains { $0.text.contains(name) } }
+        let displayFiles = files.filter { $0.state != .finalized && !named($0.name) }
+            .map { RecordingProblem(atSeconds: $0.end ?? $0.start, problem: "Display file \($0.name)", error: "not finalized") }
+        let audioFiles = audioFiles.filter { $0.state != .finalized && !named($0.name) }
+            .map { RecordingProblem(atSeconds: $0.end ?? $0.start, problem: "Audio file \($0.name)", error: "not finalized") }
+        return failures + displayFiles + audioFiles
     }
 
     /// "2026-11-12T14:03:05.120+01:00".
@@ -445,6 +462,12 @@ public struct RecordingEvent: Codable, Equatable, Sendable {
 
     /// The display or audio source the event is about, if any.
     public var subject: String? { display ?? audioSource }
+
+    /// The event as a problem told to the person, at its time.
+    public var problem: RecordingProblem {
+        let what = display.map { "Display \($0)" } ?? audioSource.map { "Audio source \($0)" } ?? "The recording"
+        return RecordingProblem(atSeconds: at, problem: what, error: error.map { "\(event.rawValue): \($0)" } ?? event.rawValue)
+    }
 }
 
 /// A problem told to the person (the Dock badge's "!", the status window,
@@ -461,6 +484,11 @@ public struct RecordingProblem: Codable, Equatable, Sendable {
         at = (Double(nanoseconds) / 1_000_000).rounded() / 1000
         self.problem = problem
         self.error = error
+    }
+
+    /// `at` in seconds from the recording's start, as a manifest entry has it.
+    init(atSeconds seconds: Double, problem: String, error: String?) {
+        self.init(at: Int64((seconds * 1_000_000_000).rounded()), problem: problem, error: error)
     }
 
     /// The problem as the person reads it.

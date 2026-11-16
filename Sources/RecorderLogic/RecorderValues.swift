@@ -7,6 +7,10 @@ public enum RecorderValues {
     public static let framesPerSecond = 30
     /// How long ticks may wait for a writer that is not ready before its
     /// display file ends with `display file writer fell behind`.
+    public static let displayFileLateTickSeconds = 6
+    /// How long guide track samples may wait for a display file's writer,
+    /// and how long the waiting ticks, guide track samples and audio
+    /// samples are written at a file's end.
     public static let lateTickBoundSeconds = 2
     /// The fragment length of every file: a crash loses at most this much.
     public static let fragmentSeconds = 2
@@ -26,6 +30,6 @@ public enum RecorderValues {
     /// whole points, so this only absorbs rounding.
     public static let displayCheckTolerancePoints = 0.5
 
-    public static let lateTickBound = lateTickBoundSeconds * framesPerSecond
+    public static let lateTickBound = displayFileLateTickSeconds * framesPerSecond
     public static let displayCheckFailuresInARow = displayCheckFailureSeconds * framesPerSecond
 }

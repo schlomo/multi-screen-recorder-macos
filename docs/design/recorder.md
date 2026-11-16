@@ -415,6 +415,10 @@ capture in macOS's own processes, `VTEncoderXPCService`, `replayd`,
 recording is finalized. `problems` lists every problem told to the
 person, also those that leave `result` `ok`, each with `at`,
 `problem` (what went wrong) and `error` (the full error text, or null).
+A failure is told at its event's time; one that no problem at its
+time tells, and a file not finalized that no problem names, is listed
+when the recording is finalized, so a `result` of `problems` always
+comes with its problems.
 `events` and `problems` are written in the order of their time.
 An audio file's `audioSource` is the audio input's name (see "Audio
 input names" below) or `System audio`; `audioSourceUID` the input's
@@ -658,14 +662,14 @@ tick is written late with its correct timestamp and counted in
 `framesRepeatedForLateness`. A tick written late carries the newest
 frame captured before the tick's own time, never one captured while it
 waited, so its picture is right and only its writing is late. At most
-2 s of ticks wait (*data*); a writer further behind ends its display
+6 s of ticks wait (*data*, D53); a writer further behind ends its display
 file with the event `display file writer fell behind`, and a new
 display file starts, as after a failing stream. The v1 gate's clock
 recording checks this from outside the recorder. A display file starts
 at the first tick after its stream's first frame that passes the
 display check (below), and never before the stream's own start. When a
 display file ends, the ticks due are written, then those still waiting,
-for at most the late-tick bound (2 s) on a clock that does not count
+for at most 2 s (*data*) on a clock that does not count
 sleep, and the file is finalized also when the writer fell behind or
 the wait ran out; what failed is in the manifest.
 
@@ -833,7 +837,9 @@ the metadata items (see "Output on disk").
   rest up to the end of its video, without taking them from the other
   display files. Its last mix is joined into one buffer per guide track,
   cut at the end of the video, and waits for the writer as long as its
-  ticks do, so its guide tracks end with the video (D51). Should the
+  ticks do, so its guide tracks end with the video (D51). At Stop the
+  audio sources stop only after every display file's last mix, so the
+  sound up to the video's end is there to mix. Should the
   samples not mixed yet start after what the file received, it writes
   up to there, never silence in their place; that, or a writer that
   does not take the last mix in time, is told as a problem at the
@@ -1118,7 +1124,7 @@ displays coming and going, failing streams with back-off, mirroring, the
 main display, sleep and wake, the display check, a full disk and the
 free space check, and keep awake. The frame rate is one value
 (*data*); the tick grid, the timecode, the keyframe interval, the
-late-tick bound (2 s) and the display check's limit (1 s of frames)
+late-tick bound (6 s) and the display check's limit (1 s of frames)
 derive from it. Tested without a screen: the logic by unit tests, and
 display files written from synthetic frames and read back (a constant
 frame rate, the timecode, BT.709, a file never finalized readable up to

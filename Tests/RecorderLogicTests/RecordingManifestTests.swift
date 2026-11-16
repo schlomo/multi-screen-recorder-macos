@@ -94,6 +94,69 @@ import Testing
         #expect(manifest.result == .problems)
     }
 
+    /// D47: `result` and `problems` never disagree. A failure no problem
+    /// at its time tells, and a file not finalized that no problem names,
+    /// is listed when the recording is finalized.
+    @Test(arguments: RecordingEvent.Kind.allCases.filter(\.isFailure))
+    func aFailureNotToldIsListedAsAProblemAtTheEnd(failure: RecordingEvent.Kind) {
+        var manifest = manifest()
+        let isAudio = failure.rawValue.contains("audio")
+        var event = RecordingEvent(at: 36_778_000_000, event: failure, display: isAudio ? nil : "DELL", audioSource: isAudio ? "BRIO" : nil)
+        event.error = "it broke"
+        manifest.events.append(event)
+        manifest.finalize(ended: start + 60, timeZone: berlin)
+        #expect(manifest.result == .problems)
+        #expect(manifest.problems == [RecordingProblem(
+            at: 36_778_000_000, problem: isAudio ? "Audio source BRIO" : "Display DELL", error: "\(failure.rawValue): it broke")])
+    }
+
+    @Test func aFailureToldAtItsTimeIsNotListedTwice() {
+        var manifest = manifest()
+        manifest.events.append(RecordingEvent(at: 12_500_000_000, event: .displayFileWriterFailed, display: "LG"))
+        let told = RecordingProblem(at: 12_500_000_000, problem: "Display file f.mov", error: "cannot finalize f.mov")
+        manifest.problems.append(told)
+        manifest.finalize(ended: start + 60, timeZone: berlin)
+        #expect(manifest.problems == [told])
+    }
+
+    @Test func aFileNotFinalizedThatNoProblemNamesIsListedAtItsEnd() {
+        var manifest = manifest()
+        var display = RecordingManifest.DisplayFile(
+            name: "d.mov", display: "LG", displayUUID: "U", frameSize: FrameSize(width: 2, height: 2), start: 1, timecode: "t")
+        display.end = 5
+        display.state = .notFinalized
+        var audio = RecordingManifest.AudioFile(
+            name: "a.mov", audioSource: "Mic", audioSourceUID: "uid", channels: .mono(1), start: 2, timecode: "t")
+        audio.state = .notFinalized
+        var named = RecordingManifest.AudioFile(
+            name: "b.mov", audioSource: "Mic 2", audioSourceUID: "uid2", channels: .mono(1), start: 2, timecode: "t")
+        named.state = .notFinalized
+        manifest.files = [display]
+        manifest.audioFiles = [audio, named]
+        let told = RecordingProblem(at: 3_000_000_000, problem: "Audio file b.mov", error: "cannot finalize")
+        manifest.problems = [told]
+        manifest.finalize(ended: start + 60, timeZone: berlin)
+        #expect(manifest.result == .problems)
+        #expect(manifest.problems == [
+            told,
+            RecordingProblem(at: 5_000_000_000, problem: "Display file d.mov", error: "not finalized"),
+            RecordingProblem(at: 2_000_000_000, problem: "Audio file a.mov", error: "not finalized"),
+        ])
+    }
+
+    /// The recording `2026-11-16 12.24.51`: two `display file writer fell
+    /// behind` and no problem, with the result `problems`.
+    @Test func whateverEndedBadlyTheResultProblemsComesWithProblems() {
+        for failure in RecordingEvent.Kind.allCases where failure.isFailure {
+            var manifest = manifest()
+            manifest.events.append(RecordingEvent(at: 1_000_000_000, event: failure, display: "A"))
+            manifest.events.append(RecordingEvent(at: 2_000_000_000, event: failure, display: "A"))
+            manifest.finalize(ended: start + 60, timeZone: berlin)
+            #expect(manifest.result == .problems)
+            #expect(manifest.problems.count == 2)
+        }
+    }
+
     @Test func filesAreWrittenInTheOrderOfTheirStartAndReadBackByKind() throws {
         var manifest = manifest()
         manifest.files = [RecordingManifest.DisplayFile(
