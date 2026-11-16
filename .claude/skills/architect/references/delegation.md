@@ -25,12 +25,10 @@ file adds how to apply them.
   tier, with the reason in one line; or, where the pinned model isn't
   available to the project, to name the highest tier that is (the
   reviewer's top-tier pin, for example); or, for a delta review, to
-  lower it to the standard tier; or, for a change to Markdown only
-(docs, rules, the backlog) or a small, low-risk one, to size the
-review to its cost and complexity, usually the standard tier (D56),
-except a principle change and the consistency pass ending a series
-of rule edits, which stay on the top tier. A tier above a human's
-per-project
+  lower it to the standard tier; or, for a first review that "Every
+change gets an adversarial review" sizes to the standard tier (a
+Markdown-only or small, low-risk change), to lower it the same way. A
+tier above a human's per-project
   cap counts as not available. A general-purpose or built-in agent has
   no pin: give it an explicit model every time.
 - **Model and effort, in Claude Code.** A narrow-lane agent pins
@@ -61,6 +59,14 @@ per-project
 Every brief states the eight points of "Brief anatomy" in the AI
 working process principles, in order. Verify what comes back as
 "Verify before declaring ready" there says.
+
+A builder's brief asks for the local run of what the pipeline runs on
+its final commit, and no wait for the pipeline ("Iterate locally;
+wait for the pipeline once"). A change that shows in the window or on
+the command line goes to the owner to try, as a local build or the
+PR's snapshot release, as soon as that local run is green, while the
+review runs alongside (D56); what the owner's feedback adds is
+reviewed as "Every change gets an adversarial review" says.
 
 A review brief also follows the closing paragraph of "Brief anatomy":
 it names the commit under review and the gates already green, asks

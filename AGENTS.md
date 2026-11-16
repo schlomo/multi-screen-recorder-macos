@@ -152,13 +152,18 @@ it becomes a mechanical check (lint, CI gate) once one exists.
 - In a task-briefed session, a tiny, fully specified change may be
   done inline. [Inline](docs/principles/ai-working-process.md#a-tiny-change-may-be-done-inline)
 - A wanted behavior is written where the acting agent reads it, a
-  command given literally. [Write it where it's read](docs/principles/ai-working-process.md#write-a-behavior-where-the-acting-agent-reads-it)
+  command given literally; agent how-to goes into `docs/principles/`,
+  a tool's own files only for what is specific to it. [Write it where it's read](docs/principles/ai-working-process.md#write-a-behavior-where-the-acting-agent-reads-it)
 - No MR/PR is ready until its settled content has had one adversarial
-  review (related ones count as one), its description checked against
-  the diff, and any later commit delta-reviewed, except a mechanical
-  one and a NIT fix whose word diff someone else has read; until then,
-  UNREVIEWED.
+  review (related ones count as one), sized to its cost and
+  complexity, its description checked against the diff, and any later
+  commit delta-reviewed, except a mechanical one and a NIT fix whose
+  word diff someone else has read; feedback that adds content gets its
+  own review; until then, UNREVIEWED.
   [Adversarial review](docs/principles/ai-working-process.md#every-change-gets-an-adversarial-review)
+- Each round is gated by the local run of what the pipeline runs;
+  the pipeline is waited for once per MR/PR, before ready.
+  [Iterate locally](docs/principles/ai-working-process.md#iterate-locally-wait-for-the-pipeline-once)
 - A series of rule edits ends with one top-tier consistency pass.
   [Consistency pass](docs/principles/ai-working-process.md#finish-a-series-of-rule-edits-with-one-consistency-pass)
 
@@ -210,12 +215,15 @@ folder the project already had. Agents find each role here.
   [context-economy.md](docs/principles/context-economy.md).
 - [docs/principles/platform-notes/](docs/principles/platform-notes/):
   read the one matching what you touch — bash, containers, GitLab CI,
-  Kubernetes/ArgoCD, Python, Terraform, test harnesses.
+  Kubernetes/ArgoCD, Python, Terraform, test harnesses, static sites
+  (the homepage).
 - `.claude/agents/`: narrow-lane helpers, each definition stating its
   lane, model and effort; `.claude/skills/`: architect, setup.
-- `.claude/rules/`: rules for one area of the tree, scoped by path.
-  Their loading is not reliable, so read the one for your area
-  explicitly, and a brief names them (see `.claude/rules/README.md`).
+- `.claude/rules/`: Claude Code's rules for one area of the tree,
+  scoped by path; how-to every agent needs goes into
+  `docs/principles/` instead (D56). Their loading is not reliable, so
+  read the one for your area explicitly, and a brief names them (see
+  `.claude/rules/README.md`).
 
 ## Model tiers and settings
 
@@ -267,10 +275,7 @@ hoc, for a local check only).
   in the app record the screens; `msr list` reads the devices. An agent
   runs these on the owner's Mac only to test the roadmap's work, into its
   own scratch folder (`--output-folder`), deleting the recordings once
-  checked and never changing settings or permissions (D48); the
-  session that briefs such a run tells the owner before it starts, as
-  it shows on their screen and may play sound (D56); on anyone else's
-  Mac, never unasked. On start the app also reads
+  checked and never changing settings or permissions (D48); before an agent starts a recording or plays a sound on the owner's Mac, the session running or briefing that test tells the owner, once before the test's first run (D56); on anyone else's Mac, never unasked. On start the app also reads
   `~/Library/Logs/DiagnosticReports`, may show the crash report dialog
   and open the browser and Finder, and may write `state.json` and a text
   copy under `~/Library/Application Support/Multi Screen Recorder`

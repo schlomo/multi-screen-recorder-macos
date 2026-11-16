@@ -268,6 +268,17 @@ still slip through, which is the risk taken.
 pinned to the top tier, runs the review on the highest tier available
 to the project. Its findings go back to whoever wrote the change; the
 reviewer never fixes them itself.
+- The review is sized to the change's cost and complexity: a change to
+  Markdown only, or a small, low-risk one, usually gets its review on
+  the standard tier, while a principle change, a guardrail, code that
+  can lose or leak data, and the consistency pass ending a series of
+  rule edits stay on the top tier. The description's review state
+  names the tier.
+- Feedback that arrives while the review runs (a human trying the
+  change, a reviewer's question) joins the fix round when it fixes
+  something. When it adds something new (a feature, a behaviour, a
+  rule), the change is no longer settled: the new content gets its
+  own adversarial review, not only a delta review.
 - The review judges the premise before the details: should this
   change exist at all, is there a simpler or ecosystem-native way,
   does a sibling repo (another repo the team owns) already solve it,
@@ -304,6 +315,29 @@ reviewer never fixes them itself.
   loop has ended, a NIT fix excepted, gets a standard-tier delta
   review, a merge in which the trunk changed something the branch
   builds on included.
+
+## Iterate locally; wait for the pipeline once
+
+**Rule:** every round of a change (the first build, each fix round)
+is gated by running locally what the pipeline runs: the project's own
+scripts, on the round's final commit. The round is pushed without
+waiting for the pipeline, and reviews start on the pushed commit. The
+pipeline is waited for once per MR/PR: on the commit about to be
+marked ready.
+**Why:** by design the pipeline runs nothing that cannot run locally
+("Thin CI" in [engineering.md](engineering.md)), so waiting for it
+after every round adds its run time to every round and catches
+nothing a local run would not. Waiting per round cost a whole session
+most of its time (the owner, 2026-11-16, D56).
+**How:** a builder's report states the local run (commands and
+exit codes) on the commit it pushed; the delegating session relies on
+it for the round and waits for the pipeline only before marking the
+MR/PR ready. A difference between the local run and the pipeline
+(another toolchain version, a missing tool) shows up at that one
+wait: it is fixed, recorded in the troubleshooting log, and the local
+procedure is brought closer to the pipeline's. What only the pipeline
+can do (signing with a secret, publishing) is the pipeline's alone;
+its local stand-in (an ad hoc signature, a dry run) is run instead.
 
 ## Docs completeness is part of being done
 
@@ -627,6 +661,13 @@ their scratch area, long path workarounds, duplicate calls.
 **How:** test each new rule with "would an agent that has read only
 `AGENTS.md` and what its task opens do this?" A skill or a brief
 gives one-line commands.
+- Any agent, whatever its tool, reads `AGENTS.md` and what it points
+  to, so how-to for agents goes there: a principle, or a platform note
+  in [platform-notes/](platform-notes/) for one technology or one
+  part of the tree. A tool's own files (Claude Code's `.claude/` with
+  its skills, agent definitions and path-scoped rules) hold only what
+  is specific to that tool: the architect skill, its references and
+  the agent definitions it delegates to.
 
 ## Finish a series of rule edits with one consistency pass
 

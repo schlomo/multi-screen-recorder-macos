@@ -31,17 +31,13 @@ verifying agent output are in the principles (linked from
   review**, or quoted with its date in the description.
 - **A ruling that changes how agents work is delivered only when its
   text is in a file those agents read**; its backlog entry stays open
-  until then.
-- **How-to for agents goes into the AI docs**: `.claude/rules/` for
-  one area of the tree, `.claude/agents/`, the skills. The human docs
-  (the READMEs, the design docs) describe the product and how a person
-  works with it, without agents' checklists (D56).
-- **A fact written into a description, a PR comment or a message to
-  the human is read from its source when it is written**: a SHA, a
-  status code, what a command prints, what a file holds. A check done
-  the lenient way (following redirects, an agent's summary, a render
-  that may be cropped) is redone strictly or named as such; a 200
-  reached through a redirect is not a 200.
+  until then. For any agent that is `AGENTS.md` and `docs/principles/`
+  ("Write a behavior where the acting agent reads it").
+- **A fact in a description, a comment or a message to the human** is
+  checked as "Verify before declaring ready" says, and strictly: a
+  lenient check (following redirects, an agent's summary, a render
+  that may be cropped) is redone or named as such; a 200 reached
+  through a redirect is not a 200.
 
 ## Deciding and asking
 
@@ -56,20 +52,9 @@ verifying agent output are in the principles (linked from
   often carries the facts a new command, channel or check would
   collect (the owner, 2026-11-16: a screenshot of the start window
   instead of two Terminal commands).
-- **The owner tries a visible change early** (D56): a change that
-  shows in the window or on the command line goes to the owner, as a
-  local build or the PR's snapshot release, as soon as the builder's
-  tests pass, while the review runs alongside; the owner's feedback
-  and the review's findings go into the same fix round.
 
 ## Supervising long-running work
 
-- **Wait for CI once per PR** (D56): before marking it ready. Each
-  round in between is gated by the local run of the same scripts, on
-  the builder's machine or the owner's, and a delta review starts on
-  the pushed commit without waiting. CI runs nothing that can't run
-  locally, by design (thin CI); the one known gap is CI's older Xcode
-  (backlog item 2), which that one wait catches.
 - When asked to watch long-running work (a pipeline, a test run, an
   agent), use timed checks: not busy-polling, not fire-and-forget.
 - A poll ends only on a terminal state from the whole set: for a
