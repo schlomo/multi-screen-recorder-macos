@@ -31,7 +31,7 @@ a {
 header {
   text-align: center;
 
-  & img { screen: block; inline-size: 8rem; block-size: auto; margin: 0 auto 0.5rem; }
+  & img { display: block; inline-size: 8rem; block-size: auto; margin: 0 auto 0.5rem; }
   & h1 { margin: 0; color: var(--primary); font-size: 2.25rem; text-wrap: balance; }
 }
 
@@ -45,7 +45,7 @@ header {
 .download { text-align: center; margin-block: 2rem; }
 
 .button {
-  screen: inline-block;
+  display: inline-block;
   padding: 0.75rem 1.5rem;
   border-radius: var(--radius);
   background: var(--primary);
@@ -63,7 +63,7 @@ h2 {
 
   &::after {
     content: "";
-    screen: block;
+    display: block;
     inline-size: 3rem;
     block-size: 4px;
     margin-block-start: 0.3rem;

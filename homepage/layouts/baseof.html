@@ -5,7 +5,7 @@
   </head>
   <body>
     <header>
-      {{- /* The app icon artwork at 2x its 8rem screen width */}}
+      {{- /* The app icon artwork at 2x its 8rem shown width */}}
       {{- with (resources.Get "images/app-icon-fancy.jpeg").Resize "256x webp q85" }}
       <a href="/"><img src="{{ .RelPermalink }}" alt="" width="128" height="128" fetchpriority="high" /></a>
       {{- end }}
