@@ -1,5 +1,6 @@
 /// What `msr record` prints at its end: how long it recorded and where,
-/// each file and its state, and the events that are errors.
+/// each file and its state, our process's CPU use, and the events that are
+/// errors.
 public struct RecordingSummary: Equatable, Sendable {
     public let manifest: RecordingManifest
     public let recordingFolder: String
@@ -22,13 +23,19 @@ public struct RecordingSummary: Equatable, Sendable {
 
     public var text: String {
         var lines = ["Recorded \(Self.elapsed(seconds: seconds)) into \(recordingFolder)"]
-        for file in manifest.files {
-            lines.append("  \(file.name)  \(file.state.rawValue)")
+        let files = (manifest.files.map { ($0.start, $0.name, $0.state) } + manifest.audioFiles.map { ($0.start, $0.name, $0.state) })
+            .enumerated().sorted { ($0.element.0, $0.offset) < ($1.element.0, $1.offset) }.map(\.element)
+        for (_, name, state) in files {
+            lines.append("  \(name)  \(state.rawValue)")
         }
-        if manifest.files.isEmpty { lines.append("  no files") }
+        if files.isEmpty { lines.append("  no files") }
+        if let cpu = manifest.cpu {
+            lines.append(String(format: "CPU %.0f %% on average, %.0f %% at the peak, of one core (this process only)",
+                                cpu.averagePercent, cpu.peakPercent))
+        }
         for event in errors {
             lines.append("Error at \(Self.elapsed(seconds: event.at)): \(event.event.rawValue)"
-                + (event.display.map { ", \($0)" } ?? "") + (event.error.map { " (\($0))" } ?? ""))
+                + (event.subject.map { ", \($0)" } ?? "") + (event.error.map { " (\($0))" } ?? ""))
         }
         for problem in manifest.problems {
             lines.append("Problem at \(Self.elapsed(seconds: problem.at)): \(problem.text)")

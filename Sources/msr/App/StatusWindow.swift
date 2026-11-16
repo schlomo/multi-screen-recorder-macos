@@ -9,6 +9,8 @@ import SwiftUI
 final class StatusModel {
     var rows: [RecordingStatusTable.Row] = []
     var line = ""
+    /// "CPU 23 %", our process only.
+    var cpu = ""
     var problems: [String] = []
 }
 
@@ -74,6 +76,15 @@ private struct StatusView: View {
                 }
             }
             Text(model.line).monospacedDigit()
+            if !model.cpu.isEmpty {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(model.cpu).monospacedDigit()
+                    Text(CPUUsage.notCounted)
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
             if !model.problems.isEmpty {
                 VStack(alignment: .leading, spacing: 4) {
                     ForEach(Array(model.problems.enumerated()), id: \.offset) { _, problem in

@@ -25,8 +25,9 @@ public struct DisplayFileWriterError: Error, Equatable, CustomStringConvertible 
 }
 
 /// A display file: HEVC 8-bit in a fragmented `.mov`, a keyframe and a
-/// fragment every 2 s, tagged BT.709, with a timecode track of one sample
-/// carrying the reel name, and metadata items (D21, D24, D31, D46). Every frame carries exactly its tick's time on the shared clock.
+/// fragment every 2 s, tagged BT.709, with the timecode track carrying the
+/// reel name, its guide tracks, and metadata items (D21, D24, D31, D46,
+/// D49). Every frame carries exactly its tick's time on the shared clock.
 /// Not thread-safe: one queue uses it.
 public final class DisplayFileWriter: DisplayFileWriting {
     public let url: URL
@@ -36,13 +37,13 @@ public final class DisplayFileWriter: DisplayFileWriting {
     private let writer: AVAssetWriter
     private let video: AVAssetWriterInput
     private let adaptor: AVAssetWriterInputPixelBufferAdaptor
-    private let timecodeTrack: AVAssetWriterInput
-    private let timecodeFormat: CMTimeCodeFormatDescription
+    private let timecodeTrack: TimecodeTrack
     private var wroteTimecode = false
+    private let guides: [GuideTrack: (track: AVAssetWriterInput, pcm: CMAudioFormatDescription)]
 
     public init(
         url: URL, frameSize: FrameSize, firstTick: Int64, timecode: Timecode, metadata: DisplayFileMetadata,
-        grid: TickGrid = .recording
+        guideTracks: [GuideTrack] = [], grid: TickGrid = .recording
     ) throws(DisplayFileWriterError) {
         precondition(timecode.framesPerSecond == grid.framesPerSecond, "the timecode counts the tick grid's frames")
         self.url = url
@@ -56,43 +57,32 @@ public final class DisplayFileWriter: DisplayFileWriting {
         }
         writer.movieFragmentInterval = CMTime(value: CMTimeValue(RecorderValues.fragmentSeconds), timescale: 1)
         writer.shouldOptimizeForNetworkUse = false
-        writer.metadata = metadata.items.map { key, value in
-            let item = AVMutableMetadataItem()
-            item.keySpace = .quickTimeMetadata
-            item.key = key as NSString
-            item.value = value as NSString
-            return item
-        }
+        writer.metadata = movieMetadataItems(metadata.items)
 
         video = AVAssetWriterInput(mediaType: .video, outputSettings: Self.videoSettings(frameSize, grid: grid))
         video.expectsMediaDataInRealTime = true
+        video.metadata = [trackNameItem(metadata.reelName)]
         adaptor = AVAssetWriterInputPixelBufferAdaptor(assetWriterInput: video, sourcePixelBufferAttributes: nil)
-
-        var format: CMTimeCodeFormatDescription?
-        let status = CMTimeCodeFormatDescriptionCreate(
-            allocator: nil, timeCodeFormatType: kCMTimeCodeFormatType_TimeCode32,
-            frameDuration: CMTime(value: 1, timescale: CMTimeScale(grid.framesPerSecond)),
-            frameQuanta: UInt32(grid.framesPerSecond), flags: kCMTimeCodeFlag_24HourMax,
-            extensions: [
-                kCMTimeCodeFormatDescriptionExtension_SourceReferenceName: [
-                    kCMTimeCodeFormatDescriptionKey_Value: metadata.reelName,
-                    kCMTimeCodeFormatDescriptionKey_LangCode: 0,
-                ] as CFDictionary,
-            ] as CFDictionary,
-            formatDescriptionOut: &format)
-        guard status == noErr, let format else {
-            throw DisplayFileWriterError(nil, while: "cannot describe the timecode track (error \(status))")
+        var guides: [GuideTrack: (AVAssetWriterInput, CMAudioFormatDescription)] = [:]
+        do {
+            timecodeTrack = try TimecodeTrack(reelName: metadata.reelName, grid: grid)
+            for guide in guideTracks {
+                guides[guide] = (aacTrack(channels: guide.channelCount, bitRate: guide.bitRate, name: guide.name),
+                                 try pcmFormat(channels: guide.channelCount))
+            }
+        } catch {
+            throw DisplayFileWriterError(nil, while: error.description)
         }
-        timecodeFormat = format
-        timecodeTrack = AVAssetWriterInput(mediaType: .timecode, outputSettings: nil, sourceFormatHint: format)
-        timecodeTrack.expectsMediaDataInRealTime = true
+        self.guides = guides
 
-        guard writer.canAdd(video), writer.canAdd(timecodeTrack) else {
+        let guideInputs = guideTracks.compactMap { guides[$0]?.0 }
+        guard writer.canAdd(video), writer.canAdd(timecodeTrack.input), guideInputs.allSatisfy(writer.canAdd) else {
             throw DisplayFileWriterError(nil, while: "cannot add the tracks to \(url.lastPathComponent)")
         }
         writer.add(video)
-        writer.add(timecodeTrack)
-        video.addTrackAssociation(withTrackOf: timecodeTrack, type: AVAssetTrack.AssociationType.timecode.rawValue)
+        guideInputs.forEach(writer.add)
+        writer.add(timecodeTrack.input)
+        video.addTrackAssociation(withTrackOf: timecodeTrack.input, type: AVAssetTrack.AssociationType.timecode.rawValue)
         guard writer.startWriting() else {
             throw DisplayFileWriterError(writer.error, while: "cannot start writing \(url.lastPathComponent)")
         }
@@ -128,7 +118,7 @@ public final class DisplayFileWriter: DisplayFileWriting {
     }
 
     /// Whether the writer takes another frame now.
-    public var isReady: Bool { video.isReadyForMoreMediaData && (wroteTimecode || timecodeTrack.isReadyForMoreMediaData) }
+    public var isReady: Bool { video.isReadyForMoreMediaData && (wroteTimecode || timecodeTrack.input.isReadyForMoreMediaData) }
 
     /// Writes a tick's frame with exactly the tick's time and its timecode;
     /// false when the writer is not ready, so the tick waits.
@@ -137,13 +127,38 @@ public final class DisplayFileWriter: DisplayFileWriting {
         guard isReady else { return false }
         if !wroteTimecode {
             wroteTimecode = true
-            guard timecodeTrack.append(try timecodeSample(tick: tick)) else {
-                throw DisplayFileWriterError(writer.error, while: "cannot write \(url.lastPathComponent)")
+            let wrote: Bool
+            do {
+                wrote = try timecodeTrack.write(timecode, tick: firstTick)
+            } catch {
+                throw DisplayFileWriterError(nil, while: error.description)
             }
-            timecodeTrack.markAsFinished()
+            guard wrote else { throw DisplayFileWriterError(writer.error, while: "cannot write \(url.lastPathComponent)") }
         }
         guard adaptor.append(pixelBuffer, withPresentationTime: time(ofTick: tick))
         else {
+            throw DisplayFileWriterError(writer.error, while: "cannot write \(url.lastPathComponent)")
+        }
+        return true
+    }
+
+    /// Writes samples of a guide track, one array per channel, the first at
+    /// `position` samples from the file's first tick; false when the track
+    /// is not ready, so they wait. A guide track the file does not have
+    /// takes nothing.
+    public func appendGuide(_ guide: GuideTrack, _ channels: [[Float]], at position: Int64) throws(DisplayFileWriterError) -> Bool {
+        try checkStatus()
+        guard let (track, pcm) = guides[guide] else { return true }
+        guard channels.first?.isEmpty == false else { return true }
+        guard track.isReadyForMoreMediaData else { return false }
+        let time = CMTimeAdd(time(ofTick: firstTick), CMTime(value: position, timescale: CMTimeScale(RecorderValues.audioSampleRate)))
+        let sample: CMSampleBuffer
+        do {
+            sample = try pcmSample(channels[...], format: pcm, at: time)
+        } catch {
+            throw DisplayFileWriterError(nil, while: error.description)
+        }
+        guard track.append(sample) else {
             throw DisplayFileWriterError(writer.error, while: "cannot write \(url.lastPathComponent)")
         }
         return true
@@ -155,41 +170,13 @@ public final class DisplayFileWriter: DisplayFileWriting {
         }
     }
 
-    /// The file's one timecode sample, at its first tick, as is the
-    /// convention; the timecode track is then finished, so the writer can
-    /// write the fragments without waiting for it, and a file that is not
-    /// finalized still carries the timecode.
-    private func timecodeSample(tick: Int64) throws(DisplayFileWriterError) -> CMSampleBuffer {
-        var frame = Int32(truncatingIfNeeded: timecode.frame(ofTick: tick)).bigEndian
-        var block: CMBlockBuffer?
-        var status = CMBlockBufferCreateWithMemoryBlock(
-            allocator: nil, memoryBlock: nil, blockLength: MemoryLayout<Int32>.size, blockAllocator: nil,
-            customBlockSource: nil, offsetToData: 0, dataLength: MemoryLayout<Int32>.size, flags: 0, blockBufferOut: &block)
-        guard status == noErr, let block else {
-            throw DisplayFileWriterError(nil, while: "cannot make a timecode sample (error \(status))")
-        }
-        status = CMBlockBufferReplaceDataBytes(
-            with: &frame, blockBuffer: block, offsetIntoDestination: 0, dataLength: MemoryLayout<Int32>.size)
-        var timing = CMSampleTimingInfo(
-            duration: CMTime(value: 1, timescale: CMTimeScale(grid.framesPerSecond)),
-            presentationTimeStamp: time(ofTick: tick), decodeTimeStamp: .invalid)
-        var size = MemoryLayout<Int32>.size
-        var sample: CMSampleBuffer?
-        status = CMSampleBufferCreate(
-            allocator: nil, dataBuffer: block, dataReady: true, makeDataReadyCallback: nil, refcon: nil,
-            formatDescription: timecodeFormat, sampleCount: 1, sampleTimingEntryCount: 1, sampleTimingArray: &timing,
-            sampleSizeEntryCount: 1, sampleSizeArray: &size, sampleBufferOut: &sample)
-        guard status == noErr, let sample else {
-            throw DisplayFileWriterError(nil, while: "cannot make a timecode sample (error \(status))")
-        }
-        return sample
-    }
-
     /// Finalizes the file after its last tick.
     public func finish(lastTick: Int64?) async throws(DisplayFileWriterError) {
         try checkStatus()
         if let lastTick { writer.endSession(atSourceTime: time(ofTick: lastTick + 1)) }
         video.markAsFinished()
+        for (track, _) in guides.values { track.markAsFinished() }
+        if !wroteTimecode { timecodeTrack.input.markAsFinished() }
         await writer.finishWriting()
         if writer.status != .completed {
             throw DisplayFileWriterError(writer.error, while: "cannot finalize \(url.lastPathComponent)")

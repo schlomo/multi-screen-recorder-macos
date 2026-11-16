@@ -23,8 +23,9 @@ public struct RecorderStartError: Error, CustomStringConvertible {
 }
 
 /// One recording: claims its recording folder, keeps its recording
-/// manifest, keeps the Mac awake, and follows the displays as
-/// they come, go and change, with one display capture per display file.
+/// manifest, keeps the Mac awake, follows the displays as they come, go
+/// and change, with one display capture per display file, and the audio
+/// sources, with one audio capture per source, and its guide tracks.
 /// Needs the AppKit event loop: macOS reports display changes only to a
 /// process running `NSApplication.run()`.
 @MainActor
@@ -50,6 +51,16 @@ public final class Recorder {
     private var isLowOnDisk = false
     private var isStopped = false
     private var displayChangePending = false
+    private var audioTracker: AudioTracker
+    /// The running capture of each audio source, with its number among all audio captures.
+    private var audioCaptures: [AudioTracker.SourceID: (Int, AudioCapture)] = [:]
+    private var audioCaptureCount = 0
+    private var audioDueTask: Task<Void, Never>?
+    private var audioWatch: AudioInputWatch?
+    private let audioReports = AudioReportInbox()
+    private let guides: GuideTrackFeed
+    private var cpu = CPUUsage()
+    private var cpuTask: Task<Void, Never>?
 
     /// Starts a recording into a new recording folder in the settings' output folder.
     public init(settings: Settings, homeFolder: URL, app: String, observer: any RecorderObserver) throws(RecorderStartError) {
@@ -77,6 +88,8 @@ public final class Recorder {
         self.observer = observer
         manifest = RecordingManifest(app: app, started: started, timeZone: timeZone, settings: settings)
         tracker = DisplayTracker(resolution: settings.effectiveResolution)
+        audioTracker = AudioTracker(settings: settings)
+        guides = GuideTrackFeed(tracks: GuideTrack.tracks(for: settings), now: { [context] in context.now() })
         do {
             try writeManifest()
         } catch {
@@ -88,15 +101,33 @@ public final class Recorder {
         activity = ProcessInfo.processInfo.beginActivity(
             options: [.idleSystemSleepDisabled, .idleDisplaySleepDisabled, .userInitiated],
             reason: "Multi Screen Recorder is recording")
+        let context = context
+        RecorderLog.timeDetail(since: { Double(context.now()) / 1_000_000_000 })
         registerForChanges()
         context.update(displays, lastDisplayChange: nil)
+        guides.start()
         apply(tracker.begin(displays, at: context.now()))
+        applyAudio(audioTracker.begin(
+            inputs: readAudioInputs() ?? [], mainDisplayID: displays.first(where: \.isMain)?.displayID,
+            displays: Set(displays.map(\.displayID)), at: context.now()))
         freeSpaceTask = Task { [weak self] in
             while !Task.isCancelled {
                 try? await Task.sleep(for: RecorderValues.freeSpaceCheckInterval)
                 self?.checkFreeSpace()
             }
         }
+        sampleCPU()
+        cpuTask = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: RecorderValues.cpuSampleInterval)
+                self?.sampleCPU()
+            }
+        }
+    }
+
+    private func sampleCPU() {
+        guard let seconds = processCPUSeconds() else { return }
+        cpu.sample(cpuSeconds: seconds, at: Double(context.now()) / 1_000_000_000)
     }
 
     /// Seconds since the recording started, on the shared clock.
@@ -108,21 +139,24 @@ public final class Recorder {
              kind: .dockIconNotShown)
     }
 
-    /// The status window's table and line, read now: each file's size on
-    /// disk and the free space in the recording folder.
-    public func status() -> (rows: [RecordingStatusTable.Row], line: String) {
-        let sizes = manifest.files.map { file in
-            (file.name, (try? FileManager.default.attributesOfItem(atPath: folder.appending(path: file.name).path(percentEncoded: false)))?[.size] as? Int64)
+    /// The status window's table, line and CPU use, read now: each file's
+    /// size on disk and the free space in the recording folder.
+    public func status() -> (rows: [RecordingStatusTable.Row], line: String, cpu: String?) {
+        let names = manifest.files.map(\.name) + manifest.audioFiles.map(\.name)
+        let sizes = names.map { name in
+            (name, (try? FileManager.default.attributesOfItem(atPath: folder.appending(path: name).path(percentEncoded: false)))?[.size] as? Int64)
         }
         let bytes = Dictionary(sizes.compactMap { name, size in size.map { (name, $0) } }, uniquingKeysWith: { $1 })
         let bytesWritten: Int64? = sizes.contains { $0.1 == nil } ? nil : bytes.values.reduce(0, +)
         let free = (try? folder.resourceValues(forKeys: [.volumeAvailableCapacityForImportantUsageKey]))?
             .volumeAvailableCapacityForImportantUsage
         return (
-            RecordingStatusTable.rows(sources: tracker.sources, files: manifest.files, bytes: bytes),
+            RecordingStatusTable.rows(sources: tracker.sources, files: manifest.files, bytes: bytes)
+                + RecordingStatusTable.audioRows(sources: audioTracker.sourcesShown, files: manifest.audioFiles, bytes: bytes),
             RecordingStatusTable.line(
-                elapsedSeconds: elapsedSeconds, bytesWritten: bytesWritten, files: manifest.files.count,
-                freeBytes: free))
+                elapsedSeconds: elapsedSeconds, bytesWritten: bytesWritten, files: names.count,
+                freeBytes: free),
+            cpu.text)
     }
 
     /// Ends every display file and finalizes the recording manifest.
@@ -130,17 +164,24 @@ public final class Recorder {
         if !isStopped {
             isStopped = true
             dueTask?.cancel()
+            audioDueTask?.cancel()
             freeSpaceTask?.cancel()
+            cpuTask?.cancel()
+            sampleCPU()
             unregisterForChanges()
             for action in tracker.stopAll() { perform(action) }
+            for action in audioTracker.stopAll() { performAudio(action) }
             for task in stopping { await task.value }
-            manifest.finalize(ended: Date(), timeZone: context.timeZone)
+            takeAudioReports()
+            guides.stop()
+            manifest.finalize(ended: Date(), timeZone: context.timeZone, cpu: cpu.manifestEntry)
             do {
                 try writeManifest()
             } catch {
                 // Told by `writeManifest`; the file on disk keeps no `ended`.
                 finalManifestWritten = false
             }
+            RecorderLog.timeDetail(since: nil)
             if let activity { ProcessInfo.processInfo.endActivity(activity) }
             activity = nil
         }
@@ -162,12 +203,19 @@ public final class Recorder {
                 MainActor.assumeIsolated { self?.didWake() }
             },
         ]
+        do {
+            audioWatch = try AudioInputWatch { [weak self] in self?.audioInputsChanged() }
+        } catch {
+            tell("Changes of the audio inputs cannot be followed", error: error.description, kind: .audioInputsNotRead)
+        }
     }
 
     private func unregisterForChanges() {
         CGDisplayRemoveReconfigurationCallback(displayReconfigured, Unmanaged.passUnretained(self).toOpaque())
         for token in notificationTokens { NSWorkspace.shared.notificationCenter.removeObserver(token) }
         notificationTokens = []
+        audioWatch?.cancel()
+        audioWatch = nil
     }
 
     /// macOS reported a display change: read the displays on the next pass of the main loop, once for a burst.
@@ -182,8 +230,32 @@ public final class Recorder {
                 let step = self.tracker.observe(displays, at: now)
                 self.context.update(displays, lastDisplayChange: self.tracker.lastDisplayChange)
                 self.apply(step)
+                self.displaysForAudio(displays)
             }
         }
+    }
+
+    /// The system audio's stream follows the main display.
+    private func displaysForAudio(_ displays: [ConnectedDisplay]) {
+        applyAudio(audioTracker.observeDisplays(
+            mainDisplayID: displays.first(where: \.isMain)?.displayID, connected: Set(displays.map(\.displayID)),
+            at: context.now()))
+    }
+
+    private func readAudioInputs() -> [AudioInputInfo]? {
+        do {
+            let inputs = try currentAudioInputs()
+            problemsTold.cleared(.audioInputsNotRead)
+            return inputs
+        } catch {
+            tell("The audio inputs cannot be read", error: error.description, kind: .audioInputsNotRead)
+            return nil
+        }
+    }
+
+    private func audioInputsChanged() {
+        guard !isStopped, let inputs = readAudioInputs() else { return }
+        applyAudio(audioTracker.observe(inputs, at: context.now()))
     }
 
     private func readDisplays() -> [ConnectedDisplay]? {
@@ -201,6 +273,8 @@ public final class Recorder {
     private func willSleep() {
         guard !isStopped else { return }
         apply(tracker.sleep(at: context.now()))
+        for action in audioTracker.sleep() { performAudio(action) }
+        audioDueTask?.cancel()
     }
 
     private func didWake() {
@@ -210,6 +284,8 @@ public final class Recorder {
         let step = tracker.wake(displays, at: context.now())
         context.update(displays, lastDisplayChange: tracker.lastDisplayChange)
         apply(step)
+        displaysForAudio(displays)
+        applyAudio(audioTracker.wake(readAudioInputs() ?? [], at: context.now()))
     }
 
     // MARK: Actions
@@ -249,6 +325,7 @@ public final class Recorder {
             let captureNumber = captureCount
             let capture = DisplayCapture(
                 uuid: uuid, displayID: displayID, number: number, name: name, frameSize: frameSize, context: context,
+                guides: guides,
                 onFileStarted: { [weak self] file in
                     Task { @MainActor in self?.fileStarted(file, uuid: uuid) }
                 },
@@ -272,6 +349,7 @@ public final class Recorder {
     private func fileStarted(_ file: RecordingManifest.DisplayFile, uuid: String) {
         RecorderLog.detail("file started: \(file.name)", category: "recorder")
         tracker.fileStarted(uuid)
+        problemsTold.cleared(.displayNotCaptured(uuid))
         guard !manifest.files.contains(where: { $0.name == file.name }) else { return }
         manifest.files.append(file)
         try? writeManifest()
@@ -306,6 +384,145 @@ public final class Recorder {
         let step = tracker.streamEnded(uuid, reason, connected: displays, at: context.now())
         context.update(displays, lastDisplayChange: tracker.lastDisplayChange)
         apply(step)
+        displaysForAudio(displays)
+        // A display that stays listed but cannot be captured is never left unrecorded silently (N-A).
+        if reason == .captureSourceGone, step.events.contains(where: { $0.event == .displayStreamFailed }) {
+            tell("Display \(display) cannot be captured", error: DisplayTracker.captureSourceGoneAgain, kind: .displayNotCaptured(uuid))
+        }
+    }
+
+    // MARK: Audio
+
+    /// Records the audio events, carries out the actions, and waits for what is due next.
+    private func applyAudio(_ step: AudioTracker.Step) {
+        guard !isStopped else { return }
+        manifest.events += step.events
+        if !step.events.isEmpty { try? writeManifest() }
+        told(step.events)
+        for name in step.notRecordable {
+            tell("The audio input \(name) cannot be recorded", error: "Core Audio does not give its UID",
+                 kind: .audioInputNotRecordable(name))
+        }
+        for action in step.actions { performAudio(action) }
+        let due = audioTracker.due(at: context.now())
+        if !due.actions.isEmpty || !due.events.isEmpty {
+            applyAudio(due)
+            return
+        }
+        audioDueTask?.cancel()
+        guard let next = audioTracker.nextDueTime() else { return }
+        let wait = max(0, next - context.now())
+        audioDueTask = Task { [weak self] in
+            try? await Task.sleep(for: .nanoseconds(wait))
+            guard !Task.isCancelled, let self else { return }
+            self.applyAudio(self.audioTracker.due(at: self.context.now()))
+        }
+    }
+
+    private func performAudio(_ action: AudioTracker.Action) {
+        RecorderLog.detail("audio: \(action)", category: "recorder")
+        switch action {
+        case .startInput(let uid, let name):
+            startAudio(.input(uid), name: name, source: MicrophoneSource(uid: uid))
+        case .startSystemAudio:
+            let number = audioCaptureCount + 1
+            startAudio(.systemAudio, name: AudioFileDescription.systemAudioName, source: SystemAudioSource { [weak self] displayID in
+                Task { @MainActor in self?.systemAudioCaptures(displayID: displayID, number: number) }
+            })
+        case .stop(let id):
+            guard let (_, capture) = audioCaptures.removeValue(forKey: id) else { return }
+            stopping.append(Task { await capture.stop() })
+        }
+    }
+
+    private func systemAudioCaptures(displayID: UInt32, number: Int) {
+        guard !isStopped, let (current, _) = audioCaptures[.systemAudio], current == number else { return }
+        audioTracker.systemAudioCaptures(displayID: displayID)
+    }
+
+    private func startAudio(_ id: AudioTracker.SourceID, name: String, source: any AudioBufferSource) {
+        audioCaptureCount += 1
+        let number = audioCaptureCount
+        let inbox = audioReports
+        let post: @Sendable (AudioReportInbox.Report) -> Void = { [weak self] report in
+            inbox.post(report)
+            Task { @MainActor in self?.takeAudioReports() }
+        }
+        let reports = AudioCaptureReports(
+            fileStarted: { file in post(.fileStarted(file, id, name: name)) },
+            fileEnded: { end in post(.fileEnded(end)) },
+            event: { event in post(.event(event)) },
+            ended: { reason in post(.ended(id, number: number, name: name, reason)) })
+        let capture = AudioCapture(id: id, name: name, source: source, context: context, guides: guides, reports: reports)
+        audioCaptures[id] = (number, capture)
+        capture.start()
+    }
+
+    /// The audio captures' reports, in order, the one route by which they
+    /// reach the manifest. Stop takes the rest, every file's end included,
+    /// right before it finalizes; after that the manifest changes no more.
+    private func takeAudioReports() {
+        for report in audioReports.take() {
+            switch report {
+            case .fileStarted(let file, let id, let name): audioFileStarted(file, id: id, name: name)
+            case .fileEnded(let end): audioFileEnded(end)
+            case .event(let event): audioEvent(event)
+            case .ended(let id, let number, let name, let reason):
+                audioCaptureEnded(id, number: number, name: name, reason: reason)
+            }
+        }
+    }
+
+    private func audioFileStarted(_ file: RecordingManifest.AudioFile, id: AudioTracker.SourceID, name: String) {
+        guard manifest.state != .finalized else { return }
+        RecorderLog.detail("file started: \(file.name)", category: "recorder")
+        audioTracker.fileStarted(id)
+        problemsTold.cleared(.audioSourceFailed(name))
+        if manifest.audioFileStarted(file) { try? writeManifest() }
+    }
+
+    private func audioFileEnded(_ end: AudioFileEnd) {
+        guard manifest.audioFileEnded(end.file) else { return }
+        RecorderLog.detail("file ended: \(end.file.name), \(end.file.state.rawValue)", category: "recorder")
+        _ = manifest.record(end.events)
+        try? writeManifest()
+        told(end.events)
+        if let error = end.error {
+            tell("Audio file \(end.file.name)", error: error.description, kind: .audioFileFailed(end.file.name))
+        }
+    }
+
+    private func audioEvent(_ event: RecordingEvent) {
+        guard manifest.record([event]) else { return }
+        try? writeManifest()
+        told([event])
+    }
+
+    private func audioCaptureEnded(
+        _ id: AudioTracker.SourceID, number: Int, name: String, reason: AudioTracker.CaptureEnd
+    ) {
+        guard !isStopped, let (current, _) = audioCaptures[id], current == number else { return }
+        audioCaptures[id] = nil
+        switch reason {
+        case .captureFailed(let error):
+            tell(id == .systemAudio ? "The system audio failed" : "The audio input \(name) failed", error: error,
+                 kind: .audioSourceFailed(name))
+        case .writerFailed(let error):
+            tell("The audio file of \(name) failed", error: error, kind: .audioSourceFailed(name))
+        case .writerFellBehind:
+            tell("The audio file of \(name) ended", error: "its writer fell behind", kind: .audioSourceFailed(name))
+        case .diskFull:
+            tell("The audio file of \(name) ended", error: "the disk is full", kind: .audioSourceFailed(name))
+        case .disconnected:
+            break
+        }
+        let step = audioTracker.captureEnded(id, reason, at: context.now())
+        applyAudio(step)
+        // A source that stays listed but is lost again and again is never left unrecorded silently.
+        if reason == .disconnected, step.events.contains(where: \.event.isFailure) {
+            tell(id == .systemAudio ? "The system audio cannot be captured" : "The audio input \(name) cannot be captured",
+                 error: AudioTracker.sourceLostAgain(id), kind: .audioSourceFailed(name))
+        }
     }
 
     // MARK: Disk
@@ -337,16 +554,29 @@ public final class Recorder {
             tracker.roomAgain()
             apply(DisplayTracker.Step())
         }
+        if audioTracker.isWaitingForRoom, !isLow {
+            audioTracker.roomAgain()
+            applyAudio(AudioTracker.Step())
+        }
     }
 
     /// The low disk warning threshold: `lowDiskWarningMinutes` of every
-    /// display's newest display file at the encoding rate.
+    /// display's newest display file and every audio source's newest audio
+    /// file at the encoding rate.
     private func lowDiskWarningBytes() -> Double {
         var newestFrameSize: [String: FrameSize] = [:]
         for file in manifest.files {
             newestFrameSize[file.displayUUID] = FrameSize(width: file.frameSize[0], height: file.frameSize[1])
         }
-        let bytesPerHour = newestFrameSize.values.reduce(0.0) {
+        var newestChannels: [String: RecordingManifest.AudioFile.Channels] = [:]
+        for file in manifest.audioFiles { newestChannels[file.audioSource] = file.channels }
+        let audioBytesPerHour = newestChannels.values.reduce(0.0) { total, channels in
+            switch channels {
+            case .mono(let count): total + DiskEstimate.audioInputFileBytesPerHour(channelCount: count)
+            case .stereo: total + DiskEstimate.systemAudioFileBytesPerHour
+            }
+        }
+        let bytesPerHour = newestFrameSize.values.reduce(audioBytesPerHour) {
             $0 + DiskEstimate.displayFileBytesPerHour(frameSize: $1, settings: settings)
         }
         return bytesPerHour * settings.lowDiskWarningMinutes / 60

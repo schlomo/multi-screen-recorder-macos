@@ -81,6 +81,20 @@ import Testing
         return items
     }
 
+    /// The video track's own metadata items: the names on the video stream.
+    private func videoTrackItems(of asset: AVAsset) async throws -> [String: String] {
+        let video = try #require(try await asset.loadTracks(withMediaType: .video).first)
+        var items: [String: String] = [:]
+        for item in try await video.load(.metadata) {
+            guard let key = item.identifier?.rawValue else { continue }
+            items[key] = try await item.load(.stringValue)
+        }
+        return items
+    }
+
+    /// The video track's name, as `ffprobe` shows it: the stream's title.
+    private let trackNames = [AVMetadataIdentifier.quickTimeUserDataFullName.rawValue: "Display 2 - LG HDR 4K"]
+
     @Test func aDisplayFileCarriesItsReelNameAndMetadata() async throws {
         defer { removeScratch() }
         let timecode = Timecode(start: try startDate(), timeZone: berlin)
@@ -99,6 +113,7 @@ import Testing
             "com.apple.proapps.reel": "Display 2 - LG HDR 4K",
             "com.apple.proapps.cameraName": "Display 2 - LG HDR 4K",
         ])
+        #expect(try await videoTrackItems(of: asset) == trackNames)
     }
 
     private func startDate() throws -> Date {
@@ -141,6 +156,39 @@ import Testing
         #expect(associated.count == 1)
     }
 
+    /// A display file's guide tracks, "Microphones" mono and "System audio"
+    /// stereo, cover its time, written as the guide track feed does.
+    @Test func aDisplayFileCarriesItsGuideTracks() async throws {
+        defer { removeScratch() }
+        let rate = RecorderValues.framesPerSecond
+        let url = scratch.appending(path: "guide.mov")
+        let writer = try DisplayFileWriter(
+            url: url, frameSize: frameSize, firstTick: 0, timecode: Timecode(start: try startDate(), timeZone: berlin),
+            metadata: metadata, guideTracks: [.microphones, .systemAudio])
+        let image = try frame(brightness: 90)
+        let samplesPerTick = RecorderValues.audioSampleRate / rate
+        for tick in Int64(0)..<Int64(3 * rate) {
+            while try !writer.append(image, tick: tick) { try await Task.sleep(for: .milliseconds(1)) }
+            let tone = (0..<samplesPerTick).map { Float(0.2 * sin(Double(Int(tick) * samplesPerTick + $0) / 10)) }
+            let position = tick * Int64(samplesPerTick)
+            while try !writer.appendGuide(.microphones, [tone], at: position) { try await Task.sleep(for: .milliseconds(1)) }
+            while try !writer.appendGuide(.systemAudio, [tone, tone], at: position) { try await Task.sleep(for: .milliseconds(1)) }
+        }
+        try await writer.finish(lastTick: Int64(3 * rate) - 1)
+        let asset = AVURLAsset(url: url)
+        let audio = try await asset.loadTracks(withMediaType: .audio)
+        #expect(audio.count == 2)
+        var found: [String: UInt32] = [:]
+        for track in audio {
+            let format = try #require(try await track.load(.formatDescriptions).first)
+            let channels = try #require(CMAudioFormatDescriptionGetStreamBasicDescription(format)?.pointee.mChannelsPerFrame)
+            let name = try await track.load(.metadata).first { $0.identifier == .quickTimeUserDataFullName }
+            found[try await name?.load(.stringValue) ?? "?"] = channels
+            #expect(abs(try await track.load(.timeRange).duration.seconds - 3) < 0.05)
+        }
+        #expect(found == ["Microphones": 1, "System audio": 2])
+    }
+
     /// A file the process never finalized, as after a crash, is readable up
     /// to its last fragment of 2 s.
     @Test func anUnfinalizedDisplayFileIsReadableUpToItsLastFragment() async throws {
@@ -168,6 +216,7 @@ import Testing
         let items = try await metadataItems(of: asset)
         #expect(items["com.apple.proapps.reel"] == "Display 2 - LG HDR 4K")
         #expect(items["com.apple.proapps.cameraName"] == "Display 2 - LG HDR 4K")
+        #expect(try await videoTrackItems(of: asset) == trackNames)
         withExtendedLifetime(writer) {}
     }
 

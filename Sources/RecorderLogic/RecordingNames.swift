@@ -23,7 +23,23 @@ public enum RecordingNames {
     public static func displayFile(
         start: Date, timeZone: TimeZone, number: Int, display: String, taken: Set<String> = []
     ) -> String {
-        let base = "\(timeStamp(start, timeZone: timeZone)) Display \(number) - \(fileNamePart(display))"
+        untaken("\(timeStamp(start, timeZone: timeZone)) Display \(number) - \(fileNamePart(display))", taken: taken)
+    }
+
+    /// "2026-11-12 14.03.05 Microphone - MacBook Pro Microphone.mov" for an
+    /// audio input under its unique name, "2026-11-12 14.03.05 System
+    /// audio.mov" for the system audio; a taken name as for a display file.
+    public static func audioFile(
+        start: Date, timeZone: TimeZone, source: AudioFileDescription.Source, taken: Set<String> = []
+    ) -> String {
+        let what = switch source {
+        case .audioInput(let name, _, _): "Microphone - \(fileNamePart(name))"
+        case .systemAudio: AudioFileDescription.systemAudioName
+        }
+        return untaken("\(timeStamp(start, timeZone: timeZone)) \(what)", taken: taken)
+    }
+
+    private static func untaken(_ base: String, taken: Set<String>) -> String {
         var name = "\(base).mov"
         var copy = 2
         while taken.contains(name) {

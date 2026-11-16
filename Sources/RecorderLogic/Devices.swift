@@ -57,18 +57,23 @@ public struct AudioInputInfo: Equatable, Sendable {
     public var channelCount: Result<Int, DeviceReadError>
     public var isDefault: Bool
     public var transport: AudioTransport
+    /// The Core Audio UID, by which a recording knows the input and opens it;
+    /// nil when it cannot be read.
+    public var uid: String?
 
     public init(
-        name: String, channelCount: Result<Int, DeviceReadError>, isDefault: Bool, transport: AudioTransport = .builtIn
+        name: String, channelCount: Result<Int, DeviceReadError>, isDefault: Bool, transport: AudioTransport = .builtIn,
+        uid: String? = nil
     ) {
         self.name = name
         self.channelCount = channelCount
         self.isDefault = isDefault
         self.transport = transport
+        self.uid = uid
     }
 
-    public init(name: String, channelCount: Int, isDefault: Bool, transport: AudioTransport = .builtIn) {
-        self.init(name: name, channelCount: .success(channelCount), isDefault: isDefault, transport: transport)
+    public init(name: String, channelCount: Int, isDefault: Bool, transport: AudioTransport = .builtIn, uid: String? = nil) {
+        self.init(name: name, channelCount: .success(channelCount), isDefault: isDefault, transport: transport, uid: uid)
     }
 
     /// "MacBook Pro Microphone (default)" or just the name.

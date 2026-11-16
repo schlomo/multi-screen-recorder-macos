@@ -5,10 +5,12 @@ A reliable multi-source screen and audio recorder for macOS. It
 captures every display and audio source, never loses a recording, and
 keeps going when screens, resolutions or audio sources change.
 
-**Status:** in development. Builds record the displays only; audio
-comes with the next version. The app shows its settings and the ready
-check and records with Start, and the command line lists displays and
-audio inputs, runs the ready check, records and manages the settings.
+**Status:** in development. Builds record every display and audio
+source. The app shows its settings and the ready check and records with
+Start, and the command line lists displays and audio inputs, runs the
+ready check, records and manages the settings. An audio input with its
+own clock still drifts against the display files (measured, not yet
+corrected).
 
 ## What it does
 
@@ -84,13 +86,17 @@ default audio input changes, and on "Check again".
 Click Start: the window closes; the Dock icon shows a "!" badge when
 the disk runs low, a display shows another display's picture or
 something went wrong. Click the Dock icon or quit to open the status
-window: each display with its files, the data written and its state,
-the time recorded (`h:mm:ss`, every second), data and free space, and any problems
-in red. Stop there finalizes the files, opens the recording folder in
-Finder and quits; Continue keeps recording. The recording folder holds
-a video file per display, a new one each time a display comes back or
-changes its frame size, and `recording.json`, which lists every file,
-what happened and every problem, and says how the recording ended.
+window: each display and audio source with its files, the data written
+and its state, the time recorded (`h:mm:ss`, every second), data and
+free space, the CPU use of Multi Screen Recorder itself (encoding and
+capture also run in macOS's own processes, which it does not include),
+and any problems in red. Stop there finalizes the files, opens the
+recording folder in Finder and quits; Continue keeps recording. The
+recording folder holds a video file per display, a new one each time a
+display comes back or changes its frame size, an audio file per audio
+source (a microphone unplugged and plugged in again gets a new one),
+and `recording.json`, which lists every file, what happened and every
+problem, and says how the recording ended.
 
 ### Command line
 
@@ -108,7 +114,7 @@ so it shows the app's version and runs with its signature.
 |---|---|
 | `msr list` | Shows displays, audio inputs and system audio |
 | `msr check [flags] [--debug]` | Prints what will be recorded, then runs the ready check; exits 0 when ready, 1 when not; creates the output folder if it is missing |
-| `msr record [flags] [--duration 1h30m] [--debug]` | Prints what will be recorded and runs the ready check, then records until Ctrl-C, the duration or Stop in the status window (click the Dock icon); shows the app's Dock icon while it records and prints each event on standard error; `--duration` without a suffix is minutes; exits 0 when every file is finalized and no display file was ended by a failure (a problem told alone is listed but still exits 0), 1 when not ready, 3 when a file is not finalized, a display file was ended by a failure, the recording manifest could not be written at the end, or the recording could not start |
+| `msr record [flags] [--duration 1h30m] [--debug]` | Prints what will be recorded and runs the ready check, then records until Ctrl-C, the duration or Stop in the status window (click the Dock icon); shows the app's Dock icon while it records and prints each event on standard error; `--duration` without a suffix is minutes; exits 0 when every file is finalized and no file was ended by a failure (a problem told alone, an unplugged microphone or a gap is listed but still exits 0), 1 when not ready, 3 when a file is not finalized, a file was ended by a failure, the recording manifest could not be written at the end, or the recording could not start |
 | `msr settings [flags]` | Without flags prints the effective settings as JSON; with a settings flag saves the effective settings into the settings file and prints them, the only way a command writes it |
 | `msr version` | Prints the version and commit |
 

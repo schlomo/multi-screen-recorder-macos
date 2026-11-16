@@ -1323,3 +1323,101 @@ architect's reading.
   last 2 s, and a crash of `msr` is still offered as a crash report
   (D40).
 - **Evidence:** [design/recorder.md](design/recorder.md); PR #11.
+
+## D48: Agents run the recorder on the owner's Mac for tests (2026-11-15)
+
+- **Status:** in force; supersedes in part the rule that an agent runs
+  `msr record`, `msr check`, `msr list` and the app on a person's Mac
+  only when asked (`AGENTS.md`, "Facts that bite") and D37's "started
+  by a person" for the end-to-end tests.
+- **Context:** The owner, after merging PR #11: "keep going and try to
+  run more tests yourself without me to keep working on our roadmap".
+- **Decision:** The architect's reading: agents may run the built `msr`
+  (`record`, `check`, `list`) and the app on the owner's Mac to test
+  the roadmap's work, without asking each time. A run writes into the
+  agent's own scratch folder (`--output-folder`), never into the
+  owner's recordings, and the recordings are deleted once checked, as
+  they hold whatever the owner's screens show. An agent never changes
+  macOS settings or permissions; a run stopped by a permission prompt
+  is reported, not worked around.
+- **Consequences:** Capture is tested without the owner; display
+  changes need the end-to-end tests' virtual displays (`backlog.md`).
+- **Evidence:** the PR "Recording core B2".
+
+## D49: The recording core's audio (B2) (2026-11-15)
+
+- **Status:** in force. Built in the PR "Recording core B2".
+- **Context:** The architect's design text for B2, in the session of
+  2026-11-15. The owner: "B2 and then analyze drift - fine", "yes, each
+  channel = mono track", "with that B2 is good for me"; on gaps D46
+  point 7.
+- **Decision:** One audio file per recorded audio source, one mono
+  track per channel, system audio one stereo track from a small
+  ScreenCaptureKit stream on the main display that moves to the new
+  main display when its display goes; guide tracks "Microphones" (the
+  sum of the recorded channels divided by √n, clamped) and "System
+  audio" in every display file; the default microphone followed (D34);
+  an audio file placed by sample count from a tick; the clock drift
+  measured per audio file as `clockDriftPpm` and corrected in a later
+  PR; a gap detected above 32 ms (one buffer is about 10.7 ms) and
+  handled by D46 point 7; `/` and `:` in a device name become `-`, a
+  duplicate name gets " (2)"; every audio file carries the reel name
+  and metadata items as a display file does. The architect's calls in
+  it: the gain of the guide mix, the names, the 32 ms.
+- **Consequences:** Until the drift is corrected, an audio input with
+  its own clock drifts against the display files (up to 0.42 s an hour
+  measured).
+- **Evidence:** [design/recorder.md](design/recorder.md), "Audio"; the
+  experiments of 2026-11-15 in
+  [design/end-to-end-tests.md](design/end-to-end-tests.md).
+
+## D50: B2's open details, the architect's calls (2026-11-16)
+
+- **Status:** in force; the architect's calls on review of the PR
+  "Recording core B2", not the owner's ruling.
+- **Context:** B2 left details open that recorder.md did not settle; the
+  reviews of the PR raised them.
+- **Decision:** An event about an audio source names it in
+  `audioSource`, never in `display`, which means a display. A display
+  file's guide tracks may end up to 300 ms before its last tick (the
+  200 ms delay plus one 100 ms hand-over); the audio files are complete.
+  The video track keeps its name as QuickTime user data `©nam`; the
+  file-level metadata items stay as they were. Samples an audio file's
+  writer never took at its end are lost, so they are the failure `audio
+  file writer fell behind` and the result is `problems` (D47). Whether
+  the system audio's timestamps follow the host clock, which would show
+  the output device's drift as steady gaps of about 32 ms, stays open
+  for the owner's live run.
+- **Evidence:** [design/recorder.md](design/recorder.md), "Build state".
+
+## D51: The guide tracks end with the video (2026-11-16)
+
+- **Status:** in force; the architect's call. Supersedes D50's guide
+  track bound of up to 300 ms.
+- **Context:** The owner, after the live runs of the PR "Recording core
+  B2", asked why the guide tracks end early.
+- **Decision:** When a display file ends, one last mix of everything
+  the sources delivered goes up to the end of its video, so its guide
+  tracks end with the video.
+- **Evidence:** [design/recorder.md](design/recorder.md), "Audio",
+  "Guide tracks".
+
+## D52: The "Microphones" guide mix: inputs averaged, summed at unity, soft-limited (2026-11-16)
+
+- **Status:** in force. Supersedes D49's mix of the recorded channels'
+  sum divided by √n, clamped.
+- **Context:** The live runs of the PR "Recording core B2" measured the
+  guide as 0.4061 × (Razer + CalDigit), that is 1/√6: n counted
+  channels, not inputs, the BRIO's two identical channels counted twice,
+  and silent inputs lowered the live one by 7.8 dB. The owner, on
+  2026-11-16: "yes to try other mixing for mic track on video, of
+  course. my ruling is not important related to getting good results".
+- **Decision:** The architect's rule: each audio input is averaged to
+  mono, the inputs are summed at unity gain, and a soft limiter keeps
+  the sum within ±1, unchanged up to 0.5 (−6 dBFS) and above it
+  `0.5 + 0.5 · tanh((|x| − 0.5) / 0.5)` with its sign.
+- **Consequences:** One live microphone among silent ones keeps its
+  level; loud speech on several inputs at once is compressed, not
+  clipped. The audio files are unchanged.
+- **Evidence:** [design/recorder.md](design/recorder.md), "Guide
+  tracks".

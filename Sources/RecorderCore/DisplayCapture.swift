@@ -59,13 +59,25 @@ public final class RecordingContext: Sendable {
 
     /// The display file's name for a file starting at `tick`, never one already used.
     func claimFileName(tick: Int64, number: Int, display: String) -> String {
+        claimName(tick: tick) { start, taken in
+            RecordingNames.displayFile(start: start, timeZone: timeZone, number: number, display: display, taken: taken)
+        }
+    }
+
+    /// The audio file's name for a file starting at `tick`, never one already used.
+    func claimAudioFileName(tick: Int64, source: AudioFileDescription.Source) -> String {
+        claimName(tick: tick) { start, taken in
+            RecordingNames.audioFile(start: start, timeZone: timeZone, source: source, taken: taken)
+        }
+    }
+
+    private func claimName(tick: Int64, _ name: (Date, Set<String>) -> String) -> String {
         let start = started.addingTimeInterval(TickGrid.recording.seconds(ofTick: tick))
         return state.withLock { state in
             let existing = Set((try? FileManager.default.contentsOfDirectory(atPath: folder.path(percentEncoded: false))) ?? [])
-            let name = RecordingNames.displayFile(
-                start: start, timeZone: timeZone, number: number, display: display, taken: state.takenNames.union(existing))
-            state.takenNames.insert(name)
-            return name
+            let claimed = name(start, state.takenNames.union(existing))
+            state.takenNames.insert(claimed)
+            return claimed
         }
     }
 }
@@ -86,6 +98,7 @@ public final class DisplayCapture: NSObject, @unchecked Sendable, SCStreamOutput
     private let queue: DispatchQueue
     private let grid = TickGrid.recording
     private let lifecycle = StreamLifecycle()
+    private let guides: GuideTrackFeed
 
     /// The file started; reports its manifest entry.
     private let onFileStarted: @Sendable (RecordingManifest.DisplayFile) -> Void
@@ -99,12 +112,17 @@ public final class DisplayCapture: NSObject, @unchecked Sendable, SCStreamOutput
     private var timer: DispatchSourceTimer?
     /// No frame and no tick is taken any more.
     private var isEnding = false
+    /// Listens to the guide tracks until the file's last mix.
+    private var guideListener: Int?
+    /// The guide tracks handed over while ending, for the file's last mix.
+    private var endingGuides: [GuideLastMix.Chunk] = []
     /// Finishing the file, by the capture itself or at the recorder's request; set once.
     private var finishTask: Task<DisplayFileEnd?, Never>?
     private static let queueKey = DispatchSpecificKey<Int>()
 
     init(
         uuid: String, displayID: UInt32, number: Int, name: String, frameSize: FrameSize, context: RecordingContext,
+        guides: GuideTrackFeed,
         onFileStarted: @escaping @Sendable (RecordingManifest.DisplayFile) -> Void,
         onEnded: @escaping @Sendable (DisplayTracker.StreamEnd, DisplayFileEnd?) -> Void
     ) {
@@ -114,23 +132,26 @@ public final class DisplayCapture: NSObject, @unchecked Sendable, SCStreamOutput
         self.name = name
         self.frameSize = frameSize
         self.context = context
+        self.guides = guides
         self.onFileStarted = onFileStarted
         self.onEnded = onEnded
         queue = DispatchQueue(label: "msr.display.\(number)", qos: .userInteractive)
         super.init()
         queue.setSpecific(key: Self.queueKey, value: ObjectIdentifier(self).hashValue)
         let started = context.now()
-        ticker = DisplayFileTicker(captureStart: started) { [context, uuid, number, name, frameSize] firstTick throws(DisplayFileWriterError) in
+        ticker = DisplayFileTicker(captureStart: started) { [context, uuid, number, name, frameSize, guides] firstTick throws(DisplayFileWriterError) in
             let fileName = context.claimFileName(tick: firstTick, number: number, display: name)
             let writer = try DisplayFileWriter(
                 url: context.folder.appending(path: fileName), frameSize: frameSize, firstTick: firstTick,
                 timecode: context.timecode,
                 metadata: DisplayFileMetadata(
                     displayUUID: uuid, displayNumber: number, displayName: name, frameSize: frameSize,
-                    recordingStarted: context.startedText, app: context.app))
+                    recordingStarted: context.startedText, app: context.app),
+                guideTracks: guides.tracks)
             return (writer, RecordingManifest.DisplayFile(
                 name: fileName, display: name, displayUUID: uuid, frameSize: frameSize,
-                start: TickGrid.recording.seconds(ofTick: firstTick), timecode: context.timecode.text(ofTick: firstTick)))
+                start: TickGrid.recording.seconds(ofTick: firstTick), timecode: context.timecode.text(ofTick: firstTick),
+                guideTracks: guides.tracks.map(\.name)))
         }
     }
 
@@ -212,6 +233,17 @@ public final class DisplayCapture: NSObject, @unchecked Sendable, SCStreamOutput
             case .fileStarted(let entry):
                 onFileStarted(entry)
                 startTicking()
+                guideListener = guides.listen { [weak self] guide, channels, position in
+                    guard let self else { return }
+                    queue.async {
+                        guard !self.isEnding else {
+                            self.endingGuides.append(GuideLastMix.Chunk(guide: guide, channels: channels, positionFromStart: position))
+                            return
+                        }
+                        guard let reason = self.ticker?.receiveGuide(guide, channels, positionFromStart: position) else { return }
+                        self.end(reason)
+                    }
+                }
             case .ended(let reason): end(reason)
             }
         case .fails:
@@ -273,12 +305,24 @@ public final class DisplayCapture: NSObject, @unchecked Sendable, SCStreamOutput
     /// writer and the frames it held.
     private func finish(writeWaitingTicks: Bool) async -> DisplayFileEnd? {
         await lifecycle.stop()
-        let (stream, ticker) = queue.sync { (self.stream, self.ticker) }
+        let (stream, ticker, listener) = queue.sync { (self.stream, self.ticker, self.guideListener) }
         if let stream { try? stream.removeStreamOutput(self, type: .screen) }
-        let file = await ticker?.finish(now: context.now(), writeWaitingTicks: writeWaitingTicks)
+        // The file listens until its last mix: stopping hands it every
+        // hand-over before, queued here, and peeks at what comes after.
+        let file = await ticker?.finish(now: context.now(), writeWaitingTicks: writeWaitingTicks) { [guides, queue] videoEnd in
+            let peeks = listener.map { guides.stopListening($0, peekingUpTo: videoEnd) } ?? [:]
+            let pending = queue.sync {
+                defer { self.endingGuides = [] }
+                return self.endingGuides
+            }
+            return GuideLastMix(pending: pending, peeks: peeks)
+        }
+        if let listener { _ = guides.stopListening(listener, peekingUpTo: nil) }
         queue.sync {
             self.stream = nil
             self.ticker = nil
+            self.guideListener = nil
+            self.endingGuides = []
         }
         return file
     }

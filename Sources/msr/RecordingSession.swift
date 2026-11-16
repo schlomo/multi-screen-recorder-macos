@@ -60,9 +60,11 @@ final class RecordingSession: RecorderObserver {
 
     private func refreshStatusWindow() {
         guard let recorder else { return }
-        let (rows, line) = recorder.status()
+        let (rows, line, cpu) = recorder.status()
         statusWindow.model.rows = rows
         statusWindow.model.line = line
+        statusWindow.model.cpu = cpu ?? ""
+
         statusWindow.model.problems = status.problems
     }
 

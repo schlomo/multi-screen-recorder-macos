@@ -200,6 +200,32 @@ import Testing
         #expect(displays.due(at: 30 * second).actions.isEmpty)
     }
 
+    /// N-A: only the first such end is free. Again without a display-change
+    /// notice for the display in between, it is a failure with back-off.
+    @Test func aSecondCaptureSourceGoneWithoutANoticeIsAFailure() {
+        var displays = tracker()
+        _ = displays.begin([Self.builtIn, Self.lg], at: 0)
+        _ = displays.streamEnded(Self.lg.uuid, .captureSourceGone, connected: [Self.builtIn, Self.lg], at: 10 * second)
+        let restarted = displays.due(at: 10 * second + displays.settleTime.nanoseconds)
+        #expect(starts(restarted) == [Self.lg.uuid])
+        let again = displays.streamEnded(Self.lg.uuid, .captureSourceGone, connected: [Self.builtIn, Self.lg], at: 20 * second)
+        #expect(again.events.map(\.event) == [.displayStreamFailed])
+        #expect(again.events.first?.error?.contains("-3815") == true)
+        #expect(displays.nextDueTime() == 21 * second)
+    }
+
+    /// A notice for the display in between makes the next such end free again.
+    @Test func aCaptureSourceGoneAfterANoticeIsFreeAgain() {
+        var displays = tracker()
+        _ = displays.begin([Self.builtIn, Self.lg], at: 0)
+        _ = displays.streamEnded(Self.lg.uuid, .captureSourceGone, connected: [Self.builtIn, Self.lg], at: 10 * second)
+        _ = displays.observe([Self.builtIn], at: 12 * second)
+        _ = displays.observe([Self.builtIn, Self.lg], at: 30 * second)
+        #expect(starts(displays.due(at: 30 * second + displays.settleTime.nanoseconds)) == [Self.lg.uuid])
+        let again = displays.streamEnded(Self.lg.uuid, .captureSourceGone, connected: [Self.builtIn, Self.lg], at: 40 * second)
+        #expect(again.events.isEmpty && again.actions.isEmpty)
+    }
+
     /// Still listed one settle time after its stream ended: a new stream, as after any change.
     @Test func aStreamWhoseDisplayIsGoneButStillListedStartsAgainAfterTheSettleTime() {
         var displays = tracker()

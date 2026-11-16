@@ -10,15 +10,15 @@ extension RecordingDuration: ExpressibleByArgument {
     }
 }
 
-/// Exit 3: a file not finalized or a display file ended by a failure (D47), the final manifest not written, or no start.
+/// Exit 3: a file not finalized or ended by a failure (D47), the final manifest not written, or no start.
 let recordingEndedWithErrorExitCode: Int32 = 3
 
 extension CommandLineInterface {
     struct Record: AsyncParsableCommand {
         static let configuration = CommandConfiguration(
-            abstract: "Record every display until Ctrl-C, SIGTERM, SIGHUP, the duration or Stop in the status window.",
+            abstract: "Record every display and audio source until Ctrl-C, SIGTERM, SIGHUP, the duration or Stop in the status window.",
             discussion: "Prints what will be recorded, runs the ready check, then records with the app's Dock icon. "
-                + "Exits 0 when every file is finalized and no display file was ended by a failure, 1 when not ready, 3 otherwise or when it could not start.")
+                + "Exits 0 when every file is finalized and no file was ended by a failure, 1 when not ready, 3 otherwise or when it could not start.")
 
         @OptionGroup var flags: SettingsFlags
 
@@ -71,8 +71,7 @@ final class RecordCommandDelegate: NSObject, NSApplicationDelegate {
         }
         let facts = await probeReadyCheckFacts(proof: .captureOneFrame, settings: settings, homeFolder: home)
         let result = ReadyCheck.evaluate(facts, settings: settings)
-        print(WhatWillBeRecorded(settings: settings, facts: facts).text, terminator: "")
-        print("  \(ProductText.displaysOnly)\n")
+        print(WhatWillBeRecorded(settings: settings, facts: facts).text)
         print(result.text, terminator: "")
         fflush(stdout)
         guard result.isReady else {

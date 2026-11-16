@@ -12,13 +12,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var session: RecordingSession?
     /// Stop in progress, for a logout that comes meanwhile to wait for.
     private var stopping: Task<Void, Never>?
+    /// For the rest of the process's life.
+    private var audioWatch: AudioInputWatch?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.mainMenu = makeMainMenu()
         let model: StartModel
         do {
             model = StartModel(homeFolder: try homeFolder())
-            try watchAudioInputs { model.devicesChanged() }
+            audioWatch = try AudioInputWatch { model.devicesChanged() }
         } catch {
             let alert = NSAlert()
             alert.messageText = "Multi Screen Recorder cannot start"
@@ -64,7 +66,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if openFolder, let folder = session.folder {
             NSWorkspace.shared.open(folder)
         }
-        if summary?.manifestWritten == false {
+        // Only after the person's Stop: at logout, restart and shutdown the
+        // problem goes to the unified log and the problem list only (N-B).
+        if openFolder, summary?.manifestWritten == false {
             showAlert("The recording manifest could not be written",
                       "\(RecordingNames.manifest) in the recording folder does not record the end of the recording.")
         }

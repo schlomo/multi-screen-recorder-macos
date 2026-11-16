@@ -77,10 +77,85 @@ import Testing
         #expect(manifest.problems.count == 1)
     }
 
-    @Test func theFailuresAreTheFiveWaysADisplayFileEndsBadly() {
+    @Test func theFailuresAreTheWaysAFileEndsBadly() {
         #expect(RecordingEvent.Kind.allCases.filter(\.isFailure) == [
             .displayStreamFailed, .displayShowsAnotherDisplaysPicture, .displayFileWriterFellBehind, .displayFileWriterFailed, .diskFull,
+            .audioInputFailed, .systemAudioFailed, .audioFileWriterFailed, .audioFileWriterFellBehind,
         ])
+    }
+
+    @Test func anAudioFileNotFinalizedMakesTheResultProblems() {
+        var manifest = manifest()
+        var file = RecordingManifest.AudioFile(
+            name: "a.mov", audioSource: "Mic", audioSourceUID: "uid", channels: .mono(1), start: 0, timecode: "14:03:05:04")
+        file.state = .notFinalized
+        manifest.audioFiles = [file]
+        manifest.finalize(ended: start + 60, timeZone: berlin)
+        #expect(manifest.result == .problems)
+    }
+
+    @Test func filesAreWrittenInTheOrderOfTheirStartAndReadBackByKind() throws {
+        var manifest = manifest()
+        manifest.files = [RecordingManifest.DisplayFile(
+            name: "d.mov", display: "LG", displayUUID: "U", frameSize: FrameSize(width: 2, height: 2), start: 3, timecode: "t")]
+        manifest.audioFiles = [
+            RecordingManifest.AudioFile(name: "s.mov", audioSource: "System audio", audioSourceUID: nil, channels: .stereo, start: 1, timecode: "t"),
+            RecordingManifest.AudioFile(name: "m.mov", audioSource: "Mic", audioSourceUID: "uid", channels: .mono(2), start: 5, timecode: "t"),
+        ]
+        let data = try manifest.jsonData()
+        let object = try #require(try JSONSerialization.jsonObject(with: data) as? [String: Any])
+        let files = try #require(object["files"] as? [[String: Any]])
+        #expect(files.map { $0["name"] as? String } == ["s.mov", "d.mov", "m.mov"])
+        #expect(files[0]["channels"] as? String == "stereo")
+        #expect(files[0]["audioSourceUID"] == nil)
+        #expect(files[2]["channels"] as? Int == 2)
+        #expect(files[2]["clockDriftPpm"] is NSNull)
+        #expect(try RecordingManifest(json: data) == manifest)
+    }
+
+    @Test func aFinalizedManifestTakesNoMoreEventsOrAudioFiles() {
+        var manifest = manifest()
+        let file = RecordingManifest.AudioFile(
+            name: "a.mov", audioSource: "Mic", audioSourceUID: "uid", channels: .mono(1), start: 0, timecode: "t")
+        let other = RecordingManifest.AudioFile(
+            name: "b.mov", audioSource: "Mic", audioSourceUID: "uid", channels: .mono(1), start: 0, timecode: "t")
+        let gap = RecordingEvent(at: 0, event: .audioInputGap, audioSource: "Mic")
+        var ended = file
+        ended.state = .finalized
+        let taken = [
+            manifest.audioFileStarted(file), manifest.audioFileStarted(file), manifest.audioFileEnded(ended), manifest.record([gap]),
+        ]
+        #expect(taken == [true, false, true, true])
+        manifest.finalize(ended: start + 60, timeZone: berlin)
+        let finalized = manifest
+        let takenAfter = [manifest.record([gap]), manifest.audioFileEnded(file), manifest.audioFileStarted(other)]
+        #expect(takenAfter == [false, false, false])
+        #expect(manifest == finalized)
+    }
+
+    @Test func theCPUUseIsWrittenAtTheEnd() throws {
+        var manifest = manifest()
+        let running = try #require(try JSONSerialization.jsonObject(with: manifest.jsonData()) as? [String: Any])
+        #expect(running["cpu"] is NSNull)
+        manifest.finalize(ended: start + 60, timeZone: berlin, cpu: .init(averagePercent: 12.5, peakPercent: 40))
+        let ended = try #require(try JSONSerialization.jsonObject(with: manifest.jsonData()) as? [String: Any])
+        #expect(ended["cpu"] as? [String: Double] == ["averagePercent": 12.5, "peakPercent": 40])
+    }
+
+    @Test func aGapAndADefaultMicrophoneChangeCarryTheirFields() throws {
+        var gap = RecordingEvent(at: 0, event: .audioInputGap, audioSource: "Mic")
+        gap.length = 0.25
+        var changed = RecordingEvent(at: 0, event: .defaultMicrophoneChanged)
+        changed.from = "Mic"
+        changed.to = "Razer"
+        for event in [gap, changed] {
+            #expect(try JSONDecoder().decode(RecordingEvent.self, from: prettyJSON(event)) == event)
+        }
+        let text = String(decoding: try prettyJSON(changed), as: UTF8.self)
+        #expect(text.contains(#""from" : "Mic""#))
+        let gapText = String(decoding: try prettyJSON(gap), as: UTF8.self)
+        #expect(gapText.contains(#""audioSource" : "Mic""#))
+        #expect(!gapText.contains(#""display""#))
     }
 
     @Test func aProblemHasItsTimeAndFullError() throws {
@@ -180,6 +255,16 @@ import Testing
         #expect(name == "1970-01-01 00.00.00 Display 3 - Dell U2720Q-2- left.mov")
     }
 
+    @Test func anAudioFileIsNamedByItsSource() {
+        let start = Date(timeIntervalSince1970: 0)
+        let microphone = RecordingNames.audioFile(
+            start: start, timeZone: utc, source: .audioInput(name: "Mic 1/2", coreAudioUID: "u", channelCount: 1))
+        #expect(microphone == "1970-01-01 00.00.00 Microphone - Mic 1-2.mov")
+        #expect(RecordingNames.audioFile(start: start, timeZone: utc, source: .systemAudio) == "1970-01-01 00.00.00 System audio.mov")
+        #expect(RecordingNames.audioFile(start: start, timeZone: utc, source: .systemAudio, taken: ["1970-01-01 00.00.00 System audio.mov"])
+            == "1970-01-01 00.00.00 System audio (2).mov")
+    }
+
     @Test func aTakenNameGetsANumber() {
         let start = Date(timeIntervalSince1970: 0)
         let name = RecordingNames.displayFile(start: start, timeZone: utc, number: 2, display: "LG HDR 4K")
@@ -266,6 +351,17 @@ import Testing
         let summary = RecordingSummary(manifest: told, recordingFolder: "/r", seconds: 70, manifestWritten: true)
         #expect(!summary.endedWithError)
         #expect(summary.text.hasSuffix("Problem at 1m05s: The displays cannot be read: denied\n"))
+    }
+
+    @Test func theSummaryListsTheAudioFilesAndTheCPUUse() {
+        var recorded = manifest([.finalized])
+        recorded.audioFiles = [RecordingManifest.AudioFile(
+            name: "a.mov", audioSource: "Mic", audioSourceUID: "u", channels: .mono(1), start: 0, timecode: "t")]
+        recorded.audioFiles[0].state = .finalized
+        recorded.cpu = RecordingManifest.CPU(averagePercent: 12.4, peakPercent: 31.6)
+        let summary = RecordingSummary(manifest: recorded, recordingFolder: "/r", seconds: 5, manifestWritten: true)
+        #expect(summary.text == "Recorded 5s into /r\n  f0.mov  finalized\n  a.mov  finalized\n"
+            + "CPU 12 % on average, 32 % at the peak, of one core (this process only)\n")
     }
 
     @Test func aWriterThatFailedIsAnError() {
