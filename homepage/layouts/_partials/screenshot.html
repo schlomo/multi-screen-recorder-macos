@@ -1,0 +1,18 @@
+{{- /* A window screenshot from assets/images/, shown at the window's size in points
+       and never wider than the page. Arguments: src, alt, caption and scale, the
+       screenshot's pixels per point (2 for a Retina screen, 1 otherwise). A 2x
+       screenshot also gets a 1x version for screens that need no more. */}}
+{{- $image := resources.Get .src }}
+{{- $width := div $image.Width .scale }}
+{{- $height := div $image.Height .scale }}
+{{- $full := $image.Process "webp q90 text" }}
+<figure class="screenshot">
+  {{- if gt .scale 1 }}
+  {{- $half := $image.Process (printf "resize %dx webp q90 text" $width) }}
+  <img src="{{ $half.RelPermalink }}" srcset="{{ $half.RelPermalink }} 1x, {{ $full.RelPermalink }} 2x"
+       alt="{{ .alt }}" width="{{ $width }}" height="{{ $height }}" loading="lazy" />
+  {{- else }}
+  <img src="{{ $full.RelPermalink }}" alt="{{ .alt }}" width="{{ $width }}" height="{{ $height }}" loading="lazy" />
+  {{- end }}
+  <figcaption>{{ .caption }}</figcaption>
+</figure>
