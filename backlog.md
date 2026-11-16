@@ -217,8 +217,8 @@ Still open from D34: what AGC does and whether it is on in auto mode;
      or debug line clears it, prints, redraws it; it goes at the end
      and the summary follows. No option for it.
    - Today all human output goes to standard output (seen 2026-11-16).
-     The architect's proposal for the split, to confirm in the PR's
-     design: standard output carries only data a script uses (the
+     The split, the owner's yes on 2026-11-16 ("yes, good plan for
+     the terminal output"): standard output carries only data a script uses (the
      recording folder's path, one line, when recording starts);
      everything for people (the banner, the table, the ready check,
      events, the status line, the summary, debug) goes to standard
