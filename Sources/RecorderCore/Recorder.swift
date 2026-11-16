@@ -42,8 +42,9 @@ public final class Recorder {
     private var endReports = CaptureEndReports()
     private var problemsTold = ProblemsTold()
     private var finalManifestWritten = true
-    /// Stops in progress, so Stop waits for every file.
-    private var stopping: [Task<Void, Never>] = []
+    /// Stops in progress, so Stop waits for every file; each leaves when done.
+    private var stopping: [Int: Task<Void, Never>] = [:]
+    private var stopCount = 0
     private var dueTask: Task<Void, Never>?
     private var freeSpaceTask: Task<Void, Never>?
     private var activity: (any NSObjectProtocol)?
@@ -159,6 +160,21 @@ public final class Recorder {
             cpu.text)
     }
 
+    /// Runs a capture's stop; Stop waits for it until it is done.
+    private func stopInProgress(_ work: @escaping @MainActor () async -> Void) {
+        stopCount += 1
+        let key = stopCount
+        stopping[key] = Task { [weak self] in
+            await work()
+            self?.stopping[key] = nil
+        }
+    }
+
+    /// Every stop in progress, also one that starts while waiting, is done.
+    private func waitForStops() async {
+        while let task = stopping.values.first { await task.value }
+    }
+
     /// Ends every screen file and finalizes the recording manifest.
     public func stop() async -> RecordingSummary {
         if !isStopped {
@@ -172,9 +188,9 @@ public final class Recorder {
             for action in tracker.stopAll() { perform(action) }
             // The audio sources stop after the screen files' last mix, so
             // their guide tracks hold the sound up to the video's end (D51).
-            for task in stopping { await task.value }
+            await waitForStops()
             for action in audioTracker.stopAll() { performAudio(action) }
-            for task in stopping { await task.value }
+            await waitForStops()
             takeAudioReports()
             guides.stop()
             manifest.finalize(ended: Date(), timeZone: context.timeZone, cpu: cpu.manifestEntry)
@@ -340,10 +356,10 @@ public final class Recorder {
             if tracker.showsAnotherScreensPicture == false { observer?.recorder(self, screenShowsAnotherScreensPicture: nil) }
         case .stop(let uuid, _):
             guard let (captureNumber, capture) = captures.removeValue(forKey: uuid) else { return }
-            stopping.append(Task { [weak self] in
+            stopInProgress { [weak self] in
                 let file = await capture.stop()
                 self?.fileEnded(file, captureNumber: captureNumber, screen: capture.name, reason: nil)
-            })
+            }
         }
     }
 
@@ -441,7 +457,7 @@ public final class Recorder {
             })
         case .stop(let id):
             guard let (_, capture) = audioCaptures.removeValue(forKey: id) else { return }
-            stopping.append(Task { await capture.stop() })
+            stopInProgress { await capture.stop() }
         }
     }
 
