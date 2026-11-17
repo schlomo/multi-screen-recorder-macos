@@ -15,20 +15,38 @@ disableKinds = ["taxonomy", "term", "section", "rss", "404"]
   problemReportURL = "https://github.com/schlomo/multi-screen-recorder-macos/issues/new?template=problem-report.yml"
   legalNoticeURL = "https://schapiro.org/impressum/"
 
-# The site's colours: the project palette of assets/icon/README.md (graphite,
+# The site's colours, for light and for dark mode: the project palette of assets/icon/README.md (graphite,
 # cool white, red) and the app icon's screen colours. Single source of truth:
-# layouts/_partials/head.html emits every entry as a CSS custom property
-# (primary -> --primary). Never hard-code a colour anywhere else.
+# layouts/_partials/palette.html emits every entry as a CSS custom property
+# (primary -> --primary), the dark ones for a browser in dark mode; both
+# tables need the same names. Never hard-code a colour anywhere else.
 [params.colors]
   primary = "#1E2330"     # graphite: headings, the download button
   accent = "#FF3B30"      # red: the record dot, the bar under headings
   link = "#415070"        # link text
   text = "#1E2330"        # body text
   text-light = "#415070"  # the tagline, the footer
-  background = "#E9EEF7"  # cool white: page background
+  background = "#F5F7FA"  # page background: the icon artwork's own background, so the header icon has no frame
   surface = "#FFFFFF"     # the download button's text, boxes
   rule = "#D5DAE6"        # footer rule
   artwork = "#F5F7FA"     # the icon artwork's own background: the link preview image
+  backdrop-from = "#5B6B8C"  # the screenshot collage's backdrop, top left
+  backdrop-to = "#A3B0C9"    # the screenshot collage's backdrop, bottom right
+  shadow = "#1E2330"      # the collage windows' shadow
+
+[params.colors-dark]
+  primary = "#E9EEF7"
+  accent = "#FF453A"
+  link = "#9DB2E0"
+  text = "#E3E7F0"
+  text-light = "#A9B4CC"
+  background = "#14171F"
+  surface = "#1E2330"
+  rule = "#2E3546"
+  artwork = "#F5F7FA"
+  backdrop-from = "#2A3450"
+  backdrop-to = "#4A5878"
+  shadow = "#000000"
 
 # The header shows the app icon artwork from the repository's assets/icon/,
 # resized by Hugo; the source is never copied into homepage/. Defining a mount
@@ -40,3 +58,11 @@ disableKinds = ["taxonomy", "term", "section", "rss", "404"]
   [[module.mounts]]
     source = "../assets/icon/app-icon-fancy.jpeg"
     target = "assets/images/app-icon-fancy.jpeg"
+  # In dark mode the header shows the app icon, transparent outside its tile.
+  [[module.mounts]]
+    source = "../assets/icon/app-icon.png"
+    target = "assets/images/app-icon.png"
+  # The features list comes from the repository's README.md, "What it does".
+  [[module.mounts]]
+    source = "../README.md"
+    target = "assets/README.md"

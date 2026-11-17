@@ -3,9 +3,10 @@
    page (see layouts/_partials/head.html).
 
    Colours are NOT defined here: --primary, --accent, --link, --text,
-   --text-light, --background, --surface and --rule come from [params.colors]
-   in hugo.toml, emitted by head.html. Use only those variables; never
-   hard-code a colour. */
+   --text-light, --background, --surface, --rule and the rest come from
+   [params.colors] and, in dark mode, [params.colors-dark] in hugo.toml,
+   emitted by layouts/_partials/palette.html. Use only those variables;
+   never hard-code a colour. */
 :root {
   --radius: 0.75rem;
   --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", Ubuntu, Cantarell, "Helvetica Neue", Arial, sans-serif;
@@ -15,7 +16,7 @@
 
 body {
   margin-inline: auto;
-  max-inline-size: 44rem;
+  max-inline-size: 76rem;
   padding: 2rem 1rem 3rem;
   font-family: var(--font-sans);
   line-height: 1.6;
@@ -28,8 +29,37 @@ a {
   &:hover { color: var(--primary); }
 }
 
+/* Text reads best at most 44rem wide; the home page's header, collage and
+   sections use the page's full width of up to 76rem. */
+.prose, footer, .features, .facts { max-inline-size: 44rem; margin-inline: auto; }
+
+/* On a wide screen (64rem, wider than a phone held sideways), the home page's header: the icon and the name on the
+   left, the tagline, description and download on the right; on a narrow one,
+   all of it centred, one under the other. */
 header {
   text-align: center;
+
+  & img { display: block; inline-size: 8rem; block-size: auto; margin: 0 auto 0.5rem; }
+  & h1 { margin: 0; color: var(--primary); font-size: 2.25rem; text-wrap: balance; }
+
+  @media (min-width: 64rem) {
+    &:has(.claim) {
+      display: grid;
+      grid-template-columns: 1fr 1.6fr;
+      gap: 3rem;
+      align-items: center;
+
+      & .claim > * { text-align: start; }
+      & .tagline { margin-block-start: 0; font-size: 1.5rem; }
+      & .download { margin-block-end: 0; }
+    }
+  }
+}
+
+.tagline { margin-block-start: 0; font-size: 1.5rem; }
+      & .download { margin-block-end: 0; }
+    }
+  }
 
   & img { display: block; inline-size: 8rem; block-size: auto; margin: 0 auto 0.5rem; }
   & h1 { margin: 0; color: var(--primary); font-size: 2.25rem; text-wrap: balance; }
@@ -58,15 +88,6 @@ header {
   &:hover { color: var(--surface); background: var(--link); }
 }
 
-/* A window screenshot: its size in points, shrunk with the page on a phone. */
-.screenshot {
-  margin: 2rem 0;
-  text-align: center;
-
-  & img { display: block; max-inline-size: 100%; block-size: auto; margin-inline: auto; }
-  & figcaption { margin-block-start: 0.5rem; color: var(--text-light); font-size: 0.95rem; text-wrap: balance; }
-}
-
 h2 {
   color: var(--primary);
   font-size: 1.4rem;
@@ -84,9 +105,37 @@ h2 {
 }
 
 footer {
-  margin: 3rem auto 0;
+  margin-block-start: 3rem;
   padding-block-start: 1rem;
   border-block-start: 1px solid var(--rule);
   text-align: center;
   color: var(--text-light);
+}
+
+/* The collage of the three windows (layouts/_partials/collage.html, which
+   holds the picture's own styles); a tap opens it full size in a new tab. */
+.collage {
+  margin: 2rem 0;
+
+  & svg { display: block; inline-size: 100%; block-size: auto; }
+  & figcaption { max-inline-size: 44rem; margin: 1rem auto 0; color: var(--text-light); }
+}
+
+/* On a wide screen, the features in two columns and the three short sections
+   side by side, Requirements last. */
+@media (min-width: 64rem) {
+  .features, .facts { max-inline-size: none; }
+
+  .features > ul {
+    columns: 2;
+    column-gap: 3rem;
+
+    & > li { break-inside: avoid; margin-block-end: 0.5rem; }
+  }
+
+  .facts {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 3rem;
+  }
 }

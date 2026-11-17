@@ -14,30 +14,36 @@ own clock is resampled continuously to stay with the screen files
 
 ## What it does
 
+- **One click, nothing missed.** Start the app, check what will be
+  recorded, click Start: every screen and every audio source is
+  recorded until you click the Dock icon, then Stop. A check before you
+  start, warnings when disk space runs low, files that stay readable
+  after a crash.
 - **Every screen, as screens come and go.** Each screen gets its own
-  video file. Plugging in a projector, removing it, or switching
-  mirroring does not stop the recording.
+  video file. Plugging in a projector, removing it, closing or opening
+  the laptop's lid, or switching mirroring does not stop the recording.
 - **Every audio source in its own file.** No audio, the default
   microphone, the wired audio inputs, or all audio inputs, plus the
-  system audio if you want it.
-  Each source gets an audio file of its own, each channel its own
-  track; every screen file also carries two guide tracks, the
-  audio inputs and the system audio, for playback and for syncing by
-  waveform with a separate recording.
-- **Edit-ready video.** A constant 30 frames per second, with a fixed
-  frame size per file and a recording resolution you choose (Native,
-  4K, 1440p, 1200p, 1080p or 720p), only ever scaled down. Native is the
-  size macOS shows as "looks like" for the screen, not the size it is
-  drawn at.
+  system audio if you want it. Each source gets an audio file of its
+  own, each channel its own track, kept in step with the screens over
+  hours by correcting each microphone's clock drift.
 - **Auto mode.** On by default: every screen at Native and the wired
   audio inputs plus the default microphone, so you get a recording that
   is safe to sort out in the editor, at the expense of disk space.
   Switch it off to choose the resolution and the audio mode yourself.
-- **Built not to lose anything.** A check before you start, warnings
-  when disk space runs low, files that stay readable after a crash.
-- **One button.** Start the app, approve the last settings, click
-  Start. Click the Dock icon, then Stop. Everything also works from the
-  command line, for scripting.
+- **Edit-ready files.**
+  - Timecode in every file, so an editor puts all of them on one
+    timeline in place.
+  - Named by source: file names, reel names and track names such as
+    `Screen 1 - DELL P3421W` or `Audio 2 - Razer Seiren V3 Mini`.
+  - A constant 30 frames per second and a fixed frame size per file,
+    at a recording resolution you choose (Native, 4K, 1440p, 1200p,
+    1080p or 720p), only ever scaled down. Native is the size macOS
+    shows as "looks like" for the screen, not the size it is drawn at.
+  - Two guide tracks in every screen file, the audio inputs and the
+    system audio, for playback and for syncing by waveform with a
+    separate recording.
+- **Scriptable.** Everything also works from the command line.
 - **Nothing leaves your Mac.** The app makes no network connections.
 
 It runs on macOS 26 and later, on Apple silicon. The homepage is

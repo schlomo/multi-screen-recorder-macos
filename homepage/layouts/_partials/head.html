@@ -14,11 +14,9 @@
 <link rel="canonical" href="{{ .Permalink }}" />
 {{- end }}
 {{- /* Inlined so rendering needs no extra request. The colour palette comes first, as
-       CSS custom properties generated from [params.colors] in hugo.toml. */}}
-{{- $palette := "" }}
-{{- range $name, $value := site.Params.colors }}{{ $palette = printf "%s--%s:%s;" $palette $name $value }}{{ end }}
+       CSS custom properties generated from [params.colors] and [params.colors-dark] in hugo.toml. */}}
 {{- with resources.Get "css/style.css" | minify }}
-<style>{{ printf ":root{%s}%s" $palette .Content | safeCSS }}</style>
+<style>{{ printf "%s%s" (partialCached "palette.html" ":root" ":root") .Content | safeCSS }}</style>
 {{- end }}
 
 <!-- Icons, rendered from assets/icon/app-icon.svg by scripts/render-app-icon -->
