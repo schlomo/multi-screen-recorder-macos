@@ -1576,3 +1576,48 @@ architect's reading.
 - **Evidence:** [recorder.md](design/recorder.md), "Output on disk",
   "Labels" and the start and status windows; the glossary's "Screen",
   "Label" and "Tagline"; the PR "Naming and window polish".
+
+## D56: Clock drift is corrected by resampling every audio source to the shared clock (2026-11-17)
+
+- **Status:** in force; the design is the architect's, built at the
+  owner's request and for the owner to confirm. Closes D49's "corrected
+  in a later PR" and D50's open question on the system audio's
+  timestamps; changes the meaning of D49's `clockDriftPpm`.
+- **Context:** The owner, 2026-11-16: "research, understand and build a
+  reliable fix for the audio drift, showing in debug mode what is going
+  on and giving a brief indicator for the applied audio fix in the
+  status window", then "if needed, build hypothesises and prove/disprove,
+  then build working solution and present to me in the morning".
+  Everything below is the architect's reading of that.
+- **Decision:**
+  1. Every audio source, the system audio too, passes one resampler
+     whose rate a control loop steers so that the source's sample count
+     follows the shared clock; one code path, no bypass.
+  2. The clock drift is measured from buffer arrivals: the smallest
+     lateness (arrival minus timestamp) per interval is the source's
+     clock against the shared clock, since timestamps follow the sample
+     count and a buffer only ever arrives late. A late stretch is
+     rejected, a lasting step followed, the rate limited to ±1000 ppm.
+  3. `clockDriftPpm` in the recording manifest, the status window's
+     column "Clock drift" and the `--debug` lines show the same
+     measured drift; `clockDriftCorrection` is the sound added to or
+     removed from a file.
+  4. `RecorderLogic` may use Accelerate beside Foundation.
+  5. Not taken: an aggregate device with drift correction (one device
+     for all inputs, so a plug or unplug would disturb every input, and
+     another capture path); Core Audio's own device clock (precise for
+     audio inputs, but the system audio has none, so two mechanisms);
+     `AudioConverter` or a varispeed unit (no rate change while
+     running, or no control of the position). Revisit Core Audio's
+     device clock if a recording shows a correction that followed a
+     change of delivery delay rather than of the clock.
+- **Consequences:** An audio file is no longer sample-identical to
+  what the device delivered: it is resampled and low-passed above
+  20 kHz. A lasting change of how late buffers are delivered is taken
+  as clock offset, and the correction is carried across a gap on the
+  assumption that timestamps keep following the sample count; both are
+  stated as limits in the design.
+- **Evidence:** [design/recorder.md](design/recorder.md), "Clock
+  drift"; the research of 2026-11-16 and 2026-11-17 and "Known limits
+  of the clock drift correction" in
+  [design/end-to-end-tests.md](design/end-to-end-tests.md).

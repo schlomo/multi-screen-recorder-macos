@@ -93,7 +93,8 @@ D28).
   markers (D47).
 - Audio (built in PR #12, D49 to D52): one audio file per audio source,
   each with a timecode track; gaps over 32 ms filled up to 1 s, a new
-  file beyond; clock drift measured per file, not yet corrected; the
+  file beyond; every source resampled to the shared clock, its clock drift
+  measured from buffer arrivals and corrected (D56); the
   "Audio inputs" guide mixes each input as mono at unity gain through a
   soft limiter (D52); guide tracks end with the video (D51).
 - Audio: none, the default microphone, wired (the default microphone

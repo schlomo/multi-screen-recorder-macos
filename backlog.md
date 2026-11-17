@@ -7,12 +7,13 @@ the homepage with screenshots of both windows (PR #15) and the tester
 guide's "What to test and send" (PR #16), all merged 2026-11-16. The
 owner shares it with colleagues, who email a screenshot of the start
 window, `recording.json` of every recording and a few sentences; the
-architect triages what comes back into this backlog. Next: queued item
+architect triages what comes back into this backlog. First: the clock
+drift correction under "In flight" waits for the owner. Next: queued item
 1, the command line polish (the owner signed off the design as text,
 2026-11-16: "the next PR should roll that stuff in"), then item 1a,
 audio only. Then: item 3, the end-to-end tests; item 4, the
 simplification; item 7, auto-recovery from disturbances; item 6, CPU;
-item 5, drift correction; then item 16, the Mac App Store and Homebrew
+then item 16, the Mac App Store and Homebrew
 (the owner, 2026-11-16: "sandbox then comes after the
 optimizations"). Agents may run `msr record` on the owner's Mac (D48;
 the owner's go-ahead in the session, 2026-11-16), and BetterDisplay's
@@ -33,7 +34,15 @@ Still open from D34: what AGC does and whether it is on in auto mode;
 
 ## In flight
 
-Nothing.
+- **Clock drift correction** (D56; was queued item 5): built and
+  reviewed locally on the branch `audio-drift-correction`, not pushed,
+  no pipeline run (the owner, 2026-11-16: "work local only, with a
+  single final CI test at the very end after we both are happy").
+  Waiting on the owner: trying the build, confirming D56's design, the
+  go-ahead to push. Verified on the owner's Mac by a 10-minute
+  recording (Razer −115.7 ppm, 69 ms corrected, every input within
+  0.2 ms). UNVERIFIED: one hour, a click test through the speakers, a
+  build with CI's Swift 6.3, the status window's column on screen.
 
 ## Queued
 
@@ -143,15 +152,19 @@ Nothing.
    a drain error labelled as a writer timeout in `guideTracksCut`; no
    test for a gap after real data in a guide track's last mix; an
    unlocked test flag in `DisplayFileTickerTests`.
-5. **Drift correction** (D49 measured it, the correction was left for
-   later): needed. The one-hour run of 2026-11-16 measured the Razer at
-   −116 ppm (its file 0.42 s short after an hour, about 70 ms after
-   10 minutes against the video) and the CalDigit at +50 ppm; system
-   audio, the BRIO and the MacBook microphone under 6 ppm. Try an
-   aggregate device with drift correction first. The drift estimate
-   itself (first and latest buffer arrival) mostly measures arrival
-   jitter on short files; a least-squares slope, null under about
-   30 s, fixes that.
+5. **Clock drift correction, what is left** after D56 (in flight):
+   - The homepage's screenshot of the status window lacks the column
+     "Clock drift"; retake it once the build is released (its alt text
+     already names the column).
+   - The Razer's and the BRIO's files are a constant 16 to 18 ms apart
+     by room sound (10-minute run, 2026-11-17): each device's own input
+     latency, which the recorder has never compensated [ASSUMED].
+     Decide whether to read Core Audio's latency per device and place
+     each file by it. Design first.
+   - The owner's runs with `--debug` answer two assumptions: whether a
+     source's timestamps keep following its sample count across a gap
+     (a debug line at each gap shows it), and whether the rate's swing
+     on the system audio (up to about 200 ppm) is inaudible.
 6. **CPU**: our process averaged 56 % of one core over an hour (two
    displays, five audio sources) and peaks at 165 to 386 % at start.
    A 20 s `sample` of 2026-11-16 (build `7ad0b6b`; shares solid,
@@ -242,7 +255,7 @@ Nothing.
      shareable content ahead, off the Core Audio path; (e) a ready-check
      warning when audio inputs share a dock with a USB-C display;
      (f) leave disturbed stretches out of the drift measurement
-     (item 5); (g) our own process tap for system audio, low: it is the
+     (done with D56: a late stretch is rejected); (g) our own process tap for system audio, low: it is the
      mechanism ScreenCaptureKit already uses. Design first.
    - Advice for the owner [ASSUMED, from the mechanism]: the Wacom
      straight into a Mac port avoids the pause; check with one replug
