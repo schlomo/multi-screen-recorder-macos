@@ -27,7 +27,17 @@ Still open from D34: what AGC does and whether it is on in auto mode;
 
 ## In flight
 
-Nothing.
+- **A re-run when GitHub has no macOS runner** (branch
+  `troubleshooting-ci-runner`, pushed, no PR yet; the owner,
+  2026-11-17: "can we add a retry as failure path into the CI yaml?").
+  The branch holds two troubleshooting entries (no macOS runner; a
+  crash dialog for crash reports the tests wrote). Proposed, waiting
+  for the owner's sign-off: a workflow on `workflow_run` of `ci.yml`
+  ending cancelled calls `scripts/rerun-without-runner` (Python,
+  tested with a stand-in `gh`), which re-runs the failed jobs only when
+  the annotations say "not acquired by Runner", up to the third
+  attempt; Linux runner, `actions: write` for that workflow only, no
+  checkout of PR code.
 
 ## Queued
 
