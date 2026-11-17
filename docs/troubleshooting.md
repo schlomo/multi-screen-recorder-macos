@@ -177,8 +177,8 @@ One row per entry, the error text exactly as in the entry.
 - **Fix:** the two simulation suites run serialized
   (`@Suite(.serialized)`), so they hold at most two pool threads; the
   three ticker tests' stand-in writer becomes ready on an event (after
-  refusing a counted number of times, each test asserting that its own
-  drain asked that often), so none depends on a task being scheduled
+  refusing four times, each test asserting all four refusals, of which
+  at most one comes before its drain), so none depends on a task being scheduled
   within the drain timeout. `GuideTrackFeedTests.theLastMixWaitsForSamplesThatComeLate`
   still delivers its late samples from a task after 150 ms, against a
   60 s bound: the feed's wait offers no event to deliver on, so the
