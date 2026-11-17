@@ -159,22 +159,29 @@ One row per entry, the error text exactly as in the entry.
   and `aLongLastMixIsNotDroppedWhileTheWriterWaits`, each "failed after
   44.6 seconds"); the same code passed on 993842b (run 44111291663),
   and passes locally.
-- **Why:** [KNOWN] the three tests made their stand-in writer ready from
-  a task sleeping 20 ms, against a 30 s drain timeout. [KNOWN, measured
-  locally] `ClockDriftTrackerTests` and `ClockDriftCorrectionTests` are
+- **Why:** [KNOWN: the test code] the three tests made their stand-in
+  writer ready from a task sleeping 20 ms, against a 30 s drain timeout.
+  [KNOWN: measured locally with a probe test timing a 20 ms task]
+  `ClockDriftTrackerTests` and `ClockDriftCorrectionTests` are
   synchronous and compute for about 28 s of CPU in all without
   suspending, so run in parallel each case holds a thread of the
-  cooperative pool; with them in the same process as the ticker tests, a
-  20 ms task took 15.7, 16.5 and 2.2 s to run on 12 cores, and 0.02 to
-  0.5 s once the two suites were serialized. [KNOWN] in CI's logs nearly
-  every test reports "passed after" about 29.7 s in the passing run and
-  44 s in the failing one, the ticker suite 0.2 s inside its 30 s bound
-  in the passing run. [CONJECTURE] the hosted runner's pool has 3 threads
-  and slower cores, so the same simulations hold it past 30 s; the three
-  tests were not made to fail locally, whose pool has 12 threads.
-- **Fix:** 9165204 serializes the two simulation suites (`@Suite(.serialized)`,
-  at most two pool threads held); 8555fdd makes the stand-in writer ready
-  on an event (`becomesReady(afterRefusals: 2)`), so no test depends on a
-  task being scheduled within the drain timeout.
+  cooperative pool; in the same process as the ticker tests, a 20 ms
+  task took 15.7, 16.5 and 2.2 s to run on 12 cores, and 0.02 to 0.5 s
+  once the two suites were serialized. [KNOWN: CI's logs of runs
+  44111291663 and 44112113090] nearly every test reports "passed after"
+  about 29.7 s in the passing run and 44 s in the failing one, the ticker
+  suite 0.2 s inside its 30 s bound in the passing run. [CONJECTURE] the
+  hosted runner's pool has 3 threads and slower cores, so the same
+  simulations hold it past 30 s; the three tests were not made to fail
+  locally, whose pool has 12 threads.
+- **Fix:** the two simulation suites run serialized
+  (`@Suite(.serialized)`), so they hold at most two pool threads; the
+  three ticker tests' stand-in writer becomes ready on an event (after
+  refusing a counted number of times, each test asserting that its own
+  drain asked that often), so none depends on a task being scheduled
+  within the drain timeout. `GuideTrackFeedTests.theLastMixWaitsForSamplesThatComeLate`
+  still delivers its late samples from a task after 150 ms, against a
+  60 s bound: the feed's wait offers no event to deliver on, so the
+  starvation pattern is left, with a bound 400 times the delay.
 - **Verify:** CI's `scripts/test` passes on the pushed head.
 - **Observed:** 2026-11-17, PR #19; open until CI passes.
