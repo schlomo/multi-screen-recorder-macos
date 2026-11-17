@@ -6,7 +6,7 @@ import RecorderLogic
 /// A running recording as the person sees it, in the app and for `msr
 /// record` alike: the Dock icon's badge "!" and a bouncing icon when
 /// something needs the person, and the status window with the problems
-/// (D45, D46, D47). `msr record` also says each event and
+/// (D45, D46, D47). `msr record` also tells each event and
 /// problem as `RecordOutput` decides and, on a terminal, draws the status line.
 @MainActor
 final class RecordingSession: RecorderObserver {
@@ -91,18 +91,18 @@ final class RecordingSession: RecorderObserver {
     func recorder(_ recorder: Recorder, screenShowsAnotherScreensPicture screen: String?) {
         status.screenShowingAnotherScreensPicture = screen
         if let screen {
-            output?.say(.event, "The screen \(screen) shows another screen's picture: its screen file ended,"
+            output?.tell(.event, "The screen \(screen) shows another screen's picture: its screen file ended,"
                 + " and it is recorded again after its next change.\n")
         }
         updateBadge()
     }
 
     func recorder(_ recorder: Recorder, eventLine: String) {
-        output?.say(.event, eventLine + "\n")
+        output?.tell(.event, eventLine + "\n")
     }
 
     func recorder(_ recorder: Recorder, problem: RecordingProblem) {
-        output?.say(.problem, problem.text + "\n")
+        output?.tell(.problem, problem.text + "\n")
         status.problems.append(problem.text)
         needsAttention()
     }
@@ -143,5 +143,3 @@ func currentQuitReason() -> OSType? {
     NSAppleEventManager.shared().currentAppleEvent?
         .attributeDescriptor(forKeyword: AEKeyword(kAEQuitReason))?.enumCodeValue
 }
-
-

@@ -79,9 +79,10 @@ data written, the problems, and Stop and Continue (D46).
 ## Status line
 
 The one line `msr record` redraws once a second on standard error when
-that is a terminal: the recording time, the size written, the files, the
-free space, the CPU use, the sources being recorded and the problems.
-Not the window's own line below its table.
+that is a terminal: the count of problems when there are any, then the
+recording time, the size written, the files and the free space, the CPU
+use and the sources being recorded, in that order. Not the window's own
+line below its table.
 
 ## Crash report
 

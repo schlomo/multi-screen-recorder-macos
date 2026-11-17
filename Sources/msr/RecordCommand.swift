@@ -82,9 +82,9 @@ final class RecordCommandDelegate: NSObject, NSApplicationDelegate {
         }
         let facts = await probeReadyCheckFacts(proof: .captureOneFrame, settings: settings, homeFolder: home)
         let result = ReadyCheck.evaluate(facts, settings: settings)
-        output.say(.banner, runningVersion.banner)
-        output.say(.whatWillBeRecorded, WhatWillBeRecorded(settings: settings, facts: facts).text + "\n")
-        output.say(.readyCheck(isReady: result.isReady), result.text)
+        output.tell(.banner, runningVersion.banner)
+        output.tell(.whatWillBeRecorded, WhatWillBeRecorded(settings: settings, facts: facts).text + "\n")
+        output.tell(.readyCheck(isReady: result.isReady), result.text)
         guard result.isReady else {
             exitStatus = 1
             endEventLoop()
@@ -93,7 +93,7 @@ final class RecordCommandDelegate: NSObject, NSApplicationDelegate {
         do {
             session = try RecordingSession(settings: settings, homeFolder: home, output: output)
         } catch {
-            output.say(.error, "Error: \(error)\n")
+            output.tell(.error, "Error: \(error)\n")
             exitStatus = recordingEndedWithErrorExitCode
             endEventLoop()
             return
@@ -104,8 +104,8 @@ final class RecordCommandDelegate: NSObject, NSApplicationDelegate {
         }
         guard let folder = session?.folder else { preconditionFailure("a started recording has its folder") }
         let folderPath = folder.path(percentEncoded: false)
-        output.say(.recordingFolderNotice, "Recording into \(folderPath)\n")
-        output.say(.recordingFolder, folderPath)
+        output.tell(.recordingFolderNotice, "Recording into \(folderPath)\n")
+        output.tell(.recordingFolder, folderPath)
         for signalNumber in [SIGINT, SIGTERM, SIGHUP] {
             signal(signalNumber, SIG_IGN)
             let source = DispatchSource.makeSignalSource(signal: signalNumber, queue: .main)
@@ -145,7 +145,7 @@ final class RecordCommandDelegate: NSObject, NSApplicationDelegate {
             return .terminateLater
         case .finalizeWithoutAsking:
             // Logout and shutdown finalize without asking, then let the process end.
-            output.say(.stopMessage, stopRequests.request() + "\n")
+            output.tell(.stopMessage, stopRequests.request() + "\n")
             stopping = Task {
                 _ = await session.stop()
                 NSApp.reply(toApplicationShouldTerminate: true)
@@ -162,12 +162,12 @@ final class RecordCommandDelegate: NSObject, NSApplicationDelegate {
     private func stopRequested() {
         guard let session else { return }
         let first = !isStopping
-        output.say(.stopMessage, stopRequests.request() + "\n")
+        output.tell(.stopMessage, stopRequests.request() + "\n")
         guard first else { return }
         stopping = Task {
             if let summary = await session.stop() {
-                // The summary is the message of a run that exits 3, so `--quiet` still says it then.
-                output.say(.summary(endedWithError: summary.endedWithError), summary.text)
+                // The summary is the message of a run that exits 3, so `--quiet` still tells it then.
+                output.tell(.summary(endedWithError: summary.endedWithError), summary.text)
                 if summary.endedWithError { exitStatus = recordingEndedWithErrorExitCode }
             }
             endEventLoop()
@@ -195,8 +195,8 @@ final class RecordCommandDelegate: NSObject, NSApplicationDelegate {
     }
 }
 
-/// What `msr record` says when asked to stop: the first request starts the
-/// stop, any later one only says that it goes on.
+/// What `msr record` tells when asked to stop: the first request starts the
+/// stop, any later one only tells that it goes on.
 struct StopRequests {
     static let stopping = "Stopping the recording and finalizing the files…"
     static let stillFinalizing = "Still finalizing the files…"

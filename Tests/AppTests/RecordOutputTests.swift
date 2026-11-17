@@ -61,17 +61,17 @@ import Testing
             let err = Collected()
             let output = RecordOutput(
                 record: record, standardOutput: { _ in }, standardError: StandardErrorWriter(isTerminal: false, width: { 80 }, sink: { err.add($0) }))
-            output.say(.banner, "banner\n")
+            output.tell(.banner, "banner\n")
             #expect(err.all == (quiet ? [] : ["banner\n"]))
         }
     }
 
-    @Test func sayDeliversToTheDestination() {
+    @Test func tellDeliversToTheDestination() {
         for quiet in [false, true] {
             let (output, out, err) = output(quiet: quiet, isTerminal: false)
-            output.say(.recordingFolder, "/folder")
-            output.say(.banner, "banner\n")
-            output.say(.error, "Error: x\n")
+            output.tell(.recordingFolder, "/folder")
+            output.tell(.banner, "banner\n")
+            output.tell(.error, "Error: x\n")
             #expect(out.all == ["/folder"])
             #expect(err.all == (quiet ? ["Error: x\n"] : ["banner\n", "Error: x\n"]))
         }
@@ -95,7 +95,7 @@ import Testing
         let (output, _, err) = output(quiet: false)
         output.drawStatusLine(isStopping: false) { "one" }
         output.endStatusLine()
-        output.say(.summary, "summary\n")
+        output.tell(.summary, "summary\n")
         #expect(err.all == ["\rone\u{1B}[K", "\r\u{1B}[K", "summary\n"])
     }
 }

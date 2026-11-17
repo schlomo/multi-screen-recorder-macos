@@ -4,9 +4,9 @@ import Synchronization
 
 /// The one place that writes on standard error, so that nothing prints
 /// into the middle of the status line: on a terminal a write clears the
-/// line, prints, and draws it again, in one write. The event, problem,
-/// summary and debug lines of `msr record`, and every other line of the
-/// process on standard error, come through here. Not a terminal: plain
+/// line, prints, and draws it again, in one write. Every line this code
+/// writes on standard error comes through here (ArgumentParser writes its
+/// own usage errors, before any status line exists). Not a terminal: plain
 /// text, never an escape code.
 public final class StandardErrorWriter: Sendable {
     private static let eraseToEnd = "\u{1B}[K"
@@ -27,8 +27,10 @@ public final class StandardErrorWriter: Sendable {
     }
 
     /// Writes on a file descriptor. It draws a status line only when that is
-    /// a terminal and `term` (the `TERM` variable) names one that takes escape codes.
+    /// a terminal and `term` (the `TERM` variable) is set, not empty and not `dumb`. A write
+    /// to it never raises SIGPIPE: it fails and is ignored.
     public convenience init(descriptor: Int32, term: String?) {
+        _ = fcntl(descriptor, F_SETNOSIGPIPE, 1)
         let takesEscapeCodes = term.map { !$0.isEmpty && $0 != "dumb" } ?? false
         self.init(
             isTerminal: isatty(descriptor) != 0 && takesEscapeCodes,
@@ -42,6 +44,7 @@ public final class StandardErrorWriter: Sendable {
                 var bytes = Array(text.utf8)[...]
                 while !bytes.isEmpty {
                     let written = bytes.withUnsafeBytes { Darwin.write(descriptor, $0.baseAddress, $0.count) }
+                    if written < 0 && errno == EINTR { continue }
                     guard written > 0 else { return }
                     bytes = bytes.dropFirst(written)
                 }

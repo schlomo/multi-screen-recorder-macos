@@ -62,7 +62,7 @@ struct RecordOutput {
     }
 
     /// The text with its newlines, where its kind goes.
-    func say(_ kind: Kind, _ text: String) {
+    func tell(_ kind: Kind, _ text: String) {
         switch destination(of: kind) {
         case .standardOutput: standardOutput(text)
         case .standardError: standardError.write(text)

@@ -119,12 +119,14 @@ import Testing
         #expect(read(ends[0]) == "event\n")
     }
 
-    @Test func aFailedWriteDoesNotEndTheProcess() throws {
+    /// Writing to a pipe nobody reads raises SIGPIPE, which ends the process unless the writer made the write fail instead.
+    @Test func aWriteToAPipeWithoutReaderFailsAndTheProcessLives() throws {
         var ends: [Int32] = [0, 0]
         try #require(pipe(&ends) == 0)
+        defer { close(ends[1]) }
         close(ends[0])
-        close(ends[1])
         let writer = StandardErrorWriter(descriptor: ends[1], term: nil)
         writer.write("nowhere to go\n")
+        writer.write("still alive\n")
     }
 }

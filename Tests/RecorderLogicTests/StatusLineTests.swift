@@ -14,8 +14,10 @@ import Testing
         return status
     }
 
-    @Test func lowDiskSpaceCountsAsAProblemLikeTheBadgeDoes() {
-        #expect(StatusLine.text(line: line, cpu: nil, rows: [], status: status(problems: 1, isLowOnDisk: true)).hasPrefix("2 problems, "))
+    /// The count is the problems', as the glossary defines them; low disk space is not one.
+    @Test func theCountIsTheProblemsEvenWhileLowDiskSpaceIsSet() {
+        #expect(StatusLine.text(line: line, cpu: nil, rows: [], status: status(problems: 1, isLowOnDisk: true)).hasPrefix("1 problem, Recording"))
+        #expect(StatusLine.text(line: line, cpu: nil, rows: [], status: status(problems: 0, isLowOnDisk: true)).hasPrefix("Recording"))
     }
 
     private let line = "Recording 0:12:34 · 1.2 GB in 7 files · 143.8 GB free"
@@ -52,18 +54,17 @@ import Testing
     }
 }
 
-@Suite struct RecordingStatusAttentionTests {
-    @Test func theCountIsWhatSetsTheBadge() {
+@Suite struct RecordingStatusBadgeTests {
+    @Test func lowDiskSpaceAScreenShowingAnotherPictureAndProblemsEachSetTheBadge() {
+        #expect(RecordingStatus().badge == nil)
         var status = RecordingStatus()
-        #expect(status.attentionCount == 0)
-        status.problems = ["a", "b"]
         status.isLowOnDisk = true
-        status.screenShowingAnotherScreensPicture = "Screen 2"
-        #expect(status.attentionCount == 4)
         #expect(status.badge == "!")
         status = RecordingStatus()
-        status.isLowOnDisk = true
-        #expect(status.attentionCount == 1)
+        status.screenShowingAnotherScreensPicture = "Screen 2"
+        #expect(status.badge == "!")
+        status = RecordingStatus()
+        status.problems = ["a"]
         #expect(status.badge == "!")
     }
 }
