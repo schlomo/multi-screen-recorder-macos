@@ -302,16 +302,22 @@ import Testing
         #expect(files.isEmpty)
     }
 
+    /// The capture ends at the buffer that pushes the waiting samples over
+    /// the audio wait bound; the correction's held-back samples are dropped,
+    /// not added to the waiting ones.
     @Test func aWriterThatTakesNothingForTheAudioWaitBoundFellBehind() async throws {
         let capture = capture(drainTimeout: .milliseconds(10))
         writer.isReady = false
-        let buffers = RecorderValues.audioWaitBoundSeconds * RecorderValues.audioSampleRate / samplesPerBuffer + 2
-        for index in 0..<buffers { source.send(try buffer(at: time(ofBuffer: index))) }
+        let bound = RecorderValues.audioWaitBoundSeconds * RecorderValues.audioSampleRate
+        // The first buffer whose corrected samples go over the bound, and one more.
+        let sent = (bound + heldBack) / samplesPerBuffer + 1
+        for index in 0...sent { source.send(try buffer(at: time(ofBuffer: index))) }
         let end = try await reported.waitForCaptureEnd()
         let files = reported.ended
         withExtendedLifetime(capture) {}
         #expect(end == .writerFellBehind)
         #expect(files.first?.error?.description.contains("lost") == true)
+        #expect(files.first?.lostSamples == Int64(sent * samplesPerBuffer - heldBack))
     }
 
     /// Every sample goes through the clock drift correction; the samples it

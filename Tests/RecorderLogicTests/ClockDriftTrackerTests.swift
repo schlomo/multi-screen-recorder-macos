@@ -1,9 +1,15 @@
+import Foundation
 import Testing
 @testable import RecorderLogic
 
 /// The tracker against simulated devices, the correction applied exactly
-/// at the rate it gives: what matters is the correction against the
-/// device's true offset.
+/// at the rate it gives and at a gap grown by the drift during it: what
+/// matters is the correction against the device's true offset since the
+/// start. The bounds are the design's simulation's worst over 20 seeds
+/// plus a margin, checked against this simulation, whose buffers arrive
+/// in order. The full matrix (seeds 1 to 10, 30 minutes for every steady
+/// device and burst pattern) was run once on 2026-11-17; here seeds 1 to
+/// 3 and one seed for the two 30-minute runs, to keep the suite fast.
 @Suite struct ClockDriftTrackerTests {
     struct Run {
         /// Per buffer: its timestamp in seconds, the correction applied
@@ -17,243 +23,302 @@ import Testing
             zip(seconds, error).filter { $0.0 >= start && $0.0 < end }.map { abs($0.1) }.max() ?? 0
         }
 
-        /// The largest error of one sign: positive, the correction fell
-        /// short of the offset or went below it after a step down.
-        func largestError(from start: Double, sign: Double) -> Double {
-            zip(seconds, error).filter { $0.0 >= start }.map { $0.1 * sign }.max() ?? 0
+        var largestRate: Double { rate.map(abs).max() ?? 0 }
+
+        func largestRate(from start: Double) -> Double {
+            zip(seconds, rate).filter { $0.0 >= start }.map { abs($0.1) }.max() ?? 0
         }
 
-        func rate(at seconds: Double) -> Double { rate[self.seconds.firstIndex { $0 >= seconds }!] }
+        /// How far the clock drift shown is from `ppm` at the worst from
+        /// `start` on; infinity if it is not shown.
+        func shownOff(_ ppm: Double, from start: Double) -> Double {
+            zip(seconds, drift).filter { $0.0 >= start }.map { abs(($0.1 ?? .infinity) - ppm) }.max() ?? 0
+        }
     }
 
     /// The device through a tracker; `corrected: false` applies nothing,
-    /// the error then being the device's own wander.
-    private func run(_ device: SimulatedDevice, seconds: Double, seed: UInt64 = 1, corrected: Bool = true) -> Run {
+    /// the error then being the device's own offset.
+    private func run(_ device: SimulatedDevice, seconds: Double, seed: Int = 1, corrected: Bool = true) -> Run {
         var tracker = ClockDriftTracker()
         var applied = 0.0
         var run = Run()
         let bufferSeconds = Double(device.bufferSamples) / Double(SimulatedDevice.sampleRate)
-        for buffer in device.buffers(for: seconds, seed: seed) {
+        let bufferLength = Int64(bufferSeconds * 1e9)
+        let start = device.offset(0)
+        var next: Int64?
+        for buffer in device.buffers(for: seconds, seed: UInt64(seed)) {
+            // A gap, as `ClockDriftCorrection` finds it: the drift during it is added.
+            if corrected, let next, buffer.time - next > RecorderValues.audioGapTolerance.nanoseconds {
+                applied += tracker.drift(over: buffer.time - next)
+            }
+            next = buffer.time + bufferLength
             tracker.record(time: buffer.time, arrival: buffer.arrival, applied: applied)
             if corrected { applied += tracker.rate * bufferSeconds }
             run.seconds.append(buffer.seconds)
-            run.error.append(device.offset(buffer.seconds) - applied)
+            run.error.append(device.offset(buffer.seconds) - start - applied)
             run.rate.append(tracker.rate)
             run.drift.append(tracker.clockDriftPpm)
         }
         return run
     }
 
+    private func ms(_ seconds: Double) -> String { String(format: "%.3f ms", seconds * 1000) }
+
     @Test func theValuesAreTheDesignsStartingPoints() {
         #expect(RecorderValues.clockDriftInterval == .seconds(1))
-        #expect(RecorderValues.clockDriftIntervalMinimumBuffers == 3)
-        #expect(RecorderValues.clockDriftRollingIntervals == 5)
-        #expect(RecorderValues.clockDriftLoopFrequency == 0.3)
-        #expect(RecorderValues.clockDriftShownFitMeasurements == 60)
-        #expect(RecorderValues.clockDriftShownMinimumMeasurements == 10)
-        #expect(RecorderValues.clockDriftShownSettlingMeasurements == 10)
+        #expect(RecorderValues.clockDriftHorizon == .seconds(20))
+        #expect(RecorderValues.clockDriftEstimateMinimumPoints == 5)
+        #expect(RecorderValues.clockDriftEstimateMinimumSpan == .seconds(10))
+        #expect(RecorderValues.clockDriftCatchUpTime == .seconds(10))
         #expect(RecorderValues.clockDriftMaximumRatePpm == 1000)
-        #expect(RecorderValues.clockDriftStep == .milliseconds(5))
-        #expect(RecorderValues.clockDriftRejectedIntervalsInARow == 10)
+        #expect(RecorderValues.clockDriftShownEstimates == 60)
+        #expect(RecorderValues.clockDriftShownMinimumEstimates == 10)
     }
 
-    /// The error includes the device's offset when the reference was
-    /// taken, which no correction can know: up to about 0.25 ms here.
-    @Test(arguments: [-116.0, 50.0], [UInt64(1), 2, 3])
-    func aSteadyDeviceIsFollowed(ppm: Double, seed: UInt64) throws {
-        let run = run(.steady(ppm: ppm), seconds: 150, seed: seed)
-        #expect(run.worstError(from: 15) < 0.0005, "\(run.worstError(from: 15) * 1000) ms")
-        #expect(run.worstError(from: 60) < 0.00035, "\(run.worstError(from: 60) * 1000) ms")
-        #expect(run.rate.allSatisfy { abs($0) <= 0.001 })
-        let shown = zip(run.seconds, run.drift)
-        // The reference after 5 intervals, 10 left out, 10 fitted.
-        #expect(shown.filter { $0.0 < 20 }.allSatisfy { $0.1 == nil })
-        let off45 = shown.filter { $0.0 >= 45 }.map { abs(($0.1 ?? .infinity) - ppm) }.max()!
-        let off120 = shown.filter { $0.0 >= 120 }.map { abs(($0.1 ?? .infinity) - ppm) }.max()!
-        #expect(off45 < 5, "\(off45) ppm off from 45 s")
-        #expect(off120 < 2, "\(off120) ppm off from 120 s")
+    // MARK: Steady devices
+
+    @Test(arguments: [-116.0, 50, 0], 1...3)
+    func aSteadyDeviceIsFollowed(ppm: Double, seed: Int) {
+        let run = run(.steady(ppm: ppm), seconds: 180, seed: seed)
+        #expect(run.worstError(from: 30) < 0.0005, "\(ms(run.worstError(from: 30)))")
+        #expect(run.shownOff(ppm, from: 60) < 5, "\(run.shownOff(ppm, from: 60)) ppm off from 60 s")
+        #expect(run.shownOff(ppm, from: 120) < 3, "\(run.shownOff(ppm, from: 120)) ppm off from 120 s")
     }
 
-    /// A device whose rate alternates between +100 and −100 ppm every 12 s:
-    /// corrected, it is closer than uncorrected.
-    @Test func anAlternatingDeviceIsCloserCorrectedThanNot() {
-        let device = SimulatedDevice(offset: { seconds in
+    @Test func aSteadyDeviceIsFollowedForHalfAnHour() {
+        let run = run(.steady(ppm: -116), seconds: 1800)
+        #expect(run.worstError(from: 30) < 0.0005, "\(ms(run.worstError(from: 30)))")
+    }
+
+    // MARK: Late, sparse and missing buffers
+
+    private func stall(seconds: Double) -> SimulatedDevice {
+        var device = SimulatedDevice.steady(ppm: -116)
+        device.extraLateness = { captured, random in
+            (100..<(100 + seconds)).contains(captured) ? Double.random(in: 0.5...4, using: &random) : 0
+        }
+        return device
+    }
+
+    /// For 4 s every buffer arrives 0.5 to 4 s late, and those queued
+    /// behind them too: those points lie far above the line and do not move it.
+    @Test(arguments: 1...3)
+    func aShortStallLiesAboveTheLine(seed: Int) {
+        let run = run(stall(seconds: 4), seconds: 200, seed: seed)
+        #expect(run.worstError(from: 30) < 0.0006, "\(ms(run.worstError(from: 30)))")
+    }
+
+    /// A known limit: a late stretch filling about half the horizon or
+    /// more (9 s of stall and the queue behind it, until about 113 s)
+    /// tilts the line until it leaves the horizon.
+    @Test(arguments: 1...3)
+    func aLongStallTiltsTheLineUntilItLeavesTheHorizon(seed: Int) {
+        let run = run(stall(seconds: 9), seconds: 200, seed: seed)
+        #expect(run.worstError(from: 30) < 0.008, "\(ms(run.worstError(from: 30)))")
+        #expect(run.worstError(from: 153) < 0.0006, "\(ms(run.worstError(from: 153)))")
+    }
+
+    /// No buffers for a while, then on after a gap: the correction grows
+    /// by the drift during it and goes on from the points it has.
+    @Test(arguments: [(5.0, 48.6), (20, 0), (20, 48.6), (60, -116)], 1...3)
+    func aPauseIsCaughtUp(pause: (seconds: Double, ppm: Double), seed: Int) {
+        var device = SimulatedDevice.steady(ppm: pause.ppm)
+        device.paused = { (100..<(100 + pause.seconds)).contains($0) }
+        let run = run(device, seconds: 250, seed: seed)
+        let worst = run.worstError(from: 100 + pause.seconds)
+        #expect(worst < 0.0006, "\(ms(worst))")
+    }
+
+    /// The buffers are delivered in 1 s of every 2 s, those of the other
+    /// second held back to the next.
+    @Test(arguments: 1...3)
+    func deliveryEveryOtherSecondIsFollowed(seed: Int) {
+        var device = SimulatedDevice.steady(ppm: 0)
+        device.delivered = { arrival in Int(arrival) % 2 == 1 ? arrival.rounded(.down) + 1 : arrival }
+        let run = run(device, seconds: 300, seed: seed)
+        #expect(run.worstError(from: 30) < 0.0003, "\(ms(run.worstError(from: 30)))")
+        #expect(run.largestRate(from: 30) <= 100e-6, "\(run.largestRate(from: 30) * 1e6) ppm")
+    }
+
+    // MARK: Bursts
+
+    /// A source delivering in bursts like the system audio: buffers of 960
+    /// samples, no clock drift, each second's smallest lateness raised by
+    /// the pattern.
+    private func burst(_ pattern: [Double]) -> SimulatedDevice {
+        var device = SimulatedDevice.steady(ppm: 0)
+        device.bufferSamples = 960
+        device.extraLateness = { captured, _ in pattern[Int(captured) % pattern.count] }
+        return device
+    }
+
+    private static let measuredBursts = [0, 0.0027, 0.0056, 0.0015]
+
+    @Test(arguments: [1.0, 2], 1...3)
+    func aSourceDeliveringInBurstsIsHardlyCorrected(depth: Double, seed: Int) {
+        let run = run(burst(Self.measuredBursts.map { $0 * depth }), seconds: 300, seed: seed)
+        #expect(run.worstError(from: 30) < 0.0005, "\(ms(run.worstError(from: 30)))")
+        #expect(run.largestRate(from: 30) <= 200e-6, "\(run.largestRate(from: 30) * 1e6) ppm")
+    }
+
+    @Test func aSourceDeliveringInBurstsIsHardlyCorrectedForHalfAnHour() {
+        let run = run(burst(Self.measuredBursts), seconds: 1800)
+        #expect(run.worstError(from: 30) < 0.0005, "\(ms(run.worstError(from: 30)))")
+        #expect(run.largestRate(from: 30) <= 200e-6, "\(run.largestRate(from: 30) * 1e6) ppm")
+    }
+
+    @Test(arguments: 1...3)
+    func aSourceAtItsLowestOnlyOnceInEightSeconds(seed: Int) {
+        let run = run(burst([0, 0.003, 0.005, 0.004, 0.002, 0.005, 0.003, 0.004]), seconds: 300, seed: seed)
+        #expect(run.worstError(from: 30) < 0.0008, "\(ms(run.worstError(from: 30)))")
+    }
+
+    // MARK: Large buffers
+
+    /// Buffers of 8192 or 16384 samples, about 6 or 3 a second: an
+    /// interval's smallest lateness scatters more.
+    @Test(arguments: [(8192, 0.0012), (16384, 0.0025)], 1...3)
+    func largeBuffersAreFollowed(buffer: (samples: Int, bound: Double), seed: Int) {
+        var device = SimulatedDevice.steady(ppm: -116)
+        device.bufferSamples = buffer.samples
+        let run = run(device, seconds: 300, seed: seed)
+        #expect(run.worstError(from: 30) < buffer.bound, "\(ms(run.worstError(from: 30)))")
+    }
+
+    // MARK: Steps and glitches
+
+    /// The device's lateness steps by `size` for good at 100 s: up, it is
+    /// followed once the points before the step leave the horizon; down,
+    /// at once; at most at the largest rate.
+    @Test(arguments: [0.004, -0.004, -0.010, 0.050], 1...3)
+    func aLastingStepIsFollowed(size: Double, seed: Int) {
+        let device = SimulatedDevice(offset: { seconds in 50e-6 * seconds + (seconds >= 100 ? size : 0) })
+        let run = run(device, seconds: 300, seed: seed)
+        #expect(run.worstError(from: 250) < 0.0005, "\(ms(run.worstError(from: 250)))")
+        #expect(run.largestRate <= 0.001)
+    }
+
+    /// A known limit: one buffer told to have arrived 20 ms early pulls the
+    /// line down for the horizon.
+    @Test(arguments: 1...3)
+    func oneEarlyBufferPullsTheLineDownForTheHorizon(seed: Int) {
+        var device = SimulatedDevice.steady(ppm: -116)
+        let index = 100 * SimulatedDevice.sampleRate / device.bufferSamples
+        device.early = { $0 == index ? 0.020 : 0 }
+        let run = run(device, seconds: 250, seed: seed)
+        #expect(run.worstError(from: 30) < 0.014, "\(ms(run.worstError(from: 30)))")
+        #expect(run.worstError(from: 160) < 0.0005, "\(ms(run.worstError(from: 160)))")
+    }
+
+    // MARK: Wander
+
+    /// A wander of ±5 ms over 300 s is followed: closer corrected than not.
+    @Test(arguments: 1...3)
+    func aSlowWanderIsFollowed(seed: Int) {
+        let device = SimulatedDevice.triangle(amplitude: 0.005, period: 300)
+        let corrected = run(device, seconds: 600, seed: seed).worstError(from: 30)
+        let uncorrected = run(device, seconds: 600, seed: seed, corrected: false).worstError(from: 30)
+        #expect(corrected < 0.002, "\(ms(corrected))")
+        #expect(corrected < uncorrected, "\(ms(corrected)) against \(ms(uncorrected))")
+    }
+
+    /// A fast wander is not followed, and comes out worse corrected than
+    /// not: ±0.5 ms in triangles of 12, 25 and 40 s (as the Logitech BRIO
+    /// does), and a rate alternating between +100 and −100 ppm every 12 s.
+    /// This bounds how much worse it gets; it is no claim that it is followed.
+    @Test(arguments: [12.0, 25, 40, 0], 1...3)
+    func aFastWanderGetsAtMostTwoMillisecondsOff(period: Double, seed: Int) {
+        let device = period == 0 ? SimulatedDevice(offset: { seconds in
             let half = Int(seconds / 12)
             let into = seconds - Double(half) * 12
             return (half % 2 == 0 ? 0 : 12 * 100e-6) + (half % 2 == 0 ? 100e-6 : -100e-6) * into
-        })
-        let corrected = run(device, seconds: 180).worstError(from: 60)
-        let uncorrected = run(device, seconds: 180, corrected: false).worstError(from: 60)
-        #expect(corrected < uncorrected, "\(corrected * 1000) ms against \(uncorrected * 1000) ms")
-        #expect(corrected < 0.0012, "\(corrected * 1000) ms")
+        }) : .triangle(amplitude: 0.0005, period: period)
+        let run = run(device, seconds: 300, seed: seed)
+        #expect(run.worstError(from: 30) < 0.002, "\(ms(run.worstError(from: 30)))")
     }
 
-    /// Devices wandering ±0.5 ms in triangles of 25, 40 and 60 s, as the
-    /// Logitech BRIO does: the rolling minimum flattens a fast wander's
-    /// peaks, but the loop does not amplify it.
-    @Test(arguments: [(25.0, 0.001), (40, 0.0007), (60, 0.0007)])
-    func aWanderingDeviceStaysWithinAMillisecond(period: Double, bound: Double) {
-        let corrected = run(.triangle(amplitude: 0.0005, period: period), seconds: 180).worstError(from: 60)
-        #expect(corrected < bound, "\(corrected * 1000) ms")
-    }
-
-    /// The system audio: buffers of 960 samples, no clock drift, but
-    /// delivered in bursts, so each second's smallest lateness follows a
-    /// sawtooth of 0, 2.7, 5.6 and 1.5 ms. The rolling minimum finds the
-    /// lowest; the correction stays within 0.5 ms of a constant, the rate
-    /// swinging by at most 200 ppm, which is inaudible.
-    @Test func aSourceDeliveringInBurstsIsNotCorrected() {
-        var device = SimulatedDevice.steady(ppm: 0)
-        device.bufferSamples = 960
-        device.extraLateness = { captured, _ in [0, 0.0027, 0.0056, 0.0015][Int(captured) % 4] }
-        let run = run(device, seconds: 120)
-        // With no clock drift, applied is minus the error; the true lowest lateness is at 0.
-        let applied = zip(run.seconds, run.error).filter { $0.0 >= 30 }.map { -$0.1 }
-        let constant = (applied.max()! + applied.min()!) / 2
-        #expect(applied.max()! - applied.min()! <= 0.001, "\(applied.min()! * 1000) to \(applied.max()! * 1000) ms")
-        #expect(abs(constant) < 0.001, "\(constant * 1000) ms")
-        let largestRate = run.rate.map { abs($0) }.max()!
-        #expect(largestRate <= 200e-6, "\(largestRate * 1e6) ppm")
-    }
-
-    /// For 4 s every buffer arrives 0.5 to 4 s late: the intervals are
-    /// rejected, the correction goes on at its rate.
-    @Test func aStallIsRejected() {
-        var device = SimulatedDevice.steady(ppm: -116)
-        device.extraLateness = { captured, random in
-            (20..<24).contains(captured) ? Double.random(in: 0.5...4, using: &random) : 0
-        }
-        let run = run(device, seconds: 80)
-        #expect(run.worstError(from: 15, to: 54) < 0.001, "\(run.worstError(from: 15) * 1000) ms")
-        #expect(run.worstError(from: 54) < 0.0003, "\(run.worstError(from: 54) * 1000) ms")
-        #expect(run.rate.allSatisfy { abs($0) <= 0.001 })
-    }
-
-    /// The device loses 50 ms at once without its timestamps showing it:
-    /// rejected for 10 intervals, then followed at the largest rate, within
-    /// 1 ms from 120 s after the step.
-    @Test func aLastingStepUpIsFollowedAfterTenRejectedIntervals() {
-        let device = SimulatedDevice(offset: { seconds in 50e-6 * seconds + (seconds >= 30 ? 0.05 : 0) })
-        let run = run(device, seconds: 160)
-        // Interval 30 still has its least late buffer before the step; the
-        // 10 intervals from 31 s to 41 s are rejected: the rate stays as it was.
-        let rejected = zip(run.seconds, run.rate).filter { (31.1..<40.9).contains($0.0) }.map(\.1)
-        #expect(Set(rejected).count == 1)
-        #expect(abs(run.rate(at: 31.1) - 50e-6) < 50e-6)
-        // Then followed at the largest rate.
-        #expect(run.rate(at: 42) == 0.001)
-        #expect(run.worstError(from: 150) < 0.001, "\(run.worstError(from: 150) * 1000) ms")
-        #expect(run.rate.allSatisfy { abs($0) <= 0.001 })
-    }
-
-    /// A step down cannot be a late buffer: accepted at once, followed
-    /// without overshooting, and the clock drift shown starts again.
-    @Test func aStepDownIsFollowedAtOnce() throws {
-        let device = SimulatedDevice(offset: { seconds in 50e-6 * seconds - (seconds >= 30 ? 0.01 : 0) })
-        let run = run(device, seconds: 210)
-        #expect(run.largestError(from: 30, sign: 1) < 0.001, "overshoot \(run.largestError(from: 30, sign: 1) * 1000) ms")
-        #expect(run.worstError(from: 90) < 0.0005, "\(run.worstError(from: 90) * 1000) ms")
-        #expect(run.drift.compactMap(\.self).allSatisfy { abs($0) <= 1000 })
-        let off = zip(run.seconds, run.drift).filter { $0.0 >= 150 }.map { abs(($0.1 ?? .infinity) - -50) }.max()!
-        #expect(off < 5, "\(off) ppm off from 150 s")
-    }
-
-    /// A step up under 5 ms is simply followed, without overshooting.
-    @Test func aSmallStepUpIsFollowed() {
-        let device = SimulatedDevice(offset: { seconds in 50e-6 * seconds + (seconds >= 30 ? 0.004 : 0) })
-        let run = run(device, seconds: 150)
-        #expect(run.largestError(from: 30, sign: -1) < 0.0005, "overshoot \(run.largestError(from: 30, sign: -1) * 1000) ms")
-    }
-
-    /// Buffers of 8192 samples, about 6 a second, are enough for a measurement.
-    @Test func largeBuffersAreMeasured() throws {
-        var device = SimulatedDevice.steady(ppm: -116)
-        device.bufferSamples = 8192
-        let run = run(device, seconds: 90)
-        #expect(run.worstError(from: 30) < 0.0005, "\(run.worstError(from: 30) * 1000) ms")
-        #expect(abs(try #require(run.drift.last ?? nil) - -116) < 5)
-    }
-
-    /// No buffers for 60 s, then on: the correction catches up.
-    @Test func aPauseIsCaughtUp() {
-        var device = SimulatedDevice.steady(ppm: -116)
-        device.paused = { (30..<90).contains($0) }
-        let run = run(device, seconds: 150)
-        #expect(run.worstError(from: 120) < 0.0005, "\(run.worstError(from: 120) * 1000) ms")
-        #expect(run.rate.allSatisfy { abs($0) <= 0.001 })
-    }
+    // MARK: The tracker's steps
 
     /// A tracker whose intervals start on whole seconds: its first buffer,
-    /// at 0, is interval 0's only one, too few for a measurement.
+    /// at 0, is interval 0's only one.
     private func tracker() -> ClockDriftTracker {
         var tracker = ClockDriftTracker()
         tracker.record(time: 0, arrival: 0, applied: 0)
         return tracker
     }
 
-    /// `count` buffers in the interval `index`, each `lateness` late; the
-    /// interval before is measured at the first of them.
-    private func interval(_ tracker: inout ClockDriftTracker, _ index: Int64, lateness: Int64, count: Int = 10, applied: Double = 0) {
-        let second: Int64 = 1_000_000_000
-        for buffer in 0..<count {
-            let time = index * second + 50_000_000 + Int64(buffer) * 90_000_000
-            tracker.record(time: time, arrival: time + lateness, applied: applied)
-        }
+    /// A buffer `lateness` late in the interval `index`, 0.5 s into it; the
+    /// interval before ends with it.
+    private func interval(_ tracker: inout ClockDriftTracker, _ index: Int64, lateness: Double, applied: Double = 0) {
+        let time = index * 1_000_000_000 + 500_000_000
+        tracker.record(time: time, arrival: time + Int64((lateness * 1e9).rounded()), applied: applied)
     }
 
-    @Test func noCorrectionUntilFiveIntervalsWereSeenAndTheLowestIsTheReference() {
+    @Test func noEstimateUntilFivePointsSpanTenSeconds() {
         var tracker = tracker()
-        for (index, lateness) in [3_000_000, 1_000_000, 4_000_000, 2_000_000, 3_000_000].enumerated() {
-            interval(&tracker, Int64(index) + 1, lateness: Int64(lateness))
-        }
+        for index in 1...10 { interval(&tracker, Int64(index), lateness: 0.001 + 0.0001 * Double(index)) }
+        // Points of intervals 0 to 9: 0 s to 9.5 s, too short a span.
         #expect(tracker.target == nil)
         #expect(tracker.rate == 0)
-        // Interval 5 measured: the reference is the lowest of the five, 1 ms.
-        interval(&tracker, 6, lateness: 1_000_000, count: 1)
-        #expect(tracker.target == 0)
-        #expect(tracker.rate == 0)
+        interval(&tracker, 11, lateness: 0.0021)
+        // Interval 10's point, at 10.5 s, spans 10.5 s with interval 0's at 0 s.
+        #expect(tracker.target != nil)
+        #expect(tracker.remaining == tracker.target)
     }
 
-    @Test func anIntervalWithFewerThanThreeBuffersChangesNothing() {
+    @Test func theRateIsTheSlopePlusWhatIsOffOverTheCatchUpTime() throws {
         var tracker = tracker()
-        for index in 1...5 { interval(&tracker, Int64(index), lateness: 1_000_000) }
-        // Interval 6 with 2 buffers 3 ms early would lower the rolling minimum.
-        interval(&tracker, 6, lateness: -2_000_000, count: 2)
-        #expect(tracker.target == 0)
-        interval(&tracker, 7, lateness: 1_000_000, count: 3)
-        interval(&tracker, 8, lateness: 1_000_000, count: 1)
-        // Interval 7 measured; interval 6 gave nothing.
-        #expect(tracker.target == 0)
-        #expect(tracker.rate == 0)
+        // Points rising 0.1 ms a second from interval 1 on (interval 0's at 0 s is lower still).
+        for index in 1...12 { interval(&tracker, Int64(index), lateness: 0.0001 * Double(index), applied: 0.0002) }
+        let target = try #require(tracker.target)
+        // Each point arrives 0.1 ms later than the one before, so 1.0001 s after it.
+        let slope = (tracker.rate - (target - 0.0002) / 10)
+        #expect(abs(slope - 0.0001 / 1.0001) < 1e-12, "\(slope * 1e6) ppm")
+        #expect(abs(try #require(tracker.remaining) - (target - 0.0002)) < 1e-12)
     }
 
-    @Test func theLoopIsProportionalAndIntegralWithinTheLimit() throws {
+    @Test func intervalsWithoutBuffersLeaveTheRateAtTheLastSlope() throws {
         var tracker = tracker()
-        for index in 1...5 { interval(&tracker, Int64(index), lateness: 1_000_000) }
-        interval(&tracker, 6, lateness: 0, applied: -0.0004)
-        #expect(tracker.target == 0)
-        interval(&tracker, 7, lateness: 0, applied: -0.0004)
-        // Interval 6: 1 ms to remove, 0.4 ms removed before its least late
-        // buffer, 0.999 s after interval 5's (which arrived 1 ms later into
-        // its second): the integral ω² · -0.6 ms · 0.999 s, the rate that
-        // plus 2ω · -0.6 ms.
-        let frequency = RecorderValues.clockDriftLoopFrequency
-        let integral = frequency * frequency * -0.0006 * 0.999
-        #expect(abs(try #require(tracker.target) - -0.001) < 1e-12)
-        #expect(abs(tracker.integral - integral) < 1e-12)
-        #expect(abs(tracker.rate - (integral + 2 * frequency * -0.0006)) < 1e-12)
-        #expect(abs(try #require(tracker.remaining) - -0.0006) < 1e-12)
-        // Interval 7 the same, 1 s later: interval 6 moved along the
-        // integral is the smallest. Then 30 ms lower is a step, accepted at
-        // once; beyond the limit, the integral holds.
-        interval(&tracker, 8, lateness: -30_000_000, applied: -0.0004)
-        let measured = -0.001 + integral * 1
-        let integrated = integral + frequency * frequency * (measured - -0.0004)
-        #expect(abs(try #require(tracker.target) - measured) < 1e-12)
-        #expect(abs(tracker.integral - integrated) < 1e-12)
-        interval(&tracker, 9, lateness: -30_000_000, applied: -0.0004)
-        #expect(abs(try #require(tracker.target) - -0.031) < 1e-12)
-        #expect(tracker.rate == -0.001)
-        #expect(abs(tracker.integral - integrated) < 1e-12)
+        for index in 1...12 { interval(&tracker, Int64(index), lateness: 0.0001 * Double(index), applied: 0.0005) }
+        #expect(abs(tracker.rate - 0.0001 / 1.0001) > 1e-6)
+        // Intervals 13 and 14 have no buffer.
+        interval(&tracker, 15, lateness: 0.0015, applied: 0.0005)
+        #expect(abs(tracker.rate - 0.0001 / 1.0001) < 1e-12)
+    }
+
+    // MARK: The support line
+
+    private func line(_ points: [(Double, Double)], maximum: Double = 0.001) -> ClockDriftTracker.Line {
+        ClockDriftTracker.supportLine(points.map { (time: $0.0, lateness: $0.1) }, maximumSlope: maximum)
+    }
+
+    @Test func theSupportLineRunsThroughTheTwoLowestPoints() {
+        // Points on a line rising 0.1 ms a second, all but two raised.
+        let line = line([(0, 0.0010), (1, 0.0013), (2, 0.0012), (3, 0.0015), (4, 0.0014)])
+        #expect(abs(line.slope - 0.0001) < 1e-12)
+        #expect(abs(line.value(at: 0) - 0.0010) < 1e-12)
+        #expect(abs(line.value(at: 2) - 0.0012) < 1e-12)
+    }
+
+    @Test func aPointAboveTheLineDoesNotMoveIt() {
+        let points: [(Double, Double)] = [(0, 0.001), (1, 0.001), (2, 0.001), (3, 0.001)]
+        let flat = line(points)
+        let withStall = line(points + [(1.5, 3.0)])
+        #expect(flat.slope == 0 && withStall.slope == 0)
+        #expect(flat.value(at: 1) == withStall.value(at: 1))
+    }
+
+    @Test func theSupportLineIsNoSteeperThanTheLimit() {
+        // Points 10 ms apart in 1 s: 10000 ppm, held at 1000 ppm, under both.
+        let line = line([(0, 0.0), (1, 0.010)])
+        #expect(line.slope == 0.001)
+        #expect(line.value(at: 0) <= 0 && line.value(at: 1) <= 0.010)
+        #expect(abs(line.value(at: 0)) < 1e-12)
+    }
+
+    @Test func aSupportLineThroughOnePoint() {
+        let line = line([(5, 0.002)])
+        #expect(abs(line.value(at: 5) - 0.002) < 1e-12)
+        #expect(abs(line.slope) <= 0.001)
     }
 }

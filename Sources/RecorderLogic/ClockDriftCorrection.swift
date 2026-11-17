@@ -4,13 +4,15 @@
 /// a segment starts with the first buffer, after a gap (a buffer whose
 /// timestamp runs more than `gapTolerance` ahead of the position its
 /// segment's sample count gives) and on a change of the channel count; the
-/// resampler is flushed at a segment's end. Within a segment the corrected
-/// audio is contiguous: the first starts at the segment's first timestamp
-/// plus the correction applied by then, each further one where the one
-/// before ended; so a gap reaches the audio file and the guide track as a
-/// jump of its length, as without the correction. That rests on an
-/// assumption: a source's timestamps keep following its sample count across
-/// a gap. Times are nanoseconds on the shared clock.
+/// resampler is flushed at a segment's end. A device's clock keeps
+/// drifting while no buffers come, so at a gap the correction grows by the
+/// tracker's drift over the gap, as a jump, not resampled. Within a segment
+/// the corrected audio is contiguous: the first starts at the segment's
+/// first timestamp plus the correction applied by then, each further one
+/// where the one before ended; so a gap reaches the audio file and the
+/// guide track as a jump of its length plus that drift. That rests on an
+/// assumption: a source's timestamps keep following its sample count
+/// across a gap. Times are nanoseconds on the shared clock.
 public struct ClockDriftCorrection: Sendable {
     /// Corrected samples, one array per channel, the first at `time`;
     /// `applied`: the correction applied up to its end, in seconds.
@@ -21,11 +23,12 @@ public struct ClockDriftCorrection: Sendable {
     }
 
     /// A gap that started a new segment: its length, the correction
-    /// applied when it came, and the lateness of the buffers before and
-    /// after it, in seconds.
+    /// applied when it came, the drift during it added to the correction,
+    /// and the lateness of the buffers before and after it, in seconds.
     public struct Gap: Equatable, Sendable {
         public var length: Int64
         public var applied: Double
+        public var drift: Double
         public var latenessBefore: Double
         public var latenessAfter: Double
     }
@@ -36,7 +39,8 @@ public struct ClockDriftCorrection: Sendable {
         public var clockDriftPpm: Double?
         /// The sound added so far, in seconds (negative: removed).
         public var applied: Double
-        /// What is still off, in seconds; nil before the first measurement.
+        /// What was still off at the latest estimate, the target and the
+        /// correction taken at the same moment, in seconds; nil before the first.
         public var remaining: Double?
 
         public init(clockDriftPpm: Double?, applied: Double, remaining: Double?) {
@@ -79,7 +83,7 @@ public struct ClockDriftCorrection: Sendable {
     public var applied: Double { segment.map { $0.appliedBefore + $0.resampler.applied } ?? appliedBefore }
 
     public var status: Status {
-        Status(clockDriftPpm: tracker.clockDriftPpm, applied: applied, remaining: tracker.target.map { $0 - applied })
+        Status(clockDriftPpm: tracker.clockDriftPpm, applied: applied, remaining: tracker.remaining)
     }
 
     /// A buffer whose first sample has the timestamp `time`, which arrived
@@ -94,7 +98,9 @@ public struct ClockDriftCorrection: Sendable {
             let ahead = time - (segment.start + Self.nanoseconds(in: segment.inputSamples, sampleRate: sampleRate))
             if ahead > gapTolerance {
                 audio += flush()
-                gap = Gap(length: ahead, applied: applied, latenessBefore: lateness ?? latenessNow, latenessAfter: latenessNow)
+                let drift = tracker.drift(over: ahead)
+                gap = Gap(length: ahead, applied: applied, drift: drift, latenessBefore: lateness ?? latenessNow, latenessAfter: latenessNow)
+                appliedBefore += drift
             } else if segment.resampler.channelCount != channels.count {
                 audio += flush()
             }

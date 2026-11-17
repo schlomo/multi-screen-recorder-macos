@@ -215,14 +215,23 @@ apart, a test cannot either:
 - **A lasting latency change is taken as a clock offset.** When a
   device's buffers start to arrive later or earlier for good (a driver
   or a dock changing its buffering), the correction follows it as if
-  the device's clock had jumped: a step up after 10 rejected intervals,
-  a step down at once, so that source's sound moves by the change.
+  the device's clock had jumped: up once the points before the change
+  leave the 20 s horizon, down at once, at up to 1000 ppm, so that
+  source's sound moves by the change.
+- **A long late stretch tilts the line.** Late points that fill about
+  half the horizon or more, such as a stall of 9 s with the buffers
+  queued behind it, tilt the support line until they leave the
+  horizon: 6.4 ms off in the tests' simulation. A stall longer than the
+  horizon is taken as a lasting step.
+- **One early buffer pulls the line down.** A buffer about 20 ms
+  early, a glitch of its timestamp or arrival, puts the line under it
+  for the horizon: up to about 12 ms off for about 20 s.
 - **A gap assumes the timestamps keep following the sample count.**
   After a gap the new segment starts at its own timestamp plus the
-  correction applied so far; a source whose timestamps jump to the
-  host clock across a gap would be off by its drift until then. The
-  `--debug` line for each gap shows the lateness before and after it,
-  which tells.
+  correction applied so far plus the device's drift during the gap; a
+  source whose timestamps jump to the host clock across a gap would be
+  off by its drift until then. The `--debug` line for each gap shows
+  the drift added and the lateness before and after it, which tells.
 
 ### What the recorder design must provide
 
@@ -409,20 +418,20 @@ tried:
   cannot correct it; a correction must follow the offset. After 300 s
   the Razer was 34.7 ms behind the host clock, more than one frame.
 - **The system audio arrives in bursts, so one second's smallest
-  lateness is not its clock.** Tried (2026-11-17, one probe of 120 s of
-  a ScreenCaptureKit audio stream, macOS 26.7.1): its buffers hold 960
+  lateness is not its clock.** Tried (2026-11-17, one probe of 120 s
+  (128 s of data) of a ScreenCaptureKit audio stream, macOS 26.7.1): its buffers hold 960
   samples, their timestamps follow the sample count exactly, but they
   arrive every 21.33 ms (median) with catch-up bursts. The smallest
   lateness per second is a sawtooth, not a line: 41.6, 44.3, 47.2 and
   43.1 ms, repeating every 4 s, with no clock drift (the lowest points
   stay within 0.25 ms over 120 s). The smallest over about 5 s is its
-  clock. In a simulation on the real arrivals of the system audio and
-  five audio inputs, a rolling minimum over 5 windows with a follow
-  time of 15 s and a rate fit over 30 measurements kept the system
-  audio within ±0.36 ms at a rate within ±18 ppm (with one second's
-  minimum, a follow time of 5 s and a fit over 10, its rate swung by
-  over 1000 ppm), and the steady inputs under 0.1 ms with a rate swing
-  under 20 ppm.
+  clock. On the real arrivals of six sources (these probes), the
+  correction as built (the lower support line of each interval's
+  smallest lateness over 20 s, [recorder.md](recorder.md), "Clock
+  drift") kept BlackHole within 0.05 ms, MacBook Pro Microphone 0.11 ms,
+  CalDigit Thunderbolt 3 Audio 0.28 ms, Razer Seiren V3 Mini 0.48 ms
+  and Logitech BRIO 0.93 ms against its 5 s envelope; the system
+  audio's correction ended at 0.09 ms with its rate within ±67 ppm.
 - **An unplugged audio input ends its `AVCaptureSession`, which does
   not resume.** Tried (2026-11-15, the Razer Seiren V3 Mini over USB,
   unplugged during a running session): `AVCaptureSession`'s runtime

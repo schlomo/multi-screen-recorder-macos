@@ -61,8 +61,12 @@ import Testing
     }
 
     @Test func aGapLineSaysWhatTheCorrectionKnew() {
-        let gap = ClockDriftCorrection.Gap(length: 100_000_000, applied: 0.003_45, latenessBefore: 0.012_3, latenessAfter: 0.012_41)
+        let gap = ClockDriftCorrection.Gap(length: 100_000_000, applied: 0.003_45, drift: 0.000_011_6, latenessBefore: 0.012_3, latenessAfter: 0.012_41)
         #expect(DebugLine.clockDriftGap(of: "Audio 2 - Razer Seiren V3 Mini", gap)
-            == "Audio 2 - Razer Seiren V3 Mini: gap of 100.0 ms, clock drift corrected +3.45 ms so far, lateness 12.30 ms before, 12.41 ms after")
+            == "Audio 2 - Razer Seiren V3 Mini: gap of 100.0 ms, clock drift corrected +3.45 ms so far, +0.012 ms for the gap, "
+            + "lateness 12.30 ms before, 12.41 ms after")
+        let before = ClockDriftCorrection.Gap(length: 50_000_000, applied: 0, drift: 0, latenessBefore: 0.01, latenessAfter: 0.01)
+        #expect(DebugLine.clockDriftGap(of: "Audio 0 - System", before)
+            == "Audio 0 - System: gap of 50.0 ms, clock drift corrected 0 ms so far, 0 ms for the gap, lateness 10.00 ms before, 10.00 ms after")
     }
 }

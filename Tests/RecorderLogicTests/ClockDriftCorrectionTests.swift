@@ -7,7 +7,7 @@ import Testing
 
     /// Clicks of a device 500 ppm slow at known shared clock times, with
     /// jittered arrivals: each comes out at its time once the correction
-    /// has caught up (it starts after 5 intervals and settles within 15 s).
+    /// has caught up (the first estimate comes once the points span 10 s).
     @Test func clicksComeOutAtTheirSharedClockTimes() throws {
         let device = SimulatedDevice.steady(ppm: -500)
         let seconds = 60.0
@@ -36,19 +36,20 @@ import Testing
             }
         }
         for (click, found) in zip(clicks, loudest) {
-            let bound = click < 15 ? 0.0035 : click < 40 ? 0.001 : 0.0005
+            let bound = click < 30 ? 0.007 : 0.002
             #expect(abs(found.seconds - click) < bound, "the click at \(click) s came at \(found.seconds) s")
         }
         let status = correction.status
         #expect(abs(try #require(status.clockDriftPpm) - -500) < 10, "\(status.clockDriftPpm ?? 0) ppm")
-        #expect(abs(status.applied - 0.03) < 0.0005, "\(status.applied * 1000) ms")
-        #expect(abs(try #require(status.remaining)) < 0.0005)
+        #expect(abs(status.applied - 0.03) < 0.002, "\(status.applied * 1000) ms")
+        #expect(abs(try #require(status.remaining)) < 0.002)
     }
 
     /// A gap at 65 s, the correction well above 1 ms by then: the segment
-    /// after it starts at its own timestamp plus the correction applied,
-    /// a jump of exactly the gap's length.
-    @Test func aGapComesOutAsAJumpOfItsLengthWithNothingLostBefore() throws {
+    /// after it starts at its own timestamp plus the correction applied
+    /// plus the device's drift during the gap, a jump of the gap's length
+    /// plus that drift.
+    @Test func aGapComesOutAsAJumpOfItsLengthAndTheDriftDuringIt() throws {
         let device = SimulatedDevice.steady(ppm: -500)
         let buffers = device.buffers(for: 70)
         let gapLength: Int64 = 100_000_000
@@ -68,8 +69,11 @@ import Testing
                 before += audio.dropLast()
                 after += audio.suffix(1)
                 let appliedAtGap = try #require(before.last).applied
+                let drift = try #require(gap).drift
                 #expect(appliedAtGap > 0.001)
-                #expect(try #require(after.first).time == time + Int64((appliedAtGap * 1e9).rounded()))
+                // 500 ppm over 100 ms: 50 µs, more than two samples.
+                #expect(abs(drift - 500e-6 * 0.1) < 2e-6, "\(drift * 1e6) µs")
+                #expect(try #require(after.first).time == time + Int64(((appliedAtGap + drift) * 1e9).rounded()))
             } else if isAfter {
                 after += audio
             } else {
@@ -88,7 +92,7 @@ import Testing
         #expect(abs(Double(output) - input - appliedAtGap * sampleRate) <= 1)
         let end = Double(try #require(before.first).time) + Double(output) / sampleRate * 1e9
         let jump = Double(try #require(after.first).time) - end
-        #expect(abs(jump - Double(gapLength)) <= 1e9 / sampleRate, "\(jump) ns")
+        #expect(abs(jump - Double(gapLength) - gap.drift * 1e9) <= 1e9 / sampleRate, "\(jump) ns")
         // Within a segment the corrected audio follows by sample count.
         for (audio, next) in zip(before, before.dropFirst()) {
             #expect(abs(Double(next.time - audio.time) - Double(audio.channels[0].count) / sampleRate * 1e9) <= 1)

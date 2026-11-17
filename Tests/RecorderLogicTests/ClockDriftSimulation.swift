@@ -37,6 +37,11 @@ struct SimulatedDevice {
     var paused: (Double) -> Bool = { _ in false }
     /// Extra lateness of the buffer captured at a shared clock time, in seconds.
     var extraLateness: (Double, inout SeededRandom) -> Double = { _, _ in 0 }
+    /// When a buffer that would arrive at a shared clock time is delivered.
+    var delivered: (Double) -> Double = { $0 }
+    /// How much earlier than its turn the buffer of an index is told to
+    /// have arrived, in seconds, as a glitch.
+    var early: (Int) -> Double = { _ in 0 }
 
     struct Buffer {
         var index: Int
@@ -63,11 +68,11 @@ struct SimulatedDevice {
             let captured = time + offset(time)
             let lateness = Double(bufferSamples) / Double(Self.sampleRate) + random.jitter()
                 + extraLateness(captured, &random)
-            let arrival = max(previous, captured + lateness)
+            let arrival = max(previous, delivered(captured + lateness))
             previous = arrival
             buffers.append(Buffer(
                 index: index, time: Int64(index * bufferSamples) * 1_000_000_000 / Int64(Self.sampleRate),
-                arrival: Int64((arrival * 1e9).rounded()), seconds: time))
+                arrival: Int64(((arrival - early(index)) * 1e9).rounded()), seconds: time))
             index += 1
         }
     }

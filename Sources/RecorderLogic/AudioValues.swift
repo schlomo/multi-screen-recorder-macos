@@ -21,39 +21,26 @@ extension RecorderValues {
 }
 
 /// The clock drift correction's values (*data*): the intervals the
-/// buffers' lateness is measured in, the loop that follows it, and the fit
-/// of the clock drift shown.
+/// buffers' lateness is measured in, the support line through them, the
+/// rate that follows it, and the clock drift shown.
 extension RecorderValues {
     /// Buffers are grouped by arrival in intervals of this length; each
-    /// interval's smallest lateness goes into the rolling minimum.
+    /// interval with a buffer gives a point, its smallest lateness.
     public static let clockDriftInterval = Duration.seconds(1)
-    /// An interval with fewer buffers gives no measurement: a source with
-    /// buffers of 8192 samples delivers about 6 a second.
-    public static let clockDriftIntervalMinimumBuffers = 3
-    /// A measurement is the smallest lateness of this many intervals, the
-    /// newest and those before it: the system audio arrives in bursts, so
-    /// one interval's smallest lateness is not its clock.
-    public static let clockDriftRollingIntervals = 5
-    /// The correction loop's natural frequency, per second, critically
-    /// damped: proportional gain 2ω, integral gain ω².
-    public static let clockDriftLoopFrequency = 0.3
-    /// The measurements the clock drift shown is fitted over, and the
-    /// fewest it is shown with.
-    public static let clockDriftShownFitMeasurements = 60
-    public static let clockDriftShownMinimumMeasurements = 10
-    /// The first measurements after the reference or a step the clock
-    /// drift shown leaves out: the loop is still settling then and the
-    /// rolling minimum lags.
-    public static let clockDriftShownSettlingMeasurements = 10
-    /// The largest correction rate and clock drift shown, in parts per million.
+    /// Points older than this are dropped: the support line is laid under
+    /// the points of the last 20 s.
+    public static let clockDriftHorizon = Duration.seconds(20)
+    /// An estimate needs at least this many points, spanning at least this long.
+    public static let clockDriftEstimateMinimumPoints = 5
+    public static let clockDriftEstimateMinimumSpan = Duration.seconds(10)
+    /// What is still off is caught up over this long, on top of the line's slope.
+    public static let clockDriftCatchUpTime = Duration.seconds(10)
+    /// The largest correction rate and the steepest support line, in parts per million.
     public static let clockDriftMaximumRatePpm = 1000.0
-    /// A measurement more than this above the expected lateness is a stall,
-    /// not the device's clock, and is rejected; more than this below it is
-    /// a step, accepted at once.
-    public static let clockDriftStep = Duration.milliseconds(5)
-    /// After this many rejected intervals in a row the lateness really
-    /// stepped up: the next measurement is accepted.
-    public static let clockDriftRejectedIntervalsInARow = 10
+    /// The clock drift shown is the mean slope of this many estimates at
+    /// most, and is shown from this many on.
+    public static let clockDriftShownEstimates = 60
+    public static let clockDriftShownMinimumEstimates = 10
     /// How often an audio capture reports its clock drift to the status window.
     public static let clockDriftStatusInterval = Duration.seconds(1)
     /// How often `--debug` writes each audio source's clock drift line.

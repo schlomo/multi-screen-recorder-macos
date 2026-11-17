@@ -1,199 +1,170 @@
 /// How far an audio source's sound falls behind the shared clock (or runs
 /// ahead of it), measured from when its buffers arrive, and the correction
 /// rate that follows it. A buffer's lateness is its arrival minus its
-/// timestamp; a buffer can arrive late, never early, so the smallest
-/// lateness of the last few intervals of buffers (a rolling minimum, each
-/// older interval's moved along the loop's integral to the newest) is the
-/// device's clock against the shared clock; a source delivering in
-/// bursts, such as the system audio, sits high in some intervals. The
-/// first measurement, once the rolling minimum spans all its intervals, is
-/// the reference; `target`, a measurement minus the reference, is the
-/// sound that must have been added so far. A critically damped
-/// proportional-integral loop turns what is still off into the rate; its
-/// integral is the device's clock drift as the loop has learned it.
-/// Times are nanoseconds on the shared clock; lateness, `target` and
-/// `applied` are seconds; a rate is output samples per input sample minus 1.
+/// timestamp; a buffer can arrive late, never early. Each interval with a
+/// buffer gives a point: its smallest lateness, at the arrival of that
+/// buffer. The device's clock is the lower support line of the points of
+/// the horizon: the line on or below every point, no steeper than the
+/// largest rate, closest to them in sum. Late stretches, bursts and sparse
+/// intervals lie above it and do not move it; the measurement never
+/// depends on the correction. Once the points are enough (an estimate),
+/// the first estimate's line at the first point is the reference, and the
+/// line now minus the reference is `target`, the sound that must have
+/// been added so far. The rate is the line's slope plus what is still off
+/// over the catch-up time. Times are nanoseconds on the shared clock;
+/// lateness, `target` and `applied` are seconds; a rate or a slope is
+/// output samples per input sample minus 1 (seconds of lateness per second).
 public struct ClockDriftTracker: Sendable {
-    public let interval: Int64
-    public let minimumBuffers: Int
-    public let rollingIntervals: Int
-    public let shownFitLength: Int
-    public let shownMinimum: Int
-    public let shownSettling: Int
-    public let proportionalGain: Double
-    public let integralGain: Double
-    public let maximumRate: Double
-    public let step: Double
-    public let rejectedInARowLimit: Int
+    /// A line `value + slope · (t − time)`, times in seconds.
+    struct Line: Equatable {
+        var time: Double
+        var value: Double
+        var slope: Double
 
-    /// The correction rate until the next measurement.
+        func value(at time: Double) -> Double { value + slope * (time - self.time) }
+    }
+
+    public let interval: Int64
+    public let horizon: Double
+    public let minimumPoints: Int
+    public let minimumSpan: Double
+    public let catchUpTime: Double
+    public let maximumRate: Double
+    public let shownEstimates: Int
+    public let shownMinimum: Int
+
+    /// The correction rate until the next estimate.
     public private(set) var rate: Double = 0
-    /// The sound that must have been added so far, as of the latest measurement.
+    /// The sound that must have been added so far, as of the latest estimate.
     public private(set) var target: Double?
-    /// The correction applied so far, as last told.
-    private(set) var applied: Double = 0
-    /// The loop's integral: the rate it has learned, without what is still off.
-    private(set) var integral: Double = 0
+    /// What was still off at the latest estimate: `target` minus the
+    /// correction applied then; nil before the first estimate.
+    private(set) var remaining: Double?
 
     private var firstArrival: Int64?
     private var intervalIndex: Int64 = 0
-    private var intervalBuffers = 0
+    private var intervalHasBuffer = false
     private var intervalLateness = Double.infinity
-    /// When the interval's least late buffer arrived, in seconds from the
-    /// first arrival, and the correction applied before it.
+    /// When the interval's least late buffer arrived, in seconds from the first arrival.
     private var intervalLatenessAt = 0.0
-    private var intervalApplied = 0.0
+    /// The points of the horizon: when, and the smallest lateness.
+    private var points: [(time: Double, lateness: Double)] = []
+    private var firstPointTime: Double?
     private var reference: Double?
-    /// The smallest lateness of the latest intervals that were not
-    /// rejected, each with when its least late buffer arrived; the
-    /// reference is taken once there are `rollingIntervals`.
-    private var rolling: [(time: Double, lateness: Double)] = []
-    /// The latest accepted measurement.
-    private var latest: (time: Double, target: Double)?
-    /// The measurements of the clock drift shown since the last step: when,
-    /// and the lateness against the reference.
-    private var shownFit: [(time: Double, target: Double)] = []
-    /// The measurements accepted since the reference or the last step.
-    private var acceptedSinceStart = 0
-    private var rejectedInARow = 0
+    /// The latest estimates' slopes, for the clock drift shown.
+    private var slopes: [Double] = []
 
     public init(
         interval: Duration = RecorderValues.clockDriftInterval,
-        minimumBuffers: Int = RecorderValues.clockDriftIntervalMinimumBuffers,
-        rollingIntervals: Int = RecorderValues.clockDriftRollingIntervals,
-        loopFrequency: Double = RecorderValues.clockDriftLoopFrequency,
-        shownFitLength: Int = RecorderValues.clockDriftShownFitMeasurements,
-        shownMinimum: Int = RecorderValues.clockDriftShownMinimumMeasurements,
-        shownSettling: Int = RecorderValues.clockDriftShownSettlingMeasurements,
+        horizon: Duration = RecorderValues.clockDriftHorizon,
+        minimumPoints: Int = RecorderValues.clockDriftEstimateMinimumPoints,
+        minimumSpan: Duration = RecorderValues.clockDriftEstimateMinimumSpan,
+        catchUpTime: Duration = RecorderValues.clockDriftCatchUpTime,
         maximumRatePpm: Double = RecorderValues.clockDriftMaximumRatePpm,
-        step: Duration = RecorderValues.clockDriftStep,
-        rejectedInARowLimit: Int = RecorderValues.clockDriftRejectedIntervalsInARow
+        shownEstimates: Int = RecorderValues.clockDriftShownEstimates,
+        shownMinimum: Int = RecorderValues.clockDriftShownMinimumEstimates
     ) {
-        precondition(interval > .zero && loopFrequency > 0, "the clock drift tracker needs a positive interval and loop frequency")
-        precondition(shownFitLength >= shownMinimum && shownMinimum >= 3, "the clock drift shown needs at least 3 measurements")
-        precondition(rollingIntervals > 0 && minimumBuffers > 0, "the clock drift tracker needs an interval with a buffer")
-        precondition(shownSettling >= 0, "the clock drift shown cannot leave out a negative number of measurements")
+        precondition(interval > .zero && horizon > minimumSpan, "the clock drift tracker needs an interval and a horizon longer than an estimate's span")
+        precondition(minimumPoints >= 2 && catchUpTime > .zero, "an estimate needs two points and a positive catch-up time")
+        precondition(shownEstimates >= shownMinimum && shownMinimum > 0, "the clock drift shown needs an estimate")
         self.interval = interval.nanoseconds
-        self.minimumBuffers = minimumBuffers
-        self.rollingIntervals = rollingIntervals
-        self.shownFitLength = shownFitLength
-        self.shownMinimum = shownMinimum
-        self.shownSettling = shownSettling
-        proportionalGain = 2 * loopFrequency
-        integralGain = loopFrequency * loopFrequency
+        self.horizon = Self.seconds(horizon)
+        self.minimumPoints = minimumPoints
+        self.minimumSpan = Self.seconds(minimumSpan)
+        self.catchUpTime = Self.seconds(catchUpTime)
         maximumRate = maximumRatePpm / 1e6
-        self.step = Double(step.nanoseconds) / 1e9
-        self.rejectedInARowLimit = rejectedInARowLimit
+        self.shownEstimates = shownEstimates
+        self.shownMinimum = shownMinimum
     }
 
     /// The device's clock drift in parts per million, positive when its
-    /// clock runs fast, within ±the largest rate: fitted over the latest
-    /// measurements, leaving out the first ones after the reference or a
-    /// step; nil until it has enough.
+    /// clock runs fast: the mean slope of the latest estimates; nil until
+    /// there are enough.
     public var clockDriftPpm: Double? {
-        guard shownFit.count >= shownMinimum else { return nil }
-        let ppm = -Self.slope(shownFit) * 1e6
-        let limit = maximumRate * 1e6
-        return min(limit, max(-limit, ppm))
+        guard slopes.count >= shownMinimum else { return nil }
+        return -slopes.reduce(0, +) / Double(slopes.count) * 1e6
     }
 
-    /// What is still off: `target` minus `applied`; nil before the first measurement.
-    var remaining: Double? { target.map { $0 - applied } }
+    /// How far the device's clock drifts during a gap of `length`
+    /// nanoseconds, in seconds: the latest estimate's slope over it, 0
+    /// before the first estimate.
+    public func drift(over length: Int64) -> Double {
+        (slopes.last ?? 0) * Double(length) / 1e9
+    }
 
     /// A buffer whose first sample has the timestamp `time` arrived at
     /// `arrival`; `applied` is the correction applied before it.
     public mutating func record(time: Int64, arrival: Int64, applied: Double) {
-        self.applied = applied
         let first = firstArrival ?? arrival
         firstArrival = first
         let index = (arrival - first) / interval
         if index > intervalIndex {
-            if intervalBuffers >= minimumBuffers { measure(intervalLateness, at: intervalLatenessAt, applied: intervalApplied) }
+            if intervalHasBuffer { estimate(applied: applied) }
+            // The intervals between gave no point: the rate follows the last slope.
+            if index > intervalIndex + 1, let slope = slopes.last { rate = slope }
             intervalIndex = index
-            intervalBuffers = 0
+            intervalHasBuffer = false
             intervalLateness = .infinity
         }
-        intervalBuffers += 1
+        intervalHasBuffer = true
         let lateness = Double(arrival - time) / 1e9
         if lateness < intervalLateness {
             intervalLateness = lateness
             intervalLatenessAt = Double(arrival - first) / 1e9
-            intervalApplied = applied
         }
     }
 
-    /// An interval's smallest lateness, at `time`, when `applied` had been
-    /// applied: with the intervals before it, the rolling minimum is the
-    /// measurement.
-    private mutating func measure(_ lateness: Double, at time: Double, applied: Double) {
-        let candidates = Array(rolling.suffix(rollingIntervals - 1)) + [(time: time, lateness: lateness)]
-        let smallest = candidates.map { $0.lateness + integral * (time - $0.time) }.min()!
-        guard let reference, let latest else {
-            rolling = candidates
-            guard rolling.count >= rollingIntervals else { return }
-            self.reference = smallest
-            accept(0, at: time, applied: applied)
+    /// The interval ended: its point joins the horizon's, and with enough
+    /// of them the line gives the target and the rate, at the interval's
+    /// end; `applied` is the correction applied by then.
+    private mutating func estimate(applied: Double) {
+        let now = Double((intervalIndex + 1) * interval) / 1e9
+        points.append((intervalLatenessAt, intervalLateness))
+        if firstPointTime == nil { firstPointTime = intervalLatenessAt }
+        points.removeAll { $0.time <= now - horizon }
+        guard points.count >= minimumPoints, points.last!.time - points.first!.time >= minimumSpan else {
+            if let slope = slopes.last { rate = slope }
             return
         }
-        let measured = smallest - reference
-        let expected = latest.target + integral * (time - latest.time)
-        // A stall is judged by the interval's own lateness: the rolling
-        // minimum would hide it behind the older intervals moved along the
-        // integral, which the stall would then feed back into.
-        if lateness - reference - expected > step {
-            guard rejectedInARow >= rejectedInARowLimit else {
-                rejectedInARow += 1
-                return
+        let line = Self.supportLine(points, maximumSlope: maximumRate)
+        if reference == nil { reference = line.value(at: firstPointTime!) }
+        let target = line.value(at: now) - reference!
+        self.target = target
+        remaining = target - applied
+        slopes.append(line.slope)
+        if slopes.count > shownEstimates { slopes.removeFirst() }
+        rate = min(maximumRate, max(-maximumRate, line.slope + (target - applied) / catchUpTime))
+    }
+
+    /// The lower support line of `points`: on or below every one, its
+    /// slope within ±`maximumSlope`, with the smallest sum of distances to
+    /// them. The best slope is one between two points or a limit; for a
+    /// slope, the line touches the point lowest against it.
+    static func supportLine(_ points: [(time: Double, lateness: Double)], maximumSlope: Double) -> Line {
+        precondition(!points.isEmpty, "a support line needs a point")
+        let newest = points.last!.time
+        let times = points.map { $0.time - newest }
+        let lateness = points.map(\.lateness)
+        let count = points.count
+        let sumOfTimes = times.reduce(0, +)
+        let sumOfLateness = lateness.reduce(0, +)
+        var best = (sum: Double.infinity, line: Line(time: newest, value: 0, slope: 0))
+        func consider(_ slope: Double) {
+            var value = Double.infinity
+            for index in 0..<count { value = min(value, lateness[index] - slope * times[index]) }
+            let sum = sumOfLateness - Double(count) * value - slope * sumOfTimes
+            if sum < best.sum - 1e-15 { best = (sum, Line(time: newest, value: value, slope: slope)) }
+        }
+        consider(-maximumSlope)
+        consider(maximumSlope)
+        for i in 0..<count {
+            for j in (i + 1)..<count where times[j] != times[i] {
+                let slope = (lateness[j] - lateness[i]) / (times[j] - times[i])
+                if abs(slope) <= maximumSlope { consider(slope) }
             }
-            restart(lateness - reference, at: time, applied: applied)
-        } else if expected - measured > step {
-            restart(lateness - reference, at: time, applied: applied)
-        } else {
-            rolling = candidates
-            accept(measured, at: time, applied: applied)
         }
+        return best.line
     }
 
-    /// The lateness stepped, up after the rejected intervals or down at
-    /// once: the rolling minimum and the clock drift shown start again from
-    /// this interval; the integral, the reference and `applied` stay.
-    private mutating func restart(_ measured: Double, at time: Double, applied: Double) {
-        rolling = [(time, measured + reference!)]
-        shownFit = []
-        acceptedSinceStart = 0
-        accept(measured, at: time, applied: applied)
-    }
-
-    /// The loop compares the measurement with the correction applied at
-    /// the same moment, before the least late buffer.
-    private mutating func accept(_ measured: Double, at time: Double, applied: Double) {
-        let elapsed = latest.map { time - $0.time } ?? 0
-        rejectedInARow = 0
-        latest = (time, measured)
-        target = measured
-        acceptedSinceStart += 1
-        if acceptedSinceStart > shownSettling {
-            shownFit.append((time, measured))
-            if shownFit.count > shownFitLength { shownFit.removeFirst() }
-        }
-        let error = measured - applied
-        // Anti-windup: the integral holds while the rate is at its limit.
-        let integrated = min(maximumRate, max(-maximumRate, integral + integralGain * error * elapsed))
-        if abs(integrated + proportionalGain * error) <= maximumRate { integral = integrated }
-        rate = min(maximumRate, max(-maximumRate, integral + proportionalGain * error))
-    }
-
-    /// The least-squares slope of the targets against their times.
-    private static func slope(_ points: [(time: Double, target: Double)]) -> Double {
-        let count = Double(points.count)
-        let meanTime = points.reduce(0) { $0 + $1.time } / count
-        let meanTarget = points.reduce(0) { $0 + $1.target } / count
-        var covariance = 0.0
-        var variance = 0.0
-        for point in points {
-            covariance += (point.time - meanTime) * (point.target - meanTarget)
-            variance += (point.time - meanTime) * (point.time - meanTime)
-        }
-        return variance > 0 ? covariance / variance : 0
-    }
+    private static func seconds(_ duration: Duration) -> Double { Double(duration.nanoseconds) / 1e9 }
 }

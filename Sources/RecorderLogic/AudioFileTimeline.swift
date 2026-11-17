@@ -33,7 +33,7 @@ public struct AudioBufferPlacement: Equatable, Sendable {
 /// and every sample after it is placed by sample count (D45). A gap up to
 /// `longestFilledGap` is filled with silence of exactly its length; a
 /// longer one ends the file. In a recording its buffers are the corrected
-/// chunks of `ClockDriftCorrection`, so the sample count follows the shared
+/// audio of `ClockDriftCorrection`, so the sample count follows the shared
 /// clock. Times are nanoseconds from t0 on the shared clock.
 public struct AudioFileTimeline: Sendable {
     public let grid: TickGrid
