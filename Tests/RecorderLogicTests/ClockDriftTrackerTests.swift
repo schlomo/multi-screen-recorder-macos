@@ -128,6 +128,7 @@ import Testing
         device.paused = { (109..<139).contains($0) }
         let run = run(device, seconds: 250, seed: seed)
         #expect(run.worstError(from: 139) < 0.0035, "\(ms(run.worstError(from: 139)))")
+        #expect(run.worstError(from: 169) < 0.002, "\(ms(run.worstError(from: 169)))")
     }
 
     /// An hour with no buffers on a steady device: the drift across it is
@@ -387,6 +388,32 @@ import Testing
         tracker.record(time: 30_500_000_000, arrival: arrival, applied: 0.0007 + drift)
         #expect(try #require(tracker.remaining) == target - 0.0007)
         #expect(abs(tracker.rate - slope) < 1e-12, "\(tracker.rate * 1e6) ppm")
+    }
+
+    /// The kept slope, shown as the clock drift, is the median of the
+    /// latest `shownEstimates` estimates' slopes: the middle one of an odd
+    /// count, the mean of the two middle ones of an even count. A horizon
+    /// of 2 s holds two points, so each estimate's slope is the one between
+    /// them.
+    @Test func theKeptSlopeIsTheMedianOfTheLatestSlopes() throws {
+        var tracker = ClockDriftTracker(
+            horizon: .seconds(2), minimumPoints: 2, minimumSpan: .milliseconds(500), shownEstimates: 4, shownMinimum: 1)
+        tracker.record(time: 0, arrival: 0, applied: 0)
+        // One point per second, the slope from one to the next `ppm`.
+        var latenesses = [0.010]
+        for ppm in [400.0, -100, 100, 300, -300] { latenesses.append(latenesses.last! + ppm * 1e-6 / (1 - ppm * 1e-6)) }
+        var shown: [Double] = []
+        for (index, lateness) in latenesses.enumerated() {
+            interval(&tracker, Int64(index + 1), lateness: lateness)
+            // From interval 3's first buffer on, each closes an interval with a new estimate.
+            if index >= 2 { shown.append(try #require(tracker.clockDriftPpm)) }
+        }
+        interval(&tracker, Int64(latenesses.count + 1), lateness: 0.020)
+        shown.append(try #require(tracker.clockDriftPpm))
+        // Medians of 400; 400, -100; then 100; 200; and of the latest four, 0.
+        let expected = [-400.0, -150, -100, -200, 0]
+        #expect(shown.count == expected.count)
+        for (value, want) in zip(shown, expected) { #expect(abs(value - want) < 0.01, "\(shown)") }
     }
 
     // MARK: The support line

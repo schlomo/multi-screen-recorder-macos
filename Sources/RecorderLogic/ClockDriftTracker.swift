@@ -15,8 +15,8 @@
 /// and at a gap until the next estimate, it is the kept slope, the median
 /// of the latest estimates' slopes. Its limits: late points that outweigh
 /// the others in the horizon (a long stall, or empty intervals and a
-/// backlog) tilt the line until they leave it; a gap after a tilt that
-/// lasted so long its slopes are half the kept ones or more adds the kept
+/// backlog) tilt the line until they leave it; a gap after a tilt whose
+/// estimates make up half or more of the kept slopes adds the kept
 /// slope's error over the gap's length; one early buffer pulls the line
 /// down for the horizon; the reference, taken from the first estimate's
 /// points, is never revised. Times are nanoseconds on the shared clock;

@@ -221,18 +221,18 @@ apart, a test cannot either:
   2 ms, 2.1 ms on 4 ms). The clock drift shown, the median of the
   latest estimates' slopes, stays within 1 ppm through a step.
 - **Late points that outweigh the others tilt the line.** Whenever the
-  late points outweigh the others in the horizon, the support line
-  tilts until they leave it, and empty intervals make that easier:
-  nothing for 8 s with the backlog drained over 6 s 6.8 ms off; a stall
-  of 6 s or more can tilt it (6 s 0.85 ms at -116 ppm, 5.2 ms at
-  +48.6 ppm), of 7 s up to 6.2 ms, of 9 s with the buffers queued
-  behind it up to 8.3 ms, of 30 s up to 30 ms; a source at its lowest
-  only once in 12 s with the rest 6 ms higher swings by up to 3.2 ms
-  all the time. The clock drift shown stays within 3 ppm through a
-  stall of up to 30 s; after a longer one it is the tilted slope until
-  the tilted estimates are under half again (a stall of 40 s: off by up
-  to 884 ppm for about 90 s), and a file's `clockDriftPpm` if it ends
-  then.
+  late points outweigh the others in the horizon, the support line tilts
+  until they leave it, and empty intervals make that easier: nothing for
+  8 s with the backlog drained over 6 s 6.8 ms off; a stall of 6 s or
+  more can tilt it (6 s 0.85 ms at -116 ppm, 5.2 ms at +48.6 ppm), of
+  7 s up to 6.2 ms, of 9 s with the buffers queued behind it up to
+  8.3 ms, of 30 s up to 30 ms; a source at its lowest only once in 12 s
+  with the rest 6 ms higher swings by up to 3.2 ms all the time. The
+  clock drift shown stays within 3.1 ppm through a stall of up to 30 s;
+  after a longer one it is the tilted slope until the tilted estimates
+  are under half again (a stall of 40 s from 100 s: off by up to
+  884 ppm, more than 5 ppm off from 131 s to 188 s, so about 90 s from
+  the stall's start), and a file's `clockDriftPpm` if it ends then.
 - **A gap after a long tilt adds the tilted slope.** The drift added
   across a gap is the kept slope, the median of the latest estimates'
   slopes, times the gap's length, so it carries the kept slope's error
