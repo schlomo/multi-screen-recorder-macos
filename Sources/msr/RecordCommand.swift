@@ -106,6 +106,8 @@ final class RecordCommandDelegate: NSObject, NSApplicationDelegate {
         let folderPath = folder.path(percentEncoded: false)
         output.tell(.recordingFolderNotice, "Recording into \(folderPath)\n")
         output.tell(.recordingFolder, folderPath)
+        // A closed reader of standard output must not end the process with the files not finalized.
+        signal(SIGPIPE, SIG_IGN)
         for signalNumber in [SIGINT, SIGTERM, SIGHUP] {
             signal(signalNumber, SIG_IGN)
             let source = DispatchSource.makeSignalSource(signal: signalNumber, queue: .main)
@@ -157,7 +159,7 @@ final class RecordCommandDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    /// Ctrl-C, SIGTERM, SIGHUP, the duration and Stop all end here: said at
+    /// Ctrl-C, SIGTERM, SIGHUP, the duration and Stop all end here: told at
     /// once, then finalized; a request while finalizing is only answered.
     private func stopRequested() {
         guard let session else { return }

@@ -28,7 +28,8 @@ public final class StandardErrorWriter: Sendable {
 
     /// Writes on a file descriptor. It draws a status line only when that is
     /// a terminal and `term` (the `TERM` variable) is set, not empty and not `dumb`. A write
-    /// to it never raises SIGPIPE: it fails and is ignored.
+    /// to it never raises SIGPIPE: it fails and is ignored (the flag sits on the
+    /// open file description, so it also holds for other processes writing to the same pipe).
     public convenience init(descriptor: Int32, term: String?) {
         _ = fcntl(descriptor, F_SETNOSIGPIPE, 1)
         let takesEscapeCodes = term.map { !$0.isEmpty && $0 != "dumb" } ?? false

@@ -64,7 +64,7 @@ import Testing
         #expect(collected.all == ["\rRec\u{1B}[K"])
     }
 
-    // The process's own writer, on a pseudo-terminal, a pipe and a closed descriptor.
+    // The process's own writer, on a pseudo-terminal, a pipe and a pipe without a reader.
 
     private func pseudoTerminal(columns: UInt16 = 0) throws -> (master: Int32, slave: Int32) {
         var master: Int32 = 0
