@@ -25,7 +25,9 @@
 <h2>Features</h2>
 {{- /* The README's "What it does" list, up to the first paragraph after it. */}}
 {{- $readme := (resources.Get "README.md").Content }}
-{{- $features := index (findRESubmatch `(?s)## What it does\n\n(.*?)\n\n[^\s-]` $readme 1) 0 1 }}
+{{- $match := findRESubmatch `(?s)## What it does\n\n(.*?)\n\n[^\s-]` $readme 1 }}
+{{- if not $match }}{{ errorf "home.html: README.md has no list under \"## What it does\" followed by a paragraph" }}{{ end }}
+{{- $features := index $match 0 1 }}
 {{ $features | markdownify }}
 </section>
 

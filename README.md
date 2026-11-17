@@ -26,7 +26,7 @@ own clock is resampled continuously to stay with the screen files
   microphone, the wired audio inputs, or all audio inputs, plus the
   system audio if you want it. Each source gets an audio file of its
   own, each channel its own track, kept in step with the screens over
-  hours by correcting each microphone's clock drift.
+  hours by correcting each audio source's clock drift.
 - **Auto mode.** On by default: every screen at Native and the wired
   audio inputs plus the default microphone, so you get a recording that
   is safe to sort out in the editor, at the expense of disk space.

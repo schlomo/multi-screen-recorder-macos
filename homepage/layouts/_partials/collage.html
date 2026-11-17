@@ -73,7 +73,7 @@
 {{- $svg = printf `%s</defs><rect width="%.0f" height="%.0f" rx="%.0f" fill="url(#collage-backdrop)"/>` $svg $w $h (mul 36 $u) }}
 {{- range $shots }}
 {{- $image := .image.Process "webp q90 text" }}
-{{- $svg = printf `%s<image href="%s" x="%.0f" y="%.0f" width="%.0f" height="%.0f" clip-path="url(#collage-%s)" filter="url(#collage-shadow)"/>` $svg $image.RelPermalink .x .y .w .h .name }}
+{{- $svg = printf `%s<g filter="url(#collage-shadow)"><image href="%s" x="%.0f" y="%.0f" width="%.0f" height="%.0f" clip-path="url(#collage-%s)"/></g>` $svg $image.RelPermalink .x .y .w .h .name }}
 {{- end }}
 {{- $svg = printf `%s<g filter="url(#collage-wobble)"><path d="%s" class="collage-arrow" marker-end="url(#collage-head)"/><path d="%s" class="collage-arrow" marker-end="url(#collage-head)"/></g>` $svg $arrow1 $arrow2 }}
 {{- range $labels }}
