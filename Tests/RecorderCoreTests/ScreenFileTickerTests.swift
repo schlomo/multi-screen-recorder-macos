@@ -11,28 +11,46 @@ import Testing
         let firstTick: Int64
         var isReady = true
         var isGuideReady = true
-        /// Refuses the next `refusals` appends of any kind, then takes every
-        /// one: ready on an event, never after a time, so a slow machine
-        /// changes nothing.
+        /// Refuses the next `refusals` video appends, then takes every one:
+        /// ready on an event, never after a time, so a slow machine changes
+        /// nothing. `videoRefusals` counts the refusals, so a test sees how
+        /// often its drain asked.
         func becomesReady(afterRefusals refusals: Int) {
-            refusalsLeft = refusals
-            refusalsMade = 0
+            videoRefusalsLeft = refusals
+            videoRefusals = 0
         }
-        private var refusalsLeft: Int?
-        private(set) var refusalsMade = 0
-        private var takes: Bool {
-            if isReady, isGuideReady { return true }
-            guard let left = refusalsLeft else { return false }
-            if left > 0 {
-                refusalsLeft = left - 1
-                refusalsMade += 1
-                return false
+        /// The same for the guide samples, counted in `guideRefusals`.
+        func becomesGuideReady(afterRefusals refusals: Int) {
+            guideRefusalsLeft = refusals
+            guideRefusals = 0
+        }
+        private var videoRefusalsLeft: Int?
+        private var guideRefusalsLeft: Int?
+        private(set) var videoRefusals = 0
+        private(set) var guideRefusals = 0
+
+        private var takesVideo: Bool {
+            if isReady { return true }
+            if videoRefusalsLeft == 0 {
+                isReady = true
+                return true
             }
-            refusalsLeft = nil
-            isReady = true
-            isGuideReady = true
-            return true
+            videoRefusals += 1
+            videoRefusalsLeft = videoRefusalsLeft.map { $0 - 1 }
+            return false
         }
+
+        private var takesGuide: Bool {
+            if isReady, isGuideReady { return true }
+            if isReady, guideRefusalsLeft == 0 {
+                isGuideReady = true
+                return true
+            }
+            guideRefusals += 1
+            guideRefusalsLeft = guideRefusalsLeft.map { $0 - 1 }
+            return false
+        }
+
         var appendError: ScreenFileWriterError?
         var finishError: ScreenFileWriterError?
         private(set) var written: [Int64] = []
@@ -46,7 +64,7 @@ import Testing
 
         func appendGuide(_ guide: GuideTrack, _ channels: [[Float]], at position: Int64) throws(ScreenFileWriterError) -> Bool {
             if let appendError { throw appendError }
-            guard takes else { return false }
+            guard takesGuide else { return false }
             guides.append((guide, position, channels[0].count))
             guideSamples[guide, default: []] += channels[0]
             return true
@@ -54,7 +72,7 @@ import Testing
 
         func append(_ frame: CVPixelBuffer, tick: Int64) throws(ScreenFileWriterError) -> Bool {
             if let appendError { throw appendError }
-            guard takes else { return false }
+            guard takesVideo else { return false }
             written.append(tick)
             return true
         }
@@ -168,14 +186,14 @@ import Testing
         #expect(ticker.tick(now: grid.time(ofTick: ticksOfVideo - 3)) == nil)
         // The video's last ticks wait for the writer.
         made.isReady = false
-        made.becomesReady(afterRefusals: 2)
+        made.becomesReady(afterRefusals: 4)
         // The stream took 6 s to stop; the feed went on handing over, past the video's end.
         let last = lastMix(&mix, from: Int64(handedOver), handOverUpTo: Int64(videoSamples + 4800), videoEnd: Int64(videoSamples))
         let end = try #require(await ticker.finish(now: grid.time(ofTick: ticksOfVideo), writeWaitingTicks: true) { videoEnd in
             #expect(videoEnd == Int64(videoSamples))
             return last
         })
-        #expect(made.refusalsMade == 2)
+        #expect(made.videoRefusals == 4)
         #expect(made.written.last == ticksOfVideo)
         let samples = try #require(made.guideSamples[.audioInputs])
         #expect(samples.count == videoSamples)
@@ -196,9 +214,9 @@ import Testing
         let last = lastMix(&mix, from: Int64(handedOver), handOverUpTo: Int64(videoSamples - 9600), videoEnd: Int64(videoSamples))
         #expect(last.pending.count > 20)
         made.isGuideReady = false
-        made.becomesReady(afterRefusals: 2)
+        made.becomesGuideReady(afterRefusals: 4)
         let end = try #require(await ticker.finish(now: grid.time(ofTick: ticksOfVideo), writeWaitingTicks: true) { _ in last })
-        #expect(made.refusalsMade == 2)
+        #expect(made.guideRefusals == 4)
         let samples = try #require(made.guideSamples[.audioInputs])
         #expect(samples.count == videoSamples)
         #expect(samples.allSatisfy { $0 == 0.25 })
@@ -240,12 +258,12 @@ import Testing
         let (ticker, made, mix) = try guidedFile(handedOver: videoSamples, guideReady: false, drainTimeout: .seconds(30))
         #expect(ticker.tick(now: grid.time(ofTick: 30)) == nil)
         #expect(made.guides.isEmpty)
-        made.becomesReady(afterRefusals: 2)
+        made.becomesGuideReady(afterRefusals: 4)
         let peek = mix.peek(upTo: Int64(videoSamples))
         _ = try #require(await ticker.finish(now: grid.time(ofTick: 30), writeWaitingTicks: true) { _ in
             GuideLastMix(pending: [], peeks: [.audioInputs: .init(start: peek.start, channels: peek.channels)])
         })
-        #expect(made.refusalsMade == 2)
+        #expect(made.guideRefusals == 4)
         #expect(made.guides.map(\.2).reduce(0, +) == videoSamples, "\(made.guides.map(\.2))")
     }
 
