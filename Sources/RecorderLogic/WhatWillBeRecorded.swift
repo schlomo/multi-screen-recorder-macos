@@ -207,6 +207,12 @@ public struct WhatWillBeRecorded: Equatable, Sendable {
         }
     }
 
+    /// The digits of the highest audio number in the table, at least 1: the width of the number an audio
+    /// source not recorded keeps blank, in the text and in the window.
+    public var numberDigits: Int {
+        String(audioRows.compactMap { $0.source?.number }.max() ?? 1).count
+    }
+
     /// The table's last row: the total GB/h max; nil without a total.
     public var totalRow: Row? {
         total.map { Row(source: nil, values: ["", "", "", $0.gigabytesPerHour], isRecorded: true) }
@@ -220,8 +226,7 @@ public struct WhatWillBeRecorded: Equatable, Sendable {
         var lines = ["What will be recorded", "  \(settingsLine)"]
         if let screensError { lines.append("  \(screensError)") }
         if let audioError { lines.append("  \(audioError)") }
-        let highestNumber = audioRows.compactMap { $0.source?.number }.max() ?? 1
-        let blank = String(repeating: " ", count: SourceLabel.audioInput(max(highestNumber, 1), name: "").count)
+        let blank = String(repeating: " ", count: SourceLabel.audioInput(0, name: "").count - 1 + numberDigits)
         func cells(_ row: Row) -> [String] {
             guard let source = row.source, source.kind != .screen, source.number == nil else { return row.cells }
             return [blank + source.name] + row.values

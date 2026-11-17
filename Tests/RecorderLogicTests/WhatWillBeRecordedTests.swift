@@ -280,6 +280,17 @@ import Testing
     }
 
     /// The blank where the number would be is as wide as the widest number's, so the names line up.
+    @Test func theNumberDigitsAreThoseOfTheHighestAudioNumber() {
+        #expect(defaultSection.numberDigits == 1)
+        let ten = (1...10).map { AudioInputInfo(name: "M\($0)", channelCount: 1, isDefault: $0 == 1, transport: .usb, uid: "U\($0)") }
+        var settings = Settings.defaults
+        settings.auto = false
+        settings.audioMode = .allInputs
+        let many = WhatWillBeRecorded(settings: settings, screens: .success([]), audioInputs: .success(ten), outputFolder: nil)
+        #expect(many.numberDigits == 2)
+        #expect(WhatWillBeRecorded(settings: settings, screens: .success([]), audioInputs: .success([]), outputFolder: nil).numberDigits == 1)
+    }
+
     @Test func theNamesLineUpWithTwoDigitNumbers() {
         var settings = Settings.defaults
         settings.auto = false

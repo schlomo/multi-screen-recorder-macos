@@ -218,10 +218,6 @@ struct WhatWillBeRecordedView: View {
         }
     }
 
-    private var numberDigits: Int {
-        String(section.audioRows.compactMap { $0.source?.number }.max() ?? 1).count
-    }
-
     private var sourceWidth: CGFloat {
         TableLayout.sourceWidth(names: (section.screenRows + section.audioRows).compactMap { $0.source?.name })
     }
@@ -249,7 +245,7 @@ struct WhatWillBeRecordedView: View {
                 if column == 0 {
                     Group {
                         if let source {
-                            SourceCellView(cell: source, numberDigits: numberDigits)
+                            SourceCellView(cell: source, numberDigits: section.numberDigits)
                         } else {
                             Text(cell)
                                 .fontWeight(boldSource ? .semibold : nil)
