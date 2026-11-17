@@ -105,6 +105,11 @@ header {
     transform: translateY(-2px);
     box-shadow: 0 0.6rem 1.6rem color-mix(in srgb, var(--button) 45%, transparent);
   }
+
+  @media (prefers-reduced-motion: reduce) {
+    transition: none;
+    &:hover { transform: none; }
+  }
 }
 
 h2 {

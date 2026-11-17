@@ -23,14 +23,13 @@ own clock is resampled continuously to stay with the screen files
   video file. Plugging in a projector, removing it, closing or opening
   the laptop's lid, or switching mirroring does not stop the recording.
 - **Every audio source in its own file.** No audio, the default
-  microphone, the wired audio inputs, or all audio inputs, plus the
-  system audio if you want it. Each source gets an audio file of its
-  own, each channel its own track, kept in step with the screens over
-  hours by correcting each audio source's clock drift.
-- **Auto mode.** On by default: every screen at Native and the wired
-  audio inputs plus the default microphone, so you get a recording that
-  is safe to sort out in the editor, at the expense of disk space.
-  Switch it off to choose the resolution and the audio mode yourself.
+  microphone, the wired or all audio inputs, plus the system audio if
+  you want it; each channel its own track.
+- **In sync after hours.** The drift of each audio source's own clock
+  is corrected, so audio and screens still line up hours later.
+- **Auto mode.** On by default: every screen at Native, the wired audio
+  inputs and the default microphone, safe to sort out in the editor at
+  the expense of disk space. Off, you choose resolution and audio mode.
 - **Edit-ready files.**
   - Timecode in every file, so an editor puts all of them on one
     timeline in place.
@@ -278,7 +277,8 @@ fit together is in [docs/design/delivery.md](docs/design/delivery.md).
 
 `scripts/install-app` replaces the app in `/Applications`: with no
 argument it builds and signs first, `--release` installs the latest
-release, and a zip path installs that zip. It refuses while the
+release, `--snapshot 20` the snapshot release of PR #20, and a zip path
+installs that zip. It refuses while the
 installed app runs, keeps both permissions (the certificate stays the
 same; `SIGNING_IDENTITY=-`, ad hoc, loses them) and needs no "Open
 Anyway" (it removes the quarantine); details in

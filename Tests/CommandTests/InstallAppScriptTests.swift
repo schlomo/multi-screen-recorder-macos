@@ -1,9 +1,10 @@
 import Foundation
 import Testing
 
-/// Runs scripts/install-app with a zip argument and INSTALL_FOLDER in a
-/// scratch folder, on small stand-in bundles. The modes without an argument
-/// and --release build, sign and download, so they are not run here.
+/// Runs scripts/install-app with INSTALL_FOLDER in a scratch folder, on small
+/// stand-in bundles: with a zip, and with --release and --snapshot through a
+/// stand-in gh. The mode without an argument builds and signs, so it is not
+/// run here.
 @Suite struct InstallAppScriptTests {
     private static let bundle = "Multi Screen Recorder.app"
     private static let quarantine = "com.apple.quarantine"
@@ -227,6 +228,49 @@ import Testing
         #expect(outcome.status == 1)
         #expect(outcome.errors.contains("is running"), "\(outcome.errors)")
         #expect(try installedVersion() == "0.20261116.1")
+    }
+
+    /// The environment for a run with a stand-in gh, found first on the PATH:
+    /// it writes its arguments to `gh-arguments` in the scratch folder and
+    /// "downloads" `zip` into the folder given with --dir.
+    private func standInGH(delivering zip: URL) throws -> [String: String] {
+        let folder = scratch.url.appending(path: "stand-in-gh", directoryHint: .isDirectory)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        let program = folder.appending(path: "gh")
+        try """
+            #!/bin/sh
+            echo "$@" > '\(path(scratch.url.appending(path: "gh-arguments")))'
+            while [ $# -gt 0 ]; do
+                if [ "$1" = --dir ]; then mkdir -p "$2" && cp '\(path(zip))' "$2/"; fi
+                shift
+            done
+            """.write(to: program, atomically: true, encoding: .utf8)
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: path(program))
+        let realPath = try #require(ProcessInfo.processInfo.environment["PATH"])
+        return ["PATH": "\(path(folder)):\(realPath)", "INSTALL_FOLDER": path(installFolder)]
+    }
+
+    @Test(arguments: [(["--snapshot", "20"], "release download pr-20 "), (["--release"], "release download --repo ")])
+    func aReleaseIsDownloadedWithGHAndInstalled(arguments: [String], expected: String) async throws {
+        defer { scratch.remove() }
+        let archive = try await makeZip(try await makeBundle(version: "0.20261117.52-pr20+d73cb1e", in: sources))
+        let outcome = try await run(repositoryRoot.appending(path: "scripts/install-app"), arguments,
+                                    environment: try standInGH(delivering: archive))
+        #expect(outcome.status == 0, "\(outcome.errors)")
+        #expect(try installedVersion() == "0.20261117.52-pr20+d73cb1e")
+        let ghArguments = try String(contentsOf: scratch.url.appending(path: "gh-arguments"), encoding: .utf8)
+        #expect(ghArguments.hasPrefix(expected), "\(ghArguments)")
+    }
+
+    @Test(arguments: [["--snapshot", "x"], ["--snapshot", "pr-20"], ["--snapshot"], ["--bogus"]])
+    func aWrongArgumentFailsAndChangesNothing(arguments: [String]) async throws {
+        defer { scratch.remove() }
+        let outcome = try await run(repositoryRoot.appending(path: "scripts/install-app"), arguments,
+                                    environment: ["INSTALL_FOLDER": path(installFolder)])
+        #expect(outcome.status == 1)
+        #expect(outcome.errors.contains("--snapshot takes a PR number") || outcome.errors.contains("usage:"),
+                "\(outcome.errors)")
+        #expect(try FileManager.default.contentsOfDirectory(atPath: path(installFolder)).isEmpty)
     }
 
     @Test(arguments: ["--help", "-h"])

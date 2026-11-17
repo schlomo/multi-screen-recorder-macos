@@ -1776,13 +1776,14 @@ architect's reading.
 - **Evidence:** [design/recorder.md](design/recorder.md), the command
   rows, "The app" and the summary.
 
-## D60: The crash report form's log command is a comment; scripts that take arguments print their usage with `--help` (2026-11-17)
+## D60: The crash report form's log command is a comment; scripts that take arguments print their usage with `--help`; `install-app --snapshot` (2026-11-17)
 
 - **Status:** in force.
 - **Context:** The owner, 2026-11-17, after trying the crash report
   form: "the log show line must be prefilled as comment to be invisible
   later in the issue itself"; and "the scripts that take arguments
-  need to support --help and -h".
+  need to support --help and -h"; "install-app could benefit from
+  --snapshot pr-20 or something".
 - **Decision:**
   1. The crash report form's log field holds the `log show` command
      (D46) in an HTML comment, followed by an empty `text` code block
@@ -1792,6 +1793,9 @@ architect's reading.
      `scripts/install-app` print how to use them with `--help` or `-h`
      and exit 0, changing nothing; `scripts/test` passes every other
      argument to `swift test`.
+  3. `scripts/install-app --snapshot <n>` installs the snapshot release
+     of PR `<n>` (tag `pr-<n>`), downloaded with `gh` like `--release`;
+     the argument is the PR's number only.
 - **Evidence:** `.github/ISSUE_TEMPLATE/crash-report.yml`,
   [design/delivery.md](design/delivery.md), `CrashReportTests`,
   `VersionScriptTests`, `InstallAppScriptTests`.

@@ -222,9 +222,11 @@ account and plan were not checked].
 - `scripts/install-app --release` downloads the latest release's zip
   with `gh release download` (gh reads its own credentials) and
   installs it.
+- `scripts/install-app --snapshot <n>` does the same for the snapshot
+  release of PR `<n>` (tag `pr-<n>`), to try a PR before it is merged.
 - `scripts/install-app <zip>` installs that zip.
 
-Installing is the same for all three: unpack the zip into a temporary
+Installing is the same for all four: unpack the zip into a temporary
 folder, verify the signature (`codesign --verify --deep --strict`),
 copy the app next to the installed one, remove the quarantine attribute
 from the copy recursively and check that no file still carries it, then

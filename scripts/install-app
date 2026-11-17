@@ -9,6 +9,9 @@ usage="Installs the app, replacing the one in INSTALL_FOLDER (default
                                  certificate (scripts/sign-app) and installs
                                  the zip it prints
   $me --release  installs the zip of the latest release
+  $me --snapshot <n>
+                                 installs the zip of PR <n>'s snapshot release
+                                 (tag pr-<n>)
   $me <zip>      installs that zip
   $me --help     prints this, also -h
 Refuses while the installed app's msr runs. Verifies the signature, removes
@@ -30,9 +33,6 @@ fail() { echo "$me: $*" >&2; exit 1; }
 for tool in ditto codesign xattr plutil lsof mktemp; do
     command -v "$tool" >/dev/null || fail "$tool is not on the PATH"
 done
-if [[ ${1-} == --release ]]; then
-    command -v gh >/dev/null || fail "gh is not on the PATH"
-fi
 
 scratch="$(mktemp -d)"
 trap 'rm -rf "$scratch"' EXIT
@@ -83,24 +83,30 @@ install_zip() {
     echo "Installed $target, version $(plutil -extract MSRVersion raw "$target/Contents/Info.plist")"
 }
 
-case $# in
-    0)
+# Installs the one zip of a release: the one tagged $1, or the latest.
+install_release() {
+    command -v gh >/dev/null || fail "gh is not on the PATH"
+    refuse_while_running
+    gh release download ${1:+"$1"} --repo "$repository" --pattern '*.zip' --dir "$scratch/download"
+    shopt -s nullglob
+    local zips=("$scratch"/download/*.zip)
+    ((${#zips[@]} == 1)) || fail "expected one zip in the release, found ${#zips[@]}"
+    install_zip "${zips[0]}"
+}
+
+case "$#:${1-}" in
+    0:)
         refuse_while_running
         cd "$(dirname "$0")/.."
         scripts/build-app
         install_zip "$(scripts/sign-app)"
         ;;
-    1)
-        if [[ $1 == --release ]]; then
-            refuse_while_running
-            gh release download --repo "$repository" --pattern '*.zip' --dir "$scratch/download"
-            shopt -s nullglob
-            zips=("$scratch"/download/*.zip)
-            ((${#zips[@]} == 1)) || fail "expected one zip in the latest release, found ${#zips[@]}"
-            install_zip "${zips[0]}"
-        else
-            install_zip "$1"
-        fi
+    1:--release) install_release ;;
+    2:--snapshot)
+        [[ $2 =~ ^[1-9][0-9]*$ ]] || fail "--snapshot takes a PR number, such as 20, not '$2'"
+        install_release "pr-$2"
         ;;
-    *) fail "usage: $me [--release | <zip> | --help]" ;;
+    1:-*) fail "usage: $me [--release | --snapshot <n> | <zip> | --help]" ;;
+    1:*) install_zip "$1" ;;
+    *) fail "usage: $me [--release | --snapshot <n> | <zip> | --help]" ;;
 esac
