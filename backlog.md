@@ -36,9 +36,14 @@ Still open from D34: what AGC does and whether it is on in auto mode;
 
 - **Clock drift correction** (D56; was queued item 5): built
   locally on the branch `audio-drift-correction` (the tracker of
-  `1e5bfe7`, review fixes after it), not pushed, no pipeline run; its review state is in the
-  session's report to the owner (the owner, 2026-11-16: "work local only, with a
-  single final CI test at the very end after we both are happy").
+  `1e5bfe7`, review fixes after it, the last one `7c303f9`), not
+  pushed, no pipeline run (the owner, 2026-11-16: "work local only,
+  with a single final CI test at the very end after we both are
+  happy"). Reviewed: one adversarial review and four delta reviews,
+  the last one's findings fixed in `7c303f9`, a tests and docs commit
+  no reviewer has read. A 180 s recording of the build of `cdd75ad`
+  (2026-11-17, the figures in recorder.md's "Build state"): result ok,
+  no events. Never run: CI's Swift, a full hour, a real gap.
   Waiting on the owner: trying the build, confirming D56's design, the
   go-ahead to push. A 10-minute recording of the build of `1e5bfe7` on the
   owner's Mac (2026-11-17, five audio sources): result ok, no events;
