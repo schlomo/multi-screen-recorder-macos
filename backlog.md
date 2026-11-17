@@ -31,8 +31,10 @@ Still open from D34: what AGC does and whether it is on in auto mode;
   local only, with a single final CI test at the very end after we
   both are happy"; the owner's go-ahead to push, 2026-11-17).
   - Also in it: the command line polish (queued item 1, D59), built
-    locally after the owner tried PR #19; one adversarial review and
-    two delta reviews, the last one's findings fixed in `171eddb`.
+    locally after the owner tried PR #19, with the owner's later
+    findings (the `--debug` clock drift lines as one block in number
+    order); reviewed by one adversarial review and delta reviews of
+    every fix.
   - Clock drift, reviewed: one adversarial review and five delta
     reviews, all findings fixed.
   - Clock drift, run on the owner's Mac (2026-11-17, five audio
@@ -184,6 +186,13 @@ Still open from D34: what AGC does and whether it is on in auto mode;
      latency, which the recorder has never compensated [ASSUMED].
      Decide whether to read Core Audio's latency per device and place
      each file by it. Design first.
+   - The BRIO's clock drift reads about −115 ppm for its first 70 to
+     110 s, then settles near +5 ppm, in every run on the owner's Mac
+     (2026-11-17). By room sound the Razer-to-BRIO lag held within
+     0.3 ms from 30 s to 330 s in the hour run, so the BRIO's clock
+     really runs slow while it warms up and the correction follows it
+     [ASSUMED, one cross-correlation]. Nothing to change unless a
+     tester's BRIO shows otherwise.
    - The owner's runs with `--debug` answer two assumptions: whether a
      source's timestamps keep following its sample count across a gap
      (a debug line at each gap shows it), and whether the rate's swing
