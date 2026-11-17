@@ -1577,7 +1577,7 @@ architect's reading.
   "Labels" and the start and status windows; the glossary's "Screen",
   "Label" and "Tagline"; the PR "Naming and window polish".
 
-## D56: Clock drift is corrected by resampling every audio source to the shared clock (2026-11-17)
+## D57: Clock drift is corrected by resampling every audio source to the shared clock (2026-11-17)
 
 - **Status:** in force; the design is the architect's, built at the
   owner's request and for the owner to confirm. Closes D49's "corrected
@@ -1626,7 +1626,7 @@ architect's reading.
   of the clock drift correction" in
   [design/end-to-end-tests.md](design/end-to-end-tests.md).
 
-## D57: `msr record` writes only the recording folder's path to standard output; a status line on a terminal; `--quiet` (2026-11-17)
+## D58: `msr record` writes only the recording folder's path to standard output; a status line on a terminal; `--quiet` (2026-11-17)
 
 - **Status:** in force for `msr record`; the other commands (`check`,
   `list`, `settings`, `version`) are not yet checked against the same

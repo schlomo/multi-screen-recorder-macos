@@ -34,8 +34,8 @@ Still open from D34: what AGC does and whether it is on in auto mode;
 
 ## In flight
 
-- **Clock drift correction** (D56; was queued item 5) and **`msr
-  record`'s status line, output split and `--quiet`** (D57; the
+- **Clock drift correction** (D57; was queued item 5) and **`msr
+  record`'s status line, output split and `--quiet`** (D58; the
   terminal part of queued item 13, for `msr record` only): built
   locally on the branch `audio-drift-correction`, not pushed, no
   pipeline run (the owner, 2026-11-16: "work local only, with a single
@@ -67,8 +67,8 @@ Still open from D34: what AGC does and whether it is on in auto mode;
   - UNVERIFIED: a build with CI's Swift 6.3, a real gap during a
     recording, a click test through the speakers, the status window's
     column on screen, the status line in the owner's own terminal.
-  - Waiting on the owner: trying the build; confirming D56's design
-    and D57's details; whether `--quiet` also writes low disk space
+  - Waiting on the owner: trying the build; confirming D57's design
+    and D58's details; whether `--quiet` also writes low disk space
     and a screen showing another screen's picture; the go-ahead to
     push. The owner, 2026-11-17: commits name the model ("Yes, mention
     model"); the agent's session rules forbid it a model name in a
@@ -183,7 +183,7 @@ Still open from D34: what AGC does and whether it is on in auto mode;
    a drain error labelled as a writer timeout in `guideTracksCut`; no
    test for a gap after real data in a guide track's last mix; an
    unlocked test flag in `DisplayFileTickerTests`.
-5. **Clock drift correction, what is left** after D56 (in flight):
+5. **Clock drift correction, what is left** after D57 (in flight):
    - The homepage's screenshot of the status window lacks the column
      "Clock drift"; retake it once the build is released (its alt text
      already names the column).
@@ -287,7 +287,7 @@ Still open from D34: what AGC does and whether it is on in auto mode;
      shareable content ahead, off the Core Audio path; (e) a ready-check
      warning when audio inputs share a dock with a USB-C display;
      (f) leave disturbed stretches out of the drift measurement
-     (done with D56 for a short one, which lies above the line; a
+     (done with D57 for a short one, which lies above the line; a
      late stretch of 7 s or more still tilts it, see recorder.md,
      "Clock drift"); (g) our own process tap for system audio, low: it is the
      mechanism ScreenCaptureKit already uses. Design first.
@@ -403,7 +403,7 @@ Still open from D34: what AGC does and whether it is on in auto mode;
    stdout and error are handled properly for managed or scripted
    operation", "a brief banner with version info, build date and
    homepage link"):
-   - Built for `msr record` on the branch under "In flight" (D57):
+   - Built for `msr record` on the branch under "In flight" (D58):
      the status line, the split and `--quiet`. Left: the other
      commands and the window, below.
    - Only when standard error is a terminal: one line, redrawn every

@@ -1432,7 +1432,7 @@ the correction over an hour, and by ear or by clicks in a real
 recording.
 
 A proportional-integral loop that followed a rolling minimum was built
-and run next, and replaced (D56): the rolling minimum moved older
+and run next, and replaced (D57): the rolling minimum moved older
 intervals along the loop's own integral, so the loop fed its own
 measurement and ran away on long pauses and deep bursts. Rebuilt with
 the lower support line (see "Clock drift") and run on the owner's Mac on
