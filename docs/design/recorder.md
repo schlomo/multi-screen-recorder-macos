@@ -155,7 +155,7 @@ then:
 ok    Screen & System Audio Recording permission
 ok    Microphone permission
 ok    Screens: 2
-ok    Audio: MacBook Pro Microphone (default), RØDE Wireless GO II RX, system audio
+ok    Audio: system audio, MacBook Pro Microphone (default), RØDE Wireless GO II RX
 ok    Output folder: ~/Movies/Multi Screen Recorder
 FAIL  Free disk space: 3.1 GB in ~/Movies/Multi Screen Recorder, 10.7 GB needed for 2 hours
       Fix: free up space, or lower --required-recording-hours
@@ -222,14 +222,14 @@ the Microphone permission (only when the recording records at least one
 audio input: with no audio input present, or none recorded under the
 audio mode, the item is left out and the permission is neither asked nor
 read), the screens (at least one, each readable), the chosen audio
-sources (each audio input the audio mode records readable; another that
+sources, listed from the same model and in the same order as the table of what will be recorded (each audio input the audio mode records readable; another that
 cannot be read does not count; with an audio mode but `none` the item
 says "no microphone recorded" when no input is recorded, such as on a
 Mac without any audio input or with only inputs the audio mode leaves
 out or that have no Core Audio UID, and passes: no microphone works in
 every audio mode, the screens and the system audio are recorded as
-usual, and the item then reads `Audio: no microphone recorded, system
-audio`, or `Audio: no microphone recorded, no system audio` with system
+usual, and the item then reads `Audio: system audio, no microphone
+recorded`, or `Audio: no microphone recorded, no system audio` with system
 audio off; an input that is recorded and whose channels cannot be read
 fails it), the output folder, and free disk space in the output folder
 for `requiredRecordingHours`.

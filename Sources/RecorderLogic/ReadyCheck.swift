@@ -160,15 +160,14 @@ public enum ReadyCheck {
         if case .failure(let error) = unreadableRecordedInputs(audioInputs, settings: settings).first?.channelCount {
             return cannotBeRead(error)
         }
-        var sources = audioInputs.filter { AudioTracker.records($0, settings: settings) }.map(\.shownName)
+        // The recorded audio sources, in the order of the table of what will be recorded.
+        let recorded = WhatWillBeRecorded(settings: settings, screens: .success([]), audioInputs: .success(audioInputs), outputFolder: nil)
+            .audio.filter(\.isRecorded)
+        var sources = recorded.map { $0.source.kind == .systemAudio ? "system audio" : $0.name }
         // A Mac without an audio input is ready in every audio mode: the screens and the system audio are recorded.
-        let noMicrophone = settings.effectiveAudioMode != .none && sources.isEmpty
+        let noMicrophone = settings.effectiveAudioMode != .none && !recorded.contains { $0.source.kind == .audioInput }
         if noMicrophone { sources.append("no microphone recorded") }
-        if settings.systemAudio {
-            sources.append("system audio")
-        } else if noMicrophone {
-            sources.append("no system audio")
-        }
+        if !settings.systemAudio, noMicrophone { sources.append("no system audio") }
         return ReadyCheckItem(
             title: "Audio: " + (sources.isEmpty ? "none" : sources.joined(separator: ", ")),
             passed: true, fix: nil)

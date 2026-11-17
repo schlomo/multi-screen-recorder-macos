@@ -31,7 +31,7 @@ import Testing
         ok    Screen & System Audio Recording permission
         ok    Microphone permission
         ok    Screens: 2
-        ok    Audio: MacBook Pro Microphone (default), RØDE Wireless GO II RX, system audio
+        ok    Audio: system audio, MacBook Pro Microphone (default), RØDE Wireless GO II RX
         ok    Output folder: ~/Movies/Multi Screen Recorder
         FAIL  Free disk space: 3.1 GB in ~/Movies/Multi Screen Recorder, 10.7 GB needed for 2 hours
               Fix: free up space, or lower --required-recording-hours
@@ -122,9 +122,9 @@ import Testing
         let result = ReadyCheck.evaluate(facts(microphoneGranted: false, audioInputs: [noUID]), settings: .defaults)
         #expect(!result.items.contains { $0.title == "Microphone permission" })
         let audio = result.items.first { $0.title.hasPrefix("Audio:") }
-        #expect(audio?.title == "Audio: no microphone recorded, system audio")
+        #expect(audio?.title == "Audio: system audio, no microphone recorded")
         let withBuiltIn = ReadyCheck.evaluate(facts(audioInputs: Self.builtInMicrophoneOnly + [noUID]), settings: .defaults)
-        #expect(withBuiltIn.items.contains { $0.title == "Audio: MacBook Pro Microphone (default), system audio" })
+        #expect(withBuiltIn.items.contains { $0.title == "Audio: system audio, MacBook Pro Microphone (default)" })
     }
 
     @Test func aMissingMicrophonePermissionNamesTheSettingsPath() throws {
@@ -165,7 +165,7 @@ import Testing
         #expect(result.isReady)
         let audio = result.items.first { $0.title.hasPrefix("Audio:") }
         #expect(audio == ReadyCheckItem(
-            title: mode == .none ? "Audio: system audio" : "Audio: no microphone recorded, system audio",
+            title: mode == .none ? "Audio: system audio" : "Audio: system audio, no microphone recorded",
             passed: true, fix: nil))
         #expect(result.items.contains { $0.title.hasPrefix("Free disk space") })
     }
@@ -330,17 +330,17 @@ import Testing
 
     @Test func theAudioItemNamesEveryRecordedInputOfTheAudioMode() {
         let inputs = DesignExample.audioInputs + [Self.airPods]
-        #expect(audioTitle(.defaultMicrophone, inputs) == "Audio: MacBook Pro Microphone (default), system audio")
+        #expect(audioTitle(.defaultMicrophone, inputs) == "Audio: system audio, MacBook Pro Microphone (default)")
         #expect(audioTitle(.wired, inputs)
-            == "Audio: MacBook Pro Microphone (default), RØDE Wireless GO II RX, system audio")
+            == "Audio: system audio, MacBook Pro Microphone (default), RØDE Wireless GO II RX")
         #expect(audioTitle(.allInputs, inputs)
-            == "Audio: MacBook Pro Microphone (default), RØDE Wireless GO II RX, AirPods, system audio")
+            == "Audio: system audio, MacBook Pro Microphone (default), RØDE Wireless GO II RX, AirPods")
         #expect(audioTitle(.none, inputs) == "Audio: system audio")
     }
 
     @Test func autoModeChecksWhatWiredRecordsWhateverTheSlidersSay() {
         #expect(audioTitle(.none, DesignExample.audioInputs, auto: true)
-            == "Audio: MacBook Pro Microphone (default), RØDE Wireless GO II RX, system audio")
+            == "Audio: system audio, MacBook Pro Microphone (default), RØDE Wireless GO II RX")
     }
 
     @Test func autoModeNeedsTheMicrophonePermission() {
@@ -354,11 +354,11 @@ import Testing
     @Test(arguments: [AudioMode.defaultMicrophone, .wired, .allInputs])
     func aBluetoothDefaultMicrophoneIsEnoughInEveryModeBut(none mode: AudioMode) {
         let headset = AudioInputInfo(name: "AirPods", channelCount: 1, isDefault: true, transport: .bluetooth, uid: "AirPods")
-        #expect(audioTitle(mode, [headset]) == "Audio: AirPods (default), system audio")
+        #expect(audioTitle(mode, [headset]) == "Audio: system audio, AirPods (default)")
     }
 
     @Test func withoutAnyRecordedInputTheItemSaysNoMicrophoneRecordedAndPasses() {
-        #expect(audioTitle(.wired, [Self.airPods]) == "Audio: no microphone recorded, system audio")
+        #expect(audioTitle(.wired, [Self.airPods]) == "Audio: system audio, no microphone recorded")
     }
 
     @Test func inputsToJudgeAreNoneWithTheAudioModeNoneWhetherTheyCanBeReadOrNot() {
