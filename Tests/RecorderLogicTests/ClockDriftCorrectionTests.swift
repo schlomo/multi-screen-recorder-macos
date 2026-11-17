@@ -2,7 +2,11 @@ import Foundation
 import Testing
 @testable import RecorderLogic
 
-@Suite struct ClockDriftCorrectionTests {
+/// Serialized: these tests compute for seconds without suspending, so run in
+/// parallel they hold every thread of the cooperative pool (3 on a CI
+/// runner) and the async tests waiting for a 20 ms task starve until their
+/// own timeouts; serialized, a suite holds one thread.
+@Suite(.serialized) struct ClockDriftCorrectionTests {
     private let sampleRate = 48_000.0
 
     /// Clicks of a device 500 ppm slow at known shared clock times, with

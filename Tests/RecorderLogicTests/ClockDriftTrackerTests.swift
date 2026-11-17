@@ -10,7 +10,11 @@ import Testing
 /// in order. The full matrix (seeds 1 to 10, 30 minutes for every steady
 /// device and burst pattern) was run once on 2026-11-17; here seeds 1 to
 /// 3 and one seed for the two 30-minute runs, to keep the suite fast.
-@Suite struct ClockDriftTrackerTests {
+/// Serialized: these tests compute for seconds without suspending, so run in
+/// parallel they hold every thread of the cooperative pool (3 on a CI
+/// runner) and the async tests waiting for a 20 ms task starve until their
+/// own timeouts; serialized, a suite holds one thread.
+@Suite(.serialized) struct ClockDriftTrackerTests {
     struct Run {
         /// Per buffer: its timestamp in seconds, the correction applied
         /// against the device's true offset, the rate, and the drift shown.
