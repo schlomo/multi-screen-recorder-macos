@@ -31,7 +31,13 @@ verifying agent output are in the principles (linked from
   review**, or quoted with its date in the description.
 - **A ruling that changes how agents work is delivered only when its
   text is in a file those agents read**; its backlog entry stays open
-  until then.
+  until then. For any agent that is `AGENTS.md` and `docs/principles/`
+  ("Write a behavior where the acting agent reads it").
+- **A fact in a description, a comment or a message to the human** is
+  checked as "Verify before declaring ready" says, and strictly: a
+  lenient check (following redirects, an agent's summary, a render
+  that may be cropped) is redone or named as such; a 200 reached
+  through a redirect is not a 200.
 
 ## Deciding and asking
 
@@ -41,6 +47,11 @@ verifying agent output are in the principles (linked from
   sign-off ("Agree the design before anyone builds it" in the
   principles); a rule is applied for what it protects, not to every
   artifact.
+- **Before designing something a person has to do, ask what they
+  already see.** The window, a file they already have or a screenshot
+  often carries the facts a new command, channel or check would
+  collect (the owner, 2026-11-16: a screenshot of the start window
+  instead of two Terminal commands).
 
 ## Supervising long-running work
 

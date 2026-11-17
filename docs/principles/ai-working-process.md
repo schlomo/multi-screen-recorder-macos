@@ -43,9 +43,10 @@ so rather than silently picking a side.
   (recommended), optionally also marking the ones agents opened ready
   once they are fully reviewed; it commits locally only and a human
   pushes; or it writes nothing to the repo without a per-change
-  instruction. The recommended level lets an agent iterate on real CI
-  results by itself — push, read the pipeline, push a fix — before a
-  human spends review time on it. With the option, the session that
+  instruction. The recommended level lets an agent push its rounds and
+  read the pipeline's result by itself, once per MR/PR ("Iterate
+  locally; wait for the pipeline once" below), before a human spends
+  review time on it. With the option, the session that
   owns an MR/PR an agent opened (it opened it, briefed the agent that
   did, or took it over) marks it ready once its adversarial review
   leaves no BLOCKER or SHOULD-FIX open, its pipeline passes, and any
@@ -266,8 +267,19 @@ a stray change in about a minute. What a word diff does not show can
 still slip through, which is the risk taken.
 **How:** the read-only reviewer agent (`.claude/agents/reviewer.md`),
 pinned to the top tier, runs the review on the highest tier available
-to the project. Its findings go back to whoever wrote the change; the
+to the project, unless the review is sized lower (below). Its findings go back to whoever wrote the change; the
 reviewer never fixes them itself.
+- The review is sized to the change's cost and complexity: a change to
+  Markdown only, or a small, low-risk one, usually gets its review on
+  the standard tier, while a principle change, a guardrail, code that
+  can lose or leak data, and the consistency pass ending a series of
+  rule edits stay on the top tier. The description's review state
+  names the tier.
+- Feedback that arrives while the review runs (a human trying the
+  change, a reviewer's question) joins the fix round when it fixes
+  something. When it adds something new (a feature, a behaviour, a
+  rule), the change is no longer settled: the new content gets its
+  own adversarial review, not only a delta review.
 - The review judges the premise before the details: should this
   change exist at all, is there a simpler or ecosystem-native way,
   does a sibling repo (another repo the team owns) already solve it,
@@ -304,6 +316,34 @@ reviewer never fixes them itself.
   loop has ended, a NIT fix excepted, gets a standard-tier delta
   review, a merge in which the trunk changed something the branch
   builds on included.
+
+## Iterate locally; wait for the pipeline once
+
+**Rule:** every round of a change (the first build, each fix round)
+is gated by running locally what the pipeline runs: the project's own
+scripts, on the round's final commit. The round is pushed without
+waiting for the pipeline, and reviews start on the pushed commit. The
+pipeline is waited for once per MR/PR: on the commit about to be
+marked ready.
+**Why:** the pipeline's jobs are the project's own scripts ("Thin
+CI" in [engineering.md](engineering.md)), and the owner designed it so
+that nothing on it cannot be tested locally (D56). A wait after every
+round adds the pipeline's run time to every round and catches only
+what differs between the two places: a toolchain version or the
+runner's load (the troubleshooting log has both). The one wait before
+ready still catches those. The owner, on waiting per round: "We
+wasted way way too much time waiting on CI" (D56).
+**How:** a builder's report states the local run (commands and
+exit codes) on the commit it pushed; the delegating session relies on
+it for the round and waits for the pipeline only before marking the
+MR/PR ready. An agent that cannot run the scripts (a Linux container
+for a macOS build) says so: its round is UNVERIFIED, and the pipeline
+is its gate. A difference between the local run and the pipeline
+(another toolchain version, a missing tool) shows up at that one
+wait: it is fixed, recorded in the troubleshooting log, and the local
+procedure is brought closer to the pipeline's. What only the pipeline
+can do (signing with a secret, publishing) is the pipeline's alone;
+its local stand-in (an ad hoc signature, a dry run) is run instead.
 
 ## Docs completeness is part of being done
 
@@ -502,7 +542,8 @@ From weighing these together, a few heuristics follow:
   - **top:** mistakes that would be silent and expensive — a novel
     design that is expensive to change later (data model, security
     boundary, interfaces), the one adversarial review of a settled
-    change (its delta reviews run on the standard tier), the analysis
+    change that "Every change gets an adversarial review" does not
+    size lower (its delta reviews run on the standard tier), the analysis
     behind a principle change, the consistency pass after a series of
     rule edits, a tie-break when two strong-tier attempts disagree or
     fail.
@@ -513,7 +554,8 @@ From weighing these together, a few heuristics follow:
   definition. A delegation overrides the model only to raise the
   tier, stating the reason in one line; or, where the pinned model
   isn't available to the project, to name the highest tier that is;
-  or, for a delta review, to lower it to the standard tier. A tier
+  or, for a delta review or a first review the review principle sizes
+  to the standard tier, to lower it to the standard tier. A tier
   above a human's per-project cap (below) counts as not available.
   An agent without a pin (a general-purpose or built-in agent) always
   gets an explicit model.
@@ -552,9 +594,9 @@ front, every time:
    in, what's deliberately out; repo paths and the deliverable files.
 3. **What applies**: always "Test first" and docs completeness, plus
    any other guardrail or hard standard (in
-   [AGENTS.md](../../AGENTS.md)) the task touches, the path-scoped
-   rule files of the area the task touches, by path, for the agent to
-   read, and how the environment provides credentials or other local
+   [AGENTS.md](../../AGENTS.md)) the task touches, the platform notes
+   and rule files of the area the task touches, by path, for the agent
+   to read, and how the environment provides credentials or other local
    facts — never a value.
 4. **Isolation**: where the agent's fresh clone of the repo is —
    never a human's working copy or a worktree of it (see "Work
@@ -627,6 +669,14 @@ their scratch area, long path workarounds, duplicate calls.
 **How:** test each new rule with "would an agent that has read only
 `AGENTS.md` and what its task opens do this?" A skill or a brief
 gives one-line commands.
+- Any agent, whatever its tool, reads `AGENTS.md` and what it points
+  to, so how-to for agents goes there: a principle, or a platform note
+  in [platform-notes/](platform-notes/) for one technology or one
+  part of the tree. A tool's own files (Claude Code's `.claude/` with
+  its skills, agent definitions and path-scoped rules) hold only what
+  is specific to that tool: the skills (architect, setup) with their
+  references, the agent definitions they delegate to, and a
+  path-scoped rule only for what concerns Claude Code alone.
 
 ## Finish a series of rule edits with one consistency pass
 

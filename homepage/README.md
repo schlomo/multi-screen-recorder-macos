@@ -23,9 +23,10 @@ to the tester guide, the problem report form and the repository.
   defined
 - **Header image:** the app icon artwork `../assets/icon/app-icon-fancy.jpeg`,
   mounted by `[module]` in `hugo.toml` (never copied here) and resized by
-  Hugo to a 256 px WebP in `layouts/baseof.html`. Changing that file
-  triggers no homepage build (it is outside the watch path); the next
-  homepage change picks it up.
+  Hugo to a 256 px WebP in `layouts/baseof.html`; the link preview image
+  below is drawn from it too. Changing that file triggers no homepage
+  build (it is outside the watch path); the next homepage change picks it
+  up.
 - **Screenshots:** the start and status windows, `assets/images/*.png` as
   taken with macOS's screenshot tool, placed in `layouts/home.html` and shown
   by `layouts/_partials/screenshot.html` as WebP at the window's size in
@@ -34,6 +35,10 @@ to the tester guide, the problem report form and the repository.
   `@2x`, which Cloudflare redirects). Any other has 1. To update one,
   replace the file, and rename it (in `home.html` too) if its pixels per
   point changed.
+- **Link preview image** (Open Graph, `og:image`): 1200 x 630, drawn by Hugo at
+  build time in `layouts/_partials/link-preview-image.html` from the icon
+  artwork, the site's name and the tagline, on the `artwork` colour; the
+  `<meta>` tags are in `layouts/_partials/head.html`.
 - **Favicons:** `static/favicon*` and `static/apple-touch-icon.png`, rendered
   from `assets/icon/app-icon.svg` by `scripts/render-app-icon`; never edit them
   by hand.
@@ -50,7 +55,9 @@ The footer links to the owner's legal notice and privacy policy at
 Install Hugo (`brew install hugo`), then run `hugo server` in this folder for a
 live-reloading preview on <http://localhost:1313>. `./build.sh` builds into
 `public/` (`./build.sh -p` for an indexable production build; all other builds
-are `noindex`).
+are `noindex`). How agents check the site (phone widths, the preview, served
+URLs) is in
+[docs/principles/platform-notes/static-sites.md](../docs/principles/platform-notes/static-sites.md).
 
 ## Deployment
 

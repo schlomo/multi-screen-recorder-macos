@@ -1577,6 +1577,66 @@ architect's reading.
   "Labels" and the start and status windows; the glossary's "Screen",
   "Label" and "Tagline"; the PR "Naming and window polish".
 
+## D56: Iterate locally and wait for the pipeline once; reviews sized to the change; agent how-to in `docs/principles/`; the owner tries changes early; tests that record are announced (2026-11-16)
+
+- **Status:** in force; three principle changes and two rulings.
+- **Context:** The owner's retro of the session of 2026-11-15 and
+  2026-11-16: "We wasted way way too much time waiting on CI. the
+  development needs to be much more local and iterating locally so
+  that we wait for CI at most once per PR. there is nothing on CI you
+  can't test locally and this is by design. we put the AI how to into
+  the section for that and not clutter the regular docs. MD reviews
+  need to be cost and complexity appropriate of course". On the
+  architect's first placement of that how-to in `.claude/rules/`: "we
+  have docs/principles for the AI docs, not claude rules. we actually
+  use agents.md specifically to not depend on claude", and "I meant
+  beyond the architect skill and its dependencies". Earlier, 2026-11-15:
+  "what about working locally and letting me test first to speed
+  up?"; 2026-11-16, during a test the architect had not announced: "I
+  hear some tone playing and saw that a recording was active?" On
+  feedback that adds content during a review: "yes by your
+  recommendation" (2026-11-16).
+- **Decision:**
+  - Principle change, new section "Iterate locally; wait for the
+    pipeline once" in `ai-working-process.md`: each round is gated by
+    the local run of what the pipeline runs; the pipeline is waited
+    for once per MR/PR, before it is marked ready.
+  - Principle change in "Every change gets an adversarial review": the
+    review is sized to the change's cost and complexity, the standard
+    tier usually enough for a Markdown-only or small, low-risk change;
+    a principle change, a guardrail, code that can lose or leak data
+    and the consistency pass stay on the top tier (the tier list is
+    the architect's reading of "cost and complexity appropriate").
+    Feedback during the review that fixes something joins the fix
+    round; feedback that adds something new gets its own adversarial
+    review (the architect's recommendation, which the owner accepted).
+  - Principle change in "Write a behavior where the acting agent
+    reads it" and "Always-loaded context is paid on every call":
+    how-to for agents goes into `docs/principles/` (a principle or a
+    platform note, rules for one area of the tree included); Claude
+    Code's files hold only the skills with their references, the agent
+    definitions and what concerns Claude Code alone. The setup skill
+    places an absorbed area convention accordingly.
+  - Ruling: a change that shows in the window or on the command line
+    goes to the owner to try as soon as its local run is green, while
+    the review runs alongside (the architect's reading of the owner's
+    question of 2026-11-15).
+  - Ruling, tightening D48: before an agent starts a recording or plays a sound on the owner's Mac, the session running or briefing that test tells the owner, once before the test's first run (the architect's reading of
+    the owner's question; the tone came from the test playing a sound
+    to record, not from `msr`).
+- **Consequences:** A difference between the local toolchain and the
+  pipeline's (backlog item 2) shows up only at the one wait, late in
+  the MR/PR. A wrong tier choice for a small change is caught only by
+  the delta review or the human. A tool other than Claude Code reads
+  every agent rule.
+- **Evidence:** [ai-working-process.md](principles/ai-working-process.md),
+  "Iterate locally; wait for the pipeline once", "Every change gets an
+  adversarial review", "Write a behavior where the acting agent reads
+  it", "Delegation"; [context-economy.md](principles/context-economy.md),
+  "Always-loaded context is paid on every call";
+  [static-sites.md](principles/platform-notes/static-sites.md);
+  `AGENTS.md`; PR #17.
+
 ## D57: Clock drift is corrected by resampling every audio source to the shared clock (2026-11-17)
 
 - **Status:** in force; the design is the architect's, built at the
