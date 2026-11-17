@@ -71,6 +71,9 @@ import Testing
                 let appliedAtGap = try #require(before.last).applied
                 let drift = try #require(gap).drift
                 #expect(appliedAtGap > 0.001)
+                // The tail starts where the audio before it ended; the audio after the gap with the drift.
+                #expect(before.last?.appliedAtStart == before.dropLast().last?.applied)
+                #expect(after.first?.appliedAtStart == appliedAtGap + drift)
                 // 500 ppm over 100 ms: 50 µs, more than two samples.
                 #expect(abs(drift - 500e-6 * 0.1) < 2e-6, "\(drift * 1e6) µs")
                 #expect(try #require(after.first).time == time + Int64(((appliedAtGap + drift) * 1e9).rounded()))
@@ -97,6 +100,39 @@ import Testing
         for (audio, next) in zip(before, before.dropFirst()) {
             #expect(abs(Double(next.time - audio.time) - Double(audio.channels[0].count) / sampleRate * 1e9) <= 1)
         }
+    }
+
+    /// No buffers for 9.5 s or 60 s, then a gap: until the next estimate
+    /// the rate is the device's drift, and in the 3 s after the gap what
+    /// the status shows still off is small, as it was before the gap.
+    @Test(arguments: [9.5, 60], 1...3)
+    func rightAfterAGapTheRateAndWhatIsOffHold(pause: Double, seed: Int) throws {
+        var device = SimulatedDevice.steady(ppm: -116)
+        device.paused = { (100..<(100 + pause)).contains($0) }
+        let bufferSeconds = Double(device.bufferSamples) / sampleRate
+        var correction = ClockDriftCorrection()
+        var gaps = 0
+        var offAfterGap: Double?
+        var ratesChecked = 0
+        for buffer in device.buffers(for: 100 + pause + 3, seed: UInt64(seed)) {
+            let appliedBefore = correction.applied
+            let (_, gap) = correction.correct([[Float](repeating: 0, count: device.bufferSamples)], at: buffer.time, arrival: buffer.arrival)
+            guard buffer.seconds >= 100 + pause else { continue }
+            let off = try #require(correction.status.remaining)
+            #expect(abs(off) < 0.0005, "\(off * 1000) ms off at \(buffer.seconds) s")
+            if gap != nil {
+                gaps += 1
+                offAfterGap = off
+            } else if off == offAfterGap {
+                let rate = (correction.applied - appliedBefore) / bufferSeconds
+                #expect(abs(rate - 116e-6) < 20e-6, "\(rate * 1e6) ppm at \(buffer.seconds) s")
+                ratesChecked += 1
+            } else {
+                offAfterGap = nil
+            }
+        }
+        #expect(gaps == 1)
+        #expect(ratesChecked > 0)
     }
 
     @Test func aChannelCountChangeStartsANewSegment() {

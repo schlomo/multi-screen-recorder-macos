@@ -100,7 +100,7 @@ public struct ClockDriftCorrection: Sendable {
             let ahead = time - (segment.start + Self.nanoseconds(in: segment.inputSamples, sampleRate: sampleRate))
             if ahead > gapTolerance {
                 audio += flush()
-                let drift = tracker.driftAcrossGap(of: ahead)
+                let drift = tracker.driftAcrossGap(of: ahead, arrival: arrival, applied: applied)
                 gap = Gap(length: ahead, applied: applied, drift: drift, latenessBefore: lateness ?? latenessNow, latenessAfter: latenessNow)
                 appliedBefore += drift
             } else if segment.resampler.channelCount != channels.count {

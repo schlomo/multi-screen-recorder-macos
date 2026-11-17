@@ -33,12 +33,15 @@ extension RecorderValues {
     /// An estimate needs at least this many points, spanning at least this long.
     public static let clockDriftEstimateMinimumPoints = 5
     public static let clockDriftEstimateMinimumSpan = Duration.seconds(10)
-    /// What is still off is caught up over this long, on top of the line's slope.
+    /// What is still off is caught up over this long, on top of the line's
+    /// slope; without a fresh estimate the rate holds for this long, then
+    /// is the kept slope.
     public static let clockDriftCatchUpTime = Duration.seconds(10)
     /// The largest correction rate and the steepest support line, in parts per million.
     public static let clockDriftMaximumRatePpm = 1000.0
-    /// The clock drift shown is the mean slope of this many estimates at
-    /// most, and is shown from this many on.
+    /// The kept slope is the median slope of this many estimates at most:
+    /// the clock drift shown (from this many estimates on), a gap's drift,
+    /// and the rate after the hold.
     public static let clockDriftShownEstimates = 60
     public static let clockDriftShownMinimumEstimates = 10
     /// How often an audio capture reports its clock drift to the status window.

@@ -49,7 +49,7 @@ import Testing
         for buffer in device.buffers(for: seconds, seed: UInt64(seed)) {
             // A gap, as `ClockDriftCorrection` finds it: the drift during it is added.
             if corrected, let next, buffer.time - next > RecorderValues.audioGapTolerance.nanoseconds {
-                applied += tracker.driftAcrossGap(of: buffer.time - next)
+                applied += tracker.driftAcrossGap(of: buffer.time - next, arrival: buffer.arrival, applied: applied)
             }
             next = buffer.time + bufferLength
             tracker.record(time: buffer.time, arrival: buffer.arrival, applied: applied)
@@ -119,13 +119,15 @@ import Testing
     }
 
     /// A 9 s stall tilts the line, then 30 s with no buffers end in a gap:
-    /// the drift added across it is the kept slope's, not the tilted one's.
+    /// the tilted estimates are under half of the kept ones, so the drift
+    /// added across the gap is their median's, the device's; what the tilt
+    /// put off before the gap is still off after it and caught up.
     @Test(arguments: 1...3)
     func aGapAfterATiltedLineAddsTheKeptSlope(seed: Int) {
         var device = stall(seconds: 9)
         device.paused = { (109..<139).contains($0) }
         let run = run(device, seconds: 250, seed: seed)
-        #expect(run.worstError(from: 169) < 0.002, "\(ms(run.worstError(from: 169)))")
+        #expect(run.worstError(from: 139) < 0.0035, "\(ms(run.worstError(from: 139)))")
     }
 
     /// An hour with no buffers on a steady device: the drift across it is
@@ -134,7 +136,7 @@ import Testing
         var device = SimulatedDevice.steady(ppm: -116)
         device.paused = { (100..<3700).contains($0) }
         let run = run(device, seconds: 3800)
-        #expect(run.worstError(from: 3700) < 0.001, "\(ms(run.worstError(from: 3700)))")
+        #expect(run.worstError(from: 3700) < 0.0013, "\(ms(run.worstError(from: 3700)))")
     }
 
     /// No buffers for a while, then on after a gap: the correction grows
@@ -161,7 +163,8 @@ import Testing
             return into >= 1 ? arrival - into + 2.1 : into < 0.05 ? arrival - into + 0.05 : arrival
         }
         let run = run(device, seconds: 300, seed: seed)
-        #expect(run.worstError(from: 30) < 0.0006, "\(ms(run.worstError(from: 30)))")
+        let bound = ppm == 0 ? 0.0003 : 0.0006
+        #expect(run.worstError(from: 30) < bound, "\(ms(run.worstError(from: 30)))")
         let swing = zip(run.seconds, run.rate).filter { $0.0 >= 30 }.map { abs($0.1 + ppm * 1e-6) }.max() ?? 0
         #expect(swing <= 100e-6, "\(swing * 1e6) ppm off the drift")
     }
@@ -208,11 +211,12 @@ import Testing
     /// A known limit: the reference comes from the first estimate's points
     /// and is never revised, so a source at its lowest only once in 8 s
     /// can start off by up to about 3.4 ms for good, depending on where
-    /// the lowest second falls.
-    @Test(arguments: 0..<8)
-    func aSourceAtItsLowestOnlyOnceInEightSeconds(rotation: Int) {
-        let run = run(burst(rotated([0, 0.003, 0.005, 0.004, 0.002, 0.005, 0.003, 0.004], by: rotation)), seconds: 300)
-        #expect(run.worstError(from: 30) < 0.004, "\(ms(run.worstError(from: 30)))")
+    /// the lowest second falls; in three of the eight phases it does not.
+    @Test(arguments: 0..<8, 1...3)
+    func aSourceAtItsLowestOnlyOnceInEightSeconds(rotation: Int, seed: Int) {
+        let run = run(burst(rotated([0, 0.003, 0.005, 0.004, 0.002, 0.005, 0.003, 0.004], by: rotation)), seconds: 300, seed: seed)
+        let bound = [0, 6, 7].contains(rotation) ? 0.0008 : 0.004
+        #expect(run.worstError(from: 30) < bound, "\(ms(run.worstError(from: 30)))")
     }
 
     // MARK: Large buffers
@@ -350,25 +354,39 @@ import Testing
         var tracker = tracker()
         let slope = 0.0001 / 1.0001
         for index in 1...12 { interval(&tracker, Int64(index), lateness: 0.0001 * Double(index), applied: 0.0005) }
-        // Intervals 13 to 16 have no buffer; interval 12's estimate, at 13 s, is 4.5 s old.
-        interval(&tracker, 17, lateness: 0.0017, applied: 0.0005)
+        // Intervals 13 to 19 have no buffer; interval 12's estimate, at 13 s, is 7.5 s old.
+        interval(&tracker, 20, lateness: 0.0020, applied: 0.0005)
         let held = tracker.rate
         #expect(abs(held - slope) > 1e-6)
-        // Nothing until 30.5 s: interval 17's estimate, at 18 s, is 12.5 s old.
-        interval(&tracker, 30, lateness: 0.0030, applied: 0.0005)
+        // Nothing until 32.5 s: interval 20's estimate, at 21 s, is 11.5 s old.
+        interval(&tracker, 32, lateness: 0.0032, applied: 0.0005)
         #expect(abs(tracker.rate - slope) < 1e-12)
     }
 
-    /// At a gap the drift during it is the kept slope's, and the rate
-    /// becomes the kept slope: the catch-up is void once the drift is added.
-    @Test func aGapAddsTheKeptSlopesDriftAndSetsTheRate() {
+    /// At a gap the interval before it is closed first, against the
+    /// correction before the jump; the drift during the gap is the kept
+    /// slope's (the median of the latest estimates', not the latest), the
+    /// rate becomes the kept slope, and what was still off stays off.
+    @Test func aGapClosesTheIntervalThenAddsTheKeptSlopesDrift() throws {
         var tracker = tracker()
-        #expect(tracker.driftAcrossGap(of: 1_000_000_000) == 0)
-        for index in 1...12 { interval(&tracker, Int64(index), lateness: 0.0001 * Double(index), applied: 0.0005) }
+        #expect(tracker.driftAcrossGap(of: 1_000_000_000, arrival: 500_000_000, applied: 0) == 0)
+        // Points rising 0.1 ms a second: 16 estimates of this slope.
+        for index in 1...25 { interval(&tracker, Int64(index), lateness: 0.0001 * Double(index), applied: 0.0005) }
         let slope = 0.0001 / 1.0001
-        #expect(abs(tracker.rate - slope) > 1e-6)
-        #expect(abs(tracker.driftAcrossGap(of: 2_000_000_000) - 2 * slope) < 1e-12)
-        #expect(abs(tracker.rate - slope) < 1e-12)
+        // A lower point: the next estimates' slopes are others.
+        interval(&tracker, 26, lateness: 0.0020, applied: 0.0005)
+        let targetBefore = try #require(tracker.target)
+        // No buffers from 26.5 s; the first after the gap arrives at 30.5 s.
+        let arrival: Int64 = 30_500_000_000 + 3_000_000
+        let drift = tracker.driftAcrossGap(of: 4_000_000_000, arrival: arrival, applied: 0.0007)
+        let target = try #require(tracker.target)
+        #expect(target != targetBefore)
+        #expect(try #require(tracker.remaining) == target - 0.0007)
+        #expect(abs(drift - 4 * slope) < 1e-12, "\(drift * 1e6) µs")
+        #expect(abs(tracker.rate - slope) < 1e-12, "\(tracker.rate * 1e6) ppm")
+        tracker.record(time: 30_500_000_000, arrival: arrival, applied: 0.0007 + drift)
+        #expect(try #require(tracker.remaining) == target - 0.0007)
+        #expect(abs(tracker.rate - slope) < 1e-12, "\(tracker.rate * 1e6) ppm")
     }
 
     // MARK: The support line

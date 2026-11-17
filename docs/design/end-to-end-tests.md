@@ -218,33 +218,49 @@ apart, a test cannot either:
   the device's clock had jumped: up once the points before the change
   leave the 20 s horizon, down at once, at up to 1000 ppm, so that
   source's sound moves by the change; a step down overshoots (1.1 ms on
-  2 ms, 2.1 ms on 4 ms), and for about a minute after a step or a tilt
-  the clock drift shown, and a file's `clockDriftPpm` if it ends then,
-  is off by up to about 190 ppm.
+  2 ms, 2.1 ms on 4 ms). The clock drift shown, the median of the
+  latest estimates' slopes, stays within 1 ppm through a step.
 - **Late points that outweigh the others tilt the line.** Whenever the
   late points outweigh the others in the horizon, the support line
   tilts until they leave it, and empty intervals make that easier:
-  nothing for 4 s then all at once 0.11 ms off; nothing for 8 s with
-  the backlog drained over 6 s 6.8 ms; a stall of 6 s 0.85 ms, of 7 s
-  4.6 ms, of 9 s with the buffers queued behind it 6.4 to 8.3 ms, of
-  30 s 25 to 30 ms; a source at its lowest only once in 12 s with the
-  rest 6 ms higher swings by ±3.2 ms all the time.
+  nothing for 8 s with the backlog drained over 6 s 6.8 ms off; a stall
+  of 6 s or more can tilt it (6 s 0.85 ms at -116 ppm, 5.2 ms at
+  +48.6 ppm), of 7 s up to 6.2 ms, of 9 s with the buffers queued
+  behind it up to 8.3 ms, of 30 s up to 30 ms; a source at its lowest
+  only once in 12 s with the rest 6 ms higher swings by up to 3.2 ms
+  all the time. The clock drift shown stays within 3 ppm through a
+  stall of up to 30 s; after a longer one it is the tilted slope until
+  the tilted estimates are under half again (a stall of 40 s: off by up
+  to 884 ppm for about 90 s), and a file's `clockDriftPpm` if it ends
+  then.
+- **A gap after a long tilt adds the tilted slope.** The drift added
+  across a gap is the kept slope, the median of the latest estimates'
+  slopes, times the gap's length, so it carries the kept slope's error
+  times the length: small while the tilted slopes are under half of
+  the kept ones (a 600 s gap at once after a stall of 9 s moves the
+  correction by up to 0.26 ms, of 20 s 0.84 ms, of 30 s 2.5 ms; a
+  3600 s gap after 9 s 1.6 ms), the tilted slope after a tilt that
+  lasted longer than the median covers (a stall of 40 s, then a 600 s
+  gap within 30 s: 530 ms).
 - **The reference is never revised.** It comes from the first
   estimate's about 10 s of points: a source at its lowest only once in
   8 s can start up to 3.4 ms off for good, depending on where its
-  lowest second falls; the system audio's measured 4 s pattern is
-  within 0.32 ms in all four phases.
+  lowest second falls (within 0.57 ms in three of its eight phases);
+  the system audio's measured 4 s pattern is within 0.32 ms in all
+  four phases.
 - **One early buffer pulls the line down, amplified.** A buffer early
   by a glitch of its timestamp or arrival puts the line under it for
-  the horizon: 20 ms early up to about 12 ms off, 6 ms early 8.9 ms,
-  3 ms early 4.4 ms, and up to 42 s until back within 0.5 ms.
+  the horizon: 20 ms early up to 12.3 ms off, 6 ms early 8.9 ms, 3 ms
+  early 4.4 ms, and up to 42 s until back within 0.5 ms.
 - **A gap assumes the timestamps keep following the sample count.**
   After a gap the new segment starts at its own timestamp plus the
   correction applied so far plus the device's drift during the gap (the
-  kept slope, the mean of the latest estimates', over its length); a
-  source whose timestamps jump to the host clock across a gap would be
-  off by its drift until then. The `--debug` line for each gap shows
-  the drift added and the lateness before and after it, which tells.
+  kept slope over its length); a source whose timestamps jump to the
+  host clock across a gap would be off by its drift until then. The
+  `--debug` line for each gap shows the drift added and the lateness
+  before and after it, which tells.
+
+All figures are the worst of 20 seeds of the tests' simulation.
 
 ### What the recorder design must provide
 
