@@ -19,16 +19,17 @@ public enum AudioTransport: Equatable, Sendable, CaseIterable {
     /// A transport type that could not be read.
     case unreadable
 
-    /// Why an input of this transport may be left out, as the table of what will be recorded says it
-    /// after its name; nil for a transport that is no reason.
-    public var reasonNotRecorded: String? {
+    /// Why an input of this transport is not wired, as the table of what will be recorded says it after its
+    /// name; nil for a wired transport.
+    public var notWiredReason: String? {
         switch self {
         case .bluetooth, .bluetoothLE: "Bluetooth"
         case .virtual: "virtual"
         case .aggregate: "aggregate"
         case .airPlay: "AirPlay"
         case .continuityCapture: "Continuity Capture"
-        case .builtIn, .usb, .fireWire, .pci, .thunderbolt, .hdmi, .displayPort, .unknown, .unreadable: nil
+        case .unknown, .unreadable: "unknown connection"
+        case .builtIn, .usb, .fireWire, .pci, .thunderbolt, .hdmi, .displayPort: nil
         }
     }
 

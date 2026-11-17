@@ -115,6 +115,16 @@ public struct Settings: Equatable, Sendable, Encodable {
         }
     }
 
+    /// Why the audio input is not recorded, as the table of what will be recorded says it after its
+    /// name: nil when it is recorded, and under the audio modes None and Default microphone, whose
+    /// settings line gives the reason. Under Wired it is the input's connection; with any mode that
+    /// includes it, it is a missing Core Audio ID.
+    public func reasonNotRecorded(_ input: AudioInputInfo) -> String? {
+        guard !AudioTracker.records(input, settings: self) else { return nil }
+        if audioModeIncludes(input) { return "no device ID" }
+        return effectiveAudioMode == .wired ? input.transport.notWiredReason : nil
+    }
+
     public func outputFolderURL(homeFolder: URL) -> URL {
         if outputFolder == "~" { return homeFolder }
         if outputFolder.hasPrefix("~/") {

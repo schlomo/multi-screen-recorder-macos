@@ -35,7 +35,7 @@ public struct WhatWillBeRecorded: Equatable, Sendable {
         public var cells: [String] { [source?.text ?? "Total"] + values }
     }
 
-    /// An audio input, or the system audio as the last row.
+    /// An audio input, or the system audio.
     public struct Audio: Equatable, Sendable {
         /// Recorded inputs (`AudioTracker.records`) are numbered from 1 in
         /// the order listed, as the recording numbers them at its start.
@@ -46,6 +46,8 @@ public struct WhatWillBeRecorded: Equatable, Sendable {
         /// A source not recorded is shown dimmed.
         public var isRecorded: Bool
         public var gigabytesPerHour: String
+        /// Why the channels cannot be read; `text` shows it after "cannot be read".
+        public var readError: String? = nil
     }
 
     /// The total GB/h max, and what the required recording hours need.
@@ -106,10 +108,11 @@ public struct WhatWillBeRecorded: Equatable, Sendable {
         case .failure(let error):
             screensError = "The screens cannot be read: \(error)"
         }
-        audio = [Audio(
+        let systemAudio = Audio(
             source: .systemAudio(isRecorded: settings.systemAudio), channels: "stereo", isRecorded: settings.systemAudio,
             gigabytesPerHour: settings.systemAudio
-                ? DiskEstimate.gigabytesPerHour(DiskEstimate.systemAudioFileBytesPerHour) : Self.notRecorded)]
+                ? DiskEstimate.gigabytesPerHour(DiskEstimate.systemAudioFileBytesPerHour) : Self.notRecorded)
+        audio = []
         switch readAudioInputs {
         case .success(let audioInputs):
             var number = 0
@@ -118,16 +121,20 @@ public struct WhatWillBeRecorded: Equatable, Sendable {
                 if isRecorded { number += 1 }
                 return Self.audio(input, number: isRecorded ? number : nil, settings: settings)
             }
-            // The numbered rows read 0, 1, 2 … without a gap; the inputs left out follow, in device order.
-            audio += inputs.filter(\.isRecorded) + inputs.filter { !$0.isRecorded }
+            audio = inputs
         case .failure(let error):
             audioError = "The audio inputs cannot be read: \(error)"
         }
+        // The numbered rows read 0, 1, 2 … without a gap; the inputs not recorded follow, in device order,
+        // and the system audio, when it is off, goes last with the sources not recorded.
+        let inputs = audio
+        audio = (settings.systemAudio ? [systemAudio] : []) + inputs.filter(\.isRecorded) + inputs.filter { !$0.isRecorded }
+            + (settings.systemAudio ? [] : [systemAudio])
     }
 
     /// "Settings: Auto (resolution Native, audio mode Wired), system audio on"; with auto mode off
     /// "Settings: resolution 1080p, audio mode Default microphone (only the default microphone is recorded), system audio off".
-    /// Under the audio modes None and Default microphone it says why the inputs are left out.
+    /// Under the audio modes None and Default microphone it says why the inputs are not recorded.
     static func settingsLine(_ settings: Settings) -> String {
         let mode = settings.effectiveAudioMode
         let reason = switch mode {
@@ -148,10 +155,10 @@ public struct WhatWillBeRecorded: Equatable, Sendable {
     }
 
     /// An input whose channels cannot be read says so; its GB/h max is "?" if it is recorded.
-    /// One not recorded says after its name why, if its transport is the reason: "BlackHole 2ch (virtual)".
+    /// One not recorded says after its name why, if there is a reason (`Settings.reasonNotRecorded`): "BlackHole 2ch (virtual)".
     private static func audio(_ input: AudioInputInfo, number: Int?, settings: Settings) -> Audio {
         let isRecorded = number != nil
-        let reason = isRecorded ? nil : input.transport.reasonNotRecorded
+        let reason = settings.reasonNotRecorded(input)
         let source = SourceCell.audioInput(number, name: input.shownName + (reason.map { " (\($0))" } ?? ""))
         return switch input.channelCount {
         case .success(let count):
@@ -159,9 +166,9 @@ public struct WhatWillBeRecorded: Equatable, Sendable {
                   gigabytesPerHour: isRecorded
                       ? DiskEstimate.gigabytesPerHour(DiskEstimate.audioInputFileBytesPerHour(channelCount: count))
                       : notRecorded)
-        case .failure:
+        case .failure(let error):
             Audio(source: source, channels: cannotBeRead, isRecorded: isRecorded,
-                  gigabytesPerHour: isRecorded ? unknown : notRecorded)
+                  gigabytesPerHour: isRecorded ? unknown : notRecorded, readError: "\(error)")
         }
     }
 
@@ -207,7 +214,7 @@ public struct WhatWillBeRecorded: Equatable, Sendable {
     /// The text `msr check`, `msr record` and `msr list` print: the settings line, then the window's
     /// one table with its total row and the line of what the hours need, its columns aligned and the
     /// GB/h max column on the right. An error that stands for rows is a line above the table. An audio
-    /// input not recorded has the `Audio <n> - ` part of its name blank.
+    /// source not recorded has the `Audio <n> - ` part of its name blank.
     public var text: String {
         var lines = ["What will be recorded", "  \(settingsLine)"]
         if let screensError { lines.append("  \(screensError)") }
@@ -215,10 +222,15 @@ public struct WhatWillBeRecorded: Equatable, Sendable {
         let highestNumber = audioRows.compactMap { $0.source?.number }.max() ?? 1
         let blank = String(repeating: " ", count: SourceLabel.audioInput(max(highestNumber, 1), name: "").count)
         func cells(_ row: Row) -> [String] {
-            guard let source = row.source, source.kind == .audioInput, source.number == nil else { return row.cells }
+            guard let source = row.source, source.kind != .screen, source.number == nil else { return row.cells }
             return [blank + source.name] + row.values
         }
-        let rows = (screenRows + audioRows + [totalRow].compactMap(\.self)).map(cells)
+        let audioCells = zip(audio, audioRows).map { audio, row in
+            var shown = cells(row)
+            if let readError = audio.readError { shown[3] = "\(Self.cannotBeRead) (\(readError))" }
+            return shown
+        }
+        let rows = screenRows.map(cells) + audioCells + [totalRow].compactMap(\.self).map(cells)
         let widths = Self.columns.indices.map { column in ([Self.columns] + rows).map { $0[column].count }.max() ?? 0 }
         func line(_ cells: [String]) -> String {
             let last = cells.count - 1
@@ -233,7 +245,7 @@ public struct WhatWillBeRecorded: Equatable, Sendable {
         lines += [line(Self.columns), rule]
         lines += screenRows.map { line(cells($0)) }
         if !screenRows.isEmpty { lines.append(rule) }
-        lines += audioRows.map { line(cells($0)) }
+        lines += audioCells.map(line)
         if let total, let totalRow {
             lines += [rule, line(totalRow.cells), "  \(total.need)"]
         }

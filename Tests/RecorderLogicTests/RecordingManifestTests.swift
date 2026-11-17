@@ -497,28 +497,36 @@ import Testing
             + "CPU 12 % on average, 32 % at the peak, of one core (this process only)\n")
     }
 
-    /// The screens by number, then the audio sources by number, the system audio (0) first; a source's files by start.
+    /// The screens by number, then the audio sources by number, the system audio (0) first; a source's files by start,
+    /// also when a later file was appended before an earlier one.
     @Test func theFilesAreListedByScreenNumberThenAudioNumberThenStart() {
+        let utc = TimeZone(identifier: "UTC")!
+        let started = Date(timeIntervalSince1970: 1_800_000_000)
+        func screen(_ number: Int, _ name: String, at seconds: Double) -> RecordingManifest.ScreenFile {
+            RecordingManifest.ScreenFile(
+                name: RecordingNames.screenFile(start: started + seconds, timeZone: utc, number: number, screen: name),
+                screen: name, screenUUID: "U\(number)", frameSize: FrameSize(width: 2, height: 2), start: seconds, timecode: "t")
+        }
+        func audio(_ source: AudioFileDescription.Source, at seconds: Double) -> RecordingManifest.AudioFile {
+            RecordingManifest.AudioFile(
+                name: RecordingNames.audioFile(start: started + seconds, timeZone: utc, source: source),
+                audioSource: "M", audioSourceUID: "u", channels: .mono(1), start: seconds, timecode: "t")
+        }
+        func input(_ number: Int, _ name: String) -> AudioFileDescription.Source {
+            .audioInput(number: number, name: name, coreAudioUID: "u\(number)", channelCount: 1)
+        }
         var recorded = manifest([])
-        func screen(_ name: String, start: Double) {
-            recorded.files.append(RecordingManifest.ScreenFile(
-                name: name, screen: "D", screenUUID: "U", frameSize: FrameSize(width: 2, height: 2), start: start, timecode: "t"))
-        }
-        func audio(_ name: String, start: Double) {
-            recorded.audioFiles.append(RecordingManifest.AudioFile(
-                name: name, audioSource: "M", audioSourceUID: "u", channels: .mono(1), start: start, timecode: "t"))
-        }
-        screen("2026-11-17 07.36.00 Screen 2 - B.mov", start: 0)
-        screen("2026-11-17 07.36.00 Screen 1 - A.mov", start: 0)
-        screen("2026-11-17 07.50.00 Screen 1 - A.mov", start: 840)
-        audio("2026-11-17 07.36.00 Audio 4 - D.mov", start: 0)
-        audio("2026-11-17 07.36.00 Audio 0 - System.mov", start: 0)
-        audio("2026-11-17 07.36.00 Audio 10 - K.mov", start: 0)
-        audio("2026-11-17 07.36.00 Audio 1 - C.mov", start: 0)
+        recorded.files = [screen(2, "B", at: 0), screen(1, "A", at: 840), screen(1, "A", at: 0)]
+        recorded.audioFiles = [audio(input(4, "D"), at: 0), audio(.systemAudio, at: 0), audio(input(10, "K"), at: 0),
+                               audio(input(1, "C"), at: 900), audio(input(1, "C"), at: 0)]
         let lines = RecordingSummary(manifest: recorded, recordingFolder: "/r", seconds: 5, manifestWritten: true)
-            .text.split(separator: "\n").dropFirst().map { $0.dropFirst(2).dropFirst(20).dropLast(11) }
-        #expect(lines == ["Screen 1 - A.mov", "Screen 1 - A.mov", "Screen 2 - B.mov", "Audio 0 - System.mov",
-                          "Audio 1 - C.mov", "Audio 4 - D.mov", "Audio 10 - K.mov"])
+            .text.split(separator: "\n").dropFirst().map { $0.dropFirst(2).dropLast(11) }
+        let names = lines.map { String($0) }
+        #expect(names == [recorded.files[2].name, recorded.files[1].name, recorded.files[0].name,
+                          recorded.audioFiles[1].name, recorded.audioFiles[4].name, recorded.audioFiles[3].name,
+                          recorded.audioFiles[0].name, recorded.audioFiles[2].name])
+        #expect(names.map { $0.dropFirst(20).prefix { $0 != "." } } == [
+            "Screen 1 - A", "Screen 1 - A", "Screen 2 - B", "Audio 0 - System", "Audio 1 - C", "Audio 1 - C", "Audio 4 - D", "Audio 10 - K"])
     }
 
     @Test func aWriterThatFailedIsAnError() {

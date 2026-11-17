@@ -92,8 +92,8 @@ import Testing
     }
 
     @Test func aSourceNotRecordedIsARowWithNotRecordedAndIsDimmed() {
-        let rows = section(audioInputs: DesignExample.audioInputs + [AudioInputInfo(
-            name: "AirPods", channelCount: 1, isDefault: false, transport: .bluetooth)]).audioRows
+        let rows = section({ $0.audioMode = .wired }, audioInputs: DesignExample.audioInputs + [AudioInputInfo(
+            name: "AirPods", channelCount: 1, isDefault: false, transport: .bluetooth, uid: "A")]).audioRows
         #expect(rows.last { $0.cells[0] == "AirPods (Bluetooth)" }
             == .init(source: .audioInput(nil, name: "AirPods (Bluetooth)"), values: ["", "", "1 channel", "-"], isRecorded: false))
     }
@@ -131,7 +131,7 @@ import Testing
     @Test func anInputWithoutAUIDIsNotRecordedAndGetsNoNumber() {
         let noUID = AudioInputInfo(name: "Mystery", channelCount: 1, isDefault: false, transport: .usb)
         let withNoUID = section({ $0.audioMode = .wired }, audioInputs: [noUID] + DesignExample.audioInputs)
-        #expect(withNoUID.audio[3] == .init(source: .audioInput(nil, name: "Mystery"), channels: "1 channel",
+        #expect(withNoUID.audio[3] == .init(source: .audioInput(nil, name: "Mystery (no device ID)"), channels: "1 channel",
                                             isRecorded: false, gigabytesPerHour: "-"))
         #expect(withNoUID.audio.map(\.source.number) == [0, 1, 2, nil])
         #expect(withNoUID.total == section { $0.audioMode = .wired }.total)
@@ -227,10 +227,56 @@ import Testing
         #expect(try repositoryFile("docs/design/recorder.md").contains("```\n\(defaultSection.text)```\n"))
     }
 
-    // The settings line, and why an input is left out.
+    // The settings line, and why an input is not recorded.
 
-    /// The numbered rows read 0, 1, 2 … without a gap; inputs left out follow, in device order.
-    @Test func inputsLeftOutComeAfterTheNumberedRows() {
+    // Why an input is not recorded, after its name in parentheses: the reason comes from the rule that does not record it.
+
+    private func reason(_ transport: AudioTransport, isDefault: Bool = false, uid: String? = "U", mode: AudioMode) -> String? {
+        var settings = Settings.manual
+        settings.audioMode = mode
+        return settings.reasonNotRecorded(AudioInputInfo(name: "X", channelCount: 1, isDefault: isDefault, transport: transport, uid: uid))
+    }
+
+    @Test(arguments: [(AudioTransport.virtual, "virtual"), (.bluetooth, "Bluetooth"), (.bluetoothLE, "Bluetooth"),
+                      (.aggregate, "aggregate"), (.airPlay, "AirPlay"), (.continuityCapture, "Continuity Capture"),
+                      (.unknown, "unknown connection"), (.unreadable, "unknown connection")])
+    func underWiredAnInputThatIsNotWiredSaysItsConnection(transport: AudioTransport, expected: String) {
+        #expect(reason(transport, mode: .wired) == expected)
+        #expect(reason(transport, isDefault: true, mode: .wired) == nil)
+        #expect(reason(transport, mode: .allInputs) == nil)
+    }
+
+    @Test(arguments: AudioTransport.allCases.filter(\.isWired))
+    func underWiredAWiredInputIsRecordedAndNeedsNoReason(transport: AudioTransport) {
+        #expect(reason(transport, mode: .wired) == nil)
+    }
+
+    @Test(arguments: AudioMode.allCases)
+    func anInputWithoutADeviceIDSaysSoWhereTheModeWantsIt(mode: AudioMode) {
+        let wanted = reason(.usb, isDefault: true, uid: nil, mode: mode)
+        #expect(wanted == (mode == .none ? nil : "no device ID"))
+        #expect(reason(.usb, uid: nil, mode: .allInputs) == "no device ID")
+        #expect(reason(.usb, uid: nil, mode: .wired) == "no device ID")
+        #expect(reason(.virtual, uid: nil, mode: .wired) == "virtual")
+    }
+
+    @Test(arguments: AudioTransport.allCases)
+    func underNoneAndDefaultMicrophoneTheSettingsLineGivesTheReasonNotTheName(transport: AudioTransport) {
+        #expect(reason(transport, mode: .none) == nil)
+        #expect(reason(transport, mode: .defaultMicrophone) == nil)
+    }
+
+    @Test func theReasonFollowsTheNameInTheTable() {
+        let rows = section({ $0.audioMode = .wired }, audioInputs: [Self.virtualInput, Self.airPods,
+            AudioInputInfo(name: "Mystery", channelCount: 1, isDefault: false, transport: .usb)]).audioRows
+        #expect(rows.compactMap { $0.source?.name }.suffix(3) == ["Loopback (virtual)", "AirPods (Bluetooth)", "Mystery (no device ID)"])
+        let withoutAudio = section({ $0.audioMode = .none }, audioInputs: [Self.virtualInput]).audioRows
+        let names = withoutAudio.compactMap { $0.source?.name }
+        #expect(names.contains("Loopback"))
+    }
+
+    /// The numbered rows read 0, 1, 2 … without a gap; inputs not recorded follow, in device order.
+    @Test func inputsNotRecordedComeAfterTheNumberedRows() {
         let other = AudioInputInfo(name: "Zed", channelCount: 1, isDefault: false, transport: .virtual, uid: "Z")
         let shown = WhatWillBeRecorded(
             settings: .defaults, screens: .success(DesignExample.screens),
@@ -254,7 +300,7 @@ import Testing
             == "Settings: resolution 1080p, audio mode Default microphone (only the default microphone is recorded), system audio on")
     }
 
-    @Test func anInputLeftOutKeepsItsNamesColumnAndSaysWhy() {
+    @Test func anInputNotRecordedKeepsItsNamesColumnAndSaysWhy() {
         var settings = Settings.defaults
         let blackHole = AudioInputInfo(name: "BlackHole 2ch", channelCount: 2, isDefault: false, transport: .virtual, uid: "BH")
         let section = WhatWillBeRecorded(
@@ -266,7 +312,7 @@ import Testing
         #expect(section.audio.first { $0.name == "BlackHole 2ch (virtual)" }?.gigabytesPerHour == "-")
         settings.systemAudio = false
         #expect(WhatWillBeRecorded(settings: settings, screens: .success([]), audioInputs: .success([]), outputFolder: nil)
-            .text.contains("System audio  "))
+            .text.contains("\n            System audio"))
     }
 
     @Test func theTextShowsErrorsInPlaceOfTheirTables() {
@@ -285,9 +331,19 @@ import Testing
     }
 
     @Test func systemAudioOffIsNotRecorded() {
-        #expect(section { $0.systemAudio = false }.audio.first
+        #expect(section { $0.systemAudio = false }.audio.last
             == .init(source: .systemAudio(isRecorded: false), channels: "stereo", isRecorded: false, gigabytesPerHour: "-"))
-        #expect(section { $0.systemAudio = false }.audioRows.first?.cells[0] == "System audio")
+        #expect(section { $0.systemAudio = false }.audioRows.last?.cells[0] == "System audio")
+    }
+
+    /// With the system audio off its row goes with the others not recorded, at the end, aligned like them.
+    @Test func theSystemAudioOffIsAfterTheRecordedRowsAndAlignedLikeTheOthersNotRecorded() {
+        let off = section({ $0.audioMode = .wired; $0.systemAudio = false }, audioInputs: DesignExample.audioInputs + [Self.virtualInput])
+        #expect(off.audioRows.map { $0.source?.number } == [1, 2, nil, nil])
+        #expect(off.audioRows.compactMap { $0.source?.text }.suffix(2) == ["Loopback (virtual)", "System audio"])
+        #expect(off.text.contains("\n            Loopback (virtual)"))
+        #expect(off.text.contains("\n            System audio"))
+        #expect(!off.text.contains("System audio ("))
     }
 
     @Test(arguments: [nil, OutputFolderProbe.unusable("gone"), .usable(.unreadable("no such volume"))])
@@ -323,7 +379,8 @@ import Testing
     @Test func anUnreadableInputThatIsNotRecordedIsARowAndKeepsTheTotal() {
         let withUnreadable = section(audioInputs: DesignExample.audioInputs + [Self.unreadable(isDefault: false)])
         #expect(withUnreadable.audio[3]
-            == .init(source: .audioInput(nil, name: "X"), channels: "cannot be read", isRecorded: false, gigabytesPerHour: "-"))
+            == .init(source: .audioInput(nil, name: "X"), channels: "cannot be read", isRecorded: false, gigabytesPerHour: "-",
+                   readError: "no format"))
         #expect(withUnreadable.screens == section().screens)
         #expect(withUnreadable.total == section().total)
     }
@@ -331,7 +388,8 @@ import Testing
     @Test func anUnreadableRecordedInputLeavesTheTotalOut() {
         let broken = section(audioInputs: [Self.unreadable(isDefault: true)])
         #expect(broken.audio[1]
-            == .init(source: .audioInput(1, name: "X (default)"), channels: "cannot be read", isRecorded: true, gigabytesPerHour: "?"))
+            == .init(source: .audioInput(1, name: "X (default)"), channels: "cannot be read", isRecorded: true, gigabytesPerHour: "?",
+                   readError: "no format"))
         #expect(broken.screens == section().screens)
         #expect(broken.total == nil)
     }

@@ -72,8 +72,10 @@ import Testing
 
     @Test func anInputWhoseChannelsCannotBeReadIsListedWithTheReason() {
         let unreadable = AudioInputInfo(name: "X", channelCount: .failure(DeviceReadError("no format")), isDefault: false)
-        #expect(rendered(screens: [], audioInputs: [unreadable]).contains("  X  "))
-        #expect(rendered(screens: [], audioInputs: [unreadable]).contains("cannot be read"))
+        let row = rendered(screens: [], audioInputs: [unreadable]).split(separator: "\n").first { $0.contains("X ") }
+        let blank = { (count: Int) in String(repeating: " ", count: count) }
+        #expect(row == Substring("  " + blank(10) + "X (no device ID)" + "  " + blank(10) + "  " + blank(8) + "  "
+            + "cannot be read (no format)" + "  " + blank(7) + "-"))
     }
 
     @Test func onlyARecordedInputThatCannotBeReadCounts() {

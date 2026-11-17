@@ -89,22 +89,32 @@ System audio: available
 The settings line says the effective settings, flags applied: `Auto
 (resolution Native, audio mode Wired)` in auto mode, otherwise
 `resolution 1080p, audio mode …`; under the audio modes None and Default
-microphone it adds why the inputs are left out (`audio mode None (no
-audio input is recorded)`). An audio input the audio mode leaves out
-keeps the column of the other names with the `Audio <n> - ` part blank,
-is followed by its reason in parentheses where its transport is one
-(`BlackHole 2ch (virtual)`, `AirPods (Bluetooth)`), and shows `-` in GB/h
-max. The screens are listed by number, then the audio sources by number,
-the system audio (0) first, then the inputs the audio mode leaves out in
-device order, so the numbers read 0, 1, 2 … without a gap.
+microphone it adds why the inputs are not recorded (`audio mode None (no
+audio input is recorded)`). The screens are listed by number, then the
+audio sources by number, the system audio (0) first, then the audio
+inputs not recorded in device order (the system audio too, last, when it
+is off), so the numbers read 0, 1, 2 … without a gap. A source not
+recorded keeps the column of the other names with the `Audio <n> - ` part
+blank, shows `-` in GB/h max, and an audio input not recorded says why in
+parentheses after its name, from the rule that leaves it out: under
+Wired, the connection of an input that is not the default one and not
+wired: `(virtual)`, `(Bluetooth)` (also Bluetooth LE), `(aggregate)`,
+`(AirPlay)`, `(Continuity Capture)`, `(unknown connection)` for an
+unknown transport or one that cannot be read; with any audio mode that
+includes the input, `(no device ID)` when it has no Core Audio ID, as
+the recording opens an input by it; under None and Default microphone
+nothing, as the settings line gives the reason. An input whose channels
+cannot be read shows `cannot be read (<reason>)` in Records at.
 
-A screen is described by what macOS calls "looks like" (its size in
-points) and the size it is drawn at (its pixel size): `3840×2160` where
-both are equal, `looks like 1728×1117, drawn at 3456×2234` where they
-differ (a HiDPI mode). "records at" is the frame size, from the looks-like
-size; the drawn-at size is never recorded (D44). It is the one of the
+In the table the "Looks like" column is what macOS calls "looks like" (a
+screen's size in points) and "Drawn at" the size it is drawn at (its
+pixel size), equal for most screens and different in a HiDPI mode (a
+screen with a looks-like size of 1728×1117 draws 3456×2234 pixels);
+"Records at" is the frame size, from the looks-like size, the one of the
 recording resolution the settings choose: Native with auto mode, the
-default.
+default. The drawn-at size is never recorded (D44). `--debug` shows a
+screen as `looks like 1728×1117, drawn at 3456×2234`, or by its size
+alone where both are equal.
 
 `msr check` first prints a banner, the name with the version as
 `msr version` shows it and the build date, such as `Multi Screen
@@ -573,15 +583,20 @@ checked, reported or rewritten at the next start (D47).
     each audio input (the default one marked "(default)") in Source,
     Looks like and Drawn at empty, its number of channels in Records
     at ("1 channel", "2 channels", "cannot be read"), and GB/h max (the
-    audio file); the first row is the system audio with "stereo", "System
-  audio" without a number when it is off. A source not recorded
-    is dimmed, its name keeps the column of the others with the `Audio
-    <n> - ` part blank and is followed by its reason where its transport
-    is one (`(virtual)`, `(Bluetooth)`), and its GB/h max is `-` (D46): every input with the audio
-    mode `none`; every input but the default one with
-    `default-microphone`; with `wired` every input but the default one
-    that is not built-in or wired; and the system audio row when it is
-    off.
+    audio file); the first row is the system audio with "stereo", then
+    the inputs by number, then the audio sources not recorded in device
+    order (D46): every input with the audio mode `none`; every input
+    but the default one with `default-microphone`; with `wired` every
+    input but the default one that is not built-in or wired; an input
+    without a Core Audio ID; and the system audio row, "System audio"
+    without a number, when it is off, last. A source not recorded is
+    dimmed, its name starts where the other names start (the number's
+    width stays blank), its GB/h max is `-`, and an audio input not
+    recorded says why in parentheses after its name, as `msr list`
+    does (`(virtual)`, `(Bluetooth)`, `(aggregate)`, `(AirPlay)`,
+    `(Continuity Capture)`, `(unknown connection)`, `(no device ID)`; no
+    reason under `none` and `default-microphone`, whose settings line
+    gives it).
   - The table's digits are all one width, so the GB/h max figures, the
     Total's included, line up on the decimal point; only the word
     "Total" is bold.
@@ -864,7 +879,7 @@ the metadata items (see "Output on disk").
   default one, `wired` the default one plus every built-in and wired one
   (transport type built-in, USB, FireWire, PCI, Thunderbolt, HDMI,
   DisplayPort; Bluetooth, Bluetooth LE, virtual, aggregate, AirPlay,
-  Continuity capture, an unknown transport and one that cannot be read
+  Continuity Capture, an unknown transport and one that cannot be read
   are not wired), `all-inputs` every input. The default microphone is
   recorded in every audio mode but `none`, whatever its transport, and
   followed (D34): when the default input changes, the event `default
