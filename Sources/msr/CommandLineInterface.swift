@@ -76,7 +76,7 @@ func homeFolderOrExit() throws -> URL {
     do {
         return try homeFolder()
     } catch let error as MissingHomeFolderError {
-        FileHandle.standardError.write(Data("Error: \(error)\n".utf8))
+        StandardErrorWriter.shared.write("Error: \(error)\n")
         throw unsetHomeExitCode
     }
 }
@@ -84,7 +84,7 @@ func homeFolderOrExit() throws -> URL {
 /// What the settings file gives, never refused; what it ignored is named on standard error.
 func loadSettings(from file: SettingsFile) -> Settings {
     let read = file.load()
-    if let note = read.note { FileHandle.standardError.write(Data("\(note)\n".utf8)) }
+    if let note = read.note { StandardErrorWriter.shared.write("\(note)\n") }
     return read.settings
 }
 

@@ -7,37 +7,52 @@ import Testing
         .init(source: source, recordsAt: "", files: 1, written: "1 MB", state: state)
     }
 
-    private let line = "Recording 0:01:07 · 1.3 GB in 3 files · 120.4 GB free"
+    private let line = "Recording 0:12:34 · 1.2 GB in 7 files · 143.8 GB free"
 
-    @Test func theLineThenCPUThenSourcesThenProblemsJoinedByCommas() {
+    @Test func problemsComeFirstThenTheLineThenCPUThenSources() {
         let rows = [row(.screen(1, name: "A")), row(.screen(2, name: "B")), row(.systemAudio(isRecorded: true)), row(.audioInput(1, name: "Mic"))]
         #expect(StatusLine.text(line: line, cpu: "CPU 23 %", rows: rows, problems: 2)
-            == "\(line), CPU 23 %, 2 screens, 2 audio sources, 2 problems")
+            == "2 problems, \(line), CPU 23 %, 2 screens, 2 audio sources")
+        #expect(StatusLine.text(line: line, cpu: "CPU 23 %", rows: rows, problems: 1).hasPrefix("1 problem, Recording"))
     }
 
-    @Test func withoutCPUTheLineLeavesItOut() {
+    @Test func noProblemsSaysNothingAboutProblems() {
         #expect(StatusLine.text(line: line, cpu: nil, rows: [row(.screen(1, name: "A"))], problems: 0)
-            == "\(line), 1 screen, 0 audio sources, no problems")
-    }
-
-    @Test func oneProblemIsSingular() {
-        #expect(StatusLine.text(line: line, cpu: nil, rows: [], problems: 1).hasSuffix(", 1 problem"))
+            == "\(line), 1 screen, 0 audio sources")
     }
 
     @Test func onlySourcesBeingRecordedAreCounted() {
         let rows = [row(.screen(1, name: "A")), row(.screen(2, name: "B"), state: "disconnected"),
                     row(.audioInput(1, name: "Mic"), state: "waiting"), row(.audioInput(2, name: "Mic 2"))]
-        #expect(StatusLine.text(line: line, cpu: nil, rows: rows, problems: 0).contains(", 1 screen, 1 audio source, "))
+        #expect(StatusLine.text(line: line, cpu: nil, rows: rows, problems: 0).hasSuffix(", 1 screen, 1 audio source"))
     }
 
-    @Test func aNarrowTerminalCutsTheLineToItsWidth() {
-        #expect(StatusLine.fit("Recording 0:01:07", width: 9) == "Recording")
-        #expect(StatusLine.fit("Recording", width: 9) == "Recording")
-        #expect(StatusLine.fit("Recording", width: 20) == "Recording")
-        #expect(StatusLine.fit("Recording", width: 0) == "")
+    @Test func theLineIsCutToTheWidthMinusOneSoItNeverWraps() {
+        #expect(StatusLine.fit("Recording 0:01:07", width: 10) == "Recording")
+        #expect(StatusLine.fit("Recording", width: 10) == "Recording")
+        #expect(StatusLine.fit("Rec", width: 10) == "Rec")
+        #expect(StatusLine.fit("Recording", width: 1) == "")
     }
 
-    @Test func anUnknownWidthCutsNothing() {
-        #expect(StatusLine.fit("Recording 0:01:07", width: nil) == "Recording 0:01:07")
+    @Test func anUnknownWidthIsTakenAs80Columns() {
+        let long = String(repeating: "x", count: 200)
+        #expect(StatusLine.fit(long, width: nil).count == 79)
+        #expect(StatusLine.fit(long, width: 0).count == 79)
+    }
+}
+
+@Suite struct RecordingStatusAttentionTests {
+    @Test func theCountIsWhatSetsTheBadge() {
+        var status = RecordingStatus()
+        #expect(status.attentionCount == 0)
+        status.problems = ["a", "b"]
+        status.isLowOnDisk = true
+        status.screenShowingAnotherScreensPicture = "Screen 2"
+        #expect(status.attentionCount == 4)
+        #expect(status.badge == "!")
+        status = RecordingStatus()
+        status.isLowOnDisk = true
+        #expect(status.attentionCount == 1)
+        #expect(status.badge == "!")
     }
 }

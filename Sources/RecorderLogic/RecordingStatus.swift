@@ -10,9 +10,12 @@ public struct RecordingStatus: Equatable, Sendable {
 
     public init() {}
 
-    public var needsAttention: Bool {
-        isLowOnDisk || screenShowingAnotherScreensPicture != nil || !problems.isEmpty
+    /// What needs the person: each problem, low disk space and a screen showing another screen's picture.
+    public var attentionCount: Int {
+        problems.count + (isLowOnDisk ? 1 : 0) + (screenShowingAnotherScreensPicture != nil ? 1 : 0)
     }
+
+    public var needsAttention: Bool { attentionCount > 0 }
 
     /// "!" when something needs the person, otherwise none (D47).
     public var badge: String? { needsAttention ? "!" : nil }

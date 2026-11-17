@@ -7,20 +7,20 @@ import RecorderLogic
 /// record` alike: the Dock icon's badge "!" and a bouncing icon when
 /// something needs the person, and the status window with the problems
 /// (D45, D46, D47). `msr record` also says each event and
-/// problem on standard error and, on a terminal, draws the status line.
+/// problem as `RecordOutput` decides and, on a terminal, draws the status line.
 @MainActor
 final class RecordingSession: RecorderObserver {
     private(set) var recorder: Recorder?
-    private let tellOnStandardError: Bool
+    private let output: RecordOutput?
     private var status = RecordingStatus()
     private var badgeTask: Task<Void, Never>?
     private let statusWindow = StatusWindow()
     /// Stop is in progress: a Dock click or a quit does nothing more.
     private(set) var isStopping = false
 
-    /// Starts the recording; `tellOnStandardError` for `msr record` without `--quiet`.
-    init(settings: Settings, homeFolder: URL, tellOnStandardError: Bool) throws(RecorderStartError) {
-        self.tellOnStandardError = tellOnStandardError
+    /// Starts the recording; `output` for `msr record`.
+    init(settings: Settings, homeFolder: URL, output: RecordOutput?) throws(RecorderStartError) {
+        self.output = output
         recorder = try Recorder(
             settings: settings, homeFolder: homeFolder, app: "Multi Screen Recorder \(runningVersion)", observer: self)
         updateBadge()
@@ -39,7 +39,7 @@ final class RecordingSession: RecorderObserver {
     func stop() async -> RecordingSummary? {
         isStopping = true
         badgeTask?.cancel()
-        StandardErrorWriter.shared.endStatus()
+        output?.endStatusLine()
         statusWindow.close()
         guard let recorder else { return nil }
         let summary = await recorder.stop()
@@ -61,10 +61,11 @@ final class RecordingSession: RecorderObserver {
     }
 
     private func drawStatusLine() {
-        guard tellOnStandardError, StandardErrorWriter.shared.drawsStatusLine, !isStopping, let recorder else { return }
-        let (rows, line, cpu) = recorder.status()
-        StandardErrorWriter.shared.showStatus(
-            StatusLine.text(line: line, cpu: cpu, rows: rows, problems: status.problems.count))
+        guard let recorder else { return }
+        output?.drawStatusLine(isStopping: isStopping) {
+            let (rows, line, cpu) = recorder.status()
+            return StatusLine.text(line: line, cpu: cpu, rows: rows, problems: status.attentionCount)
+        }
     }
 
     private func refreshStatusWindow() {
@@ -89,19 +90,19 @@ final class RecordingSession: RecorderObserver {
 
     func recorder(_ recorder: Recorder, screenShowsAnotherScreensPicture screen: String?) {
         status.screenShowingAnotherScreensPicture = screen
-        if let screen, tellOnStandardError {
-            standardError("The screen \(screen) shows another screen's picture: its screen file ended,"
-                + " and it is recorded again after its next change.")
+        if let screen {
+            output?.say(.event, "The screen \(screen) shows another screen's picture: its screen file ended,"
+                + " and it is recorded again after its next change.\n")
         }
         updateBadge()
     }
 
     func recorder(_ recorder: Recorder, eventLine: String) {
-        if tellOnStandardError { standardError(eventLine) }
+        output?.say(.event, eventLine + "\n")
     }
 
     func recorder(_ recorder: Recorder, problem: RecordingProblem) {
-        if tellOnStandardError { standardError(problem.text) }
+        output?.say(.problem, problem.text + "\n")
         status.problems.append(problem.text)
         needsAttention()
     }
@@ -143,7 +144,4 @@ func currentQuitReason() -> OSType? {
         .attributeDescriptor(forKeyword: AEKeyword(kAEQuitReason))?.enumCodeValue
 }
 
-/// One line on standard error, through the writer that keeps the status line intact.
-func standardError(_ line: String) {
-    StandardErrorWriter.shared.write("\(line)\n")
-}
+

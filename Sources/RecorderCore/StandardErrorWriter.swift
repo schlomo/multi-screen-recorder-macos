@@ -2,17 +2,17 @@ import Foundation
 import RecorderLogic
 import Synchronization
 
-/// Everything the process writes on standard error for people while
-/// `msr record` runs goes through here, so that nothing prints into the
-/// middle of the status line: on a terminal a write clears the line,
-/// prints, and draws it again. Not a terminal: plain text, never an escape code.
+/// The one place that writes on standard error, so that nothing prints
+/// into the middle of the status line: on a terminal a write clears the
+/// line, prints, and draws it again, in one write. The event, problem,
+/// summary and debug lines of `msr record`, and every other line of the
+/// process on standard error, come through here. Not a terminal: plain
+/// text, never an escape code.
 public final class StandardErrorWriter: Sendable {
     private static let eraseToEnd = "\u{1B}[K"
 
     /// The process's standard error.
-    public static let shared = StandardErrorWriter(
-        isTerminal: isatty(STDERR_FILENO) != 0, width: terminalWidth,
-        sink: { FileHandle.standardError.write(Data($0.utf8)) })
+    public static let shared = StandardErrorWriter(descriptor: STDERR_FILENO, term: getenv("TERM").map { String(cString: $0) })
 
     private let isTerminal: Bool
     private let width: @Sendable () -> Int?
@@ -26,29 +26,50 @@ public final class StandardErrorWriter: Sendable {
         self.sink = sink
     }
 
+    /// Writes on a file descriptor. It draws a status line only when that is
+    /// a terminal and `term` (the `TERM` variable) names one that takes escape codes.
+    public convenience init(descriptor: Int32, term: String?) {
+        let takesEscapeCodes = term.map { !$0.isEmpty && $0 != "dumb" } ?? false
+        self.init(
+            isTerminal: isatty(descriptor) != 0 && takesEscapeCodes,
+            width: {
+                var size = winsize()
+                guard ioctl(descriptor, TIOCGWINSZ, &size) == 0, size.ws_col > 0 else { return nil }
+                return Int(size.ws_col)
+            },
+            sink: { text in
+                // A failed write is ignored: there is nowhere left to report it, and a recording must not die of it.
+                var bytes = Array(text.utf8)[...]
+                while !bytes.isEmpty {
+                    let written = bytes.withUnsafeBytes { Darwin.write(descriptor, $0.baseAddress, $0.count) }
+                    guard written > 0 else { return }
+                    bytes = bytes.dropFirst(written)
+                }
+            })
+    }
+
     /// Whether a status line is drawn at all.
     public var drawsStatusLine: Bool { isTerminal }
 
     /// Text for people, with its newlines; the status line comes back below it.
     public func write(_ text: String) {
         status.withLock { status in
-            if status != nil { sink(clear) }
-            sink(text)
-            if let status { draw(status) }
+            guard let status else { return sink(text) }
+            sink(clear + text + drawn(status))
         }
     }
 
     /// Shows the status line, replacing the previous one; nothing when not on a terminal.
-    public func showStatus(_ text: String) {
+    public func showStatusLine(_ text: String) {
         guard isTerminal else { return }
         status.withLock { status in
             status = text
-            draw(text)
+            sink(drawn(text))
         }
     }
 
     /// Clears the status line and stops redrawing it.
-    public func endStatus() {
+    public func endStatusLine() {
         status.withLock { status in
             if status != nil { sink(clear) }
             status = nil
@@ -57,13 +78,7 @@ public final class StandardErrorWriter: Sendable {
 
     private var clear: String { "\r" + Self.eraseToEnd }
 
-    private func draw(_ text: String) {
-        sink("\r" + StatusLine.fit(text, width: width()) + Self.eraseToEnd)
-    }
-
-    private static func terminalWidth() -> Int? {
-        var size = winsize()
-        guard ioctl(STDERR_FILENO, TIOCGWINSZ, &size) == 0, size.ws_col > 0 else { return nil }
-        return Int(size.ws_col)
+    private func drawn(_ text: String) -> String {
+        "\r" + StatusLine.fit(text, width: width()) + Self.eraseToEnd
     }
 }

@@ -26,6 +26,6 @@ private func executablePath() -> String {
 
 private func stopReexecution(_ problem: String) -> Never {
     let reason = String(cString: strerror(errno))
-    FileHandle.standardError.write(Data("Error: msr \(problem) (\(reason))\n".utf8))
+    StandardErrorWriter.shared.write("Error: msr \(problem) (\(reason))\n")
     exit(reexecutionFailedExitCode)
 }
