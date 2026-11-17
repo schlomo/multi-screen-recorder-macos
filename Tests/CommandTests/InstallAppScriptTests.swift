@@ -260,16 +260,22 @@ import Testing
         #expect(try installedVersion() == "0.20261117.52-pr20+d73cb1e")
         let ghArguments = try String(contentsOf: scratch.url.appending(path: "gh-arguments"), encoding: .utf8)
         #expect(ghArguments.hasPrefix(expected), "\(ghArguments)")
+        #expect(ghArguments.contains("--repo schlomo/multi-screen-recorder-macos "), "\(ghArguments)")
     }
 
-    @Test(arguments: [["--snapshot", "x"], ["--snapshot", "pr-20"], ["--snapshot"], ["--bogus"]])
-    func aWrongArgumentFailsAndChangesNothing(arguments: [String]) async throws {
+    @Test(arguments: [
+        (["--snapshot", "x"], "--snapshot takes a PR number, such as 20, not 'x'"),
+        (["--snapshot", "pr-20"], "--snapshot takes a PR number, such as 20, not 'pr-20'"),
+        (["--snapshot"], "usage:"),
+        (["--bogus"], "usage:"),
+        ([""], " is not a file"),
+    ])
+    func aWrongArgumentFailsAndChangesNothing(arguments: [String], message: String) async throws {
         defer { scratch.remove() }
         let outcome = try await run(repositoryRoot.appending(path: "scripts/install-app"), arguments,
                                     environment: ["INSTALL_FOLDER": path(installFolder)])
         #expect(outcome.status == 1)
-        #expect(outcome.errors.contains("--snapshot takes a PR number") || outcome.errors.contains("usage:"),
-                "\(outcome.errors)")
+        #expect(outcome.errors.contains(message), "\(outcome.errors)")
         #expect(try FileManager.default.contentsOfDirectory(atPath: path(installFolder)).isEmpty)
     }
 

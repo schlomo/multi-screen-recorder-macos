@@ -106,7 +106,7 @@ case "$#:${1-}" in
         [[ $2 =~ ^[1-9][0-9]*$ ]] || fail "--snapshot takes a PR number, such as 20, not '$2'"
         install_release "pr-$2"
         ;;
-    1:-*) fail "usage: $me [--release | --snapshot <n> | <zip> | --help]" ;;
+    1:-*) fail "usage: $me [--release | --snapshot <n> | <zip> | --help]; a zip whose name starts with - is ./$1" ;;
     1:*) install_zip "$1" ;;
     *) fail "usage: $me [--release | --snapshot <n> | <zip> | --help]" ;;
 esac
