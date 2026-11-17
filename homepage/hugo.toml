@@ -28,6 +28,7 @@ disableKinds = ["taxonomy", "term", "section", "rss", "404"]
   background = "#E9EEF7"  # cool white: page background
   surface = "#FFFFFF"     # the download button's text, boxes
   rule = "#D5DAE6"        # footer rule
+  artwork = "#F5F7FA"     # the icon artwork's own background: the link preview image
 
 # The header shows the app icon artwork from the repository's assets/icon/,
 # resized by Hugo; the source is never copied into homepage/. Defining a mount
