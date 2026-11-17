@@ -1,8 +1,8 @@
 import Foundation
 
 /// The status window of a running recording (D46): a row per screen and
-/// per audio source with its files, the data written and its state, and a
-/// line with the elapsed time, the data, the files and the free space.
+/// per audio source with its files, the data written, its state and its
+/// clock drift, and a line with the elapsed time, the data, the files and the free space.
 public enum RecordingStatusTable {
     /// "1:07:00" for 1 hour 7 minutes: h:mm:ss (D47).
     public static func elapsed(_ seconds: Double) -> String {
@@ -10,7 +10,7 @@ public enum RecordingStatusTable {
         return String(format: "%d:%02d:%02d", whole / 3600, whole / 60 % 60, whole % 60)
     }
 
-    public static let columns = ["Source", "Records at", "Files", "Written", "State"]
+    public static let columns = ["Source", "Records at", "Files", "Written", "State", "Clock drift"]
 
     public struct Row: Equatable, Sendable {
         public var source: SourceCell
@@ -19,17 +19,20 @@ public enum RecordingStatusTable {
         /// The size of its files on disk, "350 MB" or "1.3 GB".
         public var written: String
         public var state: String
+        /// An audio source's clock drift and its correction, "-116 ppm (+34.9 ms)"; empty for a screen.
+        public var clockDrift: String
 
-        public init(source: SourceCell, recordsAt: String, files: Int, written: String, state: String) {
+        public init(source: SourceCell, recordsAt: String, files: Int, written: String, state: String, clockDrift: String = "") {
             self.source = source
             self.recordsAt = recordsAt
             self.files = files
             self.written = written
             self.state = state
+            self.clockDrift = clockDrift
         }
 
         /// The cells after Source.
-        public var values: [String] { [recordsAt, String(files), written, state] }
+        public var values: [String] { [recordsAt, String(files), written, state, clockDrift] }
     }
 
     /// `bytes`: each screen file's size on disk, by its name; a file
@@ -52,8 +55,12 @@ public enum RecordingStatusTable {
     }
 
     /// The audio sources' rows, below the screens': Records at is the
-    /// channels of the source's newest audio file.
-    public static func audioRows(sources: [AudioTracker.Source], files: [RecordingManifest.AudioFile], bytes: [String: Int64]) -> [Row] {
+    /// channels of the source's newest audio file; `clockDrift` the latest
+    /// clock drift correction status of each source's running capture.
+    public static func audioRows(
+        sources: [AudioTracker.Source], files: [RecordingManifest.AudioFile], bytes: [String: Int64],
+        clockDrift: [AudioTracker.SourceID: ClockDriftCorrection.Status]
+    ) -> [Row] {
         sources.map { source in
             let own = files.filter { file in
                 switch source.id {
@@ -70,9 +77,25 @@ public enum RecordingStatusTable {
             }
             let cell: SourceCell = source.id == .systemAudio
                 ? .systemAudio(isRecorded: true) : .audioInput(source.number, name: source.name)
-            return Row(source: cell, recordsAt: channels, files: own.count, written: written, state: text(source.state))
+            return Row(
+                source: cell, recordsAt: channels, files: own.count, written: written, state: text(source.state),
+                clockDrift: source.state == .recording ? clockDriftText(clockDrift[source.id]) : "")
         }
     }
+
+    /// "-116 ppm (+34.9 ms)": the clock drift and the sound added so far;
+    /// `measuring (+0.3 ms)` while the clock drift is not known but a
+    /// correction is applied, and `measuring` before any.
+    public static func clockDriftText(_ status: ClockDriftCorrection.Status?) -> String {
+        let correction = status.map { ClockDriftText.signed($0.applied * 1000, decimals: 1, unit: "ms") }
+        guard let status, let ppm = status.clockDriftPpm else {
+            guard let correction, correction != "0 ms" else { return measuring }
+            return "\(measuring) (\(correction))"
+        }
+        return "\(ClockDriftText.signed(ppm, decimals: 0, unit: "ppm")) (\(correction!))"
+    }
+
+    public static let measuring = "measuring"
 
     /// The files' sizes together; "?" when one cannot be read.
     private static func writtenText(_ sizes: [Int64?]) -> String {

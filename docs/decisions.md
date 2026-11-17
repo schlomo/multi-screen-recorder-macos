@@ -1233,7 +1233,8 @@ architect's reading.
 ## D46: The owner's rulings from trying B1 (2026-11-15)
 
 - **Status:** in force; refines D45 and, for B2, D31; superseded in
-  part by D47 (point 12: the badge shows no time). Being built in
+  part by D47 (point 12: the badge shows no time) and D59 (point 4:
+  a source not recorded shows `-`). Being built in
   PR #11 (B1), point 7 in B2.
 - **Context:** The owner tried the snapshot release of PR #11 on
   2026-11-15 and wrote: "duration without suffix is minutes"; "yes,
@@ -1636,3 +1637,141 @@ architect's reading.
   "Always-loaded context is paid on every call";
   [static-sites.md](principles/platform-notes/static-sites.md);
   `AGENTS.md`; PR #17.
+
+## D57: Clock drift is corrected by resampling every audio source to the shared clock (2026-11-17)
+
+- **Status:** in force; the design is the architect's, built at the
+  owner's request and confirmed by the owner (2026-11-17: "I think
+  yes"). Closes D49's "corrected
+  in a later PR" and D50's open question on the system audio's
+  timestamps; changes the meaning of D49's `clockDriftPpm`.
+- **Context:** The owner, 2026-11-16: "research, understand and build a
+  reliable fix for the audio drift, showing in debug mode what is going
+  on and giving a brief indicator for the applied audio fix in the
+  status window", then "if needed, build hypothesises and prove/disprove,
+  then build working solution and present to me in the morning".
+  Everything below is the architect's reading of that.
+- **Decision:**
+  1. Every audio source, the system audio too, passes one resampler
+     whose rate is steered so that the source's sample count follows
+     the shared clock; one code path, no bypass.
+  2. The clock drift is measured from buffer arrivals: timestamps
+     follow the sample count and a buffer only ever arrives late, so
+     the source's clock is the lower support line of each interval's
+     smallest lateness (arrival minus timestamp) over the last 20 s.
+     The measurement never depends on the correction's own state: two
+     loops that did were built first and replaced after review. The
+     rate is the line's slope plus what is left to catch up, limited to
+     ±1000 ppm; across a gap the correction grows by the drift during
+     it.
+  3. `clockDriftPpm` in the recording manifest, the status window's
+     column "Clock drift" and the `--debug` lines show the same
+     measured drift; `clockDriftCorrection` is the sound added to or
+     removed from a file.
+  4. `RecorderLogic` may use Accelerate beside Foundation.
+  5. Not taken: an aggregate device with drift correction (one device
+     for all inputs, so a plug or unplug would disturb every input, and
+     another capture path); Core Audio's own device clock (precise for
+     audio inputs, but the system audio has none, so two mechanisms);
+     `AudioConverter` or a varispeed unit (no rate change while
+     running, or no control of the position). Revisit Core Audio's
+     device clock if a recording shows a correction that followed a
+     change of delivery delay rather than of the clock.
+- **Consequences:** An audio file is no longer sample-identical to
+  what the device delivered: it is resampled and low-passed above
+  20 kHz. A lasting change of how late buffers are delivered is taken
+  as clock offset, and the correction is carried across a gap on the
+  assumption that timestamps keep following the sample count; both are
+  stated as limits in the design.
+- **Evidence:** [design/recorder.md](design/recorder.md), "Clock
+  drift"; the research of 2026-11-16 and 2026-11-17 and "Known limits
+  of the clock drift correction" in
+  [design/end-to-end-tests.md](design/end-to-end-tests.md).
+
+## D58: `msr record` writes only the recording folder's path to standard output; a status line on a terminal; `--quiet` (2026-11-17)
+
+- **Status:** in force for `msr record`; the other commands (`check`,
+  `list`, `settings`, `version`) are not yet checked against the same
+  split.
+- **Context:** All of `msr record`'s output went to standard output,
+  so a script could not tell data from text for people. The owner, on
+  2026-11-16: "if running in a terminal (try) then show the running
+  status as persistent last line, recording time, CPU, recording size
+  etc.", "a --quiet option to suppress all regular output", "make sure
+  that stdout and error are handled properly for managed or scripted
+  operation", and on the split: "yes, good plan for the terminal
+  output". On 2026-11-17: "add the CLI status line now".
+- **Decision:**
+  1. Standard output carries one line, the recording folder's path,
+     when the recording starts. Everything for people (the banner, the
+     table, the ready check, events, the status line, the summary,
+     debug lines) goes to standard error. `recording.json` stays the
+     machine-readable result.
+  2. When standard error is a terminal, one status line is redrawn
+     every second: the count of problems first when there are any,
+     then the recording time, the size written, the files, the free
+     space, the CPU use and the sources being recorded. No option
+     turns it on or off.
+  3. `--quiet` writes nothing for people. Still written on standard
+     error: a failing ready check, errors, the settings file note,
+     each problem as it happens and the summary of a run that exits 3.
+     Exit codes are unchanged. `--quiet` with `--debug` is refused.
+  4. A failed write to standard error never ends a recording, and
+     neither does a closed reader of standard output.
+- **The architect's details, confirmed by the owner (2026-11-17: "I
+  think yes"):** the order of the status line's parts and that it says
+  nothing about problems when there are none; what `--quiet` still
+  writes; the refusal of `--quiet` with `--debug`. On low disk space
+  and a screen showing another screen's picture, which are events, not
+  problems, the owner (2026-11-17): "no warnings in --quiet, but if it
+  fails on low disk space then of course write errors". So `--quiet`
+  writes neither, and a full disk, which is a problem, is written.
+- **Evidence:** [design/recorder.md](design/recorder.md), the
+  `msr record` row and "Tests".
+
+## D59: One "What will be recorded" table with a settings line; sources in the order of their numbers; a source not recorded says why (2026-11-17)
+
+- **Status:** in force; supersedes D46 point 4 (a source not recorded
+  shows 0).
+- **Context:** The owner, 2026-11-16, on `msr check` and `msr list`:
+  "seems to me like check and list show nearly the same info but
+  differently, maybe worth consolidating? Also, check doesn't show the
+  settings it applies, only the effect. And in the console output it is
+  not obvious why BlackHole is not recorded"; on the architect's design:
+  "I agree with your plan, but maybe add (virtual) to the name, same
+  like default and set "-" instead of 0 for the GB/h ... the next PR
+  should roll that stuff in", and "yes to both details". On 2026-11-17,
+  trying PR #19: "a bit confusing that the order of showing the audio
+  and video devices doesn't follow the numbering", and on the ready
+  check's audio item: "KISS and DRY is the guide to decide such things
+  like ready check audio line".
+- **Decision:**
+  1. `msr check`, `msr record` and `msr list` print one "What will be
+     recorded" table; `msr list` prints it without the ready check and
+     asks for no permission. A settings line above it gives the
+     effective settings, flags applied.
+  2. A source not recorded: its name keeps the column of the others,
+     the `Audio <n> - ` part blank; GB/h shows `-`; the window dims the
+     row. The reason follows the name in parentheses when the rule
+     that leaves it out is the input's own: under audio mode Wired its
+     connection (`(virtual)`, `(Bluetooth)`, `(aggregate)`,
+     `(AirPlay)`, `(Continuity Capture)`, `(unknown connection)`), and
+     `(no device ID)` for an input the recorder cannot identify and
+     the audio mode would record. Otherwise, under audio mode None or
+     Default microphone, and for system audio off, the settings line
+     gives the reason.
+  3. Every list of sources shown to people lists the screens by
+     number, then the audio sources by number (`Audio 0 - System`
+     first), then the sources not recorded; files of one source by
+     start. The ready check's audio item and the `--debug` clock
+     drift block take the same list in the same order.
+     `recording.json` keeps its order.
+  4. The ready check's "Fix:" lines wrap at 80 columns under their
+     text; `msr list` says that the program running `msr`, not the
+     app, lacks the Screen & System Audio Recording permission.
+- **The architect's reading, confirmed by the owner (2026-11-17: "I
+  think yes"):** the reasons
+  beyond "(virtual)" and "(Bluetooth)", the order in point 3, system
+  audio off at the end, the fixed 80 columns.
+- **Evidence:** [design/recorder.md](design/recorder.md), the command
+  rows, "The app" and the summary.

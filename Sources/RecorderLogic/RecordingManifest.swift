@@ -113,9 +113,14 @@ public struct RecordingManifest: Codable, Equatable, Sendable {
         public var end: Double?
         public var timecode: String
         public var state: State
-        /// The audio source's clock against the shared clock, in parts per
-        /// million, positive when it runs fast; nil until it can be measured.
+        /// The audio source's clock drift at the file's end, in parts per
+        /// million, positive when its clock runs fast: the same the status
+        /// window and `--debug` show; nil until the file ends, and when it
+        /// was not measured.
         public var clockDriftPpm: Double?
+        /// The seconds of sound the clock drift correction added to the file
+        /// (negative: removed); nil until the file ends.
+        public var clockDriftCorrection: Double?
 
         public init(
             name: String, audioSource: String, audioSourceUID: String?, channels: Channels, start: Double, timecode: String
@@ -129,13 +134,24 @@ public struct RecordingManifest: Codable, Equatable, Sendable {
             self.timecode = timecode
             state = .recording
             clockDriftPpm = nil
+            clockDriftCorrection = nil
         }
+
+        /// The file ended with `correction` seconds of sound added and the
+        /// clock drift `ppm`, if measured: `clockDriftCorrection` to 0.0001 s,
+        /// `clockDriftPpm` to a tenth of a ppm, neither negative zero.
+        public mutating func clockDrift(correction: Double, ppm: Double?) {
+            clockDriftCorrection = Self.withoutNegativeZero((correction * 10_000).rounded() / 10_000)
+            clockDriftPpm = ppm.map { Self.withoutNegativeZero(($0 * 10).rounded() / 10) }
+        }
+
+        private static func withoutNegativeZero(_ value: Double) -> Double { value == 0 ? 0 : value }
 
         private enum CodingKeys: String, CodingKey {
-            case name, audioSource, audioSourceUID, channels, start, end, timecode, state, clockDriftPpm
+            case name, audioSource, audioSourceUID, channels, start, end, timecode, state, clockDriftPpm, clockDriftCorrection
         }
 
-        /// `end` and `clockDriftPpm` are written as null until known;
+        /// `end`, `clockDriftPpm` and `clockDriftCorrection` are written as null until known;
         /// `audioSourceUID` only for an audio input.
         public func encode(to encoder: any Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
@@ -148,6 +164,7 @@ public struct RecordingManifest: Codable, Equatable, Sendable {
             try container.encode(timecode, forKey: .timecode)
             try container.encode(state, forKey: .state)
             try container.encode(clockDriftPpm, forKey: .clockDriftPpm)
+            try container.encode(clockDriftCorrection, forKey: .clockDriftCorrection)
         }
     }
 

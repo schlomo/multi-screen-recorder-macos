@@ -245,7 +245,7 @@ struct WhatWillBeRecordedView: View {
                 if column == 0 {
                     Group {
                         if let source {
-                            SourceCellView(cell: source)
+                            SourceCellView(cell: source, numberDigits: section.numberDigits)
                         } else {
                             Text(cell)
                                 .fontWeight(boldSource ? .semibold : nil)

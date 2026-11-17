@@ -27,6 +27,7 @@ One row per entry, the error text exactly as in the entry.
 | `The window has been marked as needing another Layout Window pass, but it has already had more Layout Window passes than there are views in the window.` | [Layout loop in a popup menu window after a HiDPI switch](#layout-loop-in-a-popup-menu-window-after-a-hidpi-switch) |
 | The prompt for the Screen & System Audio Recording permission comes back each time the window is clicked (symptom, no error text) | [Screen recording prompt comes back with an ad hoc signed build](#screen-recording-prompt-comes-back-with-an-ad-hoc-signed-build) |
 | `the writer took none of the last 4800 samples (0.100 s) of Razer Seiren V3 Mini within 2.0 seconds; they are lost` | [A timing test fails on CI while command tests run](#a-timing-test-fails-on-ci-while-command-tests-run) |
+| `Expectation failed: (made.guides.map(\.2).reduce(0, +) → 0) == (videoSamples → 49600)` | [Async tests time out on CI while simulation tests run](#async-tests-time-out-on-ci-while-simulation-tests-run) |
 
 ## Format
 
@@ -147,3 +148,41 @@ One row per entry, the error text exactly as in the entry.
 - **Verify:** CI's `scripts/test` passes; locally the command tests run
   at most 9 programs at once on 12 processors.
 - **Observed:** 2026-11-16, PR #14; resolved.
+
+## Async tests time out on CI while simulation tests run
+
+- **Error:** `Expectation failed: (made.guides.map(\.2).reduce(0, +) → 0) == (videoSamples → 49600)`
+- **Symptom:** in CI's `scripts/test` (run 44112113090 on 5494a9a of
+  PR #19, the three `ScreenFileTickerTests`
+  `theLastGuideSamplesWaitForTheWriterWithinTheDrainTimeout`,
+  `theGuideTracksEndWithTheVideoAfterAStreamStopLongerThanFiveSeconds`
+  and `aLongLastMixIsNotDroppedWhileTheWriterWaits`, each "failed after
+  44.6 seconds"); the same code passed on 993842b (run 44111291663),
+  and passes locally.
+- **Why:** [KNOWN: the test code] the three tests made their stand-in
+  writer ready from a task sleeping 20 ms, against a 30 s drain timeout.
+  [KNOWN: measured locally with a probe test timing a 20 ms task]
+  `ClockDriftTrackerTests` and `ClockDriftCorrectionTests` are
+  synchronous and compute for about 28 s of CPU in all without
+  suspending, so run in parallel each case holds a thread of the
+  cooperative pool; in the same process as the ticker tests, a 20 ms
+  task took 15.7, 16.5 and 2.2 s to run on 12 cores, and 0.02 to 0.5 s
+  once the two suites were serialized. [KNOWN: CI's logs of runs
+  44111291663 and 44112113090] nearly every test reports "passed after"
+  about 29.7 s in the passing run and 44 s in the failing one, the ticker
+  suite 0.2 s inside its 30 s bound in the passing run. [CONJECTURE] the
+  hosted runner's pool has 3 threads and slower cores, so the same
+  simulations hold it past 30 s; the three tests were not made to fail
+  locally, whose pool has 12 threads.
+- **Fix:** the two simulation suites run serialized
+  (`@Suite(.serialized)`), so they hold at most two pool threads; the
+  three ticker tests' stand-in writer becomes ready on an event (after
+  refusing four times, each test asserting all four refusals, of which
+  at most one comes before its drain), so none depends on a task being scheduled
+  within the drain timeout. `GuideTrackFeedTests.theLastMixWaitsForSamplesThatComeLate`
+  still delivers its late samples from a task after 150 ms, against a
+  60 s bound: the feed's wait offers no event to deliver on, so the
+  starvation pattern is left, with a bound 400 times the delay.
+- **Verify:** CI's `scripts/test` passes on the pushed head.
+- **Observed:** 2026-11-17, PR #19; resolved, CI passed with the fix
+  (run 44125362376).

@@ -48,6 +48,31 @@ public enum DebugLine {
         })
     }
 
+    /// "Audio 1 - Razer Seiren V3 Mini: clock drift -116.1 ppm, corrected +34.94 ms so far, 0.04 ms off";
+    /// "clock drift not measured yet" until it is, and no "off" before the first estimate.
+    public static func clockDrift(of label: String, _ status: ClockDriftCorrection.Status) -> String {
+        let drift = status.clockDriftPpm.map { "clock drift " + ClockDriftText.signed($0, decimals: 1, unit: "ppm") }
+            ?? "clock drift not measured yet"
+        var line = "\(label): \(drift), corrected \(ClockDriftText.signed(status.applied * 1000, decimals: 2, unit: "ms")) so far"
+        if let remaining = status.remaining { line += ", \(ClockDriftText.size(remaining * 1000, decimals: 2, unit: "ms")) off" }
+        return line
+    }
+
+    /// The clock drift lines of all audio sources being recorded, as one block in number order,
+    /// the system audio (0) first.
+    public static func clockDriftBlock(_ sources: [(number: Int, label: String, status: ClockDriftCorrection.Status)]) -> [String] {
+        sources.sorted { $0.number < $1.number }.map { clockDrift(of: $0.label, $0.status) }
+    }
+
+    /// "Audio 1 - Razer Seiren V3 Mini: gap of 100.0 ms, clock drift corrected +3.45 ms so far,
+    /// +0.012 ms for the gap, lateness 12.30 ms before, 12.41 ms after".
+    public static func clockDriftGap(of label: String, _ gap: ClockDriftCorrection.Gap) -> String {
+        "\(label): gap of " + String(format: "%.1f ms", Double(gap.length) / 1e6)
+            + ", clock drift corrected \(ClockDriftText.signed(gap.applied * 1000, decimals: 2, unit: "ms")) so far, "
+            + "\(ClockDriftText.signed(gap.drift * 1000, decimals: 3, unit: "ms")) for the gap, lateness "
+            + String(format: "%.2f ms before, %.2f ms after", gap.latenessBefore * 1000, gap.latenessAfter * 1000)
+    }
+
     private static func text(_ ending: ScreenTracker.Ending) -> String {
         switch ending {
         case .disconnected: "disconnected"

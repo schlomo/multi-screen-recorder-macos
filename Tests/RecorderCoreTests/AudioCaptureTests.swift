@@ -36,8 +36,9 @@ import Testing
     }
 
     final class StandInWriter: AudioFileWriting, @unchecked Sendable {
-        private let state = Mutex<(isReady: Bool, refusalsLeft: Int?, samples: Int64, silence: Int64, endPosition: Int64??)>(
-            (true, nil, 0, 0, nil))
+        private let state = Mutex<(
+            isReady: Bool, refusalsLeft: Int?, samples: Int64, silence: Int64, endPosition: Int64??, appends: Int, failsAtAppend: Int?
+        )>((true, nil, 0, 0, nil, 0, nil))
 
         var isReady: Bool {
             get { state.withLock { $0.isReady } }
@@ -50,12 +51,23 @@ import Testing
             state.withLock { $0.refusalsLeft = refusals }
         }
 
+        /// Throws at the `append`th append (1 the first) and every one after it.
+        func fails(atAppend append: Int) {
+            state.withLock { $0.failsAtAppend = append }
+        }
+
         var refusalsLeft: Int? { state.withLock { $0.refusalsLeft } }
+        var appends: Int { state.withLock { $0.appends } }
         var samples: Int64 { state.withLock { $0.samples } }
         var endPosition: Int64?? { state.withLock { $0.endPosition } }
 
         func append(_ channels: [[Float]], at position: Int64) throws(AudioFileWriterError) -> Bool {
-            state.withLock { state in
+            let fails = state.withLock { state in
+                state.appends += 1
+                return state.failsAtAppend.map { state.appends >= $0 } ?? false
+            }
+            if fails { throw AudioFileWriterError(nil, while: "writing a stand-in file") }
+            return state.withLock { state in
                 if let left = state.refusalsLeft, !state.isReady {
                     state.refusalsLeft = left - 1
                     if left > 0 { return false }
@@ -81,12 +93,15 @@ import Testing
     }
 
     final class Reported: @unchecked Sendable {
-        private let state = Mutex<(started: [String], ended: [AudioFileEnd], events: [RecordingEvent], end: AudioTracker.CaptureEnd?)>(
-            ([], [], [], nil))
+        private let state = Mutex<(
+            started: [String], ended: [AudioFileEnd], events: [RecordingEvent], clockDrift: [ClockDriftCorrection.Status],
+            end: AudioTracker.CaptureEnd?
+        )>(([], [], [], [], nil))
 
         var started: [String] { state.withLock { $0.started } }
         var ended: [AudioFileEnd] { state.withLock { $0.ended } }
         var events: [RecordingEvent] { state.withLock { $0.events } }
+        var clockDrift: [ClockDriftCorrection.Status] { state.withLock { $0.clockDrift } }
         var captureEnd: AudioTracker.CaptureEnd? { state.withLock { $0.end } }
 
         var reports: AudioCaptureReports {
@@ -94,6 +109,7 @@ import Testing
                 fileStarted: { file in self.state.withLock { $0.started.append(file.name) } },
                 fileEnded: { end in self.state.withLock { $0.ended.append(end) } },
                 event: { event in self.state.withLock { $0.events.append(event) } },
+                clockDrift: { status in self.state.withLock { $0.clockDrift.append(status) } },
                 ended: { end in self.state.withLock { $0.end = end } })
         }
 
@@ -109,27 +125,38 @@ import Testing
     }
 
     private let reading = readClocks()
+    /// When the capture is told a buffer arrived, when a test sets it.
+    final class Arrival: Sendable {
+        let time = Mutex<Int64?>(nil)
+    }
+
+    private let arrival = Arrival()
     private let source = StandInSource()
     private let writer = StandInWriter()
     private let reported = Reported()
     private let samplesPerBuffer = 1600
+    /// The samples the clock drift correction's resampler holds back until
+    /// the next buffer or the capture's end.
+    private let heldBack = RecorderValues.clockDriftResamplerTaps / 2
 
     private func capture(_ id: AudioTracker.SourceID = .input("Razer"), drainTimeout: Duration = .seconds(2)) -> AudioCapture {
         let context = RecordingContext(
             folder: FileManager.default.temporaryDirectory, started: Date(), timeZone: TimeZone(identifier: "Europe/Berlin")!,
             clock: SharedClock(reading: reading), app: "Multi Screen Recorder (tests)")
         let writer = writer
+        let arrival = arrival
         let capture = AudioCapture(
             id: id, number: id == .systemAudio ? 0 : 2, name: id == .systemAudio ? "System audio" : "Razer Seiren V3 Mini", source: source, context: context,
             guides: GuideTrackFeed(tracks: [], now: { 0 }), reports: reported.reports, drainTimeout: drainTimeout,
+            now: { arrival.time.withLock { $0 } ?? context.now() },
             makeWriter: { _, _, _ in writer })
         capture.start()
         return capture
     }
 
     /// A buffer of `channels` channels whose first sample is `at` nanoseconds from t0.
-    private func buffer(at nanoseconds: Int64, channels: Int = 1) throws -> CMSampleBuffer {
-        let samples = Array(repeating: [Float](repeating: 0.25, count: samplesPerBuffer), count: channels)
+    private func buffer(at nanoseconds: Int64, channels: Int = 1, count: Int? = nil) throws -> CMSampleBuffer {
+        let samples = Array(repeating: [Float](repeating: 0.25, count: count ?? samplesPerBuffer), count: channels)
         let time = CMTime(value: CMTimeValue(reading.host) + nanoseconds, timescale: 1_000_000_000)
         return try pcmSample(samples[...], format: pcmFormat(channels: channels), at: time)
     }
@@ -168,11 +195,14 @@ import Testing
         await capture.stop()
         let ends = reported.ended
         let end = try #require(ends.first)
-        #expect(writer.endPosition == .some(Int64(samplesPerBuffer)))
-        #expect(end.file.end == end.file.start + Double(samplesPerBuffer) / Double(RecorderValues.audioSampleRate))
-        #expect(end.error?.description.contains("\(samplesPerBuffer) samples") == true)
+        // The first buffer's samples but those held back for the second were written.
+        let written = samplesPerBuffer - heldBack
+        let lost = samplesPerBuffer + heldBack
+        #expect(writer.endPosition == .some(Int64(written)))
+        #expect(end.file.end == end.file.start + Double(written) / Double(RecorderValues.audioSampleRate))
+        #expect(end.error?.description.contains("\(lost) samples") == true)
         #expect(end.error?.description.contains("lost") == true)
-        #expect(end.lostSamples == Int64(samplesPerBuffer))
+        #expect(end.lostSamples == Int64(lost))
         // A failure (D47): the result is `problems`.
         let event = try #require(end.events.first)
         #expect(end.events.count == 1)
@@ -272,15 +302,188 @@ import Testing
         #expect(files.isEmpty)
     }
 
+    /// The capture ends at the buffer that pushes the waiting samples over
+    /// the audio wait bound; the correction's held-back samples are dropped,
+    /// not added to the waiting ones.
     @Test func aWriterThatTakesNothingForTheAudioWaitBoundFellBehind() async throws {
         let capture = capture(drainTimeout: .milliseconds(10))
         writer.isReady = false
-        let buffers = RecorderValues.audioWaitBoundSeconds * RecorderValues.audioSampleRate / samplesPerBuffer + 2
-        for index in 0..<buffers { source.send(try buffer(at: time(ofBuffer: index))) }
+        let bound = RecorderValues.audioWaitBoundSeconds * RecorderValues.audioSampleRate
+        // The first buffer whose corrected samples go over the bound, and one more.
+        let sent = (bound + heldBack) / samplesPerBuffer + 1
+        for index in 0...sent { source.send(try buffer(at: time(ofBuffer: index))) }
         let end = try await reported.waitForCaptureEnd()
         let files = reported.ended
         withExtendedLifetime(capture) {}
         #expect(end == .writerFellBehind)
         #expect(files.first?.error?.description.contains("lost") == true)
+        #expect(files.first?.lostSamples == Int64(sent * samplesPerBuffer - heldBack))
+    }
+
+    /// Every sample goes through the clock drift correction; the samples it
+    /// holds back reach the file at Stop.
+    @Test func theFileEndCarriesItsClockDriftCorrection() async throws {
+        let capture = capture()
+        for index in 0..<3 { source.send(try buffer(at: time(ofBuffer: index))) }
+        #expect(writer.samples == 3 * Int64(samplesPerBuffer) - Int64(heldBack))
+        await capture.stop()
+        #expect(writer.samples == 3 * Int64(samplesPerBuffer))
+        let end = try #require(reported.ended.first)
+        // Too short for a clock drift; the correction is known.
+        #expect(end.file.clockDriftPpm == nil)
+        #expect(end.file.clockDriftCorrection != nil)
+        // The status is reported from the first buffer on.
+        #expect(reported.clockDrift.first?.clockDriftPpm == nil)
+    }
+
+    @Test func aChannelCountChangeEndsTheFileWithAllItsSamples() async throws {
+        let capture = capture()
+        source.send(try buffer(at: 0))
+        source.send(try buffer(at: time(ofBuffer: 1), channels: 2))
+        #expect(reported.started.count == 2)
+        await capture.stop()
+        #expect(writer.samples == 2 * Int64(samplesPerBuffer))
+        #expect(reported.ended.map(\.file.channels).sorted { "\($0)" < "\($1)" } == [.mono(1), .mono(2)])
+    }
+
+    // MARK: Clock drift
+
+    /// A device 500 ppm slow, its buffers arriving 5 ms after their
+    /// timestamps plus what its clock lost: each buffer is sent with that
+    /// arrival, and the same buffers go through `expected`, a correction
+    /// of the test's own.
+    private func sendDrifting(
+        _ count: Int, from first: Int, after gap: Int64 = 0, to expected: inout ClockDriftCorrection
+    ) throws {
+        for index in first..<(first + count) {
+            try sendDrifting(at: time(ofBuffer: index) + gap, count: samplesPerBuffer, to: &expected)
+        }
+    }
+
+    /// The gap `expected` found before the buffer, if any.
+    @discardableResult
+    private func sendDrifting(at nanoseconds: Int64, count: Int, to expected: inout ClockDriftCorrection) throws -> ClockDriftCorrection.Gap? {
+        let time = SharedClock(reading: reading).sinceStart(host: reading.host + UInt64(nanoseconds))
+        let arrived = time + 5_000_000 + time / 2000
+        let gap = expected.correct([[Float](repeating: 0.25, count: count)], at: time, arrival: arrived).gap
+        arrival.time.withLock { $0 = arrived }
+        source.send(try buffer(at: nanoseconds, count: count))
+        return gap
+    }
+
+    /// The status goes to the recorder at the first buffer and then about
+    /// once a second of arrivals (`ClockDriftScheduleTests` has the
+    /// `--debug` block's cadence).
+    @Test func theClockDriftStatusIsReportedAboutOnceASecond() async throws {
+        let capture = capture()
+        var expected = ClockDriftCorrection()
+        // 25 s of buffers of 1600 samples.
+        try sendDrifting(750, from: 0, to: &expected)
+        let reports = reported.clockDrift
+        #expect((25...26).contains(reports.count), "\(reports.count) reports")
+        #expect(reports.last?.clockDriftPpm != nil)
+        await capture.stop()
+    }
+
+    /// A file's clock drift is the one shown at its end, its correction
+    /// what was added during it: the second file's counts from its own
+    /// start, and leaves out nothing of the first's. The drift added at
+    /// the gap that ended the first file is no file's.
+    @Test func eachFileCarriesTheCorrectionAddedDuringIt() async throws {
+        let capture = capture()
+        var expected = ClockDriftCorrection()
+        try sendDrifting(600, from: 0, to: &expected)
+        // A gap of 2 s ends the file; the correction's tail goes to it. The
+        // first buffer after it, of 1 s, adds about 0.3 ms, none of it the first file's.
+        let atGap = expected.applied
+        let gap = try #require(try sendDrifting(at: time(ofBuffer: 600) + 2_000_000_000, count: 30 * samplesPerBuffer, to: &expected))
+        // 500 ppm over the 2 s gap: about 1 ms.
+        #expect(abs(gap.drift - 0.001) < 0.0001, "\(gap.drift * 1000) ms")
+        #expect(expected.applied - atGap - gap.drift > 0.0002, "\((expected.applied - atGap - gap.drift) * 1000) ms")
+        try sendDrifting(570, from: 630, after: 2_000_000_000, to: &expected)
+        await capture.stop()
+        _ = expected.flush()
+        let ends = reported.ended.sorted { $0.file.start < $1.file.start }
+        try #require(ends.count == 2)
+        let first = try #require(ends[0].file.clockDriftCorrection)
+        let second = try #require(ends[1].file.clockDriftCorrection)
+        let rounded = { (seconds: Double) in (seconds * 10_000).rounded() / 10_000 }
+        #expect(atGap > 0.003, "\(atGap * 1000) ms at the gap")
+        #expect(first == rounded(atGap))
+        #expect(second == rounded(expected.applied - atGap - gap.drift))
+        #expect(ends[1].file.clockDriftPpm == (expected.status.clockDriftPpm.map { ($0 * 10).rounded() / 10 }))
+        #expect(ends[1].file.clockDriftPpm != nil)
+    }
+
+    /// A gap filled with silence stays in its file, and so does the drift
+    /// added at it, as longer silence.
+    @Test func aFilledGapsDriftIsInItsFile() async throws {
+        let capture = capture()
+        var expected = ClockDriftCorrection()
+        try sendDrifting(600, from: 0, to: &expected)
+        let gap = try #require(try sendDrifting(at: time(ofBuffer: 600) + 500_000_000, count: samplesPerBuffer, to: &expected))
+        #expect(abs(gap.drift - 0.00025) < 0.00005, "\(gap.drift * 1000) ms")
+        try sendDrifting(299, from: 601, after: 500_000_000, to: &expected)
+        await capture.stop()
+        _ = expected.flush()
+        let ends = reported.ended
+        try #require(ends.count == 1)
+        #expect(ends[0].file.clockDriftCorrection == (expected.applied * 10_000).rounded() / 10_000)
+    }
+
+    /// A capture that ends by itself writes the correction's held-back samples.
+    @Test func aCaptureThatEndsByItselfWritesTheCorrectionsTail() async throws {
+        let capture = capture()
+        for index in 0..<3 { source.send(try buffer(at: time(ofBuffer: index))) }
+        #expect(writer.samples == 3 * Int64(samplesPerBuffer) - Int64(heldBack))
+        source.lose(.disconnected)
+        _ = try await reported.waitForCaptureEnd()
+        withExtendedLifetime(capture) {}
+        #expect(writer.samples == 3 * Int64(samplesPerBuffer))
+    }
+
+    /// A writer that failed ends the capture without the tail, and a Stop
+    /// racing after that neither writes it nor opens a file.
+    /// The buffers start 0.5 ms after a tick, so the tail would cross the
+    /// next tick and open a file.
+    @Test func aFailedWriterEndsTheCaptureWithoutItsTail() async throws {
+        let capture = capture()
+        // The first buffer ends before the first tick: the second is the first append.
+        writer.fails(atAppend: 1)
+        source.send(try buffer(at: 500_000))
+        source.send(try buffer(at: 500_000 + time(ofBuffer: 1)))
+        let end = try await reported.waitForCaptureEnd()
+        let samples = writer.samples
+        guard case .writerFailed(let error) = end else {
+            Issue.record("the capture ended with \(end)")
+            return
+        }
+        #expect(error.contains("writing a stand-in file"))
+        await capture.stop()
+        #expect(writer.appends == 1)
+        #expect(writer.samples == samples)
+        #expect(reported.started.count == 1)
+        #expect(reported.ended.count == 1)
+    }
+
+    /// The tail at a gap pushes the waiting samples over the audio wait
+    /// bound: the capture ends, and nothing after the gap starts a file.
+    @Test func aTailThatEndsTheCaptureWritesNothingAfterIt() async throws {
+        let capture = capture(drainTimeout: .milliseconds(10))
+        writer.isReady = false
+        let bound = RecorderValues.audioWaitBoundSeconds * RecorderValues.audioSampleRate
+        // Input of the bound plus half the held-back samples: waiting stays
+        // within the bound until the tail comes.
+        let input = bound + heldBack / 2
+        let full = input / samplesPerBuffer
+        for index in 0..<full { source.send(try buffer(at: time(ofBuffer: index))) }
+        source.send(try buffer(at: time(ofBuffer: full), count: input - full * samplesPerBuffer))
+        #expect(reported.captureEnd == nil)
+        source.send(try buffer(at: time(ofBuffer: full + 1) + 2_000_000_000))
+        let end = try await reported.waitForCaptureEnd()
+        withExtendedLifetime(capture) {}
+        #expect(end == .writerFellBehind)
+        #expect(reported.started.count == 1)
+        #expect(reported.ended.count == 1)
     }
 }

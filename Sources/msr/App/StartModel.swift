@@ -50,7 +50,7 @@ final class StartModel {
     /// to standard error, as for the commands, and is not shown in the window.
     func load() {
         let read = settingsFile.load()
-        if let note = read.note { FileHandle.standardError.write(Data("\(note)\n".utf8)) }
+        if let note = read.note { StandardErrorWriter.shared.write("\(note)\n") }
         settings = read.settings
         checkAgain()
     }

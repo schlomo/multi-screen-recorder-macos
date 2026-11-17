@@ -7,17 +7,16 @@ the homepage with screenshots of both windows (PR #15) and the tester
 guide's "What to test and send" (PR #16), all merged 2026-11-16. The
 owner shares it with colleagues, who email a screenshot of the start
 window, `recording.json` of every recording and a few sentences; the
-architect triages what comes back into this backlog. Next: queued item
-1, the command line polish (the owner signed off the design as text,
-2026-11-16: "the next PR should roll that stuff in"), then item 1a,
-audio only. Then: item 3, the end-to-end tests; item 4, the
+architect triages what comes back into this backlog. First: PR #19
+under "In flight" (the clock drift correction, the status line and the
+command line polish) waits for the owner. Next: item 1a, audio only. Then: item 3, the end-to-end tests; item 4, the
 simplification; item 7, auto-recovery from disturbances; item 6, CPU;
-item 5, drift correction; then item 16, the Mac App Store and Homebrew
+then item 16, the Mac App Store and Homebrew
 (the owner, 2026-11-16: "sandbox then comes after the
 optimizations"). Agents may run `msr record` on the owner's Mac (D48;
 the owner's go-ahead in the session, 2026-11-16), and BetterDisplay's
-command line with the owner's virtual screen "Virtual 16:9"; the
-D56: before an agent starts a recording or plays a sound on the owner's Mac, the session running or briefing that test tells the owner, once before the test's first run.
+command line with the owner's virtual screen "Virtual 16:9"; by
+D56, before an agent starts a recording or plays a sound on the owner's Mac, the session running or briefing that test tells the owner, once before the test's first run.
 
 Still open from D34: what AGC does and whether it is on in auto mode;
 "AGC can also come as an improvement after the recorder" (the owner,
@@ -25,11 +24,54 @@ Still open from D34: what AGC does and whether it is on in auto mode;
 
 ## In flight
 
-Nothing.
+- **Clock drift correction** (D57; was queued item 5) and **`msr
+  record`'s status line, output split and `--quiet`** (D58; the
+  terminal part of queued item 13, for `msr record` only): draft PR
+  #19, built and tried locally first (the owner, 2026-11-16: "work
+  local only, with a single final CI test at the very end after we
+  both are happy"; the owner's go-ahead to push, 2026-11-17).
+  - Also in it: the command line polish (queued item 1, D59), built
+    locally after the owner tried PR #19, with the owner's later
+    findings (the `--debug` clock drift lines as one block in number
+    order) and rule (the ready check's audio item from the same
+    table, 2026-11-17: "KISS and DRY is the guide to decide such
+    things like ready check audio line").
+  - Reviewed: an adversarial review of each of the three changes and
+    delta reviews of every fix after it; the review state is in PR
+    #19's description.
+  - Clock drift, run on the owner's Mac (2026-11-17, five audio
+    sources, two screens): one hour on the build of `1fb8dae`, result
+    ok, no events; `clockDriftPpm` Razer −115.2, CalDigit 50.2, BRIO
+    2.5, MacBook microphone 3.2, system audio 6.3; the Razer's file
+    got 414 ms of sound added, the CalDigit's 180 ms removed; "ms off"
+    in the `--debug` lines from 30 s on at most 0.21 ms (Razer), 0.17
+    (CalDigit), 0.83 (BRIO), 0.10 (MacBook), 0.92 (system audio); by
+    room sound the Razer's and the BRIO's files kept the same lag
+    (−16.1 to −16.8 ms in ten of twelve 60 s stretches, the other two
+    with too little sound) where uncorrected they would have moved
+    about 420 ms apart; CPU 37 % of one core on average. Two 20 s
+    samples of that process: the resampler takes 8 to 9 % of its busy
+    time, Apple's AAC encoder about 27 %, CoreFoundation, the
+    allocator and kernel calls together about 40 % (queued item 6).
+    Earlier: 10 minutes on `1e5bfe7`, 180 s on `cdd75ad`.
+  - Status line, run on the owner's Mac: 12 s under a pseudo-terminal on `4768d34`,
+    standard output carried only the path, the line redrew every
+    second and was cleared before the summary.
+  - Seen by the owner (2026-11-17): the status window with the
+    "Clock drift" column, the status line in the owner's terminal, an
+    unplug and replug during a `--debug` run. UNVERIFIED: a gap within
+    a stream (samples lost while the device stays connected), a click
+    test through the speakers.
+  - The owner confirmed D57, D58 and D59 (2026-11-17), and `--quiet`
+    writes no warnings, only errors (D58).
+  - Waiting on the owner: merging. The
+    owner, 2026-11-17: commits name the model ("Yes, mention model");
+    the squash message carries it.
 
 ## Queued
 
-1. **Command line polish** (the owner, 2026-11-16, on `msr check`
+1. **Command line polish** (built in PR #19, D59; the owner,
+   2026-11-16, on `msr check`
    and `msr list`: "seems to me like check and list show nearly the
    same info but differently, maybe worth consolidating? Also, check
    doesn't show the settings it applies, only the effect. And in the
@@ -135,15 +177,29 @@ Nothing.
    a drain error labelled as a writer timeout in `guideTracksCut`; no
    test for a gap after real data in a guide track's last mix; an
    unlocked test flag in `DisplayFileTickerTests`.
-5. **Drift correction** (D49 measured it, the correction was left for
-   later): needed. The one-hour run of 2026-11-16 measured the Razer at
-   −116 ppm (its file 0.42 s short after an hour, about 70 ms after
-   10 minutes against the video) and the CalDigit at +50 ppm; system
-   audio, the BRIO and the MacBook microphone under 6 ppm. Try an
-   aggregate device with drift correction first. The drift estimate
-   itself (first and latest buffer arrival) mostly measures arrival
-   jitter on short files; a least-squares slope, null under about
-   30 s, fixes that.
+5. **Clock drift correction, what is left** after D57 (in flight):
+   - The homepage's screenshots are stale once PR #19 merges: the
+     status window lacks the column "Clock drift" (its alt text already
+     names it), and both windows show the old order and 0 for a source
+     not recorded (D59). The owner retakes them from the released
+     build.
+   - The Razer's and the BRIO's files are a constant 16 to 18 ms apart
+     by room sound (10-minute run, 2026-11-17): each device's own input
+     latency, which the recorder has never compensated [ASSUMED].
+     Decide whether to read Core Audio's latency per device and place
+     each file by it. Design first.
+   - The BRIO's clock drift reads about −115 ppm for its first 70 to
+     110 s, then settles near +5 ppm, in every run on the owner's Mac
+     (2026-11-17). By room sound the Razer-to-BRIO lag held within
+     0.3 ms from 30 s to 330 s in the hour run, so the BRIO's clock
+     really runs slow while it warms up and the correction follows it
+     [ASSUMED, one cross-correlation]. Nothing to change unless a
+     tester's BRIO shows otherwise.
+   - The owner's runs with `--debug` answer two assumptions: whether a
+     source's timestamps keep following its sample count across a gap
+     (a debug line at each gap shows it), and whether the rate's swing
+     on the system audio (within ±67 ppm on the measured arrivals) is
+     inaudible.
 6. **CPU**: our process averaged 56 % of one core over an hour (two
    displays, five audio sources) and peaks at 165 to 386 % at start.
    A 20 s `sample` of 2026-11-16 (build `7ad0b6b`; shares solid,
@@ -234,7 +290,9 @@ Nothing.
      shareable content ahead, off the Core Audio path; (e) a ready-check
      warning when audio inputs share a dock with a USB-C display;
      (f) leave disturbed stretches out of the drift measurement
-     (item 5); (g) our own process tap for system audio, low: it is the
+     (done with D57 for a short one, which lies above the line; a
+     late stretch of 7 s or more still tilts it, see recorder.md,
+     "Clock drift"); (g) our own process tap for system audio, low: it is the
      mechanism ScreenCaptureKit already uses. Design first.
    - Advice for the owner [ASSUMED, from the mechanism]: the Wacom
      straight into a Mac port avoids the pause; check with one replug
@@ -348,6 +406,9 @@ Nothing.
    stdout and error are handled properly for managed or scripted
    operation", "a brief banner with version info, build date and
    homepage link"):
+   - Built for `msr record` on the branch under "In flight" (D58):
+     the status line, the split and `--quiet`. Left: the other
+     commands and the window, below.
    - Only when standard error is a terminal: one line, redrawn every
      second: recording time with seconds, CPU of our process, the
      recording folder's size, free space, sources, problems. An event

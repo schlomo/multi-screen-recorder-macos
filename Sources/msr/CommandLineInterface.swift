@@ -76,7 +76,7 @@ func homeFolderOrExit() throws -> URL {
     do {
         return try homeFolder()
     } catch let error as MissingHomeFolderError {
-        FileHandle.standardError.write(Data("Error: \(error)\n".utf8))
+        StandardErrorWriter.shared.write("Error: \(error)\n")
         throw unsetHomeExitCode
     }
 }
@@ -84,7 +84,7 @@ func homeFolderOrExit() throws -> URL {
 /// What the settings file gives, never refused; what it ignored is named on standard error.
 func loadSettings(from file: SettingsFile) -> Settings {
     let read = file.load()
-    if let note = read.note { FileHandle.standardError.write(Data("\(note)\n".utf8)) }
+    if let note = read.note { StandardErrorWriter.shared.write("\(note)\n") }
     return read.settings
 }
 
@@ -95,7 +95,7 @@ func standardSettingsFile() throws -> SettingsFile {
 extension CommandLineInterface {
     struct List: AsyncParsableCommand {
         static let configuration = CommandConfiguration(
-            abstract: "Show screens, audio inputs and system audio.")
+            abstract: "Show what will be recorded: the settings, the screens, the audio inputs and the system audio. Asks for no permission.")
 
         func run() async throws {
             let file = try standardSettingsFile()
@@ -103,8 +103,8 @@ extension CommandLineInterface {
             let screens = try await currentScreens()
             let audioInputs = try currentAudioInputs()
             print(renderList(
-                screens: numberScreens(screens),
-                resolution: settings.effectiveResolution,
+                settings: settings,
+                screens: screens,
                 audioInputs: audioInputs,
                 systemAudioAvailable: screenRecordingIsGranted()
             ), terminator: "")

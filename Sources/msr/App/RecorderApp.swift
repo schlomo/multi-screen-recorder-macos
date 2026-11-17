@@ -49,7 +49,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func startRecording() {
         guard let model, model.canStart else { return }
         do {
-            session = try RecordingSession(settings: model.settings, homeFolder: model.homeFolder, tellOnStandardError: false)
+            session = try RecordingSession(settings: model.settings, homeFolder: model.homeFolder, output: nil)
         } catch {
             showAlert("Cannot start the recording", error.description)
             return

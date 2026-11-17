@@ -39,6 +39,6 @@ public enum RecorderLog {
         let message = message()
         logger(category).debug("\(message, privacy: .public)")
         let seconds = elapsed.withLock { $0 }?()
-        FileHandle.standardError.write(Data((EventLine.debugText(message, category: category, seconds: seconds) + "\n").utf8))
+        StandardErrorWriter.shared.write(EventLine.debugText(message, category: category, seconds: seconds) + "\n")
     }
 }

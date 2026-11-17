@@ -27,7 +27,7 @@ enum TableLayout {
         ["8888×8888"],
         ["8888×8888"],
         ["8888×8888", "2 channels", "stereo", "cannot be read"],
-        ["888.8", "<0.1", "?", "0"],
+        ["888.8", "<0.1", "?", "-"],
     ]
 
     /// Source's width for these names: each with the widest number, so that
@@ -44,12 +44,13 @@ enum TableLayout {
     }
 
     /// The widest possible content of each status column after Source:
-    /// Records at, Files, Written and State, every state's text.
+    /// Records at, Files, Written, State, every state's text, and Clock drift.
     static let statusSamples: [[String]] = [
         ["8888×8888", "2 channels", "stereo"],
         ["888"],
         ["888.8 GB", "999 MB", "?"],
         RecordingStatusTable.StateText.allCases.map(\.rawValue),
+        ["-1000 ppm (-9999.9 ms)", "\(RecordingStatusTable.measuring) (-9999.9 ms)"],
     ]
 
     /// The status window's columns after Source; its headers, in a bolder

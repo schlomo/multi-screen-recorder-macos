@@ -76,6 +76,14 @@ The small window of a running recording, opened by a click on the Dock
 icon or by Quit, in the app and in `msr record`: what is recorded, the
 data written, the problems, and Stop and Continue (D46).
 
+## Status line
+
+The one line `msr record` redraws once a second on standard error when
+that is a terminal: the count of problems when there are any, then the
+recording time, the size written, the files and the free space, the CPU
+use and the sources being recorded, in that order. Not the window's own
+line below its table.
+
 ## Crash report
 
 The `.ips` file macOS writes when `msr` quits unexpectedly, in
@@ -181,7 +189,7 @@ The audio mode Wired records the default microphone plus every audio
 input that is built-in or connected by cable (built-in counts as wired):
 built-in, USB, FireWire, PCI, Thunderbolt, HDMI
 and DisplayPort, as Core Audio reports the transport type. Bluetooth,
-Bluetooth LE, virtual, aggregate, AirPlay, Continuity capture, an
+Bluetooth LE, virtual, aggregate, AirPlay, Continuity Capture, an
 unknown transport and one that cannot be read are not wired. Auto mode's
 audio mode, and the default (D44).
 
@@ -219,11 +227,15 @@ which is told as a problem.
 
 ## Clock drift
 
-How far an audio file's sample count runs from the tick grid, in parts
-per million, measured over the file and given in the recording
-manifest as `clockDriftPpm`: positive when the audio device's clock
-runs fast (more samples than the grid's time), negative when slow. Not
-corrected yet (D49).
+How far an audio device's clock runs from the shared clock, in parts
+per million: positive when it runs fast (more samples than the shared
+clock's time), negative when slow (D49). It is measured from when the
+device's buffers arrive and corrected: every audio source's sound is
+resampled continuously so its sample count follows the shared clock.
+The recording manifest gives each audio file's clock drift at the
+file's end as `clockDriftPpm` (D57; under D49 it was measured over the
+whole file) and the sound the correction added as
+`clockDriftCorrection`.
 
 ## Recording resolution
 
@@ -245,6 +257,13 @@ Displays; a column of the table. What Native records (D44).
 
 The screen's size in pixels, which a HiDPI mode makes larger than its
 looks-like size; a column of the table. Never recorded (D44).
+
+## Not recorded
+
+A source the settings or its own state leave out of a recording: shown
+dimmed in the window, with `-` for GB/h max, and, for an audio input
+whose own rule leaves it out, the reason in parentheses after its name
+(`(virtual)`, `(no device ID)`; D59).
 
 ## Ready check
 

@@ -29,7 +29,8 @@ import Testing
             .init(source: .screen(1, name: "Built-in Retina Display"), recordsAt: "1920×1080", files: 2, written: "1.3 GB", state: "recording"),
             .init(source: .screen(2, name: "LG HDR 4K"), recordsAt: "1920×1080", files: 1, written: "40 MB", state: "disk full"),
         ])
-        #expect(RecordingStatusTable.columns == ["Source", "Records at", "Files", "Written", "State"])
+        #expect(RecordingStatusTable.columns == ["Source", "Records at", "Files", "Written", "State", "Clock drift"])
+        #expect(rows.allSatisfy { $0.values.count == RecordingStatusTable.columns.count - 1 && $0.clockDrift.isEmpty })
     }
 
     @Test func aScreenWaitingGoneOrFailingSaysSo() {
@@ -79,10 +80,40 @@ import Testing
         let usb = AudioInputInfo(name: "USB Audio", channelCount: 1, isDefault: true, transport: .usb, uid: "U1")
         let twin = AudioInputInfo(name: "USB Audio", channelCount: 2, isDefault: false, transport: .usb, uid: "U2")
         _ = tracker.begin(inputs: [usb, twin], mainDisplayID: 1, screens: [1], at: 0)
-        let rows = RecordingStatusTable.audioRows(sources: tracker.sourcesShown, files: [], bytes: [:])
+        let rows = RecordingStatusTable.audioRows(sources: tracker.sourcesShown, files: [], bytes: [:], clockDrift: [:])
         #expect(rows.map(\.source) == [
-            .audioInput(1, name: "USB Audio"), .audioInput(2, name: "USB Audio"), .systemAudio(isRecorded: true),
+            .systemAudio(isRecorded: true), .audioInput(1, name: "USB Audio"), .audioInput(2, name: "USB Audio"),
         ])
+    }
+
+    /// The clock drift and the sound added so far; `measuring` until the
+    /// clock drift is known, with the correction once one is applied;
+    /// nothing for a source that is not recording.
+    @Test func anAudioSourceShowsItsClockDrift() {
+        var settings = Settings.defaults
+        settings.auto = false
+        settings.audioMode = .allInputs
+        settings.systemAudio = true
+        var tracker = AudioTracker(settings: settings)
+        let razer = AudioInputInfo(name: "Razer Seiren V3 Mini", channelCount: 1, isDefault: true, transport: .usb, uid: "R")
+        let caldigit = AudioInputInfo(name: "CalDigit Thunderbolt 3 Audio", channelCount: 2, isDefault: false, transport: .usb, uid: "C")
+        _ = tracker.begin(inputs: [razer, caldigit], mainDisplayID: 1, screens: [1], at: 0)
+        tracker.fileStarted(.input("R"))
+        tracker.fileStarted(.input("C"))
+        _ = tracker.captureEnded(.systemAudio, .captureFailed("-3805"), at: 1)
+        let rows = RecordingStatusTable.audioRows(sources: tracker.sourcesShown, files: [], bytes: [:], clockDrift: [
+            .input("R"): ClockDriftCorrection.Status(clockDriftPpm: -116.12, applied: 0.03494, remaining: 0.00004),
+            .input("C"): ClockDriftCorrection.Status(clockDriftPpm: nil, applied: 0.0003, remaining: 0.0001),
+            .systemAudio: ClockDriftCorrection.Status(clockDriftPpm: 0, applied: 0, remaining: 0),
+        ])
+        #expect(rows.map(\.state) == ["failed, retrying", "recording", "recording"])
+        #expect(rows.map(\.clockDrift) == ["", "-116 ppm (+34.9 ms)", "measuring (+0.3 ms)"])
+        let text = RecordingStatusTable.clockDriftText
+        #expect(text(nil) == "measuring")
+        #expect(text(.init(clockDriftPpm: nil, applied: 0.000_02, remaining: nil)) == "measuring")
+        #expect(text(.init(clockDriftPpm: 49.1, applied: -0.0123, remaining: 0)) == "+49 ppm (-12.3 ms)")
+        // Zero is 0, never +0 or -0.0.
+        #expect(text(.init(clockDriftPpm: -0.3, applied: -0.000_04, remaining: 0)) == "0 ppm (0 ms)")
     }
 
     /// A size that cannot be read is not shown as nothing written.

@@ -206,6 +206,62 @@ is tried, a wrong picture after a reconnect is a failed assertion all
 the same: the recorder has to deliver the right screen in either
 case, and a recorder that cannot yet keeps those scenarios failing.
 
+### Known limits of the clock drift correction
+
+The correction measures a device's clock from when its buffers arrive
+([recorder.md](recorder.md), "Clock drift"); what that cannot tell
+apart, a test cannot either:
+
+- **A lasting latency change is taken as a clock offset.** When a
+  device's buffers start to arrive later or earlier for good (a driver
+  or a dock changing its buffering), the correction follows it as if
+  the device's clock had jumped: up once the points before the change
+  leave the 20 s horizon, down at once, at up to 1000 ppm, so that
+  source's sound moves by the change; a step down overshoots (1.1 ms on
+  2 ms, 2.1 ms on 4 ms). The clock drift shown, the median of the
+  latest estimates' slopes, stays within 1 ppm through a step.
+- **Late points that outweigh the others tilt the line.** Whenever the
+  late points outweigh the others in the horizon, the support line tilts
+  until they leave it, and empty intervals make that easier: nothing for
+  8 s with the backlog drained over 6 s 6.8 ms off; a stall of 6 s or
+  more can tilt it (6 s 0.85 ms at -116 ppm, 5.2 ms at +48.6 ppm), of
+  7 s up to 6.2 ms, of 9 s with the buffers queued behind it up to
+  8.3 ms, of 30 s up to 30 ms; a source at its lowest only once in 12 s
+  with the rest 6 ms higher swings by up to 3.2 ms all the time. The
+  clock drift shown stays within 3.1 ppm through a stall of up to 30 s;
+  after a longer one it is the tilted slope until the tilted estimates
+  are under half again (a stall of 40 s from 100 s: off by up to
+  884 ppm, more than 5 ppm off from 131 s to 188 s, so about 90 s from
+  the stall's start), and a file's `clockDriftPpm` if it ends then.
+- **A gap after a long tilt adds the tilted slope.** The drift added
+  across a gap is the kept slope, the median of the latest estimates'
+  slopes, times the gap's length, so it carries the kept slope's error
+  times the length: small while the tilted slopes are under half of
+  the kept ones (a 600 s gap at once after a stall of 9 s moves the
+  correction by up to 0.26 ms, of 20 s 0.84 ms, of 30 s 2.5 ms; a
+  3600 s gap after 9 s 1.6 ms), the tilted slope after a tilt that
+  lasted longer than the median covers (a stall of 40 s, then a 600 s
+  gap within 30 s: 530 ms).
+- **The reference is never revised.** It comes from the first
+  estimate's about 10 s of points: a source at its lowest only once in
+  8 s can start up to 3.4 ms off for good, depending on where its
+  lowest second falls (within 0.57 ms in three of its eight phases);
+  the system audio's measured 4 s pattern is within 0.32 ms in all
+  four phases.
+- **One early buffer pulls the line down, amplified.** A buffer early
+  by a glitch of its timestamp or arrival puts the line under it for
+  the horizon: 20 ms early up to 12.3 ms off, 6 ms early 8.9 ms, 3 ms
+  early 4.4 ms, and up to 42 s until back within 0.5 ms.
+- **A gap assumes the timestamps keep following the sample count.**
+  After a gap the new segment starts at its own timestamp plus the
+  correction applied so far plus the device's drift during the gap (the
+  kept slope over its length); a source whose timestamps jump to the
+  host clock across a gap would be off by its drift until then. The
+  `--debug` line for each gap shows the drift added and the lateness
+  before and after it, which tells.
+
+All figures are the worst of 20 seeds of the tests' simulation.
+
 ### What the recorder design must provide
 
 The assertions need these, and [recorder.md](recorder.md) does not
@@ -371,6 +427,40 @@ tried:
   design, untested). Not tried: a run of several
   hours, other audio inputs, a run under load or with the Mac asleep,
   a Bluetooth input, and any correction.
+- **When an audio input's buffers arrive shows its clock; their
+  timestamps do not.** Tried (2026-11-16, one probe of 300 s, macOS
+  26.7.1): one `AVCaptureSession` per audio input, five inputs, each
+  buffer's arrival on the host clock against its sample count.
+  `AVCaptureSession`'s timestamps follow the sample count exactly (the
+  timestamp minus the samples spread 0.000 ms over 300 s, all five), so
+  they carry no clock drift. The smallest, per second, of a buffer's
+  arrival minus its audio time is the device's clock against the host
+  clock: a straight line with a residual of 0.04 ms (standard
+  deviation) for the Razer Seiren V3 Mini (-116.1 ppm), CalDigit
+  Thunderbolt 3 Audio (+49.1 ppm), MacBook Pro Microphone (+1.7 ppm)
+  and BlackHole 2ch (0.0 ppm), agreeing with Core Audio's own device
+  clock (`AudioDeviceGetCurrentTime`,
+  `kAudioDevicePropertyActualSampleRate`) to under 0.1 ppm. The
+  Logitech BRIO's rate is not constant: -116 ppm for the first 45 s,
+  then swinging between about -60 and +110 ppm with a period of about
+  25 s around 0 (a sawtooth of ±0.5 ms), so a single measured rate
+  cannot correct it; a correction must follow the offset. After 300 s
+  the Razer was 34.7 ms behind the host clock, more than one frame.
+- **The system audio arrives in bursts, so one second's smallest
+  lateness is not its clock.** Tried (2026-11-17, one probe of 120 s
+  (128 s of data) of a ScreenCaptureKit audio stream, macOS 26.7.1): its buffers hold 960
+  samples, their timestamps follow the sample count exactly, but they
+  arrive every 21.33 ms (median) with catch-up bursts. The smallest
+  lateness per second is a sawtooth, not a line: 41.6, 44.3, 47.2 and
+  43.1 ms, repeating every 4 s, with no clock drift (the lowest points
+  stay within 0.25 ms over 120 s). The smallest over about 5 s is its
+  clock. On the real arrivals of six sources (these probes), the
+  correction as built (the lower support line of each interval's
+  smallest lateness over 20 s, [recorder.md](recorder.md), "Clock
+  drift") kept BlackHole within 0.05 ms, MacBook Pro Microphone 0.11 ms,
+  CalDigit Thunderbolt 3 Audio 0.28 ms, Razer Seiren V3 Mini 0.48 ms
+  and Logitech BRIO 0.93 ms against its 5 s envelope; the system
+  audio's correction ended at 0.09 ms with its rate within ±67 ppm.
 - **An unplugged audio input ends its `AVCaptureSession`, which does
   not resume.** Tried (2026-11-15, the Razer Seiren V3 Mini over USB,
   unplugged during a running session): `AVCaptureSession`'s runtime

@@ -220,7 +220,30 @@ import Testing
         #expect(files[0]["audioSourceUID"] == nil)
         #expect(files[2]["channels"] as? Int == 2)
         #expect(files[2]["clockDriftPpm"] is NSNull)
+        #expect(files[2]["clockDriftCorrection"] is NSNull)
         #expect(try RecordingManifest(json: data) == manifest)
+    }
+
+    /// An audio file's clock drift is the one shown at its end, and its
+    /// correction the sound added during it; neither is negative zero.
+    @Test func anAudioFilesClockDriftAndCorrection() throws {
+        var file = RecordingManifest.AudioFile(
+            name: "a.mov", audioSource: "Razer Seiren V3 Mini", audioSourceUID: "R", channels: .mono(1), start: 0, timecode: "t")
+        file.clockDrift(correction: 0.034_94, ppm: -116.12)
+        #expect(file.clockDriftCorrection == 0.0349)
+        #expect(file.clockDriftPpm == -116.1)
+        file.clockDrift(correction: -0.000_491, ppm: nil)
+        #expect(file.clockDriftCorrection == -0.0005)
+        #expect(file.clockDriftPpm == nil)
+        file.clockDrift(correction: -0.000_01, ppm: -0.04)
+        let object = try #require(try JSONSerialization.jsonObject(with: try JSONEncoder().encode(file)) as? [String: Any])
+        let text = try #require(String(data: try JSONEncoder().encode(file), encoding: .utf8))
+        #expect(object["clockDriftPpm"] as? Double == 0)
+        #expect(object["clockDriftCorrection"] as? Double == 0)
+        #expect(!text.contains("-0"), "\(text)")
+        file.clockDrift(correction: 0, ppm: nil)
+        let unmeasured = try #require(try JSONSerialization.jsonObject(with: try JSONEncoder().encode(file)) as? [String: Any])
+        #expect(unmeasured["clockDriftPpm"] is NSNull)
     }
 
     @Test func aFinalizedManifestTakesNoMoreEventsOrAudioFiles() {
@@ -472,6 +495,38 @@ import Testing
         let summary = RecordingSummary(manifest: recorded, recordingFolder: "/r", seconds: 5, manifestWritten: true)
         #expect(summary.text == "Recorded 5s into /r\n  f0.mov  finalized\n  a.mov  finalized\n"
             + "CPU 12 % on average, 32 % at the peak, of one core (this process only)\n")
+    }
+
+    /// The screens by number, then the audio sources by number, the system audio (0) first; a source's files by start,
+    /// also when a later file was appended before an earlier one.
+    @Test func theFilesAreListedByScreenNumberThenAudioNumberThenStart() {
+        let utc = TimeZone(identifier: "UTC")!
+        let started = Date(timeIntervalSince1970: 1_800_000_000)
+        func screen(_ number: Int, _ name: String, at seconds: Double) -> RecordingManifest.ScreenFile {
+            RecordingManifest.ScreenFile(
+                name: RecordingNames.screenFile(start: started + seconds, timeZone: utc, number: number, screen: name),
+                screen: name, screenUUID: "U\(number)", frameSize: FrameSize(width: 2, height: 2), start: seconds, timecode: "t")
+        }
+        func audio(_ source: AudioFileDescription.Source, at seconds: Double) -> RecordingManifest.AudioFile {
+            RecordingManifest.AudioFile(
+                name: RecordingNames.audioFile(start: started + seconds, timeZone: utc, source: source),
+                audioSource: "M", audioSourceUID: "u", channels: .mono(1), start: seconds, timecode: "t")
+        }
+        func input(_ number: Int, _ name: String) -> AudioFileDescription.Source {
+            .audioInput(number: number, name: name, coreAudioUID: "u\(number)", channelCount: 1)
+        }
+        var recorded = manifest([])
+        recorded.files = [screen(2, "B", at: 0), screen(1, "A", at: 840), screen(1, "A", at: 0)]
+        recorded.audioFiles = [audio(input(4, "D"), at: 0), audio(.systemAudio, at: 0), audio(input(10, "K"), at: 0),
+                               audio(input(1, "C"), at: 900), audio(input(1, "C"), at: 0)]
+        let lines = RecordingSummary(manifest: recorded, recordingFolder: "/r", seconds: 5, manifestWritten: true)
+            .text.split(separator: "\n").dropFirst().map { $0.dropFirst(2).dropLast(11) }
+        let names = lines.map { String($0) }
+        #expect(names == [recorded.files[2].name, recorded.files[1].name, recorded.files[0].name,
+                          recorded.audioFiles[1].name, recorded.audioFiles[4].name, recorded.audioFiles[3].name,
+                          recorded.audioFiles[0].name, recorded.audioFiles[2].name])
+        #expect(names.map { $0.dropFirst(20).prefix { $0 != "." } } == [
+            "Screen 1 - A", "Screen 1 - A", "Screen 2 - B", "Audio 0 - System", "Audio 1 - C", "Audio 1 - C", "Audio 4 - D", "Audio 10 - K"])
     }
 
     @Test func aWriterThatFailedIsAnError() {

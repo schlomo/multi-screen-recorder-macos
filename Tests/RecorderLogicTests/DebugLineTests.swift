@@ -26,6 +26,26 @@ import Testing
             + "audio inputs: none; output folder unusable (read-only)")
     }
 
+    /// The clock drift lines of all audio sources come together, in number order: the system audio (0) first.
+    @Test func theClockDriftBlockListsTheSourcesInNumberOrder() {
+        let measured = ClockDriftCorrection.Status(clockDriftPpm: -116.12, applied: 0.03494, remaining: 0.00004)
+        let notYet = ClockDriftCorrection.Status(clockDriftPpm: nil, applied: 0, remaining: nil)
+        let block = DebugLine.clockDriftBlock([
+            (number: 4, label: "Audio 4 - MacBook Pro Microphone", status: notYet),
+            (number: 1, label: "Audio 1 - CalDigit", status: measured),
+            (number: 0, label: "Audio 0 - System", status: notYet),
+            (number: 2, label: "Audio 2 - Razer", status: notYet),
+        ])
+        #expect(block == [
+            DebugLine.clockDrift(of: "Audio 0 - System", notYet),
+            DebugLine.clockDrift(of: "Audio 1 - CalDigit", measured),
+            DebugLine.clockDrift(of: "Audio 2 - Razer", notYet),
+            DebugLine.clockDrift(of: "Audio 4 - MacBook Pro Microphone", notYet),
+        ])
+        #expect(block[0] == "Audio 0 - System: clock drift not measured yet, corrected 0 ms so far")
+        #expect(DebugLine.clockDriftBlock([]).isEmpty)
+    }
+
     @Test func anActionNamesTheScreen() {
         let start = ScreenTracker.Action.start(
             uuid: "037036FB-1234-5678-9ABC-DEF012345678", displayID: 2, frameSize: FrameSize(width: 1920, height: 1080),
@@ -45,5 +65,28 @@ import Testing
         ]
         #expect(DebugLine.screens(screens)
             == "DELL P3421W 3440×1440 at (0,0) main (display ID 1), unnamed 1920×1080 at (3440,0) mirrors A (display ID 3)")
+    }
+
+    @Test func theClockDriftLineSaysWhatTheCorrectionDoes() {
+        let label = "Audio 1 - Razer Seiren V3 Mini"
+        #expect(DebugLine.clockDrift(of: label, .init(clockDriftPpm: -116.12, applied: 0.034_94, remaining: -0.000_04))
+            == "Audio 1 - Razer Seiren V3 Mini: clock drift -116.1 ppm, corrected +34.94 ms so far, 0.04 ms off")
+        #expect(DebugLine.clockDrift(of: label, .init(clockDriftPpm: nil, applied: 0.000_2, remaining: 0.000_5))
+            == "Audio 1 - Razer Seiren V3 Mini: clock drift not measured yet, corrected +0.20 ms so far, 0.50 ms off")
+        #expect(DebugLine.clockDrift(of: "Audio 0 - System", .init(clockDriftPpm: nil, applied: 0, remaining: nil))
+            == "Audio 0 - System: clock drift not measured yet, corrected 0 ms so far")
+        // Zero is 0, never +0.0 or -0.0.
+        #expect(DebugLine.clockDrift(of: "Audio 0 - System", .init(clockDriftPpm: -0.04, applied: -0.000_001, remaining: -0.000_001))
+            == "Audio 0 - System: clock drift 0 ppm, corrected 0 ms so far, 0 ms off")
+    }
+
+    @Test func aGapLineSaysWhatTheCorrectionKnew() {
+        let gap = ClockDriftCorrection.Gap(length: 100_000_000, applied: 0.003_45, drift: 0.000_011_6, latenessBefore: 0.012_3, latenessAfter: 0.012_41)
+        #expect(DebugLine.clockDriftGap(of: "Audio 2 - Razer Seiren V3 Mini", gap)
+            == "Audio 2 - Razer Seiren V3 Mini: gap of 100.0 ms, clock drift corrected +3.45 ms so far, +0.012 ms for the gap, "
+            + "lateness 12.30 ms before, 12.41 ms after")
+        let before = ClockDriftCorrection.Gap(length: 50_000_000, applied: 0, drift: 0, latenessBefore: 0.01, latenessAfter: 0.01)
+        #expect(DebugLine.clockDriftGap(of: "Audio 0 - System", before)
+            == "Audio 0 - System: gap of 50.0 ms, clock drift corrected 0 ms so far, 0 ms for the gap, lateness 10.00 ms before, 10.00 ms after")
     }
 }

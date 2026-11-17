@@ -24,14 +24,14 @@ import Testing
 
     @Test func theSamplesAreTheWidestPossibleContent() {
         let all = TableLayout.samples.flatMap { $0 }
-        for text in ["8888×8888", "2 channels", "stereo", "cannot be read", "888.8", "<0.1", "?", "0"] {
+        for text in ["8888×8888", "2 channels", "stereo", "cannot be read", "888.8", "<0.1", "?", "-"] {
             #expect(all.contains(text), Comment(rawValue: text))
         }
     }
 
     @Test func eachFixedStatusColumnHoldsItsWidestContent() {
         let widest = [["8888×8888", "2 channels", "stereo"], ["888"], ["888.8 GB", "999 MB", "?"],
-                      RecordingStatusTable.StateText.allCases.map(\.rawValue)]
+                      RecordingStatusTable.StateText.allCases.map(\.rawValue), ["-1000 ppm (-9999.9 ms)", "measuring (-9999.9 ms)"]]
         #expect(TableLayout.statusColumnWidths.count == RecordingStatusTable.columns.count - 1)
         for (width, texts) in zip(TableLayout.statusColumnWidths, widest) {
             for text in texts { #expect(width >= measured(text), Comment(rawValue: text)) }

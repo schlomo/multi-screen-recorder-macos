@@ -10,6 +10,14 @@ public enum SourceLabel {
         "Screen \(number) - \(name)"
     }
 
+    /// Where a source's file goes in a list of files: the screens by number, then the audio
+    /// sources by number (the system audio, 0, first), read from the label in the file's name
+    /// ("2026-11-12 14.03.05 Screen 2 - LG HDR 4K.mov"); a name without a label goes last.
+    public static func listPosition(ofFileName name: String) -> (group: Int, number: Int) {
+        guard let match = name.firstMatch(of: /\ (Screen|Audio)\ (\d+)\ -\ /), let number = Int(match.2) else { return (2, 0) }
+        return (match.1 == "Screen" ? 0 : 1, number)
+    }
+
     /// "Audio 3 - Razer Seiren V3 Mini".
     public static func audioInput(_ number: Int, name: String) -> String {
         "Audio \(number) - \(name)"

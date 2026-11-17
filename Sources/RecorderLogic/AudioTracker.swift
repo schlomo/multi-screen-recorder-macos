@@ -410,7 +410,7 @@ public struct AudioTracker: Sendable {
         }
     }
 
-    /// The audio inputs by number, then the system audio.
+    /// The system audio (0), then the audio inputs by number.
     public var sourcesShown: [Source] {
         sources.filter { $0.value.wasRecorded || $0.value.isWanted }.map { id, tracked in
             let state: Source.State = switch tracked.phase {
@@ -425,6 +425,6 @@ public struct AudioTracker: Sendable {
             }
             return Source(id: id, number: tracked.number, name: tracked.name, state: state)
         }
-        .sorted { ($0.id == .systemAudio ? 1 : 0, $0.number) < ($1.id == .systemAudio ? 1 : 0, $1.number) }
+        .sorted { $0.number < $1.number }
     }
 }
