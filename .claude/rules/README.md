@@ -9,8 +9,11 @@ The root instruction file (`AGENTS.md`) is always loaded, so it stays
 small (see `../../docs/principles/context-economy.md`). A rule that
 only matters for one area of the tree (a subsystem's own
 conventions, a language-specific style rule, a directory with unusual
-constraints) does not belong there; it belongs in a path-scoped rule
-instead, so it's loaded only when it's actually relevant.
+constraints) does not belong there; it belongs in that area's
+platform note in `../../docs/principles/platform-notes/`, which every
+agent, whatever its tool, reaches through `AGENTS.md` (D56). This
+folder holds path-scoped rules only for what concerns Claude Code
+alone.
 
 A rule file without a `paths` header loads in every session, so only
 a rule that truly applies everywhere omits it; this README has one, so

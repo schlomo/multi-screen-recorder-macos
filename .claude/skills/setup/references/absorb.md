@@ -76,13 +76,14 @@ cannot observe.
 Each instruction is sorted into the starter's `AGENTS.md`: the purpose
 line, "Where things are", "Running the tests", or "Facts that bite".
 For a fact, follow the placeholder comment there: the headline in the
-root file and the full text in the area's path-scoped rule file in
-`.claude/rules/`, except an action-triggered fact, kept in full in the
-root. An instruction a guardrail or principle already covers is not
+root file and the full text in the area's platform note in
+`docs/principles/platform-notes/`, except an action-triggered fact,
+kept in full in the root. An instruction a guardrail or principle already covers is not
 repeated; the summary names what covers it. The starter's Guardrails
 and Principles sections stay verbatim.
-A convention for one area of the tree goes to that area's rule file in
-`.claude/rules/`. A short repo-wide convention (for example "run
+A convention for one area of the tree goes to that area's platform
+note in `docs/principles/platform-notes/`; `.claude/rules/` holds only
+what concerns Claude Code alone. A short repo-wide convention (for example "run
 `make fmt` before committing") stays in the root under "Facts that
 bite", in full, like an action-triggered fact; a long one (a style
 guide) stays a doc of its own, listed in "Where things are", so the
