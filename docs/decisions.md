@@ -1647,14 +1647,15 @@ architect's reading.
      machine-readable result.
   2. When standard error is a terminal, one status line is redrawn
      every second: the count of problems first when there are any,
-     then the recording time, the size written, the free space, the
-     CPU use and the sources being recorded. No option turns it on or
-     off.
+     then the recording time, the size written, the files, the free
+     space, the CPU use and the sources being recorded. No option
+     turns it on or off.
   3. `--quiet` writes nothing for people. Still written on standard
      error: a failing ready check, errors, the settings file note,
      each problem as it happens and the summary of a run that exits 3.
      Exit codes are unchanged. `--quiet` with `--debug` is refused.
-  4. A failed write to standard error never ends a recording.
+  4. A failed write to standard error never ends a recording, and
+     neither does a closed reader of standard output.
 - **The architect's details, for the owner to confirm:** the order of
   the status line's parts and that it says nothing about problems when
   there are none; what `--quiet` still writes; the refusal of
