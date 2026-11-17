@@ -16,6 +16,7 @@ repository="schlomo/multi-screen-recorder-macos"
 install_folder="${INSTALL_FOLDER:-/Applications}"
 target="$install_folder/$bundle"
 staged="$install_folder/.$bundle.installing"
+replaced="$install_folder/.$bundle.old"
 
 fail() { echo "$me: $*" >&2; exit 1; }
 
@@ -52,15 +53,25 @@ install_zip() {
     codesign --verify --deep --strict "$unpacked/$bundle" || fail "the signature of $bundle in $zip does not verify, nothing was changed"
     refuse_while_running
 
+    [[ ! -e $replaced ]] || fail "$replaced is left over from an install that stopped; check it, remove it, and run again"
     trap 'rm -rf "$scratch" "$staged"' EXIT
     rm -rf "$staged"
     ditto "$unpacked/$bundle" "$staged"
     xattr -dr com.apple.quarantine "$staged"
-    if xattr -rl "$staged" | grep -q com.apple.quarantine; then
+    local remaining
+    remaining="$(xattr -rl "$staged")"
+    if [[ $remaining == *com.apple.quarantine* ]]; then
         fail "a file of the new app still carries com.apple.quarantine, nothing was changed"
     fi
-    rm -rf "$target"
-    mv "$staged" "$target"
+    # The old app is renamed aside, not deleted, until the new one is in place.
+    if [[ -e $target ]]; then
+        mv "$target" "$replaced"
+    fi
+    if ! mv "$staged" "$target"; then
+        [[ ! -e $replaced ]] || mv "$replaced" "$target"
+        fail "cannot move the new app to $target, the old app is back"
+    fi
+    rm -rf "$replaced" || fail "the new app is installed, but cannot remove the old one at $replaced"
     echo "Installed $target, version $(plutil -extract MSRVersion raw "$target/Contents/Info.plist")"
 }
 

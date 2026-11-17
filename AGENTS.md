@@ -286,8 +286,9 @@ below).
   safe; the tests read the Mac's audio device list, which shows no
   prompt.
 - `scripts/install-app` replaces the installed app in `/Applications`,
-  so an agent runs it only to hand the owner a try-out build, telling
-  the owner first and never while the owner records.
+  so an agent runs it against `/Applications` only with the owner's
+  go-ahead for that install (to hand over a try-out build), and never
+  while the owner records.
 - Real capture needs the Screen & System Audio Recording and
   Microphone permissions, granted by a person on the Mac. Capture
   behaviour is verified on the owner's Mac (the v1 gate in

@@ -279,8 +279,9 @@ fit together is in [docs/design/delivery.md](docs/design/delivery.md).
 `scripts/install-app` replaces the app in `/Applications`: with no
 argument it builds and signs first, `--release` installs the latest
 release, and a zip path installs that zip. It refuses while the
-installed app runs, keeps both permissions (the signature stays the
-same) and needs no "Open Anyway" (it removes the quarantine); details in
+installed app runs, keeps both permissions (the certificate stays the
+same; `SIGNING_IDENTITY=-`, ad hoc, loses them) and needs no "Open
+Anyway" (it removes the quarantine); details in
 [docs/design/delivery.md](docs/design/delivery.md).
 
 ## Feedback

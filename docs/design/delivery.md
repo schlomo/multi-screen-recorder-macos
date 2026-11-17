@@ -222,7 +222,7 @@ account and plan were not checked].
 
 Installing is the same for all three: unpack the zip into a temporary
 folder, verify the signature (`codesign --verify --deep --strict`),
-replace the installed app, remove the quarantine attribute from it
+replace the installed app (the old one is renamed aside and deleted only once the new one is in place; if the move fails it is put back), remove the quarantine attribute from it
 recursively, check that no file still carries it, and print the
 installed version. The script refuses, before changing anything, while
 the installed app's `msr` runs (the app, or `msr record` started by
@@ -232,7 +232,8 @@ the file's identity, not by the name a process was started with.
 
 The installed app keeps the Screen & System Audio Recording and
 Microphone permissions because every build is signed with the same
-certificate (D5), and needs no "Open Anyway" because the quarantine
+certificate (D5); a build signed ad hoc (`SIGNING_IDENTITY=-`) loses
+them. It needs no "Open Anyway" because the quarantine
 attribute is removed. The tests run the script with a zip argument on
 small stand-in bundles; the modes without an argument and `--release`
 build, sign and download, so no test runs them.
