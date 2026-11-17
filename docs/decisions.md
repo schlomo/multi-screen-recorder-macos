@@ -1641,7 +1641,8 @@ architect's reading.
 ## D57: Clock drift is corrected by resampling every audio source to the shared clock (2026-11-17)
 
 - **Status:** in force; the design is the architect's, built at the
-  owner's request and for the owner to confirm. Closes D49's "corrected
+  owner's request and confirmed by the owner (2026-11-17: "I think
+  yes"). Closes D49's "corrected
   in a later PR" and D50's open question on the system audio's
   timestamps; changes the meaning of D49's `clockDriftPpm`.
 - **Context:** The owner, 2026-11-16: "research, understand and build a
@@ -1717,12 +1718,14 @@ architect's reading.
      Exit codes are unchanged. `--quiet` with `--debug` is refused.
   4. A failed write to standard error never ends a recording, and
      neither does a closed reader of standard output.
-- **The architect's details, for the owner to confirm:** the order of
-  the status line's parts and that it says nothing about problems when
-  there are none; what `--quiet` still writes; the refusal of
-  `--quiet` with `--debug`. Open: whether `--quiet` also writes low
-  disk space and a screen showing another screen's picture, which are
-  events, not problems.
+- **The architect's details, confirmed by the owner (2026-11-17: "I
+  think yes"):** the order of the status line's parts and that it says
+  nothing about problems when there are none; what `--quiet` still
+  writes; the refusal of `--quiet` with `--debug`. On low disk space
+  and a screen showing another screen's picture, which are events, not
+  problems, the owner (2026-11-17): "no warnings in --quiet, but if it
+  fails on low disk space then of course write errors". So `--quiet`
+  writes neither, and a full disk, which is a problem, is written.
 - **Evidence:** [design/recorder.md](design/recorder.md), the
   `msr record` row and "Tests".
 
@@ -1766,7 +1769,8 @@ architect's reading.
   4. The ready check's "Fix:" lines wrap at 80 columns under their
      text; `msr list` says that the program running `msr`, not the
      app, lacks the Screen & System Audio Recording permission.
-- **The architect's reading, for the owner to confirm:** the reasons
+- **The architect's reading, confirmed by the owner (2026-11-17: "I
+  think yes"):** the reasons
   beyond "(virtual)" and "(Bluetooth)", the order in point 3, system
   audio off at the end, the fixed 80 columns.
 - **Evidence:** [design/recorder.md](design/recorder.md), the command

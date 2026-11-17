@@ -62,9 +62,9 @@ Still open from D34: what AGC does and whether it is on in auto mode;
     unplug and replug during a `--debug` run. UNVERIFIED: a gap within
     a stream (samples lost while the device stays connected), a click
     test through the speakers.
-  - Waiting on the owner: trying the build; confirming D57's design
-    and D58's details; whether `--quiet` also writes low disk space
-    and a screen showing another screen's picture; merging. The
+  - The owner confirmed D57, D58 and D59 (2026-11-17), and `--quiet`
+    writes no warnings, only errors (D58).
+  - Waiting on the owner: merging. The
     owner, 2026-11-17: commits name the model ("Yes, mention model");
     the squash message carries it.
 

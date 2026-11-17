@@ -184,4 +184,5 @@ One row per entry, the error text exactly as in the entry.
   60 s bound: the feed's wait offers no event to deliver on, so the
   starvation pattern is left, with a bound 400 times the delay.
 - **Verify:** CI's `scripts/test` passes on the pushed head.
-- **Observed:** 2026-11-17, PR #19; open until CI passes.
+- **Observed:** 2026-11-17, PR #19; resolved, CI passed with the fix
+  (run 44125362376).
