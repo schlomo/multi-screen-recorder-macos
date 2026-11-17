@@ -16,7 +16,7 @@ import Testing
 
     /// The count is the problems', as the glossary defines them; low disk space is not one.
     @Test func theCountIsTheProblemsEvenWhileLowDiskSpaceIsSet() {
-        #expect(StatusLine.text(line: line, cpu: nil, rows: [], status: status(problems: 1, isLowOnDisk: true)).hasPrefix("1 problem, Recording"))
+        #expect(StatusLine.text(line: line, cpu: nil, rows: [], status: status(problems: 1, isLowOnDisk: true)).hasPrefix("1 problem · Recording"))
         #expect(StatusLine.text(line: line, cpu: nil, rows: [], status: status(problems: 0, isLowOnDisk: true)).hasPrefix("Recording"))
     }
 
@@ -25,19 +25,19 @@ import Testing
     @Test func problemsComeFirstThenTheLineThenCPUThenSources() {
         let rows = [row(.screen(1, name: "A")), row(.screen(2, name: "B")), row(.systemAudio(isRecorded: true)), row(.audioInput(1, name: "Mic"))]
         #expect(StatusLine.text(line: line, cpu: "CPU 23 %", rows: rows, status: status(problems: 2))
-            == "2 problems, \(line), CPU 23 %, 2 screens, 2 audio sources")
-        #expect(StatusLine.text(line: line, cpu: "CPU 23 %", rows: rows, status: status(problems: 1)).hasPrefix("1 problem, Recording"))
+            == "2 problems · \(line) · CPU 23 % · 2 screens, 2 audio")
+        #expect(StatusLine.text(line: line, cpu: "CPU 23 %", rows: rows, status: status(problems: 1)).hasPrefix("1 problem · Recording"))
     }
 
     @Test func noProblemsSaysNothingAboutProblems() {
         #expect(StatusLine.text(line: line, cpu: nil, rows: [row(.screen(1, name: "A"))], status: status(problems: 0))
-            == "\(line), 1 screen, 0 audio sources")
+            == "\(line) · 1 screen, 0 audio")
     }
 
     @Test func onlySourcesBeingRecordedAreCounted() {
         let rows = [row(.screen(1, name: "A")), row(.screen(2, name: "B"), state: "disconnected"),
                     row(.audioInput(1, name: "Mic"), state: "waiting"), row(.audioInput(2, name: "Mic 2"))]
-        #expect(StatusLine.text(line: line, cpu: nil, rows: rows, status: status(problems: 0)).hasSuffix(", 1 screen, 1 audio source"))
+        #expect(StatusLine.text(line: line, cpu: nil, rows: rows, status: status(problems: 0)).hasSuffix(" · 1 screen, 1 audio"))
     }
 
     @Test func theLineIsCutToTheWidthMinusOneSoItNeverWraps() {
