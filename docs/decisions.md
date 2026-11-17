@@ -1591,13 +1591,17 @@ architect's reading.
   Everything below is the architect's reading of that.
 - **Decision:**
   1. Every audio source, the system audio too, passes one resampler
-     whose rate a control loop steers so that the source's sample count
-     follows the shared clock; one code path, no bypass.
-  2. The clock drift is measured from buffer arrivals: the smallest
-     lateness (arrival minus timestamp) per interval is the source's
-     clock against the shared clock, since timestamps follow the sample
-     count and a buffer only ever arrives late. A late stretch is
-     rejected, a lasting step followed, the rate limited to ±1000 ppm.
+     whose rate is steered so that the source's sample count follows
+     the shared clock; one code path, no bypass.
+  2. The clock drift is measured from buffer arrivals: timestamps
+     follow the sample count and a buffer only ever arrives late, so
+     the source's clock is the lower support line of each interval's
+     smallest lateness (arrival minus timestamp) over the last 20 s.
+     The measurement never depends on the correction's own state: two
+     loops that did were built first and replaced after review. The
+     rate is the line's slope plus what is left to catch up, limited to
+     ±1000 ppm; across a gap the correction grows by the drift during
+     it.
   3. `clockDriftPpm` in the recording manifest, the status window's
      column "Clock drift" and the `--debug` lines show the same
      measured drift; `clockDriftCorrection` is the sound added to or

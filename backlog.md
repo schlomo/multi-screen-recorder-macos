@@ -34,14 +34,21 @@ Still open from D34: what AGC does and whether it is on in auto mode;
 
 ## In flight
 
-- **Clock drift correction** (D56; was queued item 5): built and
-  reviewed locally on the branch `audio-drift-correction`, not pushed,
-  no pipeline run (the owner, 2026-11-16: "work local only, with a
+- **Clock drift correction** (D56; was queued item 5): built
+  locally on the branch `audio-drift-correction` (the tracker at
+  `1e5bfe7`), not pushed, no pipeline run; its review state is in the
+  session's report to the owner (the owner, 2026-11-16: "work local only, with a
   single final CI test at the very end after we both are happy").
   Waiting on the owner: trying the build, confirming D56's design, the
-  go-ahead to push. Verified on the owner's Mac by a 10-minute
-  recording (Razer −115.7 ppm, 69 ms corrected, every input within
-  0.2 ms). UNVERIFIED: one hour, a click test through the speakers, a
+  go-ahead to push. A 10-minute recording of the build of `1e5bfe7` on the
+  owner's Mac (2026-11-17, five audio sources): result ok, no events;
+  `clockDriftPpm` Razer −115.2, CalDigit 49.7, BRIO 5.2, MacBook
+  microphone 2.4, system audio −1.2; the Razer's file got 69.2 ms of
+  sound added; "ms off" in the `--debug` lines from 30 s on at most
+  0.23 ms (Razer), 0.10 (CalDigit), 0.11 (MacBook), 0.99 (BRIO), 0.75
+  (system audio); by room sound the Razer's and the BRIO's files kept
+  the same lag (−16.4 ms in six of nine 90 s stretches) from start to
+  end. UNVERIFIED: one hour, a click test through the speakers, a
   build with CI's Swift 6.3, the status window's column on screen.
 
 ## Queued
