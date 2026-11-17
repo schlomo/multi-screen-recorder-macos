@@ -35,8 +35,8 @@ Still open from D34: what AGC does and whether it is on in auto mode;
 ## In flight
 
 - **Clock drift correction** (D56; was queued item 5): built
-  locally on the branch `audio-drift-correction` (the tracker at
-  `1e5bfe7`), not pushed, no pipeline run; its review state is in the
+  locally on the branch `audio-drift-correction` (the tracker of
+  `1e5bfe7`, review fixes after it), not pushed, no pipeline run; its review state is in the
   session's report to the owner (the owner, 2026-11-16: "work local only, with a
   single final CI test at the very end after we both are happy").
   Waiting on the owner: trying the build, confirming D56's design, the
@@ -171,7 +171,8 @@ Still open from D34: what AGC does and whether it is on in auto mode;
    - The owner's runs with `--debug` answer two assumptions: whether a
      source's timestamps keep following its sample count across a gap
      (a debug line at each gap shows it), and whether the rate's swing
-     on the system audio (up to about 200 ppm) is inaudible.
+     on the system audio (within ±67 ppm on the measured arrivals) is
+     inaudible.
 6. **CPU**: our process averaged 56 % of one core over an hour (two
    displays, five audio sources) and peaks at 165 to 386 % at start.
    A 20 s `sample` of 2026-11-16 (build `7ad0b6b`; shares solid,
@@ -262,7 +263,9 @@ Still open from D34: what AGC does and whether it is on in auto mode;
      shareable content ahead, off the Core Audio path; (e) a ready-check
      warning when audio inputs share a dock with a USB-C display;
      (f) leave disturbed stretches out of the drift measurement
-     (done with D56: a late stretch is rejected); (g) our own process tap for system audio, low: it is the
+     (done with D56 for a short one, which lies above the line; a
+     late stretch of 7 s or more still tilts it, see recorder.md,
+     "Clock drift"); (g) our own process tap for system audio, low: it is the
      mechanism ScreenCaptureKit already uses. Design first.
    - Advice for the owner [ASSUMED, from the mechanism]: the Wacom
      straight into a Mac port avoids the pause; check with one replug
