@@ -34,27 +34,46 @@ Still open from D34: what AGC does and whether it is on in auto mode;
 
 ## In flight
 
-- **Clock drift correction** (D56; was queued item 5): built
-  locally on the branch `audio-drift-correction` (the tracker of
-  `1e5bfe7`, review fixes after it, the last one `7c303f9`), not
-  pushed, no pipeline run (the owner, 2026-11-16: "work local only,
-  with a single final CI test at the very end after we both are
-  happy"). Reviewed: one adversarial review and four delta reviews,
-  the last one's findings fixed in `7c303f9`, a tests and docs commit
-  no reviewer has read. A 180 s recording of the build of `cdd75ad`
-  (2026-11-17, the figures in recorder.md's "Build state"): result ok,
-  no events. Never run: CI's Swift, a full hour, a real gap.
-  Waiting on the owner: trying the build, confirming D56's design, the
-  go-ahead to push. A 10-minute recording of the build of `1e5bfe7` on the
-  owner's Mac (2026-11-17, five audio sources): result ok, no events;
-  `clockDriftPpm` Razer −115.2, CalDigit 49.7, BRIO 5.2, MacBook
-  microphone 2.4, system audio −1.2; the Razer's file got 69.2 ms of
-  sound added; "ms off" in the `--debug` lines from 30 s on at most
-  0.23 ms (Razer), 0.10 (CalDigit), 0.11 (MacBook), 0.99 (BRIO), 0.75
-  (system audio); by room sound the Razer's and the BRIO's files kept
-  the same lag (−16.4 ms in six of nine 90 s stretches) from start to
-  end. UNVERIFIED: one hour, a click test through the speakers, a
-  build with CI's Swift 6.3, the status window's column on screen.
+- **Clock drift correction** (D56; was queued item 5) and **`msr
+  record`'s status line, output split and `--quiet`** (D57; the
+  terminal part of queued item 13, for `msr record` only): built
+  locally on the branch `audio-drift-correction`, not pushed, no
+  pipeline run (the owner, 2026-11-16: "work local only, with a single
+  final CI test at the very end after we both are happy").
+  - Clock drift, reviewed: one adversarial review and four delta
+    reviews, the last one's findings fixed in `7c303f9`, a tests and
+    docs commit no reviewer has read.
+  - Clock drift, run on the owner's Mac (2026-11-17, five audio
+    sources, two screens): one hour on the build of `1fb8dae`, result
+    ok, no events; `clockDriftPpm` Razer −115.2, CalDigit 50.2, BRIO
+    2.5, MacBook microphone 3.2, system audio 6.3; the Razer's file
+    got 414 ms of sound added, the CalDigit's 180 ms removed; "ms off"
+    in the `--debug` lines from 30 s on at most 0.21 ms (Razer), 0.17
+    (CalDigit), 0.83 (BRIO), 0.10 (MacBook), 0.92 (system audio); by
+    room sound the Razer's and the BRIO's files kept the same lag
+    (−16.1 to −16.8 ms in ten of twelve 60 s stretches, the other two
+    with too little sound) where uncorrected they would have moved
+    about 420 ms apart; CPU 37 % of one core on average. Two 20 s
+    samples of that process: the resampler takes 8 to 9 % of its busy
+    time, Apple's AAC encoder about 27 %, CoreFoundation, the
+    allocator and kernel calls together about 40 % (queued item 6).
+    Earlier: 10 minutes on `1e5bfe7`, 180 s on `cdd75ad`.
+  - Status line, reviewed: one adversarial review and one delta
+    review, their findings fixed; the delta review of `7a3d97b`,
+    `4768d34` and `cff2a2b` was running when this was written. Run on
+    the owner's Mac: 12 s under a pseudo-terminal on `4768d34`,
+    standard output carried only the path, the line redrew every
+    second and was cleared before the summary.
+  - UNVERIFIED: a build with CI's Swift 6.3, a real gap during a
+    recording, a click test through the speakers, the status window's
+    column on screen, the status line in the owner's own terminal.
+  - Waiting on the owner: trying the build; confirming D56's design
+    and D57's details; whether `--quiet` also writes low disk space
+    and a screen showing another screen's picture; the go-ahead to
+    push. The owner, 2026-11-17: commits name the model ("Yes, mention
+    model"); the agent's session rules forbid it a model name in a
+    commit, so the squash message, written by the human who merges,
+    carries it.
 
 ## Queued
 
@@ -384,6 +403,9 @@ Still open from D34: what AGC does and whether it is on in auto mode;
    stdout and error are handled properly for managed or scripted
    operation", "a brief banner with version info, build date and
    homepage link"):
+   - Built for `msr record` on the branch under "In flight" (D57):
+     the status line, the split and `--quiet`. Left: the other
+     commands and the window, below.
    - Only when standard error is a terminal: one line, redrawn every
      second: recording time with seconds, CPU of our process, the
      recording folder's size, free space, sources, problems. An event
