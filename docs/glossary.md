@@ -76,6 +76,13 @@ The small window of a running recording, opened by a click on the Dock
 icon or by Quit, in the app and in `msr record`: what is recorded, the
 data written, the problems, and Stop and Continue (D46).
 
+## Status line
+
+The one line `msr record` redraws once a second on standard error when
+that is a terminal: the recording time, the size written, the files, the
+free space, the CPU use, the sources being recorded and the problems.
+Not the window's own line below its table.
+
 ## Crash report
 
 The `.ips` file macOS writes when `msr` quits unexpectedly, in

@@ -26,4 +26,15 @@ import Testing
     @Test func aWrongArgumentIsAnErrorBeforeAnythingRuns() {
         guard case .failed = EntryRoute(arguments: ["record", "--bogus"]) else { Issue.record("not refused"); return }
     }
+
+    @Test func quietIsAFlagOfRecord() {
+        guard case .record(let record) = EntryRoute(arguments: ["record", "--quiet"]) else { Issue.record("not msr record"); return }
+        #expect(record.quiet)
+        #expect(!record.debug)
+    }
+
+    @Test func quietTogetherWithDebugIsAUsageError() {
+        guard case .failed(let error) = EntryRoute(arguments: ["record", "--quiet", "--debug"]) else { Issue.record("not refused"); return }
+        #expect(CommandLineInterface.message(for: error).contains("--quiet cannot be combined with --debug"))
+    }
 }

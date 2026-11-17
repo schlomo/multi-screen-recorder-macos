@@ -18,6 +18,8 @@ extension CommandLineInterface {
         static let configuration = CommandConfiguration(
             abstract: "Record every screen and audio source until Ctrl-C, SIGTERM, SIGHUP, the duration or Stop in the status window.",
             discussion: "Prints what will be recorded, runs the ready check, then records with the app's Dock icon. "
+                + "Standard output carries one line, the recording folder's path, when recording starts; everything for people goes to standard error, "
+                + "on a terminal with a status line redrawn once a second. "
                 + "Exits 0 when every file is finalized and no file was ended by a failure, 1 when not ready, 3 otherwise or when it could not start.")
 
         @OptionGroup var flags: SettingsFlags
@@ -27,6 +29,13 @@ extension CommandLineInterface {
 
         @Flag(help: "Detail on standard error and at debug level in the unified log.")
         var debug = false
+
+        @Flag(help: "No output for people: only the recording folder's path on standard output, and on standard error a failing ready check and errors. Not with --debug.")
+        var quiet = false
+
+        func validate() throws {
+            if quiet && debug { throw ValidationError("--quiet cannot be combined with --debug.") }
+        }
 
         /// Never called: `main` runs `msr record` in the event loop, through `RecordCommandDelegate`.
         func run() async throws {
@@ -71,17 +80,16 @@ final class RecordCommandDelegate: NSObject, NSApplicationDelegate {
         }
         let facts = await probeReadyCheckFacts(proof: .captureOneFrame, settings: settings, homeFolder: home)
         let result = ReadyCheck.evaluate(facts, settings: settings)
-        print(runningVersion.banner, terminator: "")
-        print(WhatWillBeRecorded(settings: settings, facts: facts).text)
-        print(result.text, terminator: "")
-        fflush(stdout)
+        tell(runningVersion.banner)
+        tell(WhatWillBeRecorded(settings: settings, facts: facts).text + "\n")
+        if result.isReady { tell(result.text) } else { StandardErrorWriter.shared.write(result.text) }
         guard result.isReady else {
             exitStatus = 1
             endEventLoop()
             return
         }
         do {
-            session = try RecordingSession(settings: settings, homeFolder: home, tellOnStandardError: true)
+            session = try RecordingSession(settings: settings, homeFolder: home, tellOnStandardError: !record.quiet)
         } catch {
             standardError("Error: \(error)")
             exitStatus = recordingEndedWithErrorExitCode
@@ -92,7 +100,9 @@ final class RecordCommandDelegate: NSObject, NSApplicationDelegate {
         if !NSApp.setActivationPolicy(.regular) {
             session?.recorder?.dockIconNotShown()
         }
-        print("Recording into \(session?.folder?.path(percentEncoded: false) ?? "")")
+        let folderPath = session?.folder?.path(percentEncoded: false) ?? ""
+        tell("Recording into \(folderPath)\n")
+        print(folderPath)
         fflush(stdout)
         for signalNumber in [SIGINT, SIGTERM, SIGHUP] {
             signal(signalNumber, SIG_IGN)
@@ -133,7 +143,7 @@ final class RecordCommandDelegate: NSObject, NSApplicationDelegate {
             return .terminateLater
         case .finalizeWithoutAsking:
             // Logout and shutdown finalize without asking, then let the process end.
-            standardError(stopRequests.request())
+            tell(stopRequests.request() + "\n")
             stopping = Task {
                 _ = await session.stop()
                 NSApp.reply(toApplicationShouldTerminate: true)
@@ -150,16 +160,25 @@ final class RecordCommandDelegate: NSObject, NSApplicationDelegate {
     private func stopRequested() {
         guard let session else { return }
         let first = !isStopping
-        standardError(stopRequests.request())
+        tell(stopRequests.request() + "\n")
         guard first else { return }
         stopping = Task {
             if let summary = await session.stop() {
-                print(summary.text, terminator: "")
-                fflush(stdout)
-                if summary.endedWithError { exitStatus = recordingEndedWithErrorExitCode }
+                // The summary is the message of a run that exits 3, so `--quiet` still prints it then.
+                if summary.endedWithError {
+                    StandardErrorWriter.shared.write(summary.text)
+                    exitStatus = recordingEndedWithErrorExitCode
+                } else {
+                    tell(summary.text)
+                }
             }
             endEventLoop()
         }
+    }
+
+    /// Text for people on standard error, with its newlines; nothing with `--quiet`.
+    private func tell(_ text: String) {
+        if !record.quiet { StandardErrorWriter.shared.write(text) }
     }
 
     private func endEventLoop() {
