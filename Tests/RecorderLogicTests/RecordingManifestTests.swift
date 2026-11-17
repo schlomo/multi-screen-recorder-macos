@@ -497,6 +497,30 @@ import Testing
             + "CPU 12 % on average, 32 % at the peak, of one core (this process only)\n")
     }
 
+    /// The screens by number, then the audio sources by number, the system audio (0) first; a source's files by start.
+    @Test func theFilesAreListedByScreenNumberThenAudioNumberThenStart() {
+        var recorded = manifest([])
+        func screen(_ name: String, start: Double) {
+            recorded.files.append(RecordingManifest.ScreenFile(
+                name: name, screen: "D", screenUUID: "U", frameSize: FrameSize(width: 2, height: 2), start: start, timecode: "t"))
+        }
+        func audio(_ name: String, start: Double) {
+            recorded.audioFiles.append(RecordingManifest.AudioFile(
+                name: name, audioSource: "M", audioSourceUID: "u", channels: .mono(1), start: start, timecode: "t"))
+        }
+        screen("2026-11-17 07.36.00 Screen 2 - B.mov", start: 0)
+        screen("2026-11-17 07.36.00 Screen 1 - A.mov", start: 0)
+        screen("2026-11-17 07.50.00 Screen 1 - A.mov", start: 840)
+        audio("2026-11-17 07.36.00 Audio 4 - D.mov", start: 0)
+        audio("2026-11-17 07.36.00 Audio 0 - System.mov", start: 0)
+        audio("2026-11-17 07.36.00 Audio 10 - K.mov", start: 0)
+        audio("2026-11-17 07.36.00 Audio 1 - C.mov", start: 0)
+        let lines = RecordingSummary(manifest: recorded, recordingFolder: "/r", seconds: 5, manifestWritten: true)
+            .text.split(separator: "\n").dropFirst().map { $0.dropFirst(2).dropFirst(20).dropLast(11) }
+        #expect(lines == ["Screen 1 - A.mov", "Screen 1 - A.mov", "Screen 2 - B.mov", "Audio 0 - System.mov",
+                          "Audio 1 - C.mov", "Audio 4 - D.mov", "Audio 10 - K.mov"])
+    }
+
     @Test func aWriterThatFailedIsAnError() {
         var failed = RecordingEvent(at: 0, event: .screenFileWriterFailed, screen: "LG")
         failed.error = "cannot write"

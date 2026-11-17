@@ -82,7 +82,7 @@ import Testing
         _ = tracker.begin(inputs: [usb, twin], mainDisplayID: 1, screens: [1], at: 0)
         let rows = RecordingStatusTable.audioRows(sources: tracker.sourcesShown, files: [], bytes: [:], clockDrift: [:])
         #expect(rows.map(\.source) == [
-            .audioInput(1, name: "USB Audio"), .audioInput(2, name: "USB Audio"), .systemAudio(isRecorded: true),
+            .systemAudio(isRecorded: true), .audioInput(1, name: "USB Audio"), .audioInput(2, name: "USB Audio"),
         ])
     }
 
@@ -106,8 +106,8 @@ import Testing
             .input("C"): ClockDriftCorrection.Status(clockDriftPpm: nil, applied: 0.0003, remaining: 0.0001),
             .systemAudio: ClockDriftCorrection.Status(clockDriftPpm: 0, applied: 0, remaining: 0),
         ])
-        #expect(rows.map(\.state) == ["recording", "recording", "failed, retrying"])
-        #expect(rows.map(\.clockDrift) == ["-116 ppm (+34.9 ms)", "measuring (+0.3 ms)", ""])
+        #expect(rows.map(\.state) == ["failed, retrying", "recording", "recording"])
+        #expect(rows.map(\.clockDrift) == ["", "-116 ppm (+34.9 ms)", "measuring (+0.3 ms)"])
         let text = RecordingStatusTable.clockDriftText
         #expect(text(nil) == "measuring")
         #expect(text(.init(clockDriftPpm: nil, applied: 0.000_02, remaining: nil)) == "measuring")

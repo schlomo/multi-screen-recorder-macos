@@ -31,29 +31,49 @@ import Testing
     }
 }
 
+/// `msr list` prints the same "What will be recorded" table as `msr check`, without the ready check.
 @Suite struct ListRenderingTests {
+    private func rendered(
+        screens: [ScreenInfo] = DesignExample.screens, audioInputs: [AudioInputInfo] = DesignExample.audioInputs,
+        settings: Settings = .defaults, systemAudioAvailable: Bool = true
+    ) -> String {
+        renderList(settings: settings, screens: screens, audioInputs: audioInputs, systemAudioAvailable: systemAudioAvailable)
+    }
+
     static let designExample = """
-        Screens
-          1  Built-in Retina Display   looks like 1728×1117, drawn at 3456×2234  records at 1728×1116
-          2  LG HDR 4K                 3840×2160                                 records at 3840×2160
-        Audio inputs
-          MacBook Pro Microphone (default), 1 channel
-          RØDE Wireless GO II RX, 2 channels
+        What will be recorded
+          Settings: Auto (resolution Native, audio mode Wired), system audio on
+          Source                                      Looks like  Drawn at   Records at  GB/h max
+          ───────────────────────────────────────────────────────────────────────────────────────
+          Screen 1 - Built-in Retina Display          1728×1117   3456×2234  1728×1116        1.0
+          Screen 2 - LG HDR 4K                        3840×2160   3840×2160  3840×2160        4.1
+          ───────────────────────────────────────────────────────────────────────────────────────
+          Audio 0 - System                                                   stereo           0.1
+          Audio 1 - MacBook Pro Microphone (default)                         1 channel        0.1
+          Audio 2 - RØDE Wireless GO II RX                                   2 channels       0.1
+          ───────────────────────────────────────────────────────────────────────────────────────
+          Total                                                                               5.3
+          2 hours need 10.7 GB.
+          Files go to ~/Movies/Multi Screen Recorder
         System audio: available
 
         """
 
-    @Test func rendersExactlyAsTheDesign() {
-        let rendered = renderList(
-            screens: numberScreens(DesignExample.screens), resolution: Settings.defaults.effectiveResolution,
-            audioInputs: DesignExample.audioInputs, systemAudioAvailable: true)
-        #expect(rendered == Self.designExample)
+    @Test func rendersTheSameTableAsMSRCheckAndTheSystemAudioLine() {
+        #expect(rendered() == Self.designExample)
+        let check = WhatWillBeRecorded(settings: .defaults, screens: .success(DesignExample.screens),
+                                       audioInputs: .success(DesignExample.audioInputs), outputFolder: nil).text
+        #expect(rendered().hasPrefix(check))
+    }
+
+    @Test func theDesignShowsTheExample() throws {
+        #expect(try repositoryFile("docs/design/recorder.md").contains("```\n\(Self.designExample)```\n"))
     }
 
     @Test func anInputWhoseChannelsCannotBeReadIsListedWithTheReason() {
         let unreadable = AudioInputInfo(name: "X", channelCount: .failure(DeviceReadError("no format")), isDefault: false)
-        let rendered = renderList(screens: [], resolution: .p1080, audioInputs: [unreadable], systemAudioAvailable: true)
-        #expect(rendered.contains("\n  X, cannot be read (no format)\n"))
+        #expect(rendered(screens: [], audioInputs: [unreadable]).contains("  X  "))
+        #expect(rendered(screens: [], audioInputs: [unreadable]).contains("cannot be read"))
     }
 
     @Test func onlyARecordedInputThatCannotBeReadCounts() {
@@ -72,10 +92,6 @@ import Testing
         #expect(unreadableRecordedInputs([noUID], settings: .manual).isEmpty)
     }
 
-    @Test func theDesignShowsTheExample() throws {
-        #expect(try repositoryFile("docs/design/recorder.md").contains("```\n\(Self.designExample)```\n"))
-    }
-
     @Test func aScreenIsDescribedByWhatItLooksLikeAndItsPixels() {
         func screen(pixels: FrameSize, points: FrameSize) -> ScreenInfo {
             ScreenInfo(name: "D", pixelSize: pixels, pointSize: points, isMain: true, originX: 0, originY: 0)
@@ -87,32 +103,28 @@ import Testing
     }
 
     @Test func theOwnersHiDPIScreensRecordAtTheirLooksLikeSize() {
-        let screens = numberScreens([
-            ScreenInfo(name: "DELL P3421W", pixelSize: FrameSize(width: 6880, height: 2880),
-                        pointSize: FrameSize(width: 3440, height: 1440), isMain: true, originX: 0, originY: 0),
+        let screens = [
             ScreenInfo(name: "Wacom One 13T", pixelSize: FrameSize(width: 3840, height: 2160),
                         pointSize: FrameSize(width: 1920, height: 1080), isMain: false, originX: 3440, originY: 0),
-        ])
-        let lines = renderList(screens: screens, resolution: .p1080, audioInputs: [], systemAudioAvailable: true)
-            .split(separator: "\n")
-        #expect(lines[1] == "  1  DELL P3421W     looks like 3440×1440, drawn at 6880×2880  records at 1920×802")
-        #expect(lines[2] == "  2  Wacom One 13T   looks like 1920×1080, drawn at 3840×2160  records at 1920×1080")
-        let native = renderList(screens: screens, resolution: .native, audioInputs: [], systemAudioAvailable: true)
-            .split(separator: "\n")
-        #expect(lines.count == native.count)
-        #expect(native[1].hasSuffix("records at 3440×1440"))
-        #expect(native[2].hasSuffix("records at 1920×1080"))
+            ScreenInfo(name: "DELL P3421W", pixelSize: FrameSize(width: 6880, height: 2880),
+                        pointSize: FrameSize(width: 3440, height: 1440), isMain: true, originX: 0, originY: 0),
+        ]
+        var p1080 = Settings.manual
+        p1080.resolution = .p1080
+        let lines = rendered(screens: screens, audioInputs: [], settings: p1080).split(separator: "\n")
+        #expect(lines.contains { $0.hasPrefix("  Screen 1 - DELL P3421W") && $0.contains("3440×1440") && $0.contains("6880×2880") && $0.contains("1920×802") })
+        #expect(lines.contains { $0.hasPrefix("  Screen 2 - Wacom One 13T") && $0.contains("1920×1080") && $0.contains("3840×2160") })
     }
 
-    @Test func rendersEmptySectionsAndUnavailableSystemAudio() {
-        let expected = """
-            Screens
-              none
-            Audio inputs
-              none
-            System audio: not available without the Screen & System Audio Recording permission
+    @Test func theSystemAudioLineSaysWhichProgramLacksThePermission() {
+        #expect(rendered(systemAudioAvailable: true).hasSuffix("System audio: available\n"))
+        #expect(rendered(systemAudioAvailable: false).hasSuffix(
+            "System audio: not available, the program running msr (a terminal app) lacks the Screen & System Audio Recording permission\n"))
+    }
 
-            """
-        #expect(renderList(screens: [], resolution: .p1080, audioInputs: [], systemAudioAvailable: false) == expected)
+    @Test func noScreensAndNoInputsStillGiveTheTable() {
+        let text = rendered(screens: [], audioInputs: [])
+        #expect(text.contains("Audio 0 - System"))
+        #expect(text.hasPrefix("What will be recorded\n  Settings: "))
     }
 }

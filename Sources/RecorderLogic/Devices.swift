@@ -108,44 +108,18 @@ public func audioInputsToJudge(
     }
 }
 
-/// The text `msr list` prints.
+/// The text `msr list` prints: the table of what will be recorded, as `msr check` prints it, and
+/// whether the system audio can be recorded by the program running `msr`.
 public func renderList(
-    screens: [NumberedScreen],
-    resolution: RecordingResolution,
+    settings: Settings,
+    screens: [ScreenInfo],
     audioInputs: [AudioInputInfo],
     systemAudioAvailable: Bool
 ) -> String {
-    var lines = ["Screens"]
-    if screens.isEmpty {
-        lines.append("  none")
-    } else {
-        let numbers = screens.map { String($0.number) }
-        let sizes = screens.map(\.screen.sizeText)
-        let numberWidth = numbers.map(\.count).max() ?? 0
-        let nameWidth = screens.map(\.screen.name.count).max() ?? 0
-        let sizeWidth = sizes.map(\.count).max() ?? 0
-        for (index, numbered) in screens.enumerated() {
-            let frame = resolution.frameSize(forLooksLike: numbered.screen.pointSize)
-            lines.append(
-                "  " + padded(numbers[index], numberWidth)
-                    + "  " + padded(numbered.screen.name, nameWidth)
-                    + "   " + padded(sizes[index], sizeWidth)
-                    + "  records at \(frame)")
-        }
-    }
-    lines.append("Audio inputs")
-    if audioInputs.isEmpty {
-        lines.append("  none")
-    } else {
-        for input in audioInputs {
-            lines.append("  \(input.shownName), \(input.channelsText)")
-        }
-    }
-    lines.append(
-        systemAudioAvailable
-            ? "System audio: available"
-            : "System audio: not available without the Screen & System Audio Recording permission")
-    return lines.joined(separator: "\n") + "\n"
+    WhatWillBeRecorded(settings: settings, screens: .success(screens), audioInputs: .success(audioInputs), outputFolder: nil).text
+        + (systemAudioAvailable
+            ? "System audio: available\n"
+            : "System audio: not available, the program running msr (a terminal app) lacks the Screen & System Audio Recording permission\n")
 }
 
 func padded(_ text: String, _ width: Int) -> String {

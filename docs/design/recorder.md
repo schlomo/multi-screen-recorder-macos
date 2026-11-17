@@ -24,9 +24,9 @@ signature); if that fails it exits 71 (`EX_OSERR`).
 
 | Command | Does | Exit code |
 |---|---|---|
-| `msr list` | Shows screens, audio inputs and system audio | 0, 1 when the screens, the audio inputs or an audio input the settings record cannot be read |
+| `msr list` | Prints "What will be recorded" as `msr check` does, from the settings and the devices, without the ready check and without asking for any permission, then whether the program running `msr` may record the system audio | 0, 1 when the screens, the audio inputs or an audio input the settings record cannot be read |
 | `msr check [flags] [--debug]` | Prints the banner and "What will be recorded", then runs the ready check and prints each item; `--debug` adds detail on standard error and in the log | 0 ready, 1 not ready |
-| `msr record [flags] [--duration 1h30m] [--debug \| --quiet]` | Records the screens and the audio sources (the recording core, D45, D49). Without flags it does what Start in the window does, with the same settings file; it prints the banner (as `msr check`) and "What will be recorded" at its start, then runs the ready check, records until Ctrl-C, SIGTERM, SIGHUP, the duration or Stop in the status window (below), and prints the recording folder at the start and a summary at the end (the summary: every file with its state and our process's CPU use, average and peak). It runs as a full AppKit app without a Dock icon (the `accessory` activation policy) until the ready check passed and the recording starts, then shows the icon; a run that is not ready shows none, and an icon macOS refuses is a problem, and the recording goes on (Ctrl-C stops it); while it records, the icon shows with its badge, and clicking it or Quit opens the status window as in the app (D45, D46). When it stops, for any reason, it first prints `Stopping the recording and finalizing the files…` on standard error, then finalizes and prints the summary; a Ctrl-C while it finalizes prints `Still finalizing the files…` and does nothing more. It prints every event of the recording manifest as one line on standard error (see "Logging"). `--debug` adds detail on standard error and in the log. **Output split:** standard output carries exactly one line, the recording folder's bare path, when recording starts; everything for people goes to standard error (the banner, "What will be recorded", the ready check, `Recording into <path>`, events, the status line, the summary, debug lines), all of it, and every other line this code writes on standard error (the settings file note, `Error:` lines, debug lines; ArgumentParser writes its own usage errors, before any status line exists), through one writer so nothing prints into the middle of the status line; a failed write to standard error, SIGPIPE included, is ignored, as there is nowhere left to report it, and `msr record` ignores SIGPIPE for the whole process from its start, before it writes anything, so a closed reader of standard output does not end it. **Status line:** only when standard error is a terminal whose `TERM` is set, not empty and not `dumb`, with no option: one line redrawn once a second (`\r`, the text, `ESC[K`). Its text, joined by ` · ` as the window's line is: `<n> problems` (`1 problem`) first when there are any, counting the problems of the run (the ones the window lists; low disk space and a screen showing another screen's picture are not problems, though they set the Dock badge), nothing when there are none; then the text of the window's line (time with seconds, size written, files, free space), the CPU use when known, and `<n> screens, <m> audio` for the sources being recorded (`1 screen`), such as `1 problem · Recording 0:12:34 · 1.2 GB in 7 files · 143.8 GB free · CPU 23 % · 2 screens, 5 audio`. It is cut to the terminal's width minus 1, taking 80 columns when the width is unknown, so it does not wrap. An event or debug line clears it, prints, and it is drawn again, all in one write; at the end it is cleared and the summary follows. Not a terminal: no status line and no escape code. **`--quiet`:** no output for people (no banner, table, passing ready check, events, status line or summary); still written are the path on standard output and, on standard error, a failing ready check, `Error:` lines, the settings file note, each problem as it happens (the line the window lists) and the summary of a run that exits 3; exit codes are unchanged; with `--debug` it is a usage error. `--duration` takes hours, minutes and seconds (`1h30m`, `45m`, `90s`); a number without a suffix is minutes (`90` is 90 minutes) | 0 ok (every file finalized, no file ended by a failure, D47), 1 not ready, 3 when the recording manifest's `result` is `problems`, the finalized manifest could not be written, or the recording could not start |
+| `msr record [flags] [--duration 1h30m] [--debug \| --quiet]` | Records the screens and the audio sources (the recording core, D45, D49). Without flags it does what Start in the window does, with the same settings file; it prints the banner (as `msr check`) and "What will be recorded" at its start, then runs the ready check, records until Ctrl-C, SIGTERM, SIGHUP, the duration or Stop in the status window (below), and prints the recording folder at the start and a summary at the end (the summary: every file with its state, the screens' by number, then the audio sources' by number with the system audio first, and our process's CPU use, average and peak). It runs as a full AppKit app without a Dock icon (the `accessory` activation policy) until the ready check passed and the recording starts, then shows the icon; a run that is not ready shows none, and an icon macOS refuses is a problem, and the recording goes on (Ctrl-C stops it); while it records, the icon shows with its badge, and clicking it or Quit opens the status window as in the app (D45, D46). When it stops, for any reason, it first prints `Stopping the recording and finalizing the files…` on standard error, then finalizes and prints the summary; a Ctrl-C while it finalizes prints `Still finalizing the files…` and does nothing more. It prints every event of the recording manifest as one line on standard error (see "Logging"). `--debug` adds detail on standard error and in the log. **Output split:** standard output carries exactly one line, the recording folder's bare path, when recording starts; everything for people goes to standard error (the banner, "What will be recorded", the ready check, `Recording into <path>`, events, the status line, the summary, debug lines), all of it, and every other line this code writes on standard error (the settings file note, `Error:` lines, debug lines; ArgumentParser writes its own usage errors, before any status line exists), through one writer so nothing prints into the middle of the status line; a failed write to standard error, SIGPIPE included, is ignored, as there is nowhere left to report it, and `msr record` ignores SIGPIPE for the whole process from its start, before it writes anything, so a closed reader of standard output does not end it. **Status line:** only when standard error is a terminal whose `TERM` is set, not empty and not `dumb`, with no option: one line redrawn once a second (`\r`, the text, `ESC[K`). Its text, joined by ` · ` as the window's line is: `<n> problems` (`1 problem`) first when there are any, counting the problems of the run (the ones the window lists; low disk space and a screen showing another screen's picture are not problems, though they set the Dock badge), nothing when there are none; then the text of the window's line (time with seconds, size written, files, free space), the CPU use when known, and `<n> screens, <m> audio` for the sources being recorded (`1 screen`), such as `1 problem · Recording 0:12:34 · 1.2 GB in 7 files · 143.8 GB free · CPU 23 % · 2 screens, 5 audio`. It is cut to the terminal's width minus 1, taking 80 columns when the width is unknown, so it does not wrap. An event or debug line clears it, prints, and it is drawn again, all in one write; at the end it is cleared and the summary follows. Not a terminal: no status line and no escape code. **`--quiet`:** no output for people (no banner, table, passing ready check, events, status line or summary); still written are the path on standard output and, on standard error, a failing ready check, `Error:` lines, the settings file note, each problem as it happens (the line the window lists) and the summary of a run that exits 3; exit codes are unchanged; with `--debug` it is a usage error. `--duration` takes hours, minutes and seconds (`1h30m`, `45m`, `90s`); a number without a suffix is minutes (`90` is 90 minutes) | 0 ok (every file finalized, no file ended by a failure, D47), 1 not ready, 3 when the recording manifest's `result` is `problems`, the finalized manifest could not be written, or the recording could not start |
 | `msr settings [flags]` | Without flags prints the effective settings as JSON (show); with any settings flag, `--auto` included, saves the run's effective settings into the settings file and prints them (change). The only command that writes the file; the window also writes it | 0, 1 when it cannot write the file |
 | `msr version` | Prints the version and commit | 0 |
 
@@ -59,17 +59,43 @@ off for the run; `--auto` together with either is a usage error (exit
 with a flag writes the run's effective settings. There is no `--save`
 (a usage error, exit 64): `msr settings` shows or changes.
 
-`msr list` prints:
+`msr list` prints the table of "What will be recorded" that `msr check`
+and `msr record` print (below), the same code, from the settings and the
+devices connected now; it runs no ready check and asks for no
+permission. Under the table it says whether the system audio can be
+recorded, which depends on the program running `msr` (a terminal app),
+not on the app: without the permission it says `System audio: not
+available, the program running msr (a terminal app) lacks the Screen &
+System Audio Recording permission`. For the devices below:
 
 ```
-Screens
-  1  Built-in Retina Display   looks like 1728×1117, drawn at 3456×2234  records at 1728×1116
-  2  LG HDR 4K                 3840×2160                                 records at 3840×2160
-Audio inputs
-  MacBook Pro Microphone (default), 1 channel
-  RØDE Wireless GO II RX, 2 channels
+What will be recorded
+  Settings: Auto (resolution Native, audio mode Wired), system audio on
+  Source                                      Looks like  Drawn at   Records at  GB/h max
+  ───────────────────────────────────────────────────────────────────────────────────────
+  Screen 1 - Built-in Retina Display          1728×1117   3456×2234  1728×1116        1.0
+  Screen 2 - LG HDR 4K                        3840×2160   3840×2160  3840×2160        4.1
+  ───────────────────────────────────────────────────────────────────────────────────────
+  Audio 0 - System                                                   stereo           0.1
+  Audio 1 - MacBook Pro Microphone (default)                         1 channel        0.1
+  Audio 2 - RØDE Wireless GO II RX                                   2 channels       0.1
+  ───────────────────────────────────────────────────────────────────────────────────────
+  Total                                                                               5.3
+  2 hours need 10.7 GB.
+  Files go to ~/Movies/Multi Screen Recorder
 System audio: available
 ```
+
+The settings line says the effective settings, flags applied: `Auto
+(resolution Native, audio mode Wired)` in auto mode, otherwise
+`resolution 1080p, audio mode …`; under the audio modes None and Default
+microphone it adds why the inputs are left out (`audio mode None (no
+audio input is recorded)`). An audio input the audio mode leaves out
+keeps the column of the other names with the `Audio <n> - ` part blank,
+is followed by its reason in parentheses where its transport is one
+(`BlackHole 2ch (virtual)`, `AirPods (Bluetooth)`), and shows `-` in GB/h
+max. The screens are listed by number, then the audio sources by number,
+the system audio (0) first.
 
 A screen is described by what macOS calls "looks like" (its size in
 points) and the size it is drawn at (its pixel size): `3840×2160` where
@@ -89,19 +115,21 @@ required recording hours need, and "Files go to <output folder>", from
 the same code (see "The app"; the window's last line, "Recording
 continues when screens or audio sources change.", is not printed), then
 one line per item of the ready check, `ok` or `FAIL`, a fix under each
-failure, and `Ready.` or `Not ready.` last. For the devices of the
+failure (wrapped at 80 columns, its continuation lines under its first
+line's text), and `Ready.` or `Not ready.` last. For the devices of the
 `msr list` example, the defaults and 3.1 GB free:
 
 ```
 What will be recorded
+  Settings: Auto (resolution Native, audio mode Wired), system audio on
   Source                                      Looks like  Drawn at   Records at  GB/h max
   ───────────────────────────────────────────────────────────────────────────────────────
   Screen 1 - Built-in Retina Display          1728×1117   3456×2234  1728×1116        1.0
   Screen 2 - LG HDR 4K                        3840×2160   3840×2160  3840×2160        4.1
   ───────────────────────────────────────────────────────────────────────────────────────
+  Audio 0 - System                                                   stereo           0.1
   Audio 1 - MacBook Pro Microphone (default)                         1 channel        0.1
   Audio 2 - RØDE Wireless GO II RX                                   2 channels       0.1
-  Audio 0 - System                                                   stereo           0.1
   ───────────────────────────────────────────────────────────────────────────────────────
   Total                                                                               5.3
   2 hours need 10.7 GB, 3.1 GB free.
@@ -544,9 +572,11 @@ checked, reported or rewritten at the next start (D47).
     each audio input (the default one marked "(default)") in Source,
     Looks like and Drawn at empty, its number of channels in Records
     at ("1 channel", "2 channels", "cannot be read"), and GB/h max (the
-    audio file); the last row is the system audio with "stereo", "System
+    audio file); the first row is the system audio with "stereo", "System
   audio" without a number when it is off. A source not recorded
-    is dimmed and its GB/h max is 0 (D46): every input with the audio
+    is dimmed, its name keeps the column of the others with the `Audio
+    <n> - ` part blank and is followed by its reason where its transport
+    is one (`(virtual)`, `(Bluetooth)`), and its GB/h max is `-` (D46): every input with the audio
     mode `none`; every input but the default one with
     `default-microphone`; with `wired` every input but the default one
     that is not built-in or wired; and the system audio row when it is
@@ -605,9 +635,9 @@ checked, reported or rewritten at the next start (D47).
 |---|---|---|---|---|
 | Screen 1 - Built-in Retina Display | 1728×1117 | 3456×2234 | 1728×1116 | 1.0 |
 | Screen 2 - LG HDR 4K | 3840×2160 | 3840×2160 | 3840×2160 | 4.1 |
+| Audio 0 - System |  |  | stereo | 0.1 |
 | Audio 1 - MacBook Pro Microphone (default) |  |  | 1 channel | 0.1 |
 | Audio 2 - RØDE Wireless GO II RX |  |  | 2 channels | 0.1 |
-| Audio 0 - System |  |  | stereo | 0.1 |
 | Total |  |  |  | 5.3 |
 
 2 hours need 10.7 GB, 3.1 GB free.
@@ -624,7 +654,7 @@ checked, reported or rewritten at the next start (D47).
 - **Status window (D46):** clicking the Dock icon while recording opens
   a small window, and Quit opens it too: a table with a row per screen,
   then a row per audio source the recording records or recorded (the
-  audio inputs by number, the system audio last), and the columns Source
+  system audio first, then the audio inputs by number), and the columns Source
   (as in the start window: the kind's icon, the number and the name),
   "Records at" (a screen's frame size; an audio source's `1 channel`, `2
   channels` or `stereo`), Files, Written (its files on disk, below 1 GB
@@ -1545,7 +1575,7 @@ audio mode (D44, point 5).
 Decided while building PR A, within D44, for the owner to confirm:
 `msr check` prints "What will be recorded" before the ready check's
 items, separated by a blank line, without the window's line "Recording
-continues …"; a settings file that cannot be read as a whole is named
+continues …" (`msr record` and `msr list` print the same table); a settings file that cannot be read as a whole is named
 "the whole file" in the line on standard error; an input's transport
 that cannot be read is not wired; `msr settings` with a flag that cannot
 write exits 1; the window shows a red line when a save fails.

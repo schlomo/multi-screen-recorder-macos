@@ -52,6 +52,20 @@ import Testing
         #expect(try repositoryFile("docs/design/recorder.md").contains("```\n\(Self.designExample)```\n"))
     }
 
+    /// A long fix wraps at 80 columns and keeps its indent, under the text after "Fix: ".
+    @Test func aLongFixWrapsWithItsIndent() throws {
+        let result = ReadyCheck.evaluate(facts(screenRecording: .notGranted), settings: .manual)
+        let lines = result.text.split(separator: "\n").map(String.init)
+        let start = try #require(lines.firstIndex { $0.hasPrefix("      Fix: ") })
+        let fix = lines[start...].prefix { $0.hasPrefix("      Fix: ") || $0.hasPrefix("           ") }
+        #expect(fix.count > 2)
+        #expect(fix.allSatisfy { $0.count <= 80 })
+        #expect(fix.dropFirst().allSatisfy { $0.hasPrefix("           ") && !$0.hasPrefix("            ") })
+        #expect(fix.map { $0.dropFirst(11) }.joined(separator: " ")
+            == "allow it in System Settings › Privacy & Security › Screen & System Audio Recording. "
+            + "If it is still missing after that, " + ReadyCheck.restartNote + ReadyCheck.terminalNote)
+    }
+
     @Test func allGoodIsReady() {
         let result = ReadyCheck.evaluate(facts(), settings: .manual)
         #expect(result.isReady)

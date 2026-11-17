@@ -62,13 +62,18 @@ public struct ReadyCheckResult: Equatable, Sendable {
 
     public var isReady: Bool { items.allSatisfy(\.passed) }
 
-    /// The text `msr check` prints.
+    private static let fixLabel = "      Fix: "
+    private static let lineWidth = 80
+
+    /// The text `msr check` prints; a long fix wraps at 80 columns under its first line's text.
     public var text: String {
         var lines: [String] = []
         for item in items {
             lines.append((item.passed ? "ok    " : "FAIL  ") + item.title)
             if !item.passed, let fix = item.fix {
-                lines.append("      Fix: \(fix)")
+                let wrapped = wrappedLines(fix, width: Self.lineWidth - Self.fixLabel.count)
+                lines.append(Self.fixLabel + (wrapped.first ?? ""))
+                lines += wrapped.dropFirst().map { String(repeating: " ", count: Self.fixLabel.count) + $0 }
             }
         }
         lines.append(isReady ? "Ready." : "Not ready.")

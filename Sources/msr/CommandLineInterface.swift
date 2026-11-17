@@ -95,7 +95,7 @@ func standardSettingsFile() throws -> SettingsFile {
 extension CommandLineInterface {
     struct List: AsyncParsableCommand {
         static let configuration = CommandConfiguration(
-            abstract: "Show screens, audio inputs and system audio.")
+            abstract: "Show what will be recorded: the settings, the screens, the audio inputs and the system audio. Asks for no permission.")
 
         func run() async throws {
             let file = try standardSettingsFile()
@@ -103,8 +103,8 @@ extension CommandLineInterface {
             let screens = try await currentScreens()
             let audioInputs = try currentAudioInputs()
             print(renderList(
-                screens: numberScreens(screens),
-                resolution: settings.effectiveResolution,
+                settings: settings,
+                screens: screens,
                 audioInputs: audioInputs,
                 systemAudioAvailable: screenRecordingIsGranted()
             ), terminator: "")

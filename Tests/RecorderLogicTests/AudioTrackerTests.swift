@@ -253,6 +253,13 @@ import Testing
         #expect(tracker.sourcesShown.map(\.number) == [1, 2])
     }
 
+    /// The sources shown are in the order of their numbers, the system audio (0) first.
+    @Test func theSystemAudioIsShownFirstThenTheInputsByNumber() {
+        var tracker = AudioTracker(settings: settings(.wired, systemAudio: true))
+        _ = tracker.begin(inputs: [usb, builtIn], mainDisplayID: 1, screens: [1], at: 0)
+        #expect(tracker.sourcesShown.map(\.number) == [0, 1, 2])
+    }
+
     @Test func theSystemAudioIsNumberZero() {
         var tracker = AudioTracker(settings: settings(.none, systemAudio: true))
         _ = tracker.begin(inputs: [], mainDisplayID: 1, screens: [1], at: 0)
