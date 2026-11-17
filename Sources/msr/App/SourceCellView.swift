@@ -6,6 +6,8 @@ import SwiftUI
 /// number's width blank), and its name.
 struct SourceCellView: View {
     let cell: SourceCell
+    /// The digits of the highest number in the table, the width an audio source not recorded keeps blank.
+    var numberDigits = 1
 
     var body: some View {
         HStack(spacing: TableLayout.iconSpacing) {
@@ -27,7 +29,7 @@ struct SourceCellView: View {
             Text(cell.name)
         } else {
             HStack(spacing: 0) {
-                Text("0 ").hidden()
+                Text(String(repeating: "0", count: numberDigits) + " ").hidden()
                 Text(cell.name)
             }
         }

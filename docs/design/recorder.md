@@ -102,8 +102,10 @@ wired: `(virtual)`, `(Bluetooth)` (also Bluetooth LE), `(aggregate)`,
 `(AirPlay)`, `(Continuity Capture)`, `(unknown connection)` for an
 unknown transport or one that cannot be read; with any audio mode that
 includes the input, `(no device ID)` when it has no Core Audio ID, as
-the recording opens an input by it; under None and Default microphone
-nothing, as the settings line gives the reason. An input whose channels
+the recording opens an input by it; under None and
+Default microphone nothing, as the settings line gives the reason,
+except that a default input without a Core Audio ID still says `(no
+device ID)` under Default microphone. An input whose channels
 cannot be read shows `cannot be read (<reason>)` in Records at.
 
 In the table the "Looks like" column is what macOS calls "looks like" (a
@@ -585,7 +587,7 @@ checked, reported or rewritten at the next start (D47).
     at ("1 channel", "2 channels", "cannot be read"), and GB/h max (the
     audio file); the first row is the system audio with "stereo", then
     the inputs by number, then the audio sources not recorded in device
-    order (D46): every input with the audio mode `none`; every input
+    order (D59): every input with the audio mode `none`; every input
     but the default one with `default-microphone`; with `wired` every
     input but the default one that is not built-in or wired; an input
     without a Core Audio ID; and the system audio row, "System audio"
@@ -596,7 +598,8 @@ checked, reported or rewritten at the next start (D47).
     does (`(virtual)`, `(Bluetooth)`, `(aggregate)`, `(AirPlay)`,
     `(Continuity Capture)`, `(unknown connection)`, `(no device ID)`; no
     reason under `none` and `default-microphone`, whose settings line
-    gives it).
+    gives it, except `(no device ID)` for the default input under
+    `default-microphone`).
   - The table's digits are all one width, so the GB/h max figures, the
     Total's included, line up on the decimal point; only the word
     "Total" is bold.

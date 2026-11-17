@@ -24,7 +24,7 @@ import Testing
 
     @Test func theSamplesAreTheWidestPossibleContent() {
         let all = TableLayout.samples.flatMap { $0 }
-        for text in ["8888×8888", "2 channels", "stereo", "cannot be read", "888.8", "<0.1", "?", "0"] {
+        for text in ["8888×8888", "2 channels", "stereo", "cannot be read", "888.8", "<0.1", "?", "-"] {
             #expect(all.contains(text), Comment(rawValue: text))
         }
     }

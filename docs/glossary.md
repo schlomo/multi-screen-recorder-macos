@@ -258,6 +258,13 @@ Displays; a column of the table. What Native records (D44).
 The screen's size in pixels, which a HiDPI mode makes larger than its
 looks-like size; a column of the table. Never recorded (D44).
 
+## Not recorded
+
+A source the settings or its own state leave out of a recording: shown
+dimmed in the window, with `-` for GB/h max, and, for an audio input
+whose own rule leaves it out, the reason in parentheses after its name
+(`(virtual)`, `(no device ID)`; D59).
+
 ## Ready check
 
 The check before Start: the permissions, the screens (at least one,

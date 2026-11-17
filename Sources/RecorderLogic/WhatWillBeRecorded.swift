@@ -1,11 +1,12 @@
 /// The window's section "What will be recorded", from the settings, the
 /// devices connected now and the free space in the output folder, as data
 /// the view renders: one table, the screen rows then the audio rows (the
-/// system audio (0) first, the recorded inputs by number, the inputs left
-/// out) and the total row, and a line of what the required recording
-/// hours need, under a line of the settings. GB/h max
-/// is the encoder's ceiling, the most a source can write (D53). `msr
-/// check`, `msr record` and `msr list` print its `text`.
+/// system audio (0) first when it is on, the recorded inputs by number,
+/// then the sources not recorded, the system audio among them when it is
+/// off) and the total row, and a line of what the required recording
+/// hours need, under a line of the settings. GB/h max is the encoder's
+/// ceiling, the most a source can write (D53). `msr check`, `msr record`
+/// and `msr list` print its `text`.
 public struct WhatWillBeRecorded: Equatable, Sendable {
     public static let columns = ["Source", "Looks like", "Drawn at", "Records at", "GB/h max"]
     /// GB/h max of a source not recorded, shown dimmed.

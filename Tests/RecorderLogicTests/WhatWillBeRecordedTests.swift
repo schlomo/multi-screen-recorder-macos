@@ -266,6 +266,35 @@ import Testing
         #expect(reason(transport, mode: .defaultMicrophone) == nil)
     }
 
+    /// Auto mode records Wired whatever the stored audio mode says, and so does the reason.
+    @Test func autoModeGivesTheReasonsOfWiredWhateverTheStoredAudioModeIs() {
+        var settings = Settings.defaults
+        settings.auto = true
+        settings.audioMode = .allInputs
+        func input(_ transport: AudioTransport) -> AudioInputInfo {
+            AudioInputInfo(name: "X", channelCount: 1, isDefault: false, transport: transport, uid: "U")
+        }
+        #expect(settings.reasonNotRecorded(input(.virtual)) == "virtual")
+        #expect(settings.reasonNotRecorded(input(.bluetooth)) == "Bluetooth")
+        #expect(settings.reasonNotRecorded(input(.usb)) == nil)
+    }
+
+    /// The blank where the number would be is as wide as the widest number's, so the names line up.
+    @Test func theNamesLineUpWithTwoDigitNumbers() {
+        var settings = Settings.defaults
+        settings.auto = false
+        settings.audioMode = .allInputs
+        let inputs = (1...10).map { AudioInputInfo(name: "Mic\($0)", channelCount: 1, isDefault: $0 == 1, transport: .usb, uid: "U\($0)") }
+            + [AudioInputInfo(name: "Mystery", channelCount: 1, isDefault: false, transport: .usb)]
+        let lines = WhatWillBeRecorded(settings: settings, screens: .success([]), audioInputs: .success(inputs), outputFolder: nil)
+            .text.split(separator: "\n")
+        let numbered = lines.first { $0.contains("Audio 10 - Mic10") }
+        let notRecorded = lines.first { $0.contains("Mystery") }
+        #expect(numbered?.ranges(of: "Mic10").first?.lowerBound.utf16Offset(in: numbered ?? "")
+            == notRecorded?.ranges(of: "Mystery").first?.lowerBound.utf16Offset(in: notRecorded ?? ""))
+        #expect(numbered != nil && notRecorded != nil)
+    }
+
     @Test func theReasonFollowsTheNameInTheTable() {
         let rows = section({ $0.audioMode = .wired }, audioInputs: [Self.virtualInput, Self.airPods,
             AudioInputInfo(name: "Mystery", channelCount: 1, isDefault: false, transport: .usb)]).audioRows

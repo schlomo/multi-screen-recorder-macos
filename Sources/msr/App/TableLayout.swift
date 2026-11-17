@@ -27,7 +27,7 @@ enum TableLayout {
         ["8888×8888"],
         ["8888×8888"],
         ["8888×8888", "2 channels", "stereo", "cannot be read"],
-        ["888.8", "<0.1", "?", "0"],
+        ["888.8", "<0.1", "?", "-"],
     ]
 
     /// Source's width for these names: each with the widest number, so that
