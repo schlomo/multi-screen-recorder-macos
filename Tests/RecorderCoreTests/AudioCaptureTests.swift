@@ -360,12 +360,15 @@ import Testing
         }
     }
 
-    private func sendDrifting(at nanoseconds: Int64, count: Int, to expected: inout ClockDriftCorrection) throws {
+    /// The gap `expected` found before the buffer, if any.
+    @discardableResult
+    private func sendDrifting(at nanoseconds: Int64, count: Int, to expected: inout ClockDriftCorrection) throws -> ClockDriftCorrection.Gap? {
         let time = SharedClock(reading: reading).sinceStart(host: reading.host + UInt64(nanoseconds))
         let arrived = time + 5_000_000 + time / 2000
-        _ = expected.correct([[Float](repeating: 0.25, count: count)], at: time, arrival: arrived)
+        let gap = expected.correct([[Float](repeating: 0.25, count: count)], at: time, arrival: arrived).gap
         arrival.time.withLock { $0 = arrived }
         source.send(try buffer(at: nanoseconds, count: count))
+        return gap
     }
 
     /// The status goes to the recorder at the first buffer and then about
@@ -384,7 +387,8 @@ import Testing
 
     /// A file's clock drift is the one shown at its end, its correction
     /// what was added during it: the second file's counts from its own
-    /// start, and leaves out nothing of the first's.
+    /// start, and leaves out nothing of the first's. The drift added at
+    /// the gap that ended the first file is no file's.
     @Test func eachFileCarriesTheCorrectionAddedDuringIt() async throws {
         let capture = capture()
         var expected = ClockDriftCorrection()
@@ -392,8 +396,10 @@ import Testing
         // A gap of 2 s ends the file; the correction's tail goes to it. The
         // first buffer after it, of 1 s, adds about 0.3 ms, none of it the first file's.
         let atGap = expected.applied
-        try sendDrifting(at: time(ofBuffer: 600) + 2_000_000_000, count: 30 * samplesPerBuffer, to: &expected)
-        #expect(expected.applied - atGap > 0.0002, "\((expected.applied - atGap) * 1000) ms")
+        let gap = try #require(try sendDrifting(at: time(ofBuffer: 600) + 2_000_000_000, count: 30 * samplesPerBuffer, to: &expected))
+        // 500 ppm over the 2 s gap: about 1 ms.
+        #expect(abs(gap.drift - 0.001) < 0.0001, "\(gap.drift * 1000) ms")
+        #expect(expected.applied - atGap - gap.drift > 0.0002, "\((expected.applied - atGap - gap.drift) * 1000) ms")
         try sendDrifting(570, from: 630, after: 2_000_000_000, to: &expected)
         await capture.stop()
         _ = expected.flush()
@@ -404,9 +410,25 @@ import Testing
         let rounded = { (seconds: Double) in (seconds * 10_000).rounded() / 10_000 }
         #expect(atGap > 0.003, "\(atGap * 1000) ms at the gap")
         #expect(first == rounded(atGap))
-        #expect(second == rounded(expected.applied - atGap))
+        #expect(second == rounded(expected.applied - atGap - gap.drift))
         #expect(ends[1].file.clockDriftPpm == (expected.status.clockDriftPpm.map { ($0 * 10).rounded() / 10 }))
         #expect(ends[1].file.clockDriftPpm != nil)
+    }
+
+    /// A gap filled with silence stays in its file, and so does the drift
+    /// added at it, as longer silence.
+    @Test func aFilledGapsDriftIsInItsFile() async throws {
+        let capture = capture()
+        var expected = ClockDriftCorrection()
+        try sendDrifting(600, from: 0, to: &expected)
+        let gap = try #require(try sendDrifting(at: time(ofBuffer: 600) + 500_000_000, count: samplesPerBuffer, to: &expected))
+        #expect(abs(gap.drift - 0.00025) < 0.00005, "\(gap.drift * 1000) ms")
+        try sendDrifting(299, from: 601, after: 500_000_000, to: &expected)
+        await capture.stop()
+        _ = expected.flush()
+        let ends = reported.ended
+        try #require(ends.count == 1)
+        #expect(ends[0].file.clockDriftCorrection == (expected.applied * 10_000).rounded() / 10_000)
     }
 
     /// A capture that ends by itself writes the correction's held-back samples.

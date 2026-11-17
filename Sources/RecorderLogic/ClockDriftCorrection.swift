@@ -14,11 +14,13 @@
 /// assumption: a source's timestamps keep following its sample count
 /// across a gap. Times are nanoseconds on the shared clock.
 public struct ClockDriftCorrection: Sendable {
-    /// Corrected samples, one array per channel, the first at `time`;
-    /// `applied`: the correction applied up to its end, in seconds.
+    /// Corrected samples, one array per channel, the first at `time`; the
+    /// correction applied up to its start (after a gap including the
+    /// drift during it) and up to its end, in seconds.
     public struct CorrectedAudio: Equatable, Sendable {
         public var time: Int64
         public var channels: [[Float]]
+        public var appliedAtStart: Double
         public var applied: Double
     }
 
@@ -98,7 +100,7 @@ public struct ClockDriftCorrection: Sendable {
             let ahead = time - (segment.start + Self.nanoseconds(in: segment.inputSamples, sampleRate: sampleRate))
             if ahead > gapTolerance {
                 audio += flush()
-                let drift = tracker.drift(over: ahead)
+                let drift = tracker.driftAcrossGap(of: ahead)
                 gap = Gap(length: ahead, applied: applied, drift: drift, latenessBefore: lateness ?? latenessNow, latenessAfter: latenessNow)
                 appliedBefore += drift
             } else if segment.resampler.channelCount != channels.count {
@@ -116,7 +118,7 @@ public struct ClockDriftCorrection: Sendable {
         let outputBefore = segment!.resampler.outputCount
         let corrected = segment!.resampler.process(channels, rate: tracker.rate)
         segment!.inputSamples += Int64(count)
-        audio += Self.corrected(corrected, of: segment!, outputBefore: outputBefore, applied: applied)
+        audio += Self.corrected(corrected, of: segment!, outputBefore: outputBefore, appliedAtStart: appliedBeforeBuffer, applied: applied)
         tracker.record(time: time, arrival: arrival, applied: appliedBeforeBuffer)
         return (audio, gap)
     }
@@ -125,16 +127,19 @@ public struct ClockDriftCorrection: Sendable {
     public mutating func flush() -> [CorrectedAudio] {
         guard var segment else { return [] }
         let outputBefore = segment.resampler.outputCount
+        let appliedAtStart = segment.appliedBefore + segment.resampler.applied
         let tail = segment.resampler.flush(rate: tracker.rate)
         appliedBefore = segment.appliedBefore + segment.resampler.applied
         self.segment = nil
-        return Self.corrected(tail, of: segment, outputBefore: outputBefore, applied: appliedBefore)
+        return Self.corrected(tail, of: segment, outputBefore: outputBefore, appliedAtStart: appliedAtStart, applied: appliedBefore)
     }
 
-    private static func corrected(_ channels: [[Float]], of segment: Segment, outputBefore: Int64, applied: Double) -> [CorrectedAudio] {
+    private static func corrected(
+        _ channels: [[Float]], of segment: Segment, outputBefore: Int64, appliedAtStart: Double, applied: Double
+    ) -> [CorrectedAudio] {
         guard let first = channels.first, !first.isEmpty else { return [] }
         let time = segment.correctedStart + nanoseconds(in: outputBefore, sampleRate: segment.resampler.sampleRate)
-        return [CorrectedAudio(time: time, channels: channels, applied: applied)]
+        return [CorrectedAudio(time: time, channels: channels, appliedAtStart: appliedAtStart, applied: applied)]
     }
 
     /// A sample count as nanoseconds, rounded down, without overflowing on long files.

@@ -126,8 +126,6 @@ final class AudioCapture: @unchecked Sendable {
     private var isEnding = false
     private var guideChannels: Int?
     private var correction = ClockDriftCorrection()
-    /// The correction applied up to the end of the latest corrected audio, in seconds.
-    private var applied = 0.0
     /// The correction applied up to the current file's start and up to the
     /// end of what was placed in it, in seconds.
     private var fileApplied: (start: Double, end: Double) = (0, 0)
@@ -279,8 +277,9 @@ final class AudioCapture: @unchecked Sendable {
         let channels = corrected.channels
         let time = corrected.time
         let count = channels[0].count
-        let appliedBefore = applied
-        applied = corrected.applied
+        // A file starting here counts the correction from this audio's
+        // start: the drift added at a gap that ended a file is no file's.
+        let appliedBefore = corrected.appliedAtStart
         joinGuide(channelCount: channels.count)
         guides.receive(channels, from: label, to: guide, at: time)
 

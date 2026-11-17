@@ -11,7 +11,13 @@
 /// the first estimate's line at the first point is the reference, and the
 /// line now minus the reference is `target`, the sound that must have
 /// been added so far. The rate is the line's slope plus what is still off
-/// over the catch-up time. Times are nanoseconds on the shared clock;
+/// over the catch-up time; without a fresh estimate for the catch-up time,
+/// and at a gap, it is the kept slope, the mean of the latest estimates'
+/// slopes. Its limits: late points that outweigh the others in the
+/// horizon (a long stall, or empty intervals and a backlog) tilt the line
+/// until they leave it; one early buffer pulls it down for the horizon;
+/// the reference, taken from the first estimate's points, is never
+/// revised. Times are nanoseconds on the shared clock;
 /// lateness, `target` and `applied` are seconds; a rate or a slope is
 /// output samples per input sample minus 1 (seconds of lateness per second).
 public struct ClockDriftTracker: Sendable {
@@ -33,7 +39,8 @@ public struct ClockDriftTracker: Sendable {
     public let shownEstimates: Int
     public let shownMinimum: Int
 
-    /// The correction rate until the next estimate.
+    /// The correction rate: the latest estimate's for up to the catch-up
+    /// time, then the kept slope.
     public private(set) var rate: Double = 0
     /// The sound that must have been added so far, as of the latest estimate.
     public private(set) var target: Double?
@@ -43,7 +50,6 @@ public struct ClockDriftTracker: Sendable {
 
     private var firstArrival: Int64?
     private var intervalIndex: Int64 = 0
-    private var intervalHasBuffer = false
     private var intervalLateness = Double.infinity
     /// When the interval's least late buffer arrived, in seconds from the first arrival.
     private var intervalLatenessAt = 0.0
@@ -51,8 +57,12 @@ public struct ClockDriftTracker: Sendable {
     private var points: [(time: Double, lateness: Double)] = []
     private var firstPointTime: Double?
     private var reference: Double?
-    /// The latest estimates' slopes, for the clock drift shown.
+    /// The latest estimates' slopes, for the clock drift shown and the kept slope.
     private var slopes: [Double] = []
+    /// The mean of `slopes`, 0 with none.
+    private var keptSlope = 0.0
+    /// When the latest estimate was made, in seconds from the first arrival.
+    private var estimatedAt: Double?
 
     public init(
         interval: Duration = RecorderValues.clockDriftInterval,
@@ -78,18 +88,19 @@ public struct ClockDriftTracker: Sendable {
     }
 
     /// The device's clock drift in parts per million, positive when its
-    /// clock runs fast: the mean slope of the latest estimates; nil until
-    /// there are enough.
+    /// clock runs fast: the kept slope; nil until there are enough estimates.
     public var clockDriftPpm: Double? {
         guard slopes.count >= shownMinimum else { return nil }
-        return -slopes.reduce(0, +) / Double(slopes.count) * 1e6
+        return -keptSlope * 1e6
     }
 
-    /// How far the device's clock drifts during a gap of `length`
-    /// nanoseconds, in seconds: the latest estimate's slope over it, 0
-    /// before the first estimate.
-    public func drift(over length: Int64) -> Double {
-        (slopes.last ?? 0) * Double(length) / 1e9
+    /// A gap of `length` nanoseconds in the buffers: how far the device's
+    /// clock drifted during it, in seconds, the kept slope over it. The
+    /// correction adds that at once, so what was still off is void and the
+    /// rate becomes the kept slope.
+    public mutating func driftAcrossGap(of length: Int64) -> Double {
+        rate = keptSlope
+        return keptSlope * Double(length) / 1e9
     }
 
     /// A buffer whose first sample has the timestamp `time` arrived at
@@ -98,15 +109,14 @@ public struct ClockDriftTracker: Sendable {
         let first = firstArrival ?? arrival
         firstArrival = first
         let index = (arrival - first) / interval
+        // Every interval before this buffer's had a buffer, or no buffer came since.
         if index > intervalIndex {
-            if intervalHasBuffer { estimate(applied: applied) }
-            // The intervals between gave no point: the rate follows the last slope.
-            if index > intervalIndex + 1, let slope = slopes.last { rate = slope }
+            estimate(applied: applied)
             intervalIndex = index
-            intervalHasBuffer = false
             intervalLateness = .infinity
         }
-        intervalHasBuffer = true
+        let now = Double(arrival - first) / 1e9
+        if let estimatedAt, now - estimatedAt >= catchUpTime { rate = keptSlope }
         let lateness = Double(arrival - time) / 1e9
         if lateness < intervalLateness {
             intervalLateness = lateness
@@ -122,10 +132,7 @@ public struct ClockDriftTracker: Sendable {
         points.append((intervalLatenessAt, intervalLateness))
         if firstPointTime == nil { firstPointTime = intervalLatenessAt }
         points.removeAll { $0.time <= now - horizon }
-        guard points.count >= minimumPoints, points.last!.time - points.first!.time >= minimumSpan else {
-            if let slope = slopes.last { rate = slope }
-            return
-        }
+        guard points.count >= minimumPoints, points.last!.time - points.first!.time >= minimumSpan else { return }
         let line = Self.supportLine(points, maximumSlope: maximumRate)
         if reference == nil { reference = line.value(at: firstPointTime!) }
         let target = line.value(at: now) - reference!
@@ -133,13 +140,16 @@ public struct ClockDriftTracker: Sendable {
         remaining = target - applied
         slopes.append(line.slope)
         if slopes.count > shownEstimates { slopes.removeFirst() }
+        keptSlope = slopes.reduce(0, +) / Double(slopes.count)
+        estimatedAt = now
         rate = min(maximumRate, max(-maximumRate, line.slope + (target - applied) / catchUpTime))
     }
 
     /// The lower support line of `points`: on or below every one, its
     /// slope within ±`maximumSlope`, with the smallest sum of distances to
-    /// them. The best slope is one between two points or a limit; for a
-    /// slope, the line touches the point lowest against it.
+    /// them, on a tie the slope nearer 0. The best slope is one between two
+    /// points or a limit; for a slope, the line touches the point lowest
+    /// against it.
     static func supportLine(_ points: [(time: Double, lateness: Double)], maximumSlope: Double) -> Line {
         precondition(!points.isEmpty, "a support line needs a point")
         let newest = points.last!.time
@@ -153,7 +163,9 @@ public struct ClockDriftTracker: Sendable {
             var value = Double.infinity
             for index in 0..<count { value = min(value, lateness[index] - slope * times[index]) }
             let sum = sumOfLateness - Double(count) * value - slope * sumOfTimes
-            if sum < best.sum - 1e-15 { best = (sum, Line(time: newest, value: value, slope: slope)) }
+            if sum < best.sum - 1e-15 || (sum <= best.sum + 1e-15 && abs(slope) < abs(best.line.slope)) {
+                best = (sum, Line(time: newest, value: value, slope: slope))
+            }
         }
         consider(-maximumSlope)
         consider(maximumSlope)

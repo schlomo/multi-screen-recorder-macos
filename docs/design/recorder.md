@@ -905,32 +905,49 @@ the metadata items (see "Output on disk").
   first estimate's line at the first point is the reference; the line
   at an interval's end minus the reference is the sound that must have
   been added by then. The rate is the line's slope plus what is still
-  off divided by 10 s (*data*), limited to ±1000 ppm; after an interval
-  without buffers it is the last estimate's slope.
+  off divided by 10 s (*data*, the catch-up time), limited to
+  ±1000 ppm. Without a fresh estimate (intervals without buffers, or too
+  few points after a pause) it stays as the latest estimate set it for
+  up to the catch-up time since that estimate, then becomes the kept
+  slope: the mean slope of the last up to 60 estimates (the same the
+  clock drift shown averages), 0 before the first.
   What it does, simulated by the design (20 seeds, 600 s, the
   correction against the true offset from 30 s on): a steady device
   within 0.27 ms; a source in bursts like the system audio within
-  0.23 ms, also twice as deep, and 0.40 ms when its lowest lateness
-  comes only once in 8 s; buffers delivered in 1 s of every 2 s within
-  0.08 ms; buffers of 8192 samples within 0.6 ms, 16384 within 1.6 ms;
-  a slow wander (±5 ms over 300 s) within about 1.4 ms. The tests'
-  simulation, whose buffers arrive in order, so those held up by a
-  stall queue behind it, adds: a stall of 4 s within 0.31 ms; pauses of
-  5 to 60 s, ending in a gap, within 0.14 ms. Its limits: a late stretch
-  filling about half the horizon or more, such as a stall of 9 s with
-  the buffers queued behind it, tilts the line until it leaves the
-  horizon (6.4 ms off in the tests); a stall longer than the horizon is
-  taken as a lasting step (30 s: up to about 22 ms off until it ends); a
-  lasting step of the delivery delay is followed as if the clock had
-  stepped (up after about 20 s, down at once) at up to 1000 ppm; one
-  buffer about 20 ms early pulls the line down for the horizon (up to
-  about 12 ms off for about 20 s); a fast wander (a period under about
-  a minute, as the Logitech BRIO's) is not followed and comes out worse
-  corrected than not: ±0.5 ms with a period of 12 to 40 s up to about
-  1.5 ms off, a rate alternating by ±100 ppm every 12 s up to about
-  1.7 ms (1.2 ms uncorrected). On the real arrivals of six sources
-  (probes on the owner's Mac): BlackHole within 0.05 ms, MacBook Pro
-  Microphone 0.11 ms, CalDigit Thunderbolt 3 Audio 0.28 ms, Razer
+  0.23 ms, also twice as deep; buffers of 8192 samples within 0.6 ms,
+  16384 within 1.6 ms; a slow wander (±5 ms over 300 s) within about
+  1.4 ms. The tests' simulation, whose buffers arrive in order, so those
+  held up by a stall queue behind it, adds: the measured burst pattern
+  within 0.22 ms in each of its 4 phases; a stall of 4 s within
+  0.31 ms; buffers delivered in 1 s of every 2 s, the other intervals
+  empty, within 0.26 ms at -116 ppm; pauses of 5 to 60 s, ending in a
+  gap, within 0.08 ms, an hour within 0.65 ms.
+  Its limits, measured by the reviewer and the tests: the line tilts
+  whenever late points outweigh the others in the horizon, which empty
+  intervals make easier: nothing for 4 s then all at once 0.11 ms off;
+  nothing for 8 s with the backlog drained over 6 s 6.8 ms; a stall of
+  6 s 0.85 ms, of 7 s 4.6 ms, of 9 s with the buffers queued behind it
+  6.4 to 8.3 ms, of 30 s 25 to 30 ms, each until the late points leave
+  the horizon; a source at its lowest only once in 12 s with the rest
+  6 ms higher swings by ±3.2 ms all the time. The reference comes from
+  the first estimate's about 10 s of points and is never revised: a
+  source at its lowest only once in 8 s can start up to 3.4 ms off for
+  good, depending on where its lowest second falls (the measured 4 s
+  pattern is within 0.32 ms in all four phases). A lasting step of the
+  delivery delay is followed as if the clock had stepped (up after
+  about 20 s, down at once) at up to 1000 ppm, and a step down
+  overshoots (1.1 ms on 2 ms, 2.1 ms on 4 ms). One early buffer pulls
+  the line down for the horizon and is amplified: 20 ms early up to
+  about 12 ms off, 6 ms early 8.9 ms, 3 ms early 4.4 ms, and up to 42 s
+  until back within 0.5 ms. For about a minute after a step or a tilt
+  the clock drift shown is off by up to about 190 ppm, so a file ending
+  then carries a wrong `clockDriftPpm`. A fast wander (a period under
+  about a minute, as the Logitech BRIO's) is not followed and comes out
+  worse corrected than not: ±0.5 ms with a period of 12 to 40 s up to
+  about 1.5 ms off, a rate alternating by ±100 ppm every 12 s up to
+  about 1.9 ms (1.2 ms uncorrected). On the real arrivals of six
+  sources (probes on the owner's Mac): BlackHole within 0.05 ms, MacBook
+  Pro Microphone 0.11 ms, CalDigit Thunderbolt 3 Audio 0.28 ms, Razer
   Seiren V3 Mini 0.48 ms, Logitech BRIO 0.93 ms against its 5 s
   envelope; the system audio's correction ended at 0.09 ms, its rate
   within ±67 ppm.
@@ -943,8 +960,10 @@ the metadata items (see "Output on disk").
   delivered. A gap (as under Placement) or a change of the channel
   count ends a segment of the correction: the held-back samples go out.
   A device's clock keeps drifting while no buffers come, so at a gap
-  the correction grows by the last estimate's slope times the gap's
-  length, as a jump, not resampled; the next segment starts at its own
+  the correction grows by the kept slope times the gap's length, as a
+  jump, not resampled, and the rate becomes the kept slope (the
+  catch-up it carried is void once the jump is added); the next segment
+  starts at its own
   timestamp plus the correction applied so far, so a gap reaches the
   audio file and the guide track as a jump of its length plus that
   drift. This assumes a source's timestamps keep following its sample
@@ -954,8 +973,10 @@ the metadata items (see "Output on disk").
   The clock drift shown is the mean slope of the last 60 estimates
   (*data*), shown from the 10th (*data*) on, so from about 20 s. In the
   recording manifest each audio file has `clockDriftCorrection`, the
-  sound the correction added during the file (negative: removed; a
-  gap's drift is in it as a longer gap), to 0.0001 s, and
+  sound the correction added during the file (negative: removed; the
+  drift added at a gap filled with silence is in it, as longer silence;
+  the drift added at a gap that ends a file is in neither file), to
+  0.0001 s, and
   `clockDriftPpm`, the clock drift shown at the file's end, positive
   when the source's clock runs fast, to a tenth of a ppm, null if not
   measured by then.
@@ -1403,8 +1424,9 @@ and run next, and replaced (D56): the rolling minimum moved older
 intervals along the loop's own integral, so the loop fed its own
 measurement and ran away on long pauses and deep bursts. Rebuilt with
 the lower support line (see "Clock drift") and run on the owner's Mac
-on 2026-11-17 (180 s, wired audio mode and the system audio, `--debug`):
-the clock drift shown from about 20 s; from 30 s on the Razer Seiren V3
+on 2026-11-17 on the build `0.20261117.49-dev+a8f374d.dirty`, the
+support line before it was committed (180 s, wired audio mode and the
+system audio, `--debug`): the clock drift shown from about 20 s; from 30 s on the Razer Seiren V3
 Mini -114.2 to -119.5 ppm and at most 0.15 ms off, `clockDriftPpm`
 -116.1 with +20.8 ms corrected; CalDigit Thunderbolt 3 Audio +48.3 to
 +50.6 ppm and at most 0.07 ms off, +49.4; MacBook Pro Microphone at
@@ -1412,9 +1434,29 @@ most 0.04 ms off, +2.4; Logitech BRIO wandering from -116.2 to
 +4.8 ppm, at most 0.97 ms off, +4.4; the system audio's correction
 between -0.80 and -0.14 ms, at most 0.43 ms off, its clock drift shown
 -2.9 to +13.3 ppm, `clockDriftPpm` +2.9. No gap and no event. Our
-process's CPU use 54 % on average (51 % before the correction). Not
-verified: the correction over an hour, a real gap's drift, and by ear
-or by clicks in a real recording.
+process's CPU use 54 % on average (51 % before the correction). Run
+again on the build of `1e5bfe7` (2026-11-17, its version string
+checked; 10 minutes, the same sources and options): result ok, no event
+and no gap, our process's CPU use 55 %; `clockDriftPpm` Razer Seiren V3
+Mini -115.2, CalDigit Thunderbolt 3 Audio +49.7, Logitech BRIO +5.2,
+MacBook Pro Microphone +2.4, the system audio -1.2; `clockDriftCorrection`
+Razer +0.0692 s, CalDigit -0.0297 s, MacBook -0.0012 s, BRIO +0.0021 s,
+the system audio +0.0002 s; from 30 s on at most 0.23 ms off (Razer),
+0.10 (CalDigit), 0.11 (MacBook), 0.99 (BRIO) and 0.75 (the system
+audio). The four inputs' files end within 1.4 ms of each other. By the
+room's sound, the Razer's and the BRIO's files keep the same lag:
+-16.4 ms in six of nine 90 s stretches (the others -17.9 and -20.7 ms,
+in a quiet room), where uncorrected it would have moved about 55 ms.
+With the kept slope and the rate hold, run on the build
+`0.20261117.49-dev+151b3b7` (2026-11-17, 120 s, the same sources and
+options): result ok, no event and no gap, our process's CPU use 54 %;
+`clockDriftPpm` Razer -115, CalDigit +49.6, BRIO +6.2, MacBook +1.7,
+the system audio +0.8; `clockDriftCorrection` Razer +0.0138 s, CalDigit
+-0.0059 s, BRIO +0.0041 s, MacBook -0.0002 s, the system audio
++0.0001 s; from 30 s on at most 0.19 ms off (Razer), 0.10 (CalDigit),
+0.04 (MacBook), 0.91 (BRIO, its clock drift shown wandering from -115.3
+to +0.2 ppm) and 0.22 (the system audio). Not verified: the correction over an hour, a real gap's drift, and by
+ear or by clicks in a real recording.
 
 Answered (D50's open question): the system audio's timestamps follow
 its sample count, not the host clock. A probe of 120 s (128 s of data)
