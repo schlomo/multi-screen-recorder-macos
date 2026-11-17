@@ -207,6 +207,36 @@ account and plan were not checked].
    rm msr-signing.p12
    ```
 
+## Installing the app on the developer's Mac
+
+`scripts/install-app` replaces `/Applications/Multi Screen Recorder.app`
+(`INSTALL_FOLDER` names another folder, which the tests use):
+
+- `scripts/install-app` builds (`scripts/build-app`), signs
+  (`scripts/sign-app`, so with `SIGNING_IDENTITY` or the default
+  certificate) and installs the zip `scripts/sign-app` prints.
+- `scripts/install-app --release` downloads the latest release's zip
+  with `gh release download` (gh reads its own credentials) and
+  installs it.
+- `scripts/install-app <zip>` installs that zip.
+
+Installing is the same for all three: unpack the zip into a temporary
+folder, verify the signature (`codesign --verify --deep --strict`),
+replace the installed app, remove the quarantine attribute from it
+recursively, check that no file still carries it, and print the
+installed version. The script refuses, before changing anything, while
+the installed app's `msr` runs (the app, or `msr record` started by
+any path or symbolic link): it asks `lsof -a -t -d txt` for the
+processes that have that very file open as their program, which is by
+the file's identity, not by the name a process was started with.
+
+The installed app keeps the Screen & System Audio Recording and
+Microphone permissions because every build is signed with the same
+certificate (D5), and needs no "Open Anyway" because the quarantine
+attribute is removed. The tests run the script with a zip argument on
+small stand-in bundles; the modes without an argument and `--release`
+build, sign and download, so no test runs them.
+
 ## Why
 
 - A self-signed certificate that stays the same gives every build the

@@ -266,6 +266,7 @@ scripts/test        # runs the tests
 scripts/build-app   # builds the app in build/, signed ad hoc
 scripts/smoke-test  # runs the bundled msr: version, settings, exit codes
 scripts/sign-app    # re-signs it with your certificate and zips it into build/
+scripts/install-app # builds, signs and installs it into /Applications
 ```
 
 `scripts/sign-app` signs with the identity named in
@@ -274,6 +275,13 @@ matches any certificate whose name contains it, such as
 `Multi Screen Recorder Signing (Schlomo)`; `SIGNING_IDENTITY=-` signs
 ad hoc, for a local check only. How the pipeline, versions and signing
 fit together is in [docs/design/delivery.md](docs/design/delivery.md).
+
+`scripts/install-app` replaces the app in `/Applications`: with no
+argument it builds and signs first, `--release` installs the latest
+release, and a zip path installs that zip. It refuses while the
+installed app runs, keeps both permissions (the signature stays the
+same) and needs no "Open Anyway" (it removes the quarantine); details in
+[docs/design/delivery.md](docs/design/delivery.md).
 
 ## Feedback
 

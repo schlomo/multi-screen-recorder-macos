@@ -1,0 +1,87 @@
+#!/usr/bin/env bash
+# Installs the app, replacing the one in INSTALL_FOLDER (default
+# /Applications):
+#   scripts/install-app            builds (scripts/build-app), signs with your
+#                                  certificate (scripts/sign-app) and installs
+#                                  the zip it prints
+#   scripts/install-app --release  installs the zip of the latest release
+#   scripts/install-app <zip>      installs that zip
+# Refuses while the installed app's msr runs. Verifies the signature, removes
+# the quarantine attribute and prints the installed version.
+set -euo pipefail
+
+me="scripts/install-app"
+bundle="Multi Screen Recorder.app"
+repository="schlomo/multi-screen-recorder-macos"
+install_folder="${INSTALL_FOLDER:-/Applications}"
+target="$install_folder/$bundle"
+staged="$install_folder/.$bundle.installing"
+
+fail() { echo "$me: $*" >&2; exit 1; }
+
+for tool in ditto codesign xattr plutil lsof mktemp; do
+    command -v "$tool" >/dev/null || fail "$tool is not on the PATH"
+done
+if [[ ${1-} == --release ]]; then
+    command -v gh >/dev/null || fail "gh is not on the PATH"
+fi
+
+scratch="$(mktemp -d)"
+trap 'rm -rf "$scratch"' EXIT
+
+# lsof lists the processes that have the executable's file open as their
+# program text (-a -d txt), matched by the file itself, not by the name a process
+# was started with: a symlink or the full path both find it, and so does a
+# renamed process. Only this file counts, so another copy of the app elsewhere
+# never does. lsof exits 1 when it finds none.
+refuse_while_running() {
+    local program="$target/Contents/MacOS/msr" pids status=0
+    [[ -e $program ]] || return 0
+    pids="$(lsof -a -t -d txt -- "$program")" || status=$?
+    ((status <= 1)) || fail "lsof failed with exit code $status"
+    [[ -z $pids ]] || fail "$program is running (process ${pids//$'\n'/, }); quit it first, nothing was changed"
+}
+
+install_zip() {
+    local zip="$1" unpacked="$scratch/unpacked"
+    [[ -f $zip ]] || fail "$zip is not a file"
+    [[ -d $install_folder ]] || fail "$install_folder is not a folder"
+    mkdir "$unpacked"
+    ditto -x -k "$zip" "$unpacked"
+    [[ -d $unpacked/$bundle ]] || fail "$zip does not hold $bundle"
+    codesign --verify --deep --strict "$unpacked/$bundle" || fail "the signature of $bundle in $zip does not verify, nothing was changed"
+    refuse_while_running
+
+    trap 'rm -rf "$scratch" "$staged"' EXIT
+    rm -rf "$staged"
+    ditto "$unpacked/$bundle" "$staged"
+    xattr -dr com.apple.quarantine "$staged"
+    if xattr -rl "$staged" | grep -q com.apple.quarantine; then
+        fail "a file of the new app still carries com.apple.quarantine, nothing was changed"
+    fi
+    rm -rf "$target"
+    mv "$staged" "$target"
+    echo "Installed $target, version $(plutil -extract MSRVersion raw "$target/Contents/Info.plist")"
+}
+
+case $# in
+    0)
+        refuse_while_running
+        cd "$(dirname "$0")/.."
+        scripts/build-app
+        install_zip "$(scripts/sign-app)"
+        ;;
+    1)
+        if [[ $1 == --release ]]; then
+            refuse_while_running
+            gh release download --repo "$repository" --pattern '*.zip' --dir "$scratch/download"
+            shopt -s nullglob
+            zips=("$scratch"/download/*.zip)
+            ((${#zips[@]} == 1)) || fail "expected one zip in the latest release, found ${#zips[@]}"
+            install_zip "${zips[0]}"
+        else
+            install_zip "$1"
+        fi
+        ;;
+    *) fail "usage: $me [--release | <zip>]" ;;
+esac
