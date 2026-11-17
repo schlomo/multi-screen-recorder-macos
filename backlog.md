@@ -17,8 +17,8 @@ then item 16, the Mac App Store and Homebrew
 (the owner, 2026-11-16: "sandbox then comes after the
 optimizations"). Agents may run `msr record` on the owner's Mac (D48;
 the owner's go-ahead in the session, 2026-11-16), and BetterDisplay's
-command line with the owner's virtual screen "Virtual 16:9"; the
-D56: before an agent starts a recording or plays a sound on the owner's Mac, the session running or briefing that test tells the owner, once before the test's first run.
+command line with the owner's virtual screen "Virtual 16:9"; by
+D56, before an agent starts a recording or plays a sound on the owner's Mac, the session running or briefing that test tells the owner, once before the test's first run.
 
 Still open from D34: what AGC does and whether it is on in auto mode;
 "AGC can also come as an improvement after the recorder" (the owner,
