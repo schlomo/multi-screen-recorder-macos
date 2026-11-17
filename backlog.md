@@ -9,11 +9,12 @@ owner shares it with colleagues, who email a screenshot of the start
 window, `recording.json` of every recording and a few sentences; the
 architect triages what comes back into this backlog. PR #19 (the
 clock drift correction, the status line and the command line polish)
-merged 2026-11-17 as release `v0.20261117.51`. First: the homepage PR
-under "In flight". Next: item 17, the local-first rule, then item 1a,
-audio only. Then: item 3, the end-to-end tests; item 4, the
-simplification; item 7, auto-recovery from disturbances; item 6, CPU;
-then item 16, the Mac App Store and Homebrew
+merged 2026-11-17 as release `v0.20261117.51`; PR #20 (the homepage
+collage, dark mode, `scripts/install-app`) merged the same evening as
+release `v0.20261117.52`. First: item 17, the local-first rule, in its
+own PR. Next: item 1a, audio only. Then: item 3, the end-to-end tests;
+item 4, the simplification; item 7, auto-recovery from disturbances;
+item 6, CPU; then item 16, the Mac App Store and Homebrew
 (the owner, 2026-11-16: "sandbox then comes after the
 optimizations"). Agents may run `msr record` on the owner's Mac (D48;
 the owner's go-ahead in the session, 2026-11-16), and BetterDisplay's
@@ -26,32 +27,7 @@ Still open from D34: what AGC does and whether it is on in auto mode;
 
 ## In flight
 
-- **Homepage collage and the install script** (branch
-  `homepage-collage`, built locally; the owner, 2026-11-17: "it will
-  be part of the next PR with the screenshots"):
-  - The homepage: the owner's three screenshots as one collage with
-    arrows from Start and Stop, drawn by Hugo from the screenshots'
-    sizes, so new screenshots replace the files only; a click opens it
-    full size in a new tab; the features from the root `README.md`'s
-    "What it does" (rewritten with the owner: one click first, the lid,
-    edit-ready files as a sub-list with timecode and reel names); a
-    wide layout from 64rem (phones held sideways keep the narrow one);
-    requirements last; the page's background the icon artwork's own;
-    dark mode by a second palette. The owner chose each step on local
-    previews (variant "marker", lighter backdrop, red-bordered labels).
-  - `scripts/install-app`: builds, signs with the owner's certificate
-    and installs into `/Applications` with quarantine removed, or the
-    latest release (`--release`), or a given zip; refuses while that
-    app's `msr` runs (the owner, 2026-11-17: "create a
-    local-build-sign-and-install script ... DRY and KISS"). Homebrew
-    waits until this works for the owner (item 16). The owner's first
-    run built, signed and installed the app, which started without a
-    permission prompt.
-  - The owner's follow-ups (2026-11-17): the log command in the crash
-    report form as a comment, so the submitted issue does not show it;
-    `--help` and `-h` for the scripts that take arguments; a light frame
-    around the header icon in dark mode.
-  - Waiting on: one review, one push and CI.
+Nothing.
 
 ## Queued
 
@@ -394,8 +370,10 @@ Still open from D34: what AGC does and whether it is on in auto mode;
    the owner's choice of 2026-11-12. Revisit when the owner finds the
    Dock or Finder icon lacking.
 15. **Homepage** (D7, D53): live since PR #13. Left: preview URLs on
-   PRs (Cloudflare's comment had none before the first production
-   deploy; check on the homepage PR in flight); the owner's check that
+   PRs: on PR #20 Cloudflare's check passed but linked to a build of
+   the production Worker and no preview URL appeared, so preview
+   builds for other branches are not set up [ASSUMED from the check's
+   link]; that is the owner's, in Cloudflare. The owner's check that
    `schapiro.org/impressum/` covers the subdomain.
 
 16. **Mac App Store and Homebrew** (the owner, 2026-11-16: "I'd like
@@ -406,9 +384,12 @@ Still open from D34: what AGC does and whether it is on in auto mode;
    contributor clause and the dual-licensing note were to come with
    the command line polish's PR (D54) and did not: PR #19 left them
    out; they wait for the owner's go-ahead on their text. Homebrew
-   waits until `scripts/install-app` works for the owner (the owner,
+   waited until `scripts/install-app` worked for the owner (the owner,
    2026-11-17: "maybe hold back on the cask and we first solve my local
-   problems and then apply this learning"). Order, from the
+   problems and then apply this learning"); it does since PR #20: the
+   owner's build, signed with their certificate and installed without
+   the quarantine, started without a permission prompt. The cask
+   applies the same: the stable certificate, the quarantine removed. Order, from the
    architect's assessment of 2026-11-16:
    - A sandbox test on the owner's Mac (about half a day, no cost):
      our build signed with `com.apple.security.app-sandbox`; check
@@ -601,6 +582,15 @@ Still open from D34: what AGC does and whether it is on in auto mode;
 
 ## Done (recent)
 
+- 2026-11-17: PR #20 merged by the owner, release `v0.20261117.52` (its
+  build re-run after GitHub found no runner, again): the homepage's
+  collage of the three windows with arrows from Start and Stop, the
+  wide layout, the features from README (with "In sync after hours"),
+  dark mode, the red download button; `scripts/install-app` with
+  `--release` and `--snapshot <n>`; `--help` for the scripts and the
+  crash form's log command as a comment (D60). The tests' stand-in
+  app no longer writes crash reports (troubleshooting). Unverified until
+  someone opens a crash report issue: that GitHub hides the comment.
 - 2026-11-17: PR #19 merged by the owner, release `v0.20261117.51`
   (its release job re-run after GitHub found no runner): the clock
   drift correction (D57), `msr record`'s status line, output split and
