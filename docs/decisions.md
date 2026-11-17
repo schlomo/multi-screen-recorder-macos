@@ -1751,9 +1751,10 @@ architect's reading.
      that leaves it out is the input's own: under audio mode Wired its
      connection (`(virtual)`, `(Bluetooth)`, `(aggregate)`,
      `(AirPlay)`, `(Continuity Capture)`, `(unknown connection)`), and
-     `(no device ID)` for an input the recorder cannot identify. Under
-     audio mode None or Default microphone, and for system audio off,
-     the settings line gives the reason.
+     `(no device ID)` for an input the recorder cannot identify and
+     the audio mode would record. Otherwise, under audio mode None or
+     Default microphone, and for system audio off, the settings line
+     gives the reason.
   3. Every list of sources shown to people lists the screens by
      number, then the audio sources by number (`Audio 0 - System`
      first), then the sources not recorded; files of one source by

@@ -7,11 +7,9 @@ the homepage with screenshots of both windows (PR #15) and the tester
 guide's "What to test and send" (PR #16), all merged 2026-11-16. The
 owner shares it with colleagues, who email a screenshot of the start
 window, `recording.json` of every recording and a few sentences; the
-architect triages what comes back into this backlog. First: the clock
-drift correction under "In flight" waits for the owner. Next: queued item
-1, the command line polish (the owner signed off the design as text,
-2026-11-16: "the next PR should roll that stuff in"), then item 1a,
-audio only. Then: item 3, the end-to-end tests; item 4, the
+architect triages what comes back into this backlog. First: PR #19
+under "In flight" (the clock drift correction, the status line and the
+command line polish) waits for the owner. Next: item 1a, audio only. Then: item 3, the end-to-end tests; item 4, the
 simplification; item 7, auto-recovery from disturbances; item 6, CPU;
 then item 16, the Mac App Store and Homebrew
 (the owner, 2026-11-16: "sandbox then comes after the
@@ -32,6 +30,9 @@ Still open from D34: what AGC does and whether it is on in auto mode;
   #19, built and tried locally first (the owner, 2026-11-16: "work
   local only, with a single final CI test at the very end after we
   both are happy"; the owner's go-ahead to push, 2026-11-17).
+  - Also in it: the command line polish (queued item 1, D59), built
+    locally after the owner tried PR #19; one adversarial review and
+    two delta reviews, the last one's findings fixed in `171eddb`.
   - Clock drift, reviewed: one adversarial review and five delta
     reviews, all findings fixed.
   - Clock drift, run on the owner's Mac (2026-11-17, five audio
