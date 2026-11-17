@@ -130,13 +130,15 @@ public final class Recorder {
         }
     }
 
+    private func clockDriftShown() -> [(source: AudioTracker.Source, status: ClockDriftCorrection.Status)] {
+        ClockDriftShown.sources(
+            shown: audioTracker.sourcesShown, reports: audioClockDrift, running: audioCaptures.mapValues(\.0))
+    }
+
     /// With `--debug`, every 10 s the clock drift lines of all audio sources being recorded, together in number order.
     private func logClockDriftBlock() {
         guard RecorderLog.isDebug, clockDriftDebugSchedule.due(at: context.now()) else { return }
-        let sources = audioTracker.sourcesShown.compactMap { source -> (number: Int, label: String, status: ClockDriftCorrection.Status)? in
-            guard let drift = audioClockDrift[source.id], audioCaptures[source.id]?.0 == drift.number else { return nil }
-            return (source.number, source.label, drift.status)
-        }
+        let sources = clockDriftShown().map { (number: $0.source.number, label: $0.source.label, status: $0.status) }
         for line in DebugLine.clockDriftBlock(sources) { RecorderLog.detail(line, category: "recorder") }
     }
 
@@ -157,7 +159,7 @@ public final class Recorder {
     /// The status window's table, line and CPU use, read now: each file's
     /// size on disk and the free space in the recording folder.
     public func status() -> (rows: [RecordingStatusTable.Row], line: String, cpu: String?) {
-        let clockDrift = audioClockDrift.filter { id, drift in audioCaptures[id]?.0 == drift.number }.mapValues(\.status)
+        let clockDrift = Dictionary(uniqueKeysWithValues: clockDriftShown().map { ($0.source.id, $0.status) })
         let names = manifest.files.map(\.name) + manifest.audioFiles.map(\.name)
         let sizes = names.map { name in
             (name, (try? FileManager.default.attributesOfItem(atPath: folder.appending(path: name).path(percentEncoded: false)))?[.size] as? Int64)
