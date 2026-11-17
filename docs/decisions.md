@@ -1739,7 +1739,9 @@ architect's reading.
   like default and set "-" instead of 0 for the GB/h ... the next PR
   should roll that stuff in", and "yes to both details". On 2026-11-17,
   trying PR #19: "a bit confusing that the order of showing the audio
-  and video devices doesn't follow the numbering".
+  and video devices doesn't follow the numbering", and on the ready
+  check's audio item: "KISS and DRY is the guide to decide such things
+  like ready check audio line".
 - **Decision:**
   1. `msr check`, `msr record` and `msr list` print one "What will be
      recorded" table; `msr list` prints it without the ready check and
@@ -1758,7 +1760,9 @@ architect's reading.
   3. Every list of sources shown to people lists the screens by
      number, then the audio sources by number (`Audio 0 - System`
      first), then the sources not recorded; files of one source by
-     start. `recording.json` keeps its order.
+     start. The ready check's audio item and the `--debug` clock
+     drift block take the same list in the same order.
+     `recording.json` keeps its order.
   4. The ready check's "Fix:" lines wrap at 80 columns under their
      text; `msr list` says that the program running `msr`, not the
      app, lacks the Screen & System Audio Recording permission.

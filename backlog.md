@@ -33,10 +33,12 @@ Still open from D34: what AGC does and whether it is on in auto mode;
   - Also in it: the command line polish (queued item 1, D59), built
     locally after the owner tried PR #19, with the owner's later
     findings (the `--debug` clock drift lines as one block in number
-    order); reviewed by one adversarial review and delta reviews of
-    every fix.
-  - Clock drift, reviewed: one adversarial review and five delta
-    reviews, all findings fixed.
+    order) and rule (the ready check's audio item from the same
+    table, 2026-11-17: "KISS and DRY is the guide to decide such
+    things like ready check audio line").
+  - Reviewed: an adversarial review of each of the three changes and
+    delta reviews of every fix after it; the review state is in PR
+    #19's description.
   - Clock drift, run on the owner's Mac (2026-11-17, five audio
     sources, two screens): one hour on the build of `1fb8dae`, result
     ok, no events; `clockDriftPpm` Razer −115.2, CalDigit 50.2, BRIO
@@ -52,14 +54,14 @@ Still open from D34: what AGC does and whether it is on in auto mode;
     time, Apple's AAC encoder about 27 %, CoreFoundation, the
     allocator and kernel calls together about 40 % (queued item 6).
     Earlier: 10 minutes on `1e5bfe7`, 180 s on `cdd75ad`.
-  - Status line, reviewed: one adversarial review and three delta
-    reviews, their findings fixed. Run on
-    the owner's Mac: 12 s under a pseudo-terminal on `4768d34`,
+  - Status line, run on the owner's Mac: 12 s under a pseudo-terminal on `4768d34`,
     standard output carried only the path, the line redrew every
     second and was cleared before the summary.
-  - UNVERIFIED: a build with CI's Swift 6.3, a real gap during a
-    recording, a click test through the speakers, the status window's
-    column on screen, the status line in the owner's own terminal.
+  - Seen by the owner (2026-11-17): the status window with the
+    "Clock drift" column, the status line in the owner's terminal, an
+    unplug and replug during a `--debug` run. UNVERIFIED: a gap within
+    a stream (samples lost while the device stays connected), a click
+    test through the speakers.
   - Waiting on the owner: trying the build; confirming D57's design
     and D58's details; whether `--quiet` also writes low disk space
     and a screen showing another screen's picture; merging. The
