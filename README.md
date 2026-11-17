@@ -83,8 +83,8 @@ confirmed yet.
   with two screens and five audio sources.
 - **Clock drift:** some USB audio devices drift against the video, by
   up to about 0.4 s per hour. The recorder corrects it by resampling
-  their sound; that the correction holds over an hour is not verified
-  yet.
+  their sound; on the owner's Mac it held every file within 1 ms over
+  an hour.
 - **USB docks:** plugging a USB device into a dock while recording can
   cause a few seconds of silence or repeated audio in the USB audio
   inputs.

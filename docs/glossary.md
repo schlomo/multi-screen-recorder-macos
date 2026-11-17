@@ -232,8 +232,9 @@ per million: positive when it runs fast (more samples than the shared
 clock's time), negative when slow (D49). It is measured from when the
 device's buffers arrive and corrected: every audio source's sound is
 resampled continuously so its sample count follows the shared clock.
-The recording manifest gives each audio file's clock drift as
-`clockDriftPpm` and the sound the correction added as
+The recording manifest gives each audio file's clock drift at the
+file's end as `clockDriftPpm` (D57; under D49 it was measured over the
+whole file) and the sound the correction added as
 `clockDriftCorrection`.
 
 ## Recording resolution

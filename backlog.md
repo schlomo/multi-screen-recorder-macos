@@ -28,13 +28,12 @@ Still open from D34: what AGC does and whether it is on in auto mode;
 
 - **Clock drift correction** (D57; was queued item 5) and **`msr
   record`'s status line, output split and `--quiet`** (D58; the
-  terminal part of queued item 13, for `msr record` only): built
-  locally on the branch `audio-drift-correction`, not pushed, no
-  pipeline run (the owner, 2026-11-16: "work local only, with a single
-  final CI test at the very end after we both are happy").
-  - Clock drift, reviewed: one adversarial review and four delta
-    reviews, the last one's findings fixed in `7c303f9`, a tests and
-    docs commit no reviewer has read.
+  terminal part of queued item 13, for `msr record` only): draft PR
+  #19, built and tried locally first (the owner, 2026-11-16: "work
+  local only, with a single final CI test at the very end after we
+  both are happy"; the owner's go-ahead to push, 2026-11-17).
+  - Clock drift, reviewed: one adversarial review and five delta
+    reviews, all findings fixed.
   - Clock drift, run on the owner's Mac (2026-11-17, five audio
     sources, two screens): one hour on the build of `1fb8dae`, result
     ok, no events; `clockDriftPpm` Razer −115.2, CalDigit 50.2, BRIO
@@ -50,9 +49,8 @@ Still open from D34: what AGC does and whether it is on in auto mode;
     time, Apple's AAC encoder about 27 %, CoreFoundation, the
     allocator and kernel calls together about 40 % (queued item 6).
     Earlier: 10 minutes on `1e5bfe7`, 180 s on `cdd75ad`.
-  - Status line, reviewed: one adversarial review and one delta
-    review, their findings fixed; the delta review of `7a3d97b`,
-    `4768d34` and `cff2a2b` was running when this was written. Run on
+  - Status line, reviewed: one adversarial review and three delta
+    reviews, their findings fixed. Run on
     the owner's Mac: 12 s under a pseudo-terminal on `4768d34`,
     standard output carried only the path, the line redrew every
     second and was cleared before the summary.
@@ -61,11 +59,9 @@ Still open from D34: what AGC does and whether it is on in auto mode;
     column on screen, the status line in the owner's own terminal.
   - Waiting on the owner: trying the build; confirming D57's design
     and D58's details; whether `--quiet` also writes low disk space
-    and a screen showing another screen's picture; the go-ahead to
-    push. The owner, 2026-11-17: commits name the model ("Yes, mention
-    model"); the agent's session rules forbid it a model name in a
-    commit, so the squash message, written by the human who merges,
-    carries it.
+    and a screen showing another screen's picture; merging. The
+    owner, 2026-11-17: commits name the model ("Yes, mention model");
+    the squash message carries it.
 
 ## Queued
 

@@ -69,6 +69,8 @@ final class RecordCommandDelegate: NSObject, NSApplicationDelegate {
     /// Prints what will be recorded and the ready check, then starts, or
     /// ends with the exit status of a command that ends early.
     private func checkAndStart() async {
+        // A closed reader of standard output must not end the process with the files not finalized.
+        signal(SIGPIPE, SIG_IGN)
         if record.debug { RecorderLog.enableDebug() }
         let settings: Settings
         let home: URL
@@ -106,8 +108,6 @@ final class RecordCommandDelegate: NSObject, NSApplicationDelegate {
         let folderPath = folder.path(percentEncoded: false)
         output.tell(.recordingFolderNotice, "Recording into \(folderPath)\n")
         output.tell(.recordingFolder, folderPath)
-        // A closed reader of standard output must not end the process with the files not finalized.
-        signal(SIGPIPE, SIG_IGN)
         for signalNumber in [SIGINT, SIGTERM, SIGHUP] {
             signal(signalNumber, SIG_IGN)
             let source = DispatchSource.makeSignalSource(signal: signalNumber, queue: .main)
