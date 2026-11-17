@@ -6,14 +6,10 @@
   <body>
     <header>
       <div class="brand">
-        {{- /* The app icon artwork at 2x its 8rem shown width; in dark mode the app
-               icon, as the artwork's light background would show as a square. */}}
-        {{- $artwork := (resources.Get "images/app-icon-fancy.jpeg").Resize "256x webp q85" }}
-        {{- $icon := (resources.Get "images/app-icon.png").Resize "256x webp q85" }}
-        <a href="/"><picture>
-          <source srcset="{{ $icon.RelPermalink }}" media="(prefers-color-scheme: dark)" />
-          <img src="{{ $artwork.RelPermalink }}" alt="" width="128" height="128" fetchpriority="high" />
-        </picture></a>
+        {{- /* The icon artwork's tile, transparent outside it, at 2x its 10.5rem shown width */}}
+        {{- with (resources.Get "images/app-icon-fancy-tile.png").Resize "336x webp q85" }}
+        <a href="/"><img src="{{ .RelPermalink }}" alt="" width="168" height="168" fetchpriority="high" /></a>
+        {{- end }}
         <h1>{{ site.Title }}</h1>
       </div>
       {{- block "claim" . }}{{ end }}

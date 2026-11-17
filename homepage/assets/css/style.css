@@ -33,13 +33,14 @@ a {
    sections use the page's full width of up to 76rem. */
 .prose, footer, .features, .facts { max-inline-size: 44rem; margin-inline: auto; }
 
-/* On a wide screen (64rem, wider than a phone held sideways), the home page's header: the icon and the name on the
-   left, the tagline, description and download on the right; on a narrow one,
-   all of it centred, one under the other. */
+/* On a wide screen (64rem, wider than a phone held sideways), the home
+   page's header: the icon and the name on the left, the tagline, description
+   and download on the right; on a narrow one, all of it centred, one under
+   the other. */
 header {
   text-align: center;
 
-  & img { display: block; inline-size: 8rem; block-size: auto; margin: 0 auto 0.5rem; }
+  & img { display: block; inline-size: 10.5rem; block-size: auto; margin: 0 auto 0.5rem; }
   & h1 { margin: 0; color: var(--primary); font-size: 2.25rem; text-wrap: balance; }
 
   @media (min-width: 64rem) {
@@ -54,15 +55,6 @@ header {
       & .download { margin-block-end: 0; }
     }
   }
-}
-
-.tagline { margin-block-start: 0; font-size: 1.5rem; }
-      & .download { margin-block-end: 0; }
-    }
-  }
-
-  & img { display: block; inline-size: 8rem; block-size: auto; margin: 0 auto 0.5rem; }
-  & h1 { margin: 0; color: var(--primary); font-size: 2.25rem; text-wrap: balance; }
 }
 
 .tagline {
@@ -80,12 +72,12 @@ header {
   display: inline-block;
   padding: 0.75rem 1.5rem;
   border-radius: var(--radius);
-  background: var(--primary);
-  color: var(--surface);
+  background: var(--button);
+  color: var(--button-text);
   font-weight: 600;
   text-decoration: none;
 
-  &:hover { color: var(--surface); background: var(--link); }
+  &:hover { color: var(--button-text); background: var(--button-hover); }
 }
 
 h2 {

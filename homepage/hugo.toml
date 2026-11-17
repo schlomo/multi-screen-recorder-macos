@@ -26,13 +26,16 @@ disableKinds = ["taxonomy", "term", "section", "rss", "404"]
   link = "#415070"        # link text
   text = "#1E2330"        # body text
   text-light = "#415070"  # the tagline, the footer
-  background = "#F5F7FA"  # page background: the icon artwork's own background, so the header icon has no frame
+  background = "#F5F7FA"  # page background
   surface = "#FFFFFF"     # the download button's text, boxes
   rule = "#D5DAE6"        # footer rule
   artwork = "#F5F7FA"     # the icon artwork's own background: the link preview image
   backdrop-from = "#5B6B8C"  # the screenshot collage's backdrop, top left
   backdrop-to = "#A3B0C9"    # the screenshot collage's backdrop, bottom right
   shadow = "#1E2330"      # the collage windows' shadow
+  button = "#1E2330"      # the download button
+  button-text = "#FFFFFF"
+  button-hover = "#415070"
 
 [params.colors-dark]
   primary = "#E9EEF7"
@@ -47,6 +50,9 @@ disableKinds = ["taxonomy", "term", "section", "rss", "404"]
   backdrop-from = "#2A3450"
   backdrop-to = "#4A5878"
   shadow = "#000000"
+  button = "#FF453A"
+  button-text = "#FFFFFF"
+  button-hover = "#FF6961"
 
 # The header shows the app icon artwork from the repository's assets/icon/,
 # resized by Hugo; the source is never copied into homepage/. Defining a mount
@@ -58,10 +64,11 @@ disableKinds = ["taxonomy", "term", "section", "rss", "404"]
   [[module.mounts]]
     source = "../assets/icon/app-icon-fancy.jpeg"
     target = "assets/images/app-icon-fancy.jpeg"
-  # In dark mode the header shows the app icon, transparent outside its tile.
+  # The header shows the artwork's tile, transparent outside it, rendered by
+  # scripts/render-app-icon.
   [[module.mounts]]
-    source = "../assets/icon/app-icon.png"
-    target = "assets/images/app-icon.png"
+    source = "../assets/icon/app-icon-fancy-tile.png"
+    target = "assets/images/app-icon-fancy-tile.png"
   # The features list comes from the repository's README.md, "What it does".
   [[module.mounts]]
     source = "../README.md"

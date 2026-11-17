@@ -31,14 +31,15 @@ repository, and the requirements.
   for a browser in dark mode, the only place colours are defined; both need
   the same names (the build stops otherwise). `layouts/_partials/palette.html`
   turns them into CSS custom properties.
-- **Header image:** the app icon artwork `../assets/icon/app-icon-fancy.jpeg`,
-  mounted by `[module]` in `hugo.toml` (never copied here) and resized by
-  Hugo to a 256 px WebP in `layouts/baseof.html`; the link preview image
-  below is drawn from it too. Changing that file triggers no homepage
-  build (it is outside the watch path); the next homepage change picks it
-  up. In dark mode the header shows `../assets/icon/app-icon.png` instead,
-  transparent outside its tile, as the artwork's light background would
-  show as a square.
+- **Header image:** the app icon artwork's tile,
+  `../assets/icon/app-icon-fancy-tile.png`, transparent outside it (cut
+  out of `app-icon-fancy.jpeg` by `scripts/render-app-icon`, so it shows no
+  square on any background), mounted by `[module]` in `hugo.toml` (never
+  copied here) and resized by Hugo to a 336 px WebP in
+  `layouts/baseof.html`. The link preview image below is drawn from
+  `app-icon-fancy.jpeg` itself. Changing either file triggers no
+  homepage build (they are outside the watch path); the next homepage
+  change picks them up.
 - **Screenshots:** the collage under the download button, drawn by
   `layouts/_partials/collage.html` as one SVG picture from three PNGs in
   `assets/images/`: `app-window.png` (the start window), `status-window.png`
