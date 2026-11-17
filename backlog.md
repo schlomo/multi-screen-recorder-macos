@@ -65,7 +65,8 @@ Still open from D34: what AGC does and whether it is on in auto mode;
 
 ## Queued
 
-1. **Command line polish** (the owner, 2026-11-16, on `msr check`
+1. **Command line polish** (built in PR #19, D59; the owner,
+   2026-11-16, on `msr check`
    and `msr list`: "seems to me like check and list show nearly the
    same info but differently, maybe worth consolidating? Also, check
    doesn't show the settings it applies, only the effect. And in the
@@ -172,9 +173,11 @@ Still open from D34: what AGC does and whether it is on in auto mode;
    test for a gap after real data in a guide track's last mix; an
    unlocked test flag in `DisplayFileTickerTests`.
 5. **Clock drift correction, what is left** after D57 (in flight):
-   - The homepage's screenshot of the status window lacks the column
-     "Clock drift"; retake it once the build is released (its alt text
-     already names the column).
+   - The homepage's screenshots are stale once PR #19 merges: the
+     status window lacks the column "Clock drift" (its alt text already
+     names it), and both windows show the old order and 0 for a source
+     not recorded (D59). The owner retakes them from the released
+     build.
    - The Razer's and the BRIO's files are a constant 16 to 18 ms apart
      by room sound (10-minute run, 2026-11-17): each device's own input
      latency, which the recorder has never compensated [ASSUMED].

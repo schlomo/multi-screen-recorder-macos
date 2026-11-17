@@ -1233,7 +1233,8 @@ architect's reading.
 ## D46: The owner's rulings from trying B1 (2026-11-15)
 
 - **Status:** in force; refines D45 and, for B2, D31; superseded in
-  part by D47 (point 12: the badge shows no time). Being built in
+  part by D47 (point 12: the badge shows no time) and D59 (point 4:
+  a source not recorded shows `-`). Being built in
   PR #11 (B1), point 7 in B2.
 - **Context:** The owner tried the snapshot release of PR #11 on
   2026-11-15 and wrote: "duration without suffix is minutes"; "yes,
@@ -1724,3 +1725,44 @@ architect's reading.
   events, not problems.
 - **Evidence:** [design/recorder.md](design/recorder.md), the
   `msr record` row and "Tests".
+
+## D59: One "What will be recorded" table with a settings line; sources in the order of their numbers; a source not recorded says why (2026-11-17)
+
+- **Status:** in force; supersedes D46 point 4 (a source not recorded
+  shows 0).
+- **Context:** The owner, 2026-11-16, on `msr check` and `msr list`:
+  "seems to me like check and list show nearly the same info but
+  differently, maybe worth consolidating? Also, check doesn't show the
+  settings it applies, only the effect. And in the console output it is
+  not obvious why BlackHole is not recorded"; on the architect's design:
+  "I agree with your plan, but maybe add (virtual) to the name, same
+  like default and set "-" instead of 0 for the GB/h ... the next PR
+  should roll that stuff in", and "yes to both details". On 2026-11-17,
+  trying PR #19: "a bit confusing that the order of showing the audio
+  and video devices doesn't follow the numbering".
+- **Decision:**
+  1. `msr check`, `msr record` and `msr list` print one "What will be
+     recorded" table; `msr list` prints it without the ready check and
+     asks for no permission. A settings line above it gives the
+     effective settings, flags applied.
+  2. A source not recorded: its name keeps the column of the others,
+     the `Audio <n> - ` part blank; GB/h shows `-`; the window dims the
+     row. The reason follows the name in parentheses when the rule
+     that leaves it out is the input's own: under audio mode Wired its
+     connection (`(virtual)`, `(Bluetooth)`, `(aggregate)`,
+     `(AirPlay)`, `(Continuity Capture)`, `(unknown connection)`), and
+     `(no device ID)` for an input the recorder cannot identify. Under
+     audio mode None or Default microphone, and for system audio off,
+     the settings line gives the reason.
+  3. Every list of sources shown to people lists the screens by
+     number, then the audio sources by number (`Audio 0 - System`
+     first), then the sources not recorded; files of one source by
+     start. `recording.json` keeps its order.
+  4. The ready check's "Fix:" lines wrap at 80 columns under their
+     text; `msr list` says that the program running `msr`, not the
+     app, lacks the Screen & System Audio Recording permission.
+- **The architect's reading, for the owner to confirm:** the reasons
+  beyond "(virtual)" and "(Bluetooth)", the order in point 3, system
+  audio off at the end, the fixed 80 columns.
+- **Evidence:** [design/recorder.md](design/recorder.md), the command
+  rows, "The app" and the summary.
