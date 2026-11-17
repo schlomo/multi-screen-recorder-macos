@@ -129,6 +129,15 @@ import Testing
         #expect(outcome.errors.contains("unknown argument '--bogus'"))
     }
 
+    @Test(arguments: ["--help", "-h"])
+    func helpPrintsTheUsage(argument: String) async throws {
+        defer { scratch.remove() }
+        let outcome = try await run(repositoryRoot.appending(path: "scripts/version"), [argument])
+        #expect(outcome.status == 0, "\(outcome.errors)")
+        #expect(outcome.output.hasPrefix("Prints the version of the current checkout."), "\(outcome.output)")
+        #expect(outcome.output.contains("--build-date"))
+    }
+
     @Test func buildDateTakesNoFurtherArgument() async throws {
         defer { scratch.remove() }
         let outcome = try await run(try clone().appending(path: "scripts/version"), ["--build-date", "extra"],

@@ -1,0 +1,16 @@
+{{- /* The site's colours as CSS custom properties for the selector given, from
+       [params.colors] in hugo.toml (primary -> --primary), and from
+       [params.colors-dark] for a browser in dark mode. Returns the CSS. */}}
+{{- $light := site.Params.colors }}
+{{- $dark := index site.Params "colors-dark" }}
+{{- range $name, $value := $light }}
+{{- if not (isset $dark $name) }}{{ errorf "hugo.toml: [params.colors-dark] has no %s" $name }}{{ end }}
+{{- end }}
+{{- if ne (len $light) (len $dark) }}{{ errorf "hugo.toml: [params.colors-dark] names a colour [params.colors] does not" }}{{ end }}
+{{- $declarations := dict }}
+{{- range $mode, $colors := dict "light" $light "dark" $dark }}
+{{- $list := "" }}
+{{- range $name, $value := $colors }}{{ $list = printf "%s--%s:%s;" $list $name $value }}{{ end }}
+{{- $declarations = merge $declarations (dict $mode $list) }}
+{{- end }}
+{{- return printf "%s{color-scheme:light dark;%s}@media (prefers-color-scheme:dark){%s{%s}}" . $declarations.light . $declarations.dark }}

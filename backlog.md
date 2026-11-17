@@ -7,9 +7,11 @@ the homepage with screenshots of both windows (PR #15) and the tester
 guide's "What to test and send" (PR #16), all merged 2026-11-16. The
 owner shares it with colleagues, who email a screenshot of the start
 window, `recording.json` of every recording and a few sentences; the
-architect triages what comes back into this backlog. First: PR #19
-under "In flight" (the clock drift correction, the status line and the
-command line polish) waits for the owner. Next: item 1a, audio only. Then: item 3, the end-to-end tests; item 4, the
+architect triages what comes back into this backlog. PR #19 (the
+clock drift correction, the status line and the command line polish)
+merged 2026-11-17 as release `v0.20261117.51`. First: the homepage PR
+under "In flight". Next: item 17, the local-first rule, then item 1a,
+audio only. Then: item 3, the end-to-end tests; item 4, the
 simplification; item 7, auto-recovery from disturbances; item 6, CPU;
 then item 16, the Mac App Store and Homebrew
 (the owner, 2026-11-16: "sandbox then comes after the
@@ -24,80 +26,35 @@ Still open from D34: what AGC does and whether it is on in auto mode;
 
 ## In flight
 
-- **Clock drift correction** (D57; was queued item 5) and **`msr
-  record`'s status line, output split and `--quiet`** (D58; the
-  terminal part of queued item 13, for `msr record` only): draft PR
-  #19, built and tried locally first (the owner, 2026-11-16: "work
-  local only, with a single final CI test at the very end after we
-  both are happy"; the owner's go-ahead to push, 2026-11-17).
-  - Also in it: the command line polish (queued item 1, D59), built
-    locally after the owner tried PR #19, with the owner's later
-    findings (the `--debug` clock drift lines as one block in number
-    order) and rule (the ready check's audio item from the same
-    table, 2026-11-17: "KISS and DRY is the guide to decide such
-    things like ready check audio line").
-  - Reviewed: an adversarial review of each of the three changes and
-    delta reviews of every fix after it; the review state is in PR
-    #19's description.
-  - Clock drift, run on the owner's Mac (2026-11-17, five audio
-    sources, two screens): one hour on the build of `1fb8dae`, result
-    ok, no events; `clockDriftPpm` Razer −115.2, CalDigit 50.2, BRIO
-    2.5, MacBook microphone 3.2, system audio 6.3; the Razer's file
-    got 414 ms of sound added, the CalDigit's 180 ms removed; "ms off"
-    in the `--debug` lines from 30 s on at most 0.21 ms (Razer), 0.17
-    (CalDigit), 0.83 (BRIO), 0.10 (MacBook), 0.92 (system audio); by
-    room sound the Razer's and the BRIO's files kept the same lag
-    (−16.1 to −16.8 ms in ten of twelve 60 s stretches, the other two
-    with too little sound) where uncorrected they would have moved
-    about 420 ms apart; CPU 37 % of one core on average. Two 20 s
-    samples of that process: the resampler takes 8 to 9 % of its busy
-    time, Apple's AAC encoder about 27 %, CoreFoundation, the
-    allocator and kernel calls together about 40 % (queued item 6).
-    Earlier: 10 minutes on `1e5bfe7`, 180 s on `cdd75ad`.
-  - Status line, run on the owner's Mac: 12 s under a pseudo-terminal on `4768d34`,
-    standard output carried only the path, the line redrew every
-    second and was cleared before the summary.
-  - Seen by the owner (2026-11-17): the status window with the
-    "Clock drift" column, the status line in the owner's terminal, an
-    unplug and replug during a `--debug` run. UNVERIFIED: a gap within
-    a stream (samples lost while the device stays connected), a click
-    test through the speakers.
-  - The owner confirmed D57, D58 and D59 (2026-11-17), and `--quiet`
-    writes no warnings, only errors (D58).
-  - Waiting on the owner: merging. The
-    owner, 2026-11-17: commits name the model ("Yes, mention model");
-    the squash message carries it.
+- **Homepage collage and the install script** (branch
+  `homepage-collage`, built locally; the owner, 2026-11-17: "it will
+  be part of the next PR with the screenshots"):
+  - The homepage: the owner's three screenshots as one collage with
+    arrows from Start and Stop, drawn by Hugo from the screenshots'
+    sizes, so new screenshots replace the files only; a click opens it
+    full size in a new tab; the features from the root `README.md`'s
+    "What it does" (rewritten with the owner: one click first, the lid,
+    edit-ready files as a sub-list with timecode and reel names); a
+    wide layout from 64rem (phones held sideways keep the narrow one);
+    requirements last; the page's background the icon artwork's own;
+    dark mode by a second palette. The owner chose each step on local
+    previews (variant "marker", lighter backdrop, red-bordered labels).
+  - `scripts/install-app`: builds, signs with the owner's certificate
+    and installs into `/Applications` with quarantine removed, or the
+    latest release (`--release`), or a given zip; refuses while that
+    app's `msr` runs (the owner, 2026-11-17: "create a
+    local-build-sign-and-install script ... DRY and KISS"). Homebrew
+    waits until this works for the owner (item 16). The owner's first
+    run built, signed and installed the app, which started without a
+    permission prompt.
+  - The owner's follow-ups (2026-11-17): the log command in the crash
+    report form as a comment, so the submitted issue does not show it;
+    `--help` and `-h` for the scripts that take arguments; a light frame
+    around the header icon in dark mode.
+  - Waiting on: one review, one push and CI.
 
 ## Queued
 
-1. **Command line polish** (built in PR #19, D59; the owner,
-   2026-11-16, on `msr check`
-   and `msr list`: "seems to me like check and list show nearly the
-   same info but differently, maybe worth consolidating? Also, check
-   doesn't show the settings it applies, only the effect. And in the
-   console output it is not obvious why BlackHole is not recorded";
-   the design signed off as text: "I agree with your plan, but maybe
-   add (virtual) to the name, same like default and set "-" instead of
-   0 for the GB/h ... the next PR should roll that stuff in"):
-   - One renderer for the "What will be recorded" table, used by
-     `msr check`, `msr record` and `msr list`. `msr list` prints the
-     same table without the ready check and stays the command that
-     never asks for a permission.
-   - A settings line above the table with the effective settings,
-     flags applied, e.g. `Settings: Auto (resolution Native, audio
-     mode Wired), system audio on`.
-   - An audio input the audio mode leaves out: its name keeps the
-     column of the other names, the `Audio <n> - ` part left blank;
-     the reason follows the name in parentheses like "(default)":
-     "(virtual)", and by the same rule "(Bluetooth)"; GB/h shows `-`,
-     not 0. The window's table shows the same, besides dimming the row
-     (the owner, 2026-11-16: "yes to both details"). Under audio mode
-     None or Default microphone the settings line gives the reason.
-   - The ready check's "Fix:" lines wrap with their indent.
-   - `msr list`'s system audio line says that the program running
-     `msr` (a terminal app) lacks the Screen & System Audio Recording
-     permission, not the app (the owner saw "not available" in
-     Terminal on 2026-11-16 although the app has it).
 1a. **Audio only** (the owner, 2026-11-16: "video resolution needs a
    none mode to disable screen recording and record audio only. cost
    nothing and adds use cases and I accept the potential misnomer,
@@ -177,12 +134,7 @@ Still open from D34: what AGC does and whether it is on in auto mode;
    a drain error labelled as a writer timeout in `guideTracksCut`; no
    test for a gap after real data in a guide track's last mix; an
    unlocked test flag in `DisplayFileTickerTests`.
-5. **Clock drift correction, what is left** after D57 (in flight):
-   - The homepage's screenshots are stale once PR #19 merges: the
-     status window lacks the column "Clock drift" (its alt text already
-     names it), and both windows show the old order and 0 for a source
-     not recorded (D59). The owner retakes them from the released
-     build.
+5. **Clock drift correction, what is left** after D57 (PR #19):
    - The Razer's and the BRIO's files are a constant 16 to 18 ms apart
      by room sound (10-minute run, 2026-11-17): each device's own input
      latency, which the recorder has never compensated [ASSUMED].
@@ -443,7 +395,7 @@ Still open from D34: what AGC does and whether it is on in auto mode;
    Dock or Finder icon lacking.
 15. **Homepage** (D7, D53): live since PR #13. Left: preview URLs on
    PRs (Cloudflare's comment had none before the first production
-   deploy; check on the next homepage PR); the owner's check that
+   deploy; check on the homepage PR in flight); the owner's check that
    `schapiro.org/impressum/` covers the subdomain.
 
 16. **Mac App Store and Homebrew** (the owner, 2026-11-16: "I'd like
@@ -451,8 +403,13 @@ Still open from D34: what AGC does and whether it is on in auto mode;
    via the app store while still offering the free install via
    Homebrew"). The licence stays GPLv3; the owner, as the sole
    rights holder, distributes App Store builds under other terms; the
-   contributor clause and the dual-licensing note come with item 1's
-   PR (D54). Order, from the architect's assessment of 2026-11-16:
+   contributor clause and the dual-licensing note were to come with
+   the command line polish's PR (D54) and did not: PR #19 left them
+   out; they wait for the owner's go-ahead on their text. Homebrew
+   waits until `scripts/install-app` works for the owner (the owner,
+   2026-11-17: "maybe hold back on the cask and we first solve my local
+   problems and then apply this learning"). Order, from the
+   architect's assessment of 2026-11-16:
    - A sandbox test on the owner's Mac (about half a day, no cost):
      our build signed with `com.apple.security.app-sandbox`; check
      displays, microphones, system audio, writing to `~/Movies`
@@ -473,7 +430,46 @@ Still open from D34: what AGC does and whether it is on in auto mode;
      App Store (address, phone, email; DSA), tax, and a lawyer's look
      at the contributor clause.
 
+17. **Local first, one pipeline run per PR, tightened** (the owner,
+   2026-11-17: "make sure that the AI working docs know that we do
+   local builds and tests first and then ideally just one CI run at
+   the end"). "Iterate locally; wait for the pipeline once" (D56)
+   already says so, but PR #19 still ran CI four times at its end:
+   every pushed round starts a run, recording the owner's answers came
+   after the final run, and two runs lost their runner. The architect's
+   proposal, for the owner to sign off as text: rounds stay local and
+   reviewers read the local commits; the branch is pushed once, on the
+   commit about to be marked ready; the owner's open questions are
+   settled and recorded before that push; a run GitHub cancels for
+   want of a runner is re-run, never answered by a push. A principle
+   change: its own PR with a decisions entry.
+18. **Dark mode in the app** (the owner, 2026-11-17: "Can we easily
+   support dark mode in the app itself? Then that would be nice
+   indeed"). The app sets no appearance and defines no colour of its
+   own, so it should follow the system already [ASSUMED from the code,
+   not tried]. First: the owner looks at the windows in dark mode;
+   then fix what looks wrong.
+19. **The crash dialog offers only the app's own crashes.** On
+   2026-11-17 the owner's freshly installed app showed the crash dialog
+   for four `msr-*.ips` reports that a test's stand-in program (a copy
+   of `/bin/sleep` named `msr`, killed by macOS at launch) had written;
+   the app reads every `msr` report in `~/Library/Logs/DiagnosticReports`.
+   The stand-in is now a program of the tests' own that writes no
+   report. Left: the app could skip reports whose `procPath` is not
+   inside an app bundle named `Multi Screen Recorder.app`, so a
+   developer's test runs or a stray `msr` never prompt a report. Needs
+   a design (which paths count), signed off by the owner.
+
 ## Deliberately deferred
+
+- **`GuideTrackFeedTests.theLastMixWaitsForSamplesThatComeLate`
+  delivers its late samples from a task after 150 ms, against a 60 s
+  bound** (PR #19, `docs/troubleshooting.md`, "Async tests time out on
+  CI while simulation tests run"). Deferred because the feed's wait
+  polls every 10 ms and offers no event to deliver on, so the fix is a
+  change to the feed itself. Revisit the first time it fails on CI, or
+  with any change to the guide track feed: signal on arrival instead
+  of polling.
 
 - **A new app name.** With audio only (queued item 1a) "Multi Screen
   Recorder" can be a misnomer; the owner accepts that (2026-11-16):
@@ -604,6 +600,19 @@ Still open from D34: what AGC does and whether it is on in auto mode;
   the README (D46). Revisit when people struggle with it.
 
 ## Done (recent)
+
+- 2026-11-17: PR #19 merged by the owner, release `v0.20261117.51`
+  (its release job re-run after GitHub found no runner): the clock
+  drift correction (D57), `msr record`'s status line, output split and
+  `--quiet` (D58), the command line polish and the order of sources
+  (D59, was queued item 1). The owner confirmed D57 to D59 and ruled
+  that `--quiet` writes no warnings, only errors. One hour on the
+  owner's Mac: the Razer and the BRIO kept the same lag by room sound
+  where uncorrected they would have drifted 420 ms apart; CPU 37 % of
+  one core. CI's one failure was the clock drift test suites starving
+  three async tests (`docs/troubleshooting.md`). UNVERIFIED: a gap
+  within a stream, a click test through the speakers. Reviews: an
+  adversarial review of each change, delta reviews of every fix.
 
 - 2026-11-16: PR #16 merged by the owner: the tester guide's "What to
   test and send" (a one-hour recording, a screenshot of the start

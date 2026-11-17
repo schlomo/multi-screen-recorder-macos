@@ -1,13 +1,14 @@
 #!/usr/bin/env bash
 # Renders the derived images: in assets/icon/, app-icon.png (1024 x 1024,
-# transparent outside the tile) from app-icon.svg, and the 256 px
-# app-icon-fancy-256.jpeg for the README from app-icon-fancy.jpeg; in
+# transparent outside the tile) from app-icon.svg; from app-icon-fancy.jpeg,
+# the 256 px app-icon-fancy-256.jpeg for the README and app-icon-fancy-tile.png
+# (1024 x 1024, its tile cut out, transparent outside it) for the homepage; in
 # homepage/static/, the homepage's favicons from app-icon.svg. They are
 # committed; run this after changing either source. CI does not render, it
 # builds the .icns from the committed PNG (scripts/build-app).
 set -euo pipefail
 
-for tool in rsvg-convert sips; do
+for tool in rsvg-convert sips magick; do
     command -v "$tool" >/dev/null || { echo "scripts/render-app-icon: $tool is not on the PATH" >&2; exit 1; }
 done
 
@@ -16,6 +17,12 @@ rsvg-convert --width 1024 --height 1024 assets/icon/app-icon.svg --output assets
 sips -Z 256 assets/icon/app-icon-fancy.jpeg --out assets/icon/app-icon-fancy-256.jpeg >/dev/null
 echo assets/icon/app-icon.png
 echo assets/icon/app-icon-fancy-256.jpeg
+# The artwork's tile, found by trimming the light background around it, with
+# rounded corners of 21.7 % of its width (measured on the artwork).
+magick assets/icon/app-icon-fancy.jpeg -fuzz 20% -trim +repage -resize 1024x1024! \
+    \( -size 1024x1024 xc:black -fill white -draw "roundrectangle 4,4 1019,1019 222,222" \) \
+    -alpha off -compose CopyOpacity -composite assets/icon/app-icon-fancy-tile.png
+echo assets/icon/app-icon-fancy-tile.png
 
 favicons=homepage/static
 cp assets/icon/app-icon.svg "$favicons/favicon.svg"

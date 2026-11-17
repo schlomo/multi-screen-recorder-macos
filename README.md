@@ -14,30 +14,36 @@ own clock is resampled continuously to stay with the screen files
 
 ## What it does
 
+- **One click, nothing missed.** Start the app, check what will be
+  recorded, click Start: every screen and every audio source is
+  recorded until you click the Dock icon, then Stop. A check before you
+  start, warnings when disk space runs low, files that stay readable
+  after a crash.
 - **Every screen, as screens come and go.** Each screen gets its own
-  video file. Plugging in a projector, removing it, or switching
-  mirroring does not stop the recording.
+  video file. Plugging in a projector, removing it, closing or opening
+  the laptop's lid, or switching mirroring does not stop the recording.
 - **Every audio source in its own file.** No audio, the default
-  microphone, the wired audio inputs, or all audio inputs, plus the
-  system audio if you want it.
-  Each source gets an audio file of its own, each channel its own
-  track; every screen file also carries two guide tracks, the
-  audio inputs and the system audio, for playback and for syncing by
-  waveform with a separate recording.
-- **Edit-ready video.** A constant 30 frames per second, with a fixed
-  frame size per file and a recording resolution you choose (Native,
-  4K, 1440p, 1200p, 1080p or 720p), only ever scaled down. Native is the
-  size macOS shows as "looks like" for the screen, not the size it is
-  drawn at.
-- **Auto mode.** On by default: every screen at Native and the wired
-  audio inputs plus the default microphone, so you get a recording that
-  is safe to sort out in the editor, at the expense of disk space.
-  Switch it off to choose the resolution and the audio mode yourself.
-- **Built not to lose anything.** A check before you start, warnings
-  when disk space runs low, files that stay readable after a crash.
-- **One button.** Start the app, approve the last settings, click
-  Start. Click the Dock icon, then Stop. Everything also works from the
-  command line, for scripting.
+  microphone, the wired or all audio inputs, plus the system audio if
+  you want it; each channel its own track.
+- **In sync after hours.** The drift of each audio source's own clock
+  is corrected, so audio and screen tracks are still in sync after
+  hours.
+- **Auto mode.** On by default: every screen at Native, the wired audio
+  inputs and the default microphone, safe to sort out in the editor at
+  the expense of disk space. Off, you choose resolution and audio mode.
+- **Edit-ready files.**
+  - Timecode in every file, so an editor puts all of them on one
+    timeline in place.
+  - Named by source: file names, reel names and track names such as
+    `Screen 1 - DELL P3421W` or `Audio 2 - Razer Seiren V3 Mini`.
+  - A constant 30 frames per second and a fixed frame size per file,
+    at a recording resolution you choose (Native, 4K, 1440p, 1200p,
+    1080p or 720p), only ever scaled down. Native is the size macOS
+    shows as "looks like" for the screen, not the size it is drawn at.
+  - Two guide tracks in every screen file, the audio inputs and the
+    system audio, for playback and for syncing by waveform with a
+    separate recording.
+- **Scriptable.** Everything also works from the command line.
 - **Nothing leaves your Mac.** The app makes no network connections.
 
 It runs on macOS 26 and later, on Apple silicon. The homepage is
@@ -260,6 +266,7 @@ scripts/test        # runs the tests
 scripts/build-app   # builds the app in build/, signed ad hoc
 scripts/smoke-test  # runs the bundled msr: version, settings, exit codes
 scripts/sign-app    # re-signs it with your certificate and zips it into build/
+scripts/install-app # builds, signs and installs it into /Applications
 ```
 
 `scripts/sign-app` signs with the identity named in
@@ -268,6 +275,15 @@ matches any certificate whose name contains it, such as
 `Multi Screen Recorder Signing (Schlomo)`; `SIGNING_IDENTITY=-` signs
 ad hoc, for a local check only. How the pipeline, versions and signing
 fit together is in [docs/design/delivery.md](docs/design/delivery.md).
+
+`scripts/install-app` replaces the app in `/Applications`: with no
+argument it builds and signs first, `--release` installs the latest
+release, `--snapshot 20` the snapshot release of PR #20, and a zip path
+installs that zip. It refuses while the
+installed app runs, keeps both permissions (the certificate stays the
+same; `SIGNING_IDENTITY=-`, ad hoc, loses them) and needs no "Open
+Anyway" (it removes the quarantine); details in
+[docs/design/delivery.md](docs/design/delivery.md).
 
 ## Feedback
 

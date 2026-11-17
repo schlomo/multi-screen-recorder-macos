@@ -1,0 +1,86 @@
+{{- /* The three window screenshots as one SVG picture, laid out from their sizes:
+       the app window on the left; the status window and the recording folder
+       stacked on the right, together as tall as the app window; on a rounded
+       backdrop, with arrows from Start to the status window and from Stop to
+       the files. Arrow ends are fractions of each screenshot, so a new
+       screenshot of the same window keeps them in place; lengths are in units
+       of the app window's height, so the screenshots' pixel density does not
+       matter. Argument: alt. With "standalone" true, returns the picture as an
+       SVG file of its own, with the site's colours and the styles in it. */}}
+{{- $app := resources.Get "images/app-window.png" }}
+{{- $status := resources.Get "images/status-window.png" }}
+{{- $folder := resources.Get "images/recording-folder.png" }}
+{{- $u := div (float $app.Height) 840 }}
+{{- $pad := mul 56 $u }}
+{{- $gap := mul 56 $u }}
+{{- $middle := mul 120 $u }}
+{{- $rightPad := mul 175 $u }}
+{{- $aw := float $app.Width }}
+{{- $ah := float $app.Height }}
+{{- /* The right column's width that makes both screenshots and the gap between
+       them exactly as tall as the app window. */}}
+{{- $rw := div (sub $ah $gap) (add (div (float $status.Height) $status.Width) (div (float $folder.Height) $folder.Width)) }}
+{{- $sh := mul $rw (div (float $status.Height) $status.Width) }}
+{{- $fh := mul $rw (div (float $folder.Height) $folder.Width) }}
+{{- $ax := $pad }}
+{{- $rx := add $pad $aw $middle }}
+{{- $sy := $pad }}
+{{- $fy := add $pad $sh $gap }}
+{{- $w := add $rx $rw $rightPad }}
+{{- $h := add $ah (mul 2 $pad) }}
+{{- /* Arrow ends: beside Start in the app window, the status window's left edge,
+       beside Stop in the status window, the folder window's right edge. */}}
+{{- $startX := add $ax $aw (mul 10 $u) }}{{ $startY := add $pad (mul 0.962 $ah) }}
+{{- $statusInX := sub $rx (mul 8 $u) }}{{ $statusInY := add $sy (mul 0.45 $sh) }}
+{{- $stopX := add $rx $rw (mul 10 $u) }}{{ $stopY := add $sy (mul 0.915 $sh) }}
+{{- $folderInX := add $rx $rw (mul 12 $u) }}{{ $folderInY := add $fy (mul 0.3 $fh) }}
+{{- $loopX := add $rx $rw (mul 0.8 $rightPad) }}
+{{- $arrow1 := printf "M %.0f %.0f C %.0f %.0f, %.0f %.0f, %.0f %.0f" $startX $startY (add $rx (mul 40 $u)) $startY (sub $rx (mul 230 $u)) $statusInY $statusInX $statusInY }}
+{{- $arrow2 := printf "M %.0f %.0f C %.0f %.0f, %.0f %.0f, %.0f %.0f" $stopX $stopY $loopX $stopY $loopX $folderInY $folderInX $folderInY }}
+{{- $shots := slice
+  (dict "name" "app" "image" $app "x" $ax "y" $pad "w" $aw "h" $ah)
+  (dict "name" "status" "image" $status "x" $rx "y" $sy "w" $rw "h" $sh)
+  (dict "name" "folder" "image" $folder "x" $rx "y" $fy "w" $rw "h" $fh) }}
+{{- /* "Start" sits on its arrow between the windows, level with the middle of
+       the folder window; "Stop" on its arrow's middle, a cubic curve's point
+       at t = 0.5: (P0 + 3 P1 + 3 P2 + P3) / 8. */}}
+{{- $labels := slice
+  (dict "text" "Start" "x" (sub $rx (div $middle 2)) "y" (add $fy (div $fh 2)))
+  (dict "text" "Stop"
+    "x" (div (add $stopX (mul 6 $loopX) $folderInX) 8)
+    "y" (div (add $stopY (mul 3 $stopY) (mul 3 $folderInY) $folderInY) 8)) }}
+{{- $style := printf `
+.collage-shadow{flood-color:var(--shadow);flood-opacity:.35}
+.collage-from{stop-color:var(--backdrop-from)}
+.collage-to{stop-color:var(--backdrop-to)}
+.collage-arrow{fill:none;stroke:var(--accent);stroke-width:%.1f;stroke-linecap:round}
+.collage-head{fill:var(--accent)}
+.collage-label rect{fill:var(--surface);stroke:var(--accent);stroke-width:%.1f}
+.collage-badge circle{fill:var(--accent)}
+.collage-label text,.collage-badge text{font-family:system-ui,-apple-system,sans-serif;font-weight:700;text-anchor:middle;dominant-baseline:central;font-size:%.0fpx}
+.collage-label text{fill:var(--primary);font-style:italic}
+.collage-badge text{fill:var(--surface)}` (mul 8 $u) (mul 4 $u) (mul 24 $u) }}
+{{- $svg := printf `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 %.0f %.0f" role="img" aria-label="%s">` $w $h (.alt | htmlEscape) }}
+{{- if .standalone }}{{ $svg = printf "%s<style>%s%s</style>" $svg (partialCached "palette.html" "svg" "svg") $style }}{{ else }}{{ $svg = printf "%s<style>%s</style>" $svg $style }}{{ end }}
+{{- $svg = printf `%s<defs>
+<linearGradient id="collage-backdrop" x1="0" y1="0" x2="1" y2="1"><stop offset="0" class="collage-from"/><stop offset="1" class="collage-to"/></linearGradient>
+<filter id="collage-shadow" x="-10%%" y="-10%%" width="120%%" height="125%%"><feDropShadow dx="0" dy="%.0f" stdDeviation="%.0f" class="collage-shadow"/></filter>
+<filter id="collage-wobble"><feTurbulence type="fractalNoise" baseFrequency="%.4f" numOctaves="2" seed="3"/><feDisplacementMap in="SourceGraphic" scale="%.0f"/></filter>
+<marker id="collage-head" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="4" markerHeight="4" orient="auto"><path d="M 0 0 L 10 5 L 0 10 z" class="collage-head"/></marker>` $svg (mul 10 $u) (mul 14 $u) (div 0.02 $u) (mul 6 $u) }}
+{{- range $shots }}
+{{- $svg = printf `%s<clipPath id="collage-%s"><rect x="%.0f" y="%.0f" width="%.0f" height="%.0f" rx="%.0f"/></clipPath>` $svg .name .x .y .w .h (mul 12 $u) }}
+{{- end }}
+{{- $svg = printf `%s</defs><rect width="%.0f" height="%.0f" rx="%.0f" fill="url(#collage-backdrop)"/>` $svg $w $h (mul 36 $u) }}
+{{- range $shots }}
+{{- $image := .image.Process "webp q90 text" }}
+{{- $svg = printf `%s<g filter="url(#collage-shadow)"><image href="%s" x="%.0f" y="%.0f" width="%.0f" height="%.0f" clip-path="url(#collage-%s)"/></g>` $svg $image.RelPermalink .x .y .w .h .name }}
+{{- end }}
+{{- $svg = printf `%s<g filter="url(#collage-wobble)"><path d="%s" class="collage-arrow" marker-end="url(#collage-head)"/><path d="%s" class="collage-arrow" marker-end="url(#collage-head)"/></g>` $svg $arrow1 $arrow2 }}
+{{- range $labels }}
+{{- $lw := mul 120 $u }}{{ $lh := mul 44 $u }}
+{{- $svg = printf `%s<g class="collage-label"><rect x="%.0f" y="%.0f" width="%.0f" height="%.0f" rx="%.0f"/><text x="%.0f" y="%.0f">%s</text></g>` $svg (sub .x (div $lw 2)) (sub .y (div $lh 2)) $lw $lh (div $lh 2) .x .y .text }}
+{{- end }}
+{{- range $i, $shot := $shots }}
+{{- $svg = printf `%s<g class="collage-badge"><circle cx="%.0f" cy="%.0f" r="%.0f"/><text x="%.0f" y="%.0f">%d</text></g>` $svg $shot.x $shot.y (mul 24 $u) $shot.x $shot.y (add $i 1) }}
+{{- end }}
+{{- return printf "%s</svg>" $svg }}

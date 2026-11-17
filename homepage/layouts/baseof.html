@@ -5,11 +5,14 @@
   </head>
   <body>
     <header>
-      {{- /* The app icon artwork at 2x its 8rem shown width */}}
-      {{- with (resources.Get "images/app-icon-fancy.jpeg").Resize "256x webp q85" }}
-      <a href="/"><img src="{{ .RelPermalink }}" alt="" width="128" height="128" fetchpriority="high" /></a>
-      {{- end }}
-      <h1>{{ site.Title }}</h1>
+      <div class="brand">
+        {{- /* The icon artwork's tile, transparent outside it, at 2x its 10.5rem shown width */}}
+        {{- with (resources.Get "images/app-icon-fancy-tile.png").Resize "336x webp q85" }}
+        <a href="/"><img src="{{ .RelPermalink }}" alt="" width="168" height="168" fetchpriority="high" /></a>
+        {{- end }}
+        <h1>{{ site.Title }}</h1>
+      </div>
+      {{- block "claim" . }}{{ end }}
     </header>
     <main>
       {{ block "main" . }}{{ end }}

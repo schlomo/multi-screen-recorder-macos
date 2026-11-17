@@ -21,15 +21,20 @@ image 20261102, lists Python 3.15.2); each stops on an older one with
 an error naming that minimum. The minimum follows the runner image
 when it moves.
 
+The scripts that take arguments (`scripts/test`, `scripts/version`,
+`scripts/unpack-app`, `scripts/install-app`) print how to use them with
+`--help` or `-h`.
+
 | Script | Does |
 |---|---|
-| `scripts/test` | Compiles the Python scripts (`python3 -I -m py_compile`), then runs the unit tests and the tests that run `msr` and the scripts as commands |
+| `scripts/test` | Compiles the Python scripts (`python3 -I -m py_compile`), then runs the unit tests and the tests that run `msr` and the scripts as commands; passes its arguments to `swift test`; needs `cc` too, which builds the stand-in program of the `scripts/install-app` tests |
 | `scripts/version` | Prints the version of the current checkout, or with `--build-date` its date as `YYYY-MM-DD`; stops on a shallow clone |
 | `scripts/build-app` | Compiles `msr`, assembles the app bundle in `build/` (with `Contents/Resources/AppIcon.icns`, built at build time from the committed `assets/icon/app-icon.png` by `sips` and `iconutil`, both required up front; it stops if the PNG is missing or the iconset is not the ten expected files; the `.icns` is never committed), signs it ad hoc with the real signing's options, and archives it as `build/msr-app.tar` |
-| `scripts/render-app-icon` | Renders the derived images in `assets/icon/`: `app-icon.png` (1024 x 1024, transparent outside the tile) from `app-icon.svg` with `rsvg-convert` (librsvg), and the 256 px `app-icon-fancy-256.jpeg` for the README with `sips`; both tools required up front. Run by hand after changing a source and commit both images; CI never renders (no `rsvg-convert` on the runner) and uses the committed PNG |
+| `scripts/render-app-icon` | Renders the derived images in `assets/icon/`: `app-icon.png` (1024 x 1024, transparent outside the tile) from `app-icon.svg` with `rsvg-convert` (librsvg), the 256 px `app-icon-fancy-256.jpeg` for the README with `sips`, and `app-icon-fancy-tile.png` (the artwork's tile, transparent outside it) for the homepage's header with `magick` (ImageMagick); all three tools required up front. Run by hand after changing a source and commit the images; CI never renders (no `rsvg-convert` on the runner) and uses the committed PNG |
 | `scripts/smoke-test` | Checks the bundle names its icon file (`CFBundleIconFile`) and holds an icon that is 1024 px wide (`sips`), and that its build date (`MSRBuildDate`) is its version's date, then runs the bundled `msr` with a scratch `HOME`: version (also through a symbolic link), settings (which writes no file), a settings flag that saves it, a settings file with an unknown key (never refused) and exit 64; nothing that needs a permission, a screen or a microphone |
 | `scripts/unpack-app` | Unpacks the app archive into an empty `build/` with the `data` filter of Python's `tarfile`, rooted at the bundle folder, which refuses absolute paths, links pointing out of the bundle and special files; before writing anything the script itself refuses an archive that is not a plain tar, a member named twice, a member outside the bundle or with a `..` component (the build writes none), a bundle that is not a folder and a member below a symbolic link of the archive; a member that cannot be extracted stops it, and it removes what it wrote when it stops |
 | `scripts/sign-app` | Checks the bundle's version, commit and identifier, re-signs it, checks the signature, identifier, hardened runtime and entitlements, and zips it into `build/` |
+| `scripts/install-app` | Installs the app into `/Applications` from a local build, the latest release (`--release`), a PR's snapshot release (`--snapshot <n>`) or a zip; see "Installing the app on the developer's Mac" below |
 | `scripts/ci-import-signing-certificate` | CI only: puts the certificate from the secret into a temporary keychain |
 | `scripts/publish-snapshot-release` | Creates or replaces a PR's snapshot release; removes it once the PR is closed |
 | `scripts/remove-snapshot-release` | Removes a closed PR's snapshot release |
@@ -206,6 +211,43 @@ account and plan were not checked].
    base64 -i msr-signing.p12 | gh secret set SIGNING_CERTIFICATE_P12 --repo schlomo/multi-screen-recorder-macos
    rm msr-signing.p12
    ```
+
+## Installing the app on the developer's Mac
+
+`scripts/install-app` replaces `/Applications/Multi Screen Recorder.app`
+(`INSTALL_FOLDER` names another folder, which the tests use):
+
+- `scripts/install-app` builds (`scripts/build-app`), signs
+  (`scripts/sign-app`, so with `SIGNING_IDENTITY` or the default
+  certificate) and installs the zip `scripts/sign-app` prints.
+- `scripts/install-app --release` downloads the latest release's zip
+  with `gh release download` (gh reads its own credentials) and
+  installs it.
+- `scripts/install-app --snapshot <n>` does the same for the snapshot
+  release of PR `<n>` (tag `pr-<n>`), to try a PR before it is merged.
+- `scripts/install-app <zip>` installs that zip.
+
+Installing is the same for all four: unpack the zip into a temporary
+folder, verify the signature (`codesign --verify --deep --strict`),
+copy the app next to the installed one, remove the quarantine attribute
+from the copy recursively and check that no file still carries it, then
+replace the installed app (the old one is renamed aside to
+`.Multi Screen Recorder.app.old` and deleted only once the new one is in
+place; if the move fails it is put back), and print the installed
+version. An `.old` app left by an install that stopped makes it refuse
+until a person has checked it. The script refuses, before changing anything, while
+the installed app's `msr` runs (the app, or `msr record` started by
+any path or symbolic link): it asks `lsof -a -t -d txt` for the
+processes that have that very file open as their program, which is by
+the file's identity, not by the name a process was started with.
+
+The installed app keeps the Screen & System Audio Recording and
+Microphone permissions because every build is signed with the same
+certificate (D5); a build signed ad hoc (`SIGNING_IDENTITY=-`) loses
+them. It needs no "Open Anyway" because the quarantine
+attribute is removed. The tests run the script with a zip argument on
+small stand-in bundles; the modes without an argument and `--release`
+build, sign and download, so no test runs them.
 
 ## Why
 

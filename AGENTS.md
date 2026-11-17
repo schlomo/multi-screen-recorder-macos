@@ -251,7 +251,8 @@ Testing, `swift test`), including those that run `msr settings`,
 `msr version` and the scripts as commands; `scripts/build-app` builds the app in `build/` (signed ad
 hoc), `scripts/smoke-test` runs the bundled `msr` safely, and
 `scripts/sign-app` re-signs and zips it (`SIGNING_IDENTITY=-` signs ad
-hoc, for a local check only).
+hoc, for a local check only), and `scripts/install-app` installs it (see
+below).
 
 ## Facts that bite
 
@@ -284,6 +285,10 @@ hoc, for a local check only).
   a settings flag; `HOME` decides where) and the tests are
   safe; the tests read the Mac's audio device list, which shows no
   prompt.
+- `scripts/install-app` replaces the installed app in `/Applications`,
+  so an agent runs it against `/Applications` only with the owner's
+  go-ahead for that install (to hand over a try-out build), and never
+  while the owner records.
 - Real capture needs the Screen & System Audio Recording and
   Microphone permissions, granted by a person on the Mac. Capture
   behaviour is verified on the owner's Mac (the v1 gate in

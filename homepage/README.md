@@ -3,13 +3,21 @@
 The homepage at <https://multiscreenrecorder.schapiro.org/>: a small
 [Hugo](https://gohugo.io/) site deployed to Cloudflare Workers static assets by
 Cloudflare Workers Builds. One page, in English: what the app is, the
-requirements, the download link, screenshots of its two windows and the links
-to the tester guide, the problem report form and the repository.
+download link, a collage of three screenshots showing how it is used, the
+features, the links to the tester guide, the problem report form and the
+repository, and the requirements.
 
 ## Editing
 
 - **The page:** `layouts/home.html`; its texts and links come from `[params]` in
   `hugo.toml` (the description is the root `README.md`'s opening paragraph).
+  On a screen 64rem wide or more (wider than a phone held sideways) the
+  header, the features and the last three sections use the page's width of
+  up to 76rem; running text stays at most 44rem wide.
+- **Features:** the root `README.md`'s "What it does" list, read at build
+  time (mounted by `[module]` in `hugo.toml`); edit it there. Like the icon
+  artwork, a change there triggers no homepage build; the next homepage
+  change picks it up.
   The download link goes to the latest release, never to a file: the release
   asset's name contains the version.
 - **404 page:** `content/404.md`
@@ -19,22 +27,42 @@ to the tester guide, the problem report form and the repository.
   `layouts/_partials/head.html`
 - **Styles:** `assets/css/style.css` (plain CSS with native nesting, system
   fonts; inlined into each page)
-- **Colours:** `[params.colors]` in `hugo.toml`, the only place colours are
-  defined
-- **Header image:** the app icon artwork `../assets/icon/app-icon-fancy.jpeg`,
-  mounted by `[module]` in `hugo.toml` (never copied here) and resized by
-  Hugo to a 256 px WebP in `layouts/baseof.html`; the link preview image
-  below is drawn from it too. Changing that file triggers no homepage
-  build (it is outside the watch path); the next homepage change picks it
-  up.
-- **Screenshots:** the start and status windows, `assets/images/*.png` as
-  taken with macOS's screenshot tool, placed in `layouts/home.html` and shown
-  by `layouts/_partials/screenshot.html` as WebP at the window's size in
-  points and never wider than the page. A screenshot taken on a Retina
-  screen has 2 pixels per point; rename it to end in `-2x.png` (not macOS's
-  `@2x`, which Cloudflare redirects). Any other has 1. To update one,
-  replace the file, and rename it (in `home.html` too) if its pixels per
-  point changed.
+- **Colours:** `[params.colors]` in `hugo.toml`, and `[params.colors-dark]`
+  for a browser in dark mode, the only place colours are defined; both need
+  the same names (the build stops otherwise). `layouts/_partials/palette.html`
+  turns them into CSS custom properties.
+- **Header image:** the app icon artwork's tile,
+  `../assets/icon/app-icon-fancy-tile.png`, transparent outside it (cut
+  out of `app-icon-fancy.jpeg` by `scripts/render-app-icon`, so it shows no
+  square on any background), mounted by `[module]` in `hugo.toml` (never
+  copied here) and resized by Hugo to a 336 px WebP in
+  `layouts/baseof.html`. The link preview image below is drawn from
+  `app-icon-fancy.jpeg` itself. Changing either file triggers no
+  homepage build (they are outside the watch path); the next homepage
+  change picks them up.
+- **Screenshots:** the collage under the download button, drawn by
+  `layouts/_partials/collage.html` as one SVG picture from three PNGs in
+  `assets/images/`: `app-window.png` (the start window), `status-window.png`
+  (the status window while recording) and `recording-folder.png` (the
+  recording folder in Finder, list view). The layout comes from their
+  sizes: the app window on the left, the other two stacked on the right,
+  together as tall as it. A click opens the picture full size in a new tab
+  (`images/collage.svg`). Below it, three numbered steps say what the
+  pictures show; they are in `layouts/home.html`.
+- **Updating the screenshots:**
+  1. Make the windows show what the page should show: the start window
+     with several screens and audio sources, the status window during a
+     recording, the recording folder's Finder window in list view.
+  2. Take each with macOS's screenshot tool: Shift-Command-4, then Space,
+     then Option-click the window (Option leaves out the shadow; the
+     collage draws its own).
+  3. Save them over the three files above, under the same names. Their
+     pixel density and size do not matter.
+  4. Preview with `hugo server` (below) and check that the arrows still
+     start beside Start and Stop and end at the next window. They point at
+     fractions of each screenshot (`$startY`, `$stopY` and the others in
+     `collage.html`); only a window whose layout moved those buttons needs
+     a new fraction.
 - **Link preview image** (Open Graph, `og:image`): 1200 x 630, drawn by Hugo at
   build time in `layouts/_partials/link-preview-image.html` from the icon
   artwork, the site's name and the tagline, on the `artwork` colour; the

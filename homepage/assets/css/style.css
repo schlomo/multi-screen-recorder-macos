@@ -3,9 +3,10 @@
    page (see layouts/_partials/head.html).
 
    Colours are NOT defined here: --primary, --accent, --link, --text,
-   --text-light, --background, --surface and --rule come from [params.colors]
-   in hugo.toml, emitted by head.html. Use only those variables; never
-   hard-code a colour. */
+   --text-light, --background, --surface, --rule and the rest come from
+   [params.colors] and, in dark mode, [params.colors-dark] in hugo.toml,
+   emitted by layouts/_partials/palette.html. Use only those variables;
+   never hard-code a colour. */
 :root {
   --radius: 0.75rem;
   --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", Ubuntu, Cantarell, "Helvetica Neue", Arial, sans-serif;
@@ -15,7 +16,7 @@
 
 body {
   margin-inline: auto;
-  max-inline-size: 44rem;
+  max-inline-size: 76rem;
   padding: 2rem 1rem 3rem;
   font-family: var(--font-sans);
   line-height: 1.6;
@@ -28,11 +29,39 @@ a {
   &:hover { color: var(--primary); }
 }
 
+/* Text reads best at most 44rem wide; the home page's header, collage and
+   sections use the page's full width of up to 76rem. */
+.prose, footer, .features, .facts { max-inline-size: 44rem; margin-inline: auto; }
+
+/* On a wide screen (64rem, wider than a phone held sideways), the home
+   page's header: the icon and the name on the left, the tagline, description
+   and download on the right; on a narrow one, all of it centred, one under
+   the other. */
 header {
   text-align: center;
 
-  & img { display: block; inline-size: 8rem; block-size: auto; margin: 0 auto 0.5rem; }
+  /* A frame in the artwork's colour around the tile: it sets the icon apart
+     from a dark page and vanishes on the light one, which has the same
+     colour. The 10.5rem include the padding, so the tile is 10rem wide;
+     the frame's radius is the tile's (222/1024) plus the padding. */
+  & img {
+    display: block; inline-size: 10.5rem; block-size: auto; margin: 0 auto 0.5rem;
+    padding: 0.25rem; background: var(--artwork); border-radius: calc(10rem * 222 / 1024 + 0.25rem);
+  }
   & h1 { margin: 0; color: var(--primary); font-size: 2.25rem; text-wrap: balance; }
+
+  @media (min-width: 64rem) {
+    &:has(.claim) {
+      display: grid;
+      grid-template-columns: 1fr 1.6fr;
+      gap: 3rem;
+      align-items: center;
+
+      & .claim > * { text-align: start; }
+      & .tagline { margin-block-start: 0; font-size: 1.5rem; }
+      & .download { margin-block-end: 0; }
+    }
+  }
 }
 
 .tagline {
@@ -46,25 +75,41 @@ header {
 
 .download { text-align: center; margin-block: 2rem; }
 
+/* Red like the record dot, with a dot of its own in the text's colour: a
+   record button. It lifts a little under the pointer. */
 .button {
-  display: inline-block;
-  padding: 0.75rem 1.5rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.85rem 1.75rem;
   border-radius: var(--radius);
-  background: var(--primary);
-  color: var(--surface);
+  background: var(--button);
+  color: var(--button-text);
+  font-size: 1.1rem;
   font-weight: 600;
   text-decoration: none;
+  box-shadow: 0 0.4rem 1.2rem color-mix(in srgb, var(--button) 35%, transparent);
+  transition: transform 0.15s, box-shadow 0.15s, background 0.15s;
 
-  &:hover { color: var(--surface); background: var(--link); }
-}
+  &::before {
+    content: "";
+    inline-size: 0.7rem;
+    block-size: 0.7rem;
+    border-radius: 50%;
+    background: currentColor;
+  }
 
-/* A window screenshot: its size in points, shrunk with the page on a phone. */
-.screenshot {
-  margin: 2rem 0;
-  text-align: center;
+  &:hover {
+    color: var(--button-text);
+    background: var(--button-hover);
+    transform: translateY(-2px);
+    box-shadow: 0 0.6rem 1.6rem color-mix(in srgb, var(--button) 45%, transparent);
+  }
 
-  & img { display: block; max-inline-size: 100%; block-size: auto; margin-inline: auto; }
-  & figcaption { margin-block-start: 0.5rem; color: var(--text-light); font-size: 0.95rem; text-wrap: balance; }
+  @media (prefers-reduced-motion: reduce) {
+    transition: none;
+    &:hover { transform: none; }
+  }
 }
 
 h2 {
@@ -84,9 +129,37 @@ h2 {
 }
 
 footer {
-  margin: 3rem auto 0;
+  margin-block-start: 3rem;
   padding-block-start: 1rem;
   border-block-start: 1px solid var(--rule);
   text-align: center;
   color: var(--text-light);
+}
+
+/* The collage of the three windows (layouts/_partials/collage.html, which
+   holds the picture's own styles); a tap opens it full size in a new tab. */
+.collage {
+  margin: 2rem 0;
+
+  & svg { display: block; inline-size: 100%; block-size: auto; }
+  & figcaption { max-inline-size: 44rem; margin: 1rem auto 0; color: var(--text-light); }
+}
+
+/* On a wide screen, the features in two columns and the three short sections
+   side by side, Requirements last. */
+@media (min-width: 64rem) {
+  .features, .facts { max-inline-size: none; }
+
+  .features > ul {
+    columns: 2;
+    column-gap: 3rem;
+
+    & > li { break-inside: avoid; margin-block-end: 0.5rem; }
+  }
+
+  .facts {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 3rem;
+  }
 }

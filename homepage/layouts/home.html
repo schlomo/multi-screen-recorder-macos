@@ -1,27 +1,54 @@
+{{ define "claim" }}
+<div class="claim">
+  <p class="tagline">{{ delimit site.Params.tagline "<br />" | safeHTML }}</p>
+  <p class="description">{{ site.Params.description }}</p>
+  <p class="download"><a class="button" href="{{ site.Params.downloadURL }}">Download the latest release</a></p>
+</div>
+{{ end }}
+
 {{ define "main" }}
-<p class="tagline">{{ delimit site.Params.tagline "<br />" | safeHTML }}</p>
-<p class="description">{{ site.Params.description }}</p>
-<p class="download"><a class="button" href="{{ site.Params.downloadURL }}">Download the latest release</a></p>
 
-{{ partial "screenshot.html" (dict
-  "src" "images/start-window.png"
-  "alt" "The start window: a table of the screens and audio sources that will be recorded, with their resolution or channels and gigabytes per hour, the settings, the ready check, and the Cancel and Start buttons."
-  "caption" "Before you start: every screen and audio source that will be recorded, and the space it needs.") }}
-{{ partial "screenshot.html" (dict
-  "src" "images/status-window-2x.png"
-  "alt" "The status window while recording: each screen and audio source with its resolution or channels, its files, the megabytes written, its state and, for an audio source, its clock drift, then the recording time, the free space and the CPU use, and the Continue and Stop buttons."
-  "caption" "While it records: every source, its files and what it has written.") }}
+{{- $alt := "Three windows. The start window: every screen and audio source that will be recorded, the settings and the ready check; an arrow from its Start button leads to the status window while recording: every source with its files, what it has written, its state and clock drift; an arrow from its Stop button leads to the recording folder in Finder: one file per screen and audio source, and recording.json." }}
+{{- $standalone := partial "collage.html" (dict "alt" $alt "standalone" true) | resources.FromString "images/collage.svg" }}
+<figure class="collage">
+  <a href="{{ $standalone.RelPermalink }}" target="_blank" title="Open the picture full size in a new tab">{{ partial "collage.html" (dict "alt" $alt) | safeHTML }}</a>
+  <figcaption>
+    <ol>
+      <li>See every screen and audio source that will be recorded, and start.</li>
+      <li>Watch every source while it records, through unplugging and replugging.</li>
+      <li>Get a file for each source, and a new one whenever a source comes back or changes its size, each placed on the timeline by its timecode.</li>
+    </ol>
+  </figcaption>
+</figure>
 
-<h2>Requirements</h2>
-<p>A Mac with Apple silicon and macOS 26 or later.</p>
+<section class="features">
+<h2>Features</h2>
+{{- /* The README's "What it does" list, up to the first paragraph after it. */}}
+{{- $readme := (resources.Get "README.md").Content }}
+{{- $match := findRESubmatch `(?s)## What it does\n\n(.*?)\n\n[^\s-]` $readme 1 }}
+{{- if not $match }}{{ errorf "home.html: README.md has no list under \"## What it does\" followed by a paragraph" }}{{ end }}
+{{- $features := index $match 0 1 }}
+{{ $features | markdownify }}
+</section>
 
+<div class="facts">
+<section>
 <h2>Getting started</h2>
 <p>Multi Screen Recorder is in testing. The <a href="{{ site.Params.testerGuideURL }}">tester guide</a>
 says how to install it, how to open it the first time, which permissions it needs, and what it
 cannot do yet.</p>
+</section>
 
+<section>
 <h2>Problems and ideas</h2>
 <p>Report a problem with the <a href="{{ site.Params.problemReportURL }}">problem report form</a>
 on GitHub. The source is in the <a href="{{ site.Params.repositoryURL }}">GitHub repository</a>,
 under the GNU General Public License version 3.</p>
+</section>
+
+<section>
+<h2>Requirements</h2>
+<p>A Mac with Apple silicon and macOS 26 or later.</p>
+</section>
+</div>
 {{ end }}
