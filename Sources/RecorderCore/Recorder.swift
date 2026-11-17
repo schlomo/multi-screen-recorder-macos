@@ -62,6 +62,7 @@ public final class Recorder {
     /// The latest clock drift correction status of each audio capture, by its number among all audio captures.
     private var audioClockDrift: [AudioTracker.SourceID: (number: Int, status: ClockDriftCorrection.Status)] = [:]
     private let guides: GuideTrackFeed
+    private var clockDriftDebugSchedule = ClockDriftDebugSchedule()
     private var cpu = CPUUsage()
     private var cpuTask: Task<Void, Never>?
 
@@ -124,8 +125,19 @@ public final class Recorder {
             while !Task.isCancelled {
                 try? await Task.sleep(for: RecorderValues.cpuSampleInterval)
                 self?.sampleCPU()
+                self?.logClockDriftBlock()
             }
         }
+    }
+
+    /// With `--debug`, every 10 s the clock drift lines of all audio sources being recorded, together in number order.
+    private func logClockDriftBlock() {
+        guard RecorderLog.isDebug, clockDriftDebugSchedule.due(at: context.now()) else { return }
+        let sources = audioTracker.sourcesShown.compactMap { source -> (number: Int, label: String, status: ClockDriftCorrection.Status)? in
+            guard let drift = audioClockDrift[source.id], audioCaptures[source.id]?.0 == drift.number else { return nil }
+            return (source.number, source.label, drift.status)
+        }
+        for line in DebugLine.clockDriftBlock(sources) { RecorderLog.detail(line, category: "recorder") }
     }
 
     private func sampleCPU() {

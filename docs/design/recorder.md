@@ -1179,8 +1179,9 @@ and its screen, and the details it has, such as `22:14:40 +9.2s screen
 connected: Wacom One 13T` or `22:15:32 +61.3s screen stream failed: LG
 (-3811)`. `--debug` (for `msr record` and `msr check`) adds detail lines
 (the tracker's actions, the screens as read, files started and ended,
-the ready check's facts, and every 10 s (*data*) per audio source its
-clock drift correction, such as `Audio 3 - Razer Seiren V3 Mini: clock
+the ready check's facts, and every 10 s (*data*), together as one block
+in number order (the system audio, 0, first), the clock drift correction
+of each audio source being recorded, such as `Audio 3 - Razer Seiren V3 Mini: clock
 drift -116.1 ppm, corrected +34.94 ms so far, 0.04 ms off`, or `clock
 drift not measured yet`; zero is `0`, never `+0.0`, and at each gap in
 an audio source a line such as `Audio 3 - Razer Seiren V3 Mini: gap of

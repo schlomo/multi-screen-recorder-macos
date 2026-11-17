@@ -1,29 +1,37 @@
 /// When an audio capture reports its clock drift correction: its status to
-/// the recorder at the first buffer and then about once a second, and with
-/// `--debug` a detail line every 10 s, at a status report. Times are
-/// nanoseconds on the shared clock.
+/// the recorder at the first buffer and then about once a second. Times
+/// are nanoseconds on the shared clock.
 public struct ClockDriftSchedule: Sendable {
     public let statusInterval: Int64
-    public let debugInterval: Int64
     private var lastStatus: Int64?
-    private var lastDebugLine: Int64?
 
-    public init(
-        statusInterval: Duration = RecorderValues.clockDriftStatusInterval,
-        debugInterval: Duration = RecorderValues.clockDriftDebugInterval
-    ) {
+    public init(statusInterval: Duration = RecorderValues.clockDriftStatusInterval) {
         self.statusInterval = statusInterval.nanoseconds
-        self.debugInterval = debugInterval.nanoseconds
     }
 
-    /// What is due for a buffer that arrived at `now`.
-    public mutating func due(at now: Int64) -> (status: Bool, debugLine: Bool) {
-        let lastDebugLine = lastDebugLine ?? now
-        self.lastDebugLine = lastDebugLine
-        if let lastStatus, now - lastStatus < statusInterval { return (false, false) }
+    /// Whether the status is due for a buffer that arrived at `now`.
+    public mutating func due(at now: Int64) -> Bool {
+        if let lastStatus, now - lastStatus < statusInterval { return false }
         lastStatus = now
-        guard now - lastDebugLine >= debugInterval else { return (true, false) }
-        self.lastDebugLine = now
-        return (true, true)
+        return true
+    }
+}
+
+/// When the recorder writes the clock drift lines of all its audio sources
+/// with `--debug`, as one block: every 10 s from the first check.
+public struct ClockDriftDebugSchedule: Sendable {
+    public let interval: Int64
+    private var lastBlock: Int64?
+
+    public init(interval: Duration = RecorderValues.clockDriftDebugInterval) {
+        self.interval = interval.nanoseconds
+    }
+
+    public mutating func due(at now: Int64) -> Bool {
+        let last = lastBlock ?? now
+        lastBlock = last
+        guard now - last >= interval else { return false }
+        lastBlock = now
+        return true
     }
 }

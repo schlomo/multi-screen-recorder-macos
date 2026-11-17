@@ -308,14 +308,11 @@ final class AudioCapture: @unchecked Sendable {
         fileApplied = (appliedBefore, appliedBefore)
     }
 
-    /// The correction's status to the recorder about once a second, and with
-    /// `--debug` every 10 s as a detail line.
+    /// The correction's status to the recorder about once a second; the recorder
+    /// writes the `--debug` lines of all sources together.
     private func reportClockDrift(at now: Int64) {
-        let due = clockDriftSchedule.due(at: now)
-        guard due.status else { return }
-        let status = correction.status
-        reports.clockDrift(status)
-        if due.debugLine { RecorderLog.detail(DebugLine.clockDrift(of: label, status), category: "recorder") }
+        guard clockDriftSchedule.due(at: now) else { return }
+        reports.clockDrift(correction.status)
     }
 
     private func gapEvent(_ gap: AudioGap, at time: Int64) -> RecordingEvent {

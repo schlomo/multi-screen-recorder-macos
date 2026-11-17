@@ -373,7 +373,7 @@ import Testing
 
     /// The status goes to the recorder at the first buffer and then about
     /// once a second of arrivals (`ClockDriftScheduleTests` has the
-    /// `--debug` line's cadence).
+    /// `--debug` block's cadence).
     @Test func theClockDriftStatusIsReportedAboutOnceASecond() async throws {
         let capture = capture()
         var expected = ClockDriftCorrection()

@@ -26,6 +26,26 @@ import Testing
             + "audio inputs: none; output folder unusable (read-only)")
     }
 
+    /// The clock drift lines of all audio sources come together, in number order: the system audio (0) first.
+    @Test func theClockDriftBlockListsTheSourcesInNumberOrder() {
+        let measured = ClockDriftCorrection.Status(clockDriftPpm: -116.12, applied: 0.03494, remaining: 0.00004)
+        let notYet = ClockDriftCorrection.Status(clockDriftPpm: nil, applied: 0, remaining: nil)
+        let block = DebugLine.clockDriftBlock([
+            (number: 4, label: "Audio 4 - MacBook Pro Microphone", status: notYet),
+            (number: 1, label: "Audio 1 - CalDigit", status: measured),
+            (number: 0, label: "Audio 0 - System", status: notYet),
+            (number: 2, label: "Audio 2 - Razer", status: notYet),
+        ])
+        #expect(block == [
+            DebugLine.clockDrift(of: "Audio 0 - System", notYet),
+            DebugLine.clockDrift(of: "Audio 1 - CalDigit", measured),
+            DebugLine.clockDrift(of: "Audio 2 - Razer", notYet),
+            DebugLine.clockDrift(of: "Audio 4 - MacBook Pro Microphone", notYet),
+        ])
+        #expect(block[0] == "Audio 0 - System: clock drift not measured yet, corrected 0 ms so far")
+        #expect(DebugLine.clockDriftBlock([]).isEmpty)
+    }
+
     @Test func anActionNamesTheScreen() {
         let start = ScreenTracker.Action.start(
             uuid: "037036FB-1234-5678-9ABC-DEF012345678", displayID: 2, frameSize: FrameSize(width: 1920, height: 1080),

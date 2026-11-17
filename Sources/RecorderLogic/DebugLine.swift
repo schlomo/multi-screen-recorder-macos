@@ -58,6 +58,12 @@ public enum DebugLine {
         return line
     }
 
+    /// The clock drift lines of all audio sources being recorded, as one block in number order,
+    /// the system audio (0) first.
+    public static func clockDriftBlock(_ sources: [(number: Int, label: String, status: ClockDriftCorrection.Status)]) -> [String] {
+        sources.sorted { $0.number < $1.number }.map { clockDrift(of: $0.label, $0.status) }
+    }
+
     /// "Audio 1 - Razer Seiren V3 Mini: gap of 100.0 ms, clock drift corrected +3.45 ms so far,
     /// +0.012 ms for the gap, lateness 12.30 ms before, 12.41 ms after".
     public static func clockDriftGap(of label: String, _ gap: ClockDriftCorrection.Gap) -> String {
