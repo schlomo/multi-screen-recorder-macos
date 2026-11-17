@@ -3,11 +3,12 @@
 public enum StatusLine {
     /// "1 problem, Recording 0:12:34 · 1.2 GB in 7 files · 143.8 GB free, CPU 23 %, 2 screens, 5 audio sources";
     /// `line` is the window's line, `rows` its table: the sources being recorded are the rows that say "recording".
-    /// `problems` is what makes the Dock badge show "!"; none are not mentioned.
-    public static func text(line: String, cpu: String?, rows: [RecordingStatusTable.Row], problems: Int) -> String {
+    /// `status` counts what makes the Dock badge show "!"; none are not mentioned.
+    public static func text(line: String, cpu: String?, rows: [RecordingStatusTable.Row], status: RecordingStatus) -> String {
         let recording = rows.filter { $0.state == RecordingStatusTable.StateText.recording.rawValue }
         let screens = recording.filter { $0.source.kind == .screen }.count
         let audioSources = recording.count - screens
+        let problems = status.attentionCount
         return [problems == 0 ? nil : count(problems, "problem"), line, cpu,
                 count(screens, "screen"), count(audioSources, "audio source")]
             .compactMap(\.self).joined(separator: ", ")

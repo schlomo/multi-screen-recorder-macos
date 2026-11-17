@@ -58,8 +58,7 @@ final class RecordCommandDelegate: NSObject, NSApplicationDelegate {
 
     init(record: CommandLineInterface.Record) {
         self.record = record
-        output = RecordOutput(
-            quiet: record.quiet, standardOutput: { print($0); fflush(stdout) }, standardError: .shared)
+        output = RecordOutput(record: record)
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -85,7 +84,7 @@ final class RecordCommandDelegate: NSObject, NSApplicationDelegate {
         let result = ReadyCheck.evaluate(facts, settings: settings)
         output.say(.banner, runningVersion.banner)
         output.say(.whatWillBeRecorded, WhatWillBeRecorded(settings: settings, facts: facts).text + "\n")
-        output.say(result.isReady ? .readyCheckPassed : .readyCheckFailed, result.text)
+        output.say(.readyCheck(isReady: result.isReady), result.text)
         guard result.isReady else {
             exitStatus = 1
             endEventLoop()
@@ -168,7 +167,7 @@ final class RecordCommandDelegate: NSObject, NSApplicationDelegate {
         stopping = Task {
             if let summary = await session.stop() {
                 // The summary is the message of a run that exits 3, so `--quiet` still says it then.
-                output.say(summary.endedWithError ? .summaryOfFailedRun : .summary, summary.text)
+                output.say(.summary(endedWithError: summary.endedWithError), summary.text)
                 if summary.endedWithError { exitStatus = recordingEndedWithErrorExitCode }
             }
             endEventLoop()

@@ -7,24 +7,35 @@ import Testing
         .init(source: source, recordsAt: "", files: 1, written: "1 MB", state: state)
     }
 
+    private func status(problems: Int, isLowOnDisk: Bool = false) -> RecordingStatus {
+        var status = RecordingStatus()
+        status.problems = Array(repeating: "problem", count: problems)
+        status.isLowOnDisk = isLowOnDisk
+        return status
+    }
+
+    @Test func lowDiskSpaceCountsAsAProblemLikeTheBadgeDoes() {
+        #expect(StatusLine.text(line: line, cpu: nil, rows: [], status: status(problems: 1, isLowOnDisk: true)).hasPrefix("2 problems, "))
+    }
+
     private let line = "Recording 0:12:34 · 1.2 GB in 7 files · 143.8 GB free"
 
     @Test func problemsComeFirstThenTheLineThenCPUThenSources() {
         let rows = [row(.screen(1, name: "A")), row(.screen(2, name: "B")), row(.systemAudio(isRecorded: true)), row(.audioInput(1, name: "Mic"))]
-        #expect(StatusLine.text(line: line, cpu: "CPU 23 %", rows: rows, problems: 2)
+        #expect(StatusLine.text(line: line, cpu: "CPU 23 %", rows: rows, status: status(problems: 2))
             == "2 problems, \(line), CPU 23 %, 2 screens, 2 audio sources")
-        #expect(StatusLine.text(line: line, cpu: "CPU 23 %", rows: rows, problems: 1).hasPrefix("1 problem, Recording"))
+        #expect(StatusLine.text(line: line, cpu: "CPU 23 %", rows: rows, status: status(problems: 1)).hasPrefix("1 problem, Recording"))
     }
 
     @Test func noProblemsSaysNothingAboutProblems() {
-        #expect(StatusLine.text(line: line, cpu: nil, rows: [row(.screen(1, name: "A"))], problems: 0)
+        #expect(StatusLine.text(line: line, cpu: nil, rows: [row(.screen(1, name: "A"))], status: status(problems: 0))
             == "\(line), 1 screen, 0 audio sources")
     }
 
     @Test func onlySourcesBeingRecordedAreCounted() {
         let rows = [row(.screen(1, name: "A")), row(.screen(2, name: "B"), state: "disconnected"),
                     row(.audioInput(1, name: "Mic"), state: "waiting"), row(.audioInput(2, name: "Mic 2"))]
-        #expect(StatusLine.text(line: line, cpu: nil, rows: rows, problems: 0).hasSuffix(", 1 screen, 1 audio source"))
+        #expect(StatusLine.text(line: line, cpu: nil, rows: rows, status: status(problems: 0)).hasSuffix(", 1 screen, 1 audio source"))
     }
 
     @Test func theLineIsCutToTheWidthMinusOneSoItNeverWraps() {

@@ -64,7 +64,7 @@ final class RecordingSession: RecorderObserver {
         guard let recorder else { return }
         output?.drawStatusLine(isStopping: isStopping) {
             let (rows, line, cpu) = recorder.status()
-            return StatusLine.text(line: line, cpu: cpu, rows: rows, problems: status.attentionCount)
+            return StatusLine.text(line: line, cpu: cpu, rows: rows, status: status)
         }
     }
 

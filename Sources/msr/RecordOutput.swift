@@ -1,3 +1,4 @@
+import Foundation
 import RecorderCore
 
 /// Where each text of `msr record` goes: standard output carries the
@@ -20,6 +21,10 @@ struct RecordOutput {
         /// The summary of a run that exits 3.
         case summaryOfFailedRun
         case error
+
+        static func readyCheck(isReady: Bool) -> Kind { isReady ? .readyCheckPassed : .readyCheckFailed }
+
+        static func summary(endedWithError: Bool) -> Kind { endedWithError ? .summaryOfFailedRun : .summary }
     }
 
     enum Destination: Equatable {
@@ -31,6 +36,15 @@ struct RecordOutput {
     let quiet: Bool
     private let standardOutput: (String) -> Void
     private let standardError: StandardErrorWriter
+
+    /// For `msr record`: `--quiet` as given, standard output and standard error as the process's.
+    init(
+        record: CommandLineInterface.Record,
+        standardOutput: @escaping (String) -> Void = { print($0); fflush(stdout) },
+        standardError: StandardErrorWriter = .shared
+    ) {
+        self.init(quiet: record.quiet, standardOutput: standardOutput, standardError: standardError)
+    }
 
     init(quiet: Bool, standardOutput: @escaping (String) -> Void, standardError: StandardErrorWriter) {
         self.quiet = quiet

@@ -48,6 +48,24 @@ import Testing
         #expect(destination(kind, quiet: true) == .nowhere)
     }
 
+    @Test func theReadyCheckAndTheSummaryAreToldByTheirResult() {
+        #expect(RecordOutput.Kind.readyCheck(isReady: true) == .readyCheckPassed)
+        #expect(RecordOutput.Kind.readyCheck(isReady: false) == .readyCheckFailed)
+        #expect(RecordOutput.Kind.summary(endedWithError: false) == .summary)
+        #expect(RecordOutput.Kind.summary(endedWithError: true) == .summaryOfFailedRun)
+    }
+
+    @Test func theCommandsQuietFlagDecides() throws {
+        for (arguments, quiet) in [(["record"], false), (["record", "--quiet"], true)] {
+            let record = try #require(try CommandLineInterface.parseAsRoot(arguments) as? CommandLineInterface.Record)
+            let err = Collected()
+            let output = RecordOutput(
+                record: record, standardOutput: { _ in }, standardError: StandardErrorWriter(isTerminal: false, width: { 80 }, sink: { err.add($0) }))
+            output.say(.banner, "banner\n")
+            #expect(err.all == (quiet ? [] : ["banner\n"]))
+        }
+    }
+
     @Test func sayDeliversToTheDestination() {
         for quiet in [false, true] {
             let (output, out, err) = output(quiet: quiet, isTerminal: false)
