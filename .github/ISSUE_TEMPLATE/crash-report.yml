@@ -31,9 +31,12 @@ body:
     id: log
     attributes:
       label: Log (optional)
-      description: "The app's log of the last 2 hours helps to find the cause. In Terminal, run the command below and paste its output here; check it first, as it names your screens, audio devices and folders."
+      description: "The app's log of the last 2 hours helps to find the cause. Run the command in the field in Terminal and paste its output where it says; check it first, as it names your screens, audio devices and folders."
       value: |
+        <!-- In Terminal, run:
         log show --last 2h --predicate 'subsystem == "org.schapiro.multiscreenrecorder" and process == "msr"'
-      render: text
+        and paste its output between the two ``` lines below. -->
+        ```text
+        ```
     validations:
       required: false

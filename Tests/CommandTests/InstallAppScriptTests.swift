@@ -28,19 +28,37 @@ import Testing
         try #require(outcome.status == 0, "\(arguments) failed: \(outcome.errors)")
     }
 
-    /// A stand-in bundle holding a copy of /bin/sleep as its msr, in a folder
-    /// of its own, signed ad hoc unless `signed` is false.
+    /// A program that waits until it is ended, compiled once per test. Not a
+    /// copy of a system program: macOS may kill such a copy at launch, and
+    /// writes an msr crash report that the app then offers to report.
+    private func standInProgram() async throws -> URL {
+        let program = scratch.url.appending(path: "stand-in-msr")
+        if !FileManager.default.fileExists(atPath: path(program)) {
+            let source = scratch.url.appending(path: "stand-in-msr.c")
+            try "#include <unistd.h>\nint main(void) { pause(); return 0; }\n".write(to: source, atomically: true, encoding: .utf8)
+            try await tool("cc", "-o", path(program), path(source))
+        }
+        return program
+    }
+
+    /// A stand-in bundle holding the stand-in program as its msr, in a folder
+    /// of its own, signed ad hoc, or unsigned when `signed` is false.
     private func makeBundle(version: String, in folder: URL, signed: Bool = true) async throws -> URL {
         let app = folder.appending(path: Self.bundle, directoryHint: .isDirectory)
         let macOS = app.appending(path: "Contents/MacOS", directoryHint: .isDirectory)
         try FileManager.default.createDirectory(at: macOS, withIntermediateDirectories: true)
-        try FileManager.default.copyItem(at: URL(filePath: "/bin/sleep"), to: macOS.appending(path: "msr"))
+        try FileManager.default.copyItem(at: try await standInProgram(), to: macOS.appending(path: "msr"))
         try PropertyListSerialization.data(
             fromPropertyList: [
                 "CFBundleExecutable": "msr", "CFBundleIdentifier": "org.schapiro.multiscreenrecorder", "MSRVersion": version,
             ],
             format: .xml, options: 0).write(to: app.appending(path: "Contents/Info.plist"))
-        if signed { try await tool("codesign", "--force", "--sign", "-", path(app)) }
+        // the linker signs the program ad hoc, so an unsigned bundle needs that removed
+        if signed {
+            try await tool("codesign", "--force", "--sign", "-", path(app))
+        } else {
+            try await tool("codesign", "--remove-signature", path(macOS.appending(path: "msr")))
+        }
         return app
     }
 
@@ -173,6 +191,24 @@ import Testing
         #expect(try installedVersion() == "0.20261116.1")
     }
 
+    /// Runs `body` while `program` runs, then ends the program and waits for
+    /// its end through its termination handler: `waitUntilExit()` on a thread
+    /// of the test's pool can miss the end and wait forever.
+    private func whileRunning<T>(_ program: URL, _ body: () async throws -> T) async throws -> T {
+        let running = Process()
+        running.executableURL = program
+        running.standardOutput = FileHandle.nullDevice
+        running.standardError = FileHandle.nullDevice
+        let (ended, ending) = AsyncStream.makeStream(of: Void.self)
+        running.terminationHandler = { _ in ending.finish() }
+        try running.run()
+        let result: Result<T, any Error>
+        do { result = .success(try await body()) } catch { result = .failure(error) }
+        running.terminate()
+        for await _ in ended {}
+        return try result.get()
+    }
+
     @Test(arguments: ["full path", "symbolic link"])
     func aRunningInstalledAppMakesItRefuse(started: String) async throws {
         defer { scratch.remove() }
@@ -183,17 +219,25 @@ import Testing
             try FileManager.default.createSymbolicLink(at: link, withDestinationURL: program)
             program = link
         }
-        let running = Process()
-        running.executableURL = program
-        running.arguments = ["60"]
-        try running.run()
-        defer { running.terminate(); running.waitUntilExit() }
-        try await Task.sleep(for: .milliseconds(300))
-
-        let outcome = try await install(try await makeZip(try await makeBundle(version: "0.20261117.1", in: sources)))
+        let archive = try await makeZip(try await makeBundle(version: "0.20261117.1", in: sources))
+        let outcome = try await whileRunning(program) {
+            try await Task.sleep(for: .milliseconds(300))
+            return try await install(archive)
+        }
         #expect(outcome.status == 1)
         #expect(outcome.errors.contains("is running"), "\(outcome.errors)")
         #expect(try installedVersion() == "0.20261116.1")
+    }
+
+    @Test(arguments: ["--help", "-h"])
+    func helpPrintsTheUsageAndChangesNothing(argument: String) async throws {
+        defer { scratch.remove() }
+        let outcome = try await run(repositoryRoot.appending(path: "scripts/install-app"), [argument],
+                                    environment: ["INSTALL_FOLDER": path(installFolder)])
+        #expect(outcome.status == 0, "\(outcome.errors)")
+        #expect(outcome.output.hasPrefix("Installs the app"), "\(outcome.output)")
+        #expect(outcome.output.contains("scripts/install-app --release"))
+        #expect(try FileManager.default.contentsOfDirectory(atPath: path(installFolder)).isEmpty)
     }
 
     @Test func aMissingZipFailsLoudly() async throws {

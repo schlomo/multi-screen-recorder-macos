@@ -44,8 +44,14 @@ Still open from D34: what AGC does and whether it is on in auto mode;
     latest release (`--release`), or a given zip; refuses while that
     app's `msr` runs (the owner, 2026-11-17: "create a
     local-build-sign-and-install script ... DRY and KISS"). Homebrew
-    waits until this works for the owner (item 16).
-  - Waiting on: the build, one review, one push and CI.
+    waits until this works for the owner (item 16). The owner's first
+    run built, signed and installed the app, which started without a
+    permission prompt.
+  - The owner's follow-ups (2026-11-17): the log command in the crash
+    report form as a comment, so the submitted issue does not show it;
+    `--help` and `-h` for the scripts that take arguments; a light frame
+    around the header icon in dark mode.
+  - Waiting on: one review, one push and CI.
 
 ## Queued
 
@@ -443,6 +449,16 @@ Still open from D34: what AGC does and whether it is on in auto mode;
    own, so it should follow the system already [ASSUMED from the code,
    not tried]. First: the owner looks at the windows in dark mode;
    then fix what looks wrong.
+19. **The crash dialog offers only the app's own crashes.** On
+   2026-11-17 the owner's freshly installed app showed the crash dialog
+   for four `msr-*.ips` reports that a test's stand-in program (a copy
+   of `/bin/sleep` named `msr`, killed by macOS at launch) had written;
+   the app reads every `msr` report in `~/Library/Logs/DiagnosticReports`.
+   The stand-in is now a program of the tests' own that writes no
+   report. Left: the app could skip reports whose `procPath` is not
+   inside an app bundle named `Multi Screen Recorder.app`, so a
+   developer's test runs or a stray `msr` never prompt a report. Needs
+   a design (which paths count), signed off by the owner.
 
 ## Deliberately deferred
 

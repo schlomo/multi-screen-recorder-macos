@@ -1775,3 +1775,23 @@ architect's reading.
   audio off at the end, the fixed 80 columns.
 - **Evidence:** [design/recorder.md](design/recorder.md), the command
   rows, "The app" and the summary.
+
+## D60: The crash report form's log command is a comment; scripts that take arguments print their usage with `--help` (2026-11-17)
+
+- **Status:** in force.
+- **Context:** The owner, 2026-11-17, after trying the crash report
+  form: "the log show line must be prefilled as comment to be invisible
+  later in the issue itself"; and "the scripts that take arguments
+  need to support --help and -h".
+- **Decision:**
+  1. The crash report form's log field holds the `log show` command
+     (D46) in an HTML comment, followed by an empty `text` code block
+     to paste the output into; a submitted issue shows the output, not
+     the command. A log field left untouched shows an empty code block.
+  2. `scripts/test`, `scripts/version`, `scripts/unpack-app` and
+     `scripts/install-app` print how to use them with `--help` or `-h`
+     and exit 0, changing nothing; `scripts/test` passes every other
+     argument to `swift test`.
+- **Evidence:** `.github/ISSUE_TEMPLATE/crash-report.yml`,
+  [design/delivery.md](design/delivery.md), `CrashReportTests`,
+  `VersionScriptTests`, `InstallAppScriptTests`.

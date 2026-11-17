@@ -21,9 +21,13 @@ image 20261102, lists Python 3.15.2); each stops on an older one with
 an error naming that minimum. The minimum follows the runner image
 when it moves.
 
+The scripts that take arguments (`scripts/test`, `scripts/version`,
+`scripts/unpack-app`, `scripts/install-app`) print how to use them with
+`--help` or `-h`.
+
 | Script | Does |
 |---|---|
-| `scripts/test` | Compiles the Python scripts (`python3 -I -m py_compile`), then runs the unit tests and the tests that run `msr` and the scripts as commands |
+| `scripts/test` | Compiles the Python scripts (`python3 -I -m py_compile`), then runs the unit tests and the tests that run `msr` and the scripts as commands; passes its arguments to `swift test`; needs `cc` too, which builds the stand-in program of the `scripts/install-app` tests |
 | `scripts/version` | Prints the version of the current checkout, or with `--build-date` its date as `YYYY-MM-DD`; stops on a shallow clone |
 | `scripts/build-app` | Compiles `msr`, assembles the app bundle in `build/` (with `Contents/Resources/AppIcon.icns`, built at build time from the committed `assets/icon/app-icon.png` by `sips` and `iconutil`, both required up front; it stops if the PNG is missing or the iconset is not the ten expected files; the `.icns` is never committed), signs it ad hoc with the real signing's options, and archives it as `build/msr-app.tar` |
 | `scripts/render-app-icon` | Renders the derived images in `assets/icon/`: `app-icon.png` (1024 x 1024, transparent outside the tile) from `app-icon.svg` with `rsvg-convert` (librsvg), the 256 px `app-icon-fancy-256.jpeg` for the README with `sips`, and `app-icon-fancy-tile.png` (the artwork's tile, transparent outside it) for the homepage's header with `magick` (ImageMagick); all three tools required up front. Run by hand after changing a source and commit the images; CI never renders (no `rsvg-convert` on the runner) and uses the committed PNG |

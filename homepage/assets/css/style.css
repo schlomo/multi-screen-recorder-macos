@@ -40,7 +40,13 @@ a {
 header {
   text-align: center;
 
-  & img { display: block; inline-size: 10.5rem; block-size: auto; margin: 0 auto 0.5rem; }
+  /* A frame in the artwork's colour around the tile, rounded like the tile
+     (radius 222/1024): it sets the icon apart from a dark page and vanishes
+     on the light one, which has the same colour. */
+  & img {
+    display: block; inline-size: 10.5rem; block-size: auto; margin: 0 auto 0.5rem;
+    padding: 0.25rem; background: var(--artwork); border-radius: calc(10rem * 222 / 1024 + 0.25rem);
+  }
   & h1 { margin: 0; color: var(--primary); font-size: 2.25rem; text-wrap: balance; }
 
   @media (min-width: 64rem) {

@@ -1,16 +1,23 @@
 #!/usr/bin/env bash
-# Installs the app, replacing the one in INSTALL_FOLDER (default
-# /Applications):
-#   scripts/install-app            builds (scripts/build-app), signs with your
-#                                  certificate (scripts/sign-app) and installs
-#                                  the zip it prints
-#   scripts/install-app --release  installs the zip of the latest release
-#   scripts/install-app <zip>      installs that zip
-# Refuses while the installed app's msr runs. Verifies the signature, removes
-# the quarantine attribute and prints the installed version.
+# Installs the app; how to use it: usage below, or scripts/install-app --help.
 set -euo pipefail
 
 me="scripts/install-app"
+usage="Installs the app, replacing the one in INSTALL_FOLDER (default
+/Applications):
+  $me            builds (scripts/build-app), signs with your
+                                 certificate (scripts/sign-app) and installs
+                                 the zip it prints
+  $me --release  installs the zip of the latest release
+  $me <zip>      installs that zip
+  $me --help     prints this, also -h
+Refuses while the installed app's msr runs. Verifies the signature, removes
+the quarantine attribute and prints the installed version."
+if [[ ${1-} == -h || ${1-} == --help ]]; then
+    echo "$usage"
+    exit 0
+fi
+
 bundle="Multi Screen Recorder.app"
 repository="schlomo/multi-screen-recorder-macos"
 install_folder="${INSTALL_FOLDER:-/Applications}"
@@ -94,5 +101,5 @@ case $# in
             install_zip "$1"
         fi
         ;;
-    *) fail "usage: $me [--release | <zip>]" ;;
+    *) fail "usage: $me [--release | <zip> | --help]" ;;
 esac

@@ -71,6 +71,9 @@ import Testing
         let form = try repositoryFile(".github/ISSUE_TEMPLATE/crash-report.yml")
         #expect(form.contains("\n    id: log\n"))
         #expect(form.contains(CrashReport.logCommand))
+        // in a comment, so the submitted issue does not show it
+        let comment = try #require(form.firstMatch(of: /<!--(?s:(.*?))-->/)).1
+        #expect(comment.contains(CrashReport.logCommand))
         #expect(try repositoryFile("README.md").contains(CrashReport.logCommand))
         #expect(CrashReport.dialogText.contains(CrashReport.logCommand))
     }

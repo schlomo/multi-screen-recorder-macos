@@ -10,7 +10,7 @@ Uncommitted changes to tracked files append .dirty to a local build,
 0.<DATE>.<N+1>-dev+<commit>.dirty; a release or a snapshot stops on them.
 Untracked files do not count.
 With --build-date it prints DATE as YYYY-MM-DD instead, the build date the
-bundle carries for the banner.
+bundle carries for the banner. With --help or -h it prints this.
 """
 
 import os
@@ -61,13 +61,16 @@ def main() -> None:
     match sys.argv[1:]:
         case []:
             pass
+        case ["--help" | "-h", *_]:
+            print(__doc__.strip())
+            return
         case ["--build-date"]:
             print(commit_date_utc().isoformat())
             return
         case ["--build-date", extra, *_]:
             stop(f"--build-date takes no further argument, not '{extra}'")
         case [argument, *_]:
-            stop(f"unknown argument '{argument}'; the only one is --build-date")
+            stop(f"unknown argument '{argument}'; the only ones are --build-date and --help")
     release_build = os.environ.get("RELEASE_BUILD", "")
     pr_number = os.environ.get("PR_NUMBER", "")
     if release_build not in ("", "true"):
