@@ -27,17 +27,7 @@ Still open from D34: what AGC does and whether it is on in auto mode;
 
 ## In flight
 
-- **A re-run when GitHub has no macOS runner** (branch
-  `troubleshooting-ci-runner`, pushed, no PR yet; the owner,
-  2026-11-17: "can we add a retry as failure path into the CI yaml?").
-  The branch holds two troubleshooting entries (no macOS runner; a
-  crash dialog for crash reports the tests wrote). Proposed, waiting
-  for the owner's sign-off: a workflow on `workflow_run` of `ci.yml`
-  ending cancelled calls `scripts/rerun-without-runner` (Python,
-  tested with a stand-in `gh`), which re-runs the failed jobs only when
-  the annotations say "not acquired by Runner", up to the third
-  attempt; Linux runner, `actions: write` for that workflow only, no
-  checkout of PR code.
+Nothing.
 
 ## Queued
 
@@ -450,6 +440,21 @@ Still open from D34: what AGC does and whether it is on in auto mode;
    inside an app bundle named `Multi Screen Recorder.app`, so a
    developer's test runs or a stray `msr` never prompt a report. Needs
    a design (which paths count), signed off by the owner.
+
+20. **A re-run when GitHub has no macOS runner** (the owner,
+   2026-11-17: "can we add a retry as failure path into the CI yaml?",
+   then "add the idea to the backlog for later"). Twice on 2026-11-17 a
+   merge's build was cancelled because GitHub found no Apple-silicon
+   runner, and a person re-ran it. The idea: a workflow on
+   `workflow_run` of `ci.yml` ending cancelled calls
+   `scripts/rerun-without-runner` (Python, tested with a stand-in
+   `gh`), which re-runs the failed jobs only when the run's annotations
+   say "not acquired by Runner", up to the third attempt; on a Linux
+   runner, with `actions: write` for that workflow only and no checkout
+   of PR code. Needs the owner's sign-off of the design. The pushed
+   branch `troubleshooting-ci-runner` holds two troubleshooting entries
+   (no macOS runner; a crash dialog for crash reports the tests wrote):
+   they ship with this item, or earlier with item 17's PR.
 
 ## Deliberately deferred
 
