@@ -26,7 +26,8 @@ own clock is resampled continuously to stay with the screen files
   microphone, the wired or all audio inputs, plus the system audio if
   you want it; each channel its own track.
 - **In sync after hours.** The drift of each audio source's own clock
-  is corrected, so audio and screens still line up hours later.
+  is corrected, so audio and screen tracks are still in sync after
+  hours.
 - **Auto mode.** On by default: every screen at Native, the wired audio
   inputs and the default microphone, safe to sort out in the editor at
   the expense of disk space. Off, you choose resolution and audio mode.
