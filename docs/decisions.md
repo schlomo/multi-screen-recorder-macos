@@ -1625,3 +1625,41 @@ architect's reading.
   drift"; the research of 2026-11-16 and 2026-11-17 and "Known limits
   of the clock drift correction" in
   [design/end-to-end-tests.md](design/end-to-end-tests.md).
+
+## D57: `msr record` writes only the recording folder's path to standard output; a status line on a terminal; `--quiet` (2026-11-17)
+
+- **Status:** in force for `msr record`; the other commands (`check`,
+  `list`, `settings`, `version`) are not yet checked against the same
+  split.
+- **Context:** All of `msr record`'s output went to standard output,
+  so a script could not tell data from text for people. The owner, on
+  2026-11-16: "if running in a terminal (try) then show the running
+  status as persistent last line, recording time, CPU, recording size
+  etc.", "a --quiet option to suppress all regular output", "make sure
+  that stdout and error are handled properly for managed or scripted
+  operation", and on the split: "yes, good plan for the terminal
+  output". On 2026-11-17: "add the CLI status line now".
+- **Decision:**
+  1. Standard output carries one line, the recording folder's path,
+     when the recording starts. Everything for people (the banner, the
+     table, the ready check, events, the status line, the summary,
+     debug lines) goes to standard error. `recording.json` stays the
+     machine-readable result.
+  2. When standard error is a terminal, one status line is redrawn
+     every second: the count of problems first when there are any,
+     then the recording time, the size written, the free space, the
+     CPU use and the sources being recorded. No option turns it on or
+     off.
+  3. `--quiet` writes nothing for people. Still written on standard
+     error: a failing ready check, errors, the settings file note,
+     each problem as it happens and the summary of a run that exits 3.
+     Exit codes are unchanged. `--quiet` with `--debug` is refused.
+  4. A failed write to standard error never ends a recording.
+- **The architect's details, for the owner to confirm:** the order of
+  the status line's parts and that it says nothing about problems when
+  there are none; what `--quiet` still writes; the refusal of
+  `--quiet` with `--debug`. Open: whether `--quiet` also writes low
+  disk space and a screen showing another screen's picture, which are
+  events, not problems.
+- **Evidence:** [design/recorder.md](design/recorder.md), the
+  `msr record` row and "Tests".
