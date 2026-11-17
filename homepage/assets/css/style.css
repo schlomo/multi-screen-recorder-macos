@@ -75,16 +75,36 @@ header {
 
 .download { text-align: center; margin-block: 2rem; }
 
+/* Red like the record dot, with a dot of its own in the text's colour: a
+   record button. It lifts a little under the pointer. */
 .button {
-  display: inline-block;
-  padding: 0.75rem 1.5rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.85rem 1.75rem;
   border-radius: var(--radius);
   background: var(--button);
   color: var(--button-text);
+  font-size: 1.1rem;
   font-weight: 600;
   text-decoration: none;
+  box-shadow: 0 0.4rem 1.2rem color-mix(in srgb, var(--button) 35%, transparent);
+  transition: transform 0.15s, box-shadow 0.15s, background 0.15s;
 
-  &:hover { color: var(--button-text); background: var(--button-hover); }
+  &::before {
+    content: "";
+    inline-size: 0.7rem;
+    block-size: 0.7rem;
+    border-radius: 50%;
+    background: currentColor;
+  }
+
+  &:hover {
+    color: var(--button-text);
+    background: var(--button-hover);
+    transform: translateY(-2px);
+    box-shadow: 0 0.6rem 1.6rem color-mix(in srgb, var(--button) 45%, transparent);
+  }
 }
 
 h2 {

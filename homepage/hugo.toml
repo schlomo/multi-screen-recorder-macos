@@ -21,21 +21,21 @@ disableKinds = ["taxonomy", "term", "section", "rss", "404"]
 # (primary -> --primary), the dark ones for a browser in dark mode; both
 # tables need the same names. Never hard-code a colour anywhere else.
 [params.colors]
-  primary = "#1E2330"     # graphite: headings, the download button
+  primary = "#1E2330"     # graphite: headings
   accent = "#FF3B30"      # red: the record dot, the bar under headings
   link = "#415070"        # link text
   text = "#1E2330"        # body text
   text-light = "#415070"  # the tagline, the footer
   background = "#F5F7FA"  # page background
-  surface = "#FFFFFF"     # the download button's text, boxes
+  surface = "#FFFFFF"     # boxes, the collage's labels
   rule = "#D5DAE6"        # footer rule
   artwork = "#F5F7FA"     # the icon artwork's own background: the link preview image, the header icon's frame
   backdrop-from = "#5B6B8C"  # the screenshot collage's backdrop, top left
   backdrop-to = "#A3B0C9"    # the screenshot collage's backdrop, bottom right
   shadow = "#1E2330"      # the collage windows' shadow
-  button = "#1E2330"      # the download button
+  button = "#D70015"      # the download button: a deeper red than the accent, for white text
   button-text = "#FFFFFF"
-  button-hover = "#415070"
+  button-hover = "#B0000F"
 
 [params.colors-dark]
   primary = "#E9EEF7"
