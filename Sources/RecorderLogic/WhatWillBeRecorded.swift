@@ -1,8 +1,9 @@
 /// The window's section "What will be recorded", from the settings, the
 /// devices connected now and the free space in the output folder, as data
-/// the view renders: one table, the screen rows then the audio rows with
-/// the system audio (0) first and the total row, and a line of what the
-/// required recording hours need, under a line of the settings. GB/h max
+/// the view renders: one table, the screen rows then the audio rows (the
+/// system audio (0) first, the recorded inputs by number, the inputs left
+/// out) and the total row, and a line of what the required recording
+/// hours need, under a line of the settings. GB/h max
 /// is the encoder's ceiling, the most a source can write (D53). `msr
 /// check`, `msr record` and `msr list` print its `text`.
 public struct WhatWillBeRecorded: Equatable, Sendable {
@@ -112,11 +113,13 @@ public struct WhatWillBeRecorded: Equatable, Sendable {
         switch readAudioInputs {
         case .success(let audioInputs):
             var number = 0
-            audio += audioInputs.map { input in
+            let inputs = audioInputs.map { input in
                 let isRecorded = AudioTracker.records(input, settings: settings)
                 if isRecorded { number += 1 }
                 return Self.audio(input, number: isRecorded ? number : nil, settings: settings)
             }
+            // The numbered rows read 0, 1, 2 … without a gap; the inputs left out follow, in device order.
+            audio += inputs.filter(\.isRecorded) + inputs.filter { !$0.isRecorded }
         case .failure(let error):
             audioError = "The audio inputs cannot be read: \(error)"
         }

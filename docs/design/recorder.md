@@ -95,7 +95,8 @@ keeps the column of the other names with the `Audio <n> - ` part blank,
 is followed by its reason in parentheses where its transport is one
 (`BlackHole 2ch (virtual)`, `AirPods (Bluetooth)`), and shows `-` in GB/h
 max. The screens are listed by number, then the audio sources by number,
-the system audio (0) first.
+the system audio (0) first, then the inputs the audio mode leaves out in
+device order, so the numbers read 0, 1, 2 … without a gap.
 
 A screen is described by what macOS calls "looks like" (its size in
 points) and the size it is drawn at (its pixel size): `3840×2160` where

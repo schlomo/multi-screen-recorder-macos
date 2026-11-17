@@ -119,10 +119,10 @@ import Testing
     @Test func recordedInputsAreNumberedInOrderAndOnesNotRecordedGetNoNumber() {
         let audio = section({ $0.audioMode = .wired },
                             audioInputs: [Self.airPods] + DesignExample.audioInputs + [Self.virtualInput]).audio
-        #expect(audio.map(\.source.number) == [0, nil, 1, 2, nil])
+        #expect(audio.map(\.source.number) == [0, 1, 2, nil, nil])
         #expect(audio.map(\.source.text) == [
-            "Audio 0 - System", "AirPods (Bluetooth)", "Audio 1 - MacBook Pro Microphone (default)",
-            "Audio 2 - RØDE Wireless GO II RX", "Loopback (virtual)",
+            "Audio 0 - System", "Audio 1 - MacBook Pro Microphone (default)", "Audio 2 - RØDE Wireless GO II RX",
+            "AirPods (Bluetooth)", "Loopback (virtual)",
         ])
     }
 
@@ -131,9 +131,9 @@ import Testing
     @Test func anInputWithoutAUIDIsNotRecordedAndGetsNoNumber() {
         let noUID = AudioInputInfo(name: "Mystery", channelCount: 1, isDefault: false, transport: .usb)
         let withNoUID = section({ $0.audioMode = .wired }, audioInputs: [noUID] + DesignExample.audioInputs)
-        #expect(withNoUID.audio[1] == .init(source: .audioInput(nil, name: "Mystery"), channels: "1 channel",
+        #expect(withNoUID.audio[3] == .init(source: .audioInput(nil, name: "Mystery"), channels: "1 channel",
                                             isRecorded: false, gigabytesPerHour: "-"))
-        #expect(withNoUID.audio.map(\.source.number) == [0, nil, 1, 2])
+        #expect(withNoUID.audio.map(\.source.number) == [0, 1, 2, nil])
         #expect(withNoUID.total == section { $0.audioMode = .wired }.total)
     }
 
@@ -228,6 +228,16 @@ import Testing
     }
 
     // The settings line, and why an input is left out.
+
+    /// The numbered rows read 0, 1, 2 … without a gap; inputs left out follow, in device order.
+    @Test func inputsLeftOutComeAfterTheNumberedRows() {
+        let other = AudioInputInfo(name: "Zed", channelCount: 1, isDefault: false, transport: .virtual, uid: "Z")
+        let shown = WhatWillBeRecorded(
+            settings: .defaults, screens: .success(DesignExample.screens),
+            audioInputs: .success([Self.virtualInput, Self.airPods] + DesignExample.audioInputs + [other]), outputFolder: nil)
+        #expect(shown.audioRows.map { $0.source?.number } == [0, 1, 2, nil, nil, nil])
+        #expect(shown.audioRows.suffix(3).compactMap { $0.source?.name } == ["Loopback (virtual)", "AirPods (Bluetooth)", "Zed (virtual)"])
+    }
 
     @Test func theSettingsLineNamesTheEffectiveSettings() {
         #expect(defaultSection.settingsLine == "Settings: Auto (resolution Native, audio mode Wired), system audio on")
