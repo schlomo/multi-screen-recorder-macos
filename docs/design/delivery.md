@@ -226,9 +226,13 @@ account and plan were not checked].
 
 Installing is the same for all three: unpack the zip into a temporary
 folder, verify the signature (`codesign --verify --deep --strict`),
-replace the installed app (the old one is renamed aside and deleted only once the new one is in place; if the move fails it is put back), remove the quarantine attribute from it
-recursively, check that no file still carries it, and print the
-installed version. The script refuses, before changing anything, while
+copy the app next to the installed one, remove the quarantine attribute
+from the copy recursively and check that no file still carries it, then
+replace the installed app (the old one is renamed aside to
+`.Multi Screen Recorder.app.old` and deleted only once the new one is in
+place; if the move fails it is put back), and print the installed
+version. An `.old` app left by an install that stopped makes it refuse
+until a person has checked it. The script refuses, before changing anything, while
 the installed app's `msr` runs (the app, or `msr record` started by
 any path or symbolic link): it asks `lsof -a -t -d txt` for the
 processes that have that very file open as their program, which is by

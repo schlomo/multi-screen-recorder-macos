@@ -60,7 +60,7 @@ install_zip() {
     codesign --verify --deep --strict "$unpacked/$bundle" || fail "the signature of $bundle in $zip does not verify, nothing was changed"
     refuse_while_running
 
-    [[ ! -e $replaced ]] || fail "$replaced is left over from an install that stopped; check it, remove it, and run again"
+    [[ ! -e $replaced ]] || fail "$replaced is left over from an install that stopped; check it, then remove it or, if $target is missing, rename it back to $target, and run again"
     trap 'rm -rf "$scratch" "$staged"' EXIT
     rm -rf "$staged"
     ditto "$unpacked/$bundle" "$staged"
@@ -75,7 +75,8 @@ install_zip() {
         mv "$target" "$replaced"
     fi
     if ! mv "$staged" "$target"; then
-        [[ ! -e $replaced ]] || mv "$replaced" "$target"
+        [[ -e $replaced ]] || fail "cannot move the new app to $target"
+        mv "$replaced" "$target" || fail "cannot move the new app to $target, nor the old app back from $replaced"
         fail "cannot move the new app to $target, the old app is back"
     fi
     rm -rf "$replaced" || fail "the new app is installed, but cannot remove the old one at $replaced"

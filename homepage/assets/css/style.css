@@ -40,9 +40,10 @@ a {
 header {
   text-align: center;
 
-  /* A frame in the artwork's colour around the tile, rounded like the tile
-     (radius 222/1024): it sets the icon apart from a dark page and vanishes
-     on the light one, which has the same colour. */
+  /* A frame in the artwork's colour around the tile: it sets the icon apart
+     from a dark page and vanishes on the light one, which has the same
+     colour. The 10.5rem include the padding, so the tile is 10rem wide;
+     the frame's radius is the tile's (222/1024) plus the padding. */
   & img {
     display: block; inline-size: 10.5rem; block-size: auto; margin: 0 auto 0.5rem;
     padding: 0.25rem; background: var(--artwork); border-radius: calc(10rem * 222 / 1024 + 0.25rem);
