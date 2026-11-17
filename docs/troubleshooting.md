@@ -28,6 +28,8 @@ One row per entry, the error text exactly as in the entry.
 | The prompt for the Screen & System Audio Recording permission comes back each time the window is clicked (symptom, no error text) | [Screen recording prompt comes back with an ad hoc signed build](#screen-recording-prompt-comes-back-with-an-ad-hoc-signed-build) |
 | `the writer took none of the last 4800 samples (0.100 s) of Razer Seiren V3 Mini within 2.0 seconds; they are lost` | [A timing test fails on CI while command tests run](#a-timing-test-fails-on-ci-while-command-tests-run) |
 | `Expectation failed: (made.guides.map(\.2).reduce(0, +) → 0) == (videoSamples → 49600)` | [Async tests time out on CI while simulation tests run](#async-tests-time-out-on-ci-while-simulation-tests-run) |
+| `The job was not acquired by Runner of type hosted even after multiple attempts` | [No macOS runner: the pipeline job is cancelled](#no-macos-runner-the-pipeline-job-is-cancelled) |
+| `Multi Screen Recorder quit unexpectedly` (the app's crash dialog) after running the tests, with no crash of the app | [Crash dialog for crash reports the tests wrote](#crash-dialog-for-crash-reports-the-tests-wrote) |
 
 ## Format
 
@@ -186,3 +188,45 @@ One row per entry, the error text exactly as in the entry.
 - **Verify:** CI's `scripts/test` passes on the pushed head.
 - **Observed:** 2026-11-17, PR #19; resolved, CI passed with the fix
   (run 44125362376).
+
+## No macOS runner: the pipeline job is cancelled
+
+- **Error:** `The job was not acquired by Runner of type hosted even after multiple attempts`,
+  next to `Due to capacity constraints, jobs targeting macOS arm64 runners may experience longer queue times.`
+- **Symptom:** `test-and-build` ends as cancelled after about 15
+  minutes with no runner name and no log; the jobs after it are
+  skipped, so a merge to `main` makes no release.
+- **Why:** [KNOWN: the run's annotations] GitHub had no hosted
+  Apple-silicon macOS runner free for the job; nothing in the
+  repository caused it.
+- **Fix:** re-run the run (`gh run rerun <run id>`), never a new push:
+  the code is unchanged, and on `main` the re-run makes the release the
+  merge asked for.
+- **Verify:** the re-run's `test-and-build` gets a runner and passes,
+  and on `main` the release job publishes `v0.<DATE>.<N>`.
+- **Observed:** 2026-11-17, twice: the release run of PR #19's merge,
+  and run 44167197917 of PR #20's merge; both re-run.
+
+## Crash dialog for crash reports the tests wrote
+
+- **Error:** the app's dialog `Multi Screen Recorder quit unexpectedly`
+  on start, after `scripts/test` ran on the same Mac, while the app
+  itself had not crashed.
+- **Symptom:** `~/Library/Logs/DiagnosticReports` holds `msr-*.ips`
+  reports whose `procPath` is a temporary folder, with
+  `SIGKILL (Code Signature Invalid)` and `Launch Constraint Violation`.
+- **Why:** [KNOWN: the reports' `codeSigningID com.apple.sleep`] the
+  `scripts/install-app` tests used a copy of `/bin/sleep` named `msr`
+  as their stand-in app; macOS sometimes kills such a copy of a system
+  program at launch and writes a crash report named after it, and the
+  app offers every `msr` crash report it finds. The same kill made a
+  test's `waitUntilExit()` hang one run in eight.
+- **Fix:** the stand-in is a program the tests compile with `cc`, and
+  the test waits for it through its termination handler (PR #20).
+  Delete the reports left over:
+  `rm ~/Library/Logs/DiagnosticReports/msr-<date>-<time>.ips` for each
+  one with a temporary `procPath`. Backlog item 19 would let the app
+  skip such reports itself.
+- **Verify:** 20 runs of `InstallAppScriptTests` write no new
+  `msr-*.ips`.
+- **Observed:** 2026-11-17, PR #20; resolved.
