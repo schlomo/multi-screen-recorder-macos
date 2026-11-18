@@ -7,7 +7,13 @@ the homepage with screenshots of both windows (PR #15) and the tester
 guide's "What to test and send" (PR #16), all merged 2026-11-16. The
 owner shares it with colleagues, who email a screenshot of the start
 window, `recording.json` of every recording and a few sentences; the
-architect triages what comes back into this backlog. PR #19 (the
+architect triages what comes back into this backlog. First feedback,
+2026-11-18: a colleague on a MacBook Air (built-in screen, an LG
+2560×1440 screen, system audio, the built-in microphone and a
+Logitech BCC950 ConferenceCam, auto mode) recorded 15 minutes with
+release `v0.20261117.52`: result `ok`, no problems, no frame repeated
+for lateness; "all happy, worked as expected and no surprise". Its
+facts are in items 6, 12 and 18. PR #19 (the
 clock drift correction, the status line and the command line polish)
 merged 2026-11-17 as release `v0.20261117.51`; PR #20 (the homepage
 collage, dark mode, `scripts/install-app`) merged the same evening as
@@ -187,6 +193,10 @@ Nothing.
    9), and the colour-space work dropped if the pixels stay identical.
    Not in the first step: a cheaper AAC setting, shared guide tracks,
    24 kHz guides. The design docs get these findings with that PR.
+   A tester's MacBook Air (2026-11-18; two displays, system audio, a
+   mono and a stereo input, 15 minutes): 41.7 % average, 137.5 %
+   peak, no frame repeated for lateness. A MacBook Air has no fan, so
+   a long recording falls behind there first if anywhere [ASSUMED].
 7. **Auto-recovery from disturbances** (the owner, 2026-11-16: "if
    after a few seconds the recording is again good then I'd accept
    that. Main goal is auto-recovery after changes and continuing the
@@ -346,7 +356,9 @@ Nothing.
    constant 30 fps on the host clock (no frame repeated or dropped
    without encoding again) and the resolution cap. Camera capture is
    out of scope in D1, so this needs a decisions entry that supersedes
-   that line.
+   that line. A test device: a tester's Logitech BCC950 ConferenceCam
+   (a camera with a stereo microphone, recorded as an audio input on
+   2026-11-18); whether it offers H.264 is unchecked.
 13. **Presentation: the window and the terminal output** (the owner,
    2026-11-16: "if running in a terminal (try) then show the running
    status as persistent last line, recording time, CPU, recording size
@@ -452,7 +464,9 @@ Nothing.
    indeed"). The app sets no appearance and defines no colour of its
    own, so it should follow the system already [ASSUMED from the code,
    not tried]. First: the owner looks at the windows in dark mode;
-   then fix what looks wrong.
+   then fix what looks wrong. A tester's screenshots (2026-11-18) show
+   the start and status windows in dark mode, readable, the dimmed
+   rows included; whether that closes this item is the owner's call.
 19. **The crash dialog offers only the app's own crashes.** On
    2026-11-17 the owner's freshly installed app showed the crash dialog
    for four `msr-*.ips` reports that a test's stand-in program (a copy
