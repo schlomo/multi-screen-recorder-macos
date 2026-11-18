@@ -336,9 +336,17 @@ Nothing.
    wanted frame rate (the owner, 2026-11-18); the architect proposes
    that the recording resolution caps cameras as it caps screens (a
    4K camera often delivers MJPEG, a decode on top of the encode).
-   Open for the design: which audio a camera's file carries (its own
-   microphone or the default one). Camera capture is out of scope in
-   D1, so this needs a decisions entry that supersedes that line.
+   The owner (2026-11-18): a camera's file carries the camera's own
+   microphone when it has one ("sync problem might be there"), and
+   where a camera offers an H.264 stream, the recorder takes it as-is
+   rather than decoding and encoding again. Open for the design: the
+   audio of a camera without a microphone; whether AVFoundation hands
+   out a camera's H.264 stream undecoded at all [ASSUMED: it usually
+   delivers decoded frames]; and how a stream taken as-is fits D11's
+   constant 30 fps on the host clock (no frame repeated or dropped
+   without encoding again) and the resolution cap. Camera capture is
+   out of scope in D1, so this needs a decisions entry that supersedes
+   that line.
 13. **Presentation: the window and the terminal output** (the owner,
    2026-11-16: "if running in a terminal (try) then show the running
    status as persistent last line, recording time, CPU, recording size
