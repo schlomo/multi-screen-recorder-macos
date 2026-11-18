@@ -26,7 +26,8 @@ glossary's terms verbatim — one word per concept, no synonyms.
 
 Run every command in the FOREGROUND; do not park waiting on a
 notification. Commit and, at the recorded write level, push before
-reporting. Read back a
+reporting, with the skip-ci marker in the commit message. Never write
+the marker verbatim in a PR description. Read back a
 generated review description to confirm it rendered as real content.
 
 ## Lane

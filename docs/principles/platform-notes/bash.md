@@ -41,7 +41,7 @@
   truncate. Ask for structured output (`--json`/`--format=json`/`-o
   json` or equivalent) and match an exact field, every time.
 - **A time shown to a person carries an explicit zone, the team's
-  (recorded at setup).** Tools print UTC by default; to convert, use
+  (recorded in `AGENTS.md`).** Tools print UTC by default; to convert, use
   `TZ=<zone> date -d <time>` (GNU; on macOS `TZ=<zone> date -r
   <epoch>`). An unknown zone, or a missing zone database as in many
   minimal container images, silently falls back to UTC instead of

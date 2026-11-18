@@ -19,7 +19,9 @@ silently picking a side.
 
 Run every command in the FOREGROUND. Do not start a background watch
 and end your turn waiting on a notification. Commit and, at the
-recorded write level, push before reporting; if something backgrounds
+recorded write level, push before reporting, with the skip-ci marker
+in the commit message (the session that owns the PR makes the unmarked
+commit that starts the pipeline); if something backgrounds
 anyway, collect its result now and finish. Verify what you built
 against the actual pushed state (or your local commit, below the
 recommended write level), not against your memory of writing it.

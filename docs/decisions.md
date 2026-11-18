@@ -1580,7 +1580,7 @@ architect's reading.
 
 ## D56: Iterate locally and wait for the pipeline once; reviews sized to the change; agent how-to in `docs/principles/`; the owner tries changes early; tests that record are announced (2026-11-16)
 
-- **Status:** in force; three principle changes and two rulings.
+- **Status:** in force, tightened by D61
 - **Context:** The owner's retro of the session of 2026-11-15 and
   2026-11-16: "We wasted way way too much time waiting on CI. the
   development needs to be much more local and iterating locally so
@@ -1799,3 +1799,46 @@ architect's reading.
 - **Evidence:** `.github/ISSUE_TEMPLATE/crash-report.yml`,
   [design/delivery.md](design/delivery.md), `CrashReportTests`,
   `VersionScriptTests`, `InstallAppScriptTests`.
+
+## D61: Rounds are pushed with the skip-ci marker; one unmarked commit starts the one pipeline run; the setup skill is removed (2026-11-18)
+
+- **Status:** in force; one principle change and one removal.
+- **Context:** The owner, 2026-11-17: "make sure that the AI working
+  docs know that we do local builds and tests first and then ideally
+  just one CI run at the end". On the merge setting, 2026-11-18: "I'll
+  change the GH merge to use only the PR description and not the
+  collated commit messages so that you can use skip ci". On the rule
+  written in backlog item 17, 2026-11-18: "agree with 17, continue".
+  On the setup skill, 2026-11-18: "let's remove the setup skill here,
+  it is leftover from the ai working model setup process".
+- **Decision:**
+  1. Before (D56): each round is gated by the local run and pushed
+     without waiting for the pipeline, so every pushed round starts a
+     pipeline run. After: each round is gated by the local run and
+     pushed with the skip-ci marker in its commit message, so it starts
+     no run; reviews read the pushed commit; the draft MR/PR is opened
+     at the first push. The commit about to be marked ready carries no
+     marker (an empty commit if need be) and starts the one run, waited
+     for before ready. The owner's open questions are settled and
+     recorded before that commit. A run GitHub cancels for want of a
+     runner is re-run, never answered by a push. A fix after the one
+     run is again an unmarked commit, named in the description. An
+     agent's round push uses the marker; the session that owns the
+     MR/PR makes the unmarked commit.
+  2. A PR description never contains the marker verbatim: squash
+     merges use it as the commit message, and GitHub skips any run
+     whose commit message holds the marker, which would skip the
+     release from `main`.
+  3. `.claude/skills/setup/` is deleted, and the references to it in
+     `AGENTS.md` and the principles are removed; the recorded facts
+     stay in `AGENTS.md`. Earlier entries stay as history.
+- **Consequences:** An agent that forgets the marker costs one extra
+  run. A description quoting the marker would skip the release from
+  `main`. Copilot's review still arrives on the draft PR. Nothing
+  re-seeds the project files from a template any more.
+- **Evidence:** `backlog.md` item 17;
+  `docs/principles/ai-working-process.md`, `AGENTS.md`,
+  `.claude/agents/builder.md`, `.claude/agents/reviewer.md`,
+  `.claude/agents/scribe.md`,
+  `.claude/skills/architect/references/delegation.md`,
+  `.claude/skills/architect/SKILL.md`, `docs/principles/platform-notes/bash.md`.
