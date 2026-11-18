@@ -460,15 +460,28 @@ Nothing.
    the end"). "Iterate locally; wait for the pipeline once" (D56)
    already says so, but PR #19 still ran CI four times at its end:
    every pushed round starts a run, recording the owner's answers came
-   after the final run, and two runs lost their runner. The architect's
-   proposal, for the owner to sign off as text: rounds stay local and
-   reviewers read the local commits; the branch is pushed once, on the
-   commit about to be marked ready; the owner's open questions are
-   settled and recorded before that push; a run GitHub cancels for
-   want of a runner is re-run, never answered by a push. Signed off by
-   the owner as written (2026-11-18). A principle change: its own PR
-   with a decisions entry. The rule only; the re-run mechanism is
-   item 20.
+   after the final run, and two runs lost their runner. A first
+   proposal (rounds stay local, the branch pushed once) was signed off
+   on 2026-11-18 and replaced the same day, after review, by GitHub's
+   skip-ci marker; the owner set squash merges to use the PR title and
+   description (2026-11-18: "I'll change the GH merge to use only the
+   PR description and not the collated commit messages so that you can
+   use skip ci"). The rule the owner signed off ("agree with 17,
+   continue", 2026-11-18): (1) each round is gated by the local run of
+   what the pipeline runs, then pushed with the skip-ci marker in its
+   commit message, so it starts no run; (2) reviews read the pushed
+   commit, and the draft PR opens at the first push; (3) the commit
+   about to be marked ready carries no marker (an empty commit if
+   needed) and starts the one pipeline run, waited for before ready;
+   (4) the owner's open questions are settled and recorded before that
+   commit; (5) a run GitHub cancels for want of a runner is re-run,
+   never answered by a push; (6) a fix after the one run is again a
+   commit without the marker, named in the description; (7) a PR
+   description never contains the marker verbatim. In the same PR, the
+   setup skill is removed (the owner, 2026-11-18: "let's remove the
+   setup skill here, it is leftover from the ai working model setup
+   process"). A principle change: its own PR with a decisions entry.
+   The rule only; the re-run mechanism is item 20.
 19. **The crash dialog offers only the app's own crashes.** On
    2026-11-17 the owner's freshly installed app showed the crash dialog
    for four `msr-*.ips` reports that a test's stand-in program (a copy
