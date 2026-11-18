@@ -51,7 +51,7 @@ jobs so the key never meets compiled code (D29):
 
 | When | What runs |
 |---|---|
-| Every push to a PR | `test-and-build`, then `snapshot-release` |
+| Every push to a PR without the skip-ci marker | `test-and-build`, then `snapshot-release` |
 | A PR is closed | `remove-snapshot-release` |
 | A push to `main` that changes more than Markdown files and the homepage (`homepage/`) | `test-and-build`, then `release` |
 | A PR from a fork or from Dependabot | `test-and-build` only: tested, built and smoke-tested, never signed or published |
@@ -82,7 +82,7 @@ zip keeps no file permissions, so `msr` would lose its executable bit
 ([upload-artifact, "Permission Loss"](https://github.com/actions/upload-artifact#permission-loss)).
 
 **Snapshot release:** one GitHub pre-release per PR, tag `pr-<number>`,
-replaced on every push, titled `Snapshot PR #<n>: <version>`. A
+replaced on every push without the skip-ci marker, titled `Snapshot PR #<n>: <version>`. A
 pre-release rather than a draft, which only collaborators can see and
 which has no stable download link. It is published only while the PR
 is open and its head is the commit built; a run for a superseded push

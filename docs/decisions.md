@@ -1580,7 +1580,7 @@ architect's reading.
 
 ## D56: Iterate locally and wait for the pipeline once; reviews sized to the change; agent how-to in `docs/principles/`; the owner tries changes early; tests that record are announced (2026-11-16)
 
-- **Status:** in force, tightened by D61
+- **Status:** in force; superseded in part by D61.
 - **Context:** The owner's retro of the session of 2026-11-15 and
   2026-11-16: "We wasted way way too much time waiting on CI. the
   development needs to be much more local and iterating locally so
@@ -1812,7 +1812,7 @@ architect's reading.
   On the setup skill, 2026-11-18: "let's remove the setup skill here,
   it is leftover from the ai working model setup process".
 - **Decision:**
-  1. Before (D56): each round is gated by the local run and pushed
+  1. Replaces D56, in part (its first point). Before (D56): each round is gated by the local run and pushed
      without waiting for the pipeline, so every pushed round starts a
      pipeline run. After: each round is gated by the local run and
      pushed with the skip-ci marker in its commit message, so it starts
@@ -1824,17 +1824,31 @@ architect's reading.
      runner is re-run, never answered by a push. A fix after the one
      run is again an unmarked commit, named in the description. An
      agent's round push uses the marker; the session that owns the
-     MR/PR makes the unmarked commit.
-  2. A PR description never contains the marker verbatim: squash
-     merges use it as the commit message, and GitHub skips any run
-     whose commit message holds the marker, which would skip the
-     release from `main`.
-  3. `.claude/skills/setup/` is deleted, and the references to it in
+     MR/PR makes the unmarked commit (the architect's reading).
+  2. A PR title or description never contains any of GitHub's skip
+     strings (`[skip ci]`, `[ci skip]`, `[no ci]`, `[skip actions]`,
+     `[actions skip]`, a `skip-checks: true` trailer; the skip-ci
+     marker is `[skip ci]`): squash merges use them as the commit
+     message, and GitHub skips any run whose commit message holds one,
+     which would skip the release from `main`.
+  3. The architect's reading: a catch-up merge of the trunk carries
+     the marker only before the one run (`git merge -m "Merge
+     origin/<trunk> [skip ci]" origin/<trunk>`); after it, the merge is
+     unmarked and the pipeline re-runs on the merged result. A marked
+     head commit at close time skips the run that removes the PR's
+     snapshot release, and the check stays pending.
+  4. The architect's reading: a marked push makes no snapshot release
+     (`AGENTS.md` and `docs/design/delivery.md` say so). When the
+     owner asks for one, the owning session pushes one unmarked commit,
+     a named exception.
+  5. `.claude/skills/setup/` is deleted, and the references to it in
      `AGENTS.md` and the principles are removed; the recorded facts
      stay in `AGENTS.md`. Earlier entries stay as history.
 - **Consequences:** An agent that forgets the marker costs one extra
-  run. A description quoting the marker would skip the release from
-  `main`. Copilot's review still arrives on the draft PR. Nothing
+  run. A description quoting a skip string would skip the release from
+  `main`. The owner tries a local build; a snapshot release needs one
+  unmarked commit. Copilot's review is unaffected by the marker (a
+  ruleset, not a workflow). Nothing
   re-seeds the project files from a template any more.
 - **Evidence:** `backlog.md` item 17;
   `docs/principles/ai-working-process.md`, `AGENTS.md`,

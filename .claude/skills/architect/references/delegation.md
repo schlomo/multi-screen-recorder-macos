@@ -63,11 +63,12 @@ working process principles, in order. Verify what comes back as
 A builder's brief asks for the local run of what the pipeline runs on
 its final commit, pushed with the skip-ci marker, and no wait for the
 pipeline ("Iterate locally; wait for the pipeline once"); the final,
-unmarked commit is the owning session's. A change that shows in the window or on
-the command line goes to the owner to try, as a local build or,
-after the one pipeline run, the PR's snapshot release, as soon as the
-local run is green, while the
-review runs alongside (D56); what the owner's feedback adds is
+unmarked commit is the owning session's. A change that shows in the
+window or on the command line goes to the owner to try as a local
+build as soon as the local run is green, while the review runs
+alongside (D56). A marked push makes no snapshot release: when the
+owner asks for one, the owning session pushes one unmarked commit, a
+named exception; what the owner's feedback adds is
 reviewed as "Every change gets an adversarial review" says.
 
 A review brief also follows the closing paragraph of "Brief anatomy":

@@ -9,7 +9,8 @@ sources change.
 
 Keep this current when any of it changes.
 
-- **Starter:** `928aeb2`, set up 2026-11-12.
+- **Starter:** `928aeb2`, the template repository's commit this project was set up
+  from, on 2026-11-12.
 - **Git:** GitHub, `schlomo/multi-screen-recorder-macos`, trunk `main`;
   squash merges, so a branch catches up by merging the trunk in.
 - **Agent writes:** push work branches and open draft PRs, and mark a
@@ -30,7 +31,7 @@ Keep this current when any of it changes.
   scripts in `scripts/` on hosted Apple-silicon macOS runners: job
   `test-and-build` tests, builds and smoke-tests without any secret,
   then a separate signing job signs and publishes, for every push to a
-  PR the PR's snapshot release (a pre-release tagged `pr-<n>`), for a
+  PR without the skip-ci marker the PR's snapshot release (a pre-release tagged `pr-<n>`), for a
   push to `main` that changes more than Markdown files and the homepage
   (`homepage/`) a release `v0.<DATE>.<N>`, so a homepage-only push makes
   no release; a closed PR's snapshot release is removed. PRs from

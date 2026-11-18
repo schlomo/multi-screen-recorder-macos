@@ -45,9 +45,9 @@ so rather than silently picking a side.
   once they are fully reviewed; it commits locally only and a human
   pushes; or it writes nothing to the repo without a per-change
   instruction. The recommended level lets an agent push its rounds
-  (each with the skip-ci marker) and read the pipeline's result by
-  itself, once per MR/PR ("Iterate locally; wait for the pipeline
-  once" below), before a human spends review time on it. With the option, the session that
+  and read the pipeline's result by itself, once per MR/PR ("Iterate
+  locally; wait for the pipeline once" below), before a human spends
+  review time on it. With the option, the session that
   owns an MR/PR an agent opened (it opened it, briefed the agent that
   did, or took it over) marks it ready once its adversarial review
   leaves no BLOCKER or SHOULD-FIX open, its pipeline passes, and any
@@ -86,9 +86,14 @@ so rather than silently picking a side.
   up follows the repo's merge method, recorded in `AGENTS.md`. What decides
   it is whether the trunk must stay linear without squashing:
   - **Squash merges** (the default): bring the trunk in with a
-    plain `git merge` and push that like any other round, with the
-    skip-ci marker in the merge commit's message. Fetch
-    right before it (`git fetch origin`, then
+    plain `git merge` and push that like any other round. Before the
+    one pipeline run the merge is a round and carries the skip-ci
+    marker: `git merge -m "Merge origin/<trunk> [skip ci]"
+    origin/<trunk>`. After the run it is unmarked like any other
+    commit, and the pipeline re-runs on the merged result: a marked
+    head commit at close time skips the run that removes the PR's
+    snapshot release, and its check stays pending (the architect's
+    reading, D61). Fetch right before it (`git fetch origin`, then
     `git merge origin/<trunk>`), and before pushing check that the
     trunk is an ancestor of the branch with
     `git merge-base --is-ancestor origin/<trunk> HEAD`, and stop and
@@ -324,7 +329,8 @@ reviewer never fixes them itself.
 **Rule:** every round of a change (the first build, each fix round)
 is gated by running locally what the pipeline runs: the project's own
 scripts, on the round's final commit. The round is then pushed with
-`[skip ci]` in its commit message, so it starts no pipeline run, and
+`[skip ci]`, the skip-ci marker, in its commit message, so it starts no
+pipeline run, and
 reviews read the pushed commit. The draft MR/PR is opened at the first
 push. The commit about to be marked ready carries no marker (an empty
 commit if need be); it starts the one pipeline run, which is waited
@@ -333,10 +339,16 @@ before that commit. A run GitHub cancels for want of a runner is
 re-run, never answered by a push. A fix after the one run is again a
 commit without the marker, and the description names it. An agent's
 round push uses the marker; the session that owns the MR/PR makes the
-final, unmarked commit. An MR/PR description never contains the marker
-verbatim: squash merges use the description as the commit message
-(D61), and GitHub skips any run whose commit message holds the marker,
-which would skip the release from the trunk.
+final, unmarked commit (the architect's reading, D61). When the owner
+asks for the snapshot release, which a marked push does not make, the
+owning session pushes one unmarked commit, a named exception (the
+architect's reading, D61). An MR/PR title or description never
+contains any of GitHub's skip strings (`[skip ci]`, `[ci skip]`,
+`[no ci]`, `[skip actions]`, `[actions skip]`, and a `skip-checks: true`
+trailer; [GitHub's list](https://docs.github.com/en/actions/managing-workflow-runs-and-deployments/managing-workflow-runs/skipping-workflow-runs)):
+squash merges use them as the commit message, and GitHub skips any run
+whose commit message holds one, which would skip the release from the
+trunk.
 **Why:** the pipeline's jobs are the project's own scripts ("Thin
 CI" in [engineering.md](engineering.md)), and the owner designed it so
 that nothing on it cannot be tested locally (D56). A wait after every
@@ -618,9 +630,8 @@ front, every time:
    scratch root collide).
 5. **How to verify the result** — the actual command or check, never
    a placeholder like "add tests."
-6. **The deliverable's durable destination** — a pushed branch (its
-   rounds pushed with the skip-ci marker; a local commit below the
-   recommended write level), a review
+6. **The deliverable's durable destination** — a pushed branch (a
+   local commit below the recommended write level), a review
    artifact's description, a backlog item — never only a
    scratch file that a cleanup step might delete before anyone reads
    it.
