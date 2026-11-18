@@ -13,7 +13,7 @@ architect triages what comes back into this backlog. First feedback,
 Logitech BCC950 ConferenceCam, auto mode) recorded 15 minutes with
 release `v0.20261117.52`: result `ok`, no problems, no frame repeated
 for lateness; "all happy, worked as expected and no surprise". Its
-facts are in items 6, 12 and 18. PR #19 (the
+facts are in items 6 and 12; it closed item 18 (dark mode). PR #19 (the
 clock drift correction, the status line and the command line polish)
 merged 2026-11-17 as release `v0.20261117.51`; PR #20 (the homepage
 collage, dark mode, `scripts/install-app`) merged the same evening as
@@ -459,14 +459,6 @@ Nothing.
    the owner as written (2026-11-18). A principle change: its own PR
    with a decisions entry. The rule only; the re-run mechanism is
    item 20.
-18. **Dark mode in the app** (the owner, 2026-11-17: "Can we easily
-   support dark mode in the app itself? Then that would be nice
-   indeed"). The app sets no appearance and defines no colour of its
-   own, so it should follow the system already [ASSUMED from the code,
-   not tried]. First: the owner looks at the windows in dark mode;
-   then fix what looks wrong. A tester's screenshots (2026-11-18) show
-   the start and status windows in dark mode, readable, the dimmed
-   rows included; whether that closes this item is the owner's call.
 19. **The crash dialog offers only the app's own crashes.** On
    2026-11-17 the owner's freshly installed app showed the crash dialog
    for four `msr-*.ips` reports that a test's stand-in program (a copy
@@ -663,6 +655,9 @@ Nothing.
 
 ## Done (recent)
 
+- 2026-11-18: item 18, dark mode in the app, closed by the owner
+  without a change: a tester's screenshots showed the start and
+  status windows in dark mode, readable, the dimmed rows included.
 - 2026-11-17: PR #20 merged by the owner, release `v0.20261117.52` (its
   build re-run after GitHub found no runner, again): the homepage's
   collage of the three windows with arrows from Start and Stop, the
