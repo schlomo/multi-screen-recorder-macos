@@ -45,7 +45,7 @@ settings` saves them (D44):
 | Flag | Values |
 |---|---|
 | `--auto` | no value: auto mode for this run, whatever the settings file says |
-| `--resolution` | `native`, `4k`, `1440p`, `1200p`, `1080p`, `720p` |
+| `--resolution` | `native`, `4k`, `1440p`, `1200p`, `1080p`, `720p`, `none` (audio only) |
 | `--audio-mode` | `none`, `default-microphone`, `wired`, `all-inputs` |
 | `--system-audio` | `on`, `off` |
 | `--output-folder` | a folder |
@@ -88,14 +88,18 @@ System audio: available
 
 The settings line says the effective settings, flags applied: `Auto
 (resolution Native, audio mode Wired)` in auto mode, otherwise
-`resolution 1080p, audio mode …`; under the audio modes None and Default
-microphone it adds why the inputs are not recorded (`audio mode None (no
-audio input is recorded)`). The screens are listed by number, then the
+`resolution 1080p, audio mode …`; at the recording resolution None it
+adds that no screen is recorded (`resolution None (no screen is
+recorded)`), and under the audio modes None and Default microphone why
+the inputs are not recorded (`audio mode None (no audio input is
+recorded)`). The screens are listed by number, then the
 audio sources by number, the system audio (0) first, then the audio
 inputs not recorded in device order (the system audio too, last, when it
 is off), so the numbers read 0, 1, 2 … without a gap. A source not
 recorded keeps the column of the other names with the `Audio <n> - ` part
-blank, shows `-` in GB/h max, and an audio input not recorded says why in
+blank (at the recording resolution None the screens, with the
+`Screen <n> - ` part blank and `-` in Records at too, D62), shows `-` in
+GB/h max, and an audio input not recorded says why in
 parentheses after its name, from the rule that leaves it out: under
 Wired, the connection of an input that is not the default one and not
 wired: `(virtual)`, `(Bluetooth)` (also Bluetooth LE), `(aggregate)`,
@@ -217,11 +221,16 @@ saves, so a fresh Mac has none and the defaults apply:
 
 ## Ready check
 
-Items, in this order: the Screen & System Audio Recording permission,
-the Microphone permission (only when the recording records at least one
+Items, in this order: the Screen & System Audio Recording permission
+(only when the recording records a screen or the system audio: audio
+only without the system audio, the microphone alone, leaves the item
+out and the permission is neither asked nor proven, D62), the
+Microphone permission (only when the recording records at least one
 audio input: with no audio input present, or none recorded under the
 audio mode, the item is left out and the permission is neither asked nor
-read), the screens (at least one, each readable), the chosen audio
+read), the screens (at least one, each readable; left out at the
+recording resolution None, where screens that cannot be read fail
+nothing and the free disk space counts no screen file), the chosen audio
 sources, listed from the same model and in the same order as the table of what will be recorded (each audio input the audio mode records readable; another that
 cannot be read does not count; with an audio mode but `none` the item
 says "no microphone recorded" when no input is recorded, such as on a
@@ -231,8 +240,12 @@ every audio mode, the screens and the system audio are recorded as
 usual, and the item then reads `Audio: system audio, no microphone
 recorded`, or `Audio: no microphone recorded, no system audio` with system
 audio off; an input that is recorded and whose channels cannot be read
-fails it), the output folder, and free disk space in the output folder
-for `requiredRecordingHours`.
+fails it), at the recording resolution None with no system audio and no
+audio input recorded the item `Nothing to record: the resolution None
+records no screen, and no audio source is recorded`, which fails (a
+recording with neither screens nor audio refuses to start, D62), the
+output folder, and free disk space in the output folder for
+`requiredRecordingHours`.
 
 - A permission that was never asked for is requested, so macOS shows
   its prompt; a denied one is reported with the System Settings path.
@@ -580,7 +593,9 @@ checked, reported or rewritten at the next start (D47).
   - Screen rows first: the number and name, "Looks like" (the size in
     points), "Drawn at" (the pixel size, shown also where both are
     equal), "Records at" (the frame size) and GB/h max (the screen file,
-    its guide tracks included).
+    its guide tracks included). At the recording resolution None every
+    screen is a source not recorded (below): no number, `-` in Records
+    at and GB/h max, dimmed (D62).
   - A thin divider, no second header, then the audio rows: the name of
     each audio input (the default one marked "(default)") in Source,
     Looks like and Drawn at empty, its number of channels in Records
@@ -619,15 +634,17 @@ checked, reported or rewritten at the next start (D47).
     be read: <reason>" stands as a red line above the table too, which
     then has the system audio row only; an audio input whose channels
     cannot be read shows "cannot be read" in the Records at column (and "?" GB/h max if it is recorded). The total row
-    and the line below it appear only when the screens and every recorded audio input can
+    and the line below it appear only when the screens (not at the
+    recording resolution None) and every recorded audio input can
     be read. The ready check's items stay as they are.
 
   Then a switch "Auto", on by default: the two sliders are always shown, so
   that the switch shifts nothing: on, they are disabled (grayed out) and
   show auto mode's choices, Native and Wired, not the saved values, and
   a caption says what auto mode records (every screen at Native, the
-  audio mode Wired); off, they are enabled and show the saved values: the recording resolution (over 720p,
-  1080p, 1200p, 1440p, 4K, Native, smallest to largest) and the audio
+  audio mode Wired); off, they are enabled and show the saved values: the recording resolution (over None,
+  which records no screen (D62), then 720p, 1080p, 1200p, 1440p, 4K,
+  Native, smallest to largest) and the audio
   mode (over None, Default microphone, Wired, All), each with the chosen
   one's name beside it. Under the audio mode slider the window says:
   "Bluetooth and virtual microphones are recorded only under All, or
@@ -779,6 +796,13 @@ event loop started inside a main-queue job, such as after the first
 task, signal source or screen change would reach the recorder.
 `msr record` stops on its signals through the same path as Stop.
 
+**Audio only (D62).** At the recording resolution None the screen
+tracker follows no screen: no stream, no screen file, no screen event
+and no screen row in the status window; the screens are still read, as
+the system audio's stream follows the main screen. Everything else runs
+as with screens: the audio files, `recording.json` (its settings say
+`"resolution": "none"`), sleep and wake.
+
 **Constant 30 fps (D11, D21).** Per screen, a ScreenCaptureKit stream
 delivers complete frames when the screen changes; the newest is kept.
 The mouse pointer is recorded.
@@ -920,6 +944,16 @@ the metadata items (see "Output on disk").
   1 s (*data*) is filled with silence of exactly its length; a longer
   one ends the audio file and a new one starts (D46 point 7). A buffer
   behind that position is written by its sample count and is no gap.
+- **Appends.** The placed samples are gathered and handed to the audio
+  file's writer about 100 ms at a time (`audioFileAppendSamples`, 4800
+  samples, *data*), as the guide tracks are handed over; silence for a
+  filled gap, and the file's end, hand over what was gathered first. One
+  append per buffer of 512 samples cost more CPU than the AAC encoder
+  (see "Build state", CPU). A crash loses up to about 0.1 s more than
+  with one append per buffer, which the owner accepted (2026-11-16); the
+  decoded audio is the same sample for sample (`AudioFileWriterTests`).
+  A stereo track's samples are interleaved straight into the sample
+  buffer's memory.
 - **Clock drift.** An audio device runs on its own clock, up to 117 ppm
   off the host clock (measured), and `AVCaptureSession`'s timestamps
   follow its sample count, so drift shows as no gap; the system audio's
@@ -1054,7 +1088,8 @@ the metadata items (see "Output on disk").
   and samples left over are lost: `audio file writer fell behind` with
   its `error`, a failure, and a problem.
 - **Guide tracks.** For playback and waveform sync, every screen file
-  also carries guide tracks: "Audio inputs", one mono mix of the
+  also carries guide tracks (audio only writes no screen file, so no
+  guide track, D62): "Audio inputs", one mono mix of the
   recorded audio inputs, unless the audio mode is `none`; "System
   audio", stereo, unless system audio is off. The two are never mixed
   together. For "Audio inputs" each audio input is averaged to mono, the
@@ -1232,7 +1267,10 @@ type), settings read leniently with the line for standard error, flags
 the text `msr check` prints for "What will be recorded", file naming,
 manifest states, the screen tracker (numbers, the settle time, frame
 size changes, mirroring, the main screen, back-off, the screen check's
-fault, a full disk, sleep and wake), the screen check, the shared clock,
+fault, a full disk, sleep and wake, and no screen at the recording
+resolution None), the ready check at the recording resolution None
+(the screen permission only with the system audio, no screens item,
+nothing to record refused), the screen check, the shared clock,
 the timecode (also on a daylight saving day and at a second frame rate),
 `--duration`, the summary of `msr record`, the Dock badge and the
 problems of a recording, the audio tracker (the audio modes, inputs
@@ -1272,11 +1310,13 @@ timecode, BT.709, fragments, a file never finalized, the guide tracks),
 audio files written from synthetic PCM and read back (a mono track per
 channel or one stereo track, the bit rates, the timecode with its reel
 name, the metadata, a filled gap decoding as silence, a file never
-finalized), the proof that an audio-only fragmented `.mov` carries a
+finalized, appends of 100 ms decoding the same as appends of 512
+samples, stereo interleaved), the proof that an audio-only fragmented `.mov` carries a
 timecode track, a screen file's ticks with a stand-in writer (a failing
 writer, one that fell behind, a slow end, guide samples placed from the
 file's first tick), audio captures with a stand-in source and writer
-(the clock drift status about once a second, each file's
+(appends of about 100 ms from buffers of 512 samples, the clock drift
+status about once a second, each file's
 `clockDriftCorrection` against a correction of the test's own, the
 second file's counted from its own start, the correction's held-back
 samples written when a capture ends by itself, dropped when its writer
@@ -1294,9 +1334,11 @@ open, a stale queued refresh does nothing, choices saved only when
 changed, no ready check while recording, Start only when ready,
 which quit finalizes without asking, where each kind of text of `msr
 record` goes with and without `--quiet` (standard output the folder's
-path only), when the status line is drawn and ended, and that `--quiet`
-with `--debug` is a usage error. `CommandTests` run the built `msr`
-with a scratch `HOME` (`msr settings`, with flags and `--auto`, and `msr
+path only), when the status line is drawn and ended, that `--quiet`
+with `--debug` is a usage error, and that the icon's frame in dark mode
+follows the tile in the icon file. `CommandTests` run the built `msr`
+with a scratch `HOME` (`msr settings`, with flags, `--resolution none`
+and `--auto`, `msr record --help`, and `msr
 version`, which prompt for nothing; also through a symbolic link into an
 app bundle), `scripts/version` in scratch git repositories and
 `scripts/unpack-app` on scratch archives (some written byte by byte, as
@@ -1554,6 +1596,56 @@ ScreenCaptureKit audio stream on the owner's Mac (2026-11-17) had every
 timestamp at its sample count from the first to within a microsecond,
 and the clock drift correction corrects the output device's clock drift
 like an input's, so it shows as no `audio input gap` events.
+
+Built (audio only, the first step of the CPU work and the icon's frame
+in dark mode, D62): the recording resolution None (see "Audio only"
+and "Ready check"); the audio files' appends of about 100 ms (see
+"Appends"); `pcmSample` without an array per sample; in dark mode the
+start window's header draws a frame of white at 25 % opacity, 1 pt, on
+the edge of the icon's tile, scaled from the tile in
+`assets/icon/app-icon.svg` (inset 4.7 pt, corner radius 8.6 pt at
+48 pt; `IconTileFrame`), seen in an offscreen render of the header, not
+yet in the running app.
+
+CPU, the findings behind this step (backlog item 6, 2026-11-16, build
+`7ad0b6b`, two displays): a 20 s `sample` put the 11 AAC encoders at
+22 % (the guide tracks about 5.8 % per display), the movie writers at
+6 %, the microphone capture at 7 %, VideoToolbox at 5 % (3 % of it
+rebuilding a colour space from the frame's ICC profile, twice per
+frame) and our own code at 1.6 %; steady CPU was 11.5 % for video only,
+25.9 % with the system audio, 35.0 % with the default microphone too
+and 62.0 % with all inputs. A replica of the audio path, real-time
+paced, found the 94 appends a second, not the encoder, to be the main
+cost: appends of about 100 ms gave bit-identical files and saved about
+1.9 % of a core per input.
+
+Measured with this step (2026-11-18, the owner's Mac: two screens, LG
+Ultra HD at 2560×1440 and the built-in display at 1512×982; the system
+audio and three inputs, Jabra Evolve3 65, Logitech BRIO with two
+channels and the MacBook Pro Microphone): `msr record` for 3 minutes,
+our process's CPU from 30 s to 170 s by `ps`, the build of `main`
+(`0e179d4`) against this branch's, alternating:
+
+| Settings | `main` | this branch |
+|---|---|---|
+| Auto (two screens at Native, the system audio, three inputs) | 45.8 %, 41.0 % | 31.5 %, 32.4 % |
+| Video only (`--resolution native --audio-mode none --system-audio off`) | 11.3 % | 12.7 % |
+| Audio only (`--resolution none --audio-mode wired`) | – | 19.3 % |
+
+So about 11 percentage points of one core less with these four audio
+sources, a quarter of the process's CPU; video alone is unchanged
+within the runs' spread. `recording.json`'s `cpu` gave the same
+averages within 0.6 points.
+
+The colour space was left unchanged: with ScreenCaptureKit set to
+deliver BT.709 (`colorSpaceName` and `colorMatrix`), so VideoToolbox
+would not rebuild the colour space from the ICC profile, the decoded
+frames were not the same as before, and the step was to be taken only
+if they were (the owner, 2026-11-16; D24): recorded at the same time as
+the unchanged build, the frames' mean Y was about 6 levels (of 255)
+higher on both screens (108.1 against 114.5 on the LG, 114.8 against
+120.8 on the built-in display), where two unchanged builds recording
+together differed by under 0.05.
 
 Details the design left open, as built and confirmed by the owner
 (D25, D28, D44): a key missing from the settings file takes its default;

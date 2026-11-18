@@ -1799,3 +1799,38 @@ architect's reading.
 - **Evidence:** `.github/ISSUE_TEMPLATE/crash-report.yml`,
   [design/delivery.md](design/delivery.md), `CrashReportTests`,
   `VersionScriptTests`, `InstallAppScriptTests`.
+
+## D62: Audio only: the recording resolution None records no screen (2026-11-18)
+
+- **Status:** in force.
+- **Context:** The owner, 2026-11-16: "video resolution needs a none
+  mode to disable screen recording and record audio only. cost nothing
+  and adds use cases and I accept the potential misnomer, application
+  name stays for now"; on the details: "yes to the audio only PR
+  details". On 2026-11-18 the owner put it in one PR with the first
+  step of the CPU work.
+- **Decision:**
+  1. A recording resolution None (`none`), in the window's slider and
+     as `--resolution none`, records no screen: no screen file, so no
+     guide track. Auto mode stays Native.
+  2. The ready check asks for the Screen & System Audio Recording
+     permission when a screen or the system audio is recorded; the
+     microphone alone does not need it.
+  3. A recording with neither screens nor audio refuses to start: the
+     ready check fails.
+  4. The app's name stays.
+- **Details as built, for the owner to confirm:** None is the first step
+  of the resolution slider, left of 720p; "What will be recorded" lists
+  the screens as sources not recorded (dimmed, no number, `-` in
+  Records at and GB/h max) and the settings line says `resolution None
+  (no screen is recorded)`; at None the ready check has no screens item
+  and its free disk space counts no screen file; "nothing to record"
+  is judged by what would be recorded now, so the audio mode Default
+  microphone without a microphone and without the system audio also
+  fails it.
+- **Consequences:** "None" names a step of both sliders, the recording
+  resolution's and the audio mode's, so the docs say which one. A new
+  app name is deferred (`backlog.md`).
+- **Evidence:** [design/recorder.md](design/recorder.md), "Audio only",
+  "Ready check" and "Build state"; `ReadyCheckTests`,
+  `ScreenTrackerTests`, `WhatWillBeRecordedTests`.

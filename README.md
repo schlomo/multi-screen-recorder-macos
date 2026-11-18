@@ -24,7 +24,8 @@ own clock is resampled continuously to stay with the screen files
   the laptop's lid, or switching mirroring does not stop the recording.
 - **Every audio source in its own file.** No audio, the default
   microphone, the wired or all audio inputs, plus the system audio if
-  you want it; each channel its own track.
+  you want it; each channel its own track. Or audio only: the
+  recording resolution None records no screen.
 - **In sync after hours.** The drift of each audio source's own clock
   is corrected, so audio and screen tracks are still in sync after
   hours.
@@ -38,8 +39,9 @@ own clock is resampled continuously to stay with the screen files
     `Screen 1 - DELL P3421W` or `Audio 2 - Razer Seiren V3 Mini`.
   - A constant 30 frames per second and a fixed frame size per file,
     at a recording resolution you choose (Native, 4K, 1440p, 1200p,
-    1080p or 720p), only ever scaled down. Native is the size macOS
-    shows as "looks like" for the screen, not the size it is drawn at.
+    1080p or 720p, or None for audio only), only ever scaled down.
+    Native is the size macOS shows as "looks like" for the screen, not
+    the size it is drawn at.
   - Two guide tracks in every screen file, the audio inputs and the
     system audio, for playback and for syncing by waveform with a
     separate recording.
@@ -71,7 +73,8 @@ A Mac with Apple silicon (M1 or later) and macOS 26 or later.
    scroll to "Multi Screen Recorder was blocked", click **Open Anyway**
    and confirm.
 4. Grant the two permissions when macOS asks: **Screen & System Audio
-   Recording** (for the screens and the system audio) and
+   Recording** (for the screens and the system audio; not asked for
+   audio only without the system audio) and
    **Microphone** (asked only when a microphone is recorded: not on a
    Mac without an audio input, nor with the audio mode None). Both are in
    System Settings › Privacy & Security.
@@ -85,8 +88,9 @@ confirmed yet.
 
 ### Known limits
 
-- **CPU:** recording takes about half of one CPU core over an hour,
-  with two screens and five audio sources.
+- **CPU:** recording takes about a third of one CPU core, with two
+  screens, the system audio and three microphones (measured over
+  3 minutes on the owner's Mac, 2026-11-18).
 - **Clock drift:** some USB audio devices drift against the video, by
   up to about 0.4 s per hour. The recorder corrects it by resampling
   their sound. In a one-hour recording on the owner's Mac, two
@@ -153,17 +157,20 @@ share.
 Start the app from Finder: its window shows the app's icon, version
 and homepage, then what will be recorded (one
 table: the screens, with what each looks like, the size it is drawn at
-and the size it records at, then the audio sources, the system audio
+and the size it records at (dimmed and not numbered at the recording
+resolution None, which records no screen), then the audio sources, the system audio
 first and the inputs by number, then the ones not recorded, dimmed and
 with their reason (such as "(virtual)"); each row with the most disk space it can write
 per hour, "GB/h max", usually more than it writes; the total as the
 last row; below it the space the required hours need and the free
 space; the output folder, a link that opens it in Finder), then the switch "Auto" (on, the two sliders are grayed out and show Native and Wired; off,
-they are enabled and show the recording resolution and the audio mode: None, Default
+they are enabled and show the recording resolution (None, which records
+audio only, then 720p up to Native) and the audio mode: None, Default
 microphone, Wired or All, with a note under it on Bluetooth and virtual
 microphones), system audio, the output folder and the ready check:
 "Ready to record" when every item passes, otherwise each item with a
-fix for each failing one. Every change is saved at once; the ready check runs again after each change,
+fix for each failing one; a recording that would record neither a
+screen nor any audio does not pass. Every change is saved at once; the ready check runs again after each change,
 when you come back to the app, when a screen is plugged in, removed
 or changed, when an audio device is plugged in or removed, when the
 default audio input changes, and on "Check again". Cancel, in the
@@ -207,7 +214,7 @@ so it shows the app's version and runs with its signature.
 Without flags a command uses the settings as they are. Each flag changes
 a setting for this run only: `--auto` (no value: auto mode, whatever the
 settings say), `--resolution` (`native`, `4k`, `1440p`, `1200p`, `1080p`,
-`720p`), `--audio-mode` (`none`, `default-microphone`, `wired`,
+`720p`, `none` for audio only), `--audio-mode` (`none`, `default-microphone`, `wired`,
 `all-inputs`), `--system-audio` (`on`, `off`), `--output-folder`,
 `--required-recording-hours`, `--low-disk-warning-minutes`.
 `--resolution` and `--audio-mode` turn auto mode off for the run; `--auto`
@@ -222,6 +229,7 @@ apply for it.
 ```sh
 msr check --audio-mode none --required-recording-hours 4
 msr record --resolution 1080p --duration 45m
+msr record --resolution none     # audio only: no screen is recorded
 msr settings                     # shows the settings
 msr settings --resolution 1440p  # saves it, and turns auto mode off
 msr settings --auto              # saves auto mode
@@ -230,7 +238,9 @@ msr settings --auto              # saves auto mode
 Started from a terminal, macOS attributes the two permissions to the
 terminal app (Terminal, iTerm and so on), not to Multi Screen Recorder:
 grant them to the terminal app for `msr check` to pass and `msr record`
-to record there.
+to record there. Audio only without the system audio
+(`--resolution none --system-audio off`) needs only the Microphone
+permission.
 
 ## Developer setup
 
