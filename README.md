@@ -90,8 +90,7 @@ confirmed yet.
 
 - **CPU:** recording takes about a third of one CPU core, with two
   screens, the system audio and three microphones (steady use from
-  30 s on, over 3 minutes on the owner's Mac, 2026-11-18; the first
-  seconds peak at two to three cores).
+  30 s on, over 3 minutes on the owner's Mac, 2026-11-18).
 - **Clock drift:** some USB audio devices drift against the video, by
   up to about 0.4 s per hour. The recorder corrects it by resampling
   their sound. In a one-hour recording on the owner's Mac, two
