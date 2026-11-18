@@ -11,12 +11,15 @@ architect triages what comes back into this backlog. PR #19 (the
 clock drift correction, the status line and the command line polish)
 merged 2026-11-17 as release `v0.20261117.51`; PR #20 (the homepage
 collage, dark mode, `scripts/install-app`) merged the same evening as
-release `v0.20261117.52`. First: item 17, the local-first rule, in its
-own PR. Next: item 1a, audio only. Then: item 3, the end-to-end tests;
-item 4, the simplification; item 7, auto-recovery from disturbances;
-item 6, CPU; then item 16, the Mac App Store and Homebrew
-(the owner, 2026-11-16: "sandbox then comes after the
-optimizations"). Agents may run `msr record` on the owner's Mac (D48;
+release `v0.20261117.52`. The order, agreed with the owner on
+2026-11-18, one PR each: item 17, the local-first rule (signed off);
+item 1a, audio only, together with item 6's first step (both signed
+off); item 21, audio level meters; item 3, the end-to-end tests; item
+4, the simplification; item 7, auto-recovery from disturbances; item
+12, cameras; item 22, the lip sync calibration; the rest of item 6;
+then item 16, the Mac App Store and Homebrew (the owner, 2026-11-16:
+"sandbox then comes after the optimizations"). Items 21, 12 and 22
+each need a design signed off before building. Agents may run `msr record` on the owner's Mac (D48;
 the owner's go-ahead in the session, 2026-11-16), and BetterDisplay's
 command line with the owner's virtual screen "Virtual 16:9"; by
 D56, before an agent starts a recording or plays a sound on the owner's Mac, the session running or briefing that test tells the owner, once before the test's first run.
@@ -41,7 +44,9 @@ Nothing.
    the ready check still needs the Screen & System Audio Recording
    permission for system audio, and the microphone alone does not; no
    screen file means no guide tracks; a recording with neither
-   screens nor audio refuses to start.
+   screens nor audio refuses to start. Ships in one PR with item 6's
+   first step (the owner, 2026-11-18), so CPU is measured before
+   meters and cameras add load.
 2. **Toolchain catch-up** (D28): the pipeline builds with Xcode 26.6,
    Swift 6.3 and Python 3.15, the newest on GitHub's generally
    available runner image (D32 for Python), while the owner's Mac has
@@ -323,9 +328,17 @@ Nothing.
    event per episode. Design first.
 12. **Cameras** (the owner, 2026-11-16: "we'll have to add a feature to
    record cameras, same slider: none, default, all, all + virtual. Auto
-   defaults to default camera if available"). A camera's file carries
+   defaults to default camera if available"; 2026-11-18: keep "all +
+   virtual"). A camera's file carries
    audio too ("Later for webcam we'll have more combined files as we of
    course want have audio there as well", 2026-11-16). Design first.
+   Each camera records its largest format that still delivers the
+   wanted frame rate (the owner, 2026-11-18); the architect proposes
+   that the recording resolution caps cameras as it caps screens (a
+   4K camera often delivers MJPEG, a decode on top of the encode).
+   Open for the design: which audio a camera's file carries (its own
+   microphone or the default one). Camera capture is out of scope in
+   D1, so this needs a decisions entry that supersedes that line.
 13. **Presentation: the window and the terminal output** (the owner,
    2026-11-16: "if running in a terminal (try) then show the running
    status as persistent last line, recording time, CPU, recording size
@@ -422,8 +435,10 @@ Nothing.
    reviewers read the local commits; the branch is pushed once, on the
    commit about to be marked ready; the owner's open questions are
    settled and recorded before that push; a run GitHub cancels for
-   want of a runner is re-run, never answered by a push. A principle
-   change: its own PR with a decisions entry.
+   want of a runner is re-run, never answered by a push. Signed off by
+   the owner as written (2026-11-18). A principle change: its own PR
+   with a decisions entry. The rule only; the re-run mechanism is
+   item 20.
 18. **Dark mode in the app** (the owner, 2026-11-17: "Can we easily
    support dark mode in the app itself? Then that would be nice
    indeed"). The app sets no appearance and defines no colour of its
@@ -455,6 +470,35 @@ Nothing.
    branch `troubleshooting-ci-runner` holds two troubleshooting entries
    (no macOS runner; a crash dialog for crash reports the tests wrote):
    they ship with this item, or earlier with item 17's PR.
+21. **Audio level meters, with an input gain slider** (the owner,
+   2026-11-18, as the first step towards AGC, item 8): each audio
+   input's level shown live in the status window, and a slider that
+   sets the input's gain. Meters also make an input that delivers only
+   zeros visible (item 11). The slider sets the device's own input
+   volume in Core Audio, because gain added after capture cannot undo
+   clipping; that changes the volume for every app on the Mac, and
+   devices without that control show the slider disabled [ASSUMED:
+   some USB interfaces and HDMI inputs have none]. Every gain change
+   is written to `recording.json`; AGC later moves the same control
+   (the owner's "turning up input volume till before it clips", D34).
+   Levels come from the 100 ms batches of item 6's first step. Design
+   first.
+22. **Lip sync calibration** (the owner, 2026-11-18: measured AV
+   offsets between cameras and microphones; fixing them by hand in
+   Resolve is "super tedious", so worth automating): a support tool
+   shows a signal on the laptop's built-in screen and plays a sound on
+   its built-in speakers; the person points each camera at the screen;
+   the tool measures every camera's and microphone's offset and the
+   recorder corrects for it, for lip sync across all cameras and
+   microphones. The built-in screen and speakers are the source (the
+   owner), because their own delays are small and known; Bluetooth or
+   external ones would add their delay to the measurement. Known for
+   the design: lip sync is noticed beyond about +45 ms audio early and
+   −125 ms audio late (ITU-R BT.1359); audio shifts by the sample,
+   video at 30 fps only by 33 ms frames (D11), so the correction moves
+   audio; a webcam's delay may change with its exposure in low light
+   [CONJECTURE], so the design says when a stored offset is measured
+   again. Needs item 12. Design first.
 
 ## Deliberately deferred
 
