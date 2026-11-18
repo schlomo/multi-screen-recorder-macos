@@ -387,18 +387,44 @@ import Testing
         return settings
     }
 
-    /// The system audio still needs the Screen & System Audio Recording permission; no screen is checked.
-    @Test func atTheResolutionNoneTheSystemAudioNeedsTheScreenPermissionAndNoScreenIsChecked() {
-        let result = ReadyCheck.evaluate(facts(screens: .success([])), settings: audioOnly())
+    /// The system audio still needs the Screen & System Audio Recording permission and a main screen to
+    /// capture through (the owner, 2026-11-18); no screen is recorded.
+    @Test func atTheResolutionNoneTheSystemAudioNeedsTheScreenPermissionAndAMainScreen() {
+        let result = ReadyCheck.evaluate(facts(), settings: audioOnly())
         #expect(result.items.map(\.title) == [
             "Screen & System Audio Recording permission",
             "Microphone permission",
+            "Screens: 2, none recorded (the system audio needs the main screen)",
             "Audio: system audio, MacBook Pro Microphone (default)",
             "Output folder: ~/Movies/Multi Screen Recorder",
             "Free disk space: 100.0 GB in ~/Movies/Multi Screen Recorder, 0.3 GB needed for 2 hours",
         ])
         #expect(result.isReady)
         #expect(!ReadyCheck.evaluate(facts(screenRecording: .notGranted), settings: audioOnly()).isReady)
+    }
+
+    /// Without a main screen, or with screens that cannot be read, the system audio cannot be recorded:
+    /// one red item with its fix, also when the system audio is the only source.
+    @Test(arguments: [true, false])
+    func atTheResolutionNoneTheSystemAudioWithoutAMainScreenIsNotReady(withMicrophone: Bool) {
+        let settings = audioOnly { if !withMicrophone { $0.audioMode = .none } }
+        let microphone: Bool? = withMicrophone ? true : nil
+        let notMain = ScreenInfo(name: "One", pixelSize: FrameSize(width: 1920, height: 1080),
+                                 pointSize: FrameSize(width: 1920, height: 1080), isMain: false, originX: 0, originY: 0)
+        let fix = "connect a screen, or turn off the system audio (--system-audio off)"
+        for (screens, item) in [
+            (Result<[ScreenInfo], DeviceReadError>.success([]),
+             ReadyCheckItem(title: "Screens: 0, none recorded (the system audio needs the main screen)", passed: false, fix: fix)),
+            (.success([notMain]),
+             ReadyCheckItem(title: "Screens: 1, none recorded (the system audio needs the main screen)", passed: false, fix: fix)),
+            (.failure(DeviceReadError("no list")),
+             ReadyCheckItem(title: "Screens: cannot be read (no list), none recorded (the system audio needs the main screen)",
+                            passed: false, fix: "reconnect the screens, then check again, or turn off the system audio (--system-audio off)")),
+        ] {
+            let result = ReadyCheck.evaluate(facts(microphoneGranted: microphone, screens: screens), settings: settings)
+            #expect(!result.isReady)
+            #expect(result.items.filter { !$0.passed } == [item])
+        }
     }
 
     /// The microphone alone needs no Screen & System Audio Recording permission, which is then not asked.
@@ -415,10 +441,16 @@ import Testing
         #expect(ReadyCheck.needsScreenRecording(withoutAudio))
     }
 
-    @Test func atTheResolutionNoneUnreadableScreensNeitherFailNorHideTheFreeSpace() {
-        let result = ReadyCheck.evaluate(facts(screens: .failure(DeviceReadError("no list"))), settings: audioOnly())
-        #expect(result.isReady)
-        #expect(result.items.contains { $0.title.hasPrefix("Free disk space:") })
+    /// The microphone alone does not depend on the screens: screens that cannot be read, or none, fail
+    /// nothing and leave the free disk space in.
+    @Test func atTheResolutionNoneWithoutTheSystemAudioNoScreenIsChecked() {
+        let settings = audioOnly { $0.systemAudio = false }
+        for screens in [Result<[ScreenInfo], DeviceReadError>.failure(DeviceReadError("no list")), .success([])] {
+            let result = ReadyCheck.evaluate(facts(screenRecording: nil, screens: screens), settings: settings)
+            #expect(result.isReady)
+            #expect(!result.items.contains { $0.title.hasPrefix("Screens") })
+            #expect(result.items.contains { $0.title.hasPrefix("Free disk space:") })
+        }
     }
 
     /// A recording with neither screens nor audio refuses to start (the owner, 2026-11-16).

@@ -31,7 +31,8 @@ public enum RecordingResolution: String, CaseIterable, Sendable, Encodable {
     case p1200 = "1200p"
     case p1080 = "1080p"
     case p720 = "720p"
-    /// Audio only: no screen is recorded.
+    /// Audio only: no screen is recorded. Compared with an optional, write
+    /// `RecordingResolution.none`: a bare `.none` there means `Optional.none`.
     case none
 
     /// Every resolution from None and the smallest box to the largest,

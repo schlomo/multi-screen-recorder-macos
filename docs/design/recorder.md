@@ -228,9 +228,13 @@ out and the permission is neither asked nor proven, D62), the
 Microphone permission (only when the recording records at least one
 audio input: with no audio input present, or none recorded under the
 audio mode, the item is left out and the permission is neither asked nor
-read), the screens (at least one, each readable; left out at the
-recording resolution None, where screens that cannot be read fail
-nothing and the free disk space counts no screen file), the chosen audio
+read), the screens (at least one, each readable; at the recording
+resolution None, where the free disk space counts no screen file, only
+with the system audio, which is captured through the main screen:
+`Screens: 2, none recorded (the system audio needs the main screen)`,
+failing without a main screen or when the screens cannot be read, with
+the fix to connect a screen or turn off the system audio; without the
+system audio no screens item, and the screens fail nothing, D62), the chosen audio
 sources, listed from the same model and in the same order as the table of what will be recorded (each audio input the audio mode records readable; another that
 cannot be read does not count; with an audio mode but `none` the item
 says "no microphone recorded" when no input is recorded, such as on a
@@ -798,8 +802,10 @@ task, signal source or screen change would reach the recorder.
 
 **Audio only (D62).** At the recording resolution None the screen
 tracker follows no screen: no stream, no screen file, no screen event
-and no screen row in the status window; the screens are still read, as
-the system audio's stream follows the main screen. Everything else runs
+and no screen row in the status window. With the system audio the
+screens are still read, as its stream follows the main screen; without
+it the recorder neither reads the screens nor follows their changes, so
+a microphone recording never fails for a screen. Everything else runs
 as with screens: the audio files, `recording.json` (its settings say
 `"resolution": "none"`), sleep and wake.
 

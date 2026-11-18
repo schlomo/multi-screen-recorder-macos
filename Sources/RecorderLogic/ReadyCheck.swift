@@ -114,8 +114,9 @@ public enum ReadyCheck {
         fix: "choose another recording resolution (--resolution), turn on the system audio (--system-audio on) "
             + "or record a connected microphone (--audio-mode)")
 
-    /// One item per cause: the screen permission only when it is needed,
-    /// the screens only when they are recorded, a free disk space item only
+    /// One item per cause: the screen permission and the screens only when
+    /// they are needed (at the recording resolution None only for the system
+    /// audio, which needs a main screen), a free disk space item only
     /// when the screens and the audio inputs a recording records could be
     /// read and the output folder is usable. A recording that would record
     /// nothing is not ready.
@@ -128,7 +129,11 @@ public enum ReadyCheck {
             items.append(microphoneItem(granted: facts.microphoneGranted ?? false))
         }
         let recordsScreens = settings.effectiveResolution.recordsScreens
-        if recordsScreens { items.append(screensItem(facts.screens)) }
+        if recordsScreens {
+            items.append(screensItem(facts.screens))
+        } else if needsScreenRecording(settings) {
+            items.append(systemAudioScreensItem(facts.screens))
+        }
         items.append(audioItem(facts.audioInputs, settings: settings))
         if !recordsScreens, !settings.systemAudio,
            case .success(let inputs) = audioInputsToJudge(facts.audioInputs, settings: settings),
@@ -171,6 +176,21 @@ public enum ReadyCheck {
         case .failure(let error):
             ReadyCheckItem(title: "Screens: cannot be read (\(error))", passed: false,
                            fix: "reconnect the screens, then check again")
+        }
+    }
+
+    /// At the recording resolution None with the system audio: no screen is
+    /// recorded, but the system audio is captured through the main screen.
+    private static func systemAudioScreensItem(_ screens: Result<[ScreenInfo], DeviceReadError>) -> ReadyCheckItem {
+        let need = ", none recorded (the system audio needs the main screen)"
+        let turnOff = "turn off the system audio (--system-audio off)"
+        return switch screens {
+        case .success(let screens):
+            ReadyCheckItem(title: "Screens: \(screens.count)\(need)", passed: screens.contains(where: \.isMain),
+                           fix: "connect a screen, or \(turnOff)")
+        case .failure(let error):
+            ReadyCheckItem(title: "Screens: cannot be read (\(error))\(need)", passed: false,
+                           fix: "reconnect the screens, then check again, or \(turnOff)")
         }
     }
 

@@ -279,8 +279,8 @@ after its name (`(virtual)`, `(no device ID)`; D59, D62).
 ## Ready check
 
 The check before Start: the permissions the recording needs, the
-screens (at least one, each readable; not at the recording resolution
-None), the chosen audio sources, that something is recorded at all,
+screens (at least one, each readable; at the recording resolution None
+only with the system audio, which needs a main screen), the chosen audio sources, that something is recorded at all,
 the output folder (created if missing, and written to), and free disk
 space there for the required recording hours (D14, D28, D62).
 

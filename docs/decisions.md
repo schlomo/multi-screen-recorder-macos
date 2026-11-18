@@ -1808,7 +1808,9 @@ architect's reading.
   and adds use cases and I accept the potential misnomer, application
   name stays for now"; on the details: "yes to the audio only PR
   details". On 2026-11-18 the owner put it in one PR with the first
-  step of the CPU work.
+  step of the CPU work, and after the review of the PR confirmed the
+  details below ("5 details OK") and the screens with the system audio
+  ("recomendation for none and system audio edge case is OK").
 - **Decision:**
   1. A recording resolution None (`none`), in the window's slider and
      as `--resolution none`, records no screen: no screen file, so no
@@ -1819,15 +1821,28 @@ architect's reading.
   3. A recording with neither screens nor audio refuses to start: the
      ready check fails.
   4. The app's name stays.
-- **Details as built, for the owner to confirm:** None is the first step
-  of the resolution slider, left of 720p; "What will be recorded" lists
-  the screens as sources not recorded (dimmed, no number, `-` in
-  Records at and GB/h max) and the settings line says `resolution None
-  (no screen is recorded)`; at None the ready check has no screens item
-  and its free disk space counts no screen file; "nothing to record"
-  is judged by what would be recorded now, so the audio mode Default
-  microphone without a microphone and without the system audio also
-  fails it.
+  5. The system audio is captured through the main screen, so at None
+     with the system audio the ready check needs readable screens with
+     a main screen and fails otherwise, with a fix; without the system
+     audio the recorder neither reads nor depends on the screens, and
+     the ready check has no screens item.
+- **Details, confirmed by the owner (2026-11-18: "5 details OK"):**
+  1. None is the first step of the resolution slider, left of 720p.
+  2. "What will be recorded" lists the screens as sources not recorded
+     (dimmed, no number, `-` in Records at and GB/h max).
+  3. At None the ready check has no screens item, the screens fail
+     nothing and the free disk space counts no screen file; with the
+     system audio, point 5 of the decision applies.
+  4. "Nothing to record" is judged by what would be recorded now, so
+     the audio mode Default microphone without a microphone and without
+     the system audio also fails it.
+  5. The wording of that item and of the settings line (`resolution
+     None (no screen is recorded)`), and that a source not recorded
+     keeps the number's width blank in the window, screens included.
+- **Deferred:** not writing an input that delivers only zeros (backlog
+  item 6's first step, item 11) needs a design first and goes with the
+  audio level meters (item 21); the owner, 2026-11-18: "OK to defer the
+  audio zeros to the meters feature, good idea".
 - **Consequences:** "None" names a step of both sliders, the recording
   resolution's and the audio mode's, so the docs say which one. A new
   app name is deferred (`backlog.md`).
