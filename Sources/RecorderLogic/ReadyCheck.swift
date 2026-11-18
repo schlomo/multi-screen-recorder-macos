@@ -107,9 +107,9 @@ public enum ReadyCheck {
     }
 
     /// The item of a recording that would record nothing: no screen at the
-    /// resolution None, no system audio and no audio input.
+    /// recording resolution None, no system audio and no audio input.
     static let nothingToRecordItem = ReadyCheckItem(
-        title: "Nothing to record: the resolution None records no screen, and no audio source is recorded",
+        title: "Nothing to record: the recording resolution None records no screen, and no audio source is recorded",
         passed: false,
         fix: "choose another recording resolution (--resolution), turn on the system audio (--system-audio on) "
             + "or record a connected microphone (--audio-mode)")

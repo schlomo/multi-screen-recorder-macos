@@ -109,7 +109,7 @@ public func audioInputsToJudge(
 }
 
 /// The screens a recording with these settings is judged by: at the
-/// resolution None an empty list, whether or not the screens can be read,
+/// recording resolution None an empty list, whether or not the screens can be read,
 /// as none of them is recorded; otherwise `screens` as they are.
 public func screensToJudge<Failure: Error>(
     _ screens: Result<[ScreenInfo], Failure>, settings: Settings

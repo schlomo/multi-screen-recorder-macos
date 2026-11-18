@@ -286,7 +286,7 @@ import Testing
             == ScreenTracker.Step())
     }
 
-    /// Audio only: at the resolution None no screen gets a stream, a number,
+    /// Audio only: at the recording resolution None no screen gets a stream, a number,
     /// an event or a row, whatever the screens do; sleep and wake are still told.
     @Test func atTheResolutionNoneNoScreenIsRecordedOrTold() {
         var screens = tracker(.none)

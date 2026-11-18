@@ -5,7 +5,7 @@ import Foundation
 /// manifest (recorder.md, "Screens coming and going", "Frame size",
 /// "Screen check"). It holds no stream and no file: the recorder carries
 /// out its actions and reports back what happened. Times are nanoseconds
-/// from t0 on the shared clock. At the resolution None it follows no
+/// from t0 on the shared clock. At the recording resolution None it follows no
 /// screen: audio only.
 public struct ScreenTracker: Sendable {
     /// Why a screen file ends.
@@ -319,7 +319,7 @@ public struct ScreenTracker: Sendable {
 
     // MARK: -
 
-    /// The screens the tracker follows: none at the resolution None.
+    /// The screens the tracker follows: none at the recording resolution None.
     private func followed(_ connected: [ConnectedScreen]) -> [ConnectedScreen] {
         resolution.recordsScreens ? connected : []
     }

@@ -448,7 +448,7 @@ import Testing
         #expect(broken.total == section({ $0.audioMode = .none }).total)
     }
 
-    // Audio only: the resolution None.
+    // Audio only: the recording resolution None.
 
     private var audioOnly: WhatWillBeRecorded { section { $0.resolution = .none } }
 

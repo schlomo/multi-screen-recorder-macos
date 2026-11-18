@@ -378,7 +378,7 @@ import Testing
             == .failure(DeviceReadError("no list")))
     }
 
-    // Audio only: the resolution None.
+    // Audio only: the recording resolution None.
 
     private func audioOnly(_ edit: (inout Settings) -> Void = { _ in }) -> Settings {
         var settings = Settings.manual
@@ -431,7 +431,7 @@ import Testing
         let result = ReadyCheck.evaluate(facts(microphoneGranted: nil, audioInputs: []), settings: settings)
         #expect(!result.isReady)
         #expect(result.items.filter { !$0.passed } == [ReadyCheck.nothingToRecordItem])
-        #expect(result.text.contains("FAIL  Nothing to record: the resolution None records no screen, and no audio source is recorded\n"))
+        #expect(result.text.contains("FAIL  Nothing to record: the recording resolution None records no screen, and no audio source is recorded\n"))
     }
 
     @Test func aRecordingWithAudioAloneOrScreensAloneHasSomethingToRecord() {

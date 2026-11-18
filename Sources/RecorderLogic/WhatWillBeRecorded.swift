@@ -1,7 +1,7 @@
 /// The window's section "What will be recorded", from the settings, the
 /// devices connected now and the free space in the output folder, as data
 /// the view renders: one table, the screen rows (not recorded at the
-/// resolution None) then the audio rows (the system audio (0) first when
+/// recording resolution None) then the audio rows (the system audio (0) first when
 /// it is on, the recorded inputs by number, then the sources not
 /// recorded, the system audio among them when it is off) and the total
 /// row, and a line of what the required recording hours need, under a
@@ -17,7 +17,7 @@ public struct WhatWillBeRecorded: Equatable, Sendable {
     static let cannotBeRead = "cannot be read"
 
     public struct Screen: Equatable, Sendable {
-        /// Nil for a screen not recorded: at the resolution None.
+        /// Nil for a screen not recorded: at the recording resolution None.
         public var number: Int?
         public var name: String
         public var looksLike: String
@@ -137,7 +137,7 @@ public struct WhatWillBeRecorded: Equatable, Sendable {
 
     /// "Settings: Auto (resolution Native, audio mode Wired), system audio on"; with auto mode off
     /// "Settings: resolution 1080p, audio mode Default microphone (only the default microphone is recorded), system audio off".
-    /// At the resolution None it says that no screen is recorded, under the audio modes None and Default
+    /// At the recording resolution None it says that no screen is recorded, under the audio modes None and Default
     /// microphone why the inputs are not recorded.
     static func settingsLine(_ settings: Settings) -> String {
         let resolution = settings.effectiveResolution
@@ -179,7 +179,7 @@ public struct WhatWillBeRecorded: Equatable, Sendable {
         }
     }
 
-    /// At the resolution None a screen not recorded: no number, `-` for Records at and GB/h max.
+    /// At the recording resolution None a screen not recorded: no number, `-` for Records at and GB/h max.
     private static func screen(_ numbered: NumberedScreen, settings: Settings) -> Screen {
         let screen = numbered.screen
         guard settings.effectiveResolution.recordsScreens else {

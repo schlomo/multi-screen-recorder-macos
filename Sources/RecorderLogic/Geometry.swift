@@ -79,7 +79,7 @@ public enum RecordingResolution: String, CaseIterable, Sendable, Encodable {
     /// number. The size the screen is drawn at is never recorded. None has
     /// no frame size: asking for it is a bug.
     public func frameSize(forLooksLike looksLike: FrameSize) -> FrameSize {
-        precondition(recordsScreens, "the resolution None records no screen, so it has no frame size")
+        precondition(recordsScreens, "the recording resolution None records no screen, so it has no frame size")
         let fitted = box.map { fit(looksLike, into: looksLike.isPortrait ? $0.rotated : $0) } ?? looksLike
         return FrameSize(width: roundedDownToEven(fitted.width), height: roundedDownToEven(fitted.height))
     }

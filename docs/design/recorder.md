@@ -241,7 +241,7 @@ usual, and the item then reads `Audio: system audio, no microphone
 recorded`, or `Audio: no microphone recorded, no system audio` with system
 audio off; an input that is recorded and whose channels cannot be read
 fails it), at the recording resolution None with no system audio and no
-audio input recorded the item `Nothing to record: the resolution None
+audio input recorded the item `Nothing to record: the recording resolution None
 records no screen, and no audio source is recorded`, which fails (a
 recording with neither screens nor audio refuses to start, D62), the
 output folder, and free disk space in the output folder for

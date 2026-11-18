@@ -64,7 +64,7 @@ public enum GuideTrack: Hashable, Sendable {
 
     /// The guide tracks a screen file has follow from the settings alone: a
     /// source that is missing is silence in its guide track. Without screen
-    /// files (the resolution None) there are none.
+    /// files (the recording resolution None) there are none.
     public static func tracks(for settings: Settings) -> [GuideTrack] {
         guard settings.effectiveResolution.recordsScreens else { return [] }
         return (settings.effectiveAudioMode == .none ? [] : [.audioInputs]) + (settings.systemAudio ? [.systemAudio] : [])
