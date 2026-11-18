@@ -86,16 +86,18 @@ so rather than silently picking a side.
   up follows the repo's merge method, recorded in `AGENTS.md`. What decides
   it is whether the trunk must stay linear without squashing:
   - **Squash merges** (the default): bring the trunk in with a
-    plain `git merge` and push that like any other round. Before the
-    one pipeline run the merge is a round and carries the skip-ci
-    marker: `git merge -m "Merge origin/<trunk> [skip ci]"
-    origin/<trunk>`. After the run it is unmarked like any other
-    commit, and the pipeline re-runs on the merged result: a marked
-    head commit at close time skips the run that removes the PR's
-    snapshot release, and its check stays pending (the architect's
-    reading, D61). Fetch right before it (`git fetch origin`, then
-    `git merge origin/<trunk>`), and before pushing check that the
-    trunk is an ancestor of the branch with
+    plain `git merge` and push that like any other round. Fetch right
+    before it (`git fetch origin`). Before the one pipeline run the
+    merge is a round and carries the skip-ci marker:
+    `git merge -m "Merge origin/<trunk> [skip ci]" origin/<trunk>`.
+    After the run it is unmarked like any other commit
+    (`git merge origin/<trunk>`), and the pipeline re-runs on the
+    merged result: a marked head commit at close time skips the run
+    that removes the PR's snapshot release, and its check stays
+    pending. A PR closed without merging whose head commit carries the
+    skip-ci marker gets an unmarked empty commit first, so its snapshot
+    release is removed (the architect's reading, D61). Before pushing,
+    check that the trunk is an ancestor of the branch with
     `git merge-base --is-ancestor origin/<trunk> HEAD`, and stop and
     ask if it fails: a merge against a stale trunk ref is a silent
     no-op. Once the branch is pushed, don't rebase it, and don't

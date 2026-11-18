@@ -34,7 +34,9 @@ Keep this current when any of it changes.
   PR without the skip-ci marker the PR's snapshot release (a pre-release tagged `pr-<n>`), for a
   push to `main` that changes more than Markdown files and the homepage
   (`homepage/`) a release `v0.<DATE>.<N>`, so a homepage-only push makes
-  no release; a closed PR's snapshot release is removed. PRs from
+  no release; a closed PR's snapshot release is removed (a head commit
+  with the skip-ci marker first needs an unmarked empty commit, see
+  "Work branches"). PRs from
   forks and Dependabot are tested, built and smoke-tested, never signed
   or published. Signing needs the repository secret
   `SIGNING_CERTIFICATE_P12` ([delivery.md](docs/design/delivery.md)).
