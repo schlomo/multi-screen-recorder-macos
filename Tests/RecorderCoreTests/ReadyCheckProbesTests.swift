@@ -129,4 +129,19 @@ import Testing
         #expect(calls.names.contains { $0.hasPrefix("outputFolder") })
         #expect(calls.namesOnTheMainThread == ["screens"])
     }
+
+    /// Audio only with the microphone alone: the Screen & System Audio Recording permission is neither asked nor proven, so no prompt.
+    @Test func theScreenPermissionIsNotAskedWhenNeitherScreensNorSystemAudioAreRecorded() async {
+        var settings = Settings.defaults
+        settings.auto = false
+        settings.resolution = .none
+        settings.systemAudio = false
+        let calls = Calls()
+        let facts = await probeReadyCheckFacts(proof: .captureOneFrame, settings: settings, homeFolder: home, probes: probes(calls))
+        #expect(facts.screenRecording == nil)
+        #expect(!calls.names.contains { $0.hasPrefix("screenRecording") })
+        settings.systemAudio = true
+        let withSystemAudio = await probeReadyCheckFacts(proof: .captureOneFrame, settings: settings, homeFolder: home, probes: probes(calls))
+        #expect(withSystemAudio.screenRecording == .granted)
+    }
 }

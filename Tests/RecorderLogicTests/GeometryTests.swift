@@ -12,7 +12,7 @@ import Testing
     }
 
     @Test func valuesAreTheDocumentedWords() {
-        #expect(RecordingResolution.allCases.map(\.rawValue) == ["native", "4k", "1440p", "1200p", "1080p", "720p"])
+        #expect(RecordingResolution.allCases.map(\.rawValue) == ["native", "4k", "1440p", "1200p", "1080p", "720p", "none"])
     }
 }
 
@@ -92,13 +92,20 @@ import Testing
         #expect(resolution.frameSize(forLooksLike: portrait) == expected)
     }
 
+    /// None records no screen: asking for its frame size is a bug, which stops the program.
+    @Test func noneHasNoFrameSize() async {
+        await #expect(processExitsWith: .failure) {
+            _ = RecordingResolution.none.frameSize(forLooksLike: FrameSize(width: 1920, height: 1080))
+        }
+    }
+
     @Test func aSquareScreenUsesTheLandscapeBox() {
         let square = FrameSize(width: 2000, height: 2000)
         #expect(RecordingResolution.p1080.frameSize(forLooksLike: square) == FrameSize(width: 1080, height: 1080))
     }
 
     @Test func keepsProportionsWithinRounding() {
-        for resolution in RecordingResolution.allCases {
+        for resolution in RecordingResolution.allCases where resolution.recordsScreens {
             let frame = resolution.frameSize(forLooksLike: builtIn)
             let screenRatio = Double(builtIn.width) / Double(builtIn.height)
             let frameRatio = Double(frame.width) / Double(frame.height)
@@ -136,7 +143,7 @@ import Testing
     }
 
     @Test func anUnchangedLooksLikeSizeContinuesTheFile() {
-        for resolution in RecordingResolution.allCases {
+        for resolution in RecordingResolution.allCases where resolution.recordsScreens {
             #expect(resolution.screenFileContinues(from: ultrawide, to: ultrawide))
         }
     }

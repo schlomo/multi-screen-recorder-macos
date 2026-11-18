@@ -22,7 +22,9 @@ public enum OutputFolderProbe: Equatable, Sendable {
 
 /// What the probes found on this Mac, for the ready check to judge.
 public struct ReadyCheckFacts: Sendable {
-    public var screenRecording: PermissionProbe
+    /// Nil when the recording records neither a screen nor the system
+    /// audio, so it was not asked (`ReadyCheck.needsScreenRecording`).
+    public var screenRecording: PermissionProbe?
     /// Whether the Microphone permission is granted; nil when the recording
     /// records no audio input, so it was not asked.
     public var microphoneGranted: Bool?
@@ -31,7 +33,7 @@ public struct ReadyCheckFacts: Sendable {
     public var outputFolder: OutputFolderProbe
 
     public init(
-        screenRecording: PermissionProbe,
+        screenRecording: PermissionProbe?,
         microphoneGranted: Bool?,
         screens: Result<[ScreenInfo], DeviceReadError>,
         audioInputs: Result<[AudioInputInfo], DeviceReadError>,
@@ -97,18 +99,45 @@ public enum ReadyCheck {
         return inputs.contains { AudioTracker.records($0, settings: settings) }
     }
 
-    /// One item per cause: a free disk space item appears only when the
-    /// screens and the audio inputs a recording records could be read and
-    /// the output folder is usable.
+    /// Whether a recording with these settings needs the Screen & System
+    /// Audio Recording permission: for the screens and for the system
+    /// audio. Audio only with no system audio, the microphone alone, does not.
+    public static func needsScreenRecording(_ settings: Settings) -> Bool {
+        settings.effectiveResolution.recordsScreens || settings.systemAudio
+    }
+
+    /// The item of a recording that would record nothing: no screen at the
+    /// resolution None, no system audio and no audio input.
+    static let nothingToRecordItem = ReadyCheckItem(
+        title: "Nothing to record: the resolution None records no screen, and no audio source is recorded",
+        passed: false,
+        fix: "choose another recording resolution (--resolution), turn on the system audio (--system-audio on) "
+            + "or record a connected microphone (--audio-mode)")
+
+    /// One item per cause: the screen permission only when it is needed,
+    /// the screens only when they are recorded, a free disk space item only
+    /// when the screens and the audio inputs a recording records could be
+    /// read and the output folder is usable. A recording that would record
+    /// nothing is not ready.
     public static func evaluate(_ facts: ReadyCheckFacts, settings: Settings) -> ReadyCheckResult {
-        var items = [screenRecordingItem(facts.screenRecording)]
+        var items: [ReadyCheckItem] = []
+        if needsScreenRecording(settings) {
+            items.append(screenRecordingItem(facts.screenRecording ?? .notGranted))
+        }
         if recordsAudioInput(facts.audioInputs, settings: settings) {
             items.append(microphoneItem(granted: facts.microphoneGranted ?? false))
         }
-        items.append(screensItem(facts.screens))
+        let recordsScreens = settings.effectiveResolution.recordsScreens
+        if recordsScreens { items.append(screensItem(facts.screens)) }
         items.append(audioItem(facts.audioInputs, settings: settings))
+        if !recordsScreens, !settings.systemAudio,
+           case .success(let inputs) = audioInputsToJudge(facts.audioInputs, settings: settings),
+           !inputs.contains(where: { AudioTracker.records($0, settings: settings) }) {
+            items.append(nothingToRecordItem)
+        }
         items.append(outputFolderItem(facts.outputFolder, settings: settings))
-        if case .success(let screens) = facts.screens, case .usable(let freeSpace) = facts.outputFolder,
+        if case .success(let screens) = screensToJudge(facts.screens, settings: settings),
+           case .usable(let freeSpace) = facts.outputFolder,
            case .success(let audioInputs) = audioInputsToJudge(facts.audioInputs, settings: settings),
            let bytesPerHour = DiskEstimate.bytesPerHour(settings: settings, screens: screens, audioInputs: audioInputs) {
             items.append(diskItem(freeSpace, bytesPerHour: bytesPerHour, settings: settings))

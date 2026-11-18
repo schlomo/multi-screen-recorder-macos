@@ -8,7 +8,7 @@ import Testing
     ]
 
     private func facts(
-        screenRecording: PermissionProbe = .granted,
+        screenRecording: PermissionProbe? = .granted,
         microphoneGranted: Bool? = true,
         screens: Result<[ScreenInfo], DeviceReadError>? = nil,
         audioInputs: [AudioInputInfo] = builtInMicrophoneOnly,
@@ -376,5 +376,70 @@ import Testing
             == .success(DesignExample.audioInputs))
         #expect(audioInputsToJudge(.failure(DeviceReadError("no list")), settings: settings)
             == .failure(DeviceReadError("no list")))
+    }
+
+    // Audio only: the resolution None.
+
+    private func audioOnly(_ edit: (inout Settings) -> Void = { _ in }) -> Settings {
+        var settings = Settings.manual
+        settings.resolution = .none
+        edit(&settings)
+        return settings
+    }
+
+    /// The system audio still needs the Screen & System Audio Recording permission; no screen is checked.
+    @Test func atTheResolutionNoneTheSystemAudioNeedsTheScreenPermissionAndNoScreenIsChecked() {
+        let result = ReadyCheck.evaluate(facts(screens: .success([])), settings: audioOnly())
+        #expect(result.items.map(\.title) == [
+            "Screen & System Audio Recording permission",
+            "Microphone permission",
+            "Audio: system audio, MacBook Pro Microphone (default)",
+            "Output folder: ~/Movies/Multi Screen Recorder",
+            "Free disk space: 100.0 GB in ~/Movies/Multi Screen Recorder, 0.3 GB needed for 2 hours",
+        ])
+        #expect(result.isReady)
+        #expect(!ReadyCheck.evaluate(facts(screenRecording: .notGranted), settings: audioOnly()).isReady)
+    }
+
+    /// The microphone alone needs no Screen & System Audio Recording permission, which is then not asked.
+    @Test func atTheResolutionNoneTheMicrophoneAloneNeedsNoScreenPermission() {
+        let settings = audioOnly { $0.systemAudio = false }
+        #expect(!ReadyCheck.needsScreenRecording(settings))
+        let result = ReadyCheck.evaluate(facts(screenRecording: nil), settings: settings)
+        #expect(!result.items.contains { $0.title.hasPrefix("Screen") })
+        #expect(result.isReady)
+        #expect(ReadyCheck.needsScreenRecording(audioOnly()))
+        #expect(ReadyCheck.needsScreenRecording(.manual))
+        var withoutAudio = Settings.manual
+        withoutAudio.systemAudio = false
+        #expect(ReadyCheck.needsScreenRecording(withoutAudio))
+    }
+
+    @Test func atTheResolutionNoneUnreadableScreensNeitherFailNorHideTheFreeSpace() {
+        let result = ReadyCheck.evaluate(facts(screens: .failure(DeviceReadError("no list"))), settings: audioOnly())
+        #expect(result.isReady)
+        #expect(result.items.contains { $0.title.hasPrefix("Free disk space:") })
+    }
+
+    /// A recording with neither screens nor audio refuses to start (the owner, 2026-11-16).
+    @Test(arguments: [AudioMode.none, .defaultMicrophone])
+    func aRecordingWithNeitherScreensNorAudioIsNotReady(mode: AudioMode) {
+        let settings = audioOnly {
+            $0.audioMode = mode
+            $0.systemAudio = false
+        }
+        let result = ReadyCheck.evaluate(facts(microphoneGranted: nil, audioInputs: []), settings: settings)
+        #expect(!result.isReady)
+        #expect(result.items.filter { !$0.passed } == [ReadyCheck.nothingToRecordItem])
+        #expect(result.text.contains("FAIL  Nothing to record: the resolution None records no screen, and no audio source is recorded\n"))
+    }
+
+    @Test func aRecordingWithAudioAloneOrScreensAloneHasSomethingToRecord() {
+        #expect(ReadyCheck.evaluate(facts(screenRecording: nil), settings: audioOnly { $0.systemAudio = false }).isReady)
+        #expect(ReadyCheck.evaluate(facts(microphoneGranted: nil), settings: audioOnly { $0.audioMode = .none }).isReady)
+        var screensAlone = Settings.manual
+        screensAlone.audioMode = .none
+        screensAlone.systemAudio = false
+        #expect(ReadyCheck.evaluate(facts(microphoneGranted: nil), settings: screensAlone).isReady)
     }
 }

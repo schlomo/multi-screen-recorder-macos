@@ -65,6 +65,17 @@ import Testing
         #expect(saved["auto"] as? Bool == false)
     }
 
+    /// Audio only: `--resolution none` is a value like the others, and `--help` names it.
+    @Test func theResolutionNoneSavesAndTheHelpNamesIt() async throws {
+        defer { home.remove() }
+        #expect(try await msr("settings", "--resolution", "none").status == 0)
+        #expect(try savedSettings()["resolution"] as? String == "none")
+        let help = try await msr("record", "--help")
+        // ArgumentParser wraps the help at 80 columns.
+        let words = help.output.split(whereSeparator: \.isWhitespace).joined(separator: " ")
+        #expect(words.contains("1080p, 720p or none (audio only: no screen is recorded)"))
+    }
+
     @Test func anAudioModeFlagSavesAndTurnsAutoOff() async throws {
         defer { home.remove() }
         #expect(try await msr("settings", "--audio-mode", "all-inputs").status == 0)

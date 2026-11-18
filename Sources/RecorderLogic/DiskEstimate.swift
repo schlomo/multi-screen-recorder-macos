@@ -15,10 +15,12 @@ public enum DiskEstimate {
 
     public static let systemAudioFileBytesPerHour = bytesPerHour(bitRate: Encoding.systemAudioTrackBitRate)
 
-    /// Every file a recording with these settings and devices writes; nil
-    /// when the channels of an audio input it records cannot be read.
+    /// Every file a recording with these settings and devices writes, no
+    /// screen file at the resolution None; nil when the channels of an
+    /// audio input it records cannot be read.
     public static func bytesPerHour(settings: Settings, screens: [ScreenInfo], audioInputs: [AudioInputInfo]) -> Double? {
-        let screenFiles = screens.map {
+        let recordedScreens = settings.effectiveResolution.recordsScreens ? screens : []
+        let screenFiles = recordedScreens.map {
             screenFileBytesPerHour(
                 frameSize: settings.effectiveResolution.frameSize(forLooksLike: $0.pointSize), settings: settings)
         }

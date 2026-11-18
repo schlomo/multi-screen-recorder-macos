@@ -26,6 +26,14 @@ import Testing
             + "audio inputs: none; output folder unusable (read-only)")
     }
 
+    /// Audio only with the microphone alone: the screen permission was not asked.
+    @Test func aScreenPermissionNotAskedSaysSo() {
+        let facts = ReadyCheckFacts(
+            screenRecording: nil, microphoneGranted: true, screens: .success([]),
+            audioInputs: .success([]), outputFolder: .unusable("read-only"))
+        #expect(DebugLine.facts(facts).hasPrefix("screen recording not asked; microphone granted; "))
+    }
+
     /// The clock drift lines of all audio sources come together, in number order: the system audio (0) first.
     @Test func theClockDriftBlockListsTheSourcesInNumberOrder() {
         let measured = ClockDriftCorrection.Status(clockDriftPpm: -116.12, applied: 0.03494, remaining: 0.00004)

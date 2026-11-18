@@ -187,7 +187,9 @@ struct WhatWillBeRecordedView: View {
                     .background(.quaternary.opacity(0.5))
                 Divider()
                 ForEach(Array(section.screenRows.enumerated()), id: \.offset) { index, screenRow in
-                    row(screenRow).background(stripe(index))
+                    row(screenRow)
+                        .foregroundStyle(screenRow.isRecorded ? .primary : .tertiary)
+                        .background(stripe(index))
                 }
                 if !section.screenRows.isEmpty { Divider() }
                 ForEach(Array(section.audioRows.enumerated()), id: \.offset) { index, audioRow in
