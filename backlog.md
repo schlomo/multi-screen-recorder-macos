@@ -19,13 +19,14 @@ merged 2026-11-17 as release `v0.20261117.51`; PR #20 (the homepage
 collage, dark mode, `scripts/install-app`) merged the same evening as
 release `v0.20261117.52`. The order, agreed with the owner on
 2026-11-18, one PR each: item 17, the local-first rule (signed off);
-item 1a, audio only, together with item 6's first step (both signed
-off); item 21, audio level meters; item 3, the end-to-end tests; item
+item 1a, audio only, together with item 6's first step and the
+icon's dark-mode frame (all signed off); item 21, audio level meters; item 3, the end-to-end tests; item
 4, the simplification; item 7, auto-recovery from disturbances; item
 12, cameras; item 22, the lip sync calibration; the rest of item 6;
 then item 16, the Mac App Store and Homebrew (the owner, 2026-11-16:
 "sandbox then comes after the optimizations"). Items 21, 12 and 22
-each need a design signed off before building. Agents may run `msr record` on the owner's Mac (D48;
+each need a design signed off before building. Item 17 waits for the
+owner's go to start. Agents may run `msr record` on the owner's Mac (D48;
 the owner's go-ahead in the session, 2026-11-16), and BetterDisplay's
 command line with the owner's virtual screen "Virtual 16:9"; by
 D56, before an agent starts a recording or plays a sound on the owner's Mac, the session running or briefing that test tells the owner, once before the test's first run.
@@ -52,7 +53,16 @@ Nothing.
    screen file means no guide tracks; a recording with neither
    screens nor audio refuses to start. Ships in one PR with item 6's
    first step (the owner, 2026-11-18), so CPU is measured before
-   meters and cameras add load.
+   meters and cameras add load. The same PR carries one nit, signed
+   off by the owner (2026-11-18): in dark mode the icon's graphite
+   tile has almost no edge against the window and looks ragged (a
+   tester's 1x screenshot); `AppHeader` (`StartView.swift`) draws a
+   slim light frame around the tile in dark mode only: white at about
+   25 % opacity, 1 pt, following the tile's shape in
+   `assets/icon/app-icon.svg` (in the 48 pt image: inset 4.7 pt,
+   corner radius 8.6 pt, derived from the SVG's 300-unit tile, rx 67,
+   viewBox 372.82). Light mode and the icon file stay unchanged; a dark
+   icon variant belongs to item 14.
 2. **Toolchain catch-up** (D28): the pipeline builds with Xcode 26.6,
    Swift 6.3 and Python 3.15, the newest on GitHub's generally
    available runner image (D32 for Python), while the owner's Mac has
