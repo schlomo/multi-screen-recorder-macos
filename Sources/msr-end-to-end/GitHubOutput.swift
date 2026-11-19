@@ -2,7 +2,8 @@ import EndToEndLogic
 import Foundation
 
 /// The run's report for GitHub Actions, only when the environment says the
-/// run is there: annotations as workflow commands on standard output, and
+/// run is there: annotations as workflow commands on standard error (not in
+/// `run.log`, which has the plain `FAIL` line), and
 /// the table appended to the job summary file the environment names.
 struct GitHubOutput {
     let annotates: Bool
@@ -15,7 +16,7 @@ struct GitHubOutput {
 
     func annotate(scenario: String, _ firstFailure: String) {
         guard annotates else { return }
-        RunLog.out(GitHubReport.annotation(title: scenario, message: firstFailure))
+        RunLog.error(GitHubReport.annotation(title: scenario, message: firstFailure), logged: false)
     }
 
     func summarize(rows: [GitHubReport.Row], verdict: String) throws {

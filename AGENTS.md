@@ -261,8 +261,7 @@ hoc, for a local check only), and `scripts/install-app` installs it (see
 below). `scripts/end-to-end-test` records with the built app while it
 adds a virtual screen and plays a tone into BlackHole, then examines the
 recording folders; it also starts the built app's window (with a
-scratch `HOME`) and takes screenshots of the app's windows, and of the
-main screen when the status window cannot be opened; it needs `ffmpeg`
+scratch `HOME`) and takes a screenshot of it; it needs `ffmpeg`
 and BlackHole 2ch, and records, so the rules for `msr record` below
 apply to it
 ([end-to-end-tests.md](docs/design/end-to-end-tests.md)).

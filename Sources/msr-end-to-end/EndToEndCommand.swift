@@ -77,12 +77,24 @@ struct Run: ParsableCommand {
         Review.clear(scratch: scratchFolder)
         let github = GitHubOutput(environment: ProcessInfo.processInfo.environment)
         var rows: [GitHubReport.Row] = []
-        let startNotes = driver.startWindow()
-        for note in startNotes { RunLog.out("      evidence: \(note)") }
-        rows.append(.init(scenario: ReviewNames.appStep, result: "evidence", seconds: nil, margin: nil, firstFailure: nil,
-                          notes: startNotes.first))
         var tally = RunTally(total: scenarios.count)
+        do {
+            try driver.startWindow()
+            RunLog.out("ok    \(ReviewNames.appStep): the start window's screenshot")
+            rows.append(.init(scenario: ReviewNames.appStep, result: "ok", seconds: nil, margin: nil, firstFailure: nil))
+        } catch {
+            let failure = "the start window's screenshot was not taken: \(error)"
+            tally.stepFailed(failure)
+            RunLog.error("FAIL  \(ReviewNames.appStep): \(failure)")
+            github.annotate(scenario: ReviewNames.appStep, failure)
+            rows.append(.init(scenario: ReviewNames.appStep, result: "FAIL", seconds: nil, margin: nil, firstFailure: failure))
+        }
         for scenario in scenarios {
+            if Interruption.shared.happened {
+                tally.stopped("interrupted before \(scenario.name)")
+                RunLog.error("STOP  interrupted before \(scenario.name)")
+                break
+            }
             let began = Date()
             do {
                 let failures = try driver.run(scenario)
@@ -100,9 +112,8 @@ struct Run: ParsableCommand {
                     github.annotate(scenario: scenario.name, failures[0])
                 }
                 if let margin = driver.margin { RunLog.out("      margin: \(margin)") }
-                for note in driver.evidenceNotes { RunLog.out("      evidence: \(note)") }
                 rows.append(.init(scenario: scenario.name, result: failures.isEmpty ? "ok" : "FAIL", seconds: seconds,
-                                  margin: driver.margin, firstFailure: failures.first, notes: driver.evidenceNotes.first))
+                                  margin: driver.margin, firstFailure: failures.first))
             } catch {
                 tally.stopped("\(scenario.name): \(error)")
                 RunLog.error("STOP  \(scenario.name): \(error); kept: \(scratchFolder.appending(path: scenario.name).path)")

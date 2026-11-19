@@ -25,6 +25,15 @@ import Testing
         #expect(tally.verdict(finalRestoreSucceeded: true) == .failed(["msr-end-to-end: only 1 of 3 scenarios ran"]))
     }
 
+    @Test func aFailedStepBeforeTheScenariosFailsTheRun() {
+        var tally = RunTally(total: 1)
+        tally.stepFailed("the start window: no window of process 7 on screen within 20 s")
+        tally.passed()
+        #expect(tally.verdict(finalRestoreSucceeded: true) == .failed([
+            "msr-end-to-end: the start window: no window of process 7 on screen within 20 s",
+        ]))
+    }
+
     @Test func aFailedScenarioOrAFailedFinalRestoreFails() {
         var tally = RunTally(total: 2)
         tally.passed()

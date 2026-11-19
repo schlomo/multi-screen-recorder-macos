@@ -207,34 +207,32 @@ now, to check them" (D63). Each run writes, in its scratch folder:
   name; `excerpt <file>`, the first 5 s (`reviewExcerptSeconds`) of the
   smallest screen file and, in `tone` and `system-audio`, of
   BlackHole's audio file, copied by `ffmpeg -c copy`, not re-encoded.
-- Screenshots of the app's real windows, taken with `screencapture -l`
-  by the window's number from `CGWindowListCopyWindowInfo`:
-  `review/app/app-start-window-light.png`, the start window of the
-  built app started as `msr` without arguments, with a scratch `HOME`
-  (its ready check, `state.json` and crash report folder are there),
-  before the scenarios, then quit; and in `plain-recording` at 4 s the
-  status window, opened as a click on the Dock icon does, by the
-  reopen Apple event. macOS may want the person's consent for that
-  event (asked without a prompt first): then the main screen is taken
-  instead, `plain-recording-main-screen-light.jpg`, and a note says so.
-  Only the light appearance: `AppleInterfaceStyle` set to `Dark` in the
+- A screenshot of the app's real start window, taken with
+  `screencapture -l` by the window's number from
+  `CGWindowListCopyWindowInfo`: `review/app/app-start-window-light.png`,
+  the built app started as `msr` without arguments, with a scratch
+  `HOME` (its ready check, `state.json` and crash report folder are
+  there), before the scenarios, then quit (the quit Apple event when
+  macOS allows it without asking, otherwise SIGTERM, and SIGKILL after
+  15 s; the process is in the restore file meanwhile). It is part of
+  the run: when it cannot be taken, the run fails like on any other
+  failure. The status window's picture comes later, with the offscreen
+  renders for the homepage's screenshot script: opening it during a
+  recording needs the reopen Apple event, which needs the person's
+  Automation consent. Only the light appearance: `AppleInterfaceStyle` set to `Dark` in the
   app's own defaults domain left its window light (tried 2026-11-19), so
   dark screenshots are not taken.
 - A failed scenario's whole folder stays, as before, and a restore file
   if one is left.
 
-**Screenshots are evidence, not assertions,** the one named exception
-to "Fail early and loudly": a screenshot that cannot be taken is a note
-in `run.log` and the job summary, and the scenario goes on, because what
-it shows is not under test. Everything else in the review folder fails
-its scenario when it cannot be made.
+Anything in the review folder that cannot be made fails the run.
 
 In GitHub Actions the driver also reports in GitHub's own formats:
 when `GITHUB_STEP_SUMMARY` is set it appends a table to the job summary
-(scenario, result, time, margin, first failure, evidence notes), and
-when `GITHUB_ACTIONS` is `true` each `FAIL` and `STOP` is also an
-`::error` workflow command on standard output, escaped as GitHub
-requires, while the error line itself stays on standard error.
+(scenario, result, time, margin, first failure), and when
+`GITHUB_ACTIONS` is `true` each `FAIL` and `STOP` is also an `::error`
+workflow command on standard error, escaped as GitHub requires, beside
+the error line itself (only the error line goes into `run.log`).
 
 ### Known content
 

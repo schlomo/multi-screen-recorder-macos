@@ -4,14 +4,14 @@ import EndToEndLogic
 import Foundation
 
 /// Screenshots of the app's real windows, taken while the end-to-end run
-/// drives it: evidence for a person to look at, never an assertion. A
-/// screenshot that cannot be taken is told as a note, and the scenario goes
-/// on (docs/design/end-to-end-tests.md, "Artifacts for review").
+/// drives it, for a person to look at (docs/design/end-to-end-tests.md,
+/// "Artifacts for review"); one that cannot be taken fails the run.
 enum Screenshots {
     /// The first ordinary window of the process, once it is on screen.
-    static func windowID(of pid: pid_t, seconds: Double) throws -> CGWindowID {
+    static func windowID(of pid: pid_t, seconds: Double, interruption: Interruption) throws -> CGWindowID {
         let deadline = Date().addingTimeInterval(seconds)
         while true {
+            try interruption.check()
             let windows = (CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID)
                 as? [[String: Any]]) ?? []
             if let window = windows.first(where: {
@@ -29,11 +29,6 @@ enum Screenshots {
         try screencapture(["-x", "-o", "-l", "\(window)", png.path], png, what: "window \(window)")
     }
 
-    /// `screencapture` of the main screen as a JPEG, without a sound.
-    static func captureMainScreen(to jpeg: URL) throws {
-        try screencapture(["-x", "-t", "jpg", "-D", "1", jpeg.path], jpeg, what: "the main screen")
-    }
-
     private static func screencapture(_ arguments: [String], _ png: URL, what: String) throws {
         let process = Process()
         process.executableURL = URL(filePath: try Media.onPath("screencapture"))
@@ -45,9 +40,8 @@ enum Screenshots {
         }
     }
 
-    /// Sends one of the core Apple events (reopen, quit) to the process, as
-    /// a click on its Dock icon or Quit does; refuses, rather than asks,
-    /// should macOS want the person's consent for it.
+    /// Sends a core Apple event (quit) to the process, as Quit does;
+    /// refuses, rather than asks, should macOS want the person's consent.
     static func send(_ eventID: AEEventID, to pid: pid_t) throws {
         let target = NSAppleEventDescriptor(processIdentifier: pid)
         let permission = AEDeterminePermissionToAutomateTarget(target.aeDesc, AEEventClass(kCoreEventClass), eventID, false)

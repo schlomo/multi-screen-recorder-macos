@@ -14,6 +14,8 @@ public struct RunTally: Sendable {
     public private(set) var failedCount = 0
     /// Why the run stopped before its last scenario, if it did.
     public private(set) var stopReason: String?
+    /// The steps besides the scenarios that failed, such as the start window.
+    public private(set) var failedSteps: [String] = []
 
     public init(total: Int) {
         self.total = total
@@ -22,10 +24,11 @@ public struct RunTally: Sendable {
     public mutating func passed() { passedCount += 1 }
     public mutating func failed() { failedCount += 1 }
     public mutating func stopped(_ reason: String) { stopReason = reason }
+    public mutating func stepFailed(_ reason: String) { failedSteps.append(reason) }
 
     public func verdict(finalRestoreSucceeded: Bool) -> Verdict {
         let ran = passedCount + failedCount
-        var lines: [String] = []
+        var lines = failedSteps.map { "msr-end-to-end: \($0)" }
         if let stopReason {
             lines.append("msr-end-to-end: stopped, \(stopReason); \(ran) of \(total) scenarios ran")
         } else if ran < total {

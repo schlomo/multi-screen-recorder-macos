@@ -78,13 +78,9 @@ public struct Scenario: Sendable {
     public var stop: Stop
     /// When it stops, in seconds after the recording started.
     public var stopAt: Double
-    /// When the driver opens the status window, as a click on the Dock
-    /// icon does, and takes its screenshot; nil for none. Evidence only.
-    public var statusWindowAt: Double?
 
     public init(name: String, summary: String, flags: [String], settings: ManifestExpectation.Settings,
-                playsTone: Bool = false, events: [(at: Double, event: Event)] = [], stop: Stop, stopAt: Double,
-                statusWindowAt: Double? = nil) {
+                playsTone: Bool = false, events: [(at: Double, event: Event)] = [], stop: Stop, stopAt: Double) {
         self.name = name
         self.summary = summary
         self.flags = flags
@@ -93,7 +89,6 @@ public struct Scenario: Sendable {
         self.events = events
         self.stop = stop
         self.stopAt = stopAt
-        self.statusWindowAt = statusWindowAt
     }
 
     /// How long after its stop a recording stopped by a signal ends by its
@@ -118,7 +113,7 @@ extension Scenario {
     public static let named: [Scenario] = [
         Scenario(
             name: "plain-recording", summary: "a recording in auto mode, ended by its duration",
-            flags: [], settings: auto, stop: .duration, stopAt: 8, statusWindowAt: 4),
+            flags: [], settings: auto, stop: .duration, stopAt: 8),
         Scenario(
             name: "virtual-screen",
             summary: "a virtual screen connected, its mode switched there and back, and disconnected",

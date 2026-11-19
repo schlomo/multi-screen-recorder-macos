@@ -10,8 +10,7 @@ import Testing
 
     @Test func theSummaryIsATableWithOneRowPerScenario() {
         let summary = GitHubReport.summary(rows: [
-            .init(scenario: "app", result: "evidence", seconds: nil, margin: nil, firstFailure: nil,
-                  notes: "the screenshot of the start window was not taken: no window"),
+            .init(scenario: "app", result: "FAIL", seconds: nil, margin: nil, firstFailure: "no window \\ here"),
             .init(scenario: "plain-recording", result: "ok", seconds: 14, margin: "+0.19 s / +0.13 s", firstFailure: nil),
             .init(scenario: "tone", result: "FAIL", seconds: 15, margin: nil, firstFailure: "a | b\nc"),
             .init(scenario: "system-audio", result: "STOP", seconds: nil, margin: nil, firstFailure: "interrupted"),
@@ -21,12 +20,12 @@ import Testing
 
             msr-end-to-end: 1 of 3 scenarios failed
 
-            | Scenario | Result | Time | Margin | First failure | Evidence notes |
-            |---|---|---|---|---|---|
-            | app | evidence |  |  |  | the screenshot of the start window was not taken: no window |
-            | plain-recording | ok | 14 s | +0.19 s / +0.13 s |  |  |
-            | tone | FAIL | 15 s |  | a \\| b c |  |
-            | system-audio | STOP |  |  | interrupted |  |
+            | Scenario | Result | Time | Margin | First failure |
+            |---|---|---|---|---|
+            | app | FAIL |  |  | no window \\\\ here |
+            | plain-recording | ok | 14 s | +0.19 s / +0.13 s |  |
+            | tone | FAIL | 15 s |  | a \\| b c |
+            | system-audio | STOP |  |  | interrupted |
 
             """)
     }

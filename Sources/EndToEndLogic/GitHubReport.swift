@@ -10,17 +10,13 @@ public enum GitHubReport {
         public var seconds: Int?
         public var margin: String?
         public var firstFailure: String?
-        /// The screenshots that could not be taken: evidence, not a failure.
-        public var notes: String?
 
-        public init(scenario: String, result: String, seconds: Int?, margin: String?, firstFailure: String?,
-                    notes: String? = nil) {
+        public init(scenario: String, result: String, seconds: Int?, margin: String?, firstFailure: String?) {
             self.scenario = scenario
             self.result = result
             self.seconds = seconds
             self.margin = margin
             self.firstFailure = firstFailure
-            self.notes = notes
         }
     }
 
@@ -46,14 +42,14 @@ public enum GitHubReport {
     /// The job summary's Markdown: the verdict and one row per scenario.
     public static func summary(rows: [Row], verdict: String) -> String {
         let lines = rows.map { row in
-            let cells = [row.scenario, row.result, row.seconds.map { "\($0) s" } ?? "", row.margin ?? "", row.firstFailure ?? "", row.notes ?? ""]
+            let cells = [row.scenario, row.result, row.seconds.map { "\($0) s" } ?? "", row.margin ?? "", row.firstFailure ?? ""]
             return "| " + cells.map(cell).joined(separator: " | ") + " |"
         }
-        return (["## End-to-end tests", "", verdict, "", "| Scenario | Result | Time | Margin | First failure | Evidence notes |", "|---|---|---|---|---|---|"]
+        return (["## End-to-end tests", "", verdict, "", "| Scenario | Result | Time | Margin | First failure |", "|---|---|---|---|---|"]
             + lines + [""]).joined(separator: "\n")
     }
 
     private static func cell(_ text: String) -> String {
-        escape(text, ["|": "\\|", "\r": " ", "\n": " "]).replacing("  ", with: " ")
+        escape(text, ["\\": "\\\\", "|": "\\|", "\r": " ", "\n": " "]).replacing("  ", with: " ")
     }
 }

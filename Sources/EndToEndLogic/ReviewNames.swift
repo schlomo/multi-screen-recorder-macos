@@ -14,10 +14,6 @@ public enum ReviewNames {
         "\(scenario)-\(window)-light.png"
     }
 
-    /// The main screen, when a window could not be opened: a JPEG, as a
-    /// PNG of a large screen takes tens of megabytes.
-    public static func mainScreen(scenario: String) -> String { "\(scenario)-main-screen-light.jpg" }
-
     /// The first seconds of a recorded file, cut without re-encoding.
     public static func excerpt(of fileName: String) -> String { "excerpt \(fileName)" }
 }
