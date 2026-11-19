@@ -2,7 +2,12 @@
 # Runs as root INSIDE the VM (SIP disabled): grants Screen & System Audio
 # Recording and Microphone in the system and the admin user's TCC.db, row
 # for row in the form actions/runner-images' configure-tccdb-macos.sh writes
-# for GitHub's runners (17 columns, client by path, allowed).
+# for GitHub's runners (17 columns, client by path, allowed). Screen & System
+# Audio Recording, Microphone and Accessibility go to bash, sshd-keygen-wrapper
+# (what ssh sessions are attributed to), the app's msr, the driver and the app's
+# bundle id; Automation (Apple events) from each of those clients to System
+# Events, Finder and the app. Not narrowed: in a SIP-disabled throwaway VM that
+# buys no security and would cost an image rebuild (D67).
 #   guest-configure-tcc <app root>   <app root>: the folder holding build/ and the driver
 set -euo pipefail
 me="guest-configure-tcc"

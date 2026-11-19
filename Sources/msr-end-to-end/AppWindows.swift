@@ -6,18 +6,25 @@ import Foundation
 /// left it blind to the virtual screens that connect later (`CGDisplayCreateUUIDFromDisplayID` gave
 /// nil, tried 2026-11-19), as the note on modes in docs/troubleshooting.md says of a long-running process.
 enum AppleScript {
-    static func run(_ source: String) throws {
+    static func run(_ source: String) throws { _ = try output(of: source) }
+
+    /// What the script printed, without the final newline.
+    static func output(of source: String) throws -> String {
         let process = Process()
         process.executableURL = URL(filePath: try Media.onPath("osascript"))
         process.arguments = ["-e", source]
         let errors = Pipe()
         process.standardError = errors
+        let printed = Pipe()
+        process.standardOutput = printed
         try process.run()
         let message = String(decoding: errors.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
+        let text = String(decoding: printed.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
         process.waitUntilExit()
         guard process.terminationStatus == 0 else {
             throw DriverError("osascript failed (exit \(process.terminationStatus)): \(message.trimmingCharacters(in: .whitespacesAndNewlines))")
         }
+        return text.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     static func quoted(_ text: String) -> String {

@@ -2271,10 +2271,16 @@ architect's reading.
      encoder's stall, not a writer fed a wrong frame. The cause in the
      runner's encoder stays unfixed; it is not a recorder fault shown by
      these tests.
-  7. SSH to the VM uses the image's published default login for every
+  7. The VM's TCC rows are not narrowed: Screen & System Audio Recording,
+     Microphone and Accessibility go to bash, sshd-keygen-wrapper, the
+     app's `msr`, the driver and the app's bundle id, and Automation
+     from each of those to System Events, Finder and the app; in a
+     SIP-disabled throwaway VM narrowing buys no security and would cost
+     an image rebuild (the architect's decision).
+  8. SSH to the VM uses the image's published default login for every
      login (`scripts/end-to-end-vm/askpass`), no key. The owner: "Default
      creds are no secret, obviously".
-  8. Follow-ups of the same day, the owner: "we need full export of
+  9. Follow-ups of the same day, the owner: "we need full export of
      results, screenshots and desktop video from the e2e runs": every
      scenario's whole folder (recordings, `recording.json`,
      `recording.log`, `logs/`) stays in the scratch folder and is copied
@@ -2285,11 +2291,12 @@ architect's reading.
      without the flag takes the start window in light only;
      and "Document manual steps to find, interact with, and stop the VM
      in case it is lost" ("When a VM is left behind").
-  9. A click spacing failure of the `tone` scenario is pardoned only
+  10. A click spacing failure of the `tone` scenario is pardoned only
      when the recording holds a hole (a quiet run at sample resolution)
      that starts within 0.1 s of a playback break the player measured,
      each hole with a break of its own (so pardons never exceed the
-     break count), and the clicks on either side are a whole number of
+     break count, counted per played track: the tracks of the loopback
+     device's file record the same playback, each showing the same holes), and the clicks on either side are a whole number of
      seconds apart within 1 ms; each pardon is reported in `run.log`.
      This replaces D63's "a named break is still a failure". The case:
      run 4 of the architect's VM runs at 3c8fe02 failed `tone` because

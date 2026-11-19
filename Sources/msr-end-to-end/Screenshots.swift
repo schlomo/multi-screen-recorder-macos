@@ -26,15 +26,16 @@ enum Screenshots {
 
     /// Runs `body` with the system in the appearance: dark is switched for the whole
     /// user session through System Events, which also tells the windows already open
-    /// (Finder), and switched back after it. The caller changes the appearance only
+    /// (Finder), and put back to what it was after it. The caller changes the appearance only
     /// where that harms nobody's session (`Appearance.taken`).
     static func withAppearance(_ appearance: Appearance, _ body: () throws -> Void) throws {
         guard appearance == .dark else { return try body() }
         let set = { (dark: Bool) in
             try AppleScript.run("tell application \"System Events\" to tell appearance preferences to set dark mode to \(dark)")
         }
+        let wasDark = try AppleScript.output(of: "tell application \"System Events\" to tell appearance preferences to get dark mode") == "true"
         try set(true)
-        defer { try? set(false) }
+        defer { try? set(wasDark) }
         try body()
     }
 

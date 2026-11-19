@@ -357,7 +357,11 @@ break the player measured, each hole having a break of its own; (b) the
 clicks on either side are a whole number of seconds apart, at least
 two, within the click period tolerance (1 ms), so the hole took whole
 clicks and moved nothing; (c) the number of pardons is at most the
-player's break count, which the one-break-per-hole matching gives. The
+player's break count, counted per played track (every track of the
+loopback device's file records the same playback, so each shows the
+same holes and uses the player's breaks once; a count over the scenario
+would charge the one break once per track), which the one-break-per-hole
+matching gives. The
 expected click count is lowered by the clicks the pardoned holes took.
 `run.log` reports each pardon: `pardoned: playback broke at 4.643 s,
 31.9 ms quiet in the recording, clicks 2.000 s apart`. Anything else

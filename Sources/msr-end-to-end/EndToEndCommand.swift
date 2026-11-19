@@ -53,7 +53,7 @@ struct Run: ParsableCommand {
     @Option(name: .customLong("scenario"), help: "A scenario to run; repeat for several. One of: \(Scenario.named.map(\.name).joined(separator: ", ")).")
     var scenarioNames: [String] = []
 
-    @Flag(help: "Told by scripts/end-to-end-test: this runs in the throwaway VM, where the driver may switch the system appearance to dark for the start window's screenshot. Without it, light only.")
+    @Flag(help: "Told by scripts/end-to-end-test: this runs in the throwaway VM, where the driver may switch the system appearance to dark and drives the status and Finder windows. Without it, the start window in light only.")
     var throwawayVM = false
 
     @OptionGroup var scratch: ScratchOption
@@ -81,14 +81,19 @@ struct Run: ParsableCommand {
         RunLog.out("msr-end-to-end: \(driver.version), \(scenarios.count) scenarios; the Mac cannot be used until they end")
         Review.clear(scratch: scratchFolder)
         var tally = RunTally(total: scenarios.count)
-        do {
-            try driver.startWindow()
-            try driver.recordingWindows()
-            RunLog.out("ok    \(ReviewNames.appStep): the start window's screenshot")
-        } catch {
-            let failure = "the start window's screenshot was not taken: \(error)"
-            tally.stepFailed(failure)
-            RunLog.error("FAIL  \(ReviewNames.appStep): \(failure)")
+        let captures: [(name: String, take: () throws -> Void)] = [
+            ("the start window's screenshots", driver.startWindow),
+            ("the status window's screenshots and video and the Finder window's screenshots", driver.recordingWindows),
+        ]
+        for capture in captures {
+            do {
+                try capture.take()
+                RunLog.out("ok    \(ReviewNames.appStep): \(capture.name)")
+            } catch {
+                let failure = "\(capture.name) not taken: \(error)"
+                tally.stepFailed(failure)
+                RunLog.error("FAIL  \(ReviewNames.appStep): \(failure)")
+            }
         }
         for scenario in scenarios {
             if Interruption.shared.happened {
