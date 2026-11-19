@@ -71,6 +71,14 @@ one line each, appended and never rewritten, synchronized to disk after
 each event and problem; written by every recording, in the app and in
 `msr record` (D64). Not the unified log, which is macOS's.
 
+## Detail line
+
+A line about what the recorder did or read during a recording or the
+ready check, beyond the events and problems: the tracker's actions, the
+screens as read, files started and ended, the ready check's facts, the
+clock drift block and the gaps. Always in the recording log; with
+`--debug` also on standard error, as `detail <category>: …` (D64).
+
 ## Problem
 
 Something that went wrong in a recording and that the person is told:

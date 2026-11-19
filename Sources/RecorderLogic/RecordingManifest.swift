@@ -325,12 +325,14 @@ public struct RecordingManifest: Codable, Equatable, Sendable {
     }
 
     /// The recording ends: its end time, its result and its CPU use; a
-    /// result of `problems` never comes with empty `problems` (D47).
-    public mutating func finalize(ended date: Date, timeZone: TimeZone, cpu: CPU? = nil) {
+    /// result of `problems` never comes with empty `problems` (D47). A
+    /// recording log that did not end complete on disk, a problem told
+    /// before, makes the result `problems` too (D64).
+    public mutating func finalize(ended date: Date, timeZone: TimeZone, cpu: CPU? = nil, recordingLogWritten: Bool = true) {
         state = .finalized
         ended = Self.timestamp(date, timeZone: timeZone)
         problems += untoldProblems
-        result = endedWell ? .ok : .problems
+        result = endedWell && recordingLogWritten ? .ok : .problems
         self.cpu = cpu
     }
 
@@ -343,10 +345,9 @@ public struct RecordingManifest: Codable, Equatable, Sendable {
         let failures = events.filter(\.event.isFailure).sorted { $0.at < $1.at }
         if let first = failures.first {
             let count = failures.count == 1 ? "1 failure event" : "\(failures.count) failure events"
-            let told = first.problem
             return [RecordingProblem(
                 atSeconds: first.at, problem: "A failure was not told while recording",
-                error: "\(told.text) (\(count), see events)", errorDetail: told.errorDetail ?? ErrorDetail(message: told.text))]
+                error: "\(first.problem.text) (\(count), see events)", errorDetail: first.problemErrorDetail)]
         }
         let notFinalized = files.filter { $0.state != .finalized }.map { ($0.name, $0.end ?? $0.start) }
             + audioFiles.filter { $0.state != .finalized }.map { ($0.name, $0.end ?? $0.start) }
@@ -492,8 +493,12 @@ public struct RecordingEvent: Codable, Equatable, Sendable {
     /// The event as a problem told to the person, at its time.
     public var problem: RecordingProblem {
         let what = screen.map { "Screen \($0)" } ?? audioSource.map { "Audio source \($0)" } ?? "The recording"
-        return RecordingProblem(
-            atSeconds: at, problem: what, error: ErrorDetail(message: event.rawValue, underlying: errorDetail.map { [$0] } ?? []))
+        return RecordingProblem(atSeconds: at, problem: what, error: problemErrorDetail)
+    }
+
+    /// The error detail of the event as a problem: the event's name, with its error under it.
+    var problemErrorDetail: ErrorDetail {
+        ErrorDetail(message: event.rawValue, underlying: errorDetail.map { [$0] } ?? [])
     }
 
     private enum CodingKeys: String, CodingKey {
@@ -510,7 +515,9 @@ public struct RecordingEvent: Codable, Equatable, Sendable {
         to = try container.decodeIfPresent(Value.self, forKey: .to)
         length = try container.decodeIfPresent(Double.self, forKey: .length)
         mirrors = try container.decodeIfPresent(String.self, forKey: .mirrors)
+        // A manifest written before D64 has only the `error` text: kept as the recorder's own.
         errorDetail = try container.decodeIfPresent(ErrorDetail.self, forKey: .errorDetail)
+            ?? container.decodeIfPresent(String.self, forKey: .error).map { ErrorDetail(message: $0) }
     }
 
     /// `error` and `errorDetail` are left out, like every other field, where there is none.

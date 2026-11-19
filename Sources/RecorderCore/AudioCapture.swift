@@ -303,7 +303,7 @@ final class AudioCapture: @unchecked Sendable {
         let pts = CMTimeConvertScale(CMSampleBufferGetPresentationTimeStamp(buffer), timescale: 1_000_000_000, method: .roundHalfAwayFromZero)
         let time = context.clock.sinceStart(host: UInt64(max(0, pts.value)))
         let (audio, gap) = correction.correct(channels, at: time, arrival: arrival)
-        if let gap { RecorderLog.detail(DebugLine.clockDriftGap(of: label, gap), category: "recorder") }
+        if let gap { RecorderLog.detail(DetailLine.clockDriftGap(of: label, gap), category: "recorder") }
         for corrected in audio where !isEnding { take(corrected) }
         reportClockDrift(at: arrival)
     }

@@ -14,15 +14,17 @@ public struct ErrorDetail: Codable, Equatable, Sendable, ExpressibleByStringLite
     public var reason: String?
     public var suggestion: String?
     public var underlying: [ErrorDetail]
+    /// The chain was cut at `maximumDepth`: this error has underlying
+    /// errors that are left out.
+    public var truncated = false
 
     /// The domain of the recorder's own errors that come from no `Error`.
     public static let ownDomain = "MultiScreenRecorder"
     /// The modules whose Swift errors are the recorder's own.
     static let ownModules = ["RecorderLogic", "RecorderCore", "msr"]
-    /// How many levels of underlying errors are kept; below them, one
-    /// detail says that more were left out.
+    /// How many levels of underlying errors are kept; the last kept says
+    /// it is `truncated` when it has more.
     public static let maximumDepth = 8
-    static let leftOut = "deeper underlying errors left out"
 
     /// Any error with its chain of underlying errors.
     public init(_ error: any Error) {
@@ -58,7 +60,8 @@ public struct ErrorDetail: Codable, Equatable, Sendable, ExpressibleByStringLite
         reason = nsError.localizedFailureReason
         suggestion = nsError.localizedRecoverySuggestion
         guard depth < Self.maximumDepth else {
-            underlying = nsError.underlyingErrors.isEmpty ? [] : [ErrorDetail(message: Self.leftOut)]
+            underlying = []
+            truncated = !nsError.underlyingErrors.isEmpty
             return
         }
         underlying = nsError.underlyingErrors.map { ErrorDetail($0, depth: depth + 1) }
@@ -90,7 +93,14 @@ public struct ErrorDetail: Codable, Equatable, Sendable, ExpressibleByStringLite
         var line = description
         if !facts.isEmpty { line += " (\(facts.joined(separator: "; ")))" }
         if !underlying.isEmpty { line += ": " + underlying.map(\.text).joined(separator: "; ") }
-        return line
+        if truncated { line += ": … (deeper underlying errors left out)" }
+        return Self.oneLine(line)
+    }
+
+    /// Line breaks in a text macOS gives become `⏎`, so a recording log
+    /// entry stays one line.
+    static func oneLine(_ text: String) -> String {
+        text.replacing(/\r\n|\r|\n/, with: "⏎")
     }
 
     /// A code, with its four-character code where it has one, as an
@@ -108,9 +118,20 @@ public struct ErrorDetail: Codable, Equatable, Sendable, ExpressibleByStringLite
         return String(decoding: bytes, as: UTF8.self)
     }
 
-    private enum CodingKeys: String, CodingKey { case domain, code, description, reason, suggestion, underlying }
+    private enum CodingKeys: String, CodingKey { case domain, code, description, reason, suggestion, underlying, truncated }
 
-    /// `reason` and `suggestion` are left out where there is none.
+    public init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        domain = try container.decode(String.self, forKey: .domain)
+        code = try container.decode(Int.self, forKey: .code)
+        description = try container.decode(String.self, forKey: .description)
+        reason = try container.decodeIfPresent(String.self, forKey: .reason)
+        suggestion = try container.decodeIfPresent(String.self, forKey: .suggestion)
+        underlying = try container.decode([ErrorDetail].self, forKey: .underlying)
+        truncated = try container.decodeIfPresent(Bool.self, forKey: .truncated) ?? false
+    }
+
+    /// `reason` and `suggestion` are left out where there is none, `truncated` where it is false.
     public func encode(to encoder: any Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(domain, forKey: .domain)
@@ -118,6 +139,7 @@ public struct ErrorDetail: Codable, Equatable, Sendable, ExpressibleByStringLite
         try container.encode(description, forKey: .description)
         try container.encodeIfPresent(reason, forKey: .reason)
         try container.encodeIfPresent(suggestion, forKey: .suggestion)
+        if truncated { try container.encode(truncated, forKey: .truncated) }
         try container.encode(underlying, forKey: .underlying)
     }
 }

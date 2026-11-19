@@ -11,7 +11,18 @@ private final class StandInFile: RecordingLogFile {
         var appended = ""
         var synchronized = ""
         var fails = false
+        var closeFails = false
         var closed = false
+    }
+
+    /// When set, the first synchronize signals `entered` and blocks until `release` is signalled.
+    let blocksSync: Bool
+    private let blocked = Atomic(false)
+    let entered = DispatchSemaphore(value: 0)
+    let release = DispatchSemaphore(value: 0)
+
+    init(blocksSync: Bool = false) {
+        self.blocksSync = blocksSync
     }
 
     private let state = Mutex(State())
@@ -20,6 +31,7 @@ private final class StandInFile: RecordingLogFile {
     var synchronized: String { state.withLock { $0.synchronized } }
     var closed: Bool { state.withLock { $0.closed } }
     func fail(_ fails: Bool) { state.withLock { $0.fails = fails } }
+    func failClose() { state.withLock { $0.closeFails = true } }
 
     func append(_ data: Data) throws {
         try state.withLock { state in
@@ -29,11 +41,18 @@ private final class StandInFile: RecordingLogFile {
     }
 
     func synchronize() throws {
+        if blocksSync, !blocked.exchange(true, ordering: .relaxed) {
+            entered.signal()
+            release.wait()
+        }
         state.withLock { $0.synchronized = $0.appended }
     }
 
     func close() throws {
-        state.withLock { $0.closed = true }
+        try state.withLock { state in
+            if state.closeFails { throw POSIXError(.EIO) }
+            state.closed = true
+        }
     }
 }
 
@@ -59,10 +78,10 @@ private final class Reports: Sendable {
     private let clock = StandInClock()
     private let reports = Reports()
 
-    private func log() -> RecordingLog {
+    private func log(_ file: StandInFile? = nil) -> RecordingLog {
         let clock = clock
         let reports = reports
-        return RecordingLog(file: file, started: start, timeZone: berlin, now: { clock.now },
+        return RecordingLog(file: file ?? self.file, started: start, timeZone: berlin, now: { clock.now },
                             writing: { reports.add($0) })
     }
 
@@ -75,7 +94,7 @@ private final class Reports: Sendable {
         #expect(file.appended == "")
         at(4)
         log.event("22:14:35 +4.0s screen connected: DELL")
-        #expect(file.synchronized == "22:14:34 +3.0s debug recorder: start Screen 1 DELL\n22:14:35 +4.0s screen connected: DELL\n")
+        #expect(file.synchronized == "22:14:34 +3.0s detail recorder: start Screen 1 DELL\n22:14:35 +4.0s screen connected: DELL\n")
         log.problem(RecordingProblem(at: 4 * second, problem: "Screen DELL", error: "it broke"))
         #expect(file.synchronized.hasSuffix("22:14:35 +4.0s problem: Screen DELL: it broke\n"))
         #expect(reports.all.isEmpty)
@@ -99,7 +118,7 @@ private final class Reports: Sendable {
         #expect(!file.appended.contains("waits"))
         at(10)
         log.flushIfDue()
-        #expect(file.synchronized.hasSuffix("+1.0s debug recorder: waits\n"))
+        #expect(file.synchronized.hasSuffix("+1.0s detail recorder: waits\n"))
         let written = file.appended
         at(30)
         log.flushIfDue()
@@ -108,9 +127,9 @@ private final class Reports: Sendable {
 
     @Test func closeWritesWhatWaitsAndClosesAndLaterLinesGoNowhere() {
         let log = log()
-        log.detail("ended: result ok", category: "recorder")
-        log.close()
-        #expect(file.synchronized.hasSuffix("debug recorder: ended: result ok\n"))
+        log.detail("finalizing the recording manifest", category: "recorder")
+        #expect(log.close() == nil)
+        #expect(file.synchronized.hasSuffix("detail recorder: finalizing the recording manifest\n"))
         #expect(file.closed)
         let written = file.appended
         log.event("after")
@@ -133,6 +152,39 @@ private final class Reports: Sendable {
         #expect(file.appended == "back\n")
     }
 
+    /// Stop takes the failure at once, for the final manifest, and it is not reported later.
+    @Test func closeReturnsAFailureToWriteOrToClose() throws {
+        let failingWrite = log()
+        file.fail(true)
+        failingWrite.detail("lost", category: "recorder")
+        let failure = try #require(failingWrite.close())
+        #expect(failure.code == Int(ENOSPC))
+        let other = StandInFile()
+        other.failClose()
+        #expect(try #require(log(other).close()).code == Int(EIO))
+        #expect(reports.all.isEmpty)
+    }
+
+    /// A slow synchronize, as on an external or network volume, never
+    /// holds up a capture thread adding a detail line.
+    @Test func aDetailLineDoesNotWaitForASlowWrite() {
+        let slow = StandInFile(blocksSync: true)
+        let log = log(slow)
+        let writing = DispatchGroup()
+        DispatchQueue.global().async(group: writing) { log.event("an event") }
+        slow.entered.wait()
+        let adding = DispatchGroup()
+        DispatchQueue.global(qos: .userInteractive).async(group: adding) {
+            log.detail("from a capture thread", category: "recorder")
+        }
+        let added = adding.wait(timeout: .now() + 2) == .success
+        slow.release.signal()
+        writing.wait()
+        #expect(added)
+        log.event("next")
+        #expect(slow.appended.hasSuffix("detail recorder: from a capture thread\nnext\n"))
+    }
+
     @Test func theFileIsCreatedNewAndOnlyAppendedTo() throws {
         let folder = FileManager.default.temporaryDirectory.appending(path: "recording-log-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
@@ -144,6 +196,8 @@ private final class Reports: Sendable {
         try file.append(Data("two\n".utf8))
         try file.close()
         #expect(try String(contentsOf: url, encoding: .utf8) == "one\ntwo\n")
-        #expect(throws: POSIXError.self) { try AppendOnlyFile(creating: url) }
+        let refused = #expect(throws: NSError.self) { try AppendOnlyFile(creating: url) }
+        #expect(refused?.domain == NSPOSIXErrorDomain)
+        #expect(refused?.code == Int(EEXIST))
     }
 }

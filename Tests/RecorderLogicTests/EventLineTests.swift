@@ -37,16 +37,16 @@ import Testing
 
     /// The recording log's lines (D64) start, as an event's, with the local time and the offset.
     @Test func theRecordingLogsDetailAndProblemLines() {
-        #expect(EventLine.detailText("start Screen 3 - LG", category: "recorder", seconds: 27.94, started: start, timeZone: berlin)
-            == "22:14:58 +27.9s debug recorder: start Screen 3 - LG")
+        #expect(DetailLine.recordingLogText("start Screen 3 - LG", category: "recorder", seconds: 27.94, started: start, timeZone: berlin)
+            == "22:14:58 +27.9s detail recorder: start Screen 3 - LG")
         let problem = RecordingProblem(at: 61_300_000_000, problem: "Screen file a.mov", error: "cannot write a.mov")
         #expect(EventLine.problemText(problem, started: start, timeZone: berlin)
             == "22:15:32 +61.3s problem: Screen file a.mov: cannot write a.mov")
     }
 
-    @Test func aDebugLineCarriesTheTimeSinceTheStartAsAnEventLineDoes() {
-        #expect(EventLine.debugText("start Screen 3 - LG", category: "recorder", seconds: 27.94)
-            == "debug recorder: +27.9s start Screen 3 - LG")
-        #expect(EventLine.debugText("probe", category: "ready check", seconds: nil) == "debug ready check: probe")
+    @Test func aDetailLineCarriesTheTimeSinceTheStartAsAnEventLineDoes() {
+        #expect(DetailLine.standardErrorText("start Screen 3 - LG", category: "recorder", seconds: 27.94)
+            == "detail recorder: +27.9s start Screen 3 - LG")
+        #expect(DetailLine.standardErrorText("probe", category: "ready check", seconds: nil) == "detail ready check: probe")
     }
 }

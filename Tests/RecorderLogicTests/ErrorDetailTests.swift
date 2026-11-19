@@ -91,7 +91,23 @@ private struct Detailed: ErrorWithDetail {
             levels += 1
         }
         #expect(levels == ErrorDetail.maximumDepth + 1)
-        #expect(detail.underlying == [ErrorDetail(message: ErrorDetail.leftOut)])
+        #expect(detail.underlying.isEmpty)
+        #expect(detail.truncated)
+        #expect(detail.text.hasSuffix(": … (deeper underlying errors left out)"))
+        let object = try? JSONSerialization.jsonObject(with: prettyJSON(detail)) as? [String: Any]
+        #expect(object?["truncated"] as? Bool == true)
+        #expect(!ErrorDetail(NSError(domain: "Level", code: 1)).truncated)
+    }
+
+    /// A recording log entry stays one line.
+    @Test func lineBreaksInAnErrorBecomeOneLine() {
+        let error = NSError(domain: "Multi", code: 1, userInfo: [
+            NSLocalizedDescriptionKey: "first\nsecond\r\nthird\rfourth",
+            NSLocalizedFailureReasonErrorKey: "a\nb",
+        ])
+        let text = ErrorDetail(error).text
+        #expect(text == "first⏎second⏎third⏎fourth (Multi 1; reason: a⏎b)")
+        #expect(ErrorDetail(message: "x", underlying: [ErrorDetail(error)]).text.contains("first⏎second"))
     }
 
     @Test func aSwiftErrorSaysItsOwnTextNotTheBridgedOne() {

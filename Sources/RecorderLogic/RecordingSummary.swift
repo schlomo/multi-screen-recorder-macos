@@ -16,8 +16,8 @@ public struct RecordingSummary: Equatable, Sendable {
     }
 
     /// Ended with an error (exit 3): the manifest's result is `problems`
-    /// (D47), or the finalized manifest could not be written (F3).
-    public var endedWithError: Bool { !manifest.endedWell || !manifestWritten }
+    /// (D47, D64), or the finalized manifest could not be written (F3).
+    public var endedWithError: Bool { !manifest.endedWell || manifest.result == .problems || !manifestWritten }
 
     private var errors: [RecordingEvent] { manifest.events.filter(\.event.isFailure) }
 

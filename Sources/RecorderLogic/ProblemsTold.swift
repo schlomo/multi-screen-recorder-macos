@@ -29,6 +29,9 @@ public struct ProblemsTold: Sendable {
         case tell(writeManifest: Bool)
         /// The same kind stands since it was told: nothing to do.
         case alreadyTold
+        /// The manifest is finalized and changes no more: told only on
+        /// standard error and in the unified log (D64).
+        case afterTheEnd
     }
 
     private var standing: Set<ProblemKind> = []
@@ -36,6 +39,7 @@ public struct ProblemsTold: Sendable {
     public init() {}
 
     public mutating func add(_ problem: RecordingProblem, kind: ProblemKind, to manifest: inout RecordingManifest) -> Outcome {
+        guard manifest.state != .finalized else { return .afterTheEnd }
         guard standing.insert(kind).inserted else { return .alreadyTold }
         manifest.problems.append(problem)
         return .tell(writeManifest: kind != .manifestNotWritten)

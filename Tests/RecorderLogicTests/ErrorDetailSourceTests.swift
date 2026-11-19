@@ -2,7 +2,10 @@ import Foundation
 import Testing
 
 /// Every error turned into text goes through the error detail, which keeps
-/// its domain, code and underlying errors (D64): only its own file reads
+/// its domain, code and underlying errors (D64). Most of that is enforced by
+/// the types: `tell`, the problems and the events, `captureFailed`,
+/// `streamFailed` and `writerFailed` take an `ErrorDetail`, not a string.
+/// This grep catches the rest: only the error detail's own file reads
 /// `localizedDescription`, which says none of them.
 @Suite struct ErrorDetailSourceTests {
     @Test func noSourceFileButTheErrorDetailReadsTheLocalizedDescription() throws {

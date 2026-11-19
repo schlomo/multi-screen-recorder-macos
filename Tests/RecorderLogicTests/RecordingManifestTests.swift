@@ -304,6 +304,24 @@ import Testing
         #expect(text.contains(#""errorDetail" : null"#))
     }
 
+    /// A recording log not complete on disk at the end makes the result `problems` (D64).
+    @Test func aRecordingLogNotWrittenAtTheEndIsAnError() {
+        var manifest = manifest()
+        manifest.problems = [RecordingProblem(at: 0, problem: "Cannot write the recording log recording.log", error: "full")]
+        manifest.finalize(ended: start + 60, timeZone: berlin, recordingLogWritten: false)
+        #expect(manifest.result == .problems)
+        #expect(RecordingSummary(manifest: manifest, recordingFolder: "/r", seconds: 60, manifestWritten: true).endedWithError)
+    }
+
+    /// A manifest from before D64 has an event's `error` and no `errorDetail`: reading it keeps the text.
+    @Test func anOlderEventsErrorIsKept() throws {
+        let json = #"{ "at": 1.0, "event": "screen stream failed", "screen": "LG", "error": "the stream stopped (-3811)" }"#
+        let event = try JSONDecoder().decode(RecordingEvent.self, from: Data(json.utf8))
+        #expect(event.error == "the stream stopped (-3811)")
+        let written = try #require(try JSONSerialization.jsonObject(with: prettyJSON(event)) as? [String: Any])
+        #expect(written["error"] as? String == "the stream stopped (-3811)")
+    }
+
     /// D64: every event and problem with an `error` carries its `errorDetail`,
     /// the full chain with each level's domain and code.
     @Test func anErrorIsWrittenAsItsTextAndItsErrorDetail() throws {

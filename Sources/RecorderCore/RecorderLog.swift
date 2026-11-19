@@ -48,6 +48,6 @@ public enum RecorderLog {
         guard isDebug else { return }
         logger(category).debug("\(message, privacy: .public)")
         let seconds = elapsed.withLock { $0 }?()
-        StandardErrorWriter.shared.write(EventLine.debugText(message, category: category, seconds: seconds) + "\n")
+        StandardErrorWriter.shared.write(DetailLine.standardErrorText(message, category: category, seconds: seconds) + "\n")
     }
 }

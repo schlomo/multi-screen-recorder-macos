@@ -1233,8 +1233,9 @@ architect's reading.
 ## D46: The owner's rulings from trying B1 (2026-11-15)
 
 - **Status:** in force; refines D45 and, for B2, D31; superseded in
-  part by D47 (point 12: the badge shows no time) and D59 (point 4:
-  a source not recorded shows `-`). Being built in
+  part by D47 (point 12: the badge shows no time), D59 (point 4:
+  a source not recorded shows `-`) and D64 (point 3: no log file of our
+  own; each recording writes its recording log). Being built in
   PR #11 (B1), point 7 in B2.
 - **Context:** The owner tried the snapshot release of PR #11 on
   2026-11-15 and wrote: "duration without suffix is minutes"; "yes,
@@ -1946,7 +1947,8 @@ architect's reading.
      gaps, the ready check's facts). Append-only: each line is appended,
      never rewritten; after an event's or a problem's line the file is
      synchronized to disk; detail lines wait in memory until the next
-     event, problem or Stop, at most 10 s. Lines as on standard error,
+     event, problem or Stop, or about 11 s (a check once a second
+     against 10 s). Lines as on standard error,
      with the local time and the offset from the start. `--debug` only
      decides whether detail lines also go to standard error; the
      unified log stays as it is. A recording log that cannot be written
@@ -1971,6 +1973,22 @@ architect's reading.
   event's under it; a write of the recording log that fails drops its
   lines, and the problem clears once a write works again; the periodic
   write of detail lines is synchronized too.
+- **Rulings from the review (2026-11-19, the architect):** the term is
+  **detail line** (`detail <category>:` in the recording log and on
+  standard error; `--debug` keeps its name and also prints them on
+  standard error). Capture threads only add lines; the write and its
+  `fsync` run under a lock of their own. At Stop the recording log's last
+  line (`finalizing the recording manifest`) is written, synchronized
+  and closed before the manifest is finalized; a failure there is a
+  problem in the final manifest, `result` `problems`, exit 3. Nothing is
+  added to a finalized manifest: a later problem goes to standard error
+  and the unified log only. A chain cut at the depth limit is marked
+  `"truncated": true`; line breaks in an error's text become `⏎`; an
+  older manifest's event `error` is kept when read. The recorder's own
+  error types interpolated into texts (`DeviceReadError` in the ready
+  check, "What will be recorded" and the detail lines) go through the
+  error detail too; the ready check facts' strings are the error
+  detail's text already.
 - **Consequences:** a recording folder holds one more file, about
   0.4 MB per hour (measured: 6.8 kB for 1 minute of 2 screens and 5
   audio sources). Point 3's button is not built in this change: when it
@@ -1980,4 +1998,5 @@ architect's reading.
   are open questions for the owner.
 - **Evidence:** [design/recorder.md](design/recorder.md), "Output on
   disk" and "Logging"; `ErrorDetailTests`, `ErrorDetailSourceTests`,
-  `RecordingLogTests`, `WriterErrorTests`, `RecordingManifestTests`.
+  `RecordingLogTests`, `WriterErrorTests`, `RecordingManifestTests`,
+  `ProblemsToldTests`, `StatusTextTests`.

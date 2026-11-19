@@ -157,7 +157,7 @@ public final class Recorder {
     private func logClockDriftBlock() {
         guard clockDriftDetailSchedule.due(at: context.now()) else { return }
         let sources = clockDriftShown().map { (number: $0.source.number, label: $0.source.label, status: $0.status) }
-        for line in DebugLine.clockDriftBlock(sources) { RecorderLog.detail(line, category: "recorder") }
+        for line in DetailLine.clockDriftBlock(sources) { RecorderLog.detail(line, category: "recorder") }
     }
 
     private func sampleCPU() {
@@ -229,16 +229,22 @@ public final class Recorder {
             await waitForStops()
             takeAudioReports()
             guides.stop()
-            manifest.finalize(ended: Date(), timeZone: context.timeZone, cpu: cpu.manifestEntry)
+            // The recording log ends before the manifest is finalized, so its
+            // failure is a problem in the final manifest (D64).
+            RecorderLog.detail("finalizing the recording manifest", category: "recorder")
+            RecorderLog.recording(since: nil, log: nil)
+            let logFailure = recordingLog?.close()
+            if let logFailure {
+                tell("Cannot write the recording log \(RecordingNames.recordingLog)", error: logFailure, kind: .recordingLogNotWritten)
+            }
+            manifest.finalize(
+                ended: Date(), timeZone: context.timeZone, cpu: cpu.manifestEntry, recordingLogWritten: logFailure == nil)
             do {
                 try writeManifest()
             } catch {
                 // Told by `writeManifest`; the file on disk keeps no `ended`.
                 finalManifestWritten = false
             }
-            RecorderLog.detail("ended: result \(manifest.result?.rawValue ?? "none")", category: "recorder")
-            RecorderLog.recording(since: nil, log: nil)
-            recordingLog?.close()
             if let activity { ProcessInfo.processInfo.endActivity(activity) }
             activity = nil
         }
@@ -322,7 +328,7 @@ public final class Recorder {
     private func readScreens() -> [ConnectedScreen]? {
         do {
             let screens = try connectedScreens()
-            RecorderLog.detail("screens: \(DebugLine.screens(screens))", category: "recorder")
+            RecorderLog.detail("screens: \(DetailLine.screens(screens))", category: "recorder")
             problemsTold.cleared(.screensNotRead)
             return screens
         } catch {
@@ -384,7 +390,7 @@ public final class Recorder {
 
     private func perform(_ action: ScreenTracker.Action) {
         RecorderLog.detail(
-            DebugLine.action(action, names: captures.mapValues { "Screen \($0.1.number) \($0.1.name)" }), category: "recorder")
+            DetailLine.action(action, names: captures.mapValues { "Screen \($0.1.number) \($0.1.name)" }), category: "recorder")
         switch action {
         case .start(let uuid, let displayID, let frameSize, let number, let name):
             captureCount += 1
@@ -682,7 +688,7 @@ public final class Recorder {
             return
         }
         recordingLog?.detail("started: \(app), recording folder \(folder.lastPathComponent)", category: "recorder")
-        recordingLog?.detail(DebugLine.facts(readyCheckFacts), category: "ready check")
+        recordingLog?.detail(DetailLine.facts(readyCheckFacts), category: "ready check")
     }
 
     private func recordingLogWriting(_ failure: ErrorDetail?) {
@@ -711,9 +717,17 @@ public final class Recorder {
     }
 
     private func tell(_ problem: RecordingProblem, kind: ProblemKind) {
-        guard case .tell(let writesManifest) = problemsTold.add(problem, kind: kind, to: &manifest) else { return }
-        if writesManifest { try? writeManifest() }
-        told(problem)
+        switch problemsTold.add(problem, kind: kind, to: &manifest) {
+        case .tell(let writesManifest):
+            if writesManifest { try? writeManifest() }
+            told(problem)
+        case .alreadyTold:
+            break
+        case .afterTheEnd:
+            // Such as the final manifest that cannot be written, or a late report of the recording log.
+            RecorderLog.error("at \(problem.at)s, after the end: \(problem.text)", category: "recorder")
+            StandardErrorWriter.shared.write("Problem at the end: \(problem.text)\n")
+        }
     }
 
     private func told(_ problem: RecordingProblem) {

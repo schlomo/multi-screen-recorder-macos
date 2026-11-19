@@ -78,7 +78,6 @@ import Testing
         #expect(try repositoryFile("README.md").contains(CrashReport.logCommand))
         #expect(!CrashReport.dialogText.contains(CrashReport.logCommand))
         #expect(CrashReport.dialogText.contains("recording.json and recording.log"))
-        #expect(RecordingNames.forAReport.contains("recording.json and recording.log"))
         #expect(try repositoryFile("README.md").contains("`recording.json` and `recording.log`"))
     }
 

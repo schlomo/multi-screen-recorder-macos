@@ -119,7 +119,7 @@ extension CommandLineInterface {
 
         @OptionGroup var flags: SettingsFlags
 
-        @Flag(help: "Detail on standard error and at debug level in the unified log.")
+        @Flag(help: "Also prints the detail lines on standard error, and writes them at debug level in the unified log.")
         var debug = false
 
         func run() async throws {
