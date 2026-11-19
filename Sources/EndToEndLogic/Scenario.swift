@@ -117,7 +117,7 @@ extension Scenario {
         Scenario(
             name: "virtual-screen",
             summary: "a virtual screen connected, its mode switched there and back, and disconnected",
-            flags: fixedFlags + ["--system-audio", "off"],
+            flags: fixedFlags + ["--system-audio", "off", "--debug"],
             settings: .init(resolution: "1080p", audioMode: "all-inputs", systemAudio: false),
             events: [
                 (2, .connectScreen(screen)),

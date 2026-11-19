@@ -1,3 +1,4 @@
+import AppKit
 import CoreGraphics
 import EndToEndLogic
 import Foundation
@@ -7,7 +8,8 @@ import VirtualScreen
 /// of this executable: ending the process removes the screen. It ends on
 /// SIGTERM, SIGINT or when its standard input closes, which happens when the
 /// driver that started it ends in any way. A line `size <width>x<height>`
-/// on its standard input switches the screen's mode.
+/// on its standard input switches the screen's mode. The screen shows
+/// moving content (`MovingContent`).
 enum VirtualScreenHelper {
     static let readyPrefix = "connected "
     static let switchedPrefix = "switched "
@@ -48,19 +50,26 @@ enum VirtualScreenHelper {
             source.resume()
             return source
         }
-        print("\(readyPrefix)\(display)")
-        fflush(stdout)
-        while let line = readLine() {
-            guard line.hasPrefix("size "), let size = ScreenSize(String(line.dropFirst("size ".count))) else { continue }
-            do {
-                try switchModeInOwnProcess(display, to: size)
-                print("\(switchedPrefix)\(size)")
-            } catch {
-                print("\(failedPrefix)\(error)")
+        Thread.detachNewThread {
+            while let line = readLine() {
+                guard line.hasPrefix("size "), let size = ScreenSize(String(line.dropFirst("size ".count))) else { continue }
+                do {
+                    try switchModeInOwnProcess(display, to: size)
+                    print("\(switchedPrefix)\(size)")
+                } catch {
+                    print("\(failedPrefix)\(error)")
+                }
+                fflush(stdout)
             }
-            fflush(stdout)
+            leave(display, at: first)
         }
-        withExtendedLifetime((screen, signals)) { leave(display, at: first) }
+        MainActor.assumeIsolated {
+            let content = MovingContent(display: display)
+            print("\(readyPrefix)\(display)")
+            fflush(stdout)
+            withExtendedLifetime((screen, signals, content)) { NSApplication.shared.run() }
+        }
+        leave(display, at: first)
     }
 
     /// Back to its first size, then the process ends and the screen with it.

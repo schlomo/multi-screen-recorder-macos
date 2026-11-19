@@ -197,13 +197,30 @@ took 97 s on the owner's Mac.
 driver keeps when it asked for the change and when it saw it done (the
 helper reported the screen active or the mode switched; for a
 disconnect, the helper has ended and the screen is gone from the active
-screens). A time the recorder writes for it lies in one of two windows,
-widened by the 0.5 s tolerance: **settled** (a screen file's start,
-`screen frame size changed`, a file's end at a mode switch) from the
-ask plus the settle time to the done plus the settle time; **immediate**
-(`screen connected`, `screen disconnected`, a file's end at a
-disconnect) from the ask to the done. `run.log` shows each change's
-times and both windows' widths.
+screens). After the done it watches every screen's place and size, the
+Mac's own included, until all have been unchanged for the settle time:
+a change can knock on to another screen (on the runner a connect
+switched the own screen from 1024 × 768 to 1920 × 1080), and each
+change starts the recorder's settle time again. A time the recorder
+writes for the change lies in one of two windows, widened by the 0.5 s
+tolerance: **settled** (a screen file's start, `screen frame size
+changed`, a file's end at a mode switch) from the ask plus the settle
+time to the moment the screens settled; **immediate** (`screen
+connected`, `screen disconnected`, a file's end at a disconnect) from
+the ask to the done. `run.log` shows each change's times, the moment the
+screens settled and both windows' widths. The `virtual-screen` scenario
+records with `--debug`, so its `msr.err` keeps the recorder's detail;
+it changes only standard error, which nothing asserts.
+
+**Moving content.** Screen capture delivers a frame only when the
+picture changes, so a virtual screen showing a static picture gives its
+file no frame to start with (seen on the runner: 26 identical black
+frames, the file's start only after the next mode switch). The device
+helper therefore puts a borderless window on its virtual screen only,
+following its bounds through mode switches, with a block that moves and
+a frame counter, redrawn 60 times a second; the window never takes the
+focus or the mouse and ends with the helper. The full pattern of "Known
+content" is not built.
 
 **Placing decoded sound.** A track's samples start at its first sample,
 which an edit list may put after the file's start (the guide track

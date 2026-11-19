@@ -38,6 +38,11 @@ import Testing
         ])
     }
 
+    @Test func onlyTheVirtualScreenScenarioRecordsWithDebugDetail() {
+        // Its msr.err keeps the recorder's detail on the screens for a later look.
+        #expect(Scenario.named.filter { $0.flags.contains("--debug") }.map(\.name) == ["virtual-screen"])
+    }
+
     @Test func everyRecordingHasACeilingSoAKilledDriverNeverLeavesItRunning() throws {
         for scenario in Scenario.named {
             let arguments = scenario.arguments(outputFolder: "/s")
