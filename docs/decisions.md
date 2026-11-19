@@ -1914,8 +1914,7 @@ architect's reading.
 
 ## D64: Diagnostics: the error detail everywhere, a recording log per recording, reports without Terminal (2026-11-19)
 
-- **Status:** in force; point 3 is decided but not built yet (see
-  "Consequences").
+- **Status:** in force; point 3 as "Report a problem" below has it.
 - **Context:** A CI run of PR #23 showed `screen file writer failed …
   The operation could not be completed` with no code: the screen file
   writer kept only `localizedDescription`, so the cause cannot be
@@ -1992,7 +1991,7 @@ architect's reading.
 - **The starting situation (2026-11-19, the owner):** "Error reporting
   as you suggest via the same GH issue template, I hope the log
   contains enough context to figure out what happened". Point 3 becomes
-  its own change, through the problem report form. The recording log
+  its own step, through the problem report form. The recording log
   starts, before the first event, with detail lines of the starting
   situation: the app's version, macOS's version and build and the Mac's
   model identifier, the effective settings as `msr settings` prints
@@ -2001,14 +2000,36 @@ architect's reading.
   a serial number. The architect's review: the block is synchronized to
   disk before the recording starts, and goes to the recording log only,
   also with `--debug`.
+- **Report a problem (2026-11-19, the owner):** "24 needs to include
+  the error reporting via GH issue template too", with the design
+  signed off as text; it replaces point 3's status window button, as
+  the status window closes and the app quits at Stop. At Stop, in the
+  app and in `msr record`, the state file remembers the last
+  recording's folder and how it ended (`problems` exactly when
+  `msr record` exits 3: the manifest's `result` is `problems` or the
+  final manifest could not be written). On the app's next start, after
+  the crash report offer, a notice "The last recording had problems"
+  offers **Report a problem** and **Dismiss**, once per recording
+  (marked in the state file before it shows) and not if the recording
+  folder is gone. Report a problem opens a new issue with the existing
+  form `problem-report.yml`, its `version` and `what-happened` fields
+  filled: the summary's error and problem lines from the recording's
+  `recording.json`, the last first, as many as keep the link within
+  8000 characters, saying how many more there are; it shows that
+  recording's `recording.json` and `recording.log` in Finder. The form
+  gains an optional field `recording-log`. `msr record` whose summary
+  says it exits 3 ends that summary, also with `--quiet`, with
+  `Report it: <the same link>` and `Attach: <recording folder>/recording.log and recording.json`.
+  The crash report and the problem report build their links in one
+  place (`IssueFormLink`).
 - **Consequences:** a recording folder holds one more file, about
   0.4 MB per hour (measured: 6.8 kB for 1 minute of 2 screens and 5
-  audio sources). Point 3's button is not built in this change: when it
-  shows (the status window closes, and the app quits, at Stop) and
-  whether the issue link fills the existing problem report form
-  (`template=problem-report.yml` and its fields) or `title` and `body`
-  are open questions for the owner.
+  audio sources). The state file is written at every Stop; one that
+  cannot be written leaves the recording unremembered (an `Error:` line
+  in `msr record`, an alert after the person's Stop in the app). The
+  link's length limit is GitHub's, about 8 kB [ASSUMED], not measured.
 - **Evidence:** [design/recorder.md](design/recorder.md), "Output on
   disk" and "Logging"; `ErrorDetailTests`, `ErrorDetailSourceTests`,
   `RecordingLogTests`, `WriterErrorTests`, `RecordingManifestTests`,
-  `ProblemsToldTests`, `StatusTextTests`.
+  `ProblemsToldTests`, `StatusTextTests`, `ProblemReportTests`,
+  `ProblemReportActionTests`, `AppStateTests`, `StateFileTests`.

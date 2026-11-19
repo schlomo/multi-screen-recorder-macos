@@ -52,4 +52,15 @@ import RecorderLogic
         #expect(message.contains("state.json"))
         #expect(!message.contains("Error Domain="))
     }
+
+    @Test func anUpdateKeepsWhatItDoesNotChange() throws {
+        let home = try scratchHome()
+        defer { try? FileManager.default.removeItem(at: home) }
+        let file = StateFile(homeFolder: home)
+        try file.save(AppState(lastOfferedCrashReport: "msr-2026-11-14-212425.ips"))
+        try file.update { $0.recorded(folder: "/r", result: .problems) }
+        #expect(try file.load() == AppState(
+            lastOfferedCrashReport: "msr-2026-11-14-212425.ips",
+            lastRecording: AppState.LastRecording(folder: "/r", result: .problems)))
+    }
 }

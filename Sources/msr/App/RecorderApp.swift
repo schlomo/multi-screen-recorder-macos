@@ -43,6 +43,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.activate()
         model.load()
         offerCrashReport(homeFolder: model.homeFolder)
+        offerProblemReport(homeFolder: model.homeFolder)
     }
 
     /// Start: the window closes; the Dock icon shows "!" when something needs the person.
@@ -72,6 +73,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if openFolder, summary?.manifestWritten == false {
             showAlert("The recording manifest could not be written",
                       "\(RecordingNames.manifest) in the recording folder does not record the end of the recording.")
+        }
+        if openFolder, let notRemembered = session.notRemembered {
+            showAlert("The recording is not remembered", ErrorDetail(notRemembered).text)
         }
     }
 
@@ -179,6 +183,32 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
         } catch {
             showAlert("Cannot offer the crash report", ErrorDetail(error).text)
+        }
+    }
+
+    /// Tells, once, that the last recording had problems, and offers to
+    /// report them: Report a problem runs `ProblemReportAction` (D64).
+    private func offerProblemReport(homeFolder: URL) {
+        do {
+            let stateFile = StateFile(homeFolder: homeFolder)
+            let state = try stateFile.load()
+            guard let folder = state.problemsNoticeFolder(folderExists: { FileManager.default.fileExists(atPath: $0) })
+            else { return }
+            // Marked before the notice, so a crash while it is open, or a quit, never shows it twice.
+            try stateFile.save(state.showingProblemsNotice())
+            let alert = NSAlert()
+            alert.messageText = ProblemReport.noticeTitle
+            alert.informativeText = ProblemReport.noticeText(recordingFolder: folder)
+            alert.addButton(withTitle: ProblemReport.reportButton)
+            alert.addButton(withTitle: ProblemReport.dismissButton)
+            guard alert.runModal() == .alertFirstButtonReturn else { return }
+            let action = ProblemReportAction(recordingFolder: URL(filePath: folder, directoryHint: .isDirectory),
+                                             version: runningVersion.description)
+            if let notOpened = action.run(opener: Workspace()) {
+                showAlert("Cannot open the browser", "Open this address yourself:\n\(notOpened.absoluteString)")
+            }
+        } catch {
+            showAlert("Cannot offer to report the last recording", ErrorDetail(error).text)
         }
     }
 

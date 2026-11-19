@@ -143,7 +143,12 @@ also report it as below.
 
 ### Reporting a problem
 
-Use the
+When a recording had problems, the app says so the next time it
+starts: **Report a problem** opens the problem report form in your
+browser with the version and what went wrong filled in, and shows that
+recording's `recording.json` and `recording.log` in Finder. `msr record`
+ends such a recording's summary with the same link (`Report it:`) and
+the files to attach (`Attach:`). Otherwise use the
 [problem report form](https://github.com/schlomo/multi-screen-recorder-macos/issues/new?template=problem-report.yml)
 (a GitHub account is needed). It asks for the output of `msr version`
 (see "Command line" below; About Multi Screen Recorder in the app's

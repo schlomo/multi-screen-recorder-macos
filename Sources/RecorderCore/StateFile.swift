@@ -37,4 +37,9 @@ public struct StateFile: Sendable {
             throw StateFileError(fileURL: url, problem: ErrorDetail(error).text)
         }
     }
+
+    /// Loads the state, changes it and saves it.
+    public func update(_ change: (AppState) -> AppState) throws(StateFileError) {
+        try save(change(load()))
+    }
 }

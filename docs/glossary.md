@@ -122,7 +122,9 @@ the state file, because GitHub refuses `.ips` attachments.
 ## State file
 
 `~/Library/Application Support/Multi Screen Recorder/state.json`: what
-the app remembers between starts (the last offered crash report), kept
+the app remembers between starts (the last offered crash report, and
+the last recording's folder, how it ended and whether its problems
+were told, D64), kept
 apart from the settings file because the person never edits it (D40).
 
 ## Restore file

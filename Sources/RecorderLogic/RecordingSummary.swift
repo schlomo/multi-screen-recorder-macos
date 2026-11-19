@@ -19,8 +19,6 @@ public struct RecordingSummary: Equatable, Sendable {
     /// (D47, D64), or the finalized manifest could not be written (F3).
     public var endedWithError: Bool { !manifest.endedWell || manifest.result == .problems || !manifestWritten }
 
-    private var errors: [RecordingEvent] { manifest.events.filter(\.event.isFailure) }
-
     public var text: String {
         var lines = ["Recorded \(Self.elapsed(seconds: seconds)) into \(recordingFolder)"]
         let files = (manifest.files.map { ($0.start, $0.name, $0.state) } + manifest.audioFiles.map { ($0.start, $0.name, $0.state) })
@@ -36,17 +34,33 @@ public struct RecordingSummary: Equatable, Sendable {
             lines.append(String(format: "CPU %.0f %% on average, %.0f %% at the peak, of one core (this process only)",
                                 cpu.averagePercent, cpu.peakPercent))
         }
-        for event in errors {
-            lines.append("Error at \(Self.elapsed(seconds: event.at)): \(event.event.rawValue)"
+        lines += whatWentWrong.map(\.line)
+        return lines.joined(separator: "\n") + "\n"
+    }
+
+    /// The events that are errors, then the problems, as the summary tells them, each with its seconds from the start.
+    public static func whatWentWrong(_ manifest: RecordingManifest) -> [(at: Double, line: String)] {
+        let errors = manifest.events.filter(\.event.isFailure).map { event in
+            (event.at, "Error at \(elapsed(seconds: event.at)): \(event.event.rawValue)"
                 + (event.subject.map { ", \($0)" } ?? "") + (event.error.map { " (\($0))" } ?? ""))
         }
-        for problem in manifest.problems {
-            lines.append("Problem at \(Self.elapsed(seconds: problem.at)): \(problem.text)")
-        }
-        if !manifestWritten {
-            lines.append("The recording manifest could not be written at the end: \(RecordingNames.manifest) has no end.")
-        }
-        return lines.joined(separator: "\n") + "\n"
+        let problems = manifest.problems.map { ($0.at, "Problem at \(elapsed(seconds: $0.at)): \($0.text)") }
+        return errors + problems
+    }
+
+    public static let manifestNotWrittenLine = "The recording manifest could not be written at the end: \(RecordingNames.manifest) has no end."
+
+    /// What the summary tells went wrong, each with its seconds from the start.
+    public var whatWentWrong: [(at: Double, line: String)] {
+        Self.whatWentWrong(manifest) + (manifestWritten ? [] : [(seconds, Self.manifestNotWrittenLine)])
+    }
+
+    /// The end of the summary of a recording that ended with an error: the
+    /// link to report it, with what went wrong, and what to attach (D64).
+    public func reportText(version: String) -> String {
+        let folder = recordingFolder.hasSuffix("/") ? recordingFolder : recordingFolder + "/"
+        return "Report it: \(ProblemReport.issueURL(whatWentWrong: whatWentWrong, version: version).absoluteString)\n"
+            + "Attach: \(folder)\(RecordingNames.recordingLog) and \(RecordingNames.manifest)\n"
     }
 
     /// "1h02m05s", "2m05s" or "5s".

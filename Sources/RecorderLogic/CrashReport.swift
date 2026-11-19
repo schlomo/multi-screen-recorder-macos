@@ -35,18 +35,7 @@ public enum CrashReport {
     }
 
     public static func issueURL(crashReportName: String, version: String, macOSVersion: String) -> URL {
-        var components = URLComponents(url: GitHubRepository.issues.appending(path: "new"), resolvingAgainstBaseURL: false)!
-        components.queryItems = [
-            URLQueryItem(name: "template", value: template),
-            URLQueryItem(name: "title", value: "Crash: \(crashReportName)"),
-            URLQueryItem(name: versionField, value: version),
-            URLQueryItem(name: macOSField, value: macOSVersion),
-        ]
-        // URLComponents leaves & = + # unencoded in values; the form needs them encoded.
-        let allowed = CharacterSet.urlQueryAllowed.subtracting(CharacterSet(charactersIn: "&=+#"))
-        components.percentEncodedQuery = components.queryItems!.map { item in
-            "\(item.name)=\(item.value!.addingPercentEncoding(withAllowedCharacters: allowed)!)"
-        }.joined(separator: "&")
-        return components.url!
+        IssueFormLink.url(template: template, title: "Crash: \(crashReportName)",
+                          fields: [(versionField, version), (macOSField, macOSVersion)])
     }
 }

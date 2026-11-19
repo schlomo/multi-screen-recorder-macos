@@ -17,12 +17,16 @@ final class RecordingSession: RecorderObserver {
     private let statusWindow = StatusWindow()
     /// Stop is in progress: a Dock click or a quit does nothing more.
     private(set) var isStopping = false
+    private let homeFolder: URL
+    /// Why the state file does not remember this recording, if it does not.
+    private(set) var notRemembered: StateFileError?
 
     /// Starts the recording, the ready check's facts for its recording log; `output` for `msr record`.
     init(
         settings: Settings, homeFolder: URL, readyCheckFacts: ReadyCheckFacts, output: RecordOutput?
     ) throws(RecorderStartError) {
         self.output = output
+        self.homeFolder = homeFolder
         recorder = try Recorder(
             settings: settings, homeFolder: homeFolder, app: "Multi Screen Recorder \(runningVersion)",
             readyCheckFacts: readyCheckFacts, observer: self)
@@ -38,7 +42,7 @@ final class RecordingSession: RecorderObserver {
 
     var folder: URL? { recorder?.folder }
 
-    /// Ends the recording; the summary of what it wrote.
+    /// Ends the recording and remembers it in the state file; the summary of what it wrote.
     func stop() async -> RecordingSummary? {
         isStopping = true
         badgeTask?.cancel()
@@ -47,7 +51,21 @@ final class RecordingSession: RecorderObserver {
         guard let recorder else { return nil }
         let summary = await recorder.stop()
         NSApp.dockTile.badgeLabel = nil
+        remember(summary)
         return summary
+    }
+
+    /// The state file remembers the recording and how it ended, for the app's next start to offer a report (D64).
+    private func remember(_ summary: RecordingSummary) {
+        do {
+            try StateFile(homeFolder: homeFolder).update {
+                $0.recorded(folder: summary.recordingFolder, result: summary.endedWithError ? .problems : .ok)
+            }
+        } catch {
+            notRemembered = error
+            RecorderLog.error("The recording is not remembered: \(ErrorDetail(error).text)", category: "state")
+            output?.tell(.error, "Error: \(ErrorDetail(error).text)\n")
+        }
     }
 
     /// Opens the status window; its Stop calls `onStop`.
