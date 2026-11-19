@@ -53,6 +53,10 @@ public struct ManifestCheck {
     public private(set) var failures: [String] = []
     /// The files listed, for the checks of the files themselves.
     public private(set) var files: [ListedFile] = []
+    /// The recorder's notices that passed their own check, by their index
+    /// among the virtual screens' events: the anchors of the starts after them.
+    public private(set) var notices: [Int: Double] = [:]
+    private var eventTimes: [Int: Double] = [:]
     /// The recording's start, in seconds of the local day.
     public private(set) var started: Double?
     /// How long the recording ran from `started` to `ended`, when finalized.
@@ -265,6 +269,20 @@ public struct ManifestCheck {
         if actual.count != expected.count {
             fail("the virtual screens have \(actual.count) screen files, expected \(expected.count): \(actual.map(\.name))")
         }
+        let virtualEvents = (events?.array ?? []).filter {
+            $0["screen"]?.string?.hasPrefix(expectation.virtualScreenNamePrefix) == true
+        }
+        let kinds = virtualEvents.map { $0["event"]?.string ?? "?" }
+        let expectedKinds = expectation.virtualScreenEvents.map(\.event)
+        if kinds == expectedKinds {
+            let noticeIndices = Set(expected.compactMap(\.noticedBy))
+            for (index, (event, wanted)) in zip(virtualEvents, expectation.virtualScreenEvents).enumerated()
+            where noticeIndices.contains(index) {
+                guard let at = event["at"]?.number else { continue }
+                eventTimes[index] = at
+                if outside(at, wanted.expected) == nil { notices[index] = at }
+            }
+        }
         var numbers: [Int] = []
         for (file, wanted) in zip(actual, expected) {
             guard case .screen(let uuid, let name, let size, _) = file.source else { continue }
@@ -273,7 +291,17 @@ public struct ManifestCheck {
                 fail("\(file.name): screen \(name), expected a name starting \(expectation.virtualScreenNamePrefix)")
             }
             if size != wanted.frameSize { fail("\(file.name): frameSize \(size), expected \(wanted.frameSize)") }
-            if let wrong = outside(file.start, ExpectedTime(change: wanted.startedBy, kind: .settled)) {
+            var startedBy = wanted.startedBy
+            if let index = wanted.noticedBy {
+                let name = expectation.virtualScreenEvents[index].event
+                startedBy.notice = notices[index]
+                if startedBy.notice == nil {
+                    let reason = eventTimes[index].map { String(format: "%@ at %.2f s, is outside its window", name, $0) } ?? "\(name), is missing"
+                    fail("\(file.name): its start is not checked: the recorder's notice, \(reason)")
+                }
+            }
+            if wanted.noticedBy == nil || startedBy.notice != nil,
+               let wrong = outside(file.start, ExpectedTime(change: startedBy, kind: .settled)) {
                 fail("\(file.name): starts at \(wrong)")
             }
             if expectation.ending == .finalized, let fileEnd = file.end {
@@ -290,11 +318,6 @@ public struct ManifestCheck {
                 fail("the first virtual screen is screen \(first), expected \(expectation.ownScreenCount + 1), after the Mac's own")
             }
         }
-        let virtualEvents = (events?.array ?? []).filter {
-            $0["screen"]?.string?.hasPrefix(expectation.virtualScreenNamePrefix) == true
-        }
-        let kinds = virtualEvents.map { $0["event"]?.string ?? "?" }
-        let expectedKinds = expectation.virtualScreenEvents.map(\.event)
         guard kinds == expectedKinds else {
             fail("the virtual screens' events are \(kinds), expected \(expectedKinds)")
             return
@@ -312,8 +335,11 @@ public struct ManifestCheck {
     private func outside(_ time: Double, _ expected: ExpectedTime) -> String? {
         let window = expected.change.window(expected.kind, settleTime: expectation.settleTime, tolerance: expectation.timeTolerance)
         guard !window.contains(time) else { return nil }
-        return String(format: "%.2f s, expected %.2f s to %.2f s, ", time, window.lowerBound, window.upperBound)
-            + expected.kind.description
+        let follows = switch (expected.kind, expected.change.anchor) {
+        case (.settled, let anchor?): String(format: "the settle time after %@ at %.2f s", anchor.source.description, anchor.time)
+        default: expected.kind.description
+        }
+        return String(format: "%.2f s, expected %.2f s to %.2f s, ", time, window.lowerBound, window.upperBound) + follows
     }
 
     private mutating func checkPlayedAudioInputs(_ events: JSONValue?) {

@@ -279,14 +279,6 @@ final class Driver {
             HappenedEvent(times: ChangeTimes(asked: seconds($0.asked), done: seconds($0.done), lastChange: seconds($0.lastChange)),
                           event: $0.event, screenUUID: $0.uuid)
         }
-        eventWindows = zip(changes, happened).map { change, event in
-            let width = { (kind: TimingKind) in
-                change.times.windowWidth(kind, settleTime: EndToEndValues.settleTime, tolerance: EndToEndValues.timeTolerance)
-            }
-            return String(format: "%@ asked at %.2f s, done at %.2f s, the screen last changed at %.2f s: the settled window is %.2f s wide, the immediate one %.2f s",
-                          Self.describe(event.event), change.times.asked, change.times.done, change.times.lastChange ?? .nan,
-                          width(.settled), width(.immediate))
-        }
         let virtual = Scenario.virtualScreenExpectation(changes)
         let stopped = scenario.stop == .duration ? scenario.stopAt : seconds(stoppedAt)
         let expectation = ManifestExpectation(
@@ -300,6 +292,17 @@ final class Driver {
             settleTime: EndToEndValues.settleTime)
         let names = try FileManager.default.contentsOfDirectory(atPath: folder.path)
         let check = ManifestCheck(manifest: manifest, folder: names, expectation: expectation)
+        eventWindows = changes.enumerated().map { index, change in
+            var times = change.times
+            times.notice = check.notices[index]
+            let width = { (kind: TimingKind) in
+                times.windowWidth(kind, settleTime: EndToEndValues.settleTime, tolerance: EndToEndValues.timeTolerance)
+            }
+            let anchor = times.anchor.map { String(format: "anchored at %.2f s, %@", $0.time, $0.source.description) } ?? "no anchor"
+            return String(format: "%@ asked at %.2f s, done at %.2f s, the screen last changed at %.2f s, %@: the settled window is %.2f s wide, the immediate one %.2f s",
+                          Self.describe(change.event), times.asked, times.done, times.lastChange ?? .nan, anchor,
+                          width(.settled), width(.immediate))
+        }
         failures += check.failures
         if let ranFor = check.ranFor {
             let latestEnd = check.files.compactMap(\.end).max()

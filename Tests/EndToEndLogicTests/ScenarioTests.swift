@@ -87,8 +87,8 @@ import Testing
         let modeSwitch = ChangeTimes(asked: 6.0, done: 6.2)
         let disconnect = ChangeTimes(asked: 11.0, done: 11.5)
         #expect(expectation.files == [
-            .init(screenUUID: "U", frameSize: [1280, 720], startedBy: connect, endedBy: .init(change: modeSwitch, kind: .settled)),
-            .init(screenUUID: "U", frameSize: [1600, 900], startedBy: modeSwitch, endedBy: .init(change: disconnect, kind: .immediate)),
+            .init(screenUUID: "U", frameSize: [1280, 720], startedBy: connect, noticedBy: 0, endedBy: .init(change: modeSwitch, kind: .settled)),
+            .init(screenUUID: "U", frameSize: [1600, 900], startedBy: modeSwitch, noticedBy: nil, endedBy: .init(change: disconnect, kind: .immediate)),
         ])
         #expect(expectation.events == [
             .init(event: "screen connected", expected: .init(change: connect, kind: .immediate)),

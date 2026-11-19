@@ -8,6 +8,10 @@ public struct ChangeTimes: Sendable, Equatable {
     /// The changed screen's last change after the ask, as the driver
     /// watched it (`ScreenSettling`); nil when not watched.
     public var lastChange: Double?
+    /// When the recorder noticed the change, by the event it writes for it
+    /// (`screen connected`), once that event has passed its own check; nil
+    /// when it writes none.
+    public var notice: Double?
 
     public init(asked: Double, done: Double, lastChange: Double? = nil) {
         self.asked = asked
@@ -15,15 +19,33 @@ public struct ChangeTimes: Sendable, Equatable {
         self.lastChange = lastChange
     }
 
+    /// What a settled time follows: the later of the recorder's notice and
+    /// the screen's last change.
+    public struct Anchor: Sendable, Equatable {
+        public enum Source: Sendable, Equatable {
+            case notice, lastChange
+
+            public var description: String { self == .notice ? "the recorder's notice" : "the screen's last change" }
+        }
+
+        public var time: Double
+        public var source: Source
+    }
+
+    public var anchor: Anchor? {
+        let candidates = [notice.map { Anchor(time: $0, source: .notice) }, lastChange.map { Anchor(time: $0, source: .lastChange) }]
+        return candidates.compactMap(\.self).max { $0.time < $1.time }
+    }
+
     /// Where a time the recorder writes for the change may lie, by its kind,
     /// widened by the tolerance: an immediate one from the ask to the done;
-    /// a settled one the settle time after the screen's last change (when
-    /// not watched, from the ask to the done, the settle time later).
+    /// a settled one the settle time after its anchor (when not watched,
+    /// from the ask to the done, the settle time later).
     public func window(_ kind: TimingKind, settleTime: Double, tolerance: Double) -> ClosedRange<Double> {
         switch kind {
         case .immediate: (asked - tolerance)...(done + tolerance)
         case .settled:
-            if let lastChange { (lastChange + settleTime - tolerance)...(lastChange + settleTime + tolerance) }
+            if let anchor { (anchor.time + settleTime - tolerance)...(anchor.time + settleTime + tolerance) }
             else { (asked + settleTime - tolerance)...(done + settleTime + tolerance) }
         }
     }
@@ -99,14 +121,19 @@ public struct ManifestExpectation: Sendable {
         public var frameSize: [Int]
         /// The connect or mode switch its file starts after, the settle time later.
         public var startedBy: ChangeTimes
+        /// The index, among the virtual screens' events, of the recorder's
+        /// notice of `startedBy` (a connect's `screen connected`); nil for a
+        /// mode switch, whose event the recorder writes only at the settle.
+        public var noticedBy: Int?
         /// The mode switch (settled) or disconnect (immediate) that ends it;
         /// nil when the recording ended first.
         public var endedBy: ExpectedTime?
 
-        public init(screenUUID: String, frameSize: [Int], startedBy: ChangeTimes, endedBy: ExpectedTime?) {
+        public init(screenUUID: String, frameSize: [Int], startedBy: ChangeTimes, noticedBy: Int?, endedBy: ExpectedTime?) {
             self.screenUUID = screenUUID
             self.frameSize = frameSize
             self.startedBy = startedBy
+            self.noticedBy = noticedBy
             self.endedBy = endedBy
         }
     }

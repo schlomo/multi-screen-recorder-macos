@@ -53,4 +53,14 @@ import Testing
         // Not watched: from the ask to the done, the settle time later.
         #expect(ChangeTimes(asked: 2.25, done: 3.75).window(.settled, settleTime: 1, tolerance: 0.5) == 2.75...5.25)
     }
+
+    @Test func theSettledWindowFollowsTheLaterOfTheNoticeAndTheLastChange() {
+        var change = ChangeTimes(asked: 2.0, done: 2.75, lastChange: 2.0625)
+        change.notice = 2.5
+        #expect(change.anchor == .init(time: 2.5, source: .notice))
+        #expect(change.window(.settled, settleTime: 1, tolerance: 0.5) == 3.0...4.0)
+        change.notice = 1.75
+        #expect(change.anchor == .init(time: 2.0625, source: .lastChange))
+        #expect(change.window(.settled, settleTime: 1, tolerance: 0.5) == 2.5625...3.5625)
+    }
 }

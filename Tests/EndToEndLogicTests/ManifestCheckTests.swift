@@ -80,9 +80,9 @@ struct SampleRecording {
             ending: killedAt.map { .killed(at: $0) } ?? .finalized, stoppedAt: killedAt ?? 17, ownScreenCount: 1,
             virtualScreenNamePrefix: "MSR Test",
             virtualScreenFiles: [
-                .init(screenUUID: virtualUUID, frameSize: [1280, 720], startedBy: connect,
+                .init(screenUUID: virtualUUID, frameSize: [1280, 720], startedBy: connect, noticedBy: 0,
                       endedBy: .init(change: modeSwitch, kind: .settled)),
-                .init(screenUUID: virtualUUID, frameSize: [1600, 900], startedBy: modeSwitch,
+                .init(screenUUID: virtualUUID, frameSize: [1600, 900], startedBy: modeSwitch, noticedBy: nil,
                       endedBy: .init(change: disconnect, kind: .immediate)),
             ],
             virtualScreenEvents: [
@@ -202,24 +202,76 @@ struct SampleRecording {
     @Test func aVirtualScreenAtTheWrongSizeOrTimeFails() {
         var sample = SampleRecording()
         sample.files[4]["frameSize"] = [1280, 720]
-        // The connect was asked at 2.0 s and done at 2.2 s: its file starts
-        // from 2.5 s to 3.7 s, after the settle time; at 2.4 s it ignored it.
+        // The recorder noticed the connect at 2.226 s: its file starts the
+        // settle time later, within the tolerance; at 2.4 s it ignored it.
         sample.files[3]["start"] = 2.4
         sample.files[3]["name"] = "2026-11-19 08.27.24 Screen 2 - MSR Test 101.mov"
         sample.files[3]["timecode"] = "08:27:24:03"
         let failures = sample.check().failures
         #expect(failures.contains("2026-11-19 08.27.29 Screen 2 - MSR Test 101.mov: frameSize [1280, 720], expected [1600, 900]"))
         #expect(failures.contains(
-            "2026-11-19 08.27.24 Screen 2 - MSR Test 101.mov: starts at 2.40 s, expected 2.50 s to 3.70 s, the settle time after the change"))
+            "2026-11-19 08.27.24 Screen 2 - MSR Test 101.mov: starts at 2.40 s, expected 2.73 s to 3.73 s, the settle time after the recorder's notice at 2.23 s"))
     }
 
     @Test func aFileStartBeforeItsScreenSettledFails() {
-        // The virtual screen last changed at 3.0 s, after the connect was done:
-        // its file starts from 3.5 s on, so 3.4 s fails though after the ask plus the settle time.
+        // The virtual screen last changed at 3.0 s, after the recorder's notice:
+        // its file starts from 3.5 s on, so 3.4 s fails though after the notice plus the settle time.
         var expectation = SampleRecording.expectation()
         expectation.virtualScreenFiles[0].startedBy.lastChange = 3.0
         #expect(SampleRecording().check(expectation).failures == [
-            "2026-11-19 08.27.25 Screen 2 - MSR Test 101.mov: starts at 3.40 s, expected 3.50 s to 4.50 s, the settle time after the change",
+            "2026-11-19 08.27.25 Screen 2 - MSR Test 101.mov: starts at 3.40 s, expected 3.50 s to 4.50 s, the settle time after the screen's last change at 3.00 s",
+        ])
+    }
+
+    /// The sample with the connect noticed at `notice` and the first virtual screen file starting at `start`;
+    /// the driver saw the screen last change at 2.05 s.
+    func connect(noticedAt notice: Double, startingAt start: Double) -> [String] {
+        var sample = SampleRecording()
+        var events = sample.manifest["events"] as! [[String: Any]]
+        events[0]["at"] = notice
+        sample.manifest["events"] = events
+        sample.files[3]["start"] = start
+        var expectation = SampleRecording.expectation()
+        expectation.virtualScreenFiles[0].startedBy.lastChange = 2.05
+        return sample.check(expectation).failures.filter { !$0.contains("timecode") }
+    }
+
+    @Test func aConnectNoticedLateStartsTheSettleTimeAfterTheNotice() {
+        #expect(connect(noticedAt: 2.5, startingAt: 3.5) == [])
+    }
+
+    @Test func onlyAConnectsEventIsANotice() {
+        #expect(SampleRecording().check().notices == [0: 2.226])
+    }
+
+    @Test func aStartTooLongAfterTheNoticeFails() {
+        #expect(connect(noticedAt: 2.5, startingAt: 4.1) == [
+            "2026-11-19 08.27.25 Screen 2 - MSR Test 101.mov: starts at 4.10 s, expected 3.00 s to 4.00 s, the settle time after the recorder's notice at 2.50 s",
+        ])
+    }
+
+    @Test func aStartBeforeTheNoticePlusTheSettleTimeFails() {
+        #expect(connect(noticedAt: 2.5, startingAt: 2.9) == [
+            "2026-11-19 08.27.25 Screen 2 - MSR Test 101.mov: starts at 2.90 s, expected 3.00 s to 4.00 s, the settle time after the recorder's notice at 2.50 s",
+        ])
+    }
+
+    @Test func aNoticeOutsideItsWindowFailsTheStartToo() {
+        // The connect was asked at 2.0 s and done at 2.2 s: its notice is due by 2.7 s.
+        #expect(connect(noticedAt: 2.9, startingAt: 3.9) == [
+            "2026-11-19 08.27.25 Screen 2 - MSR Test 101.mov: its start is not checked: the recorder's notice, screen connected at 2.90 s, is outside its window",
+            "screen connected at 2.90 s, expected 1.50 s to 2.70 s, with the change",
+        ])
+    }
+
+    @Test func aMissingNoticeFailsTheStart() {
+        var sample = SampleRecording()
+        var events = sample.manifest["events"] as! [[String: Any]]
+        events[0]["at"] = nil
+        sample.manifest["events"] = events
+        #expect(sample.check().failures == [
+            "2026-11-19 08.27.25 Screen 2 - MSR Test 101.mov: its start is not checked: the recorder's notice, screen connected, is missing",
+            "event {\"event\": \"screen connected\", \"screen\": \"MSR Test 101\"} has no time",
         ])
     }
 
@@ -237,6 +289,7 @@ struct SampleRecording {
         events.swapAt(0, 1)
         sample.manifest["events"] = events
         #expect(sample.check().failures == [
+            "2026-11-19 08.27.25 Screen 2 - MSR Test 101.mov: its start is not checked: the recorder's notice, screen connected, is missing",
             "the virtual screens' events are [\"screen frame size changed\", \"screen connected\", \"screen disconnected\"], expected [\"screen connected\", \"screen frame size changed\", \"screen disconnected\"]",
         ])
         var late = SampleRecording()

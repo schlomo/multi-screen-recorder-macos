@@ -178,14 +178,14 @@ extension Scenario {
             case .connectScreen(let spec):
                 open[spec.serialNumber] = files.count
                 files.append(.init(screenUUID: event.screenUUID ?? "?", frameSize: [spec.sizes[0].width, spec.sizes[0].height],
-                                   startedBy: event.times, endedBy: nil))
+                                   startedBy: event.times, noticedBy: events.count, endedBy: nil))
                 events.append(.init(event: "screen connected", expected: .init(change: event.times, kind: .immediate)))
             case .switchScreenMode(let serialNumber, let size):
                 guard let index = open[serialNumber] else { continue }
                 files[index].endedBy = .init(change: event.times, kind: .settled)
                 open[serialNumber] = files.count
                 files.append(.init(screenUUID: files[index].screenUUID, frameSize: [size.width, size.height],
-                                   startedBy: event.times, endedBy: nil))
+                                   startedBy: event.times, noticedBy: nil, endedBy: nil))
                 events.append(.init(event: "screen frame size changed", expected: .init(change: event.times, kind: .settled)))
             case .disconnectScreen(let serialNumber):
                 if let index = open.removeValue(forKey: serialNumber) {

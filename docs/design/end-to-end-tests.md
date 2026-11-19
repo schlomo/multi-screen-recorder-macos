@@ -207,12 +207,21 @@ connect switched the own screen from 1024 × 768 to 1920 × 1080, which
 can move the virtual screen too); another screen's change does not
 count. A screen that has not settled within 15 s of the done fails the
 scenario. A time the recorder writes for the change lies in one of two
-windows, widened by the 0.5 s tolerance: **settled** (a screen file's
-start, `screen frame size changed`, a file's end at a mode switch) the
-settle time after the screen's last change; **immediate** (`screen
+windows, widened by the 0.5 s tolerance: **immediate** (`screen
 connected`, `screen disconnected`, a file's end at a disconnect) from
-the ask to the done. `run.log` shows each change's times, the screen's
-last change and both windows' widths. The `virtual-screen` scenario
+the ask to the done; **settled** (a screen file's start, `screen frame
+size changed`, a file's end at a mode switch) the settle time after the
+change's anchor. The anchor is the later of the screen's last change and
+the recorder's notice of the change: for a connect, its `screen
+connected` time, which the recorder writes when macOS tells it of the
+screen, measured up to about 0.5 s after the screen is in the active
+display list; a mode switch has no notice, as the recorder writes
+`screen frame size changed` only at the settle (its own notice
+measured 0.03 to 0.08 s after the screen's last change). A connect's
+file start is checked only against a notice that passed its own check;
+a missing or misplaced notice fails the start too, naming it. `run.log`
+shows each change's times, the screen's last change, the anchor and
+where it came from, and both windows' widths. The `virtual-screen` scenario
 records with `--debug`, so its `msr.err` keeps the recorder's detail;
 it changes only standard error, which nothing asserts.
 
