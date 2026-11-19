@@ -74,45 +74,63 @@ struct Run: ParsableCommand {
         _ = try restorer.save()
         Interruption.shared.watch()
         RunLog.out("msr-end-to-end: \(driver.version), \(scenarios.count) scenarios; the Mac cannot be used until they end")
+        Review.clear(scratch: scratchFolder)
+        let github = GitHubOutput(environment: ProcessInfo.processInfo.environment)
+        var rows: [GitHubReport.Row] = []
+        let startNotes = driver.startWindow()
+        for note in startNotes { RunLog.out("      evidence: \(note)") }
+        rows.append(.init(scenario: ReviewNames.appStep, result: "evidence", seconds: nil, margin: nil, firstFailure: nil,
+                          notes: startNotes.first))
         var tally = RunTally(total: scenarios.count)
         for scenario in scenarios {
             let began = Date()
             do {
                 let failures = try driver.run(scenario)
-                let took = String(format: "%.0f s", Date().timeIntervalSince(began))
+                let seconds = Int(Date().timeIntervalSince(began).rounded())
                 let folder = scratchFolder.appending(path: scenario.name)
                 if failures.isEmpty {
                     tally.passed()
-                    RunLog.out("ok    \(scenario.name) (\(took)): \(scenario.summary)")
+                    RunLog.out("ok    \(scenario.name) (\(seconds) s): \(scenario.summary)")
                     try? FileManager.default.removeItem(at: folder)
                 } else {
                     tally.failed()
-                    RunLog.error("FAIL  \(scenario.name) (\(took)): \(scenario.summary)")
+                    RunLog.error("FAIL  \(scenario.name) (\(seconds) s): \(scenario.summary)")
                     for failure in failures { RunLog.error("      \(failure)") }
                     RunLog.error("      kept: \(folder.path)")
+                    github.annotate(scenario: scenario.name, failures[0])
                 }
                 if let margin = driver.margin { RunLog.out("      margin: \(margin)") }
+                for note in driver.evidenceNotes { RunLog.out("      evidence: \(note)") }
+                rows.append(.init(scenario: scenario.name, result: failures.isEmpty ? "ok" : "FAIL", seconds: seconds,
+                                  margin: driver.margin, firstFailure: failures.first, notes: driver.evidenceNotes.first))
             } catch {
                 tally.stopped("\(scenario.name): \(error)")
                 RunLog.error("STOP  \(scenario.name): \(error); kept: \(scratchFolder.appending(path: scenario.name).path)")
+                github.annotate(scenario: scenario.name, "\(error)")
+                rows.append(.init(scenario: scenario.name, result: "STOP", seconds: nil, margin: nil, firstFailure: "\(error)"))
                 break
             }
             guard restore(driver, keepingFile: true) else {
                 tally.stopped("the restore after \(scenario.name) failed")
                 RunLog.error("STOP  the restore after \(scenario.name) failed")
+                github.annotate(scenario: scenario.name, "the restore after \(scenario.name) failed")
                 break
             }
             if Interruption.shared.happened {
                 tally.stopped("interrupted after \(scenario.name)")
                 RunLog.error("STOP  interrupted after \(scenario.name)")
+                github.annotate(scenario: scenario.name, "interrupted after \(scenario.name)")
                 break
             }
         }
-        switch tally.verdict(finalRestoreSucceeded: restore(driver, keepingFile: false)) {
+        let verdict = tally.verdict(finalRestoreSucceeded: restore(driver, keepingFile: false))
+        switch verdict {
         case .passed(let line):
             RunLog.out(line)
+            try github.summarize(rows: rows, verdict: line)
         case .failed(let lines):
             for line in lines { RunLog.error(line) }
+            try github.summarize(rows: rows, verdict: lines.joined(separator: "; "))
             throw ExitCode.failure
         }
     }

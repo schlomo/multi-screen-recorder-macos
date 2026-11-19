@@ -50,8 +50,8 @@ compiled code (D29), and the end-to-end tests in a third (D63):
 
 | Job | Holds | Does |
 |---|---|---|
-| `test-and-build` | the checkout, read access; no secret, no token | `scripts/test`, `scripts/build-app`, `scripts/smoke-test`; uploads `build/msr-app.tar` as a workflow artifact (kept 1 day) |
-| `end-to-end-test` | the checkout, read access; no secret, no token | downloads the artifact, `scripts/unpack-app`, `scripts/ci-install-end-to-end-tools`, `scripts/end-to-end-test` with its scratch folder in `$RUNNER_TEMP/end-to-end`; the runner image grants both permissions. When it fails, it uploads that folder (the kept scenario folders, the restore file if left, the driver's log `run.log`) as the workflow artifact `end-to-end-scratch`, kept 14 days |
+| `test-and-build` | the checkout, read access; no secret, no token | `scripts/test` writing JUnit XML (`--xunit-output`), `scripts/build-app`, `scripts/smoke-test`; uploads `build/msr-app.tar` as a workflow artifact (kept 1 day) and, passed or failed, the JUnit XML as `unit-tests-junit` (kept 14 days) |
+| `end-to-end-test` | the checkout, read access; no secret, no token | downloads the artifact, `scripts/unpack-app`, `scripts/ci-install-end-to-end-tools`, `scripts/end-to-end-test` with its scratch folder in `$RUNNER_TEMP/end-to-end`; the runner image grants both permissions. Passed or failed, it uploads that folder as the workflow artifact `end-to-end-review`, kept 14 days: the driver's log, each scenario's review files and the app's screenshots, failed scenarios' folders and a restore file if left ([end-to-end-tests.md](end-to-end-tests.md), "Artifacts for review"); the driver also writes the job summary's table and an annotation per failure |
 | `snapshot-release`, `release` (the signing jobs) | the checkout, write access, the signing secret in the import step only, the token in the publish step only | downloads the artifact, `scripts/unpack-app`, `scripts/ci-import-signing-certificate`, `scripts/sign-app`, then `scripts/publish-snapshot-release` or `scripts/publish-release` |
 
 | When | What runs |

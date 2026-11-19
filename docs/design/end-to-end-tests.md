@@ -113,10 +113,10 @@ unasked (`AGENTS.md`, "Facts that bite"). Not part of
 whose image grants both permissions (D63): the job `end-to-end-test`
 after `test-and-build`, with ffmpeg and BlackHole installed at fixed
 versions by `scripts/ci-install-end-to-end-tools`; the signing jobs
-wait for it, so nothing that failed it is signed or published. When it
-fails, the job keeps the driver's scratch folder as the workflow
-artifact `end-to-end-scratch` for 14 days: the failed scenarios'
-folders, the restore file if one is left, and `run.log`.
+wait for it, so nothing that failed it is signed or published. Every
+run of the job, passed or failed, keeps the driver's scratch folder as
+the workflow artifact `end-to-end-review` for 14 days ("Artifacts for
+review").
 
 ### Built so far
 
@@ -143,6 +143,8 @@ identity had, so the helper puts it back to its first size when it
 starts and when it ends. A frame size change is therefore a mode switch
 on the virtual screen, not the replacement "The design" describes; the
 owner confirmed it (D63).
+
+The review files and screenshots: "Artifacts for review".
 
 The driver writes its error lines (`FAIL`, `STOP`, `restore: FAILED`,
 `restore: NOT RESTORED`) to standard error and its progress and `ok`
@@ -191,6 +193,48 @@ driver saw the change (beyond the settle time), the tone within 1 dB,
 a click within 5 ms across files (measured: within 1 ms) and 1 ms of
 one second apart in BlackHole's file. A run of the six took 97 s on the
 owner's Mac.
+
+### Artifacts for review
+
+The owner (2026-11-19): "full artifact upload now, only homepage
+screenshot automation comes later", and "No, screenshots as artifacts
+now, to check them" (D63). Each run writes, in its scratch folder:
+
+- `run.log`: every line the driver printed.
+- `review/<scenario>/` for each scenario, passed ones included:
+  `recording.json`; `contact-sheet.png`, a still from the middle of
+  each screen file (taken by `ffmpeg`) under a strip with the file's
+  name; `excerpt <file>`, the first 5 s (`reviewExcerptSeconds`) of the
+  smallest screen file and, in `tone` and `system-audio`, of
+  BlackHole's audio file, copied by `ffmpeg -c copy`, not re-encoded.
+- Screenshots of the app's real windows, taken with `screencapture -l`
+  by the window's number from `CGWindowListCopyWindowInfo`:
+  `review/app/app-start-window-light.png`, the start window of the
+  built app started as `msr` without arguments, with a scratch `HOME`
+  (its ready check, `state.json` and crash report folder are there),
+  before the scenarios, then quit; and in `plain-recording` at 4 s the
+  status window, opened as a click on the Dock icon does, by the
+  reopen Apple event. macOS may want the person's consent for that
+  event (asked without a prompt first): then the main screen is taken
+  instead, `plain-recording-main-screen-light.jpg`, and a note says so.
+  Only the light appearance: `AppleInterfaceStyle` set to `Dark` in the
+  app's own defaults domain left its window light (tried 2026-11-19), so
+  dark screenshots are not taken.
+- A failed scenario's whole folder stays, as before, and a restore file
+  if one is left.
+
+**Screenshots are evidence, not assertions,** the one named exception
+to "Fail early and loudly": a screenshot that cannot be taken is a note
+in `run.log` and the job summary, and the scenario goes on, because what
+it shows is not under test. Everything else in the review folder fails
+its scenario when it cannot be made.
+
+In GitHub Actions the driver also reports in GitHub's own formats:
+when `GITHUB_STEP_SUMMARY` is set it appends a table to the job summary
+(scenario, result, time, margin, first failure, evidence notes), and
+when `GITHUB_ACTIONS` is `true` each `FAIL` and `STOP` is also an
+`::error` workflow command on standard output, escaped as GitHub
+requires, while the error line itself stays on standard error.
 
 ### Known content
 

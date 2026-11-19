@@ -49,6 +49,18 @@ struct Media {
         return data.withUnsafeBytes { Array($0.bindMemory(to: Float.self)) }
     }
 
+    /// One frame of a video file at `seconds`, as a PNG.
+    func still(_ file: URL, at seconds: Double, to png: URL) throws {
+        _ = try run(ffmpeg, ["-nostdin", "-v", "error", "-y", "-ss", String(format: "%.3f", seconds), "-i", file.path,
+                             "-map", "0:v:0", "-frames:v", "1", png.path])
+    }
+
+    /// The first `seconds` of a file, every stream copied, not re-encoded.
+    func excerpt(_ file: URL, seconds: Int, to target: URL) throws {
+        _ = try run(ffmpeg, ["-nostdin", "-v", "error", "-y", "-i", file.path, "-t", "\(seconds)", "-map", "0",
+                             "-c", "copy", target.path])
+    }
+
     @discardableResult
     private func run(_ tool: String, _ arguments: [String], standardError: URL? = nil) throws -> (output: Data, status: Int32) {
         let output = scratch.appending(path: "tool.out")

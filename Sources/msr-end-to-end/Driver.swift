@@ -20,6 +20,10 @@ final class Driver {
     /// The last finalized scenario's margins past its stop, for calibrating
     /// the finalize allowance.
     private(set) var margin: String?
+    /// The last scenario's screenshots that could not be taken, one line each.
+    private(set) var evidenceNotes: [String] = []
+    /// The last scenario's recording, for its review files.
+    private var lastRecording: (folder: URL, files: [ListedFile], probed: [String: ProbedFile])?
 
     init(app: URL, scratch: URL, restorer: Restorer, media: Media) throws {
         msr = app.appending(path: "Contents/MacOS/msr")
@@ -63,6 +67,8 @@ final class Driver {
     /// One scenario: its failures, one line each.
     func run(_ scenario: Scenario) throws -> [String] {
         margin = nil
+        evidenceNotes = []
+        lastRecording = nil
         let folder = scratch.appending(path: scenario.name)
         try? FileManager.default.removeItem(at: folder)
         let home = folder.appending(path: "home")
@@ -129,6 +135,13 @@ final class Driver {
             }
         }
 
+        if let at = scenario.statusWindowAt {
+            try interruption.sleep(until: begun.addingTimeInterval(at))
+            evidenceNotes += screenshot(of: recorder.pid, scenario: scenario.name, window: "status-window",
+                                        opening: { try Screenshots.send(AEEventID(kAEReopenApplication), to: recorder.pid) })
+            if !evidenceNotes.isEmpty { evidenceNotes += mainScreenshot(scenario: scenario.name) }
+        }
+
         let stoppedAt: Date
         switch scenario.stop {
         case .duration:
@@ -146,8 +159,82 @@ final class Driver {
         tone?.stop()
         tone = nil
 
-        return try assertions(scenario, recorder: recorder, output: output, logs: logs, ownScreenCount: ownScreenCount,
-                              happened: happened, stoppedAt: stoppedAt)
+        var failures = try assertions(scenario, recorder: recorder, output: output, logs: logs, ownScreenCount: ownScreenCount,
+                                      happened: happened, stoppedAt: stoppedAt)
+        if let recording = lastRecording {
+            do {
+                try Review(scratch: scratch, scenario: scenario.name, media: media)
+                    .collect(recording: recording.folder, files: recording.files, probed: recording.probed,
+                             playsTone: scenario.playsTone)
+            } catch {
+                failures.append("the review files cannot be made: \(error)")
+            }
+        }
+        return failures
+    }
+
+    /// The app's start window, as a person sees it on starting the app:
+    /// the built app started with the scratch HOME, its window captured,
+    /// then quit. Evidence only: what went wrong is returned, one line each.
+    func startWindow() -> [String] {
+        do {
+            return try startWindowScreenshot()
+        } catch {
+            return ["the screenshot of the start window was not taken: \(error)"]
+        }
+    }
+
+    private func startWindowScreenshot() throws -> [String] {
+        let folder = scratch.appending(path: ReviewNames.appStep)
+        try? FileManager.default.removeItem(at: folder)
+        let home = folder.appending(path: "home")
+        try FileManager.default.createDirectory(at: home, withIntermediateDirectories: true)
+        var environment = ProcessInfo.processInfo.environment
+        environment["HOME"] = home.path
+        let app = try ChildProcess(executable: msr.path, arguments: [], environment: environment,
+                                   standardOutput: folder.appending(path: "app.out"), standardError: folder.appending(path: "app.err"))
+        try restorer.started(app, stopSignal: SIGTERM)
+        defer {
+            if !app.hasExited {
+                do {
+                    try Screenshots.send(AEEventID(kAEQuitApplication), to: app.pid)
+                } catch {
+                    app.signal(SIGTERM)
+                }
+                if !app.wait(seconds: 15) { app.signal(SIGKILL); _ = app.wait(seconds: 5) }
+            }
+            try? restorer.ended(app)
+            try? FileManager.default.removeItem(at: folder)
+        }
+        return screenshot(of: app.pid, scenario: ReviewNames.appStep, window: "start-window", opening: {})
+    }
+
+    /// The main screen instead, when the window could not be opened.
+    private func mainScreenshot(scenario: String) -> [String] {
+        do {
+            let folder = scratch.appending(path: ReviewNames.folder).appending(path: scenario)
+            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+            try Screenshots.captureMainScreen(to: folder.appending(path: ReviewNames.mainScreen(scenario: scenario)))
+            return ["the main screen was taken instead"]
+        } catch {
+            return ["the main screen was not taken either: \(error)"]
+        }
+    }
+
+    /// Opens a window of the process, waits for it, lets it draw and
+    /// captures it into the review folder; what went wrong, if anything.
+    private func screenshot(of pid: pid_t, scenario: String, window: String, opening: () throws -> Void) -> [String] {
+        do {
+            try opening()
+            let id = try Screenshots.windowID(of: pid, seconds: 20)
+            Thread.sleep(forTimeInterval: 1.5)
+            let folder = scratch.appending(path: ReviewNames.folder).appending(path: scenario)
+            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+            try Screenshots.capture(id, to: folder.appending(path: ReviewNames.screenshot(scenario: scenario, window: window)))
+            return []
+        } catch {
+            return ["the screenshot of the \(window.replacing("-", with: " ")) was not taken: \(error)"]
+        }
     }
 
     private func disconnectAllScreens() {
@@ -226,6 +313,7 @@ final class Driver {
                 failures.append("\(file.name): cannot be read: \(error)")
             }
         }
+        lastRecording = (folder, check.files, probed)
         if scenario.playsTone {
             failures += try toneFailures(check.files, probed: probed, folder: folder)
         }

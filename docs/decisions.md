@@ -1960,10 +1960,27 @@ architect's reading.
      "Fail early and loudly" asks; progress and `ok` lines stay on
      standard output, and the device helper's `failed` line on its
      standard output is its protocol with the driver.
+  7. Every run of `end-to-end-test` uploads its scratch folder as the
+     artifact `end-to-end-review` (14 days): the driver's log, each
+     scenario's `recording.json`, a contact sheet and the first 5 s of a
+     screen file and of BlackHole's file, and screenshots of the app's
+     real start and status windows taken during the run; the driver
+     writes the job summary's table and an annotation per failure;
+     `test-and-build` uploads the unit tests' JUnit XML as
+     `unit-tests-junit`. Screenshots are evidence, not assertions: one
+     that cannot be taken is a note, never a failure, the one named
+     exception to "Fail early and loudly". Only light screenshots:
+     `AppleInterfaceStyle` in the app's own defaults domain left the
+     window light. Rendering windows from made-up devices stays for the
+     homepage's screenshot script.
 - **Rulings of 2026-11-19:** the owner on points 1, 5 and the mode
   switch below: "3 design choices for e2e test ok". The owner on
   point 6: "Stderror handling think big as architect and apply common
-  sense"; point 6 is the architect's ruling under it.
+  sense"; point 6 is the architect's ruling under it. The owner on
+  point 7: "full artifact upload now, only homepage screenshot
+  automation comes later", "No, screenshots as artifacts now, to check
+  them", and "And also in dark mode if easy to have"; real windows
+  during the run, not offscreen renders, is the architect's call.
 - **Deviation from the agreed design, confirmed by the owner:** the
   design makes a frame size change by replacing a virtual screen with
   one of another size. Tried on 2026-11-19 (macOS 27.2.1): macOS brings

@@ -16,6 +16,10 @@ public enum EndToEndValues {
     /// How much less than everything up to the kill's last fragment a
     /// killed file may hold, in seconds.
     public static let killSlack = 0.5
+    /// How much of a recording's start the review artifact keeps of one
+    /// screen file per scenario and of the loopback device's audio file, in
+    /// seconds, cut without re-encoding.
+    public static let reviewExcerptSeconds = 5
     /// How far the tone's level may be from what was played, in dB.
     public static let levelTolerance = 1.0
     /// A stretch this far below the tone's level is silent, in dB.
