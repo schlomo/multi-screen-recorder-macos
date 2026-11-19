@@ -1284,8 +1284,12 @@ recording log is written, synchronized and closed before the recording
 manifest is finalized: if that fails, it is a problem in the final
 manifest and the `result` is `problems` (exit 3 for `msr record`). A
 problem reported after the manifest is finalized (the final manifest
-that cannot be written) goes to standard error and the unified log
-only. Its cost: a
+that cannot be written, or a late report of the recording log) goes to
+the unified log and, in the app and in `msr record` (also with
+`--quiet`), to standard error as `Problem at the end: <the problem as
+the status window lists it>`, such as `Problem at the end: Cannot write
+the recording manifest: …`; it is printed when the problem is reported,
+before the summary of `msr record`. Its cost: a
 1-minute recording of 2 screens and 5 audio sources wrote 56 lines,
 6.8 kB [KNOWN, measured 2026-11-19], most of it the clock drift block
 (one line per audio source every 10 s), so about 0.4 MB per hour, and
@@ -1356,7 +1360,7 @@ wander, and fast wanders as a bound on how much worse they get; the
 support line with hand-made points and the rate; the resampler's purity,
 its sample count, chunking and a rate change; clicks, gaps with the
 drift during them, and the rate and what is still off right after a gap,
-through the whole correction; when the status and the `--debug` line are
+through the whole correction; when the status and the detail line are
 due) and an audio file's `clockDriftPpm` and `clockDriftCorrection`
 (never `-0`), splitting interleaved and non-interleaved PCM, the guide
 track mixes, audio file names and metadata, our process's CPU use, the
@@ -1581,7 +1585,7 @@ peak, of one core (this process only)`.
 Built (the clock drift correction): every audio source resampled to
 follow the shared clock (see "Audio", "Clock drift"), `clockDriftPpm`
 and `clockDriftCorrection` per audio file, the status window's "Clock
-drift" column and the `--debug` lines. Tested by unit tests against
+drift" column and the detail lines. Tested by unit tests against
 simulated devices. Run on the owner's Mac on 2026-11-16 (two runs of
 90 s, wired audio mode and the system audio; their builds were not
 recorded) with one interval's smallest lateness, a follow time of 5 s
@@ -1656,7 +1660,7 @@ screens on the owner's Mac): result ok, no event; `clockDriftPpm` Razer
 -115.2, CalDigit +50.2, BRIO +2.5, MacBook +3.2, the system audio +6.3;
 `clockDriftCorrection` Razer +0.4139 s, CalDigit -0.1804 s, BRIO
 -0.0146 s, MacBook -0.0108 s, the system audio +0.0002 s; "ms off" in
-the `--debug` lines from 30 s on at most 0.21 (Razer), 0.17 (CalDigit),
+the detail lines from 30 s on at most 0.21 (Razer), 0.17 (CalDigit),
 0.83 (BRIO), 0.10 (MacBook) and 0.92 (the system audio). By room sound
 the Razer's and the BRIO's files kept the same lag, -16.1 to -16.8 ms
 in ten of twelve 60 s stretches across the hour, the other two with too

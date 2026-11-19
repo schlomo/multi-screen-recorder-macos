@@ -350,7 +350,7 @@ final class AudioCapture: @unchecked Sendable {
     }
 
     /// The correction's status to the recorder about once a second; the recorder
-    /// writes the `--debug` lines of all sources together.
+    /// writes the detail lines of all sources together.
     private func reportClockDrift(at now: Int64) {
         guard clockDriftSchedule.due(at: now) else { return }
         reports.clockDrift(correction.status)
