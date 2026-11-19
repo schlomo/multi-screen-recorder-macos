@@ -230,8 +230,12 @@ private final class CollectingFile: RecordingLogFile {
         #expect(lines.contains("a repeat of the one before: yes"))
         #expect(lines.contains("detail capture: video encoders for hvc1: "))
         #expect(lines.contains("timecode: 1 sample, last at 0.000 s"))
-        // The writer failed on its own, behind an append that returned true.
-        #expect(lines.contains("no append returned false"))
+        // Which way it fails is the encoder's: on its own behind an append that
+        // returned true, or by refusing the append (the hosted runner's, 2026-11-19).
+        // The line tells which, never both.
+        let failedOnItsOwn = lines.contains("no append returned false")
+        let refused = lines.contains("the first append that returned false: video")
+        #expect(failedOnItsOwn != refused)
     }
 
     @Test func aChangeOfOnlyTheColourPrimariesChangesTheFrameKeyAndIsTold() throws {
