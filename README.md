@@ -260,7 +260,9 @@ Once, on the Mac:
    me override defaults" ticked, validity 3650 days (the default is one
    year, and a new certificate means granting both permissions again),
    the rest unchanged, in the login keychain.
-4. For the pipeline, by the repository owner only: export the
+4. For the end-to-end tests: `brew install ffmpeg` and
+   `brew install --cask blackhole-2ch` (an administrator's password, once).
+5. For the pipeline, by the repository owner only: export the
    certificate from My Certificates as `.p12` with an empty password,
    then
 
@@ -277,6 +279,7 @@ scripts/build-app   # builds the app in build/, signed ad hoc
 scripts/smoke-test  # runs the bundled msr: version, settings, exit codes
 scripts/sign-app    # re-signs it with your certificate and zips it into build/
 scripts/install-app # builds, signs and installs it into /Applications
+scripts/end-to-end-test # records with the built app and checks the result; the Mac is busy meanwhile
 ```
 
 `scripts/sign-app` signs with the identity named in

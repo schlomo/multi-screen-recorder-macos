@@ -1,0 +1,24 @@
+/// The end-to-end tests' tolerances (*data*), calibrated on the first
+/// recordings on the owner's Mac (2026-11-19) and to be revisited when a
+/// run shows them too tight or too loose.
+public enum EndToEndValues {
+    /// How far a time in the manifest may be from when the driver saw the
+    /// change happen, beyond the settle time, in seconds.
+    public static let timeTolerance = 0.5
+    /// How long a screen waits unchanged before its file starts: the
+    /// recorder's settle time (recorder.md), restated here, not read from
+    /// the recorder's code.
+    public static let settleTime = 1.0
+    /// How much less than everything up to the kill's last fragment a
+    /// killed file may hold, in seconds.
+    public static let killSlack = 0.5
+    /// How far the tone's level may be from what was played, in dB.
+    public static let levelTolerance = 1.0
+    /// A stretch this far below the tone's level is silent, in dB.
+    public static let quietBelowTone = 10.0
+    /// How far apart the same click may be in two files, placed by their
+    /// timecode, in seconds.
+    public static let clickTolerance = 0.005
+    /// How far two clicks in one file may be from one second apart.
+    public static let clickPeriodTolerance = 0.001
+}

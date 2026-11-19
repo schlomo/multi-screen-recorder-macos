@@ -1,0 +1,65 @@
+import Foundation
+import Testing
+@testable import EndToEndLogic
+
+@Suite struct ScenarioTests {
+    @Test func theNamedScenariosHaveUniqueNamesAndTheirEventsInOrder() {
+        let names = Scenario.named.map(\.name)
+        #expect(Set(names).count == names.count)
+        #expect(names == ["plain-recording", "virtual-screen", "tone", "system-audio", "stop-by-ctrl-c", "stop-by-kill"])
+        for scenario in Scenario.named {
+            #expect(scenario.events.map(\.at) == scenario.events.map(\.at).sorted())
+            #expect(scenario.events.allSatisfy { $0.at < scenario.stopAt })
+        }
+    }
+
+    @Test func eachVirtualScreenEndsAtTheSizeItStarted() {
+        // macOS brings an identity back at its last mode: a scenario leaves it at its first.
+        for scenario in Scenario.named {
+            var sizes: [UInt32: (first: ScreenSize, now: ScreenSize)] = [:]
+            for (_, event) in scenario.events {
+                switch event {
+                case .connectScreen(let spec): sizes[spec.serialNumber] = (spec.sizes[0], spec.sizes[0])
+                case .resizeScreen(let serial, let size): sizes[serial]?.now = size
+                case .disconnectScreen(let serial):
+                    #expect(sizes[serial].map { $0.first == $0.now } == true)
+                }
+            }
+        }
+    }
+
+    @Test func theRecordCommandCarriesTheFolderTheFlagsAndADuration() {
+        let plain = Scenario.named[0]
+        #expect(plain.arguments(outputFolder: "/s") == ["record", "--output-folder", "/s", "--duration", "8s"])
+        let tone = Scenario.named.first { $0.name == "tone" }!
+        #expect(tone.arguments(outputFolder: "/s") == [
+            "record", "--output-folder", "/s", "--resolution", "1080p", "--audio-mode", "all-inputs", "--system-audio", "off",
+        ])
+    }
+
+    @Test func aConnectAResizeAndADisconnectGiveTheirFilesAndEvents() {
+        let spec = VirtualScreenSpec(serialNumber: 101, sizes: [.init(width: 1280, height: 720), .init(width: 1600, height: 900)])
+        let expectation = Scenario.virtualScreenExpectation([
+            HappenedEvent(at: 2.2, event: .connectScreen(spec), screenUUID: "U"),
+            HappenedEvent(at: 6.2, event: .resizeScreen(serialNumber: 101, to: spec.sizes[1]), screenUUID: "U"),
+            HappenedEvent(at: 11.2, event: .disconnectScreen(serialNumber: 101)),
+        ], settleTime: 1)
+        #expect(expectation.files == [
+            .init(screenUUID: "U", frameSize: [1280, 720], connectedAt: 2.2, disconnectedAt: 7.2),
+            .init(screenUUID: "U", frameSize: [1600, 900], connectedAt: 6.2, disconnectedAt: 11.2),
+        ])
+        #expect(expectation.events == [
+            .init(event: "screen connected", at: 2.2), .init(event: "screen frame size changed", at: 7.2),
+            .init(event: "screen disconnected", at: 11.2),
+        ])
+    }
+
+    @Test func aScreenStillConnectedAtTheStopHasNoDisconnect() {
+        let spec = VirtualScreenSpec(serialNumber: 102, sizes: [.init(width: 1280, height: 720)])
+        let expectation = Scenario.virtualScreenExpectation([HappenedEvent(at: 1, event: .connectScreen(spec), screenUUID: "V")],
+                                                            settleTime: 1)
+        #expect(expectation.files.map(\.disconnectedAt) == [nil])
+        #expect(expectation.events.map(\.event) == ["screen connected"])
+        #expect(spec.name == "MSR Test 102")
+    }
+}

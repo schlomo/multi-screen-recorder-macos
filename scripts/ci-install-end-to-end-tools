@@ -1,0 +1,65 @@
+#!/usr/bin/env bash
+# CI only: installs what scripts/end-to-end-test needs on a hosted runner, at
+# fixed versions checked by their SHA-256: ffmpeg and ffprobe (static builds
+# for Apple silicon) into a folder put first on the PATH of the steps after
+# this one, and the BlackHole 2ch loopback driver, then restarts Core Audio
+# and waits until the device is listed. Downloads come from the projects'
+# own sites (the owner, 2026-11-16: downloads in CI are fine).
+set -euo pipefail
+
+me="scripts/ci-install-end-to-end-tools"
+ffmpeg_url="https://ffmpeg.martin-riedl.de/download/macos/arm64/1789931890_9.0.2"
+ffmpeg_sha256="c8ed4c4e6978a03c485edbfe4e0a5dc2380f8a30bba5150531b31b094492d924"
+ffprobe_sha256="fcbe839537485eaee7a7a8bc5cbc0f90d53617e80943e8a5b2e31cb851197ea6"
+blackhole_url="https://existential.audio/downloads/BlackHole2ch-0.7.1.pkg"
+blackhole_sha256="57b540f27a3e29c37e310e01bee0fdfab76733087e47f997ef9dccf851400dcf"
+blackhole_name="BlackHole 2ch"
+
+for tool in curl shasum unzip sudo installer killall system_profiler python3; do
+    command -v "$tool" >/dev/null || { echo "$me: $tool is not on the PATH" >&2; exit 1; }
+done
+for variable in RUNNER_TEMP GITHUB_PATH; do
+    if [[ -z "${!variable:-}" ]]; then
+        echo "$me: $variable is not set; this script runs in CI only" >&2
+        exit 1
+    fi
+done
+
+downloads="$RUNNER_TEMP/end-to-end-tools/downloads"
+bin="$RUNNER_TEMP/end-to-end-tools/bin"
+mkdir -p "$downloads" "$bin"
+
+# Downloads $1 to $2 and checks it against the SHA-256 $3.
+fetch() {
+    curl --fail --silent --show-error --location --retry 3 --output "$2" "$1"
+    echo "$3  $2" | shasum -a 256 --check --status \
+        || { echo "$me: $1 does not have the SHA-256 $3" >&2; exit 1; }
+}
+
+fetch "$ffmpeg_url/ffmpeg.zip" "$downloads/ffmpeg.zip" "$ffmpeg_sha256"
+fetch "$ffmpeg_url/ffprobe.zip" "$downloads/ffprobe.zip" "$ffprobe_sha256"
+unzip -o -q "$downloads/ffmpeg.zip" -d "$bin"
+unzip -o -q "$downloads/ffprobe.zip" -d "$bin"
+chmod 0755 "$bin/ffmpeg" "$bin/ffprobe"
+"$bin/ffmpeg" -version | head -n 1
+"$bin/ffprobe" -version | head -n 1
+echo "$bin" >> "$GITHUB_PATH"
+
+fetch "$blackhole_url" "$downloads/BlackHole2ch.pkg" "$blackhole_sha256"
+sudo installer -pkg "$downloads/BlackHole2ch.pkg" -target /
+sudo killall coreaudiod
+
+# Core Audio starts again on demand; wait until it lists the device.
+for _ in $(seq 30); do
+    if system_profiler -json SPAudioDataType | python3 -I -c '
+import json, sys
+name = sys.argv[1]
+devices = json.load(sys.stdin).get("SPAudioDataType", [{}])[0].get("_items", [])
+sys.exit(0 if any(device.get("_name") == name for device in devices) else 1)' "$blackhole_name"; then
+        echo "$me: $blackhole_name is installed"
+        exit 0
+    fi
+    sleep 1
+done
+echo "$me: $blackhole_name is not listed 30 s after its installation" >&2
+exit 1

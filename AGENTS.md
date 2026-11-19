@@ -256,7 +256,11 @@ Testing, `swift test`), including those that run `msr settings`,
 hoc), `scripts/smoke-test` runs the bundled `msr` safely, and
 `scripts/sign-app` re-signs and zips it (`SIGNING_IDENTITY=-` signs ad
 hoc, for a local check only), and `scripts/install-app` installs it (see
-below).
+below). `scripts/end-to-end-test` records with the built app while it
+adds a virtual screen and plays a tone into BlackHole, then examines the
+recording folders; it needs `ffmpeg` and BlackHole 2ch, and records, so
+the rules for `msr record` below apply to it
+([end-to-end-tests.md](docs/design/end-to-end-tests.md)).
 
 ## Facts that bite
 
@@ -295,8 +299,11 @@ below).
   go-ahead for that install (to hand over a try-out build), and never
   while the owner records.
 - Real capture needs the Screen & System Audio Recording and
-  Microphone permissions, granted by a person on the Mac. Capture
+  Microphone permissions, granted by a person on the Mac (on GitHub's
+  hosted runner, by its image). Capture
   behaviour is verified on the owner's Mac (the v1 gate in
-  `backlog.md`); capture cannot run in CI, which has no way to grant
-  the permissions [ASSUMED] ([recorder.md](docs/design/recorder.md),
-  "Tests").
+  `backlog.md`) and by the end-to-end tests, also in CI, whose hosted
+  runner image grants both permissions (D63). A run of
+  `scripts/end-to-end-test` killed before it restored leaves a restore
+  file: `scripts/end-to-end-test restore` puts the Mac back, and the
+  next run refuses to start until then.

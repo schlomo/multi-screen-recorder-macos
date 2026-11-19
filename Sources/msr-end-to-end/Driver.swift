@@ -1,0 +1,256 @@
+import AVFoundation
+import CoreGraphics
+import EndToEndLogic
+import Foundation
+import VirtualScreen
+
+/// Runs scenarios against the built app's `msr record`, as shipped, with a
+/// scratch HOME and a scratch output folder, and runs the assertions.
+final class Driver {
+    let msr: URL
+    let helper: String
+    let scratch: URL
+    let restorer: Restorer
+    let media: Media
+    let interruption = Interruption.shared
+    /// `msr version`'s line: the manifest's `app` is the name and it.
+    let version: String
+    private var screens: [UInt32: (process: ChildProcess, uuid: String)] = [:]
+
+    init(app: URL, scratch: URL, restorer: Restorer, media: Media) throws {
+        msr = app.appending(path: "Contents/MacOS/msr")
+        guard FileManager.default.isExecutableFile(atPath: msr.path) else {
+            throw DriverError("\(msr.path) does not exist; run scripts/build-app first")
+        }
+        guard let executable = Bundle.main.executableURL else { throw DriverError("cannot find its own executable") }
+        helper = executable.resolvingSymlinksInPath().path
+        self.scratch = scratch
+        self.restorer = restorer
+        self.media = media
+        let versionFolder = scratch.appending(path: "version")
+        try FileManager.default.createDirectory(at: versionFolder, withIntermediateDirectories: true)
+        let process = try ChildProcess(
+            executable: msr.path, arguments: ["version"], environment: ["HOME": versionFolder.path],
+            standardOutput: versionFolder.appending(path: "out"), standardError: versionFolder.appending(path: "err"))
+        guard process.wait(seconds: 30), process.exit == .exited(0) else {
+            throw DriverError("msr version failed: \(process.errors())")
+        }
+        version = process.output().trimmingCharacters(in: .newlines)
+        try FileManager.default.removeItem(at: versionFolder)
+    }
+
+    /// The preconditions, checked before anything changes: both permissions,
+    /// asked without a prompt; the loopback device; the private interface.
+    static func requirePreconditions() throws {
+        guard CGPreflightScreenCaptureAccess() else {
+            throw DriverError("the program running this (a terminal app) lacks the Screen & System Audio Recording permission")
+        }
+        guard AVCaptureDevice.authorizationStatus(for: .audio) == .authorized else {
+            throw DriverError("the program running this (a terminal app) lacks the Microphone permission")
+        }
+        guard CoreAudioDevices.device(uid: Machine.loopbackUID) != nil else {
+            throw DriverError("the loopback device \(Machine.loopbackName) (\(Machine.loopbackUID)) is missing; install BlackHole 2ch (brew install --cask blackhole-2ch)")
+        }
+        guard MSRVirtualScreen.isAvailable else {
+            throw DriverError("this macOS has no CGVirtualDisplay, the private interface virtual screens need")
+        }
+    }
+
+    /// One scenario: its failures, one line each.
+    func run(_ scenario: Scenario) throws -> [String] {
+        let folder = scratch.appending(path: scenario.name)
+        try? FileManager.default.removeItem(at: folder)
+        let home = folder.appending(path: "home")
+        let output = folder.appending(path: "recordings")
+        let logs = folder.appending(path: "logs")
+        for made in [home, output, logs] { try FileManager.default.createDirectory(at: made, withIntermediateDirectories: true) }
+        let ownScreenCount = Machine.screenIDs(online: false).filter { !Machine.isVirtualScreen($0) }.count
+
+        var tone: TonePlayer?
+        defer { tone?.stop() }
+        if scenario.playsTone {
+            tone = try TonePlayer(deviceUID: Machine.loopbackUID)
+            try tone?.start()
+        }
+
+        var environment = ProcessInfo.processInfo.environment
+        environment["HOME"] = home.path
+        let recorder = try ChildProcess(
+            executable: msr.path, arguments: scenario.arguments(outputFolder: output.path), environment: environment,
+            standardOutput: logs.appending(path: "msr.out"), standardError: logs.appending(path: "msr.err"))
+        defer { disconnectAllScreens() }
+        try restorer.started(recorder, stopSignal: SIGINT)
+        defer {
+            if !recorder.hasExited {
+                recorder.signal(SIGINT)
+                if !recorder.wait(seconds: 60) { recorder.signal(SIGKILL); _ = recorder.wait(seconds: 5) }
+            }
+            try? restorer.ended(recorder)
+        }
+
+        let startDeadline = Date().addingTimeInterval(60)
+        while !recorder.output().contains("\n") {
+            try interruption.check()
+            if recorder.hasExited || Date() > startDeadline {
+                return ["msr record did not start recording (\(recorder.exit.map { "\($0)" } ?? "still running after 60 s")): \(recorder.errors())"]
+            }
+            Thread.sleep(forTimeInterval: 0.02)
+        }
+        let begun = Date()
+        var happened: [(Date, Scenario.Event, String?)] = []
+        for (at, event) in scenario.events {
+            try interruption.sleep(until: begun.addingTimeInterval(at))
+            switch event {
+            case .connectScreen(let spec):
+                let (process, uuid) = try VirtualScreenHelper.connect(spec, executable: helper, folder: logs)
+                try restorer.started(process, stopSignal: SIGTERM)
+                screens[spec.serialNumber] = (process, uuid)
+                happened.append((Date(), event, uuid))
+            case .resizeScreen(let serialNumber, let size):
+                guard let (process, uuid) = screens[serialNumber] else {
+                    throw DriverError("\(scenario.name): no virtual screen \(serialNumber) to resize")
+                }
+                let resized = Date()
+                try VirtualScreenHelper.resize(process, to: size)
+                happened.append((resized, event, uuid))
+            case .disconnectScreen(let serialNumber):
+                guard let (process, uuid) = screens.removeValue(forKey: serialNumber) else {
+                    throw DriverError("\(scenario.name): no virtual screen \(serialNumber) to disconnect")
+                }
+                let ended = Date()
+                try VirtualScreenHelper.disconnect(process, uuid: uuid)
+                try restorer.ended(process)
+                happened.append((ended, event, nil))
+            }
+        }
+
+        let stoppedAt: Date
+        switch scenario.stop {
+        case .duration:
+            stoppedAt = begun.addingTimeInterval(scenario.stopAt)
+        case .interrupt, .kill:
+            try interruption.sleep(until: begun.addingTimeInterval(scenario.stopAt))
+            stoppedAt = Date()
+            recorder.signal(scenario.stop == .kill ? SIGKILL : SIGINT)
+        }
+        guard recorder.wait(seconds: scenario.stopAt + 60, interrupted: { interruption.happened }) else {
+            try interruption.check()
+            return ["msr record did not end within 60 s of its stop"]
+        }
+        disconnectAllScreens()
+        tone?.stop()
+        tone = nil
+
+        return try assertions(scenario, recorder: recorder, output: output, logs: logs, ownScreenCount: ownScreenCount,
+                              happened: happened, stoppedAt: stoppedAt)
+    }
+
+    private func disconnectAllScreens() {
+        for (serial, screen) in screens {
+            try? VirtualScreenHelper.disconnect(screen.process, uuid: screen.uuid)
+            try? restorer.ended(screen.process)
+            screens[serial] = nil
+        }
+    }
+
+    // MARK: Assertions
+
+    private func assertions(
+        _ scenario: Scenario, recorder: ChildProcess, output: URL, logs: URL, ownScreenCount: Int,
+        happened: [(Date, Scenario.Event, String?)], stoppedAt: Date
+    ) throws -> [String] {
+        var failures: [String] = []
+        let expectedExit: ChildProcess.ExitStatus = scenario.stop == .kill ? .signalled(SIGKILL) : .exited(0)
+        if recorder.exit != expectedExit {
+            failures.append("msr record: \(recorder.exit.map { "\($0)" } ?? "running"), expected \(expectedExit); its messages are in \(logs.path)")
+        }
+        let lines = recorder.output().split(separator: "\n", omittingEmptySubsequences: false)
+        guard lines.count == 2, lines[1].isEmpty, let printed = lines.first,
+              let folder = (try? FileManager.default.contentsOfDirectory(at: output, includingPropertiesForKeys: nil))?
+                .first(where: { $0.hasDirectoryPath }),
+              URL(filePath: String(printed)).standardizedFileURL.path == folder.standardizedFileURL.path
+        else {
+            return failures + ["standard output is \(recorder.output().debugDescription), expected the recording folder's path alone"]
+        }
+        let manifestFile = folder.appending(path: "recording.json")
+        let manifest: JSONValue
+        do {
+            manifest = try JSONValue(json: Data(contentsOf: manifestFile))
+        } catch {
+            return failures + ["recording.json cannot be read: \(error)"]
+        }
+        guard let started = (manifest["started"]?.string).flatMap(Self.date) else {
+            return failures + ["recording.json has no readable started"]
+        }
+        let seconds = { (date: Date) in date.timeIntervalSince(started) }
+        let virtual = Scenario.virtualScreenExpectation(
+            happened.map { HappenedEvent(at: seconds($0.0), event: $0.1, screenUUID: $0.2) },
+            settleTime: EndToEndValues.settleTime)
+        let stopped = seconds(stoppedAt)
+        let expectation = ManifestExpectation(
+            app: "Multi Screen Recorder \(version)", settings: scenario.settings,
+            ending: scenario.stop == .kill ? .killed(at: stopped) : .finalized, stoppedAt: stopped,
+            ownScreenCount: ownScreenCount, virtualScreenNamePrefix: VirtualScreenSpec.namePrefix,
+            virtualScreenFiles: virtual.files, virtualScreenEvents: virtual.events,
+            playedAudioInputs: scenario.playsTone
+                ? [.init(name: Machine.loopbackName, uid: Machine.loopbackUID, channels: 2)] : [],
+            timeTolerance: EndToEndValues.timeTolerance, settleTime: EndToEndValues.settleTime)
+        let names = try FileManager.default.contentsOfDirectory(atPath: folder.path)
+        let check = ManifestCheck(manifest: manifest, folder: names, expectation: expectation)
+        failures += check.failures
+
+        var probed: [String: ProbedFile] = [:]
+        for file in check.files {
+            let url = folder.appending(path: file.name)
+            guard FileManager.default.fileExists(atPath: url.path) else { continue }
+            do {
+                let probe = try media.probe(url)
+                probed[file.name] = probe
+                failures += FileCheck.failures(file, probed: probe, ending: expectation.ending, slack: EndToEndValues.killSlack)
+                if let errors = try media.decodeErrors(url) {
+                    failures.append("\(file.name): does not decode: \(errors)")
+                }
+            } catch {
+                failures.append("\(file.name): cannot be read: \(error)")
+            }
+        }
+        if scenario.playsTone {
+            failures += try toneFailures(check.files, probed: probed, folder: folder)
+        }
+        return failures
+    }
+
+    /// The tone in the loopback device's audio file, and in each screen
+    /// file's guide track "Audio inputs".
+    private func toneFailures(_ files: [ListedFile], probed: [String: ProbedFile], folder: URL) throws -> [String] {
+        func tracks(_ file: ListedFile, titled include: (String) -> Bool) throws -> [ToneCheck.Track] {
+            guard let probe = probed[file.name], let start = TimecodeValue(file.timecode) else { return [] }
+            return try probe.audio.filter { include($0.title ?? "") }.map { stream in
+                let rate = stream.sampleRate ?? 48_000
+                return ToneCheck.Track(
+                    name: "\(file.name), \(stream.title ?? "track \(stream.index)")",
+                    samples: try media.samples(folder.appending(path: file.name), stream: stream.index, sampleRate: rate),
+                    sampleRate: Double(rate), startsAt: start.seconds)
+            }
+        }
+        var played: [ToneCheck.Track] = []
+        var mixed: [ToneCheck.Track] = []
+        for file in files {
+            switch file.source {
+            case .audioInput(let uid, _, _) where uid == Machine.loopbackUID:
+                played += try tracks(file) { _ in true }
+            case .screen:
+                mixed += try tracks(file) { $0 == "Audio inputs" }
+            default:
+                break
+            }
+        }
+        return ToneCheck.failures(played: played, mixed: mixed)
+    }
+
+    static func date(_ timestamp: String) -> Date? {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return formatter.date(from: timestamp)
+    }
+}

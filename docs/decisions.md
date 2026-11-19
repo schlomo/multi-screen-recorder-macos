@@ -1910,3 +1910,62 @@ architect's reading.
 - **Evidence:** [design/recorder.md](design/recorder.md), "Audio only",
   "Ready check" and "Build state"; `ReadyCheckTests`,
   `ScreenTrackerTests`, `WhatWillBeRecordedTests`.
+
+## D63: End-to-end tests run in the pipeline too, on the hosted runner (2026-11-19)
+
+- **Status:** in force; replaces D37's "out of the pipeline" (the
+  agreed design's "not part of the pipeline", and D34 point 5's tests in
+  the pipeline deferred). The first part is built: backlog item 3's
+  first PR.
+- **Context:** An experiment on 2026-11-16 (three runs on GitHub's
+  hosted `macos-26` arm64 runner, image 20261102, macOS 26.7.2) showed
+  that the image grants Screen Recording and Microphone, `msr check`
+  passes, a `CGVirtualDisplay` connected and disconnected during a
+  recording gives the right files and events, BlackHole installed with
+  brew carries a 1 kHz tone into its file, and system audio is recorded
+  (`backlog.md`, item 3). The owner signed off the design as text on
+  2026-11-16: "Yes to both CI questions and plan for that", and on the
+  tools: downloads in CI are fine.
+- **Decision:**
+  1. A job `end-to-end-test` in `.github/workflows/ci.yml`, after
+     `test-and-build` and holding no secret, unpacks the app that job
+     built, installs ffmpeg and BlackHole 2ch at fixed versions checked
+     by their SHA-256 (`scripts/ci-install-end-to-end-tools`) and runs
+     `scripts/end-to-end-test`; all behaviour lives in the scripts and
+     the driver. It runs for every pipeline run `test-and-build` runs
+     for, forks and Dependabot included. Open, for the owner: whether
+     the signing jobs (snapshot release, release) wait for it; this
+     change leaves them as they were, needing `test-and-build` only.
+  2. The same driver runs on the owner's Mac (D34, D48); what needs real
+     hardware stays there.
+  3. The driver is the package's executable `msr-end-to-end`, never in
+     the app bundle (D35): the driver, the device helper as its
+     subcommands `virtual-screen` and `switch-mode`, `restore` and
+     `state`; its logic, the assertions included, in the library
+     `EndToEndLogic` under unit tests in `scripts/test`.
+  4. The first named scenarios: a plain recording, a virtual screen
+     connected, resized and disconnected, the test tone through
+     BlackHole (level, silent stretches, timing across files by
+     timecode), the system audio, stop by Ctrl-C and by `kill -9`.
+- **Deviation from the agreed design, for the owner to confirm:** the
+  design makes a frame size change by replacing a virtual screen with
+  one of another size. Tried on 2026-11-19 (macOS 27.2.1): macOS brings
+  a virtual screen back at the last mode its identity had, whatever
+  modes it is given, so a replacement comes back at the old size. The
+  helper switches the screen's mode through the public interface
+  instead, and puts it back to its first size when it starts and when
+  it ends, so the next screen of that identity starts there; the
+  screen was removed every time its helper ended (all runs of
+  2026-11-19). A mode switch is what the design names for the Mac's own
+  screens, and it gives the recorder's `screen frame size changed`.
+- **Consequences:** Every pipeline run that runs `test-and-build`
+  takes one more macOS runner for some minutes, free for a public
+  repository; it depends on the runner image granting the permissions
+  and on the two download sites being reachable, which the owner
+  accepted for downloads. Capture is exercised by the pipeline, not
+  only by a person.
+- **Evidence:** `backlog.md` item 3;
+  [design/end-to-end-tests.md](design/end-to-end-tests.md);
+  `scripts/end-to-end-test`, `scripts/ci-install-end-to-end-tools`,
+  `Sources/msr-end-to-end/`, `Sources/EndToEndLogic/`,
+  `Tests/EndToEndLogicTests/`.

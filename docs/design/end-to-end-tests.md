@@ -1,11 +1,20 @@
 # End-to-end tests
 
-**Status: agreed (D37), nothing built.** The owner asked for this
+**Status: agreed (D37); the first part built, in the pipeline too
+(D63).** The owner asked for this
 document (2026-11-13) after ruling that automated end-to-end tests run
 on the owner's Mac first (D34), ruled on five of its open questions
 (D35) and merged it, which by the rule this status line stated before
 is the sign-off (D37); two questions stay open ("Open questions").
-Corrected after an automated review (D38).
+Corrected after an automated review (D38). Since D63 the tests run in
+the pipeline as well, on GitHub's hosted runner. Built (backlog item 3,
+first PR): the driver, the device helper's virtual screens and mode
+switches, the test tone, the restore file and `restore`, and six named
+scenarios ("Built so far"). Not built yet: the picture's pattern and
+its assertions, combinations and random runs, the self-test, audio
+inputs appearing and vanishing, broken settings files, a full disk,
+an unwritable folder, the clock scenario set, BetterDisplay and real
+hardware.
 
 Every statement about what a tool or macOS does comes from web
 research of 2026-11-13 (sources at the end) and is UNVERIFIED on this
@@ -100,7 +109,61 @@ screens, covers every screen with a pattern and changes the default
 microphone: the Mac cannot be used meanwhile. On the owner's Mac an
 agent may start one to test the roadmap's work (D48); elsewhere never
 unasked (`AGENTS.md`, "Facts that bite"). Not part of
-`scripts/test`, not part of the pipeline.
+`scripts/test`. The pipeline runs it too, on GitHub's hosted runner,
+whose image grants both permissions (D63): the job `end-to-end-test`
+after `test-and-build`, with ffmpeg and BlackHole installed at fixed
+versions by `scripts/ci-install-end-to-end-tools`.
+
+### Built so far
+
+The executable is `msr-end-to-end`; `scripts/end-to-end-test` builds it
+and passes its arguments on. Its subcommands: `run` (the default: the
+named scenarios, or those given with `--scenario`), `restore`, `state`
+(prints what the restore file saves), and the device helper's
+`virtual-screen` (one virtual screen, held until SIGTERM or until its
+standard input closes, which happens when the driver ends in any way;
+a line `size <width>x<height>` switches its mode) and `switch-mode`.
+Its logic is the library `EndToEndLogic`, under unit tests in
+`scripts/test` (`EndToEndLogicTests`): the scenarios, what the manifest
+must say, the assertions on the manifest, on `ffprobe`'s output and on
+decoded sound, the timecode maths, and the restore file and its plan.
+The private interface is declared in the Objective-C target
+`VirtualScreen` and looked up when it runs.
+
+Two facts of macOS shape it (tried 2026-11-19, macOS 27.2.1): a process
+that has read the screens' modes keeps what it read, and sees none of a
+screen that connected later, so every mode switch and every read of
+the state after a run is a process of its own (`switch-mode`, `state`,
+`restore`); and macOS brings a virtual screen back at the last mode its
+identity had, so the helper puts it back to its first size when it
+starts and when it ends.
+
+The named scenarios, each about 10 to 25 s of recording:
+
+| Scenario | What happens | What it asserts beyond every scenario's checks |
+|---|---|---|
+| `plain-recording` | auto mode, ended by `--duration` | exit 0 |
+| `virtual-screen` | a virtual screen of 1280 × 720 connects, switches to 1600 × 900 and back, disconnects; stopped by SIGINT | the screen's three files, frame sizes, number and times, and its events in order at their times |
+| `tone` | the test tone in BlackHole, all audio inputs recorded, no system audio | the tone's level, no silent stretch and a click every second in each of BlackHole's tracks; the clicks at the same time of day, by timecode, in every screen file's guide track "Audio inputs" |
+| `system-audio` | as `tone`, with the system audio | the system audio's file: one stereo track, its length |
+| `stop-by-ctrl-c` | auto mode, SIGINT | exit 0, finalized |
+| `stop-by-kill` | auto mode, `kill -9` | no `ended`, every file `recording` and readable up to its last fragment |
+
+Every scenario's checks: `msr record`'s exit status, the recording
+folder's path alone on standard output, `recording.json` exactly
+(its keys, the app and the settings, its state, `ended`, `result`
+and `cpu` for how it stopped, each file's name, label, number, state,
+start, end and timecode from `started` and its start, the guide tracks,
+no failure event, the played audio input and the system audio once),
+and every file through `ffprobe` and `ffmpeg`: it decodes without an
+error, its timecode track, its tracks and their names, the video's
+codec, frame size and 30 frames for each second of its length, an audio
+file's length. The tolerances are data (`EndToEndValues`), calibrated
+on the owner's Mac: a time in the manifest within 0.5 s of when the
+driver saw the change (beyond the settle time), the tone within 1 dB,
+a click within 5 ms across files (measured: within 1 ms) and 1 ms of
+one second apart in BlackHole's file. A run of the six took 97 s on the
+owner's Mac.
 
 ### Known content
 
@@ -164,7 +227,7 @@ only if that falls short. See "Unknowns".
 | Event | How it is made | Needs |
 |---|---|---|
 | Screen connects, disconnects | the helper creates a virtual screen through Apple's private `CGVirtualDisplay` interface; ending its process removes it | private interface |
-| Frame size changes, HiDPI | the helper replaces a virtual screen by one of another size (a mode switch on a virtual screen is reported to leave it unremovable); on one of the Mac's own screens, a mode change through the public interface | |
+| Frame size changes, HiDPI | a mode switch of the virtual screen through the public interface, in a process of its own (D63; replacing it by one of another size does not work, as macOS brings an identity back at its last mode, and the screen was removed after every mode switch, both tried 2026-11-19); on one of the Mac's own screens, a mode change through the public interface | |
 | Mirroring, arrangement, main screen | the helper, through the public display configuration interface (Apple's) | |
 | Rotation; one of the Mac's own screens switched off and on | BetterDisplay's command line | BetterDisplay Pro, a paid licence (the owner: "I have BetterDisplay Pro if it helps we can use it"); a scenario set of its own, asked for by name, which stops with an error where BetterDisplay is missing |
 | Audio input appears, vanishes, changes its channel count | the helper creates and removes an aggregate device around BlackHole through the public CoreAudio interface | BlackHole installed once (administrator) |
@@ -507,9 +570,23 @@ tried:
   lost: `restore` restores the rest and says that the time is the
   person's to set, unless it is set automatically again. Untried (see
   "Unknowns").
+- As built (D63): the restore file is `restore.json` in the scratch
+  folder (`--scratch-folder`, by default `msr-end-to-end` in the
+  temporary folder), with the processes the run started (`msr record`
+  and the helpers), so `restore` ends them should the driver be killed;
+  a run refuses to start while a restore file is left. The driver runs
+  `restore` as a process of its own after each scenario and at the end;
+  it puts back what an interface can put back, reads the state back and
+  names every difference, keeping the restore file until there is none.
+  Whether a screen is on and its rotation are only compared: putting
+  them back needs BetterDisplay, which no scenario uses yet. The time,
+  the time zone and whether the time is set automatically are not in it
+  yet: no scenario set changes them. The helpers end when the driver
+  ends in any way (their standard input closes).
 - Virtual screens use a small fixed set of identities: macOS keeps an
   arrangement and a colour profile (owned by root, never removed) per
-  identity.
+  identity; the scenarios use one, serial number 101 of the tests'
+  vendor and product.
 - Nothing switches off the built-in screen: a helper killed while
   holding it off is reported to leave it off until logout.
 - Nothing sends keystrokes or asks for the person's password.
@@ -525,7 +602,10 @@ BlackHole and `ffmpeg`. Building the helper, the driver and the first
 scenarios is the larger cost, estimated at one PR the size of the
 skeleton PR; the pattern decoder is the uncertain part. The pipeline
 compiles and unit-tests the tests' code with every push, which adds to
-its run time.
+its run time, and runs the named scenarios on a runner of their own
+(D63): the downloads, building the driver and about 100 s of
+scenarios, some minutes per run [ASSUMED from the run on the owner's
+Mac], free for a public repository.
 
 ## Why not otherwise
 
@@ -536,9 +616,9 @@ its run time.
   test is another one. It would give a clean start and permissions
   granted once in an image; the owner's Mac has both without it.
   Parallels adds nothing over free tools here.
-- **GitHub's hosted runners:** deferred (`backlog.md`); permissions are
-  granted there by writing into the permission database, which breaks
-  with macOS versions.
+- **GitHub's hosted runners as the only place:** they now run the
+  tests too (D63), as the image grants the permissions; what needs real
+  hardware or BetterDisplay stays on the owner's Mac.
 - **A self-hosted runner on the owner's Mac:** GitHub advises against
   one for a public repository; a pull request could run code on the
   Mac.
@@ -580,7 +660,10 @@ its run time.
 - Fast connect and disconnect cycles are reported flaky in macOS
   itself; a failure there must be told apart from a recorder fault,
   and a flake is root-caused, never retried blindly.
-- The pipeline does not gate the self-test, which needs `ffmpeg` and
+- The pipeline depends on the runner image granting both permissions
+  and on the download sites of ffmpeg and BlackHole being reachable;
+  the owner accepted downloads in CI (D63).
+- The pipeline does not gate the self-test (not built yet), which needs `ffmpeg` and
   runs on a Mac, before a run and when the driver changes. What it
   alone covers is whether an assertion still fails on real files
   broken on purpose; a change that breaks that is seen at the next
@@ -724,7 +807,11 @@ this design is built:
   tone;
 - BetterDisplay's command line returns only when the change is done;
 - a tone played into the loopback device is, or is not, in system
-  audio and on the speakers;
+  audio and on the speakers. **Tried** for the system audio
+  (2026-11-19, two runs on the owner's Mac, macOS 27.2.1): the system
+  audio's file held only zeros while the driver played the test tone
+  into BlackHole, so it is not in the system audio; the speakers were
+  not checked;
 - the time can be put back after the clock scenario set: a clock that
   counts sleep and that setting the time does not move, and setting
   the time from the driver.
