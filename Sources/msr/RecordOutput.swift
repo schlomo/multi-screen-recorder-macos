@@ -4,7 +4,8 @@ import RecorderCore
 /// Where each text of `msr record` goes: standard output carries the
 /// recording folder's path and nothing else; everything for people goes
 /// to standard error through the one writer; `--quiet` leaves out all of
-/// it but the failures and the problems.
+/// it but the failures and the problems. A failure is told once: by its
+/// event's line, or by its problem when no event tells it (D65).
 struct RecordOutput {
     enum Kind: CaseIterable {
         /// The recording folder's path, when recording starts.
@@ -16,7 +17,11 @@ struct RecordOutput {
         case recordingFolderNotice
         case stopMessage
         case event
+        /// A failure event's line, or the count of its repeats.
+        case failureEvent
         case problem
+        /// A problem whose failure event's line tells it: not printed.
+        case problemOfAnEvent
         case summary
         /// The summary of a run that exits 3.
         case summaryOfFailedRun
@@ -55,7 +60,8 @@ struct RecordOutput {
     func destination(of kind: Kind) -> Destination {
         switch kind {
         case .recordingFolder: .standardOutput
-        case .readyCheckFailed, .problem, .summaryOfFailedRun, .error: .standardError
+        case .readyCheckFailed, .failureEvent, .problem, .summaryOfFailedRun, .error: .standardError
+        case .problemOfAnEvent: .nowhere
         case .banner, .whatWillBeRecorded, .readyCheckPassed, .recordingFolderNotice, .stopMessage, .event, .summary:
             quiet ? .nowhere : .standardError
         }

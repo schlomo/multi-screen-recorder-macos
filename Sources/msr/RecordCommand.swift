@@ -30,7 +30,7 @@ extension CommandLineInterface {
         @Flag(help: "Also prints the detail lines on standard error, and writes them at debug level in the unified log.")
         var debug = false
 
-        @Flag(help: "No output for people: only the recording folder's path on standard output, and on standard error a failing ready check, errors, the settings file note, each problem as it happens and the summary of a run that exits 3. Not with --debug.")
+        @Flag(help: "No output for people: only the recording folder's path on standard output, and on standard error a failing ready check, errors, the settings file note, each failure as it happens with the count of its repeats, and the summary of a run that exits 3. Not with --debug.")
         var quiet = false
 
         func validate() throws {

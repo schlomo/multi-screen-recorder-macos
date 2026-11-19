@@ -118,12 +118,12 @@ final class RecordingSession: RecorderObserver {
         updateBadge()
     }
 
-    func recorder(_ recorder: Recorder, eventLine: String) {
-        output?.tell(.event, eventLine + "\n")
+    func recorder(_ recorder: Recorder, eventLine: String, isFailure: Bool) {
+        output?.tell(isFailure ? .failureEvent : .event, eventLine + "\n")
     }
 
-    func recorder(_ recorder: Recorder, problem: RecordingProblem) {
-        output?.tell(.problem, problem.text + "\n")
+    func recorder(_ recorder: Recorder, problem: RecordingProblem, ofAnEvent: Bool) {
+        output?.tell(ofAnEvent ? .problemOfAnEvent : .problem, problem.text + "\n")
         status.problems.append(problem.text)
         needsAttention()
     }

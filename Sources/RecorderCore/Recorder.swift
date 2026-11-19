@@ -12,10 +12,13 @@ public protocol RecorderObserver: AnyObject {
     /// A screen's file ended because it showed another screen's picture,
     /// or (nil) no screen is in that state any more.
     func recorder(_ recorder: Recorder, screenShowsAnotherScreensPicture screen: String?)
-    /// A problem, also listed in the recording manifest's `problems`.
-    func recorder(_ recorder: Recorder, problem: RecordingProblem)
-    /// An event of the recording manifest, as one line (`EventLine`).
-    func recorder(_ recorder: Recorder, eventLine: String)
+    /// A problem, also listed in the recording manifest's `problems`;
+    /// `ofAnEvent` when an event's line tells the same failure (D65).
+    func recorder(_ recorder: Recorder, problem: RecordingProblem, ofAnEvent: Bool)
+    /// An event of the recording manifest, as one line (`EventLine`), or
+    /// the count of a failure's repeats; a repeat itself is not passed on
+    /// (`RepeatedFailures`, D65). `isFailure` for a failure and a count.
+    func recorder(_ recorder: Recorder, eventLine: String, isFailure: Bool)
 }
 
 public struct RecorderStartError: ErrorWithDetail, CustomStringConvertible {
@@ -51,6 +54,7 @@ public final class Recorder {
     private var captureCount = 0
     private var endReports = CaptureEndReports()
     private var problemsTold = ProblemsTold()
+    private var repeats = RepeatedFailures()
     private var finalManifestWritten = true
     /// Stops in progress, so Stop waits for every file; each leaves when done.
     private var stopping: [Int: Task<Void, Never>] = [:]
@@ -227,6 +231,9 @@ public final class Recorder {
             for action in audioTracker.stopAll() { performAudio(action) }
             await waitForStops()
             takeAudioReports()
+            for line in repeats.stop(at: elapsedSeconds, started: context.started, timeZone: context.timeZone) {
+                observer?.recorder(self, eventLine: line, isFailure: true)
+            }
             guides.stop()
             // The recording log ends before the manifest is finalized, so its
             // failure is a problem in the final manifest (D64).
@@ -465,7 +472,7 @@ public final class Recorder {
                 problem = RecordingProblem(
                     atSeconds: failure.at, problem: "Screen \(screen) cannot be captured", error: ScreenTracker.captureSourceGoneAgain)
             }
-            tell(problem, kind: .screenNotCaptured(uuid))
+            tell(problem, kind: .screenNotCaptured(uuid), ofAnEvent: true)
         }
     }
 
@@ -592,13 +599,15 @@ public final class Recorder {
         switch reason {
         case .captureFailed(let error):
             tell(id == .systemAudio ? "The system audio failed" : "The audio input \(name) failed", error: error,
-                 kind: .audioSourceFailed(name), at: now)
+                 kind: .audioSourceFailed(name), at: now, ofAnEvent: true)
         case .writerFailed(let error):
-            tell("The audio file of \(name) failed", error: error, kind: .audioSourceFailed(name), at: now)
+            tell("The audio file of \(name) failed", error: error, kind: .audioSourceFailed(name), at: now, ofAnEvent: true)
         case .writerFellBehind:
-            tell("The audio file of \(name) ended", error: "its writer fell behind", kind: .audioSourceFailed(name), at: now)
+            tell("The audio file of \(name) ended", error: "its writer fell behind", kind: .audioSourceFailed(name), at: now,
+                 ofAnEvent: true)
         case .diskFull:
-            tell("The audio file of \(name) ended", error: "the disk is full", kind: .audioSourceFailed(name), at: now)
+            tell("The audio file of \(name) ended", error: "the disk is full", kind: .audioSourceFailed(name), at: now,
+                 ofAnEvent: true)
         case .disconnected:
             break
         }
@@ -607,7 +616,7 @@ public final class Recorder {
         // A source that stays listed but is lost again and again is never left unrecorded silently.
         if reason == .disconnected, step.events.contains(where: \.event.isFailure) {
             tell(id == .systemAudio ? "The system audio cannot be captured" : "The audio input \(name) cannot be captured",
-                 error: AudioTracker.sourceLostAgain(id), kind: .audioSourceFailed(name), at: now)
+                 error: AudioTracker.sourceLostAgain(id), kind: .audioSourceFailed(name), at: now, ofAnEvent: true)
         }
     }
 
@@ -721,16 +730,16 @@ public final class Recorder {
 
     /// A problem for the person and the manifest's `problems`, the manifest
     /// written at once (`ProblemsTold`); one that repeats is told once until
-    /// it clears.
-    private func tell(_ problem: String, error: ErrorDetail?, kind: ProblemKind, at time: Int64? = nil) {
-        tell(RecordingProblem(at: time ?? context.now(), problem: problem, error: error), kind: kind)
+    /// it clears. `ofAnEvent`: a failure event's line tells it on standard error (D65).
+    private func tell(_ problem: String, error: ErrorDetail?, kind: ProblemKind, at time: Int64? = nil, ofAnEvent: Bool = false) {
+        tell(RecordingProblem(at: time ?? context.now(), problem: problem, error: error), kind: kind, ofAnEvent: ofAnEvent)
     }
 
-    private func tell(_ problem: RecordingProblem, kind: ProblemKind) {
+    private func tell(_ problem: RecordingProblem, kind: ProblemKind, ofAnEvent: Bool = false) {
         switch problemsTold.add(problem, kind: kind, to: &manifest) {
         case .tell(let writesManifest):
             if writesManifest { try? writeManifest() }
-            told(problem)
+            told(problem, ofAnEvent: ofAnEvent)
         case .alreadyTold:
             break
         case .afterTheEnd:
@@ -740,19 +749,22 @@ public final class Recorder {
         }
     }
 
-    private func told(_ problem: RecordingProblem) {
+    private func told(_ problem: RecordingProblem, ofAnEvent: Bool = false) {
         RecorderLog.error("at \(problem.at)s: \(problem.text)", category: "recorder")
         recordingLog?.problem(problem)
-        observer?.recorder(self, problem: problem)
+        observer?.recorder(self, problem: problem, ofAnEvent: ofAnEvent)
     }
 
-    /// Events now in the manifest: to the log and the observer.
+    /// Events now in the manifest: every one to the logs, to the observer
+    /// without the repeats of a failure (D65).
     private func told(_ events: [RecordingEvent]) {
         for event in events {
-            let line = EventLine.text(event, started: context.started, timeZone: context.timeZone)
-            RecorderLog.notice(line, category: "recorder")
-            recordingLog?.event(line)
-            observer?.recorder(self, eventLine: line)
+            repeats.tell(event, started: context.started, timeZone: context.timeZone) { line in
+                RecorderLog.notice(line, category: "recorder")
+                recordingLog?.event(line)
+            } people: { line, isFailure in
+                observer?.recorder(self, eventLine: line, isFailure: isFailure)
+            }
         }
     }
 }

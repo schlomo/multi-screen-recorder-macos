@@ -2138,3 +2138,37 @@ architect's reading.
   `RecordingLogTests`, `WriterErrorTests`, `RecordingManifestTests`,
   `ProblemsToldTests`, `StatusTextTests`, `ProblemReportTests`,
   `ProblemReportActionTests`, `AppStateTests`, `StateFileTests`.
+
+## D65: Standard error tells a failure once and counts its repeats (2026-11-19)
+
+- **Status:** in force.
+- **Context:** The owner's run on 2026-11-19: with the recording folder
+  made read-only, a microphone was replugged. Its audio file writer then
+  failed again about every 10 s, and each try printed the full error on
+  standard error; the first failure was printed twice, as the problem
+  "The audio file of Razer Seiren V3 Mini failed: cannot start writing
+  …" and as the event line "15:35:31 +90.7s audio file writer failed:
+  Razer Seiren V3 Mini (…)". The owner: "repeat problems should be
+  handled smartly", signing off the design below.
+- **Decision:**
+  1. A repeat is the same failure event (`isFailure`) of the same
+     subject with the same chain of error domains and codes; the
+     message text does not count, as it holds the changing file name.
+     This holds for every failure event.
+  2. On standard error the first failure prints as before; repeats are
+     counted, not printed. The subject's next event that is no repeat
+     (it recovered, or failed differently), or Stop, first prints one
+     line in the event line's format: `<event> repeated N times since
+     HH:MM:SS: <subject>`; with N = 0 nothing more.
+  3. A failure that is both an event and a problem prints once, as its
+     event line with the error; a problem that is no event prints as
+     before. With `--quiet` too: it prints the failure event lines and
+     the counts in place of those problems.
+  4. Unchanged: `recording.log`, the unified log and `recording.json`
+     keep every event; the status line, the status window and the
+     summary count as before.
+- **Consequences:** a source that recovers by a start event (the system
+  audio's `system audio started`) between failures ends the
+  count each time, so its failures print each time.
+- **Evidence:** [design/recorder.md](design/recorder.md), "Logging";
+  `RepeatedFailuresTests`, `RecordOutputTests`.
