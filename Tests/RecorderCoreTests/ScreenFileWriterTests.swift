@@ -258,6 +258,9 @@ private final class CollectingFile: RecordingLogFile {
         let times = try readTimes(of: video, asset: asset)
         let lost = 9 - Double(times.count) / Double(rate)
         #expect(lost <= Double(RecorderValues.fragmentSeconds), "\(times.count) frames of \(9 * rate)")
+        // What the failed-file end reads (D66): the unfinalized file's own duration, the fragments' sum.
+        let duration = try await AssetDurationReader().duration(of: copy)
+        #expect(duration > 9 - Double(RecorderValues.fragmentSeconds) - 0.1 && duration <= 9.1, "\(duration) s")
         // The one timecode sample of the file is in it before the file is finalized.
         let timecodeTrack = try #require(try await asset.loadTracks(withMediaType: .timecode).first)
         #expect(try readFirstTimecodeFrame(of: timecodeTrack, asset: asset) == Int32(timecode.frame(ofTick: 0)))

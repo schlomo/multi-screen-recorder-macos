@@ -155,21 +155,25 @@ public final class ScreenFileWriter: ScreenFileWriting {
 
     /// Whether the writer takes another frame now.
     public var isReady: Bool {
+        video.isReadyForMoreMediaData && (wroteTimecode || timecodeTrack.input.isReadyForMoreMediaData)
+    }
+
+    /// Tells the video input's readiness when it changed since the last append (D66).
+    private func tellVideoReadiness() {
         let videoReady = video.isReadyForMoreMediaData
-        if videoReady != wasReady {
-            if wasReady != nil || !videoReady {
-                RecorderLog.detail("video input of \(url.lastPathComponent) ready for more media data: \(videoReady)",
-                                   category: Self.detailCategory)
-            }
-            wasReady = videoReady
+        guard videoReady != wasReady else { return }
+        if wasReady != nil || !videoReady {
+            RecorderLog.detail("video input of \(url.lastPathComponent) ready for more media data: \(videoReady)",
+                               category: Self.detailCategory)
         }
-        return videoReady && (wroteTimecode || timecodeTrack.input.isReadyForMoreMediaData)
+        wasReady = videoReady
     }
 
     /// Writes a tick's frame with exactly the tick's time and its timecode;
     /// false when the writer is not ready, so the tick waits.
     public func append(_ pixelBuffer: CVPixelBuffer, tick: Int64) throws(ScreenFileWriterError) -> Bool {
         try checkStatus()
+        tellVideoReadiness()
         guard isReady else { return false }
         if !wroteTimecode {
             wroteTimecode = true

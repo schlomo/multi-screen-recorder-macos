@@ -23,9 +23,9 @@ enum RunLog {
         append(line)
     }
 
-    static func error(_ line: String, logged: Bool = true) {
+    static func error(_ line: String) {
         FileHandle.standardError.write(Data("\(line)\n".utf8))
-        if logged { append(line) }
+        append(line)
     }
 
     private static func append(_ line: String) {

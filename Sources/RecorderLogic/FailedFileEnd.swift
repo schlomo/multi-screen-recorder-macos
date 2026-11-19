@@ -6,7 +6,7 @@ import Foundation
 /// hold is lost, and said so. All times are seconds from the recording's start.
 public struct FailedFileEnd: Equatable, Sendable {
     /// What reading the failed file's duration gave.
-    public enum Duration: Equatable, Sendable {
+    public enum ReadDuration: Equatable, Sendable {
         case seconds(Double)
         case unreadable(ErrorDetail)
     }
@@ -18,7 +18,7 @@ public struct FailedFileEnd: Equatable, Sendable {
     /// The problem's text: what was lost; nil when nothing was.
     public var lost: String?
 
-    public init(start: Double, failedAt: Double, duration: Duration) {
+    public init(start: Double, failedAt: Double, duration: ReadDuration) {
         self.failedAt = failedAt
         switch duration {
         case .seconds(let seconds):

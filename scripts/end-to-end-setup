@@ -23,7 +23,7 @@ cd "$(dirname "$0")/.."
 source scripts/end-to-end-vm/lib.sh
 require tart packer ssh
 work=$(mktemp -d)
-trap 'vm_stop; rm -rf "$work"' EXIT
+trap 'set +e; vm_stop; rm -rf "$work"' EXIT
 
 python_version="3.15.2"
 python_pkg="python-$python_version-macos11.pkg"
@@ -34,7 +34,6 @@ start=$(date +%s)
 
 if vm_exists "$image_vm"; then tart delete "$image_vm"; fi
 tart clone "$base_image" "$image_vm"
-tart set "$image_vm" --cpu 4 --memory 8192
 
 echo "$me: disabling SIP in $image_vm through Recovery"
 packer init "$sip_template"
@@ -51,7 +50,7 @@ guest "sudo /bin/bash ~/guest-configure-tcc '$guest_app_root' && rm ~/guest-conf
 
 guest "set -euo pipefail
     cd /tmp && curl --fail --silent --show-error --location --retry 3 -o '$python_pkg' '$python_url'
-    pkgutil --check-signature '$python_pkg' | grep -q '($python_team)' \
+    [[ \$(pkgutil --check-signature '$python_pkg') == *'($python_team)'* ]] \
         || { echo 'the Python package is not signed by the Python Software Foundation ($python_team)' >&2; exit 1; }
     sudo installer -pkg '$python_pkg' -target /
     rm '$python_pkg'

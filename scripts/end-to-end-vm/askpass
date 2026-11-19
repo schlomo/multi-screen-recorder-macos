@@ -1,3 +1,4 @@
 #!/bin/sh
-# The published password of the Cirrus Labs images' admin user, for the first SSH login only.
+# The published password of the Cirrus Labs images' admin user: every SSH login of the
+# setup and the tests, to a VM on a NAT-only network that lives for minutes (D67).
 echo admin

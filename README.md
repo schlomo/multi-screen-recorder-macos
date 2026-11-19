@@ -274,7 +274,7 @@ Once, on the Mac:
    me override defaults" ticked, validity 3650 days (the default is one
    year, and a new certificate means granting both permissions again),
    the rest unchanged, in the login keychain.
-4. For the end-to-end tests: `brew install tart packer`, then
+4. For the end-to-end tests: `brew install openai/tools/tart hashicorp/tap/packer`, then
    `scripts/end-to-end-setup` once, which builds the VM they run in.
 5. For the pipeline, by the repository owner only: export the
    certificate from My Certificates as `.p12` with an empty password,

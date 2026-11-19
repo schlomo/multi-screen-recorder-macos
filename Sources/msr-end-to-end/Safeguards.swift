@@ -65,7 +65,7 @@ struct Restorer {
     /// from a run that did not restore.
     func save() throws -> RestoreFile {
         if exists {
-            throw DriverError("a run did not restore the Mac: run scripts/end-to-end-test restore first (\(file.path))")
+            throw DriverError("a run did not restore the Mac: run msr-end-to-end restore --scratch-folder \(file.deletingLastPathComponent().path) first (\(file.path))")
         }
         let restore = RestoreFile(saved: try Machine.state())
         try write(restore)

@@ -125,7 +125,12 @@ runners (`scripts/end-to-end-vm/guest-configure-tcc`), installs Python
 2ch at fixed versions by their SHA-256
 (`scripts/install-end-to-end-tools`). Re-running rebuilds it; it took
 3.5 minutes with the base image cached. It needs `tart` and `packer` on
-the `PATH` and installs neither.
+the `PATH` and installs neither. Every SSH login to the VM, the setup's
+and each run's, uses the image's published password for its admin user
+(`scripts/end-to-end-vm/askpass`): the VM is a throwaway on a NAT-only
+network that lives for minutes, so the password protects nothing that
+matters, and a key would add a lifecycle (creating, installing, keeping
+it) for no gain (D67).
 
 Per run, `scripts/end-to-end-test --scratch-folder <folder>`: builds the
 app and the driver on the Mac, clones a throwaway VM from
@@ -354,12 +359,6 @@ Each run writes, in its scratch folder:
   if one is left.
 
 Anything in the review folder that cannot be made fails the run.
-
-Under GitHub Actions the driver would also report in GitHub's own
-formats (a table when `GITHUB_STEP_SUMMARY` is set, an `::error`
-workflow command per `FAIL` and `STOP` when `GITHUB_ACTIONS` is `true`);
-nothing sets those variables now that the tests are not in the pipeline
-(D67).
 
 ### Known content
 

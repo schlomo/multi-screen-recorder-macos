@@ -75,19 +75,14 @@ struct Run: ParsableCommand {
         Interruption.shared.watch()
         RunLog.out("msr-end-to-end: \(driver.version), \(scenarios.count) scenarios; the Mac cannot be used until they end")
         Review.clear(scratch: scratchFolder)
-        let github = GitHubOutput(environment: ProcessInfo.processInfo.environment)
-        var rows: [GitHubReport.Row] = []
         var tally = RunTally(total: scenarios.count)
         do {
             try driver.startWindow()
             RunLog.out("ok    \(ReviewNames.appStep): the start window's screenshot")
-            rows.append(.init(scenario: ReviewNames.appStep, result: "ok", seconds: nil, margin: nil, firstFailure: nil))
         } catch {
             let failure = "the start window's screenshot was not taken: \(error)"
             tally.stepFailed(failure)
             RunLog.error("FAIL  \(ReviewNames.appStep): \(failure)")
-            github.annotate(scenario: ReviewNames.appStep, failure)
-            rows.append(.init(scenario: ReviewNames.appStep, result: "FAIL", seconds: nil, margin: nil, firstFailure: failure))
         }
         for scenario in scenarios {
             if Interruption.shared.happened {
@@ -109,30 +104,23 @@ struct Run: ParsableCommand {
                     RunLog.error("FAIL  \(scenario.name) (\(seconds) s): \(scenario.summary)")
                     for failure in failures { RunLog.error("      \(failure)") }
                     RunLog.error("      kept: \(folder.path)")
-                    github.annotate(scenario: scenario.name, failures[0])
                 }
                 if let margin = driver.margin { RunLog.out("      margin: \(margin)") }
                 for window in driver.eventWindows { RunLog.out("      window: \(window)") }
                 if let count = driver.playbackBreakCount { RunLog.out("      playback breaks: \(count)") }
-                rows.append(.init(scenario: scenario.name, result: failures.isEmpty ? "ok" : "FAIL", seconds: seconds,
-                                  margin: driver.margin, firstFailure: failures.first))
             } catch {
                 tally.stopped("\(scenario.name): \(error)")
                 RunLog.error("STOP  \(scenario.name): \(error); kept: \(scratchFolder.appending(path: scenario.name).path)")
-                github.annotate(scenario: scenario.name, "\(error)")
-                rows.append(.init(scenario: scenario.name, result: "STOP", seconds: nil, margin: nil, firstFailure: "\(error)"))
                 break
             }
             guard restore(driver, keepingFile: true) else {
                 tally.stopped("the restore after \(scenario.name) failed")
                 RunLog.error("STOP  the restore after \(scenario.name) failed")
-                github.annotate(scenario: scenario.name, "the restore after \(scenario.name) failed")
                 break
             }
             if Interruption.shared.happened {
                 tally.stopped("interrupted after \(scenario.name)")
                 RunLog.error("STOP  interrupted after \(scenario.name)")
-                github.annotate(scenario: scenario.name, "interrupted after \(scenario.name)")
                 break
             }
         }
@@ -140,10 +128,8 @@ struct Run: ParsableCommand {
         switch verdict {
         case .passed(let line):
             RunLog.out(line)
-            try github.summarize(rows: rows, verdict: line)
         case .failed(let lines):
             for line in lines { RunLog.error(line) }
-            try github.summarize(rows: rows, verdict: lines.joined(separator: "; "))
             throw ExitCode.failure
         }
     }
@@ -159,10 +145,10 @@ struct Run: ParsableCommand {
             try process.run()
             process.waitUntilExit()
         } catch {
-            RunLog.error("restore: FAILED to start: \(error); run scripts/end-to-end-test restore")
+            RunLog.error("restore: FAILED to start: \(error); run msr-end-to-end restore --scratch-folder \(driver.scratch.path)")
             return false
         }
-        if process.terminationStatus != 0 { RunLog.error("restore: FAILED; run scripts/end-to-end-test restore") }
+        if process.terminationStatus != 0 { RunLog.error("restore: FAILED; run msr-end-to-end restore --scratch-folder \(driver.scratch.path)") }
         return process.terminationStatus == 0
     }
 }

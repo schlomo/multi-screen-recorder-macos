@@ -108,8 +108,20 @@ public final class ScreenCapture: NSObject, @unchecked Sendable, SCStreamOutput,
     // Confined to `queue`.
     private var stream: SCStream?
     private var check = ScreenCheck()
-    /// The last frame's facts, for the detail line of a change.
+    /// The last told frame's facts, for the detail line of a change, and the cheap fields
+    /// that decide whether a frame's facts are read at all.
     private var frameFacts: FrameFacts?
+    private var frameKey: FrameKey?
+
+    /// What is compared on every frame: reading all the facts costs strings from
+    /// the buffer's attachments, too much at 30 frames per second.
+    private struct FrameKey: Equatable {
+        var width: Int
+        var height: Int
+        var pixelFormat: UInt32
+        var scaleFactor: Double?
+        var screenCheck: String
+    }
     private var ticker: ScreenFileTicker?
     private var timer: DispatchSourceTimer?
     /// No frame and no tick is taken any more.
@@ -224,8 +236,17 @@ public final class ScreenCapture: NSObject, @unchecked Sendable, SCStreamOutput,
         let verdict = bounds.map {
             check.judge(frameRect: ScreenRect(screenRect), screenBounds: $0, capturedAt: capturedAt, lastScreenChange: lastChange)
         }
-        // Told for every complete frame, before the verdict acts: a frame the check drops is no less a fact.
-        tellFrameFacts(FrameFacts(pixelBuffer, info: attachments, screenCheck: verdict.map(Self.text) ?? "no screen bounds yet"))
+        // Told before the verdict acts: a frame the check drops is no less a fact. The facts are
+        // read at the first frame and whenever its size, pixel format, scale factor or verdict changes.
+        let screenCheck = verdict.map(Self.text) ?? "no screen bounds yet"
+        let key = FrameKey(
+            width: CVPixelBufferGetWidth(pixelBuffer), height: CVPixelBufferGetHeight(pixelBuffer),
+            pixelFormat: CVPixelBufferGetPixelFormatType(pixelBuffer),
+            scaleFactor: (attachments[.scaleFactor] as? NSNumber)?.doubleValue, screenCheck: screenCheck)
+        if key != frameKey {
+            frameKey = key
+            tellFrameFacts(FrameFacts(pixelBuffer, info: attachments, screenCheck: screenCheck))
+        }
         guard let verdict else { return }
         switch verdict {
         case .passes:

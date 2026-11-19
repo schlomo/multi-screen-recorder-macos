@@ -10,7 +10,10 @@ die() { echo "$me: $*" >&2; exit 1; }
 
 [[ $# == 1 ]] || die "usage: $me <app root>"
 [[ $EUID == 0 ]] || die "runs as root"
-csrutil status | grep -q disabled || die "SIP is enabled; TCC.db cannot be written"
+[[ $(csrutil status) == *disabled* ]] || die "SIP is enabled; TCC.db cannot be written"
+command -v sqlite3 >/dev/null || die "sqlite3 is not on the PATH"
+# tccd may hold the database for a moment after the boot.
+sqlite() { sqlite3 -cmd ".timeout 30000" "$@"; }
 app_root="$1"
 system_db="/Library/Application Support/com.apple.TCC/TCC.db"
 user_db="/Users/admin/Library/Application Support/com.apple.TCC/TCC.db"
@@ -28,15 +31,15 @@ services=(kTCCServiceScreenCapture kTCCServiceMicrophone)
 
 for db in "$system_db" "$user_db"; do
     [[ -f $db ]] || die "$db is missing"
-    columns=$(sqlite3 "$db" "SELECT count(*) FROM pragma_table_info('access');")
+    columns=$(sqlite "$db" "SELECT count(*) FROM pragma_table_info('access');")
     [[ $columns == 17 ]] || die "$db's access table has $columns columns, not the 17 the runner image writes"
     for service in "${services[@]}"; do
         for client in "${clients[@]}"; do
             IFS=, read -r name type csreq <<<"$client"
-            sqlite3 "$db" "INSERT OR REPLACE INTO access VALUES('$service',$name,$type,2,4,1,$csreq,NULL,0,'UNUSED',NULL,0,$now,NULL,NULL,'UNUSED',$now);"
+            sqlite "$db" "INSERT OR REPLACE INTO access VALUES('$service',$name,$type,2,4,1,$csreq,NULL,0,'UNUSED',NULL,0,$now,NULL,NULL,'UNUSED',$now);"
         done
     done
     echo "$me: $db"
-    sqlite3 "$db" "SELECT service, client, auth_value FROM access WHERE service IN ('kTCCServiceScreenCapture','kTCCServiceMicrophone');"
+    sqlite "$db" "SELECT service, client, auth_value FROM access WHERE service IN ('kTCCServiceScreenCapture','kTCCServiceMicrophone');"
 done
 chown admin:staff "$user_db"

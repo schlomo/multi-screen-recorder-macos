@@ -42,7 +42,7 @@ import Testing
         var restoredBadly = RunTally(total: 1)
         restoredBadly.passed()
         #expect(restoredBadly.verdict(finalRestoreSucceeded: false) == .failed([
-            "msr-end-to-end: the final restore failed; run scripts/end-to-end-test restore",
+            "msr-end-to-end: the final restore failed; run msr-end-to-end restore with the run's --scratch-folder",
         ]))
     }
 }

@@ -35,7 +35,7 @@ public struct RunTally: Sendable {
             lines.append("msr-end-to-end: only \(ran) of \(total) scenarios ran")
         }
         if failedCount > 0 { lines.append("msr-end-to-end: \(failedCount) of \(total) scenarios failed") }
-        if !finalRestoreSucceeded { lines.append("msr-end-to-end: the final restore failed; run scripts/end-to-end-test restore") }
+        if !finalRestoreSucceeded { lines.append("msr-end-to-end: the final restore failed; run msr-end-to-end restore with the run's --scratch-folder") }
         return lines.isEmpty ? .passed("msr-end-to-end: all \(total) scenarios passed") : .failed(lines)
     }
 }

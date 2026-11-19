@@ -29,7 +29,7 @@ extension FailedFileEnd {
     /// The end of the failed file `url`, which started at `start` and was
     /// last given up to `failedAt`, from the duration `reader` reads.
     static func read(_ url: URL, start: Double, failedAt: Double, with reader: any FileDurationReader) async -> FailedFileEnd {
-        let duration: Duration
+        let duration: ReadDuration
         do {
             duration = .seconds(try await reader.duration(of: url))
         } catch {

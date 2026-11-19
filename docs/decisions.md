@@ -2257,7 +2257,9 @@ architect's reading.
      throwaway clone of the VM, copies the scratch folder back, deletes
      the clone also on failure and exits with the driver's status; the
      driver's other arguments pass through. `restore` and `state` are no
-     longer reached through it: a run changes only the clone.
+     longer reached through it: a run changes only the clone (the
+     driver's own messages name `msr-end-to-end restore --scratch-folder
+     <folder>`, to run in the VM).
   5. Before a PR that touches the recorder or the end-to-end driver is
      marked ready, the architect runs the tests on the PR's head and
      records the commit and the result in the PR description
@@ -2269,13 +2271,20 @@ architect's reading.
      encoder's stall, not a writer fed a wrong frame. The cause in the
      runner's encoder stays unfixed; it is not a recorder fault shown by
      these tests.
+  7. SSH to the VM uses the image's published admin password for every
+     login (`scripts/end-to-end-vm/askpass`), no key: the VM is a
+     throwaway on a NAT-only network that lives for minutes, the
+     password is the image's public default and no secret the
+     credentials principle protects, and a key would add a lifecycle for
+     no gain (the architect's decision).
 - **Consequences:** the pipeline no longer gates the recorder's capture
   behaviour: a person runs the tests, and the PR description says
   whether they passed. The pipeline is faster and no longer depends on
   a macOS runner's encoder. The VM takes 27 GB of the owner's disk and
   3.5 minutes to build; a run takes about 2 minutes and nothing records
-  on the Mac itself. The driver's GitHub summary and annotations stay
-  in the code and are unused.
+  on the Mac itself. The driver's GitHub job summary and annotations
+  (`GitHubOutput`, `GitHubReport`) are removed, as nothing would use
+  them.
 - **Evidence:** [design/end-to-end-tests.md](design/end-to-end-tests.md),
   "Running them" and "Why the VM"; [design/delivery.md](design/delivery.md);
   `scripts/end-to-end-setup`, `scripts/end-to-end-test`,

@@ -42,7 +42,9 @@ vm_exists "$image_vm" || die "the VM $image_vm is missing; run scripts/end-to-en
 
 scratch_vm="$image_vm-run-$$"
 work=$(mktemp -d)
+# Every step runs whatever failed before it: the clone must not outlive the run.
 cleanup() {
+    set +e
     vm_stop
     if vm_exists "$scratch_vm"; then tart delete "$scratch_vm"; fi
     rm -rf "$work"

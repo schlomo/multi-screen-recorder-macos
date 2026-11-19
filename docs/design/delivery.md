@@ -9,9 +9,11 @@ delivery, and the one-time developer setup. What the app does is in [recorder.md
 ## The decision
 
 **Scripts hold the behaviour; the pipeline only wires them** (thin CI).
-Each script but the CI-only one (`scripts/ci-import-signing-certificate`)
-and the end-to-end ones, which run on a developer's Mac only, runs the same
-on a developer's Mac and in CI. Five are Python (D32): `scripts/version`, `scripts/unpack-app`,
+Each script but the CI-only one (`scripts/ci-import-signing-certificate`),
+the end-to-end ones (`scripts/end-to-end-setup`, `scripts/end-to-end-test`),
+which run on a developer's Mac only, and the one that runs inside their VM
+(`scripts/install-end-to-end-tools`) runs the same on a developer's Mac and
+in CI. Five are Python (D32): `scripts/version`, `scripts/unpack-app`,
 `scripts/sign-app`, `scripts/smoke-test` and
 `scripts/publish-snapshot-release`; the rest are bash glue around a few
 commands. The Python scripts use the standard library only, so nothing
@@ -209,7 +211,7 @@ account and plan were not checked].
    me override defaults" ticked, validity 3650 days (the default is one
    year, and a new certificate means granting both permissions again),
    the rest unchanged, in the login keychain.
-4. For the end-to-end tests: `brew install tart packer`, then
+4. For the end-to-end tests: `brew install openai/tools/tart hashicorp/tap/packer`, then
    `scripts/end-to-end-setup` (about 4 minutes once the 28 GB base image is downloaded; 30 GB of disk).
 5. For the pipeline, by the repository owner only: export the
    certificate from My Certificates as `.p12` with an empty password,

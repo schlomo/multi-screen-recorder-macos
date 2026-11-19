@@ -37,12 +37,19 @@ vm_start() {
     vm_booted=$1
     tart run --no-graphics "$1" >"$work/tart-run-$1.log" 2>&1 &
     vm_pid=$!
-    vm_ip=$(tart ip --wait 120 "$1")
+    vm_ip=$(tart ip --wait 120 "$1") || vm_failed "$1 has no IP address within 120 s"
     for _ in $(seq 60); do
         if guest true 2>/dev/null; then return 0; fi
         sleep 5
     done
-    die "$1 did not answer over SSH within 300 s (tart output: $work/tart-run-$1.log)"
+    vm_failed "$1 did not answer over SSH within 300 s"
+}
+
+# Dies with the reason and the tail of the VM's output, which the exit trap deletes with $work.
+vm_failed() {
+    echo "tart output of $vm_booted:" >&2
+    tail -n 20 "$work/tart-run-$vm_booted.log" >&2
+    die "$1"
 }
 
 # Stops the VM vm_start booted, if it is still running, after the guest wrote
@@ -50,7 +57,8 @@ vm_start() {
 vm_stop() {
     if [[ -n ${vm_pid:-} ]] && kill -0 "$vm_pid" 2>/dev/null; then
         guest sync
-        tart stop --timeout 60 "$vm_booted"
+        # A VM that is still starting is not yet running for tart stop: end its process instead.
+        tart stop --timeout 60 "$vm_booted" || kill "$vm_pid"
         wait "$vm_pid" || true
     fi
     vm_pid=""
