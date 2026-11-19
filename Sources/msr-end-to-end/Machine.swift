@@ -25,14 +25,15 @@ enum Machine {
         return CFUUIDCreateString(nil, uuid) as String
     }
 
-    /// Each active screen's identity, place and size, for watching them
-    /// settle: one line per screen, sorted.
-    static func screenPlaces() -> [String] {
-        screenIDs(online: false).map { display in
+    /// Each active screen's place and size by its UUID, for watching a
+    /// changed screen settle.
+    static func screenPlaces() -> [String: String] {
+        Dictionary(screenIDs(online: false).map { display in
             let bounds = CGDisplayBounds(display)
-            return "\(uuid(display) ?? "\(display)") \(Int(bounds.minX)),\(Int(bounds.minY)) \(Int(bounds.width))x\(Int(bounds.height))"
-                + " drawn at \(CGDisplayPixelsWide(display))x\(CGDisplayPixelsHigh(display))"
-        }.sorted()
+            return (uuid(display) ?? "\(display)",
+                    "\(Int(bounds.minX)),\(Int(bounds.minY)) \(Int(bounds.width))x\(Int(bounds.height))"
+                        + " drawn at \(CGDisplayPixelsWide(display))x\(CGDisplayPixelsHigh(display))")
+        }) { first, _ in first }
     }
 
     static func isVirtualScreen(_ display: CGDirectDisplayID) -> Bool {

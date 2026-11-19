@@ -197,18 +197,22 @@ took 97 s on the owner's Mac.
 driver keeps when it asked for the change and when it saw it done (the
 helper reported the screen active or the mode switched; for a
 disconnect, the helper has ended and the screen is gone from the active
-screens). After the done it watches every screen's place and size, the
-Mac's own included, until all have been unchanged for the settle time:
-a change can knock on to another screen (on the runner a connect
-switched the own screen from 1024 × 768 to 1920 × 1080), and each
-change starts the recorder's settle time again. A time the recorder
-writes for the change lies in one of two windows, widened by the 0.5 s
-tolerance: **settled** (a screen file's start, `screen frame size
-changed`, a file's end at a mode switch) from the ask plus the settle
-time to the moment the screens settled; **immediate** (`screen
+screens). From just before the ask a thread reads every screen's place
+and size every 20 ms; the changed screen's last change is the last
+reading in which its own place, size or presence differed from the one
+before, once it has been unchanged for the settle time after it. The
+recorder's settle time is per screen and starts again with each change
+of that screen's own reading, a knock-on one included (on the runner a
+connect switched the own screen from 1024 × 768 to 1920 × 1080, which
+can move the virtual screen too); another screen's change does not
+count. A screen that has not settled within 15 s of the done fails the
+scenario. A time the recorder writes for the change lies in one of two
+windows, widened by the 0.5 s tolerance: **settled** (a screen file's
+start, `screen frame size changed`, a file's end at a mode switch) the
+settle time after the screen's last change; **immediate** (`screen
 connected`, `screen disconnected`, a file's end at a disconnect) from
-the ask to the done. `run.log` shows each change's times, the moment the
-screens settled and both windows' widths. The `virtual-screen` scenario
+the ask to the done. `run.log` shows each change's times, the screen's
+last change and both windows' widths. The `virtual-screen` scenario
 records with `--debug`, so its `msr.err` keeps the recorder's detail;
 it changes only standard error, which nothing asserts.
 

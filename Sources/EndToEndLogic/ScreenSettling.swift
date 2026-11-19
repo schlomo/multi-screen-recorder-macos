@@ -1,33 +1,35 @@
-/// When the screens have settled after a change the driver made: the first
-/// moment all of them, the Mac's own included, have been unchanged for the
-/// settle time. A change can knock on to another screen (on the runner, a
-/// connect switched the own screen's mode), and each change starts the
-/// recorder's settle time again.
+/// When the screen a change was made to last changed, the way the recorder
+/// counts it: its settle time is per screen and starts again with each
+/// change of that screen's own place or size, a knock-on one included (on
+/// the runner, a connect switched the own screen's mode and moved the
+/// virtual screen with it); another screen's change does not count.
 public enum ScreenSettling {
     /// The screens as the driver read them at a time, in seconds after the
-    /// recording's start: one line per screen, its place and size.
+    /// recording's start: each screen's place and size by its UUID.
     public struct Observation: Sendable, Equatable {
         public var time: Double
-        public var screens: [String]
+        public var screens: [String: String]
 
-        public init(time: Double, screens: [String]) {
+        public init(time: Double, screens: [String: String]) {
             self.time = time
             self.screens = screens
         }
     }
 
-    /// The moment the screens settled after a change done at `changeDone`,
-    /// from observations from then on; nil while they have not yet. A change
-    /// after they had settled belongs to something else.
-    public static func settledAt(changeDone: Double, observations: [Observation], settleTime: Double) -> Double? {
-        var lastChange = changeDone
-        var previous: [String]?
-        for observation in observations where observation.time >= changeDone {
-            defer { previous = observation.screens }
-            if observation.time - lastChange >= settleTime { return lastChange + settleTime }
-            if let previous, previous != observation.screens { lastChange = observation.time }
+    /// The screen's last change, from observations whose first one was
+    /// taken before the ask, once it has been unchanged for the settle time
+    /// after it; nil while it has not, or has not changed at all. A change
+    /// after it had settled belongs to something else.
+    public static func lastChange(of screenUUID: String, observations: [Observation], settleTime: Double) -> Double? {
+        guard let first = observations.first else { return nil }
+        var previous = first.screens[screenUUID]
+        var lastChange: Double?
+        for observation in observations.dropFirst() {
+            if let lastChange, observation.time - lastChange >= settleTime { return lastChange }
+            let place = observation.screens[screenUUID]
+            if place != previous { lastChange = observation.time }
+            previous = place
         }
-        guard let last = observations.last, last.time - lastChange >= settleTime else { return nil }
-        return lastChange + settleTime
+        return nil
     }
 }

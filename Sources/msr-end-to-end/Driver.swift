@@ -116,15 +116,19 @@ final class Driver {
             Thread.sleep(forTimeInterval: 0.02)
         }
         let begun = Date()
-        var happened: [(asked: Date, done: Date, settled: Date, event: Scenario.Event, uuid: String?)] = []
+        var happened: [(asked: Date, done: Date, lastChange: Date, event: Scenario.Event, uuid: String?)] = []
         for (at, event) in scenario.events {
             try interruption.sleep(until: begun.addingTimeInterval(at))
+            let watch = ScreenWatch()
+            defer { watch.stop() }
             let asked = Date()
+            let done: Date
             let uuid: String
             switch event {
             case .connectScreen(let spec):
                 let process: ChildProcess
                 (process, uuid) = try VirtualScreenHelper.connect(spec, executable: ownExecutable, folder: logs)
+                done = Date()
                 try restorer.started(process, stopSignal: SIGTERM)
                 screens[spec.serialNumber] = (process, uuid)
             case .switchScreenMode(let serialNumber, let size):
@@ -133,17 +137,20 @@ final class Driver {
                 }
                 uuid = screen.uuid
                 try VirtualScreenHelper.requestModeSwitch(screen.process, to: size)
+                done = Date()
             case .disconnectScreen(let serialNumber):
                 guard let screen = screens.removeValue(forKey: serialNumber) else {
                     throw DriverError("\(scenario.name): no virtual screen \(serialNumber) to disconnect")
                 }
                 uuid = screen.uuid
                 try VirtualScreenHelper.disconnect(screen.process, uuid: uuid)
+                done = Date()
                 try restorer.ended(screen.process)
             }
-            let done = Date()
-            let settled = try watchScreensSettle(after: done)
-            happened.append((asked, done, settled, event, uuid))
+            guard let lastChange = try lastChange(of: uuid, watch: watch, done: done) else {
+                return ["\(Self.describe(event)): the screen did not settle within \(Int(EndToEndValues.screensSettleLimit)) s"]
+            }
+            happened.append((asked, done, lastChange, event, uuid))
         }
 
         let stoppedAt: Date
@@ -214,23 +221,18 @@ final class Driver {
         try Screenshots.capture(id, to: review.appending(path: ReviewNames.screenshot(scenario: ReviewNames.appStep, window: "start-window")))
     }
 
-    /// Watches every screen's place and size, the Mac's own included, from
-    /// a change's done until all have been unchanged for the settle time:
-    /// that moment (`ScreenSettling`).
-    private func watchScreensSettle(after done: Date) throws -> Date {
-        let settleTime = EndToEndValues.settleTime
+    /// The changed screen's last change, once it has been unchanged for the
+    /// settle time after it (`ScreenSettling`); nil when it has not within
+    /// the limit after the done.
+    private func lastChange(of uuid: String, watch: ScreenWatch, done: Date) throws -> Date? {
         let deadline = done.addingTimeInterval(EndToEndValues.screensSettleLimit)
-        var observations: [ScreenSettling.Observation] = []
         while true {
             try interruption.check()
-            let now = Date()
-            observations.append(.init(time: now.timeIntervalSince(done), screens: Machine.screenPlaces()))
-            if let settled = ScreenSettling.settledAt(changeDone: 0, observations: observations, settleTime: settleTime) {
-                return done.addingTimeInterval(settled)
+            let observations = watch.observations(since: done)
+            if let lastChange = ScreenSettling.lastChange(of: uuid, observations: observations, settleTime: EndToEndValues.settleTime) {
+                return done.addingTimeInterval(lastChange)
             }
-            guard now < deadline else {
-                throw DriverError("the screens did not settle within \(Int(EndToEndValues.screensSettleLimit)) s of a change")
-            }
+            guard Date() < deadline else { return nil }
             Thread.sleep(forTimeInterval: 0.02)
         }
     }
@@ -247,7 +249,7 @@ final class Driver {
 
     private func assertions(
         _ scenario: Scenario, recorder: ChildProcess, output: URL, logs: URL, ownScreenCount: Int,
-        happened: [(asked: Date, done: Date, settled: Date, event: Scenario.Event, uuid: String?)], stoppedAt: Date
+        happened: [(asked: Date, done: Date, lastChange: Date, event: Scenario.Event, uuid: String?)], stoppedAt: Date
     ) throws -> [String] {
         var failures: [String] = []
         let expectedExit: ChildProcess.ExitStatus = scenario.stop == .kill ? .signalled(SIGKILL) : .exited(0)
@@ -274,15 +276,15 @@ final class Driver {
         }
         let seconds = { (date: Date) in date.timeIntervalSince(started) }
         let changes = happened.map {
-            HappenedEvent(times: ChangeTimes(asked: seconds($0.asked), done: seconds($0.done), screensSettled: seconds($0.settled)),
+            HappenedEvent(times: ChangeTimes(asked: seconds($0.asked), done: seconds($0.done), lastChange: seconds($0.lastChange)),
                           event: $0.event, screenUUID: $0.uuid)
         }
         eventWindows = zip(changes, happened).map { change, event in
             let width = { (kind: TimingKind) in
                 change.times.windowWidth(kind, settleTime: EndToEndValues.settleTime, tolerance: EndToEndValues.timeTolerance)
             }
-            return String(format: "%@ asked at %.2f s, done at %.2f s, screens settled at %.2f s: the settled window is %.2f s wide, the immediate one %.2f s",
-                          Self.describe(event.event), change.times.asked, change.times.done, change.times.screensSettled ?? .nan,
+            return String(format: "%@ asked at %.2f s, done at %.2f s, the screen last changed at %.2f s: the settled window is %.2f s wide, the immediate one %.2f s",
+                          Self.describe(event.event), change.times.asked, change.times.done, change.times.lastChange ?? .nan,
                           width(.settled), width(.immediate))
         }
         let virtual = Scenario.virtualScreenExpectation(changes)

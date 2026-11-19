@@ -5,24 +5,26 @@ import Foundation
 public struct ChangeTimes: Sendable, Equatable {
     public var asked: Double
     public var done: Double
-    /// When all screens had been unchanged for the settle time after it, as
-    /// the driver watched them (`ScreenSettling`); nil when not watched.
-    public var screensSettled: Double?
+    /// The changed screen's last change after the ask, as the driver
+    /// watched it (`ScreenSettling`); nil when not watched.
+    public var lastChange: Double?
 
-    public init(asked: Double, done: Double, screensSettled: Double? = nil) {
+    public init(asked: Double, done: Double, lastChange: Double? = nil) {
         self.asked = asked
         self.done = done
-        self.screensSettled = screensSettled
+        self.lastChange = lastChange
     }
 
     /// Where a time the recorder writes for the change may lie, by its kind,
     /// widened by the tolerance: an immediate one from the ask to the done;
-    /// a settled one from the ask plus the settle time to the moment the
-    /// screens settled (the done plus the settle time when not watched).
+    /// a settled one the settle time after the screen's last change (when
+    /// not watched, from the ask to the done, the settle time later).
     public func window(_ kind: TimingKind, settleTime: Double, tolerance: Double) -> ClosedRange<Double> {
         switch kind {
         case .immediate: (asked - tolerance)...(done + tolerance)
-        case .settled: (asked + settleTime - tolerance)...((screensSettled ?? done + settleTime) + tolerance)
+        case .settled:
+            if let lastChange { (lastChange + settleTime - tolerance)...(lastChange + settleTime + tolerance) }
+            else { (asked + settleTime - tolerance)...(done + settleTime + tolerance) }
         }
     }
 

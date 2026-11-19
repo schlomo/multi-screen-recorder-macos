@@ -213,6 +213,16 @@ struct SampleRecording {
             "2026-11-19 08.27.24 Screen 2 - MSR Test 101.mov: starts at 2.40 s, expected 2.50 s to 3.70 s, the settle time after the change"))
     }
 
+    @Test func aFileStartBeforeItsScreenSettledFails() {
+        // The virtual screen last changed at 3.0 s, after the connect was done:
+        // its file starts from 3.5 s on, so 3.4 s fails though after the ask plus the settle time.
+        var expectation = SampleRecording.expectation()
+        expectation.virtualScreenFiles[0].startedBy.lastChange = 3.0
+        #expect(SampleRecording().check(expectation).failures == [
+            "2026-11-19 08.27.25 Screen 2 - MSR Test 101.mov: starts at 3.40 s, expected 3.50 s to 4.50 s, the settle time after the change",
+        ])
+    }
+
     @Test func aMissingVirtualScreenFileFails() {
         var sample = SampleRecording()
         sample.files.remove(at: 4)
