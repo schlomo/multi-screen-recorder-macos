@@ -1167,7 +1167,9 @@ current screen file runs on through the settle time, with the picture
 scaled to the old frame size, and then ends; the stream is stopped and
 a new one started at the new frame size, the same path as a reconnect
 (`updateConfiguration` is not used: never tried). The gap is the
-restart only.
+restart only. Target, checked by the end-to-end tests: a screen's file
+starts within 1 s (*data*) after its settle time ends, the new
+stream's first frame included (D63).
 - **Mirroring:** a screen that starts mirroring another
   (`CGDisplayMirrorsDisplay`) ends its screen file with the event
   `screen mirroring started` (the screen and the one it mirrors);

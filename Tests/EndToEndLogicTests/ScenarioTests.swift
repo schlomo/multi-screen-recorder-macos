@@ -60,19 +60,27 @@ import Testing
 
     @Test func aSettledTimeComesTheSettleTimeAfterTheChange() {
         let change = ChangeTimes(asked: 6.0, done: 6.25)
-        let window = change.window(.settled, settleTime: 1, tolerance: 0.5)
+        let window = change.window(.settled, settleTime: 1, tolerance: 0.5, firstFrameLimit: 1)
         #expect(window == 6.5...7.75)
         #expect(window.contains(6.5) && window.contains(7.75))
         #expect(!window.contains(6.49) && !window.contains(7.76))
-        #expect(change.windowWidth(.settled, settleTime: 1, tolerance: 0.5) == 1.25)
+        #expect(change.windowWidth(.settled, settleTime: 1, tolerance: 0.5, firstFrameLimit: 1) == 1.25)
+    }
+
+    @Test func aFileStartComesTheSettleTimeAfterTheChangeThenItsFirstFrame() {
+        let change = ChangeTimes(asked: 6.0, done: 6.25, lastChange: 6.125)
+        let window = change.window(.started, settleTime: 1, tolerance: 0.5, firstFrameLimit: 1)
+        #expect(window == 6.625...8.125)
+        #expect(window.contains(7.125 + 0.875) && !window.contains(7.125 + 1.125))
+        #expect(!window.contains(6.5))
     }
 
     @Test func anImmediateTimeComesWithTheChange() {
         let change = ChangeTimes(asked: 6.0, done: 6.25)
-        let window = change.window(.immediate, settleTime: 1, tolerance: 0.5)
+        let window = change.window(.immediate, settleTime: 1, tolerance: 0.5, firstFrameLimit: 1)
         #expect(window == 5.5...6.75)
         #expect(!window.contains(5.49) && !window.contains(6.76))
-        #expect(change.windowWidth(.immediate, settleTime: 1, tolerance: 0.5) == 1.25)
+        #expect(change.windowWidth(.immediate, settleTime: 1, tolerance: 0.5, firstFrameLimit: 1) == 1.25)
     }
 
     @Test func aConnectAModeSwitchAndADisconnectGiveTheirFilesAndEvents() {

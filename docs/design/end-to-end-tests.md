@@ -211,7 +211,9 @@ windows, widened by the 0.5 s tolerance: **immediate** (`screen
 connected`, `screen disconnected`, a file's end at a disconnect) from
 the ask to the done; **settled** (a screen file's start, `screen frame
 size changed`, a file's end at a mode switch) the settle time after the
-change's anchor. The anchor is the later of the screen's last change and
+change's anchor, and a screen file's start, which waits for the new
+stream's first frame, up to the first-frame limit, 1 s, instead of the
+tolerance late (recorder.md, "Screens coming and going"). The anchor is the later of the screen's last change and
 the recorder's notice of the change: for a connect, its `screen
 connected` time, which the recorder writes when macOS tells it of the
 screen, measured up to about 0.5 s after the screen is in the active
@@ -221,7 +223,8 @@ measured 0.03 to 0.08 s after the screen's last change). A connect's
 file start is checked only against a notice that passed its own check;
 a missing or misplaced notice fails the start too, naming it. `run.log`
 shows each change's times, the screen's last change, the anchor and
-where it came from, and both windows' widths. The `virtual-screen` scenario
+where it came from, the windows' widths and, after a connect or mode
+switch, how long after the settle time its file started. The `virtual-screen` scenario
 records with `--debug`, so its `msr.err` keeps the recorder's detail;
 it changes only standard error, which nothing asserts.
 

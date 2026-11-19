@@ -13,6 +13,10 @@ public enum EndToEndValues {
     /// recorder's settle time (recorder.md), restated here, not read from
     /// the recorder's code.
     public static let settleTime = 1.0
+    /// How long after its settle time ends a screen file may start, the
+    /// new stream's first frame included: the recorder design's target
+    /// (recorder.md, owner's ruling in D63).
+    public static let firstFrameLimit = 1.0
     /// How long the driver waits for the screens to settle after a change
     /// before it stops: they settle within about 2.5 s on the runner.
     public static let screensSettleLimit = 15.0

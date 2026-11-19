@@ -289,19 +289,25 @@ final class Driver {
             playedAudioInputs: scenario.playsTone
                 ? [.init(name: Machine.loopbackName, uid: Machine.loopbackUID, channels: 2)] : [],
             timeTolerance: EndToEndValues.timeTolerance, finalizeAllowance: EndToEndValues.finalizeAllowance,
-            settleTime: EndToEndValues.settleTime)
+            settleTime: EndToEndValues.settleTime, firstFrameLimit: EndToEndValues.firstFrameLimit)
         let names = try FileManager.default.contentsOfDirectory(atPath: folder.path)
         let check = ManifestCheck(manifest: manifest, folder: names, expectation: expectation)
         eventWindows = changes.enumerated().map { index, change in
             var times = change.times
             times.notice = check.notices[index]
             let width = { (kind: TimingKind) in
-                times.windowWidth(kind, settleTime: EndToEndValues.settleTime, tolerance: EndToEndValues.timeTolerance)
+                times.windowWidth(kind, settleTime: EndToEndValues.settleTime, tolerance: EndToEndValues.timeTolerance,
+                                  firstFrameLimit: EndToEndValues.firstFrameLimit)
             }
+            let startedFile = expectation.virtualScreenFiles.firstIndex { $0.startedBy == change.times }
+            let startUp = startedFile.map { file in
+                check.startUps[file].map { String(format: "; its file started %.2f s after the settle time", $0) }
+                    ?? "; its file's start-up was not measured"
+            } ?? ""
             let anchor = times.anchor.map { String(format: "anchored at %.2f s, %@", $0.time, $0.source.description) } ?? "no anchor"
-            return String(format: "%@ asked at %.2f s, done at %.2f s, the screen last changed at %.2f s, %@: the settled window is %.2f s wide, the immediate one %.2f s",
+            return String(format: "%@ asked at %.2f s, done at %.2f s, the screen last changed at %.2f s, %@: the settled window is %.2f s wide, a file start's %.2f s, the immediate one %.2f s%@",
                           Self.describe(change.event), times.asked, times.done, times.lastChange ?? .nan, anchor,
-                          width(.settled), width(.immediate))
+                          width(.settled), width(.started), width(.immediate), startUp)
         }
         failures += check.failures
         if let ranFor = check.ranFor {

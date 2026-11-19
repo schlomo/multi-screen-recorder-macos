@@ -91,7 +91,7 @@ struct SampleRecording {
                 .init(event: "screen disconnected", expected: .init(change: disconnect, kind: .immediate)),
             ],
             playedAudioInputs: [.init(name: "BlackHole 2ch", uid: "BlackHole2ch_UID", channels: 2)],
-            timeTolerance: 0.5, finalizeAllowance: 3, settleTime: 1)
+            timeTolerance: 0.5, finalizeAllowance: 3, settleTime: 1, firstFrameLimit: 1)
     }
 
     func check(_ expectation: ManifestExpectation = expectation(), folder: [String]? = nil) -> ManifestCheck {
@@ -210,7 +210,7 @@ struct SampleRecording {
         let failures = sample.check().failures
         #expect(failures.contains("2026-11-19 08.27.29 Screen 2 - MSR Test 101.mov: frameSize [1280, 720], expected [1600, 900]"))
         #expect(failures.contains(
-            "2026-11-19 08.27.24 Screen 2 - MSR Test 101.mov: starts at 2.40 s, expected 2.73 s to 3.73 s, the settle time after the recorder's notice at 2.23 s"))
+            "2026-11-19 08.27.24 Screen 2 - MSR Test 101.mov: starts at 2.40 s, expected 2.73 s to 4.23 s, the settle time after the recorder's notice at 2.23 s"))
     }
 
     @Test func aFileStartBeforeItsScreenSettledFails() {
@@ -219,7 +219,7 @@ struct SampleRecording {
         var expectation = SampleRecording.expectation()
         expectation.virtualScreenFiles[0].startedBy.lastChange = 3.0
         #expect(SampleRecording().check(expectation).failures == [
-            "2026-11-19 08.27.25 Screen 2 - MSR Test 101.mov: starts at 3.40 s, expected 3.50 s to 4.50 s, the settle time after the screen's last change at 3.00 s",
+            "2026-11-19 08.27.25 Screen 2 - MSR Test 101.mov: starts at 3.40 s, expected 3.50 s to 5.00 s, the settle time after the screen's last change at 3.00 s",
         ])
     }
 
@@ -244,15 +244,27 @@ struct SampleRecording {
         #expect(SampleRecording().check().notices == [0: 2.226])
     }
 
-    @Test func aStartTooLongAfterTheNoticeFails() {
-        #expect(connect(noticedAt: 2.5, startingAt: 4.1) == [
-            "2026-11-19 08.27.25 Screen 2 - MSR Test 101.mov: starts at 4.10 s, expected 3.00 s to 4.00 s, the settle time after the recorder's notice at 2.50 s",
+    @Test func aFirstFrameWithinTheLimitAfterTheSettleTimePasses() {
+        #expect(connect(noticedAt: 2.5, startingAt: 4.4) == [])
+    }
+
+    @Test func aFirstFrameLaterThanTheLimitFails() {
+        #expect(connect(noticedAt: 2.5, startingAt: 4.6) == [
+            "2026-11-19 08.27.25 Screen 2 - MSR Test 101.mov: starts at 4.60 s, expected 3.00 s to 4.50 s, the settle time after the recorder's notice at 2.50 s",
         ])
+    }
+
+    @Test func theStartUpIsMeasuredFromTheSettleTimesEnd() {
+        var sample = SampleRecording()
+        sample.files[3]["start"] = 3.75
+        var expectation = SampleRecording.expectation()
+        expectation.virtualScreenFiles[0].startedBy.lastChange = 2.5
+        #expect(sample.check(expectation).startUps[0] == 0.25)
     }
 
     @Test func aStartBeforeTheNoticePlusTheSettleTimeFails() {
         #expect(connect(noticedAt: 2.5, startingAt: 2.9) == [
-            "2026-11-19 08.27.25 Screen 2 - MSR Test 101.mov: starts at 2.90 s, expected 3.00 s to 4.00 s, the settle time after the recorder's notice at 2.50 s",
+            "2026-11-19 08.27.25 Screen 2 - MSR Test 101.mov: starts at 2.90 s, expected 3.00 s to 4.50 s, the settle time after the recorder's notice at 2.50 s",
         ])
     }
 

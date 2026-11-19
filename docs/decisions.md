@@ -1984,6 +1984,15 @@ architect's reading.
   during the run, not offscreen renders, the start window only, and no
   exception from "Fail early and loudly" for it, are the architect's
   calls.
+- **First-frame limit, owner's ruling of 2026-11-19:** a pipeline run
+  had a mode switch's new stream take 0.55 s to its first frame (other
+  restarts 0.10 to 0.32 s), and the recorder's design set no limit. On
+  a proposed 1 s limit the owner: "1s sounds good, and we see where we
+  go from there". recorder.md now sets the target that a screen's file
+  starts within 1 s after its settle time ends; the end-to-end tests
+  let a screen file's start lie up to that limit, not the 0.5 s
+  tolerance, after its anchor's settle time, with the lower bound
+  unchanged, and `run.log` prints each start-up time.
 - **Deviation from the agreed design, confirmed by the owner:** the
   design makes a frame size change by replacing a virtual screen with
   one of another size. Tried on 2026-11-19 (macOS 27.2.1): macOS brings

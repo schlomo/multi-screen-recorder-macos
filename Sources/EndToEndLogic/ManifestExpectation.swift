@@ -40,32 +40,37 @@ public struct ChangeTimes: Sendable, Equatable {
     /// Where a time the recorder writes for the change may lie, by its kind,
     /// widened by the tolerance: an immediate one from the ask to the done;
     /// a settled one the settle time after its anchor (when not watched,
-    /// from the ask to the done, the settle time later).
-    public func window(_ kind: TimingKind, settleTime: Double, tolerance: Double) -> ClosedRange<Double> {
-        switch kind {
+    /// from the ask to the done, the settle time later); a file's start
+    /// as a settled one, but up to the first-frame limit late.
+    public func window(_ kind: TimingKind, settleTime: Double, tolerance: Double, firstFrameLimit: Double) -> ClosedRange<Double> {
+        let late = kind == .started ? firstFrameLimit : tolerance
+        return switch kind {
         case .immediate: (asked - tolerance)...(done + tolerance)
-        case .settled:
-            if let anchor { (anchor.time + settleTime - tolerance)...(anchor.time + settleTime + tolerance) }
-            else { (asked + settleTime - tolerance)...(done + settleTime + tolerance) }
+        case .settled, .started:
+            if let anchor { (anchor.time + settleTime - tolerance)...(anchor.time + settleTime + late) }
+            else { (asked + settleTime - tolerance)...(done + settleTime + late) }
         }
     }
 
-    public func windowWidth(_ kind: TimingKind, settleTime: Double, tolerance: Double) -> Double {
-        let window = window(kind, settleTime: settleTime, tolerance: tolerance)
+    public func windowWidth(_ kind: TimingKind, settleTime: Double, tolerance: Double, firstFrameLimit: Double) -> Double {
+        let window = window(kind, settleTime: settleTime, tolerance: tolerance, firstFrameLimit: firstFrameLimit)
         return window.upperBound - window.lowerBound
     }
 }
 
 /// How a time the recorder writes follows the change it tells of.
 public enum TimingKind: Sendable, Equatable {
-    /// After the settle time: a screen file's start, `screen frame size
-    /// changed`, a file's end at a mode switch.
+    /// After the settle time: `screen frame size changed`, a file's end at
+    /// a mode switch.
     case settled
+    /// A screen file's start: after the settle time, its first frame
+    /// within the first-frame limit.
+    case started
     /// With the change: `screen connected`, `screen disconnected`, a file's
     /// end at a disconnect.
     case immediate
 
-    var description: String { self == .settled ? "the settle time after the change" : "with the change" }
+    var description: String { self == .immediate ? "with the change" : "the settle time after the change" }
 }
 
 /// A time the recorder writes: the change it follows, and how.
@@ -197,13 +202,16 @@ public struct ManifestExpectation: Sendable {
     public var finalizeAllowance: Double
     /// How long a screen waits unchanged before its file starts.
     public var settleTime: Double
+    /// How long after the settle time a screen file may start.
+    public var firstFrameLimit: Double
 
     public init(
         app: String, settings: Settings, ending: Ending, stoppedAt: Double, ownScreenCount: Int,
         virtualScreenNamePrefix: String, virtualScreenFiles: [VirtualScreenFile] = [],
         virtualScreenEvents: [VirtualScreenEvent] = [], playedAudioInputs: [PlayedAudioInput] = [],
-        timeTolerance: Double, finalizeAllowance: Double, settleTime: Double
+        timeTolerance: Double, finalizeAllowance: Double, settleTime: Double, firstFrameLimit: Double
     ) {
+        self.firstFrameLimit = firstFrameLimit
         self.app = app
         self.settings = settings
         self.ending = ending

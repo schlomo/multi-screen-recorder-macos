@@ -57,6 +57,9 @@ public struct ManifestCheck {
     /// among the virtual screens' events: the anchors of the starts after them.
     public private(set) var notices: [Int: Double] = [:]
     private var eventTimes: [Int: Double] = [:]
+    /// Each virtual screen file's start after its anchor's settle time, in
+    /// seconds, by its index among the expected files.
+    public private(set) var startUps: [Int: Double] = [:]
     /// The recording's start, in seconds of the local day.
     public private(set) var started: Double?
     /// How long the recording ran from `started` to `ended`, when finalized.
@@ -284,7 +287,7 @@ public struct ManifestCheck {
             }
         }
         var numbers: [Int] = []
-        for (file, wanted) in zip(actual, expected) {
+        for (index, (file, wanted)) in zip(actual, expected).enumerated() {
             guard case .screen(let uuid, let name, let size, _) = file.source else { continue }
             if uuid != wanted.screenUUID { fail("\(file.name): screen \(uuid), expected \(wanted.screenUUID)") }
             if !name.hasPrefix(expectation.virtualScreenNamePrefix) {
@@ -292,16 +295,17 @@ public struct ManifestCheck {
             }
             if size != wanted.frameSize { fail("\(file.name): frameSize \(size), expected \(wanted.frameSize)") }
             var startedBy = wanted.startedBy
-            if let index = wanted.noticedBy {
-                let name = expectation.virtualScreenEvents[index].event
-                startedBy.notice = notices[index]
+            defer { if let anchor = startedBy.anchor { startUps[index] = file.start - (anchor.time + expectation.settleTime) } }
+            if let noticeIndex = wanted.noticedBy {
+                let name = expectation.virtualScreenEvents[noticeIndex].event
+                startedBy.notice = notices[noticeIndex]
                 if startedBy.notice == nil {
-                    let reason = eventTimes[index].map { String(format: "%@ at %.2f s, is outside its window", name, $0) } ?? "\(name), is missing"
+                    let reason = eventTimes[noticeIndex].map { String(format: "%@ at %.2f s, is outside its window", name, $0) } ?? "\(name), is missing"
                     fail("\(file.name): its start is not checked: the recorder's notice, \(reason)")
                 }
             }
             if wanted.noticedBy == nil || startedBy.notice != nil,
-               let wrong = outside(file.start, ExpectedTime(change: startedBy, kind: .settled)) {
+               let wrong = outside(file.start, ExpectedTime(change: startedBy, kind: .started)) {
                 fail("\(file.name): starts at \(wrong)")
             }
             if expectation.ending == .finalized, let fileEnd = file.end {
@@ -333,10 +337,11 @@ public struct ManifestCheck {
 
     /// The failure's text when `time` is outside the change's window, else nil.
     private func outside(_ time: Double, _ expected: ExpectedTime) -> String? {
-        let window = expected.change.window(expected.kind, settleTime: expectation.settleTime, tolerance: expectation.timeTolerance)
+        let window = expected.change.window(expected.kind, settleTime: expectation.settleTime, tolerance: expectation.timeTolerance,
+                                            firstFrameLimit: expectation.firstFrameLimit)
         guard !window.contains(time) else { return nil }
         let follows = switch (expected.kind, expected.change.anchor) {
-        case (.settled, let anchor?): String(format: "the settle time after %@ at %.2f s", anchor.source.description, anchor.time)
+        case (.settled, let anchor?), (.started, let anchor?): String(format: "the settle time after %@ at %.2f s", anchor.source.description, anchor.time)
         default: expected.kind.description
         }
         return String(format: "%.2f s, expected %.2f s to %.2f s, ", time, window.lowerBound, window.upperBound) + follows
