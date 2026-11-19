@@ -2,21 +2,24 @@
 
 ## Next session starts here
 
-Two PRs are in flight (2026-11-19), see "In flight". First the
-diagnostics PR (item 24) gets its adversarial review, the pipeline and
-the owner's merge. Then PR #23 (item 3's first part) takes `main` in,
-and its end-to-end job is rerun on one commit until it passes 5 times
-in a row (the owner: "keep working till you see consistently reliable
-e2e tests"); every failure is root-caused from the uploaded artifacts,
+PR #24 (item 24, diagnostics) is merged (2026-11-19). Next: PR #23
+(item 3's first part) takes `main` in, and its end-to-end job is rerun
+on one commit until it passes 5 times in a row (the owner: "keep
+working till you see consistently reliable e2e tests"); every failure
+is root-caused from the uploaded artifacts and the recording log,
 never retried away, and no check is loosened. The 4th attempt on
 `298e4c9` failed on a real `screen file writer failed` at a mode
-switch, whose cause item 24 makes visible. Then, one PR each: item
-23, the Resolve timeline (after the owner's test import of the spike
-`.otio` files, instructions in the session of 2026-11-19, remade if
-gone); item 21, the meters (design signed off); item 3's follow-up;
-item 4; item 7; item 12; item 22; the rest of item 6; item 16.
+switch; the recording log now shows its cause. The owner's ruling
+(2026-11-19): "you can do follow up fixes in 23", so item 24's
+follow-ups (item 27, once its design is signed off) go into PR #23.
+Then, one PR each: item 23, the Resolve timeline (after the owner's
+test import of the spike `.otio` files, instructions in the session of
+2026-11-19, remade if gone); item 21, the meters (design signed off);
+item 3's follow-up; item 4; item 7; item 12; item 22; the rest of item
+6; item 16.
 
-Agents may run `msr record` on the owner's Mac (D48), and BetterDisplay's command
+Agents may run `msr record` on the owner's Mac (D48), with `HOME` set
+to a scratch folder (`AGENTS.md`, "Facts that bite"), and BetterDisplay's command
 line with the owner's virtual screen "Virtual 16:9"; by D56, before
 an agent starts a recording or plays a sound on the owner's Mac, the
 session running or briefing that test tells the owner, once before
@@ -33,11 +36,11 @@ Still open from D34: what AGC does and whether it is on in auto mode;
 - **PR #23, end-to-end tests** (item 3, first part; branch
   `end-to-end-tests`, draft): six scenarios on the owner's Mac and on
   the hosted runner, review artifacts, a job summary and annotations.
-  Reviewed in full, every round delta-reviewed. Waits for item 24, then
-  5 green end-to-end runs in a row. Left for the follow-up: match a
+  Reviewed in full, every round delta-reviewed. Item 24 is merged; next,
+  5 green end-to-end runs in a row; item 24's follow-ups go here too
+  (the owner, 2026-11-19). Left for the follow-up: match a
   screen's notice by its name, not its order, and say "misordered"
   where "missing" is printed today (review NITs, 2026-11-19).
-- **Item 24, diagnostics** (branch `diagnostics`, being built).
 
 ## Queued
 
@@ -555,20 +558,6 @@ Still open from D34: what AGC does and whether it is on in auto mode;
    names kept, absolute vs relative paths, multichannel audio files on
    one track, and whether only a screen file's video is placed. Then
    built in Swift without a library, with golden-file tests.
-24. **Diagnostics** (the owner, 2026-11-19: "The error handing pr must
-   be smarter about collection unknown and unexpected errors in
-   general so that future similar situations will give us something
-   to analyze. Same with user reports. And think about how to connect
-   such error details from GUI runs without terminal, ideally writing
-   something into the results folder"; on the design: "Better append.
-   Otherwise agree"): one error detail for every error (its whole
-   chain of domain, code and underlying errors, in the events, the
-   problems with `errorDetail`, and the log), enforced by a test
-   against `localizedDescription`; a recording log, `recording.log`,
-   in every recording folder, append-only, synced at each event and
-   problem, with the detail lines `--debug` printed before (partly
-   reverses D46); **Report a problem** in the status window after a
-   recording with problems. In flight.
 25. **A new screen showing a still picture gets no file until it
    changes** (found by PR #23's runs, 2026-11-19): ScreenCaptureKit
    delivers complete frames only on change, so a newly connected
@@ -581,6 +570,17 @@ Still open from D34: what AGC does and whether it is on in auto mode;
    guide tracks start 5 to 77 ms in (an edit list), and the design
    says they "cover exactly its own time". The audio files are
    complete. Decide whether it matters for editors.
+
+27. **A writer that cannot start repeats its error without end** (the
+   owner's run, 2026-11-19, folder made read-only, microphone replugged):
+   the audio file writer retries about every 10 s and each try prints
+   the full error detail on standard error, so the terminal fills with
+   the same line; the first failure is also printed twice, as "The
+   audio file of … failed: …" and as the event "audio file writer
+   failed: … (…)". Proposed: standard error prints a writer's failure
+   once and then only how often it repeated (when it recovers or at
+   Stop); the recording log keeps every line; one line per failure.
+   Needs the owner's sign-off; then into PR #23.
 
 ## Deliberately deferred
 
@@ -731,6 +731,19 @@ Still open from D34: what AGC does and whether it is on in auto mode;
   the README (D46). Revisit when people struggle with it.
 
 ## Done (recent)
+
+- 2026-11-19: PR #24 merged by the owner: item 24, diagnostics. One
+  error detail for every error (domain, code, underlying errors; the
+  manifest's `errorDetail`), a test against `localizedDescription`;
+  an append-only `recording.log` in every recording folder with the
+  starting situation and the detail lines; **Report a problem**: the
+  app's next start after a recording with problems offers the
+  prefilled problem report form and shows the two files to attach,
+  and `msr record` ends its summary with the link (one link builder
+  with the crash report's). Agents testing on the owner's Mac set a
+  scratch `HOME`. D64 (partly reverses D46). The owner checked the
+  notice and the link by hand. Reviews: one top-tier review, two delta
+  reviews, the last fix diff read by the architect.
 
 - 2026-11-19: PR #22 merged by the owner (Markdown only, no release):
   item 17. Rounds are pushed with the skip-ci marker, so they start
