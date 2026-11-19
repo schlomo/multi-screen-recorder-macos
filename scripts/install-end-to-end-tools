@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
-# CI only: installs what scripts/end-to-end-test needs on a hosted runner, at
-# fixed versions checked by their SHA-256: ffmpeg and ffprobe (static builds
-# for Apple silicon) into a folder put first on the PATH of the steps after
-# this one, and the BlackHole 2ch loopback driver, then restarts Core Audio
-# and waits until the device is listed. Downloads come from the projects'
-# own sites (the owner, 2026-11-16: downloads in CI are fine).
+# Installs what scripts/end-to-end-test's driver needs, at fixed versions
+# checked by their SHA-256: ffmpeg and ffprobe (static builds for Apple
+# silicon) into the folder given, and the BlackHole 2ch loopback driver, then
+# restarts Core Audio and waits until the device is listed. scripts/end-to-end-setup
+# runs it inside the VM, which is the only place it is meant for: it installs
+# a system package with sudo. Downloads come from the projects' own sites.
 set -euo pipefail
 
-me="scripts/ci-install-end-to-end-tools"
+me="scripts/install-end-to-end-tools"
 ffmpeg_url="https://ffmpeg.martin-riedl.de/download/macos/arm64/1789931890_9.0.2"
 ffmpeg_sha256="c8ed4c4e6978a03c485edbfe4e0a5dc2380f8a30bba5150531b31b094492d924"
 ffprobe_sha256="fcbe839537485eaee7a7a8bc5cbc0f90d53617e80943e8a5b2e31cb851197ea6"
@@ -15,19 +15,17 @@ blackhole_url="https://existential.audio/downloads/BlackHole2ch-0.7.1.pkg"
 blackhole_sha256="57b540f27a3e29c37e310e01bee0fdfab76733087e47f997ef9dccf851400dcf"
 blackhole_name="BlackHole 2ch"
 
+if [[ $# != 1 ]]; then
+    echo "$me: usage: $me <folder for ffmpeg and ffprobe>" >&2
+    exit 64
+fi
 for tool in curl shasum unzip sudo installer killall system_profiler python3; do
     command -v "$tool" >/dev/null || { echo "$me: $tool is not on the PATH" >&2; exit 1; }
 done
-for variable in RUNNER_TEMP GITHUB_PATH; do
-    if [[ -z "${!variable:-}" ]]; then
-        echo "$me: $variable is not set; this script runs in CI only" >&2
-        exit 1
-    fi
-done
-
-downloads="$RUNNER_TEMP/end-to-end-tools/downloads"
-bin="$RUNNER_TEMP/end-to-end-tools/bin"
-mkdir -p "$downloads" "$bin"
+bin="$1"
+downloads=$(mktemp -d)
+trap 'rm -rf "$downloads"' EXIT
+mkdir -p "$bin"
 
 # Downloads $1 to $2 and checks it against the SHA-256 $3.
 fetch() {
@@ -43,7 +41,6 @@ unzip -o -q "$downloads/ffprobe.zip" -d "$bin"
 chmod 0755 "$bin/ffmpeg" "$bin/ffprobe"
 "$bin/ffmpeg" -version | head -n 1
 "$bin/ffprobe" -version | head -n 1
-echo "$bin" >> "$GITHUB_PATH"
 
 fetch "$blackhole_url" "$downloads/BlackHole2ch.pkg" "$blackhole_sha256"
 sudo installer -pkg "$downloads/BlackHole2ch.pkg" -target /

@@ -1,0 +1,68 @@
+#!/usr/bin/env bash
+# Builds the VM scripts/end-to-end-test runs in (docs/design/end-to-end-tests.md):
+# Cirrus Labs' macOS 26 vanilla image cloned to the VM msr-end-to-end, SIP
+# disabled through Recovery with Packer, the recording permissions written
+# into TCC.db as actions/runner-images does for GitHub's runners, Python 3.15,
+# and ffmpeg, ffprobe and BlackHole 2ch from scripts/install-end-to-end-tools.
+# Re-running replaces the VM. Needs tart and packer on the PATH, installs
+# neither, and takes about 4 minutes with the base image cached (its
+# first download is 28 GB) and 30 GB of disk.
+set -euo pipefail
+
+me="scripts/end-to-end-setup"
+if [[ ${1-} == -h || ${1-} == --help ]]; then
+    echo "Builds the VM scripts/end-to-end-test runs in (msr-end-to-end); re-running replaces it.
+  $me           builds the VM
+  $me --help    prints this, also -h
+Needs tart and packer on the PATH."
+    exit 0
+fi
+[[ $# == 0 ]] || { echo "$me: takes no arguments, see $me --help" >&2; exit 64; }
+
+cd "$(dirname "$0")/.."
+source scripts/end-to-end-vm/lib.sh
+require tart packer ssh
+work=$(mktemp -d)
+trap 'vm_stop; rm -rf "$work"' EXIT
+
+python_version="3.15.2"
+python_pkg="python-$python_version-macos11.pkg"
+python_url="https://www.python.org/ftp/python/$python_version/$python_pkg"
+python_team="BMM5U3QVKW"
+sip_template="$vm_dir/disable-sip.pkr.hcl"
+start=$(date +%s)
+
+if vm_exists "$image_vm"; then tart delete "$image_vm"; fi
+tart clone "$base_image" "$image_vm"
+tart set "$image_vm" --cpu 4 --memory 8192
+
+echo "$me: disabling SIP in $image_vm through Recovery"
+packer init "$sip_template"
+packer build -var "vm_name=$image_vm" "$sip_template"
+tart set "$image_vm" --cpu 4 --memory 8192
+
+vm_start "$image_vm"
+sip=$(guest csrutil status)
+echo "$me: $sip"
+[[ $sip == *disabled* ]] || die "SIP is still enabled in $image_vm; Packer's Recovery keystrokes did not take"
+
+guest "cat > ~/guest-configure-tcc" <"$vm_dir/guest-configure-tcc"
+guest "sudo /bin/bash ~/guest-configure-tcc '$guest_app_root' && rm ~/guest-configure-tcc"
+
+guest "set -euo pipefail
+    cd /tmp && curl --fail --silent --show-error --location --retry 3 -o '$python_pkg' '$python_url'
+    pkgutil --check-signature '$python_pkg' | grep -q '($python_team)' \
+        || { echo 'the Python package is not signed by the Python Software Foundation ($python_team)' >&2; exit 1; }
+    sudo installer -pkg '$python_pkg' -target /
+    rm '$python_pkg'
+    /usr/local/bin/python3 --version"
+
+guest "cat > ~/install-end-to-end-tools && chmod +x ~/install-end-to-end-tools" <scripts/install-end-to-end-tools
+guest "export PATH=/usr/local/bin:\$PATH && ~/install-end-to-end-tools '$guest_tools' && rm ~/install-end-to-end-tools"
+
+# A restart makes tccd read the new entries, as the runner image's build does.
+vm_stop
+vm_start "$image_vm"
+guest "ls '$guest_tools/ffmpeg' '$guest_tools/ffprobe' /Library/Audio/Plug-Ins/HAL/BlackHole2ch.driver >/dev/null"
+vm_stop
+echo "$me: $image_vm is ready in $(( ($(date +%s) - start) / 60 )) min"

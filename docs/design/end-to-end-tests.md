@@ -1,13 +1,14 @@
 # End-to-end tests
 
-**Status: agreed (D37); the first part built, in the pipeline too
-(D63).** The owner asked for this
+**Status: agreed (D37); the first part built, run by hand in a tart VM
+(D67; D63's pipeline job is gone).** The owner asked for this
 document (2026-11-13) after ruling that automated end-to-end tests run
 on the owner's Mac first (D34), ruled on five of its open questions
 (D35) and merged it, which by the rule this status line stated before
 is the sign-off (D37); two questions stay open ("Open questions").
-Corrected after an automated review (D38). Since D63 the tests run in
-the pipeline as well, on GitHub's hosted runner. Built (backlog item 3,
+Corrected after an automated review (D38). D63 put the tests in
+the pipeline, on GitHub's hosted runner; D67 took them out again and
+made them a manual step in a VM ("Running them", "Why the VM"). Built (backlog item 3,
 first PR): the driver, the device helper's virtual screens and mode
 switches, the test tone, the restore file and `restore`, and six named
 scenarios ("Built so far"). Not built yet: the picture's pattern and
@@ -66,7 +67,7 @@ any scenario. So three kinds of scenario use the same code:
 the language to the architect, D35; the reasons are under "Why not
 otherwise"). They are one executable of its own, never in the app
 bundle, which `scripts/build-app` assembles from `msr` alone.
-`scripts/end-to-end-test` is a few lines that build and start it;
+`scripts/end-to-end-test` builds it and starts it in a VM ("Running them");
 `scripts/` holds scripts only, so the tests' code and data live in the
 package (D35).
 
@@ -106,17 +107,56 @@ inputs it asserts only that their files are readable and listed.
 
 **Run in a person's own session** (D35). A run adds
 screens, covers every screen with a pattern and changes the default
-microphone: the Mac cannot be used meanwhile. On the owner's Mac an
-agent may start one to test the roadmap's work (D48); elsewhere never
-unasked (`AGENTS.md`, "Facts that bite"). Not part of
-`scripts/test`. The pipeline runs it too, on GitHub's hosted runner,
-whose image grants both permissions (D63): the job `end-to-end-test`
-after `test-and-build`, with ffmpeg and BlackHole installed at fixed
-versions by `scripts/ci-install-end-to-end-tools`; the signing jobs
-wait for it, so nothing that failed it is signed or published. Every
-run of the job, passed or failed, keeps the driver's scratch folder as
-the workflow artifact `end-to-end-review` for 14 days ("Artifacts for
-review").
+microphone, which since D67 happens in a VM, not on the Mac the tests
+are started from. Not part of `scripts/test` and not part of the
+pipeline.
+
+### Running them
+
+Once, `brew install tart packer` and `scripts/end-to-end-setup`: it
+clones Cirrus Labs' `macos-tahoe-vanilla` image to the VM
+`msr-end-to-end` (50 GB disk, 27 GB used, 4 CPUs, 8 GB memory), disables
+SIP through Recovery with Packer's `tart-cli` template
+(`scripts/end-to-end-vm/disable-sip.pkr.hcl`), writes the Screen &
+System Audio Recording and Microphone rows into the system's and the
+admin user's TCC.db the way actions/runner-images does for GitHub's
+runners (`scripts/end-to-end-vm/guest-configure-tcc`), installs Python
+3.15 (its signature is checked) and then ffmpeg, ffprobe and BlackHole
+2ch at fixed versions by their SHA-256
+(`scripts/install-end-to-end-tools`). Re-running rebuilds it; it took
+3.5 minutes with the base image cached. It needs `tart` and `packer` on
+the `PATH` and installs neither.
+
+Per run, `scripts/end-to-end-test --scratch-folder <folder>`: builds the
+app and the driver on the Mac, clones a throwaway VM from
+`msr-end-to-end` (a copy-on-write clone, so every run starts clean),
+copies the app and the driver in, runs the driver in the admin user's
+GUI session, copies the driver's scratch folder to `<folder>` (new or
+empty) and deletes the clone, also when the run fails. Arguments other
+than `--scratch-folder` go to the driver (`--scenario <name>`). The exit
+status is the driver's. All 7 scenarios and the start window's
+screenshot took 2 minutes 10 seconds with the build. Nothing records or
+plays sound on the Mac itself.
+
+**When:** before a PR that touches the recorder or the driver is marked
+ready, the architect runs it on the PR's head and records the commit and
+the result in the PR description (`AGENTS.md`). The owner (2026-11-19):
+"We'll leave e2e a manual step that uses the VM and another script for
+setup. You'll run e2e manually when needed and mark in the pr that it
+succeeded. Kiss" (D67).
+
+### Why the VM
+
+On GitHub's hosted macOS runner the video encoder stalls at a virtual
+screen's mode switch and sometimes fails: in about 2 of 9 runs the
+screen file writer failed with `-11800` from `-19092`, inside a stall of
+the encoder at +6.6 to +7.0 s into the recording, which hit both screen
+files at once (the old one and the new one, so no fault of one
+writer's input). That did not happen in 18 runs on the owner's Mac and
+in a tart VM (0 failures). Hosted macOS arm64 runners are also often
+unavailable, which holds the pipeline up for something that is not the
+code. So the runner is not a place for these tests; the VM is the same
+macOS with permissions and SIP set the way the runner has them.
 
 ### Built so far
 
@@ -164,7 +204,7 @@ The named scenarios, each about 10 to 25 s of recording:
 |---|---|---|
 | `plain-recording` | auto mode, ended by `--duration` | exit 0 |
 | `virtual-screen` | a virtual screen of 1280 × 720 connects, switches to 1600 × 900 and back, disconnects; stopped by SIGINT | the screen's three files, frame sizes, number and times, and its events in order at their times |
-| `virtual-screen-stress` | a virtual screen of 1280 × 720 connects, its mode is switched ten times, 1280 × 720 ↔ 1600 × 900, about 2 s apart (the next switch waits for the screen to settle, so at least that), and it disconnects; stopped by SIGINT | as `virtual-screen`, as strictly: no failure event, a `screen frame size changed` per switch, no lost content. Expected to fail on the hosted runner today (D66): it is there to make the writer failure of `OSStatus -19092` happen often enough to study |
+| `virtual-screen-stress` | a virtual screen of 1280 × 720 connects, its mode is switched ten times, 1280 × 720 ↔ 1600 × 900, about 2 s apart (the next switch waits for the screen to settle, so at least that), and it disconnects; stopped by SIGINT | as `virtual-screen`, as strictly: no failure event, a `screen frame size changed` per switch, no lost content. Added to make the writer failure of `OSStatus -19092` happen often enough to study (D66); it passed on the hosted runner, and no frame of the new size reached the old file (D67) |
 | `tone` | the test tone in BlackHole, all audio inputs recorded, no system audio | the tone's level, no silent stretch and a click every second in each of BlackHole's tracks; the clicks at the same time of day, by timecode, in every screen file's guide track "Audio inputs" |
 | `system-audio` | as `tone`, with the system audio | the system audio's file: one stereo track, its length |
 | `stop-by-ctrl-c` | auto mode, SIGINT | exit 0, finalized |
@@ -183,7 +223,7 @@ driver let it, and each file of a source no event names, the played
 audio input among them, starts within the settle time of the start;
 both end not before the stop and at most a finalize allowance of 3 s
 after it, as `ended` follows the finalizing of every file; each
-scenario prints that margin, so the pipeline's runs calibrate the
+scenario prints that margin, so the runs calibrate the
 allowance),
 and every file through `ffprobe` and `ffmpeg`: it decodes without an
 error, its timecode track, its tracks and their names, the video's
@@ -235,7 +275,7 @@ the driver (not the workflow) runs `log show --style compact --start
 the subsystems whose name contains `videotoolbox`, `coremedia`,
 `avfoundation`, `screencapturekit` or `display`, and the processes
 `WindowServer` and `replayd`, and keeps the output as `logs/system.log`
-in the scenario's folder, which the uploaded artifact takes whole. When
+in the scenario's folder, which the copy to `--scratch-folder` takes whole. When
 `log show` fails or does not end within 300 s, that is one more failure
 line of the scenario, never skipped silently.
 
@@ -280,7 +320,9 @@ each scenario with the tone.
 
 The owner (2026-11-19): "full artifact upload now, only homepage
 screenshot automation comes later", and "No, screenshots as artifacts
-now, to check them" (D63). Each run writes, in its scratch folder:
+now, to check them" (D63; the pipeline's artifact upload went with the
+pipeline job, D67: the scratch folder is copied to `--scratch-folder`).
+Each run writes, in its scratch folder:
 
 - `run.log`: every line the driver printed.
 - `review/<scenario>/` for each scenario, passed ones included:
@@ -313,12 +355,11 @@ now, to check them" (D63). Each run writes, in its scratch folder:
 
 Anything in the review folder that cannot be made fails the run.
 
-In GitHub Actions the driver also reports in GitHub's own formats:
-when `GITHUB_STEP_SUMMARY` is set it appends a table to the job summary
-(scenario, result, time, margin, first failure), and when
-`GITHUB_ACTIONS` is `true` each `FAIL` and `STOP` is also an `::error`
-workflow command on standard error, escaped as GitHub requires, beside
-the error line itself (only the error line goes into `run.log`).
+Under GitHub Actions the driver would also report in GitHub's own
+formats (a table when `GITHUB_STEP_SUMMARY` is set, an `::error`
+workflow command per `FAIL` and `STOP` when `GITHUB_ACTIONS` is `true`);
+nothing sets those variables now that the tests are not in the pipeline
+(D67).
 
 ### Known content
 
@@ -751,29 +792,25 @@ tried:
 ## Cost
 
 No money beyond BetterDisplay Pro, which the owner has. The named
-scenarios should take minutes, combinations and random runs as long as
-their time budget; the Mac is not usable during a run. Once: installing
-BlackHole and `ffmpeg`. Building the helper, the driver and the first
+scenarios take about 2 minutes in the VM, combinations and random runs
+as long as their time budget; the Mac stays usable during a run. Once:
+the VM, 27 GB of disk and 3.5 minutes. Building the helper, the driver and the first
 scenarios is the larger cost, estimated at one PR the size of the
 skeleton PR; the pattern decoder is the uncertain part. The pipeline
 compiles and unit-tests the tests' code with every push, which adds to
-its run time, and runs the named scenarios on a runner of their own
-(D63): the downloads, building the driver and about 100 s of
-scenarios, some minutes per run [ASSUMED from the run on the owner's
-Mac], free for a public repository.
+its run time; it does not run the scenarios (D67).
 
 ## Why not otherwise
 
-- **A macOS virtual machine** (Parallels Desktop, Tart): the guest has
-  one screen, one sound device tied to the host's default microphone,
-  no USB audio and no hardware HEVC encoder, so screen changes need
-  the same virtual screens as on the Mac itself, and the encoder under
-  test is another one. It would give a clean start and permissions
-  granted once in an image; the owner's Mac has both without it.
-  Parallels adds nothing over free tools here.
-- **GitHub's hosted runners as the only place:** they now run the
-  tests too (D63), as the image grants the permissions; what needs real
-  hardware or BetterDisplay stays on the owner's Mac.
+- **The owner's Mac itself:** the Mac cannot be used during a run, and
+  the permissions are the terminal's. A tart VM gives a clean start per
+  run (D67); what needs real hardware or BetterDisplay stays on the
+  owner's Mac. The guest has one screen and no USB audio, so screen
+  changes use the same virtual screens, and the encoder under test is
+  the guest's.
+- **GitHub's hosted runners:** they ran the tests from D63 to D67 and
+  stalled the video encoder at a virtual screen's mode switch ("Why the
+  VM").
 - **A self-hosted runner on the owner's Mac:** GitHub advises against
   one for a public repository; a pull request could run code on the
   Mac.
@@ -815,9 +852,11 @@ Mac], free for a public repository.
 - Fast connect and disconnect cycles are reported flaky in macOS
   itself; a failure there must be told apart from a recorder fault,
   and a flake is root-caused, never retried blindly.
-- The pipeline depends on the runner image granting both permissions
-  and on the download sites of ffmpeg and BlackHole being reachable;
-  the owner accepted downloads in CI (D63).
+- The tests are not a gate: a person runs them (D67), and a PR
+  that touches the recorder or the driver may be ready without a run if
+  nobody remembers; `AGENTS.md` says when they run. The VM's setup
+  depends on the download sites of the base image, Packer's tart
+  plugin, ffmpeg, BlackHole and Python being reachable.
 - The pipeline does not gate the self-test (not built yet), which needs `ffmpeg` and
   runs on a Mac, before a run and when the driver changes. What it
   alone covers is whether an assertion still fails on real files

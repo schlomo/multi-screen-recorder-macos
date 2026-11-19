@@ -48,41 +48,11 @@ jobs:
           retention-days: 1
           if-no-files-found: error
 
-  # Holds no secret and no token: records with the app test-and-build built,
-  # on the runner's own screen with a virtual screen added, ffmpeg and
-  # BlackHole installed at fixed versions (docs/design/end-to-end-tests.md).
-  # The runner image grants the permissions recording needs.
-  end-to-end-test:
-    needs: test-and-build
-    if: github.event_name == 'push' || github.event.action != 'closed'
-    runs-on: macos-26
-    timeout-minutes: 20
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          ref: ${{ github.event.pull_request.head.sha }}
-          persist-credentials: false
-      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
-        with:
-          name: msr-app.tar
-          path: ${{ runner.temp }}/artifact
-      - run: scripts/unpack-app "$RUNNER_TEMP/artifact/msr-app.tar"
-      - run: scripts/ci-install-end-to-end-tools
-      - run: scripts/end-to-end-test --scratch-folder "$RUNNER_TEMP/end-to-end"
-      - if: always()
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: end-to-end-review
-          path: ${{ runner.temp }}/end-to-end
-          retention-days: 14
-
   snapshot-release:
     # Signing job: never compiles, never restores a cache, and never executes
     # anything that came out of the artifact; its scripts come from its own
     # checkout.
-    needs: [test-and-build, end-to-end-test]
+    needs: test-and-build
     if: >-
       github.event_name == 'pull_request'
       && github.event.action != 'closed'
@@ -141,7 +111,7 @@ jobs:
     # Signing job: never compiles, never restores a cache, and never executes
     # anything that came out of the artifact; its scripts come from its own
     # checkout.
-    needs: [test-and-build, end-to-end-test]
+    needs: test-and-build
     if: github.event_name == 'push'
     runs-on: macos-26
     permissions:

@@ -1546,9 +1546,8 @@ no tar would write them from a file system), `scripts/sign-app` and
 `scripts/publish-snapshot-release` against a stub `gh`;
 `scripts/smoke-test` runs the built app's `msr` the same way in the
 pipeline. Capture itself is verified by the end-to-end tests, which
-drive `msr record` as built and examine the recording folder, in the
-pipeline on GitHub's hosted runner, whose image grants both permissions,
-and on the owner's Mac (D63), and by the v1 gate. The design of the
+drive `msr record` as built and examine the recording folder, run by
+hand in a tart VM on the owner's Mac (D67), and by the v1 gate. The design of the
 end-to-end tests is [end-to-end-tests.md](end-to-end-tests.md) (D37);
 their logic is unit-tested in `EndToEndLogicTests`.
 

@@ -1914,10 +1914,11 @@ architect's reading.
 
 ## D63: End-to-end tests run in the pipeline too, on the hosted runner (2026-11-19)
 
-- **Status:** in force; replaces D37's "out of the pipeline" (the
-  agreed design's "not part of the pipeline", and D34 point 5's tests in
-  the pipeline deferred). The first part is built: backlog item 3's
-  first PR.
+- **Status:** in force except point 1's pipeline job and point 7's
+  artifact upload, superseded by D67; replaces D37's "out of the
+  pipeline" (the agreed design's "not part of the pipeline", and D34
+  point 5's tests in the pipeline deferred). The first part is built:
+  backlog item 3's first PR.
 - **Context:** An experiment on 2026-11-16 (three runs on GitHub's
   hosted `macos-26` arm64 runner, image 20261102, macOS 26.7.2) showed
   that the image grants Screen Recording and Microphone, `msr check`
@@ -2182,6 +2183,8 @@ architect's reading.
 ## D66: A failed file ends where it really ends; the capture's frames and writer are logged (2026-11-19)
 
 - **Status:** in force.
+  Point 3's "expected to fail on the runner" and the context's cause
+  are corrected by D67.
 - **Context:** The end-to-end scenario `virtual-screen` of PR #23 fails
   on the hosted macOS runner in about 2 of 7 runs: about 0.25 s after a
   new virtual screen's mode switch (1280×720 to 1600×900) the screen
@@ -2221,3 +2224,61 @@ architect's reading.
   "A failed file's end"; [design/end-to-end-tests.md](design/end-to-end-tests.md);
   `FailedFileEndTests`, `FailedFileEndsTests`, `FrameFactsTests`,
   `ScreenFileWriterTests`, `SystemLogTests`, `ScenarioTests`.
+
+## D67: The end-to-end tests are a manual step in a tart VM, not a pipeline job (2026-11-19)
+
+- **Status:** in force; supersedes D63's pipeline job (point 1) and its
+  artifact upload (point 7), and corrects D66.
+- **Context:** The end-to-end scenario `virtual-screen` failed on
+  GitHub's hosted macOS runner in about 2 of 9 runs: at a virtual
+  screen's mode switch the runner's video encoder stalled at +6.6 to
+  +7.0 s into the recording, in both screen files at once, and the
+  screen file writer failed inside the stall with `-11800` from
+  `-19092`. It did not happen in 18 runs on the owner's Mac and in a
+  tart VM (0 failures). Hosted macOS arm64 runners are also often
+  unavailable. The owner (2026-11-19): "We'll leave e2e a manual step
+  that uses the VM and another script for setup. You'll run e2e
+  manually when needed and mark in the pr that it succeeded. Kiss".
+- **Decision:**
+  1. The job `end-to-end-test` is removed from `.github/workflows/ci.yml`;
+     `snapshot-release` and `release` need only `test-and-build`.
+  2. `scripts/end-to-end-setup` builds the tart VM `msr-end-to-end`
+     (Cirrus Labs' `macos-tahoe-vanilla`, SIP disabled through Recovery
+     by Packer, the TCC rows as actions/runner-images writes them,
+     Python 3.15, ffmpeg, ffprobe and BlackHole 2ch); re-running rebuilds
+     it. It needs `tart` and `packer` on the `PATH` and installs
+     neither. Its helper files are in `scripts/end-to-end-vm/`.
+  3. `scripts/ci-install-end-to-end-tools` is now
+     `scripts/install-end-to-end-tools`, takes the folder for ffmpeg and
+     ffprobe as its argument, keeps its SHA-256 checks and runs inside
+     the VM.
+  4. `scripts/end-to-end-test --scratch-folder <folder>` is the one way
+     to run the tests: it builds on the Mac, runs the driver in a
+     throwaway clone of the VM, copies the scratch folder back, deletes
+     the clone also on failure and exits with the driver's status; the
+     driver's other arguments pass through. `restore` and `state` are no
+     longer reached through it: a run changes only the clone.
+  5. Before a PR that touches the recorder or the end-to-end driver is
+     marked ready, the architect runs the tests on the PR's head and
+     records the commit and the result in the PR description
+     (`AGENTS.md`). The unit tests of the driver's logic stay in
+     `scripts/test`.
+  6. Correction of D66: the stress scenario `virtual-screen-stress` was
+     "expected to fail on the runner" but passed there, and no frame of
+     the new size ever reached the old file; the failure is the
+     encoder's stall, not a writer fed a wrong frame. The cause in the
+     runner's encoder stays unfixed; it is not a recorder fault shown by
+     these tests.
+- **Consequences:** the pipeline no longer gates the recorder's capture
+  behaviour: a person runs the tests, and the PR description says
+  whether they passed. The pipeline is faster and no longer depends on
+  a macOS runner's encoder. The VM takes 27 GB of the owner's disk and
+  3.5 minutes to build; a run takes about 2 minutes and nothing records
+  on the Mac itself. The driver's GitHub summary and annotations stay
+  in the code and are unused.
+- **Evidence:** [design/end-to-end-tests.md](design/end-to-end-tests.md),
+  "Running them" and "Why the VM"; [design/delivery.md](design/delivery.md);
+  `scripts/end-to-end-setup`, `scripts/end-to-end-test`,
+  `scripts/install-end-to-end-tools`, `scripts/end-to-end-vm/`;
+  the setup and a full pass of the 7 scenarios in the VM on
+  2026-11-19.

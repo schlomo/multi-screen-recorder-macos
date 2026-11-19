@@ -9,9 +9,9 @@ delivery, and the one-time developer setup. What the app does is in [recorder.md
 ## The decision
 
 **Scripts hold the behaviour; the pipeline only wires them** (thin CI).
-Each script but the CI-only ones (`scripts/ci-import-signing-certificate`,
-`scripts/ci-install-end-to-end-tools`) runs the same on a developer's
-Mac and in CI. Five are Python (D32): `scripts/version`, `scripts/unpack-app`,
+Each script but the CI-only one (`scripts/ci-import-signing-certificate`)
+and the end-to-end ones, which run on a developer's Mac only, runs the same
+on a developer's Mac and in CI. Five are Python (D32): `scripts/version`, `scripts/unpack-app`,
 `scripts/sign-app`, `scripts/smoke-test` and
 `scripts/publish-snapshot-release`; the rest are bash glue around a few
 commands. The Python scripts use the standard library only, so nothing
@@ -23,8 +23,8 @@ an error naming that minimum. The minimum follows the runner image
 when it moves.
 
 The scripts that take arguments (`scripts/test`, `scripts/version`,
-`scripts/unpack-app`, `scripts/install-app`, `scripts/end-to-end-test`)
-print how to use them with `--help` or `-h`.
+`scripts/unpack-app`, `scripts/install-app`, `scripts/end-to-end-setup`,
+`scripts/end-to-end-test`) print how to use them with `--help` or `-h`.
 
 | Script | Does |
 |---|---|
@@ -36,9 +36,10 @@ print how to use them with `--help` or `-h`.
 | `scripts/unpack-app` | Unpacks the app archive into an empty `build/` with the `data` filter of Python's `tarfile`, rooted at the bundle folder, which refuses absolute paths, links pointing out of the bundle and special files; before writing anything the script itself refuses an archive that is not a plain tar, a member named twice, a member outside the bundle or with a `..` component (the build writes none), a bundle that is not a folder and a member below a symbolic link of the archive; a member that cannot be extracted stops it, and it removes what it wrote when it stops |
 | `scripts/sign-app` | Checks the bundle's version, commit and identifier, re-signs it, checks the signature, identifier, hardened runtime and entitlements, and zips it into `build/` |
 | `scripts/install-app` | Installs the app into `/Applications` from a local build, the latest release (`--release`), a PR's snapshot release (`--snapshot <n>`) or a zip; see "Installing the app on the developer's Mac" below |
-| `scripts/end-to-end-test` | Builds the end-to-end tests' driver (`msr-end-to-end`, never in the bundle) and runs it against `build/Multi Screen Recorder.app`: records with `msr record` while it adds a virtual screen and plays a tone into BlackHole, examines the recording folders, and restores the Mac; `restore` puts the Mac back after a killed run. Needs `ffmpeg`, `ffprobe` and BlackHole 2ch, and both permissions for the program running it ([end-to-end-tests.md](end-to-end-tests.md)) |
+| `scripts/end-to-end-setup` | Not in the pipeline, run by hand once: builds the tart VM `msr-end-to-end` the end-to-end tests run in (Cirrus Labs' macOS 26 vanilla image, SIP disabled through Recovery by Packer, the two permissions written into TCC.db, Python 3.15 and `scripts/install-end-to-end-tools`); re-running replaces it. Needs `tart` and `packer` on the `PATH`; its helper files are in `scripts/end-to-end-vm/` ([end-to-end-tests.md](end-to-end-tests.md), "Running them") |
+| `scripts/end-to-end-test` | Not in the pipeline: builds the app (`scripts/build-app`) and the end-to-end tests' driver (`msr-end-to-end`, never in the bundle) on the Mac, clones a throwaway VM from `msr-end-to-end`, runs the driver there against the app, copies its scratch folder to `--scratch-folder` and deletes the clone, also when the run fails; its exit status is the driver's ([end-to-end-tests.md](end-to-end-tests.md)) |
 | `scripts/ci-import-signing-certificate` | CI only: puts the certificate from the secret into a temporary keychain |
-| `scripts/ci-install-end-to-end-tools` | CI only: downloads ffmpeg and ffprobe (static builds) and BlackHole 2ch at fixed versions, checks each against its SHA-256, puts ffmpeg on the `PATH` of the later steps, installs BlackHole and waits until Core Audio lists it |
+| `scripts/install-end-to-end-tools` | Run inside the VM by `scripts/end-to-end-setup`: downloads ffmpeg and ffprobe (static builds) and BlackHole 2ch at fixed versions, checks each against its SHA-256, puts ffmpeg and ffprobe into the folder given as its argument, installs BlackHole and waits until Core Audio lists it |
 | `scripts/publish-snapshot-release` | Creates or replaces a PR's snapshot release; removes it once the PR is closed (a marked head commit needs an unmarked empty commit first, see [Work branches](../principles/ai-working-process.md#work-branches)) |
 | `scripts/remove-snapshot-release` | Removes a closed PR's snapshot release (see [Work branches](../principles/ai-working-process.md#work-branches) for a marked head commit) |
 | `scripts/publish-release` | Publishes the release for a merge to `main` |
@@ -46,20 +47,19 @@ print how to use them with `--help` or `-h`.
 **Pipeline** (`.github/workflows/ci.yml`, GitHub Actions on a hosted
 macOS runner for Apple silicon; free for a public repository), the
 build and the signing in jobs of their own so the key never meets
-compiled code (D29), and the end-to-end tests in a third (D63):
+compiled code (D29); the end-to-end tests are not in it (D67):
 
 | Job | Holds | Does |
 |---|---|---|
 | `test-and-build` | the checkout, read access; no secret, no token | `scripts/test` writing JUnit XML (`--xunit-output`), `scripts/build-app`, `scripts/smoke-test`; uploads `build/msr-app.tar` as a workflow artifact (kept 1 day) and, passed or failed, the JUnit XML as `unit-tests-junit` (kept 14 days) |
-| `end-to-end-test` | the checkout, read access; no secret, no token | downloads the artifact, `scripts/unpack-app`, `scripts/ci-install-end-to-end-tools`, `scripts/end-to-end-test` with its scratch folder in `$RUNNER_TEMP/end-to-end`; the runner image grants both permissions. Passed or failed, it uploads that folder as the workflow artifact `end-to-end-review`, kept 14 days: the driver's log, each scenario's review files and the app's start window's screenshot, failed scenarios' folders and a restore file if left ([end-to-end-tests.md](end-to-end-tests.md), "Artifacts for review"); the driver also writes the job summary's table and an annotation per failure |
 | `snapshot-release`, `release` (the signing jobs) | the checkout, write access, the signing secret in the import step only, the token in the publish step only | downloads the artifact, `scripts/unpack-app`, `scripts/ci-import-signing-certificate`, `scripts/sign-app`, then `scripts/publish-snapshot-release` or `scripts/publish-release` |
 
 | When | What runs |
 |---|---|
-| Every push to a PR without the skip-ci marker | `test-and-build`, then `end-to-end-test`, then `snapshot-release` |
+| Every push to a PR without the skip-ci marker | `test-and-build`, then `snapshot-release` |
 | A PR is closed (not skipped only if its head commit carries no skip-ci marker, see [Work branches](../principles/ai-working-process.md#work-branches)) | `remove-snapshot-release` |
-| A push to `main` that changes more than Markdown files and the homepage (`homepage/`) | `test-and-build`, then `end-to-end-test`, then `release` |
-| A PR from a fork or from Dependabot | `test-and-build`, then `end-to-end-test`: tested, built, smoke-tested and end-to-end tested, never signed or published |
+| A push to `main` that changes more than Markdown files and the homepage (`homepage/`) | `test-and-build`, then `release` |
+| A PR from a fork or from Dependabot | `test-and-build`: tested, built and smoke-tested, never signed or published |
 
 Three things cross from `test-and-build` into a signing job, and the
 signing job refuses each as a carrier of code:
@@ -105,11 +105,9 @@ up to 100 waiting), so every push to `main` that changes more than
 Markdown files and the homepage gets its release. They wait in the order their builds
 finish, not the order of the pushes (see "Accepted risks").
 
-`test-and-build` and `end-to-end-test` stop after 20 minutes (a run of
-`test-and-build` takes about 2), so a hanging test fails the job
-instead of holding a runner for GitHub's six hours. The signing jobs
-wait for `end-to-end-test` too, so nothing that failed it is signed or
-published (D63).
+`test-and-build` stops after 20 minutes (a run takes about 2), so a
+hanging test fails the job instead of holding a runner for GitHub's
+six hours.
 
 **Versions** (D42) carry the committer date of HEAD in UTC, DATE as
 YYYYMMDD, and the number of commits on `main`, N:
@@ -211,8 +209,8 @@ account and plan were not checked].
    me override defaults" ticked, validity 3650 days (the default is one
    year, and a new certificate means granting both permissions again),
    the rest unchanged, in the login keychain.
-4. For the end-to-end tests: `brew install ffmpeg` and
-   `brew install --cask blackhole-2ch` (an administrator's password, once).
+4. For the end-to-end tests: `brew install tart packer`, then
+   `scripts/end-to-end-setup` (about 4 minutes once the 28 GB base image is downloaded; 30 GB of disk).
 5. For the pipeline, by the repository owner only: export the
    certificate from My Certificates as `.p12` with an empty password,
    then

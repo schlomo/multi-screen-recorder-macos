@@ -222,6 +222,6 @@ One row per entry, the error text exactly as in the entry.
 - **Fix:** every mode switch is a process of its own
   (`msr-end-to-end switch-mode`), and so is every read of the state
   after a run (`state`, `restore`).
-- **Verify:** `scripts/end-to-end-test --scenario virtual-screen`
+- **Verify:** `scripts/end-to-end-test --scratch-folder <folder> --scenario virtual-screen`
   passes, with its three screen files at 1280x720, 1600x900, 1280x720.
 - **Observed:** 2026-11-19, macOS 27.2.1; open.
