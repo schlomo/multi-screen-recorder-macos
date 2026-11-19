@@ -25,7 +25,7 @@ struct Media {
     /// Every stream with its decoded frame count.
     func probe(_ file: URL) throws -> ProbedFile {
         let output = try run(ffprobe, ["-v", "error", "-count_frames", "-show_entries",
-                                       "stream=index,codec_type,codec_name,width,height,channels,sample_rate,duration,nb_read_frames:stream_tags=title,timecode",
+                                       "stream=index,codec_type,codec_name,width,height,channels,sample_rate,start_time,duration,nb_read_frames:stream_tags=title,timecode",
                                        "-of", "json", file.path])
         return try ProbedFile(ffprobeJSON: output.output)
     }
@@ -39,7 +39,9 @@ struct Media {
         return status == 0 && text.isEmpty ? nil : "exit \(status): \(text.trimmingCharacters(in: .whitespacesAndNewlines))"
     }
 
-    /// One audio stream's samples, its channels averaged to mono, as 32-bit floats.
+    /// One audio stream's samples, its channels averaged to mono, as 32-bit
+    /// floats. They start at the stream's first sample, not at the file's
+    /// start: the stream's `start_time` places them (`ProbedFile`).
     func samples(_ file: URL, stream index: Int, sampleRate: Int) throws -> [Float] {
         let raw = scratch.appending(path: "samples.f32")
         _ = try run(ffmpeg, ["-nostdin", "-v", "error", "-y", "-i", file.path, "-map", "0:\(index)", "-ac", "1",

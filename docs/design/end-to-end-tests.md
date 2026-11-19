@@ -188,11 +188,33 @@ and every file through `ffprobe` and `ffmpeg`: it decodes without an
 error, its timecode track, its tracks and their names, the video's
 codec, frame size and 30 frames for each second of its length, an audio
 file's length. The tolerances are data (`EndToEndValues`), calibrated
-on the owner's Mac: a time in the manifest within 0.5 s of when the
-driver saw the change (beyond the settle time), the tone within 1 dB,
-a click within 5 ms across files (measured: within 1 ms) and 1 ms of
-one second apart in BlackHole's file. A run of the six took 97 s on the
-owner's Mac.
+on the owner's Mac: a time in the manifest within the change's window,
+the tone within 1 dB, a click within 5 ms across files (measured: within
+1 ms) and 1 ms of one second apart in BlackHole's file. A run of the six
+took 97 s on the owner's Mac.
+
+**A change's window.** For each connect, mode switch and disconnect the
+driver keeps when it asked for the change and when it saw it done (the
+helper reported the screen active or the mode switched; for a
+disconnect, the helper has ended and the screen is gone from the active
+screens). The recorder's time for it, an event or a file's start or
+end, must lie from the ask less the 0.5 s tolerance to the done plus the
+settle time and the tolerance. `run.log` shows each change's times and
+the window's width.
+
+**Placing decoded sound.** A track's samples start at its first sample,
+which an edit list may put after the file's start (the guide track
+"Audio inputs" by a few to about 80 ms): ffprobe's `start_time` for the
+stream is added to the file's timecode before clicks are compared.
+
+**Playback breaks.** The tone player takes the tone from each render
+cycle's sample time, so a cycle the output skips does not shift the
+tone; each skip, and each overload the loopback device tells of, is kept
+with its time of day. When a click spacing in BlackHole's file fails and
+a break lies in it (within 0.1 s), the failure line says so: "the tone
+player's output broke at <t> s (<n> samples); the recording shows it".
+It is still a failure. `run.log` gives the number of playback breaks for
+each scenario with the tone.
 
 ### Artifacts for review
 

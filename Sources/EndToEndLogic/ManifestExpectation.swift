@@ -1,5 +1,29 @@
 import Foundation
 
+/// A change the driver made during a recording: when it asked for it and
+/// when it saw it done, in seconds after the recording's start.
+public struct ChangeTimes: Sendable, Equatable {
+    public var asked: Double
+    public var done: Double
+
+    public init(asked: Double, done: Double) {
+        self.asked = asked
+        self.done = done
+    }
+
+    /// Where a time the recorder writes for the change may lie: from the
+    /// ask less the tolerance to the done plus the settle time and the
+    /// tolerance.
+    public func window(settleTime: Double, tolerance: Double) -> ClosedRange<Double> {
+        (asked - tolerance)...(done + settleTime + tolerance)
+    }
+
+    public func windowWidth(settleTime: Double, tolerance: Double) -> Double {
+        let window = window(settleTime: settleTime, tolerance: tolerance)
+        return window.upperBound - window.lowerBound
+    }
+}
+
 /// What a scenario's recording manifest must say, built by the driver from
 /// what it did: exact where the recording is deterministic (the settings,
 /// the virtual screens and the audio inputs the driver plays into, how the
@@ -40,27 +64,29 @@ public struct ManifestExpectation: Sendable {
     public struct VirtualScreenFile: Sendable, Equatable {
         public var screenUUID: String
         public var frameSize: [Int]
-        /// When the screen connected, in seconds after the recording's start.
-        public var connectedAt: Double
-        /// When the screen disconnected; nil when the recording ended first.
-        public var disconnectedAt: Double?
+        /// The connect or mode switch its file starts after.
+        public var startedBy: ChangeTimes
+        /// The mode switch or disconnect that ends it; nil when the
+        /// recording ended first.
+        public var endedBy: ChangeTimes?
 
-        public init(screenUUID: String, frameSize: [Int], connectedAt: Double, disconnectedAt: Double?) {
+        public init(screenUUID: String, frameSize: [Int], startedBy: ChangeTimes, endedBy: ChangeTimes?) {
             self.screenUUID = screenUUID
             self.frameSize = frameSize
-            self.connectedAt = connectedAt
-            self.disconnectedAt = disconnectedAt
+            self.startedBy = startedBy
+            self.endedBy = endedBy
         }
     }
 
     /// One event about a virtual screen, in order.
     public struct VirtualScreenEvent: Sendable, Equatable {
         public var event: String
-        public var at: Double
+        /// The change the event tells of.
+        public var change: ChangeTimes
 
-        public init(event: String, at: Double) {
+        public init(event: String, change: ChangeTimes) {
             self.event = event
-            self.at = at
+            self.change = change
         }
     }
 

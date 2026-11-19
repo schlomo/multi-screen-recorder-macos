@@ -24,9 +24,16 @@ public enum ToneCheck {
         public var clicks: [Double] { SignalAnalysis.clicks(samples, sampleRate: sampleRate).map { startsAt + $0 } }
     }
 
+    /// A playback break this close to a failing click spacing is named in
+    /// its failure: the player sees the break up to a buffer before or after
+    /// the device does.
+    static let breakMargin = 0.1
+
     /// The failures of the tracks of the loopback device's audio file
-    /// (`played`) and of the tracks that carry it mixed with others (`mixed`).
-    public static func failures(played: [Track], mixed: [Track]) -> [String] {
+    /// (`played`) and of the tracks that carry it mixed with others
+    /// (`mixed`); a failing click spacing names a playback break that
+    /// overlaps it.
+    public static func failures(played: [Track], mixed: [Track], breaks: [PlaybackBreak] = []) -> [String] {
         var failures: [String] = []
         guard let reference = played.first else { return ["no track carries the test tone"] }
         let referenceClicks = reference.clicks
@@ -47,7 +54,14 @@ public enum ToneCheck {
                 failures.append("\(track.name): \(clicks.count) clicks, expected at least \(expectedClicks), one a second")
             }
             for (earlier, later) in zip(clicks, clicks.dropFirst()) where abs(later - earlier - 1) > EndToEndValues.clickPeriodTolerance {
-                failures.append(String(format: "%@: clicks at %.4f s and %.4f s are not one second apart", track.name, earlier, later))
+                var failure = String(format: "%@: clicks at %.4f s and %.4f s are not one second apart", track.name, earlier, later)
+                let window = (track.startsAt + earlier - breakMargin)...(track.startsAt + later + breakMargin)
+                if let broke = breaks.first(where: { window.contains($0.timeOfDay) }) {
+                    let size = broke.samples.map { "\($0) samples" } ?? "an overload"
+                    failure += String(format: "; the tone player's output broke at %.3f s (%@); the recording shows it",
+                                      broke.timeOfDay - track.startsAt, size)
+                }
+                failures.append(failure)
                 break
             }
         }

@@ -82,4 +82,29 @@ import Testing
         #expect(failures.first?.hasPrefix("Screen 1, Audio inputs:") == true)
         #expect(ToneCheck.failures(played: [], mixed: []) == ["no track carries the test tone"])
     }
+
+    @Test func aGapThatAPlaybackBreakOverlapsNamesIt() {
+        var samples = Self.recorded(seconds: 4)
+        samples.removeSubrange(100_000..<100_480)
+        let broke = ToneCheck.failures(played: [track("BlackHole", samples)], mixed: [],
+                                       breaks: [PlaybackBreak(timeOfDay: 1002.1, samples: 612)])
+        #expect(broke == [
+            "BlackHole: clicks at 1.7431 s and 2.7331 s are not one second apart; the tone player's output broke at 2.100 s (612 samples); the recording shows it",
+        ])
+        let elsewhere = ToneCheck.failures(played: [track("BlackHole", samples)], mixed: [],
+                                           breaks: [PlaybackBreak(timeOfDay: 1003.5, samples: 612)])
+        #expect(elsewhere == ["BlackHole: clicks at 1.7431 s and 2.7331 s are not one second apart"])
+        let overload = ToneCheck.failures(played: [track("BlackHole", samples)], mixed: [],
+                                          breaks: [PlaybackBreak(timeOfDay: 1002.1, samples: nil)])
+        #expect(overload.first?.hasSuffix("the tone player's output broke at 2.100 s (an overload); the recording shows it") == true)
+    }
+
+    @Test func theToneFollowsTheRenderSampleTimeAcrossASkippedCycle() {
+        var clock = PlaybackClock()
+        #expect(clock.render(sampleTime: 5_000, frames: 512) == .init(firstIndex: 0, skipped: nil))
+        #expect(clock.render(sampleTime: 5_512, frames: 512) == .init(firstIndex: 512, skipped: nil))
+        // A cycle of 612 samples never rendered: the tone goes on where the time is.
+        #expect(clock.render(sampleTime: 6_636, frames: 512) == .init(firstIndex: 1_636, skipped: 612))
+        #expect(clock.render(sampleTime: 7_148, frames: 512) == .init(firstIndex: 2_148, skipped: nil))
+    }
 }

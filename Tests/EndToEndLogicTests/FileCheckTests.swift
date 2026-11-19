@@ -9,7 +9,7 @@ import Testing
         let audio = titles.enumerated().map { index, title in
             """
             {"index": \(index + 1), "codec_name": "aac", "codec_type": "audio", "sample_rate": "48000", "channels": \(index + 1),
-             "duration": "4.842667", "nb_read_frames": "225", "tags": {"title": "\(title)"}}
+             "start_time": "\(index == 0 ? "0.004792" : "0.000000")", "duration": "4.842667", "nb_read_frames": "225", "tags": {"title": "\(title)"}}
             """
         }
         return """
@@ -58,7 +58,17 @@ import Testing
         #expect(probed.audio.map(\.title) == ["Audio inputs", "System audio"])
         #expect(probed.audio.map(\.sampleRate) == [48_000, 48_000])
         #expect(probed.timecodeTrack.map(\.index) == [3])
+        #expect(probed.audio.map(\.startTime) == [0.004792, 0])
         #expect(throws: ProbeError.self) { try ProbedFile(ffprobeJSON: Data("{}".utf8)) }
+    }
+
+    @Test func aTracksFirstSampleIsAtTheTimecodePlusItsStartTime() throws {
+        let probed = try ProbedFile(ffprobeJSON: Data(Self.screenProbe().utf8))
+        // The guide track "Audio inputs" starts 4.792 ms into the file (its edit list).
+        #expect(abs(probed.audio[0].firstSampleTime(fileStartsAt: 100) - 100.004792) < 1e-9)
+        #expect(probed.audio[1].firstSampleTime(fileStartsAt: 100) == 100)
+        let noStart = try ProbedFile(ffprobeJSON: Data(Self.audioProbe(titles: ["a"]).utf8))
+        #expect(noStart.audio[0].firstSampleTime(fileStartsAt: 100) == 100)
     }
 
     @Test func aScreenFileAsRecordedPasses() throws {

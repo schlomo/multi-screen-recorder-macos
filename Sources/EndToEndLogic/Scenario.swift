@@ -145,15 +145,16 @@ extension Scenario {
     ]
 }
 
-/// An event as it happened: when the driver saw it done, in seconds after
-/// the recording started, and for a connected virtual screen its UUID.
+/// An event as it happened: when the driver asked for it and when it saw
+/// it done, in seconds after the recording started, and for a virtual
+/// screen its UUID.
 public struct HappenedEvent: Sendable, Equatable {
-    public var at: Double
+    public var times: ChangeTimes
     public var event: Scenario.Event
     public var screenUUID: String?
 
-    public init(at: Double, event: Scenario.Event, screenUUID: String? = nil) {
-        self.at = at
+    public init(times: ChangeTimes, event: Scenario.Event, screenUUID: String? = nil) {
+        self.times = times
         self.event = event
         self.screenUUID = screenUUID
     }
@@ -161,11 +162,12 @@ public struct HappenedEvent: Sendable, Equatable {
 
 extension Scenario {
     /// The virtual screens' files and events the manifest must list, from
-    /// what happened. A connected screen's file starts after the settle
-    /// time; at a mode switch the screen's file ends and one at the new frame size
-    /// starts after the settle time, when `screen frame size changed` is
-    /// written (recorder.md, "Screen identity" and the screen tracker).
-    public static func virtualScreenExpectation(_ happened: [HappenedEvent], settleTime: Double)
+    /// what happened, each tied to the change that brings it. A connected
+    /// screen's file starts after the settle time; at a mode switch the
+    /// screen's file ends and one at the new frame size starts after the
+    /// settle time, when `screen frame size changed` is written (recorder.md,
+    /// "Screen identity" and the screen tracker).
+    public static func virtualScreenExpectation(_ happened: [HappenedEvent])
         -> (files: [ManifestExpectation.VirtualScreenFile], events: [ManifestExpectation.VirtualScreenEvent])
     {
         var files: [ManifestExpectation.VirtualScreenFile] = []
@@ -176,19 +178,18 @@ extension Scenario {
             case .connectScreen(let spec):
                 open[spec.serialNumber] = files.count
                 files.append(.init(screenUUID: event.screenUUID ?? "?", frameSize: [spec.sizes[0].width, spec.sizes[0].height],
-                                   connectedAt: event.at, disconnectedAt: nil))
-                events.append(.init(event: "screen connected", at: event.at))
+                                   startedBy: event.times, endedBy: nil))
+                events.append(.init(event: "screen connected", change: event.times))
             case .switchScreenMode(let serialNumber, let size):
                 guard let index = open[serialNumber] else { continue }
-                let changed = event.at + settleTime
-                files[index].disconnectedAt = changed
+                files[index].endedBy = event.times
                 open[serialNumber] = files.count
                 files.append(.init(screenUUID: files[index].screenUUID, frameSize: [size.width, size.height],
-                                   connectedAt: event.at, disconnectedAt: nil))
-                events.append(.init(event: "screen frame size changed", at: changed))
+                                   startedBy: event.times, endedBy: nil))
+                events.append(.init(event: "screen frame size changed", change: event.times))
             case .disconnectScreen(let serialNumber):
-                if let index = open.removeValue(forKey: serialNumber) { files[index].disconnectedAt = event.at }
-                events.append(.init(event: "screen disconnected", at: event.at))
+                if let index = open.removeValue(forKey: serialNumber) { files[index].endedBy = event.times }
+                events.append(.init(event: "screen disconnected", change: event.times))
             }
         }
         return (files, events)

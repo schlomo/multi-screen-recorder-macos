@@ -69,6 +69,10 @@ struct SampleRecording {
 
     var json: JSONValue { try! JSONValue(json: JSONSerialization.data(withJSONObject: manifest)) }
 
+    static let connect = ChangeTimes(asked: 2.0, done: 2.2)
+    static let modeSwitch = ChangeTimes(asked: 6.0, done: 6.2)
+    static let disconnect = ChangeTimes(asked: 11.0, done: 11.24)
+
     static func expectation(killedAt: Double? = nil) -> ManifestExpectation {
         ManifestExpectation(
             app: "Multi Screen Recorder 0.20261119.65 (6ffc65f)",
@@ -76,12 +80,12 @@ struct SampleRecording {
             ending: killedAt.map { .killed(at: $0) } ?? .finalized, stoppedAt: killedAt ?? 17, ownScreenCount: 1,
             virtualScreenNamePrefix: "MSR Test",
             virtualScreenFiles: [
-                .init(screenUUID: virtualUUID, frameSize: [1280, 720], connectedAt: 2.2, disconnectedAt: 7.2),
-                .init(screenUUID: virtualUUID, frameSize: [1600, 900], connectedAt: 6.2, disconnectedAt: 11.24),
+                .init(screenUUID: virtualUUID, frameSize: [1280, 720], startedBy: connect, endedBy: modeSwitch),
+                .init(screenUUID: virtualUUID, frameSize: [1600, 900], startedBy: modeSwitch, endedBy: disconnect),
             ],
             virtualScreenEvents: [
-                .init(event: "screen connected", at: 2.2), .init(event: "screen frame size changed", at: 7.2),
-                .init(event: "screen disconnected", at: 11.24),
+                .init(event: "screen connected", change: connect), .init(event: "screen frame size changed", change: modeSwitch),
+                .init(event: "screen disconnected", change: disconnect),
             ],
             playedAudioInputs: [.init(name: "BlackHole 2ch", uid: "BlackHole2ch_UID", channels: 2)],
             timeTolerance: 0.5, finalizeAllowance: 3, settleTime: 1)
@@ -195,12 +199,14 @@ struct SampleRecording {
     @Test func aVirtualScreenAtTheWrongSizeOrTimeFails() {
         var sample = SampleRecording()
         sample.files[4]["frameSize"] = [1280, 720]
-        sample.files[3]["start"] = 2.4
-        sample.files[3]["name"] = "2026-11-19 08.27.24 Screen 2 - MSR Test 101.mov"
-        sample.files[3]["timecode"] = "08:27:24:03"
+        sample.files[3]["start"] = 1.4
+        sample.files[3]["name"] = "2026-11-19 08.27.23 Screen 2 - MSR Test 101.mov"
+        sample.files[3]["timecode"] = "08:27:23:03"
         let failures = sample.check().failures
         #expect(failures.contains("2026-11-19 08.27.29 Screen 2 - MSR Test 101.mov: frameSize [1280, 720], expected [1600, 900]"))
-        #expect(failures.contains("2026-11-19 08.27.24 Screen 2 - MSR Test 101.mov: starts at 2.4, expected 3.2, the connect plus the settle time"))
+        // The connect was asked at 2.0 s and done at 2.2 s: 1.5 s to 3.7 s.
+        #expect(failures.contains(
+            "2026-11-19 08.27.23 Screen 2 - MSR Test 101.mov: starts at 1.40 s, expected 1.50 s to 3.70 s, from the ask less the tolerance to the done plus the settle time and the tolerance"))
     }
 
     @Test func aMissingVirtualScreenFileFails() {
@@ -225,7 +231,9 @@ struct SampleRecording {
             ["at": 8.0, "event": "screen frame size changed", "screen": "MSR Test 101", "from": [1280, 720], "to": [1600, 900]],
             ["at": 11.242, "event": "screen disconnected", "screen": "MSR Test 101"],
         ]
-        #expect(late.check().failures == ["screen frame size changed at 8.0, expected 7.2"])
+        #expect(late.check().failures == [
+            "screen frame size changed at 8.00 s, expected 5.50 s to 7.70 s, from the ask less the tolerance to the done plus the settle time and the tolerance",
+        ])
     }
 
     @Test func aFailureEventOrAnEventOfThePlayedInputFails() {

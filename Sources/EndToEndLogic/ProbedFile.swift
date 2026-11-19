@@ -11,10 +11,18 @@ public struct ProbedFile: Sendable, Equatable {
         public var channels: Int?
         public var sampleRate: Int?
         public var duration: Double?
+        /// Where its first sample sits in the file, in seconds (`start_time`,
+        /// from the track's edit list); nil when ffprobe gives none.
+        public var startTime: Double?
         /// The frames decoded (`nb_read_frames`).
         public var framesRead: Int?
         public var title: String?
         public var timecode: String?
+
+        /// The time of day of its first sample, in a file whose timecode is
+        /// `fileStartsAt` (seconds of the day): decoded samples drop the
+        /// edit list's start, so it is added here.
+        public func firstSampleTime(fileStartsAt: Double) -> Double { fileStartsAt + (startTime ?? 0) }
     }
 
     public var streams: [Stream]
@@ -32,6 +40,7 @@ public struct ProbedFile: Sendable, Equatable {
                 index: index, codecType: type, codecName: stream["codec_name"]?.string,
                 width: stream["width"]?.integer, height: stream["height"]?.integer, channels: stream["channels"]?.integer,
                 sampleRate: number("sample_rate").map { Int($0) }, duration: number("duration"),
+                startTime: number("start_time"),
                 framesRead: number("nb_read_frames").map { Int($0) },
                 title: stream["tags"]?["title"]?.string, timecode: stream["tags"]?["timecode"]?.string)
         }

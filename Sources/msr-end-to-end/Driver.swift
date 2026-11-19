@@ -20,6 +20,11 @@ final class Driver {
     /// The last finalized scenario's margins past its stop, for calibrating
     /// the finalize allowance.
     private(set) var margin: String?
+    /// The last scenario's events: when each was asked and done, and the
+    /// width of the window the recorder's time for it must lie in.
+    private(set) var eventWindows: [String] = []
+    /// The last scenario's breaks in the tone player's output; nil without the tone.
+    private(set) var playbackBreaks: [PlaybackBreak]?
     /// The last scenario's recording, for its review files.
     private var lastRecording: (folder: URL, files: [ListedFile], probed: [String: ProbedFile])?
 
@@ -65,6 +70,8 @@ final class Driver {
     /// One scenario: its failures, one line each.
     func run(_ scenario: Scenario) throws -> [String] {
         margin = nil
+        eventWindows = []
+        playbackBreaks = nil
         lastRecording = nil
         let folder = scratch.appending(path: scenario.name)
         try? FileManager.default.removeItem(at: folder)
@@ -105,30 +112,32 @@ final class Driver {
             Thread.sleep(forTimeInterval: 0.02)
         }
         let begun = Date()
-        var happened: [(Date, Scenario.Event, String?)] = []
+        var happened: [(asked: Date, done: Date, event: Scenario.Event, uuid: String?)] = []
         for (at, event) in scenario.events {
             try interruption.sleep(until: begun.addingTimeInterval(at))
             switch event {
             case .connectScreen(let spec):
+                let asked = Date()
                 let (process, uuid) = try VirtualScreenHelper.connect(spec, executable: ownExecutable, folder: logs)
                 try restorer.started(process, stopSignal: SIGTERM)
                 screens[spec.serialNumber] = (process, uuid)
-                happened.append((Date(), event, uuid))
+                happened.append((asked, Date(), event, uuid))
             case .switchScreenMode(let serialNumber, let size):
                 guard let (process, uuid) = screens[serialNumber] else {
                     throw DriverError("\(scenario.name): no virtual screen \(serialNumber) for a mode switch")
                 }
-                let switched = Date()
+                let asked = Date()
                 try VirtualScreenHelper.requestModeSwitch(process, to: size)
-                happened.append((switched, event, uuid))
+                happened.append((asked, Date(), event, uuid))
             case .disconnectScreen(let serialNumber):
                 guard let (process, uuid) = screens.removeValue(forKey: serialNumber) else {
                     throw DriverError("\(scenario.name): no virtual screen \(serialNumber) to disconnect")
                 }
-                let ended = Date()
+                let asked = Date()
                 try VirtualScreenHelper.disconnect(process, uuid: uuid)
+                let done = Date()
                 try restorer.ended(process)
-                happened.append((ended, event, nil))
+                happened.append((asked, done, event, uuid))
             }
         }
 
@@ -147,6 +156,7 @@ final class Driver {
         }
         disconnectAllScreens()
         tone?.stop()
+        playbackBreaks = tone?.breaks()
         tone = nil
 
         var failures = try assertions(scenario, recorder: recorder, output: output, logs: logs, ownScreenCount: ownScreenCount,
@@ -210,7 +220,7 @@ final class Driver {
 
     private func assertions(
         _ scenario: Scenario, recorder: ChildProcess, output: URL, logs: URL, ownScreenCount: Int,
-        happened: [(Date, Scenario.Event, String?)], stoppedAt: Date
+        happened: [(asked: Date, done: Date, event: Scenario.Event, uuid: String?)], stoppedAt: Date
     ) throws -> [String] {
         var failures: [String] = []
         let expectedExit: ChildProcess.ExitStatus = scenario.stop == .kill ? .signalled(SIGKILL) : .exited(0)
@@ -236,9 +246,15 @@ final class Driver {
             return failures + ["recording.json has no readable started"]
         }
         let seconds = { (date: Date) in date.timeIntervalSince(started) }
-        let virtual = Scenario.virtualScreenExpectation(
-            happened.map { HappenedEvent(at: seconds($0.0), event: $0.1, screenUUID: $0.2) },
-            settleTime: EndToEndValues.settleTime)
+        let changes = happened.map {
+            HappenedEvent(times: ChangeTimes(asked: seconds($0.asked), done: seconds($0.done)), event: $0.event, screenUUID: $0.uuid)
+        }
+        eventWindows = zip(changes, happened).map { change, event in
+            let width = change.times.windowWidth(settleTime: EndToEndValues.settleTime, tolerance: EndToEndValues.timeTolerance)
+            return String(format: "%@ asked at %.2f s, done at %.2f s: the window is %.2f s wide",
+                          Self.describe(event.event), change.times.asked, change.times.done, width)
+        }
+        let virtual = Scenario.virtualScreenExpectation(changes)
         let stopped = scenario.stop == .duration ? scenario.stopAt : seconds(stoppedAt)
         let expectation = ManifestExpectation(
             app: "Multi Screen Recorder \(version)", settings: scenario.settings,
@@ -291,7 +307,7 @@ final class Driver {
                 return ToneCheck.Track(
                     name: "\(file.name), \(stream.title ?? "track \(stream.index)")",
                     samples: try media.samples(folder.appending(path: file.name), stream: stream.index, sampleRate: rate),
-                    sampleRate: Double(rate), startsAt: start.seconds)
+                    sampleRate: Double(rate), startsAt: stream.firstSampleTime(fileStartsAt: start.seconds))
             }
         }
         var played: [ToneCheck.Track] = []
@@ -307,7 +323,15 @@ final class Driver {
                 break
             }
         }
-        return ToneCheck.failures(played: played, mixed: mixed)
+        return ToneCheck.failures(played: played, mixed: mixed, breaks: playbackBreaks ?? [])
+    }
+
+    static func describe(_ event: Scenario.Event) -> String {
+        switch event {
+        case .connectScreen(let spec): "the connect of \(spec.name)"
+        case .switchScreenMode(let serialNumber, let size): "the mode switch of \(VirtualScreenSpec.namePrefix) \(serialNumber) to \(size)"
+        case .disconnectScreen(let serialNumber): "the disconnect of \(VirtualScreenSpec.namePrefix) \(serialNumber)"
+        }
     }
 
     static func signed(_ seconds: Double) -> String { String(format: "%+.2f", seconds) }

@@ -273,14 +273,12 @@ public struct ManifestCheck {
                 fail("\(file.name): screen \(name), expected a name starting \(expectation.virtualScreenNamePrefix)")
             }
             if size != wanted.frameSize { fail("\(file.name): frameSize \(size), expected \(wanted.frameSize)") }
-            let earliest = wanted.connectedAt + expectation.settleTime
-            if file.start < earliest - expectation.timeTolerance || file.start > earliest + expectation.timeTolerance {
-                fail("\(file.name): starts at \(file.start), expected \(earliest), the connect plus the settle time")
-            }
-            if expectation.ending == .finalized {
-                let end = wanted.disconnectedAt ?? expectation.stoppedAt
-                if let fileEnd = file.end, abs(fileEnd - end) > expectation.timeTolerance {
-                    fail("\(file.name): ends at \(fileEnd), expected \(end)")
+            if let wrong = outside(file.start, wanted.startedBy) { fail("\(file.name): starts at \(wrong)") }
+            if expectation.ending == .finalized, let fileEnd = file.end {
+                if let endedBy = wanted.endedBy {
+                    if let wrong = outside(fileEnd, endedBy) { fail("\(file.name): ends at \(wrong)") }
+                } else if abs(fileEnd - expectation.stoppedAt) > expectation.timeTolerance {
+                    fail("\(file.name): ends at \(fileEnd), expected \(expectation.stoppedAt)")
                 }
             }
             if let match = file.label.wholeMatch(of: /Screen (\d+) - .*/), let number = Int(match.1) { numbers.append(number) }
@@ -304,10 +302,16 @@ public struct ManifestCheck {
                 fail("event \(event) has no time")
                 continue
             }
-            if abs(at - wanted.at) > expectation.timeTolerance {
-                fail("\(wanted.event) at \(at), expected \(wanted.at)")
-            }
+            if let wrong = outside(at, wanted.change) { fail("\(wanted.event) at \(wrong)") }
         }
+    }
+
+    /// The failure's text when `time` is outside the change's window, else nil.
+    private func outside(_ time: Double, _ change: ChangeTimes) -> String? {
+        let window = change.window(settleTime: expectation.settleTime, tolerance: expectation.timeTolerance)
+        guard !window.contains(time) else { return nil }
+        return String(format: "%.2f s, expected %.2f s to %.2f s, ", time, window.lowerBound, window.upperBound)
+            + "from the ask less the tolerance to the done plus the settle time and the tolerance"
     }
 
     private mutating func checkPlayedAudioInputs(_ events: JSONValue?) {
