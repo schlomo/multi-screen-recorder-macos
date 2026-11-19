@@ -56,7 +56,7 @@ public func probeReadyCheckFacts(
         screens: screens,
         audioInputs: audioInputs,
         outputFolder: probes.outputFolder(settings.outputFolderURL(homeFolder: homeFolder)))
-    RecorderLog.detail(DebugLine.facts(facts), category: "ready check")
+    RecorderLog.detail(DetailLine.facts(facts), category: "ready check")
     return facts
 }
 
@@ -95,7 +95,7 @@ public func probeScreenRecording(_ proof: ScreenRecordingProof) async -> Permiss
         }
         return .granted
     } catch {
-        return CGPreflightScreenCaptureAccess() ? .failed(error.localizedDescription) : .notGranted
+        return CGPreflightScreenCaptureAccess() ? .failed(ErrorDetail(error).text) : .notGranted
     }
 }
 
@@ -122,7 +122,7 @@ public func probeOutputFolder(_ folder: URL) -> OutputFolderProbe {
         try Data().write(to: probeFile, options: .withoutOverwriting)
         try FileManager.default.removeItem(at: probeFile)
     } catch {
-        return .unusable(error.localizedDescription)
+        return .unusable(ErrorDetail(error).text)
     }
     return .usable(freeSpace(in: folder))
 }
@@ -136,6 +136,6 @@ private func freeSpace(in folder: URL) -> FreeSpace {
         }
         return .bytes(bytes)
     } catch {
-        return .unreadable(error.localizedDescription)
+        return .unreadable(ErrorDetail(error).text)
     }
 }

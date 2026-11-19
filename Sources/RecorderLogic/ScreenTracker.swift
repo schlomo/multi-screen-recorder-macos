@@ -27,11 +27,11 @@ public struct ScreenTracker: Sendable {
 
     /// Why a stream ended by itself; the recorder reports it.
     public enum StreamEnd: Equatable, Sendable {
-        case streamFailed(String)
+        case streamFailed(ErrorDetail)
         /// The screen the stream captured is gone, as on an unplug, often
         /// seconds before macOS's screen-change notice: no failure (F4).
         case captureSourceGone
-        case writerFailed(String)
+        case writerFailed(ErrorDetail)
         case writerFellBehind
         case diskFull
         case showsAnotherScreen
@@ -341,16 +341,16 @@ public struct ScreenTracker: Sendable {
 
     /// The error of a stream that lost its capture source again without a
     /// screen-change notice in between: a failure (N-A).
-    public static let captureSourceGoneAgain =
+    public static let captureSourceGoneAgain: ErrorDetail =
         "ScreenCaptureKit lost the screen again without a screen change (noCaptureSource, -3815)"
 
-    private mutating func streamFailed(_ uuid: String, error: String, isPresent: Bool, at now: Int64) -> Step {
+    private mutating func streamFailed(_ uuid: String, error: ErrorDetail, isPresent: Bool, at now: Int64) -> Step {
         guard isPresent else {
             screens[uuid]?.phase = .idle
             return Step()
         }
         var failed = event(.screenStreamFailed, uuid, at: now)
-        failed.error = error
+        failed.errorDetail = error
         scheduleRestart(uuid, at: now)
         return Step(events: [failed])
     }

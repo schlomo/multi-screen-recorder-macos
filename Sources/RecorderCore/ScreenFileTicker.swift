@@ -128,7 +128,7 @@ public final class ScreenFileTicker {
             return .fileStarted(made.entry)
         } catch {
             writerError = error
-            return .ended(error.isDiskFull ? .diskFull : .writerFailed(error.description))
+            return .ended(error.isDiskFull ? .diskFull : .writerFailed(error.detail))
         }
     }
 
@@ -175,9 +175,9 @@ public final class ScreenFileTicker {
 
     private func failed(_ error: any Error) -> ScreenTracker.StreamEnd {
         let error = error as? ScreenFileWriterError
-            ?? ScreenFileWriterError(description: String(describing: error), isDiskFull: false)
+            ?? ScreenFileWriterError(detail: ErrorDetail(error), isDiskFull: false)
         writerError = writerError ?? error
-        return error.isDiskFull ? .diskFull : .writerFailed(error.description)
+        return error.isDiskFull ? .diskFull : .writerFailed(error.detail)
     }
 
     /// Ends the file: writes the ticks due by `now` and, with

@@ -24,7 +24,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         } catch {
             let alert = NSAlert()
             alert.messageText = "Multi Screen Recorder cannot start"
-            alert.informativeText = String(describing: error)
+            alert.informativeText = ErrorDetail(error).text
             alert.runModal()
             NSApp.terminate(nil)
             return
@@ -42,16 +42,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         startWindow?.makeKeyAndOrderFront(nil)
         NSApp.activate()
         model.load()
-        offerCrashReport(homeFolder: model.homeFolder)
+        offerReports(homeFolder: model.homeFolder)
     }
 
     /// Start: the window closes; the Dock icon shows "!" when something needs the person.
     private func startRecording() {
-        guard let model, model.canStart else { return }
+        guard let model, model.canStart, let facts = model.readyCheckFacts else { return }
         do {
-            session = try RecordingSession(settings: model.settings, homeFolder: model.homeFolder, output: nil)
+            session = try RecordingSession(
+                settings: model.settings, homeFolder: model.homeFolder, readyCheckFacts: facts, output: nil)
         } catch {
-            showAlert("Cannot start the recording", error.description)
+            showAlert("Cannot start the recording", ErrorDetail(error).text)
             return
         }
         model.recordingStarted()
@@ -71,6 +72,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if openFolder, summary?.manifestWritten == false {
             showAlert("The recording manifest could not be written",
                       "\(RecordingNames.manifest) in the recording folder does not record the end of the recording.")
+        }
+        if openFolder, let notRemembered = session.notRemembered {
+            showAlert("The recording is not remembered", ErrorDetail(notRemembered).text)
         }
     }
 
@@ -145,29 +149,43 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         return window
     }
 
+    /// The crash report offer, then the notice of the last recording's
+    /// problems, from one read of the state file: one that cannot be read is
+    /// one alert, and nothing is offered.
+    private func offerReports(homeFolder: URL) {
+        let stateFile = StateFile(homeFolder: homeFolder)
+        let state: AppState
+        do { state = try stateFile.load() } catch {
+            showAlert("Cannot offer to report a crash or a recording's problems", ErrorDetail(error).text)
+            return
+        }
+        offerProblemReport(state: offerCrashReport(state: state, stateFile: stateFile, homeFolder: homeFolder),
+                           stateFile: stateFile)
+    }
+
     /// Offers the newest crash report of `msr` that was not offered before:
     /// opens a new GitHub issue in the browser and shows a text copy of the
     /// crash report in Finder. The app opens no connection itself (D15).
-    private func offerCrashReport(homeFolder: URL) {
+    /// Gives the state as the offer left it.
+    private func offerCrashReport(state: AppState, stateFile: StateFile, homeFolder: URL) -> AppState {
         do {
-            let stateFile = StateFile(homeFolder: homeFolder)
-            let state = try stateFile.load()
             guard let name = CrashReport.toOffer(
                 fileNames: try crashReportFileNames(homeFolder: homeFolder),
                 lastOffered: state.lastOfferedCrashReport)
-            else { return }
+            else { return state }
             // Marked before the dialog, so a crash while it is open, or a quit, never offers it twice.
-            try stateFile.save(state.offering(name))
+            let offered = state.offering(name)
+            try stateFile.save(offered)
             let alert = NSAlert()
             alert.messageText = "Multi Screen Recorder quit unexpectedly"
             alert.informativeText = CrashReport.dialogText
             alert.addButton(withTitle: "Report on GitHub")
             alert.addButton(withTitle: "Not Now")
-            guard alert.runModal() == .alertFirstButtonReturn else { return }
+            guard alert.runModal() == .alertFirstButtonReturn else { return offered }
             let copy: URL
             do { copy = try makeTextCopy(of: name, homeFolder: homeFolder) } catch {
-                showAlert("Cannot copy the crash report", error.localizedDescription)
-                return
+                showAlert("Cannot copy the crash report", ErrorDetail(error).text)
+                return offered
             }
             let issue = CrashReport.issueURL(
                 crashReportName: name, version: runningVersion.description,
@@ -176,8 +194,34 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             if !NSWorkspace.shared.open(issue) {
                 showAlert("Cannot open the browser", "Open this address yourself:\n\(issue.absoluteString)")
             }
+            return offered
         } catch {
-            showAlert("Cannot offer the crash report", error.localizedDescription)
+            showAlert("Cannot offer the crash report", ErrorDetail(error).text)
+            return state
+        }
+    }
+
+    /// Tells, once, that the last recording had problems, and offers to
+    /// report them: Report a problem runs `ProblemReportAction` (D64).
+    private func offerProblemReport(state: AppState, stateFile: StateFile) {
+        do {
+            guard let folder = state.problemsNoticeFolder(folderExists: { FileManager.default.fileExists(atPath: $0) })
+            else { return }
+            // Marked before the notice, so a crash while it is open, or a quit, never shows it twice.
+            try stateFile.save(state.showingProblemsNotice())
+            let alert = NSAlert()
+            alert.messageText = ProblemReport.noticeTitle
+            alert.informativeText = ProblemReport.noticeText(recordingFolder: folder)
+            alert.addButton(withTitle: ProblemReport.reportButton)
+            alert.addButton(withTitle: ProblemReport.dismissButton)
+            guard alert.runModal() == .alertFirstButtonReturn else { return }
+            let action = ProblemReportAction(recordingFolder: URL(filePath: folder, directoryHint: .isDirectory),
+                                             version: runningVersion.description)
+            if let notOpened = action.run(opener: Workspace()) {
+                showAlert("Cannot open the browser", "Open this address yourself:\n\(notOpened.absoluteString)")
+            }
+        } catch {
+            showAlert("Cannot offer to report the last recording", ErrorDetail(error).text)
         }
     }
 

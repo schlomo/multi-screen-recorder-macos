@@ -280,12 +280,17 @@ below).
   creates the output folder if it is missing; `msr record` and Start
   in the app record the screens; `msr list` reads the devices. An agent
   runs these on the owner's Mac only to test the roadmap's work, into its
-  own scratch folder (`--output-folder`), deleting the recordings once
+  own scratch folder (`--output-folder`) with `HOME` set to a scratch
+  folder too, so the owner's settings and last-recording notice are
+  never overwritten or faked (the permissions do not depend on `HOME`;
+  the settings fall back to their defaults), deleting the recordings once
   checked and never changing settings or permissions (D48); before an agent starts a recording or plays a sound on the owner's Mac, the session running or briefing that test tells the owner, once before the test's first run (D56); on anyone else's Mac, never unasked. On start the app also reads
   `~/Library/Logs/DiagnosticReports`, may show the crash report dialog
-  and open the browser and Finder, and may write `state.json` and a text
-  copy under `~/Library/Application Support/Multi Screen Recorder`
-  (`HOME` decides where).
+  or the notice of the last recording's problems and open the browser
+  and Finder, and may write `state.json` and a text copy under
+  `~/Library/Application Support/Multi Screen Recorder`; at Stop the app
+  and `msr record` write the last recording into `state.json` (`HOME`
+  decides where).
   `msr version`, `msr settings` (it writes the settings file only with
   a settings flag; `HOME` decides where) and the tests are
   safe; the tests read the Mac's audio device list, which shows no

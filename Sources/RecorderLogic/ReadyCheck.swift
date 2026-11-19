@@ -4,7 +4,7 @@ import Foundation
 public enum PermissionProbe: Equatable, Sendable {
     case granted
     case notGranted
-    /// Granted, but the proof failed, for the given reason.
+    /// Granted, but the proof failed, for the given reason: the error detail's text.
     case failed(String)
 }
 
@@ -174,7 +174,7 @@ public enum ReadyCheck {
         case .success(let screens):
             ReadyCheckItem(title: "Screens: \(screens.count)", passed: !screens.isEmpty, fix: "connect a screen")
         case .failure(let error):
-            ReadyCheckItem(title: "Screens: cannot be read (\(error))", passed: false,
+            ReadyCheckItem(title: "Screens: cannot be read (\(ErrorDetail(error).text))", passed: false,
                            fix: "reconnect the screens, then check again")
         }
     }
@@ -189,7 +189,7 @@ public enum ReadyCheck {
             ReadyCheckItem(title: "Screens: \(screens.count)\(need)", passed: screens.contains(where: \.isMain),
                            fix: "connect a screen, or \(turnOff)")
         case .failure(let error):
-            ReadyCheckItem(title: "Screens: cannot be read (\(error))\(need)", passed: false,
+            ReadyCheckItem(title: "Screens: cannot be read (\(ErrorDetail(error).text))\(need)", passed: false,
                            fix: "reconnect the screens, then check again, or \(turnOff)")
         }
     }
@@ -198,7 +198,7 @@ public enum ReadyCheck {
         _ readAudioInputs: Result<[AudioInputInfo], DeviceReadError>, settings: Settings
     ) -> ReadyCheckItem {
         let cannotBeRead = { (error: DeviceReadError) in
-            ReadyCheckItem(title: "Audio: cannot be read (\(error))", passed: false,
+            ReadyCheckItem(title: "Audio: cannot be read (\(ErrorDetail(error).text))", passed: false,
                            fix: "reconnect the audio inputs, then check again")
         }
         let audioInputs: [AudioInputInfo]

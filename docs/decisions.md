@@ -1233,8 +1233,9 @@ architect's reading.
 ## D46: The owner's rulings from trying B1 (2026-11-15)
 
 - **Status:** in force; refines D45 and, for B2, D31; superseded in
-  part by D47 (point 12: the badge shows no time) and D59 (point 4:
-  a source not recorded shows `-`). Being built in
+  part by D47 (point 12: the badge shows no time), D59 (point 4:
+  a source not recorded shows `-`) and D64 (point 3: no log file of our
+  own; each recording writes its recording log). Being built in
   PR #11 (B1), point 7 in B2.
 - **Context:** The owner tried the snapshot release of PR #11 on
   2026-11-15 and wrote: "duration without suffix is minutes"; "yes,
@@ -1910,3 +1911,125 @@ architect's reading.
 - **Evidence:** [design/recorder.md](design/recorder.md), "Audio only",
   "Ready check" and "Build state"; `ReadyCheckTests`,
   `ScreenTrackerTests`, `WhatWillBeRecordedTests`.
+
+## D64: Diagnostics: the error detail everywhere, a recording log per recording, reports without Terminal (2026-11-19)
+
+- **Status:** in force; point 3 as "Report a problem" below has it.
+- **Context:** A CI run of PR #23 showed `screen file writer failed …
+  The operation could not be completed` with no code: the screen file
+  writer kept only `localizedDescription`, so the cause cannot be
+  found. The owner, 2026-11-19: "The error handing pr must be smarter
+  about collection unknown and unexpected errors in general so that
+  future similar situations will give us something to analyze. Same
+  with user reports. And think about how to connect such error details
+  from GUI runs without terminal, ideally writing something into the
+  results folder"; on the design: "Rewrite log in full on every event?
+  Better append. Otherwise agree".
+- **Decision:**
+  1. **Error detail.** One type (`ErrorDetail`, pure logic in
+     `RecorderLogic`) turns any error into its full chain: domain, code
+     (a code whose four bytes are printable also as its four-character
+     code), description, failure reason, recovery suggestion and every
+     underlying error, recursively, 8 levels deep at most. Every place
+     that turns an error into text goes through it: events, problems,
+     `Error:` lines, alerts and the logs, for screens, audio, settings,
+     files and the ready check. The recording manifest's events and
+     problems with an `error` gain `errorDetail`, the structured value;
+     null (for a problem) or absent (for an event) where there is no
+     `error`. A test fails when any source file but the error detail's
+     own reads `localizedDescription`.
+  2. **Recording log.** `recording.log` in the recording folder, always
+     written, in the app and in `msr record`: every event, every
+     problem with its full error, and the detail lines that before only
+     `--debug` printed (the tracker's actions, the screens as read,
+     files started and ended, the clock drift block every 10 s, the
+     gaps, the ready check's facts). Append-only: each line is appended,
+     never rewritten; after an event's or a problem's line the file is
+     synchronized to disk; detail lines wait in memory until the next
+     event, problem or Stop, or about 11 s (a check once a second
+     against 10 s). Lines as on standard error,
+     with the local time and the offset from the start. `--debug` only
+     decides whether detail lines also go to standard error; the
+     unified log stays as it is. A recording log that cannot be written
+     is a problem, told once; the recording goes on. This partially
+     reverses D46 ("No log file of our own"): not an app-wide log, but
+     one bounded file per recording, next to the files it explains.
+  3. **User reports without Terminal.** When a recording ends with
+     `result` `problems`, the status window shows **Report a problem**:
+     it opens a new GitHub issue with the app version, the result and
+     the problem lines with their error chains filled in, cut to a safe
+     URL length, and reveals `recording.json` and `recording.log` in
+     Finder for the person to attach. Nothing is sent automatically.
+     The crash report dialog, the status window's problem text and the
+     README name these two files instead of the `log show` command; the
+     README keeps the command for a crash outside a recording.
+- **Details settled while building (2026-11-19, for review):** the
+  recorder's own errors have the domain `MultiScreenRecorder`, or their
+  Swift type's (`RecorderCore.ScreenFileWriterError`), and their one
+  line leaves the domain and code out; a wrapping error (`cannot write
+  <file>`) keeps the system's error as its underlying error; a problem
+  made from an event has the event's name as its error detail with the
+  event's under it; a write of the recording log that fails drops its
+  lines, and the problem clears once a write works again; the periodic
+  write of detail lines is synchronized too.
+- **Rulings from the review (2026-11-19, the architect):** the term is
+  **detail line** (`detail <category>:` in the recording log and on
+  standard error; `--debug` keeps its name and also prints them on
+  standard error). Capture threads only add lines; the write and its
+  `fsync` run under a lock of their own. At Stop the recording log's last
+  line (`finalizing the recording manifest`) is written, synchronized
+  and closed before the manifest is finalized; a failure there is a
+  problem in the final manifest, `result` `problems`, exit 3. Nothing is
+  added to a finalized manifest: a later problem goes to standard error
+  and the unified log only. A chain cut at the depth limit is marked
+  `"truncated": true`; line breaks in an error's text become `⏎`; an
+  older manifest's event `error` is kept when read. The recorder's own
+  error types interpolated into texts (`DeviceReadError` in the ready
+  check, "What will be recorded" and the detail lines) go through the
+  error detail too; the ready check facts' strings are the error
+  detail's text already.
+- **The starting situation (2026-11-19, the owner):** "Error reporting
+  as you suggest via the same GH issue template, I hope the log
+  contains enough context to figure out what happened". Point 3 becomes
+  its own step, through the problem report form. The recording log
+  starts, before the first event, with detail lines of the starting
+  situation: the app's version, macOS's version and build and the Mac's
+  model identifier, the effective settings as `msr settings` prints
+  them, "What will be recorded" as `msr record` prints it, and the ready
+  check's facts and result; nothing that names the person, the host or
+  a serial number. The architect's review: the block is synchronized to
+  disk before the recording starts, and goes to the recording log only,
+  also with `--debug`.
+- **Report a problem (2026-11-19, the owner):** "24 needs to include
+  the error reporting via GH issue template too", with the design
+  signed off as text; it replaces point 3's status window button, as
+  the status window closes and the app quits at Stop. At Stop, in the
+  app and in `msr record`, the state file remembers the last
+  recording's folder and how it ended (`problems` exactly when
+  `msr record` exits 3: the manifest's `result` is `problems` or the
+  final manifest could not be written). On the app's next start, after
+  the crash report offer, a notice "The last recording had problems"
+  offers **Report a problem** and **Dismiss**, once per recording
+  (marked in the state file before it shows) and not if the recording
+  folder is gone. Report a problem opens a new issue with the existing
+  form `problem-report.yml`, its `version` and `what-happened` fields
+  filled: the summary's error and problem lines from the recording's
+  `recording.json`, the last first, as many as keep the link within
+  8000 characters, saying how many more there are; it shows that
+  recording's `recording.json` and `recording.log` in Finder. The form
+  gains an optional field `recording-log`. `msr record` whose summary
+  says it exits 3 ends that summary, also with `--quiet`, with
+  `Report it: <the same link>` and `Attach: <recording folder>/recording.log and recording.json`.
+  The crash report and the problem report build their links in one
+  place (`IssueFormLink`).
+- **Consequences:** a recording folder holds one more file, about
+  0.4 MB per hour (measured: 6.8 kB for 1 minute of 2 screens and 5
+  audio sources). The state file is written at every Stop; one that
+  cannot be written leaves the recording unremembered (an `Error:` line
+  in `msr record`, an alert after the person's Stop in the app). The
+  link's length limit is GitHub's, about 8 kB [ASSUMED], not measured.
+- **Evidence:** [design/recorder.md](design/recorder.md), "Output on
+  disk" and "Logging"; `ErrorDetailTests`, `ErrorDetailSourceTests`,
+  `RecordingLogTests`, `WriterErrorTests`, `RecordingManifestTests`,
+  `ProblemsToldTests`, `StatusTextTests`, `ProblemReportTests`,
+  `ProblemReportActionTests`, `AppStateTests`, `StateFileTests`.

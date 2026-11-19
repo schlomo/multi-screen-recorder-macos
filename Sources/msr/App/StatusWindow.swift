@@ -53,6 +53,10 @@ final class StatusWindow {
 }
 
 struct StatusView: View {
+    /// The line under the problems: the two files a report needs (D64).
+    nonisolated static let forAReport = "For a report, \(RecordingNames.manifest) and \(RecordingNames.recordingLog) in the recording folder"
+        + " show what happened; attach them to the issue."
+
     let model: StatusModel
     let stop: () -> Void
     let continueRecording: () -> Void
@@ -99,7 +103,7 @@ struct StatusView: View {
                     ForEach(Array(model.problems.enumerated()), id: \.offset) { _, problem in
                         Text(problem).foregroundStyle(.red).fixedSize(horizontal: false, vertical: true)
                     }
-                    Text("The log of the last 2 hours, for a report, in Terminal: \(CrashReport.logCommand)")
+                    Text(Self.forAReport)
                         .font(.callout)
                         .foregroundStyle(.secondary)
                         .textSelection(.enabled)

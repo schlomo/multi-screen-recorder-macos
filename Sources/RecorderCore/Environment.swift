@@ -17,3 +17,13 @@ public func homeFolder() throws -> URL {
 public var runningVersion: AppVersion {
     AppVersion(infoDictionary: Bundle.main.infoDictionary)
 }
+
+/// The Mac's model identifier, such as `Mac15,8` (`hw.model`); nil when
+/// macOS does not give it.
+public func macModel() -> String? {
+    var size = 0
+    guard sysctlbyname("hw.model", nil, &size, nil, 0) == 0, size > 0 else { return nil }
+    var bytes = [CChar](repeating: 0, count: size)
+    guard sysctlbyname("hw.model", &bytes, &size, nil, 0) == 0 else { return nil }
+    return String(decoding: bytes.prefix { $0 != 0 }.map { UInt8(bitPattern: $0) }, as: UTF8.self)
+}

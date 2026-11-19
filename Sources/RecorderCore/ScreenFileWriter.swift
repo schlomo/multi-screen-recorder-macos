@@ -3,25 +3,26 @@ import CoreMedia
 import RecorderLogic
 import VideoToolbox
 
-public struct ScreenFileWriterError: Error, Equatable, CustomStringConvertible {
-    public let description: String
+public struct ScreenFileWriterError: ErrorWithDetail, Equatable, CustomStringConvertible {
+    /// What failed, with the error macOS gave, if any, and its full chain.
+    public let detail: ErrorDetail
     /// The disk is full: the file ends, readable up to its last fragment.
     public let isDiskFull: Bool
 
-    public init(description: String, isDiskFull: Bool) {
-        self.description = description
+    public init(detail: ErrorDetail, isDiskFull: Bool) {
+        self.detail = detail
         self.isDiskFull = isDiskFull
     }
 
-    init(_ error: (any Error)?, while doing: String) {
-        if let error {
-            description = "\(doing): \(error.localizedDescription)"
-            isDiskFull = isDiskFullError(error)
-        } else {
-            description = doing
-            isDiskFull = false
-        }
+    public init(description: String, isDiskFull: Bool) {
+        self.init(detail: ErrorDetail(message: description), isDiskFull: isDiskFull)
     }
+
+    init(_ error: (any Error)?, while doing: String) {
+        self.init(detail: ErrorDetail(message: doing, underlying: error), isDiskFull: error.map(isDiskFullError) ?? false)
+    }
+
+    public var description: String { detail.text }
 }
 
 /// A screen file: HEVC 8-bit in a fragmented `.mov`, a keyframe and a

@@ -27,6 +27,8 @@ public enum RecorderValues {
     public static let longestRestartDelay = Duration.seconds(10)
     /// How often the free space in the recording folder is checked.
     public static let freeSpaceCheckInterval = Duration.seconds(5)
+    /// The longest detail lines wait in memory before the recording log gets them (D64).
+    public static let recordingLogFlushInterval = Duration.seconds(10)
     /// How far a frame's screen rectangle may differ from its screen's
     /// bounds, in points, and still pass the screen check: the two are
     /// whole points, so this only absorbs rounding.

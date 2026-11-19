@@ -13,6 +13,16 @@ import Testing
         RecordingProblem(at: at, problem: text, error: "denied")
     }
 
+    /// A problem reported after the recording manifest was finalized changes it no more (D64).
+    @Test func aProblemAfterTheEndIsNotAdded() {
+        var told = ProblemsTold()
+        var manifest = manifest()
+        manifest.finalize(ended: .now, timeZone: .current)
+        #expect(told.add(problem(1), kind: .recordingLogNotWritten, to: &manifest) == .afterTheEnd)
+        #expect(manifest.problems.isEmpty)
+        #expect(manifest.result == .ok)
+    }
+
     @Test func aProblemIsAddedToldAndTheManifestWritten() {
         var told = ProblemsTold()
         var manifest = manifest()

@@ -26,8 +26,8 @@ public struct AudioTracker: Sendable {
     public enum CaptureEnd: Equatable, Sendable {
         /// The audio input was unplugged, or the system audio's screen went: no failure.
         case disconnected
-        case captureFailed(String)
-        case writerFailed(String)
+        case captureFailed(ErrorDetail)
+        case writerFailed(ErrorDetail)
         /// The writer took none of the samples of `audioWaitBoundSeconds`.
         case writerFellBehind
         case diskFull
@@ -236,10 +236,10 @@ public struct AudioTracker: Sendable {
     }
 
     /// The error of a capture lost again with no change of the devices or screens.
-    public static func sourceLostAgain(_ id: SourceID) -> String {
-        id == .systemAudio
+    public static func sourceLostAgain(_ id: SourceID) -> ErrorDetail {
+        ErrorDetail(message: id == .systemAudio
             ? "ScreenCaptureKit lost the system audio's screen again without a screen change"
-            : "AVFoundation lost the audio input again without a change of the audio devices"
+            : "AVFoundation lost the audio input again without a change of the audio devices")
     }
 
     /// A file of the source started: its restart delay starts over.
@@ -256,7 +256,7 @@ public struct AudioTracker: Sendable {
         case .disconnected where !tracked.mayLoseCaptureSource && tracked.isPresent && tracked.isWanted:
             // Lost again with no notice that it went: a failure, as for a screen.
             var failed = RecordingEvent(at: now, event: id == .systemAudio ? .systemAudioFailed : .audioInputFailed, audioSource: tracked.name)
-            failed.error = Self.sourceLostAgain(id)
+            failed.errorDetail = Self.sourceLostAgain(id)
             step.events.append(failed)
             scheduleRestart(id, at: now)
         case .disconnected:
@@ -275,12 +275,12 @@ public struct AudioTracker: Sendable {
             }
         case .captureFailed(let error):
             var failed = RecordingEvent(at: now, event: id == .systemAudio ? .systemAudioFailed : .audioInputFailed, audioSource: tracked.name)
-            failed.error = error
+            failed.errorDetail = error
             step.events.append(failed)
             scheduleRestart(id, at: now)
         case .writerFailed(let error):
             var failed = RecordingEvent(at: now, event: .audioFileWriterFailed, audioSource: tracked.name)
-            failed.error = error
+            failed.errorDetail = error
             step.events.append(failed)
             scheduleRestart(id, at: now)
         case .writerFellBehind:

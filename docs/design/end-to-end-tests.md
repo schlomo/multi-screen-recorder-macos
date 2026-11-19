@@ -257,7 +257,7 @@ apart, a test cannot either:
   correction applied so far plus the device's drift during the gap (the
   kept slope over its length); a source whose timestamps jump to the
   host clock across a gap would be off by its drift until then. The
-  `--debug` line for each gap shows the drift added and the lateness
+  detail line for each gap shows the drift added and the lateness
   before and after it, which tells.
 
 All figures are the worst of 20 seeds of the tests' simulation.
