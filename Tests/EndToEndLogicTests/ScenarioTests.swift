@@ -53,13 +53,21 @@ import Testing
         #expect(Scenario.ceilingMargin == 120)
     }
 
-    @Test func aChangesWindowRunsFromTheAskToTheDonePlusTheSettleTime() {
+    @Test func aSettledTimeComesTheSettleTimeAfterTheChange() {
         let change = ChangeTimes(asked: 6.0, done: 6.25)
-        let window = change.window(settleTime: 1, tolerance: 0.5)
-        #expect(window == 5.5...7.75)
-        #expect(window.contains(5.5) && window.contains(7.75))
-        #expect(!window.contains(5.49) && !window.contains(7.76))
-        #expect(change.windowWidth(settleTime: 1, tolerance: 0.5) == 2.25)
+        let window = change.window(.settled, settleTime: 1, tolerance: 0.5)
+        #expect(window == 6.5...7.75)
+        #expect(window.contains(6.5) && window.contains(7.75))
+        #expect(!window.contains(6.49) && !window.contains(7.76))
+        #expect(change.windowWidth(.settled, settleTime: 1, tolerance: 0.5) == 1.25)
+    }
+
+    @Test func anImmediateTimeComesWithTheChange() {
+        let change = ChangeTimes(asked: 6.0, done: 6.25)
+        let window = change.window(.immediate, settleTime: 1, tolerance: 0.5)
+        #expect(window == 5.5...6.75)
+        #expect(!window.contains(5.49) && !window.contains(6.76))
+        #expect(change.windowWidth(.immediate, settleTime: 1, tolerance: 0.5) == 1.25)
     }
 
     @Test func aConnectAModeSwitchAndADisconnectGiveTheirFilesAndEvents() {
@@ -74,12 +82,13 @@ import Testing
         let modeSwitch = ChangeTimes(asked: 6.0, done: 6.2)
         let disconnect = ChangeTimes(asked: 11.0, done: 11.5)
         #expect(expectation.files == [
-            .init(screenUUID: "U", frameSize: [1280, 720], startedBy: connect, endedBy: modeSwitch),
-            .init(screenUUID: "U", frameSize: [1600, 900], startedBy: modeSwitch, endedBy: disconnect),
+            .init(screenUUID: "U", frameSize: [1280, 720], startedBy: connect, endedBy: .init(change: modeSwitch, kind: .settled)),
+            .init(screenUUID: "U", frameSize: [1600, 900], startedBy: modeSwitch, endedBy: .init(change: disconnect, kind: .immediate)),
         ])
         #expect(expectation.events == [
-            .init(event: "screen connected", change: connect), .init(event: "screen frame size changed", change: modeSwitch),
-            .init(event: "screen disconnected", change: disconnect),
+            .init(event: "screen connected", expected: .init(change: connect, kind: .immediate)),
+            .init(event: "screen frame size changed", expected: .init(change: modeSwitch, kind: .settled)),
+            .init(event: "screen disconnected", expected: .init(change: disconnect, kind: .immediate)),
         ])
     }
 

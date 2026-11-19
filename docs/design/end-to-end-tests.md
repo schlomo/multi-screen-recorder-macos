@@ -197,10 +197,13 @@ took 97 s on the owner's Mac.
 driver keeps when it asked for the change and when it saw it done (the
 helper reported the screen active or the mode switched; for a
 disconnect, the helper has ended and the screen is gone from the active
-screens). The recorder's time for it, an event or a file's start or
-end, must lie from the ask less the 0.5 s tolerance to the done plus the
-settle time and the tolerance. `run.log` shows each change's times and
-the window's width.
+screens). A time the recorder writes for it lies in one of two windows,
+widened by the 0.5 s tolerance: **settled** (a screen file's start,
+`screen frame size changed`, a file's end at a mode switch) from the
+ask plus the settle time to the done plus the settle time; **immediate**
+(`screen connected`, `screen disconnected`, a file's end at a
+disconnect) from the ask to the done. `run.log` shows each change's
+times and both windows' widths.
 
 **Placing decoded sound.** A track's samples start at its first sample,
 which an edit list may put after the file's start (the guide track
@@ -211,8 +214,11 @@ stream is added to the file's timecode before clicks are compared.
 cycle's sample time, so a cycle the output skips does not shift the
 tone; each skip, and each overload the loopback device tells of, is kept
 with its time of day. When a click spacing in BlackHole's file fails and
-a break lies in it (within 0.1 s), the failure line says so: "the tone
-player's output broke at <t> s (<n> samples); the recording shows it".
+a break lies in it (within 0.1 s), the failure line says so: "playback
+on the loopback device broke at <t> s (<n> samples); the recording shows
+it" (an overload the device tells of may come from the recorder's own
+input on it too). The breaks are kept in a fixed buffer, so the render
+thread never locks or allocates; more than it holds are counted.
 It is still a failure. `run.log` gives the number of playback breaks for
 each scenario with the tone.
 

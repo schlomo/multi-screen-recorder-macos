@@ -179,17 +179,19 @@ extension Scenario {
                 open[spec.serialNumber] = files.count
                 files.append(.init(screenUUID: event.screenUUID ?? "?", frameSize: [spec.sizes[0].width, spec.sizes[0].height],
                                    startedBy: event.times, endedBy: nil))
-                events.append(.init(event: "screen connected", change: event.times))
+                events.append(.init(event: "screen connected", expected: .init(change: event.times, kind: .immediate)))
             case .switchScreenMode(let serialNumber, let size):
                 guard let index = open[serialNumber] else { continue }
-                files[index].endedBy = event.times
+                files[index].endedBy = .init(change: event.times, kind: .settled)
                 open[serialNumber] = files.count
                 files.append(.init(screenUUID: files[index].screenUUID, frameSize: [size.width, size.height],
                                    startedBy: event.times, endedBy: nil))
-                events.append(.init(event: "screen frame size changed", change: event.times))
+                events.append(.init(event: "screen frame size changed", expected: .init(change: event.times, kind: .settled)))
             case .disconnectScreen(let serialNumber):
-                if let index = open.removeValue(forKey: serialNumber) { files[index].endedBy = event.times }
-                events.append(.init(event: "screen disconnected", change: event.times))
+                if let index = open.removeValue(forKey: serialNumber) {
+                    files[index].endedBy = .init(change: event.times, kind: .immediate)
+                }
+                events.append(.init(event: "screen disconnected", expected: .init(change: event.times, kind: .immediate)))
             }
         }
         return (files, events)

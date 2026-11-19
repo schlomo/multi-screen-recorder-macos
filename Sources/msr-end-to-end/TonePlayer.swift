@@ -71,21 +71,49 @@ final class TonePlayer {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = .current
         return seen.all().map { seen in
-            let parts = calendar.dateComponents([.hour, .minute, .second, .nanosecond], from: seen.at)
+            let parts = calendar.dateComponents([.hour, .minute, .second, .nanosecond],
+                                                from: Date(timeIntervalSinceReferenceDate: seen.at))
             let seconds = Double((parts.hour ?? 0) * 3600 + (parts.minute ?? 0) * 60 + (parts.second ?? 0))
                 + Double(parts.nanosecond ?? 0) / 1_000_000_000
             return PlaybackBreak(timeOfDay: seconds, samples: seen.samples)
         }
     }
+
+    /// How many breaks there were, those beyond what the log holds included.
+    var breakCount: Int { seen.count }
 }
 
-/// The breaks as the player sees them: from the render thread and the
-/// overload listener.
-private final class BreakLog: Sendable {
-    private let entries = Mutex<[(at: Date, samples: Int64?)]>([])
+/// The breaks as the player sees them, from the render thread and the
+/// overload listener: slots allocated up front and taken by an atomic
+/// index, so adding one never locks or allocates; those beyond the
+/// capacity are only counted. Read once playback has stopped.
+private final class BreakLog: @unchecked Sendable {
+    static let capacity = 1024
+    private let times = UnsafeMutablePointer<Double>.allocate(capacity: capacity)
+    private let samples = UnsafeMutablePointer<Int64>.allocate(capacity: capacity)
+    private let next = Atomic<Int>(0)
+    /// `samples` of an overload, which has no sample count.
+    private static let overload = Int64.min
 
-    func add(_ samples: Int64?) { entries.withLock { $0.append((Date(), samples)) } }
-    func all() -> [(at: Date, samples: Int64?)] { entries.withLock { $0 } }
+    deinit {
+        times.deallocate()
+        samples.deallocate()
+    }
+
+    func add(_ skipped: Int64?) {
+        let slot = next.wrappingAdd(1, ordering: .sequentiallyConsistent).oldValue
+        guard slot < Self.capacity else { return }
+        times[slot] = Date.timeIntervalSinceReferenceDate
+        samples[slot] = skipped ?? Self.overload
+    }
+
+    var count: Int { next.load(ordering: .sequentiallyConsistent) }
+
+    func all() -> [(at: TimeInterval, samples: Int64?)] {
+        (0..<min(count, Self.capacity)).map { slot in
+            (times[slot], samples[slot] == Self.overload ? nil : samples[slot])
+        }
+    }
 }
 
 /// The playback clock, touched only by the render thread.

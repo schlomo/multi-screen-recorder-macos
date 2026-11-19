@@ -273,7 +273,9 @@ public struct ManifestCheck {
                 fail("\(file.name): screen \(name), expected a name starting \(expectation.virtualScreenNamePrefix)")
             }
             if size != wanted.frameSize { fail("\(file.name): frameSize \(size), expected \(wanted.frameSize)") }
-            if let wrong = outside(file.start, wanted.startedBy) { fail("\(file.name): starts at \(wrong)") }
+            if let wrong = outside(file.start, ExpectedTime(change: wanted.startedBy, kind: .settled)) {
+                fail("\(file.name): starts at \(wrong)")
+            }
             if expectation.ending == .finalized, let fileEnd = file.end {
                 if let endedBy = wanted.endedBy {
                     if let wrong = outside(fileEnd, endedBy) { fail("\(file.name): ends at \(wrong)") }
@@ -302,16 +304,16 @@ public struct ManifestCheck {
                 fail("event \(event) has no time")
                 continue
             }
-            if let wrong = outside(at, wanted.change) { fail("\(wanted.event) at \(wrong)") }
+            if let wrong = outside(at, wanted.expected) { fail("\(wanted.event) at \(wrong)") }
         }
     }
 
     /// The failure's text when `time` is outside the change's window, else nil.
-    private func outside(_ time: Double, _ change: ChangeTimes) -> String? {
-        let window = change.window(settleTime: expectation.settleTime, tolerance: expectation.timeTolerance)
+    private func outside(_ time: Double, _ expected: ExpectedTime) -> String? {
+        let window = expected.change.window(expected.kind, settleTime: expectation.settleTime, tolerance: expectation.timeTolerance)
         guard !window.contains(time) else { return nil }
         return String(format: "%.2f s, expected %.2f s to %.2f s, ", time, window.lowerBound, window.upperBound)
-            + "from the ask less the tolerance to the done plus the settle time and the tolerance"
+            + expected.kind.description
     }
 
     private mutating func checkPlayedAudioInputs(_ events: JSONValue?) {

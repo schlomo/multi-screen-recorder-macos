@@ -58,7 +58,7 @@ public enum ToneCheck {
                 let window = (track.startsAt + earlier - breakMargin)...(track.startsAt + later + breakMargin)
                 if let broke = breaks.first(where: { window.contains($0.timeOfDay) }) {
                     let size = broke.samples.map { "\($0) samples" } ?? "an overload"
-                    failure += String(format: "; the tone player's output broke at %.3f s (%@); the recording shows it",
+                    failure += String(format: "; playback on the loopback device broke at %.3f s (%@); the recording shows it",
                                       broke.timeOfDay - track.startsAt, size)
                 }
                 failures.append(failure)

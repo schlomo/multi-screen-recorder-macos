@@ -113,7 +113,7 @@ struct Run: ParsableCommand {
                 }
                 if let margin = driver.margin { RunLog.out("      margin: \(margin)") }
                 for window in driver.eventWindows { RunLog.out("      window: \(window)") }
-                if let breaks = driver.playbackBreaks { RunLog.out("      playback breaks: \(breaks.count)") }
+                if let count = driver.playbackBreakCount { RunLog.out("      playback breaks: \(count)") }
                 rows.append(.init(scenario: scenario.name, result: failures.isEmpty ? "ok" : "FAIL", seconds: seconds,
                                   margin: driver.margin, firstFailure: failures.first))
             } catch {

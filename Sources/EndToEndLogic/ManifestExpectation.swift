@@ -11,16 +11,40 @@ public struct ChangeTimes: Sendable, Equatable {
         self.done = done
     }
 
-    /// Where a time the recorder writes for the change may lie: from the
-    /// ask less the tolerance to the done plus the settle time and the
-    /// tolerance.
-    public func window(settleTime: Double, tolerance: Double) -> ClosedRange<Double> {
-        (asked - tolerance)...(done + settleTime + tolerance)
+    /// Where a time the recorder writes for the change may lie, by its kind:
+    /// the change's own span widened by the tolerance, the settle time later
+    /// for a settled one.
+    public func window(_ kind: TimingKind, settleTime: Double, tolerance: Double) -> ClosedRange<Double> {
+        let delay = kind == .settled ? settleTime : 0
+        return (asked + delay - tolerance)...(done + delay + tolerance)
     }
 
-    public func windowWidth(settleTime: Double, tolerance: Double) -> Double {
-        let window = window(settleTime: settleTime, tolerance: tolerance)
+    public func windowWidth(_ kind: TimingKind, settleTime: Double, tolerance: Double) -> Double {
+        let window = window(kind, settleTime: settleTime, tolerance: tolerance)
         return window.upperBound - window.lowerBound
+    }
+}
+
+/// How a time the recorder writes follows the change it tells of.
+public enum TimingKind: Sendable, Equatable {
+    /// After the settle time: a screen file's start, `screen frame size
+    /// changed`, a file's end at a mode switch.
+    case settled
+    /// With the change: `screen connected`, `screen disconnected`, a file's
+    /// end at a disconnect.
+    case immediate
+
+    var description: String { self == .settled ? "the settle time after the change" : "with the change" }
+}
+
+/// A time the recorder writes: the change it follows, and how.
+public struct ExpectedTime: Sendable, Equatable {
+    public var change: ChangeTimes
+    public var kind: TimingKind
+
+    public init(change: ChangeTimes, kind: TimingKind) {
+        self.change = change
+        self.kind = kind
     }
 }
 
@@ -64,13 +88,13 @@ public struct ManifestExpectation: Sendable {
     public struct VirtualScreenFile: Sendable, Equatable {
         public var screenUUID: String
         public var frameSize: [Int]
-        /// The connect or mode switch its file starts after.
+        /// The connect or mode switch its file starts after, the settle time later.
         public var startedBy: ChangeTimes
-        /// The mode switch or disconnect that ends it; nil when the
-        /// recording ended first.
-        public var endedBy: ChangeTimes?
+        /// The mode switch (settled) or disconnect (immediate) that ends it;
+        /// nil when the recording ended first.
+        public var endedBy: ExpectedTime?
 
-        public init(screenUUID: String, frameSize: [Int], startedBy: ChangeTimes, endedBy: ChangeTimes?) {
+        public init(screenUUID: String, frameSize: [Int], startedBy: ChangeTimes, endedBy: ExpectedTime?) {
             self.screenUUID = screenUUID
             self.frameSize = frameSize
             self.startedBy = startedBy
@@ -81,12 +105,12 @@ public struct ManifestExpectation: Sendable {
     /// One event about a virtual screen, in order.
     public struct VirtualScreenEvent: Sendable, Equatable {
         public var event: String
-        /// The change the event tells of.
-        public var change: ChangeTimes
+        /// The change the event tells of, and how it follows it.
+        public var expected: ExpectedTime
 
-        public init(event: String, change: ChangeTimes) {
+        public init(event: String, expected: ExpectedTime) {
             self.event = event
-            self.change = change
+            self.expected = expected
         }
     }
 

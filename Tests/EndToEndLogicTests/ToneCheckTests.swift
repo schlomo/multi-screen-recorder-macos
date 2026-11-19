@@ -89,14 +89,14 @@ import Testing
         let broke = ToneCheck.failures(played: [track("BlackHole", samples)], mixed: [],
                                        breaks: [PlaybackBreak(timeOfDay: 1002.1, samples: 612)])
         #expect(broke == [
-            "BlackHole: clicks at 1.7431 s and 2.7331 s are not one second apart; the tone player's output broke at 2.100 s (612 samples); the recording shows it",
+            "BlackHole: clicks at 1.7431 s and 2.7331 s are not one second apart; playback on the loopback device broke at 2.100 s (612 samples); the recording shows it",
         ])
         let elsewhere = ToneCheck.failures(played: [track("BlackHole", samples)], mixed: [],
                                            breaks: [PlaybackBreak(timeOfDay: 1003.5, samples: 612)])
         #expect(elsewhere == ["BlackHole: clicks at 1.7431 s and 2.7331 s are not one second apart"])
         let overload = ToneCheck.failures(played: [track("BlackHole", samples)], mixed: [],
                                           breaks: [PlaybackBreak(timeOfDay: 1002.1, samples: nil)])
-        #expect(overload.first?.hasSuffix("the tone player's output broke at 2.100 s (an overload); the recording shows it") == true)
+        #expect(overload.first?.hasSuffix("playback on the loopback device broke at 2.100 s (an overload); the recording shows it") == true)
     }
 
     @Test func theToneFollowsTheRenderSampleTimeAcrossASkippedCycle() {

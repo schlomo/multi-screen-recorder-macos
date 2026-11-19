@@ -23,8 +23,11 @@ final class Driver {
     /// The last scenario's events: when each was asked and done, and the
     /// width of the window the recorder's time for it must lie in.
     private(set) var eventWindows: [String] = []
-    /// The last scenario's breaks in the tone player's output; nil without the tone.
+    /// The last scenario's breaks in playback on the loopback device; nil
+    /// without the tone.
     private(set) var playbackBreaks: [PlaybackBreak]?
+    /// How many there were, those beyond what the player's log holds included.
+    private(set) var playbackBreakCount: Int?
     /// The last scenario's recording, for its review files.
     private var lastRecording: (folder: URL, files: [ListedFile], probed: [String: ProbedFile])?
 
@@ -72,6 +75,7 @@ final class Driver {
         margin = nil
         eventWindows = []
         playbackBreaks = nil
+        playbackBreakCount = nil
         lastRecording = nil
         let folder = scratch.appending(path: scenario.name)
         try? FileManager.default.removeItem(at: folder)
@@ -157,6 +161,7 @@ final class Driver {
         disconnectAllScreens()
         tone?.stop()
         playbackBreaks = tone?.breaks()
+        playbackBreakCount = tone?.breakCount
         tone = nil
 
         var failures = try assertions(scenario, recorder: recorder, output: output, logs: logs, ownScreenCount: ownScreenCount,
@@ -250,9 +255,11 @@ final class Driver {
             HappenedEvent(times: ChangeTimes(asked: seconds($0.asked), done: seconds($0.done)), event: $0.event, screenUUID: $0.uuid)
         }
         eventWindows = zip(changes, happened).map { change, event in
-            let width = change.times.windowWidth(settleTime: EndToEndValues.settleTime, tolerance: EndToEndValues.timeTolerance)
-            return String(format: "%@ asked at %.2f s, done at %.2f s: the window is %.2f s wide",
-                          Self.describe(event.event), change.times.asked, change.times.done, width)
+            let width = { (kind: TimingKind) in
+                change.times.windowWidth(kind, settleTime: EndToEndValues.settleTime, tolerance: EndToEndValues.timeTolerance)
+            }
+            return String(format: "%@ asked at %.2f s, done at %.2f s: the settled window is %.2f s wide, the immediate one %.2f s",
+                          Self.describe(event.event), change.times.asked, change.times.done, width(.settled), width(.immediate))
         }
         let virtual = Scenario.virtualScreenExpectation(changes)
         let stopped = scenario.stop == .duration ? scenario.stopAt : seconds(stoppedAt)
