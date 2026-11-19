@@ -2,15 +2,13 @@
 
 ## Next session starts here
 
-PR #24 (item 24, diagnostics) is merged (2026-11-19). PR #23 (item 3's
-first part) is finishing: the end-to-end tests now run manually in a
-tart VM on the owner's Mac (`scripts/end-to-end-setup`, then
-`scripts/end-to-end-test`), no longer in CI (D67; the owner: "We'll
-leave e2e a manual step that uses the VM and another script for setup.
-You'll run e2e manually when needed and mark in the pr that it
-succeeded. Kiss"). Left: the fix round for the review of the VM move,
-one CI run, 5 passing end-to-end runs in a row in the VM on the head,
-the result in the PR description, then ready.
+PR #23 (item 3's first part) is ready for the owner's merge
+(2026-11-19): 5 end-to-end runs in a row passed in the tart VM, CI is
+green, every round reviewed. The end-to-end tests are a manual step
+(`scripts/end-to-end-setup` once, then `scripts/end-to-end-test`); the
+architect runs them before marking a PR ready that touches the recorder
+or the driver, and records the result in its description (D67). After
+the merge, start a fresh session.
 Then, one PR each: item 23, the Resolve timeline (after the owner's
 test import of the spike `.otio` files, instructions in the session of
 2026-11-19, remade if gone); item 21, the meters (design signed off);
