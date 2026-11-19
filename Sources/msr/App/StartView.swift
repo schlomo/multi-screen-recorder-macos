@@ -46,13 +46,40 @@ struct StartView: View {
     }
 }
 
+/// The slim light frame around the icon's graphite tile in dark mode, where
+/// the tile has almost no edge against the window: the tile's shape in
+/// `assets/icon/app-icon.svg`, scaled to the icon's size.
+struct IconTileFrame {
+    static let viewBox = 372.82
+    static let tileSize = 300.0
+    static let tileCornerRadius = 67.0
+
+    let iconSize: Double
+    let lineWidth = 1.0
+    let opacity = 0.25
+
+    var inset: Double { (Self.viewBox - Self.tileSize) / 2 * iconSize / Self.viewBox }
+    var cornerRadius: Double { Self.tileCornerRadius * iconSize / Self.viewBox }
+}
+
 /// The app icon, the name, the version and the homepage, and the tagline.
 struct AppHeader: View {
+    private static let iconSize = 48.0
+    private let tileFrame = IconTileFrame(iconSize: iconSize)
+    @Environment(\.colorScheme) private var colorScheme
+
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
             Image(nsImage: NSApp.applicationIconImage)
                 .resizable()
-                .frame(width: 48, height: 48)
+                .frame(width: Self.iconSize, height: Self.iconSize)
+                .overlay {
+                    if colorScheme == .dark {
+                        RoundedRectangle(cornerRadius: tileFrame.cornerRadius)
+                            .stroke(.white.opacity(tileFrame.opacity), lineWidth: tileFrame.lineWidth)
+                            .padding(tileFrame.inset)
+                    }
+                }
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 2) {
                 Text("Multi Screen Recorder").font(.title2.bold())
@@ -187,7 +214,9 @@ struct WhatWillBeRecordedView: View {
                     .background(.quaternary.opacity(0.5))
                 Divider()
                 ForEach(Array(section.screenRows.enumerated()), id: \.offset) { index, screenRow in
-                    row(screenRow).background(stripe(index))
+                    row(screenRow)
+                        .foregroundStyle(screenRow.isRecorded ? .primary : .tertiary)
+                        .background(stripe(index))
                 }
                 if !section.screenRows.isEmpty { Divider() }
                 ForEach(Array(section.audioRows.enumerated()), id: \.offset) { index, audioRow in

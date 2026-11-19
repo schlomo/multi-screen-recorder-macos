@@ -242,6 +242,16 @@ whole file) and the sound the correction added as
 The maximum box a screen's looks-like size is shrunk to fit: 4K,
 1440p, 1200p, 1080p or 720p, turned upright for a portrait screen, or
 Native, which has no box. It never enlarges the picture (D11, D25, D44).
+Or None (`none`), first on the slider, which records no screen: audio
+only (D62). Said in full, "the recording resolution None", as the audio
+mode has a None of its own.
+
+## Audio only
+
+A recording at the recording resolution None: its audio files and
+`recording.json`, no screen file and so no guide track. The screens are
+not recorded; a recording that would record neither a screen nor any
+audio source does not pass the ready check (D62).
 
 ## Native
 
@@ -261,16 +271,18 @@ looks-like size; a column of the table. Never recorded (D44).
 ## Not recorded
 
 A source the settings or its own state leave out of a recording: shown
-dimmed in the window, with `-` for GB/h max, and, for an audio input
-whose own rule leaves it out, the reason in parentheses after its name
-(`(virtual)`, `(no device ID)`; D59).
+dimmed in the window, without a number, with `-` for GB/h max (and for
+Records at, for a screen at the recording resolution None), and, for an
+audio input whose own rule leaves it out, the reason in parentheses
+after its name (`(virtual)`, `(no device ID)`; D59, D62).
 
 ## Ready check
 
-The check before Start: the permissions, the screens (at least one,
-each readable), the chosen audio sources, the output folder (created
-if missing, and written to), and free disk space there for the
-required recording hours (D14, D28).
+The check before Start: the permissions the recording needs, the
+screens (at least one, each readable; at the recording resolution None
+only with the system audio, which needs a main screen), the chosen audio sources, that something is recorded at all,
+the output folder (created if missing, and written to), and free disk
+space there for the required recording hours (D14, D28, D62).
 
 ## Required recording hours
 

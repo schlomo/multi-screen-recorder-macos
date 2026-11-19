@@ -5,7 +5,8 @@ import Foundation
 /// manifest (recorder.md, "Screens coming and going", "Frame size",
 /// "Screen check"). It holds no stream and no file: the recorder carries
 /// out its actions and reports back what happened. Times are nanoseconds
-/// from t0 on the shared clock.
+/// from t0 on the shared clock. At the recording resolution None it follows no
+/// screen: audio only.
 public struct ScreenTracker: Sendable {
     /// Why a screen file ends.
     public enum Ending: Equatable, Sendable {
@@ -104,6 +105,7 @@ public struct ScreenTracker: Sendable {
     /// The screens connected at the start: each gets its stream at once.
     /// Screen 1 is the main screen, the others are numbered left to right.
     public mutating func begin(_ connected: [ConnectedScreen], at now: Int64) -> Step {
+        let connected = followed(connected)
         for screen in connected {
             screens[screen.uuid] = Tracked(
                 name: screen.name, reading: screen, changedAt: Int64.min / 2, restartDelay: firstRestartDelay)
@@ -125,6 +127,7 @@ public struct ScreenTracker: Sendable {
     /// went or started mirroring ends its file at once; one that came, came
     /// back or changed starts after the settle time (`due(at:)`).
     public mutating func observe(_ connected: [ConnectedScreen], at now: Int64) -> Step {
+        let connected = followed(connected)
         var step = Step()
         let byUUID = Dictionary(connected.map { ($0.uuid, $0) }, uniquingKeysWith: { first, _ in first })
         for (uuid, tracked) in screens.sorted(by: { $0.key < $1.key }) where tracked.reading != nil && byUUID[uuid] == nil {
@@ -315,6 +318,11 @@ public struct ScreenTracker: Sendable {
     }
 
     // MARK: -
+
+    /// The screens the tracker follows: none at the recording resolution None.
+    private func followed(_ connected: [ConnectedScreen]) -> [ConnectedScreen] {
+        resolution.recordsScreens ? connected : []
+    }
 
     private mutating func start(_ uuid: String, at now: Int64) -> Action {
         var tracked = screens[uuid]!

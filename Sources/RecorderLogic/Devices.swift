@@ -108,6 +108,15 @@ public func audioInputsToJudge(
     }
 }
 
+/// The screens a recording with these settings is judged by: at the
+/// recording resolution None an empty list, whether or not the screens can be read,
+/// as none of them is recorded; otherwise `screens` as they are.
+public func screensToJudge<Failure: Error>(
+    _ screens: Result<[ScreenInfo], Failure>, settings: Settings
+) -> Result<[ScreenInfo], Failure> {
+    settings.effectiveResolution.recordsScreens ? screens : .success([])
+}
+
 /// The text `msr list` prints: the table of what will be recorded, as `msr check` prints it, and
 /// whether the system audio can be recorded by the program running `msr`.
 public func renderList(

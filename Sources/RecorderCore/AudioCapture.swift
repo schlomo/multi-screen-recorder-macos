@@ -88,7 +88,8 @@ extension AudioFileWriter: AudioFileWriting {}
 /// One audio source's capture and its audio files: buffers are resampled
 /// to follow the shared clock by `ClockDriftCorrection`, and its corrected
 /// audio placed on the tick grid by `AudioFileTimeline`, written by an
-/// `AudioFileWriting`, and handed to the source's guide track. A gap over
+/// `AudioFileWriting` in appends of about 100 ms
+/// (`audioFileAppendSamples`), and handed to the source's guide track. A gap over
 /// the longest filled gap or a change of the channel count ends the file
 /// and starts a new one, in the same capture. Everything runs on its own queue.
 final class AudioCapture: @unchecked Sendable {
@@ -148,10 +149,50 @@ final class AudioCapture: @unchecked Sendable {
         var entry: RecordingManifest.AudioFile
         /// Silence or samples waiting for the writer, in order.
         var waiting: [(chunk: Chunk, position: Int64)] = []
+        /// Samples gathered for the next append, after the waiting ones, from `gatheredPosition` on.
+        private var gathered: [[Float]] = []
+        private var gatheredPosition: Int64 = 0
         /// The end of what the writer took, in samples from the file's first tick.
         var written: Int64 = 0
 
-        var waitingSamples: Int64 { waiting.reduce(0) { $0 + $1.chunk.count } }
+        init(writer: any AudioFileWriting, entry: RecordingManifest.AudioFile) {
+            self.writer = writer
+            self.entry = entry
+        }
+
+        var gatheredSamples: Int64 { Int64(gathered.first?.count ?? 0) }
+
+        /// Everything not taken by the writer yet, gathered samples included.
+        var waitingSamples: Int64 { waiting.reduce(gatheredSamples) { $0 + $1.chunk.count } }
+
+        /// Samples join the gathered ones, which they follow without a gap.
+        mutating func gather(_ channels: [[Float]], at position: Int64) {
+            if gathered.isEmpty {
+                gathered = channels
+                gatheredPosition = position
+            } else {
+                for index in gathered.indices { gathered[index].append(contentsOf: channels[index]) }
+            }
+        }
+
+        /// Silence waits after the samples gathered before it.
+        mutating func addSilence(_ count: Int64, at position: Int64) {
+            closeGathered()
+            waiting.append((.silence(count), position))
+        }
+
+        /// The gathered samples wait for the writer as one append.
+        mutating func closeGathered() {
+            guard !gathered.isEmpty else { return }
+            waiting.append((.samples(gathered), gatheredPosition))
+            gathered = []
+        }
+
+        /// Nothing is written any more: what waits and what was gathered is dropped.
+        mutating func dropWaiting() {
+            waiting = []
+            gathered = []
+        }
 
         /// Hands the waiting chunks to the writer while it takes them.
         mutating func write() throws(AudioFileWriterError) {
@@ -297,8 +338,8 @@ final class AudioCapture: @unchecked Sendable {
         if open == nil {
             guard openFile(firstTick: timeline!.firstTick!) else { return }
         }
-        if silence > 0 { open!.waiting.append((.silence(silence), position - silence)) }
-        open!.waiting.append((.samples(firstSample == 0 ? channels : channels.map { Array($0[firstSample...]) }), position))
+        if silence > 0 { open!.addSilence(silence, at: position - silence) }
+        open!.gather(firstSample == 0 ? channels : channels.map { Array($0[firstSample...]) }, at: position)
         writeWaiting()
     }
 
@@ -321,7 +362,11 @@ final class AudioCapture: @unchecked Sendable {
         return event
     }
 
+    /// Once about 100 ms are gathered, or silence waits, the writer gets what waits.
     private func writeWaiting() {
+        if let gathered = open?.gatheredSamples, gathered >= Int64(RecorderValues.audioFileAppendSamples) {
+            open?.closeGathered()
+        }
         do {
             try open?.write()
         } catch {
@@ -334,7 +379,7 @@ final class AudioCapture: @unchecked Sendable {
     }
 
     private func fail(_ error: AudioFileWriterError) {
-        open?.waiting = []
+        open?.dropWaiting()
         end(error.isDiskFull ? .diskFull : .writerFailed(error.description), keepTail: false)
     }
 
@@ -380,6 +425,7 @@ final class AudioCapture: @unchecked Sendable {
         finishing.append(Task {
             // No longer open: only this task uses the writer from here on.
             var file = file
+            file.closeGathered()
             var (failure, lost) = await Self.drain(&file, timeout: drainTimeout, name: name)
             var entry = file.entry
             do throws(AudioFileWriterError) {
@@ -408,13 +454,13 @@ final class AudioCapture: @unchecked Sendable {
             do {
                 try file.write()
             } catch {
-                file.waiting = []
+                file.dropWaiting()
                 return (error, 0)
             }
             let left = file.waitingSamples
             if left == 0 { return (nil, 0) }
             if clock.now >= deadline {
-                file.waiting = []
+                file.dropWaiting()
                 let seconds = Double(left) / Double(RecorderValues.audioSampleRate)
                 let error = AudioFileWriterError(nil, while: "the writer took none of the last \(left) samples ("
                     + String(format: "%.3f", seconds) + " s) of \(name) within \(timeout); they are lost")

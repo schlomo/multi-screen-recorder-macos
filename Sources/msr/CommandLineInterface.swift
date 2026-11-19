@@ -20,7 +20,7 @@ struct SettingsFlags: ParsableArguments {
     @Flag(help: "Auto mode for this run, whatever the settings file says: every screen at Native, the audio mode Wired. Not with --resolution or --audio-mode.")
     var auto = false
 
-    @Option(help: "Recording resolution: native, 4k, 1440p, 1200p, 1080p or 720p. Turns auto mode off for this run.")
+    @Option(help: "Recording resolution: native, 4k, 1440p, 1200p, 1080p, 720p or none (audio only: no screen is recorded). Turns auto mode off for this run.")
     var resolution: String?
 
     @Option(help: "Audio mode: none, default-microphone, wired or all-inputs. Turns auto mode off for this run.")

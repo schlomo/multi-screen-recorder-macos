@@ -33,6 +33,10 @@ public final class Recorder {
     public let folder: URL
     private let context: RecordingContext
     private let settings: Settings
+    /// Whether the recording reads the screens: for screen files and for the
+    /// system audio, which follows the main screen. Audio only without the
+    /// system audio never reads them, so no screen fails a microphone recording.
+    private let readsScreens: Bool
     private weak var observer: (any RecorderObserver)?
     private var manifest: RecordingManifest
     private var tracker: ScreenTracker
@@ -68,9 +72,10 @@ public final class Recorder {
 
     /// Starts a recording into a new recording folder in the settings' output folder.
     public init(settings: Settings, homeFolder: URL, app: String, observer: any RecorderObserver) throws(RecorderStartError) {
+        let readsScreens = ReadyCheck.needsScreenRecording(settings)
         let screens: [ConnectedScreen]
         do {
-            screens = try connectedScreens()
+            screens = readsScreens ? try connectedScreens() : []
         } catch {
             throw RecorderStartError(description: "The screens cannot be read: \(error)")
         }
@@ -89,6 +94,7 @@ public final class Recorder {
         }
         context = RecordingContext(folder: folder, started: started, timeZone: timeZone, clock: SharedClock(reading: reading), app: app)
         self.settings = settings
+        self.readsScreens = readsScreens
         self.observer = observer
         manifest = RecordingManifest(app: app, started: started, timeZone: timeZone, settings: settings)
         tracker = ScreenTracker(resolution: settings.effectiveResolution)
@@ -230,7 +236,9 @@ public final class Recorder {
     // MARK: Screen changes
 
     private func registerForChanges() {
-        CGDisplayRegisterReconfigurationCallback(screenReconfigured, Unmanaged.passUnretained(self).toOpaque())
+        if readsScreens {
+            CGDisplayRegisterReconfigurationCallback(screenReconfigured, Unmanaged.passUnretained(self).toOpaque())
+        }
         let center = NSWorkspace.shared.notificationCenter
         notificationTokens = [
             center.addObserver(forName: NSWorkspace.willSleepNotification, object: nil, queue: .main) { [weak self] _ in
@@ -248,7 +256,9 @@ public final class Recorder {
     }
 
     private func unregisterForChanges() {
-        CGDisplayRemoveReconfigurationCallback(screenReconfigured, Unmanaged.passUnretained(self).toOpaque())
+        if readsScreens {
+            CGDisplayRemoveReconfigurationCallback(screenReconfigured, Unmanaged.passUnretained(self).toOpaque())
+        }
         for token in notificationTokens { NSWorkspace.shared.notificationCenter.removeObserver(token) }
         notificationTokens = []
         audioWatch?.cancel()
@@ -317,6 +327,11 @@ public final class Recorder {
     private func didWake() {
         guard !isStopped else { return }
         context.rereadClocks()
+        guard readsScreens else {
+            apply(tracker.wake([], at: context.now()))
+            applyAudio(audioTracker.wake(readAudioInputs() ?? [], at: context.now()))
+            return
+        }
         guard let screens = readScreens() else { return }
         let step = tracker.wake(screens, at: context.now())
         context.update(screens, lastScreenChange: tracker.lastScreenChange)

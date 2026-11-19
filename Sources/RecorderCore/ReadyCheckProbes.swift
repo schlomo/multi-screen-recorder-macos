@@ -39,12 +39,13 @@ public struct ReadyCheckProbes: Sendable {
 }
 
 /// Runs the ready check's probes. The microphone permission is asked only
-/// when the recording records an audio input.
+/// when the recording records an audio input, the Screen & System Audio
+/// Recording permission only when it records a screen or the system audio.
 @concurrent
 public func probeReadyCheckFacts(
     proof: ScreenRecordingProof, settings: Settings, homeFolder: URL, probes: ReadyCheckProbes = .system
 ) async -> ReadyCheckFacts {
-    let screenRecording = await probes.screenRecording(proof)
+    let screenRecording = ReadyCheck.needsScreenRecording(settings) ? await probes.screenRecording(proof) : nil
     let audioInputs = probes.audioInputs()
     let microphoneGranted = ReadyCheck.recordsAudioInput(audioInputs, settings: settings)
         ? await probes.microphonePermission() : nil
