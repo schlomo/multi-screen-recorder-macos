@@ -1,14 +1,23 @@
-import AppKit
+import CoreText
 import EndToEndLogic
 import Foundation
 
-/// AppleScript run in this process: the driver's own Automation permission applies.
+/// AppleScript run by `osascript`, a process of its own: AppKit or NSAppleScript in the driver itself
+/// left it blind to the virtual screens that connect later (`CGDisplayCreateUUIDFromDisplayID` gave
+/// nil, tried 2026-11-19), as the note on modes in docs/troubleshooting.md says of a long-running process.
 enum AppleScript {
     static func run(_ source: String) throws {
-        guard let script = NSAppleScript(source: source) else { throw DriverError("AppleScript does not compile: \(source)") }
-        var error: NSDictionary?
-        script.executeAndReturnError(&error)
-        if let error { throw DriverError("AppleScript failed: \(error[NSAppleScript.errorMessage] ?? error)") }
+        let process = Process()
+        process.executableURL = URL(filePath: try Media.onPath("osascript"))
+        process.arguments = ["-e", source]
+        let errors = Pipe()
+        process.standardError = errors
+        try process.run()
+        let message = String(decoding: errors.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
+        process.waitUntilExit()
+        guard process.terminationStatus == 0 else {
+            throw DriverError("osascript failed (exit \(process.terminationStatus)): \(message.trimmingCharacters(in: .whitespacesAndNewlines))")
+        }
     }
 
     static func quoted(_ text: String) -> String {
@@ -104,8 +113,11 @@ extension Driver {
     /// column as wide as its content and the window as high as its rows.
     private func finderWindow(of recording: URL, appearance: Appearance, review: URL) throws {
         let names = try FileManager.default.contentsOfDirectory(atPath: recording.path)
-        let font = NSFont.systemFont(ofSize: 13)
-        let widest = names.map { NSAttributedString(string: $0, attributes: [.font: font]).size().width }.max() ?? 0
+        let font = CTFontCreateUIFontForLanguage(.system, 13, nil)!
+        let widest = names.map { name -> Double in
+            let line = CTLineCreateWithAttributedString(NSAttributedString(string: name, attributes: [kCTFontAttributeName as NSAttributedString.Key: font]))
+            return CTLineGetTypographicBounds(line, nil, nil, nil)
+        }.max() ?? 0
         let nameWidth = Int(widest.rounded(.up)) + 60
         let (left, top) = (30, 40)
         let right = left + nameWidth + 181 + 97 + 125 + 20

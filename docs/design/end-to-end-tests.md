@@ -156,16 +156,17 @@ it** (`scripts/end-to-end-setup`, with a 28 GB download), and the
 throwaway clones `msr-end-to-end-run-<pid>`, named after the process of
 the script that made them.
 
-1. Find them: `tart list` (State `running` or `stopped`); a `tart run`
-   process shows in `ps aux | grep "tart run"`.
+1. Find them: `tart list` (State `running` or `stopped`); a running
+   one has a `tart run --no-graphics msr-end-to-end-run-<pid>` process,
+   `pgrep -fl "tart run"`.
 2. Its IP address: `tart ip msr-end-to-end-run-<pid>` (waits with
    `--wait 60`).
 3. Get in: `ssh admin@<ip>` with the password `admin`, the image's
    published default login. See its screen: `open vnc://admin:admin@<ip>`
-   (macOS's Screen Sharing), or start a stopped clone with a window,
-   `tart run msr-end-to-end-run-<pid>`.
+   (macOS's Screen Sharing; the guest's port 5900 answers), or, for a
+   stopped clone, start it with a window: `tart run msr-end-to-end-run-<pid>`.
 4. Stop it: `tart stop msr-end-to-end-run-<pid>`; if it stays running,
-   end its process: `pkill -f "tart run msr-end-to-end-run-<pid>"`, and
+   end its process: `pkill -f "tart run .*msr-end-to-end-run-<pid>"`, and
    `pkill -9 -f ...` if that does not end it.
 5. Delete it: `tart delete msr-end-to-end-run-<pid>`. Deleting a clone
    frees what it wrote, not the image's 27 GB.
@@ -413,7 +414,8 @@ video from the e2e runs"):
     one frame per change, so about one a second), then the PNG right
     after it, then sends Stop (SIGINT) and waits for the recording's
     files. The video shows macOS's sharing indicator over the window's
-    traffic lights and the pointer; the video has no shadow.
+    traffic lights and the pointer; the video has no shadow, its margin is
+    black.
   - `app-finder-window-<appearance>.png`: a Finder window of the finished
     recording folder, driven through AppleScript: list view, no sidebar,
     no toolbar or status bar, Name, Date Modified, Size and Kind as wide
