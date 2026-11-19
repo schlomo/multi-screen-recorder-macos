@@ -84,7 +84,7 @@ struct SampleRecording {
                 .init(event: "screen disconnected", at: 11.24),
             ],
             playedAudioInputs: [.init(name: "BlackHole 2ch", uid: "BlackHole2ch_UID", channels: 2)],
-            timeTolerance: 0.5, settleTime: 1)
+            timeTolerance: 0.5, finalizeAllowance: 3, settleTime: 1)
     }
 
     func check(_ expectation: ManifestExpectation = expectation(), folder: [String]? = nil) -> ManifestCheck {
@@ -265,12 +265,34 @@ struct SampleRecording {
         #expect(sample.check().failures.contains("files are not in the order of their start"))
     }
 
-    @Test func aRecordingThatEndedTooEarlyOrTooLateFails() {
+    private func ranFailures(ended: String) -> [String] {
         var sample = SampleRecording()
-        sample.manifest["ended"] = "2026-11-19T08:27:30.000+01:00"
-        #expect(sample.check().failures.contains("the recording ran 8.3 s from started to ended, expected 17.0 s, to its stop"))
-        sample.manifest["ended"] = "2026-11-19T08:27:39.600+01:00"
-        #expect(sample.check().failures.contains("the recording ran 17.9 s from started to ended, expected 17.0 s, to its stop"))
+        sample.manifest["ended"] = ended
+        return sample.check().failures.filter { $0.hasPrefix("the recording ran") }
+    }
+
+    @Test func aRecordingEndsNotBeforeItsStopAndWithinTheFinalizeAllowanceAfterIt() {
+        // started 08:27:21.700, the stop at 17 s: from 16.5 s to 20 s.
+        #expect(ranFailures(ended: "2026-11-19T08:27:38.100+01:00") == [
+            "the recording ran 16.4 s from started to ended, expected 16.5 s to 20.0 s, from its stop to the finalize allowance after it",
+        ])
+        #expect(ranFailures(ended: "2026-11-19T08:27:38.300+01:00") == [])
+        #expect(ranFailures(ended: "2026-11-19T08:27:41.600+01:00") == [])
+        #expect(ranFailures(ended: "2026-11-19T08:27:41.800+01:00") == [
+            "the recording ran 20.1 s from started to ended, expected 16.5 s to 20.0 s, from its stop to the finalize allowance after it",
+        ])
+    }
+
+    @Test func aFileOfASourceWithoutEventsEndsWithinTheSameBounds() {
+        func endFailures(_ end: Double) -> [String] {
+            var sample = SampleRecording()
+            sample.files[1]["end"] = end
+            return sample.check().failures.filter { $0.contains(": ends at") }
+        }
+        #expect(endFailures(16.4) == ["2026-11-19 08.27.22 Audio 0 - System.mov: ends at 16.4 s, expected 16.5 s to 20.0 s, the stop"])
+        #expect(endFailures(16.6) == [])
+        #expect(endFailures(19.9) == [])
+        #expect(endFailures(20.1) == ["2026-11-19 08.27.22 Audio 0 - System.mov: ends at 20.1 s, expected 16.5 s to 20.0 s, the stop"])
     }
 
     @Test func aFileWithoutEventsRunsFromTheStartToTheStop() {
@@ -283,7 +305,7 @@ struct SampleRecording {
         let failures = sample.check().failures.filter { $0.contains(": starts at") || $0.contains(": ends at") }
         #expect(failures == [
             "2026-11-19 08.27.23 Screen 1 - DELL P3421W.mov: starts at 1.6 s, expected by 1.5 s, the settle time and the tolerance after the start",
-            "2026-11-19 08.27.22 Audio 0 - System.mov: ends at 12.0 s, expected 17.0 s, the stop",
+            "2026-11-19 08.27.22 Audio 0 - System.mov: ends at 12.0 s, expected 16.5 s to 20.0 s, the stop",
         ])
     }
 

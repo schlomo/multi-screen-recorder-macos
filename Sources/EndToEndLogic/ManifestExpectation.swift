@@ -84,6 +84,17 @@ public struct ManifestExpectation: Sendable {
     /// When the recording stopped, in seconds after its start: the
     /// duration, or when the driver sent the signal; for a kill, the kill.
     public var stoppedAt: Double
+
+    /// Whether a time at which the recording or a file ended is not before
+    /// the stop and within the finalize allowance after it.
+    func endsAtTheStop(_ seconds: Double) -> Bool {
+        seconds >= stoppedAt - timeTolerance && seconds <= stoppedAt + finalizeAllowance
+    }
+
+    /// The bounds of `endsAtTheStop`, for failure lines.
+    var stopBounds: String {
+        "\(ManifestCheck.seconds(stoppedAt - timeTolerance)) s to \(ManifestCheck.seconds(stoppedAt + finalizeAllowance)) s"
+    }
     /// The Mac's own screens when the run started: they take the first numbers.
     public var ownScreenCount: Int
     /// The name every virtual screen's name starts with.
@@ -94,6 +105,10 @@ public struct ManifestExpectation: Sendable {
     /// How far a time the recorder writes may be from the time the driver
     /// saw the change, in seconds, beyond the settle time.
     public var timeTolerance: Double
+    /// How long after the stop the recording may end, in seconds: `ended`
+    /// is written once every file is finalized, and the audio stops after
+    /// the screens (D51).
+    public var finalizeAllowance: Double
     /// How long a screen waits unchanged before its file starts.
     public var settleTime: Double
 
@@ -101,7 +116,7 @@ public struct ManifestExpectation: Sendable {
         app: String, settings: Settings, ending: Ending, stoppedAt: Double, ownScreenCount: Int,
         virtualScreenNamePrefix: String, virtualScreenFiles: [VirtualScreenFile] = [],
         virtualScreenEvents: [VirtualScreenEvent] = [], playedAudioInputs: [PlayedAudioInput] = [],
-        timeTolerance: Double, settleTime: Double
+        timeTolerance: Double, finalizeAllowance: Double, settleTime: Double
     ) {
         self.app = app
         self.settings = settings
@@ -113,6 +128,7 @@ public struct ManifestExpectation: Sendable {
         self.virtualScreenEvents = virtualScreenEvents
         self.playedAudioInputs = playedAudioInputs
         self.timeTolerance = timeTolerance
+        self.finalizeAllowance = finalizeAllowance
         self.settleTime = settleTime
     }
 }

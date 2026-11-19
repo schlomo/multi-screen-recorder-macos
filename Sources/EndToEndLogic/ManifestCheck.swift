@@ -55,6 +55,8 @@ public struct ManifestCheck {
     public private(set) var files: [ListedFile] = []
     /// The recording's start, in seconds of the local day.
     public private(set) var started: Double?
+    /// How long the recording ran from `started` to `ended`, when finalized.
+    public private(set) var ranFor: Double?
 
     /// Checks the manifest against the expectation and the names of the
     /// files in the recording folder, `recording.json` included.
@@ -89,8 +91,9 @@ public struct ManifestCheck {
             if let ended = manifest["ended"]?.string.flatMap(TimeOfDay.seconds(ofTimestamp:)) {
                 if let started {
                     let ran = TimeOfDay.difference(ended, started)
-                    if abs(ran - expectation.stoppedAt) > expectation.timeTolerance {
-                        fail("the recording ran \(Self.seconds(ran)) s from started to ended, expected \(Self.seconds(expectation.stoppedAt)) s, to its stop")
+                    ranFor = ran
+                    if !expectation.endsAtTheStop(ran) {
+                        fail("the recording ran \(Self.seconds(ran)) s from started to ended, expected \(expectation.stopBounds), from its stop to the finalize allowance after it")
                     }
                 }
             } else {
@@ -338,8 +341,8 @@ public struct ManifestCheck {
             if file.start > latestStart {
                 fail("\(file.name): starts at \(Self.seconds(file.start)) s, expected by \(Self.seconds(latestStart)) s, the settle time and the tolerance after the start")
             }
-            if expectation.ending == .finalized, let end = file.end, abs(end - expectation.stoppedAt) > expectation.timeTolerance {
-                fail("\(file.name): ends at \(Self.seconds(end)) s, expected \(Self.seconds(expectation.stoppedAt)) s, the stop")
+            if expectation.ending == .finalized, let end = file.end, !expectation.endsAtTheStop(end) {
+                fail("\(file.name): ends at \(Self.seconds(end)) s, expected \(expectation.stopBounds), the stop")
             }
         }
     }

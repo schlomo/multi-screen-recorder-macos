@@ -5,6 +5,10 @@ public enum EndToEndValues {
     /// How far a time in the manifest may be from when the driver saw the
     /// change happen, beyond the settle time, in seconds.
     public static let timeTolerance = 0.5
+    /// How long after the stop a recording and its files may end, in
+    /// seconds: finalizing every file comes first. Uncalibrated until the
+    /// pipeline's first run; each scenario prints its margin for that.
+    public static let finalizeAllowance = 3.0
     /// How long a screen waits unchanged before its file starts: the
     /// recorder's settle time (recorder.md), restated here, not read from
     /// the recorder's code.

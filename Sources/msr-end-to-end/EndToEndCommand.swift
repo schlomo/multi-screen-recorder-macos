@@ -73,6 +73,7 @@ struct Run: ParsableCommand {
                     for failure in failures { print("      \(failure)") }
                     print("      kept: \(folder.path)")
                 }
+                if let margin = driver.margin { print("      margin: \(margin)") }
             } catch {
                 stopped = error
                 print("STOP  \(scenario.name): \(error); kept: \(scratchFolder.appending(path: scenario.name).path)")
@@ -124,6 +125,8 @@ struct Restore: ParsableCommand {
     var keepRestoreFile = false
 
     func run() throws {
+        // A Ctrl-C meant for the driver must never cut a restore short.
+        signal(SIGINT, SIG_IGN)
         let restorer = Restorer(scratch: try EndToEndCommand.scratchFolder(scratch.scratchFolder))
         guard restorer.exists else {
             print("restore: no restore file, nothing to restore (\(restorer.file.path))")

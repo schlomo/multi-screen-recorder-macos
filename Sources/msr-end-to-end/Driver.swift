@@ -17,6 +17,9 @@ final class Driver {
     /// `msr version`'s line: the manifest's `app` is the name and it.
     let version: String
     private var screens: [UInt32: (process: ChildProcess, uuid: String)] = [:]
+    /// The last finalized scenario's margins past its stop, for calibrating
+    /// the finalize allowance.
+    private(set) var margin: String?
 
     init(app: URL, scratch: URL, restorer: Restorer, media: Media) throws {
         msr = app.appending(path: "Contents/MacOS/msr")
@@ -59,6 +62,7 @@ final class Driver {
 
     /// One scenario: its failures, one line each.
     func run(_ scenario: Scenario) throws -> [String] {
+        margin = nil
         let folder = scratch.appending(path: scenario.name)
         try? FileManager.default.removeItem(at: folder)
         let home = folder.appending(path: "home")
@@ -195,10 +199,16 @@ final class Driver {
             virtualScreenFiles: virtual.files, virtualScreenEvents: virtual.events,
             playedAudioInputs: scenario.playsTone
                 ? [.init(name: Machine.loopbackName, uid: Machine.loopbackUID, channels: 2)] : [],
-            timeTolerance: EndToEndValues.timeTolerance, settleTime: EndToEndValues.settleTime)
+            timeTolerance: EndToEndValues.timeTolerance, finalizeAllowance: EndToEndValues.finalizeAllowance,
+            settleTime: EndToEndValues.settleTime)
         let names = try FileManager.default.contentsOfDirectory(atPath: folder.path)
         let check = ManifestCheck(manifest: manifest, folder: names, expectation: expectation)
         failures += check.failures
+        if let ranFor = check.ranFor {
+            let latestEnd = check.files.compactMap(\.end).max()
+            margin = "ended − started − stop \(Self.signed(ranFor - stopped)) s, latest file end − stop "
+                + (latestEnd.map { "\(Self.signed($0 - stopped)) s" } ?? "none")
+        }
 
         var probed: [String: ProbedFile] = [:]
         for file in check.files {
@@ -238,6 +248,7 @@ final class Driver {
         var played: [ToneCheck.Track] = []
         var mixed: [ToneCheck.Track] = []
         for file in files {
+            try interruption.check()
             switch file.source {
             case .audioInput(let uid, _, _) where uid == Machine.loopbackUID:
                 played += try tracks(file) { _ in true }
@@ -249,6 +260,8 @@ final class Driver {
         }
         return ToneCheck.failures(played: played, mixed: mixed)
     }
+
+    static func signed(_ seconds: Double) -> String { String(format: "%+.2f", seconds) }
 
     static func date(_ timestamp: String) -> Date? {
         let formatter = ISO8601DateFormatter()

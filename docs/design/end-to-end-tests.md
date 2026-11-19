@@ -164,8 +164,11 @@ written to the millisecond after the timecode is taken), the guide
 tracks, no failure event, the played audio input and the system audio
 once; the recording ran from `started` to `ended` as long as the
 driver let it, and each file of a source no event names, the played
-audio input among them, starts within the settle time of the start and
-ends at the stop),
+audio input among them, starts within the settle time of the start;
+both end not before the stop and at most a finalize allowance of 3 s
+after it, as `ended` follows the finalizing of every file; each
+scenario prints that margin, so the pipeline's runs calibrate the
+allowance),
 and every file through `ffprobe` and `ffmpeg`: it decodes without an
 error, its timecode track, its tracks and their names, the video's
 codec, frame size and 30 frames for each second of its length, an audio
