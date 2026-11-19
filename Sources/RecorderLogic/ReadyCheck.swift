@@ -4,8 +4,7 @@ import Foundation
 public enum PermissionProbe: Equatable, Sendable {
     case granted
     case notGranted
-    /// Granted, but the proof failed, for the given reason.
-    /// The error detail's text.
+    /// Granted, but the proof failed, for the given reason: the error detail's text.
     case failed(String)
 }
 
