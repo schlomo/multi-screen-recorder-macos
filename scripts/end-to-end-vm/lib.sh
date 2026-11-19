@@ -59,6 +59,8 @@ vm_stop() {
         guest sync
         # A VM that is still starting is not yet running for tart stop: end its process instead.
         tart stop --timeout 60 "$vm_booted" || kill "$vm_pid"
+        for _ in $(seq 15); do kill -0 "$vm_pid" 2>/dev/null || break; sleep 1; done
+        if kill -0 "$vm_pid" 2>/dev/null; then kill -9 "$vm_pid"; fi
         wait "$vm_pid" || true
     fi
     vm_pid=""

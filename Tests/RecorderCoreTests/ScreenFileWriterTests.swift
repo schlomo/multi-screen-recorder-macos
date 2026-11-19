@@ -244,6 +244,16 @@ private final class CollectingFile: RecordingLogFile {
         #expect(told == "primaries ITU_R_709_2 → P3_D65")
     }
 
+    @Test func aChangeOfOnlyTheICCProfileBytesIsTold() throws {
+        let before = try frame(brightness: 90)
+        let after = try frame(brightness: 90)
+        CVBufferSetAttachment(before, kCVImageBufferICCProfileKey, Data([1, 2, 3, 4]) as CFData, .shouldPropagate)
+        CVBufferSetAttachment(after, kCVImageBufferICCProfileKey, Data([1, 2, 3, 5]) as CFData, .shouldPropagate)
+        #expect(FrameKey(before, info: [:], screenCheck: "passes") != FrameKey(after, info: [:], screenCheck: "passes"))
+        let told = try #require(FrameFacts(after, info: [:]).changes(from: FrameFacts(before, info: [:])))
+        #expect(told.hasPrefix("ICC profile attached (4 bytes, checksum "), "\(told)")
+    }
+
     @Test func aFrameTellsItsFacts() throws {
         let facts = FrameFacts(try frame(brightness: 90), info: [:])
         #expect(facts.text == "320×180 420v, primaries ITU_R_709_2, transfer function ITU_R_709_2, matrix ITU_R_709_2, "

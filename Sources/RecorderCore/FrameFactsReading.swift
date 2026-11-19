@@ -20,9 +20,18 @@ extension FrameFacts {
             primaries: attachment(kCVImageBufferColorPrimariesKey),
             transferFunction: attachment(kCVImageBufferTransferFunctionKey),
             yCbCrMatrix: attachment(kCVImageBufferYCbCrMatrixKey),
-            iccProfile: CVBufferCopyAttachment(pixelBuffer, kCVImageBufferICCProfileKey, nil) == nil ? "none" : "attached",
+            iccProfile: Self.iccProfileText(CVBufferCopyAttachment(pixelBuffer, kCVImageBufferICCProfileKey, nil)),
             contentRect: rect.map { "(\(Self.number($0.origin.x)),\(Self.number($0.origin.y)),\(Self.number($0.width)),\(Self.number($0.height)))" },
             scaleFactor: (info[.scaleFactor] as? NSNumber)?.doubleValue, screenCheck: screenCheck)
+    }
+
+    /// "none", or "attached (<bytes> bytes, checksum <FNV-1a>)": a profile whose bytes change is a change.
+    private static func iccProfileText(_ profile: CFTypeRef?) -> String {
+        guard let profile else { return "none" }
+        guard CFGetTypeID(profile) == CFDataGetTypeID() else { return "attached" }
+        let data = profile as! CFData as Data
+        let checksum = data.reduce(UInt32(2166136261)) { ($0 ^ UInt32($1)) &* 16777619 }
+        return "attached (\(data.count) bytes, checksum \(String(checksum, radix: 16)))"
     }
 
     private static func number(_ value: CGFloat) -> String {

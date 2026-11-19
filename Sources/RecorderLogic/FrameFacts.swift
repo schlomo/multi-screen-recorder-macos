@@ -12,7 +12,7 @@ public struct FrameFacts: Equatable, Sendable {
     public var primaries: String
     public var transferFunction: String
     public var yCbCrMatrix: String
-    /// "attached" or "none": whether the pixel buffer carries an ICC profile.
+    /// "none", or "attached" with the profile's size and checksum: whether the pixel buffer carries an ICC profile, and which.
     public var iccProfile: String
     /// The frame info's content rect, "(x,y,w,h)"; nil when the frame has none.
     public var contentRect: String?

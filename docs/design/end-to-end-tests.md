@@ -113,7 +113,7 @@ pipeline.
 
 ### Running them
 
-Once, `brew install tart packer` and `scripts/end-to-end-setup`: it
+Once, `brew install openai/tools/tart hashicorp/tap/packer` and `scripts/end-to-end-setup`: it
 clones Cirrus Labs' `macos-tahoe-vanilla` image to the VM
 `msr-end-to-end` (50 GB disk, 27 GB used, 4 CPUs, 8 GB memory), disables
 SIP through Recovery with Packer's `tart-cli` template
