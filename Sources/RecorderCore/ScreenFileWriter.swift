@@ -1,5 +1,6 @@
 import AVFoundation
 import CoreMedia
+import IOSurface
 import RecorderLogic
 import VideoToolbox
 
@@ -40,6 +41,12 @@ public final class ScreenFileWriter: ScreenFileWriting {
     private let adaptor: AVAssetWriterInputPixelBufferAdaptor
     private let timecodeTrack: TimecodeTrack
     private var wroteTimecode = false
+    private var appends: InputAppends
+    private var failureTold = false
+    /// The last buffer handed to the adaptor, and whether it was the one before again.
+    private var lastBuffer: CVPixelBuffer?
+    private var lastBufferWasRepeat = false
+    private var wasReady: Bool?
     private let guides: [GuideTrack: (track: AVAssetWriterInput, pcm: CMAudioFormatDescription)]
 
     public init(
@@ -60,7 +67,8 @@ public final class ScreenFileWriter: ScreenFileWriting {
         writer.shouldOptimizeForNetworkUse = false
         writer.metadata = movieMetadataItems(metadata.items)
 
-        video = AVAssetWriterInput(mediaType: .video, outputSettings: Self.videoSettings(frameSize, grid: grid))
+        let settings = Self.videoSettings(frameSize, grid: grid)
+        video = AVAssetWriterInput(mediaType: .video, outputSettings: settings)
         video.expectsMediaDataInRealTime = true
         video.metadata = [trackNameItem(metadata.reelName)]
         adaptor = AVAssetWriterInputPixelBufferAdaptor(assetWriterInput: video, sourcePixelBufferAttributes: nil)
@@ -75,6 +83,7 @@ public final class ScreenFileWriter: ScreenFileWriting {
             throw ScreenFileWriterError(nil, while: error.description)
         }
         self.guides = guides
+        appends = InputAppends(inputs: [Self.videoName] + guideTracks.map(Self.name(of:)) + [Self.timecodeName])
 
         let guideInputs = guideTracks.compactMap { guides[$0]?.0 }
         guard writer.canAdd(video), writer.canAdd(timecodeTrack.input), guideInputs.allSatisfy(writer.canAdd) else {
@@ -88,7 +97,33 @@ public final class ScreenFileWriter: ScreenFileWriting {
             throw ScreenFileWriterError(writer.error, while: "cannot start writing \(url.lastPathComponent)")
         }
         writer.startSession(atSourceTime: time(ofTick: firstTick))
+        RecorderLog.detail("video settings of \(url.lastPathComponent): \(SettingsText.text(settings))", category: Self.detailCategory)
+        RecorderLog.detail(Self.encoderList(), category: Self.detailCategory)
     }
+
+    /// The encoders VideoToolbox lists for HEVC.
+    private static func encoderList() -> String {
+        var list: CFArray?
+        let status = VTCopyVideoEncoderList(nil, &list)
+        guard status == noErr, let entries = list as? [[String: Any]] else {
+            return "video encoders cannot be listed (error \(ErrorDetail.codeText(Int(status))))"
+        }
+        let encoders = entries
+            .filter { ($0[kVTVideoEncoderList_CodecType as String] as? NSNumber)?.uint32Value == kCMVideoCodecType_HEVC }
+            .map {
+                EncoderListText.Encoder(
+                    name: $0[kVTVideoEncoderList_EncoderName as String] as? String ?? "unnamed",
+                    id: $0[kVTVideoEncoderList_EncoderID as String] as? String ?? "no ID",
+                    isHardwareAccelerated: ($0[kVTVideoEncoderList_IsHardwareAccelerated as String] as? Bool) ?? false)
+            }
+        return EncoderListText.text(codec: FrameFacts.fourCharacterCode(kCMVideoCodecType_HEVC), encoders)
+    }
+
+    /// The category of the detail lines about the capture's frames and this writer's inputs (D66).
+    static let detailCategory = "capture"
+    private static let videoName = "video"
+    private static let timecodeName = "timecode"
+    private static func name(of guide: GuideTrack) -> String { "guide track \(guide.name)" }
 
     static func videoSettings(_ frameSize: FrameSize, grid: TickGrid) -> [String: Any] {
         [
@@ -119,7 +154,17 @@ public final class ScreenFileWriter: ScreenFileWriting {
     }
 
     /// Whether the writer takes another frame now.
-    public var isReady: Bool { video.isReadyForMoreMediaData && (wroteTimecode || timecodeTrack.input.isReadyForMoreMediaData) }
+    public var isReady: Bool {
+        let videoReady = video.isReadyForMoreMediaData
+        if videoReady != wasReady {
+            if wasReady != nil || !videoReady {
+                RecorderLog.detail("video input of \(url.lastPathComponent) ready for more media data: \(videoReady)",
+                                   category: Self.detailCategory)
+            }
+            wasReady = videoReady
+        }
+        return videoReady && (wroteTimecode || timecodeTrack.input.isReadyForMoreMediaData)
+    }
 
     /// Writes a tick's frame with exactly the tick's time and its timecode;
     /// false when the writer is not ready, so the tick waits.
@@ -134,12 +179,19 @@ public final class ScreenFileWriter: ScreenFileWriting {
             } catch {
                 throw ScreenFileWriterError(nil, while: error.description)
             }
-            guard wrote else { throw ScreenFileWriterError(writer.error, while: "cannot write \(url.lastPathComponent)") }
+            guard wrote else {
+                appends.refused(Self.timecodeName)
+                throw failed("cannot write \(url.lastPathComponent)")
+            }
+            appends.appended(Self.timecodeName, at: time(ofTick: firstTick).seconds)
         }
-        guard adaptor.append(pixelBuffer, withPresentationTime: time(ofTick: tick))
-        else {
-            throw ScreenFileWriterError(writer.error, while: "cannot write \(url.lastPathComponent)")
+        lastBufferWasRepeat = lastBuffer === pixelBuffer
+        lastBuffer = pixelBuffer
+        guard adaptor.append(pixelBuffer, withPresentationTime: time(ofTick: tick)) else {
+            appends.refused(Self.videoName)
+            throw failed("cannot write \(url.lastPathComponent)")
         }
+        appends.appended(Self.videoName, at: time(ofTick: tick).seconds)
         return true
     }
 
@@ -160,14 +212,46 @@ public final class ScreenFileWriter: ScreenFileWriting {
             throw ScreenFileWriterError(nil, while: error.description)
         }
         guard track.append(sample) else {
-            throw ScreenFileWriterError(writer.error, while: "cannot write \(url.lastPathComponent)")
+            appends.refused(Self.name(of: guide))
+            throw failed("cannot write \(url.lastPathComponent)")
         }
+        appends.appended(Self.name(of: guide), at: time.seconds)
         return true
     }
 
     private func checkStatus() throws(ScreenFileWriterError) {
-        if writer.status == .failed {
-            throw ScreenFileWriterError(writer.error, while: "cannot write \(url.lastPathComponent)")
+        if writer.status == .failed { throw failed("cannot write \(url.lastPathComponent)") }
+    }
+
+    /// The writer's error as the recorder's, with one detail line, the first time, on what
+    /// each input took (D66).
+    private func failed(_ doing: String) -> ScreenFileWriterError {
+        if !failureTold {
+            failureTold = true
+            let error = writer.error.map { ErrorDetail($0).text } ?? "none"
+            RecorderLog.detail(
+                "writer of \(url.lastPathComponent) failed: status \(Self.statusName(writer.status)), error \(error); \(appends.text); \(lastBufferText)",
+                category: Self.detailCategory)
+        }
+        return ScreenFileWriterError(writer.error, while: doing)
+    }
+
+    /// "last buffer 1600×900, IOSurface ID 4711, a repeat of the one before: no"
+    private var lastBufferText: String {
+        guard let lastBuffer else { return "no buffer was handed over" }
+        let surface = CVPixelBufferGetIOSurface(lastBuffer).map { "\(IOSurfaceGetID($0.takeUnretainedValue()))" } ?? "none"
+        return "last buffer \(CVPixelBufferGetWidth(lastBuffer))×\(CVPixelBufferGetHeight(lastBuffer)), IOSurface ID \(surface), "
+            + "a repeat of the one before: \(lastBufferWasRepeat ? "yes" : "no")"
+    }
+
+    private static func statusName(_ status: AVAssetWriter.Status) -> String {
+        switch status {
+        case .unknown: "unknown"
+        case .writing: "writing"
+        case .completed: "completed"
+        case .failed: "failed"
+        case .cancelled: "cancelled"
+        @unknown default: "\(status.rawValue)"
         }
     }
 
@@ -180,7 +264,7 @@ public final class ScreenFileWriter: ScreenFileWriting {
         if !wroteTimecode { timecodeTrack.input.markAsFinished() }
         await writer.finishWriting()
         if writer.status != .completed {
-            throw ScreenFileWriterError(writer.error, while: "cannot finalize \(url.lastPathComponent)")
+            throw failed("cannot finalize \(url.lastPathComponent)")
         }
     }
 }

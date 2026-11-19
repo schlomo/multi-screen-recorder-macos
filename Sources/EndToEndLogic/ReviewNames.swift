@@ -7,6 +7,8 @@ public enum ReviewNames {
     public static let contactSheet = "contact-sheet.png"
     public static let manifest = "recording.json"
     public static let recordingLog = "recording.log"
+    /// `msr record`'s standard error, as the driver captured it.
+    public static let standardError = "msr.err"
 
     /// A window's screenshot. Only the light appearance is taken: the app
     /// stays light with `AppleInterfaceStyle` set in its own defaults

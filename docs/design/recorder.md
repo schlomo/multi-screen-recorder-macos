@@ -1188,6 +1188,21 @@ the metadata items (see "Output on disk").
   file's end. A file ended by a failure (its writer failed or fell
   behind) gets no last mix, so its guide tracks may end early.
 
+**A failed file's end (D66).** A file whose writer failed is not
+finalized, and its entry in the recording manifest ends where the file
+really ends, not where the writer was last given a frame: after the
+file is closed the recorder reads its duration (`AVURLAsset`, loaded
+asynchronously), and the end is the file's start plus that duration. A
+problem on the file, `Screen file <name>` or `Audio file <name>`, says
+`the file ends at <t> s, the writer failed at <t> s: <n> s of the
+recording are lost`, with the times in seconds from the recording's
+start; no such problem when nothing is lost. A file that cannot be read
+at all ends at its start, and the problem says so with the read error.
+The failure's event and its problem stay at the failure's time, the end
+the writer was given. A file that is finalized, or ended without a
+writer failure (such as samples lost at the end of an audio file), keeps
+the end it had.
+
 **Screen identity.** A screen is known by the UUID macOS gives it
 (`CGDisplayCreateUUIDFromDisplayID`), never by its display ID, which
 changes when a screen comes back, nor by its name, which macOS may
@@ -1225,7 +1240,9 @@ again, only once the screen has been unchanged for the settle time,
 reconnect, or modes switched through quickly, so make no burst of
 short screen files. When a mode change gives a new frame size, the
 current screen file runs on through the settle time, with the picture
-scaled to the old frame size, and then ends; the stream is stopped and
+scaled to the old frame size (never observed: the code reads no
+buffer's size or format, and the `capture` detail lines of "Logging"
+show what the frames are), and then ends; the stream is stopped and
 a new one started at the new frame size, the same path as a reconnect
 (`updateConfiguration` is not used: never tried). The gap is the
 restart only. Target, checked by the end-to-end tests: a screen's file
@@ -1308,6 +1325,37 @@ also prints the detail lines on standard error, each as `detail
 recording runs, each line on standard error carries the time since its
 start as the event lines do, such as `detail recorder: +27.9s start
 Screen 3 - LG`.
+
+**Capture detail (D66).** The detail lines of category `capture` say
+what a screen capture and its writer saw, to root-cause a writer that
+fails on some Macs only (the hosted runner, about 2 of 7 runs, with
+`AVFoundationErrorDomain -11800` from `OSStatus -19092`):
+
+- Per screen capture, for every complete frame before its screen check
+  acts, the frame's facts: width × height of the pixel buffer, pixel
+  format as its four-character code, colour primaries, transfer
+  function and YCbCr matrix attachments, whether an ICC profile is
+  attached, ScreenCaptureKit's content rect and scale factor, and the
+  screen check's verdict. One line, `Screen 2 LG: first frame <facts>`,
+  at the first frame; after that one line `Screen 2 LG: frame changed:
+  <value was → now, …>` whenever any of them changes; never per frame.
+- Per screen file, at its start: the video output settings
+  (`video settings of <file>: {…}`) and the video encoders VideoToolbox
+  lists for HEVC with their hardware-accelerated flag.
+- Per screen file, when its video input's `isReadyForMoreMediaData`
+  changes (the first time only when not ready): `video input of <file>
+  ready for more media data: false`, and back.
+- Once, when a screen file's writer fails: `writer of <file> failed:
+  status <writer status>, error <error detail>; <per input: video, each
+  guide track, timecode: samples appended and the presentation time of
+  the last>; <the first input whose append returned false, or that none
+  did>; last buffer <w>×<h>, IOSurface ID <id>, a repeat of the one
+  before: yes or no` (the ticker appends the last passed frame again
+  when the screen shows no new one).
+
+A frame is never converted: its size and format go to the writer as
+they come, so a frame of a size other than the file's gets no check
+before the writer; the lines above are what tells whether that happens.
 
 **Recording log (D64).** Every recording, in the app and in `msr
 record`, with or without `--debug`, writes `recording.log` in its

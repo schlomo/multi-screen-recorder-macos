@@ -80,7 +80,9 @@ ready check, beyond the events and problems: the starting situation at
 the head of the recording log (the app, macOS and the Mac model, the
 effective settings, "What will be recorded" and the ready check), the
 tracker's actions, the screens as read, files started and ended, the
-ready check's facts, the clock drift block and the gaps. Always in the
+ready check's facts, the clock drift block and the gaps, and the
+`capture` lines about a screen capture's frames and its writer's inputs
+(D66). Always in the
 recording log, as `detail <category>: …`; with `--debug` also on
 standard error, except the starting situation, which `msr record` has
 printed already (D64).

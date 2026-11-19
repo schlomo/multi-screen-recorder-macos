@@ -2178,3 +2178,46 @@ architect's reading.
 - **Evidence:** [design/recorder.md](design/recorder.md), "Logging";
   `RepeatedFailuresTests`, `RecordOutputTests`, `CaptureEndReportsTests`,
   `AudioCaptureTests`, `AudioTrackerTests`.
+
+## D66: A failed file ends where it really ends; the capture's frames and writer are logged (2026-11-19)
+
+- **Status:** in force.
+- **Context:** The end-to-end scenario `virtual-screen` of PR #23 fails
+  on the hosted macOS runner in about 2 of 7 runs: about 0.25 s after a
+  new virtual screen's mode switch (1280×720 to 1600×900) the screen
+  file writer fails with `AVFoundationErrorDomain -11800` from `OSStatus
+  -19092`. The file keeps its first 2 s fragment and decodes, but
+  `recording.json` says it ends at 6.933 s while its content ends at
+  5.667 s; the owner's Mac shows 0 failures in 10 runs. The owner:
+  "PR23 must achieve good quality. Keep working on it and grinding
+  away", wanting it root-caused, not retried away. This round collects
+  evidence and fixes the one lie; it changes no capture behaviour.
+- **Decision:**
+  1. When a screen file's or an audio file's writer fails, the file's
+     end in `recording.json` is what the file holds: after the file is
+     closed its duration is read (`AVURLAsset`, loaded asynchronously)
+     and the end is the start plus that. A problem says how many
+     seconds were lost, from the real end to the failure's time. A file
+     that cannot be read ends at its start, and the problem says so.
+  2. The recording log gets detail lines of category `capture`: each
+     screen capture's frame facts (size, pixel format, colour
+     attachments, ICC profile, content rect, scale factor, the screen
+     check's verdict) at the first frame and at each change; per screen
+     file the video settings, the HEVC encoders VideoToolbox lists and
+     each change of the video input's readiness; and, when a writer
+     fails, what each of its inputs took, which append returned false
+     first and the last buffer's IOSurface ID and whether it was a
+     repeat.
+  3. A failed end-to-end scenario saves the system log of its time
+     (`logs/system.log`), the review artifact keeps every scenario's
+     `msr.err`, and a stress scenario, `virtual-screen-stress`, makes
+     the mode switch happen ten times; it is expected to fail on the
+     runner until the cause is found and fixed.
+- **Consequences:** a failed file's manifest entry is truthful; no
+  capture behaviour changed. The cause stays open: whether a
+  post-switch frame of the new size reaches a writer set to the old one
+  is logged, not yet fixed.
+- **Evidence:** [design/recorder.md](design/recorder.md), "Logging" and
+  "A failed file's end"; [design/end-to-end-tests.md](design/end-to-end-tests.md);
+  `FailedFileEndTests`, `FailedFileEndsTests`, `FrameFactsTests`,
+  `ScreenFileWriterTests`, `SystemLogTests`, `ScenarioTests`.

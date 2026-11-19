@@ -108,6 +108,8 @@ public final class ScreenCapture: NSObject, @unchecked Sendable, SCStreamOutput,
     // Confined to `queue`.
     private var stream: SCStream?
     private var check = ScreenCheck()
+    /// The last frame's facts, for the detail line of a change.
+    private var frameFacts: FrameFacts?
     private var ticker: ScreenFileTicker?
     private var timer: DispatchSourceTimer?
     /// No frame and no tick is taken any more.
@@ -219,9 +221,13 @@ public final class ScreenCapture: NSObject, @unchecked Sendable, SCStreamOutput,
         else { return }
         let capturedAt = context.clock.sinceStart(host: nanoseconds(machTicks: displayTime))
         let (bounds, lastChange) = context.bounds(of: uuid)
-        guard let bounds else { return }
-        switch check.judge(frameRect: ScreenRect(screenRect), screenBounds: bounds, capturedAt: capturedAt,
-                           lastScreenChange: lastChange) {
+        let verdict = bounds.map {
+            check.judge(frameRect: ScreenRect(screenRect), screenBounds: $0, capturedAt: capturedAt, lastScreenChange: lastChange)
+        }
+        // Told for every complete frame, before the verdict acts: a frame the check drops is no less a fact.
+        tellFrameFacts(FrameFacts(pixelBuffer, info: attachments, screenCheck: verdict.map(Self.text) ?? "no screen bounds yet"))
+        guard let verdict else { return }
+        switch verdict {
         case .passes:
             switch ticker.receive(pixelBuffer, capturedAt: capturedAt) {
             case .none: break
@@ -246,6 +252,26 @@ public final class ScreenCapture: NSObject, @unchecked Sendable, SCStreamOutput,
         case .showsAnotherScreen:
             end(.showsAnotherScreen)
         }
+    }
+
+    private static func text(_ verdict: ScreenCheck.Verdict) -> String {
+        switch verdict {
+        case .passes: "passes"
+        case .fails: "fails"
+        case .showsAnotherScreen: "shows another screen"
+        }
+    }
+
+    /// The first frame's facts, then each change of them: one detail line each (D66).
+    private func tellFrameFacts(_ facts: FrameFacts) {
+        defer { frameFacts = facts }
+        let label = "Screen \(number) \(name)"
+        guard let before = frameFacts else {
+            RecorderLog.detail("\(label): first frame \(facts.text)", category: ScreenFileWriter.detailCategory)
+            return
+        }
+        guard let changes = facts.changes(from: before) else { return }
+        RecorderLog.detail("\(label): frame changed: \(changes)", category: ScreenFileWriter.detailCategory)
     }
 
     public func stream(_ stream: SCStream, didStopWithError error: any Error) {
@@ -322,6 +348,6 @@ public final class ScreenCapture: NSObject, @unchecked Sendable, SCStreamOutput,
             self.guideListener = nil
             self.endingGuides = []
         }
-        return file
+        return await file?.readingItsFile(in: context.folder)
     }
 }

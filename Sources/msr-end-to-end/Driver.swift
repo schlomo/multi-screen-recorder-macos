@@ -70,8 +70,38 @@ final class Driver {
         }
     }
 
-    /// One scenario: its failures, one line each.
+    /// One scenario: its failures, one line each. A failed scenario also
+    /// saves the system log since its start (`SystemLog`); a system log
+    /// that cannot be saved is a failure line of its own.
     func run(_ scenario: Scenario) throws -> [String] {
+        let started = Date()
+        var failures = try runScenario(scenario)
+        if !failures.isEmpty {
+            do {
+                try saveSystemLog(since: started, to: scratch.appending(path: scenario.name).appending(path: "logs"))
+            } catch {
+                failures.append("the system log cannot be saved: \(error)")
+            }
+        }
+        return failures
+    }
+
+    /// `log show` since `date`, filtered to the video, media and display subsystems, into `system.log` of `logs`.
+    private func saveSystemLog(since date: Date, to logs: URL) throws {
+        let process = try ChildProcess(
+            executable: Media.onPath("log"), arguments: SystemLog.arguments(since: date),
+            environment: ProcessInfo.processInfo.environment, standardOutput: logs.appending(path: SystemLog.fileName),
+            standardError: logs.appending(path: "system-log.err"))
+        guard process.wait(seconds: 300, interrupted: { interruption.happened }) else {
+            process.signal(SIGKILL)
+            throw DriverError("log show did not end within 300 s")
+        }
+        guard process.exit == .exited(0) else {
+            throw DriverError("log show ended with \(process.exit.map { "\($0)" } ?? "no status"): \(process.errors())")
+        }
+    }
+
+    private func runScenario(_ scenario: Scenario) throws -> [String] {
         margin = nil
         eventWindows = []
         playbackBreaks = nil
@@ -96,7 +126,7 @@ final class Driver {
         environment["HOME"] = home.path
         let recorder = try ChildProcess(
             executable: msr.path, arguments: scenario.arguments(outputFolder: output.path), environment: environment,
-            standardOutput: logs.appending(path: "msr.out"), standardError: logs.appending(path: "msr.err"))
+            standardOutput: logs.appending(path: "msr.out"), standardError: logs.appending(path: ReviewNames.standardError))
         defer { disconnectAllScreens() }
         try restorer.started(recorder, stopSignal: SIGINT)
         defer {
@@ -177,7 +207,7 @@ final class Driver {
         if let recording = lastRecording {
             do {
                 try Review(scratch: scratch, scenario: scenario.name, media: media)
-                    .collect(recording: recording.folder, files: recording.files, probed: recording.probed,
+                    .collect(recording: recording.folder, logs: logs, files: recording.files, probed: recording.probed,
                              playsTone: scenario.playsTone)
             } catch {
                 failures.append("the review files cannot be made: \(error)")

@@ -6,7 +6,7 @@ import Testing
     @Test func theNamedScenariosHaveUniqueNamesAndTheirEventsInOrder() {
         let names = Scenario.named.map(\.name)
         #expect(Set(names).count == names.count)
-        #expect(names == ["plain-recording", "virtual-screen", "tone", "system-audio", "stop-by-ctrl-c", "stop-by-kill"])
+        #expect(names == ["plain-recording", "virtual-screen", "virtual-screen-stress", "tone", "system-audio", "stop-by-ctrl-c", "stop-by-kill"])
         for scenario in Scenario.named {
             #expect(scenario.events.map(\.at) == scenario.events.map(\.at).sorted())
             #expect(scenario.events.allSatisfy { $0.at < scenario.stopAt })
@@ -38,9 +38,22 @@ import Testing
         ])
     }
 
-    @Test func onlyTheVirtualScreenScenarioRecordsWithDebugDetail() {
-        // Its msr.err keeps the recorder's detail on the screens for a later look.
-        #expect(Scenario.named.filter { $0.flags.contains("--debug") }.map(\.name) == ["virtual-screen"])
+    @Test func onlyTheVirtualScreenScenariosRecordWithDebugDetail() {
+        // Their msr.err keeps the recorder's detail on the screens for a later look.
+        #expect(Scenario.named.filter { $0.flags.contains("--debug") }.map(\.name) == ["virtual-screen", "virtual-screen-stress"])
+    }
+
+    @Test func theStressScenarioSwitchesTenTimesAboutTwoSecondsApart() throws {
+        let stress = try #require(Scenario.named.first { $0.name == "virtual-screen-stress" })
+        let switches = stress.events.filter { if case .switchScreenMode = $0.event { true } else { false } }
+        #expect(switches.count == 10)
+        #expect(zip(switches, switches.dropFirst()).allSatisfy { $1.at - $0.at == 2 })
+        let sizes = switches.compactMap { entry -> ScreenSize? in
+            if case .switchScreenMode(_, let size) = entry.event { size } else { nil }
+        }
+        #expect(sizes.map(\.description) == Array(repeating: ["1600x900", "1280x720"], count: 5).flatMap { $0 })
+        #expect(stress.events.first.map { if case .connectScreen = $0.event { true } else { false } } == true)
+        #expect(stress.events.last.map { if case .disconnectScreen = $0.event { true } else { false } } == true)
     }
 
     @Test func everyRecordingHasACeilingSoAKilledDriverNeverLeavesItRunning() throws {

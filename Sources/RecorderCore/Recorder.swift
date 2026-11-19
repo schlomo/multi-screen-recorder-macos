@@ -444,6 +444,7 @@ public final class Recorder {
         if manifest != before { try? writeManifest() }
         told(Array(manifest.events.dropFirst(before.events.count)))
         if let problem = report?.problem { told(problem, ofAnEvent: report?.event != nil) }
+        if let lost = report?.lostProblem { told(lost) }
         // Both end paths may report the same end: said once.
         if let end, manifest.files != before.files {
             RecorderLog.detail("file ended: \(end.file.name), \(end.file.state.rawValue)", category: "recorder")
@@ -579,10 +580,14 @@ public final class Recorder {
         told(end.events)
         // At the file's end, so a lost end (`audio file writer fell behind`) is told once (D47).
         if end.error != nil || !end.events.isEmpty {
-            let at = Int64(((end.file.end ?? end.file.start) * 1_000_000_000).rounded())
+            let at = Int64((end.failureSeconds * 1_000_000_000).rounded())
             tell(RecordingProblem(at: at, problem: "Audio file \(end.file.name)",
                                   error: end.error?.detail ?? "its writer fell behind"),
                  kind: .audioFileFailed(end.file.name), ofAnEvent: end.toldByAnEvent)
+            if let lost = end.lost {
+                tell(RecordingProblem(at: at, problem: "Audio file \(end.file.name)", error: ErrorDetail(message: lost)),
+                     kind: .audioFileLost(end.file.name))
+            }
         }
     }
 

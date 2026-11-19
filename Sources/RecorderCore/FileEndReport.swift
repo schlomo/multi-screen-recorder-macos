@@ -8,6 +8,8 @@ import RecorderLogic
 struct FileEndReport: Equatable {
     var event: RecordingEvent?
     var problem: RecordingProblem?
+    /// What a failed file lacks of what its writer was given (D66); a problem of its own.
+    var lostProblem: RecordingProblem?
 
     /// The problem's text for guide tracks that end before the video.
     static func guideTracksCut(_ cuts: [GuideTrackCut]) -> String {
@@ -32,14 +34,17 @@ struct FileEndReport: Equatable {
         guard let error = fileError?.detail ?? reasonError else {
             if let end, !end.guideTracksCut.isEmpty {
                 problem = RecordingProblem(
-                    at: Int64(((end.file.end ?? end.file.start) * 1_000_000_000).rounded()), problem: "Screen file \(end.file.name)",
+                    at: Int64((end.failureSeconds * 1_000_000_000).rounded()), problem: "Screen file \(end.file.name)",
                     error: ErrorDetail(message: Self.guideTracksCut(end.guideTracksCut)))
             }
             return
         }
-        let time = end.map { Int64((($0.file.end ?? $0.file.start) * 1_000_000_000).rounded()) } ?? now
+        let time = end.map { Int64(($0.failureSeconds * 1_000_000_000).rounded()) } ?? now
         let what = if let end, fileError != nil { "Screen file \(end.file.name)" } else { "Screen \(screen)" }
         problem = RecordingProblem(at: time, problem: what, error: error)
+        if let end, let lost = end.lost {
+            lostProblem = RecordingProblem(at: time, problem: "Screen file \(end.file.name)", error: ErrorDetail(message: lost))
+        }
         let isDiskFull = reason == .diskFull || fileError?.isDiskFull == true
         var event = RecordingEvent(at: time, event: isDiskFull ? .diskFull : .screenFileWriterFailed, screen: screen)
         if !isDiskFull { event.errorDetail = error }
@@ -72,6 +77,7 @@ struct CaptureEndReports {
         guard report.event != nil || report.problem != nil, told.insert(captureNumber).inserted else { return nil }
         if let event = report.event { manifest.events.append(event) }
         if let problem = report.problem { manifest.problems.append(problem) }
+        if let lost = report.lostProblem { manifest.problems.append(lost) }
         return report
     }
 }

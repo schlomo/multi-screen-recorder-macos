@@ -2,8 +2,17 @@ import AVFoundation
 import CoreMedia
 import Foundation
 import RecorderLogic
+import Synchronization
 import Testing
 @testable import RecorderCore
+
+private final class CollectingFile: RecordingLogFile {
+    private let text = Mutex("")
+    var appended: String { text.withLock { $0 } }
+    func append(_ data: Data) throws { text.withLock { $0 += String(decoding: data, as: UTF8.self) } }
+    func synchronize() throws {}
+    func close() throws {}
+}
 
 /// Writes screen files from synthetic frames and reads them back with
 /// AVFoundation: no screen, no permission.
@@ -191,6 +200,46 @@ import Testing
 
     /// A file the process never finalized, as after a crash, is readable up
     /// to its last fragment of 2 s.
+    @Test func aWriterTellsItsVideoSettingsAndWhatItsInputsTookWhenItFails() async throws {
+        defer { removeScratch() }
+        let file = CollectingFile()
+        let log = RecordingLog(file: file, started: Date(), timeZone: berlin, now: { 0 }, writing: { _ in })
+        RecorderLog.recording(since: { 0 }, log: log)
+        defer { RecorderLog.recording(since: nil, log: nil) }
+        let timecode = Timecode(start: try startDate(), timeZone: berlin)
+        let writer = try ScreenFileWriter(
+            url: scratch.appending(path: "failing.mov"), frameSize: frameSize, firstTick: 0, timecode: timecode,
+            metadata: metadata)
+        let picture = try frame(brightness: 90)
+        for tick in 100..<103 {
+            while try !writer.append(picture, tick: Int64(tick)) { try await Task.sleep(for: .milliseconds(1)) }
+        }
+        // A frame before the last one makes the writer fail, after the append returned.
+        var failure: ScreenFileWriterError?
+        for attempt in 0..<200 where failure == nil {
+            do { _ = try writer.append(picture, tick: Int64(5 + attempt)) } catch { failure = error }
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        _ = try #require(failure)
+        log.synchronize()
+        let lines = file.appended
+        #expect(lines.contains("detail capture: video settings of failing.mov: {"))
+        #expect(lines.contains("detail capture: writer of failing.mov failed: status failed, error "))
+        #expect(lines.contains("samples, last at 0."))
+        #expect(lines.contains("last buffer 320×180, IOSurface ID "))
+        #expect(lines.contains("a repeat of the one before: yes"))
+        #expect(lines.contains("detail capture: video encoders for hvc1: "))
+        #expect(lines.contains("timecode: 1 sample, last at 0.000 s"))
+        // The writer failed on its own, behind an append that returned true.
+        #expect(lines.contains("no append returned false"))
+    }
+
+    @Test func aFrameTellsItsFacts() throws {
+        let facts = FrameFacts(try frame(brightness: 90), info: [:])
+        #expect(facts.text == "320×180 420v, primaries ITU_R_709_2, transfer function ITU_R_709_2, matrix ITU_R_709_2, "
+            + "ICC profile none, content rect none, scale factor none, screen check not judged")
+    }
+
     @Test func anUnfinalizedScreenFileIsReadableUpToItsLastFragment() async throws {
         defer { removeScratch() }
         let rate = RecorderValues.framesPerSecond

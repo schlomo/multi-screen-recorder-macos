@@ -6,7 +6,7 @@ import ImageIO
 import UniformTypeIdentifiers
 
 /// The review artifact of one scenario, in `review/<scenario>/` of the
-/// scratch folder: its `recording.json` and `recording.log`, a contact sheet with a still from
+/// scratch folder: its `recording.json`, `recording.log` and `msr.err`, a contact sheet with a still from
 /// the middle of each screen file, and the first seconds of one screen
 /// file and of the loopback device's audio file. What it shows is for a
 /// person to look at, not asserted.
@@ -24,7 +24,10 @@ struct Review {
         try? FileManager.default.removeItem(at: scratch.appending(path: ReviewNames.folder))
     }
 
-    func collect(recording: URL, files: [ListedFile], probed: [String: ProbedFile], playsTone: Bool) throws {
+    func collect(recording: URL, logs: URL, files: [ListedFile], probed: [String: ProbedFile], playsTone: Bool) throws {
+        // Its standard error holds the recorder's detail and macOS's own complaints, whether the scenario passed or not.
+        try FileManager.default.copyItem(at: logs.appending(path: ReviewNames.standardError),
+                                         to: folder.appending(path: ReviewNames.standardError))
         try FileManager.default.copyItem(at: recording.appending(path: ReviewNames.manifest),
                                          to: folder.appending(path: ReviewNames.manifest))
         try FileManager.default.copyItem(at: recording.appending(path: ReviewNames.recordingLog),

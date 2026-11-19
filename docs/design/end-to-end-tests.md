@@ -164,6 +164,7 @@ The named scenarios, each about 10 to 25 s of recording:
 |---|---|---|
 | `plain-recording` | auto mode, ended by `--duration` | exit 0 |
 | `virtual-screen` | a virtual screen of 1280 × 720 connects, switches to 1600 × 900 and back, disconnects; stopped by SIGINT | the screen's three files, frame sizes, number and times, and its events in order at their times |
+| `virtual-screen-stress` | a virtual screen of 1280 × 720 connects, its mode is switched ten times, 1280 × 720 ↔ 1600 × 900, about 2 s apart (the next switch waits for the screen to settle, so at least that), and it disconnects; stopped by SIGINT | as `virtual-screen`, as strictly: no failure event, a `screen frame size changed` per switch, no lost content. Expected to fail on the hosted runner today (D66): it is there to make the writer failure of `OSStatus -19092` happen often enough to study |
 | `tone` | the test tone in BlackHole, all audio inputs recorded, no system audio | the tone's level, no silent stretch and a click every second in each of BlackHole's tracks; the clicks at the same time of day, by timecode, in every screen file's guide track "Audio inputs" |
 | `system-audio` | as `tone`, with the system audio | the system audio's file: one stereo track, its length |
 | `stop-by-ctrl-c` | auto mode, SIGINT | exit 0, finalized |
@@ -224,9 +225,29 @@ file start is checked only against a notice that passed its own check;
 a missing or misplaced notice fails the start too, naming it. `run.log`
 shows each change's times, the screen's last change, the anchor and
 where it came from, the windows' widths and, after a connect or mode
-switch, how long after the settle time its file started. The `virtual-screen` scenario
-records with `--debug`, so its `msr.err` keeps the recorder's detail;
+switch, how long after the settle time its file started. The `virtual-screen`
+scenarios record with `--debug`, so their `msr.err` keeps the recorder's detail;
 it changes only standard error, which nothing asserts.
+
+**The system log of a failed scenario (D66).** When a scenario fails,
+the driver (not the workflow) runs `log show --style compact --start
+<the scenario's start, local time, a second early>` with a predicate on
+the subsystems whose name contains `videotoolbox`, `coremedia`,
+`avfoundation`, `screencapturekit` or `display`, and the processes
+`WindowServer` and `replayd`, and keeps the output as `logs/system.log`
+in the scenario's folder, which the uploaded artifact takes whole. When
+`log show` fails or does not end within 300 s, that is one more failure
+line of the scenario, never skipped silently.
+
+**A failed file's end (D66).** The recorder now writes the end of a
+file whose writer failed from what the file holds (recorder.md, "A
+failed file's end"). The driver's checks are unchanged and none loosened:
+such a file is still `not finalized` and a failure event is still a
+failure, so the scenario fails on those as before; its frame count and
+its length are now compared with the file's real end, so they no longer
+add a mismatch of their own to the failure lines, and the problems list
+gains the problem that tells what was lost (the check of problems' keys
+is unchanged).
 
 **Moving content.** Screen capture delivers a frame only when the
 picture changes, so a virtual screen showing a static picture gives its
@@ -263,7 +284,11 @@ now, to check them" (D63). Each run writes, in its scratch folder:
 
 - `run.log`: every line the driver printed.
 - `review/<scenario>/` for each scenario, passed ones included:
-  `recording.json` and `recording.log`; `contact-sheet.png`, a still from the middle of
+  `recording.json`, `recording.log` and `msr.err` (the recorder's
+  standard error: its detail lines with `--debug`, and what macOS
+  prints into it, such as `IOServiceMatchingfailed for:
+  AppleM2ScalerParavirtDriver`, so passing runs show it too, D66; it
+  is text, a few hundred kilobytes at most); `contact-sheet.png`, a still from the middle of
   each screen file (taken by `ffmpeg`) under a strip with the file's
   name; `excerpt <file>`, the first 5 s (`reviewExcerptSeconds`) of the
   smallest screen file and, in `tone` and `system-audio`, of

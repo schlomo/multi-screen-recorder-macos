@@ -107,6 +107,8 @@ extension Scenario {
     static let auto = ManifestExpectation.Settings(resolution: "native", audioMode: "wired", systemAudio: true)
     static let screen = VirtualScreenSpec(
         serialNumber: 101, sizes: [ScreenSize(width: 1280, height: 720), ScreenSize(width: 1600, height: 900)])
+    /// How often the stress scenario switches the screen's mode.
+    static let stressSwitches = 10
     static let fixedFlags = ["--resolution", "1080p", "--audio-mode", "all-inputs"]
 
     /// The named scenarios, the regression suite, in the order they run.
@@ -126,6 +128,17 @@ extension Scenario {
                 (14, .disconnectScreen(serialNumber: screen.serialNumber)),
             ],
             stop: .interrupt, stopAt: 17),
+        Scenario(
+            name: "virtual-screen-stress",
+            summary: "a virtual screen connected, its mode switched ten times about 2 s apart, and disconnected",
+            flags: fixedFlags + ["--system-audio", "off", "--debug"],
+            settings: .init(resolution: "1080p", audioMode: "all-inputs", systemAudio: false),
+            events: [(2, .connectScreen(screen))]
+                + (0..<stressSwitches).map { index in
+                    (5 + Double(index) * 2, .switchScreenMode(serialNumber: screen.serialNumber, to: screen.sizes[(index + 1) % 2]))
+                }
+                + [(5 + Double(stressSwitches) * 2 + 1, .disconnectScreen(serialNumber: screen.serialNumber))],
+            stop: .interrupt, stopAt: 5 + Double(stressSwitches) * 2 + 4),
         Scenario(
             name: "tone", summary: "the test tone in the loopback device: level, silent stretches, timing by timecode",
             flags: fixedFlags + ["--system-audio", "off"],
