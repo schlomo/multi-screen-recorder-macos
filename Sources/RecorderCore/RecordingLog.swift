@@ -88,6 +88,11 @@ public final class RecordingLog: Sendable {
         report(write([EventLine.problemText(problem, started: started, timeZone: timeZone)]))
     }
 
+    /// Writes what waits and synchronizes now: the starting situation, before the recording starts.
+    public func synchronize() {
+        report(write([]))
+    }
+
     /// Writes the detail lines once they have waited the flush interval since the last write.
     public func flushIfDue() {
         let at = now()

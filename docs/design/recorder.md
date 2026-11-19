@@ -1269,14 +1269,17 @@ detail as one line, see "Output on disk"), and every detail line, and
 first event, with detail lines of the starting situation, in this
 order: `started: <app and version>, recording folder <name>`; `macOS
 <version and build>, Mac model <identifier>` (`hw.model`, such as
-`Mac15,8`); `settings: ` and the manifest's `settings` as JSON; "What
-will be recorded" line by line as `msr record` prints it (category
-`what will be recorded`, its empty lines left out); and the ready
-check's facts and its result, line by line (category `ready check`), of
-the ready check before Start. Nothing in it names the person beyond
-what the files already carry: no user name, serial number or host name.
-With `--debug` these lines also go to standard error, as every detail
-line does. Each line starts with the local time
+`Mac15,8`); the effective settings line by line as `msr settings`
+prints them (category `settings`: the output folder, the low disk
+warning minutes and the rest); "What will be recorded" line by line as
+`msr record` prints it (category `what will be recorded`, its empty
+lines left out); and the ready check's facts and its result, line by
+line (category `ready check`), of the ready check before Start. The
+block is written and synchronized to disk before the recording starts,
+so a crash in its first seconds leaves it. It goes to the recording log
+only, also with `--debug`: `msr record` printed the table and the ready
+check already. Nothing in it names the person beyond what the files
+already carry: no user name, serial number or host name. Each line starts with the local time
 and the offset from the recording's start: an event's line is its line
 on standard error, a problem's `22:15:32 +61.3s problem: <the problem
 as the status window lists it>`, a detail line `22:14:58 +27.9s detail

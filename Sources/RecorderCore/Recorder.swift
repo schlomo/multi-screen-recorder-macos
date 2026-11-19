@@ -672,18 +672,12 @@ public final class Recorder {
     // MARK: Manifest and recording log
 
     /// Creates the recording log and starts it with the starting situation
-    /// (`RecordingLogStart`), detail lines like any other; one that cannot
-    /// be created or written is a problem, and the recording goes on.
+    /// (`RecordingLogStart`), on disk before the recording starts and only
+    /// there: `msr record` printed its table and ready check already. One
+    /// that cannot be created or written is a problem, and the recording goes on.
     private func startRecordingLog(app: String, readyCheckFacts: ReadyCheckFacts) {
         let context = context
-        defer {
-            RecorderLog.recording(since: { Double(context.now()) / 1_000_000_000 }, log: recordingLog)
-            let start = RecordingLogStart.lines(
-                app: app, recordingFolder: folder.lastPathComponent,
-                macOS: ProcessInfo.processInfo.operatingSystemVersionString, macModel: macModel(), settings: settings,
-                facts: readyCheckFacts)
-            for line in start { RecorderLog.detail(line.message, category: line.category) }
-        }
+        defer { RecorderLog.recording(since: { Double(context.now()) / 1_000_000_000 }, log: recordingLog) }
         do {
             let file = try AppendOnlyFile(creating: folder.appending(path: RecordingNames.recordingLog))
             recordingLog = RecordingLog(
@@ -693,7 +687,18 @@ public final class Recorder {
                 })
         } catch {
             recordingLogWriting(ErrorDetail(error))
+            return
         }
+        do {
+            let start = try RecordingLogStart.lines(
+                app: app, recordingFolder: folder.lastPathComponent,
+                macOS: ProcessInfo.processInfo.operatingSystemVersionString, macModel: macModel(), settings: settings,
+                facts: readyCheckFacts)
+            for line in start { recordingLog?.detail(line.message, category: line.category) }
+        } catch {
+            recordingLogWriting(ErrorDetail(message: "the starting situation cannot be written", underlying: error))
+        }
+        recordingLog?.synchronize()
     }
 
     private func recordingLogWriting(_ failure: ErrorDetail?) {

@@ -100,6 +100,14 @@ private final class Reports: Sendable {
         #expect(reports.all.isEmpty)
     }
 
+    /// The starting situation is on disk before the recording starts (D64).
+    @Test func synchronizeWritesWhatWaitsAtOnce() {
+        let log = log()
+        log.detail("started: Multi Screen Recorder", category: "recorder")
+        log.synchronize()
+        #expect(file.synchronized.hasSuffix("detail recorder: started: Multi Screen Recorder\n"))
+    }
+
     @Test func eachWriteAppendsAndNeverRewrites() {
         let log = log()
         log.event("one")

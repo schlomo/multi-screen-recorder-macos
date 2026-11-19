@@ -54,7 +54,7 @@ final class StatusWindow {
 
 struct StatusView: View {
     /// The line under the problems: the two files a report needs (D64).
-    static let forAReport = "For a report, \(RecordingNames.manifest) and \(RecordingNames.recordingLog) in the recording folder"
+    nonisolated static let forAReport = "For a report, \(RecordingNames.manifest) and \(RecordingNames.recordingLog) in the recording folder"
         + " show what happened; attach them to the issue."
 
     let model: StatusModel

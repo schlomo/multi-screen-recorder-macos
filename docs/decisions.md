@@ -1995,10 +1995,12 @@ architect's reading.
   its own change, through the problem report form. The recording log
   starts, before the first event, with detail lines of the starting
   situation: the app's version, macOS's version and build and the Mac's
-  model identifier, the settings as the manifest has them, "What will
-  be recorded" as `msr record` prints it, and the ready check's facts
-  and result; nothing that names the person, the host or a serial
-  number.
+  model identifier, the effective settings as `msr settings` prints
+  them, "What will be recorded" as `msr record` prints it, and the ready
+  check's facts and result; nothing that names the person, the host or
+  a serial number. The architect's review: the block is synchronized to
+  disk before the recording starts, and goes to the recording log only,
+  also with `--debug`.
 - **Consequences:** a recording folder holds one more file, about
   0.4 MB per hour (measured: 6.8 kB for 1 minute of 2 screens and 5
   audio sources). Point 3's button is not built in this change: when it
