@@ -274,7 +274,8 @@ below).
   an older one); see [delivery.md](docs/design/delivery.md).
 - `msr` without arguments starts the app, and the app, `msr check` and
   `msr record` run the ready check, which requests any never-asked
-  permission and captures one frame of a screen, so macOS shows a
+  permission and captures one frame of a screen (not at the recording
+  resolution None without the system audio), so macOS shows a
   prompt on the person's screen, and
   creates the output folder if it is missing; `msr record` and Start
   in the app record the screens; `msr list` reads the devices. An agent

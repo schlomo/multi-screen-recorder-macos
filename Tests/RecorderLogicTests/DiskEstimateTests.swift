@@ -34,6 +34,8 @@ import Testing
         #expect(GuideTrack.tracks(for: settings { $0.audioMode = .none }) == [.systemAudio])
         #expect(GuideTrack.tracks(for: settings { $0.systemAudio = false }) == [.audioInputs])
         #expect(GuideTrack.tracks(for: silent).isEmpty)
+        // Audio only: no screen file, so no guide track.
+        #expect(GuideTrack.tracks(for: settings { $0.resolution = .none }).isEmpty)
         #expect(GuideTrack.audioInputs.name == "Audio inputs")
         #expect(GuideTrack.systemAudio.name == "System audio")
     }
@@ -82,6 +84,14 @@ import Testing
         #expect(DiskEstimate.bytesPerHour(settings: settings(), screens: DesignExample.screens, audioInputs: [noUID]) == alone)
         #expect(DiskEstimate.bytesPerHour(settings: settings(), screens: DesignExample.screens, audioInputs: [unreadableNoUID])
             == alone)
+    }
+
+    /// Audio only: the screens connected need no space, only the audio files do.
+    @Test func atTheResolutionNoneOnlyTheAudioFilesCount() throws {
+        let audioOnly = settings { $0.resolution = .none }
+        let total = try #require(DiskEstimate.bytesPerHour(
+            settings: audioOnly, screens: DesignExample.screens, audioInputs: DesignExample.audioInputs))
+        #expect(abs(total - (57_600_000 + 86_400_000)) < 1)
     }
 
     @Test func noScreensNeedNoSpaceForVideo() {

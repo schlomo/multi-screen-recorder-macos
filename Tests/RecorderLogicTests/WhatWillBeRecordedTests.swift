@@ -447,4 +447,50 @@ import Testing
         #expect(broken.audioError == "The audio inputs cannot be read: no list")
         #expect(broken.total == section({ $0.audioMode = .none }).total)
     }
+
+    // Audio only: the recording resolution None.
+
+    private var audioOnly: WhatWillBeRecorded { section { $0.resolution = .none } }
+
+    @Test func atTheResolutionNoneTheSettingsLineSaysThatNoScreenIsRecorded() {
+        #expect(audioOnly.settingsLine
+            == "Settings: resolution None (no screen is recorded), audio mode Default microphone (only the default microphone is recorded), system audio on")
+        #expect(section { $0.resolution = .none; $0.audioMode = .wired }.settingsLine
+            == "Settings: resolution None (no screen is recorded), audio mode Wired, system audio on")
+    }
+
+    /// The screens are rows not recorded, without a number, Records at and GB/h max; the total is the audio files'.
+    @Test func atTheResolutionNoneTheScreensAreRowsNotRecordedAndTheTotalIsTheAudios() {
+        #expect(audioOnly.screenRows == [
+            .init(source: .screen(nil, name: "Built-in Retina Display"), values: ["1728×1117", "3456×2234", "-", "-"], isRecorded: false),
+            .init(source: .screen(nil, name: "LG HDR 4K"), values: ["3840×2160", "3840×2160", "-", "-"], isRecorded: false),
+        ])
+        #expect(audioOnly.audio == section().audio)
+        #expect(audioOnly.total == .init(gigabytesPerHour: "0.1", need: "2 hours need 0.3 GB, 3.1 GB free."))
+    }
+
+    @Test func atTheResolutionNoneUnreadableScreensKeepTheTotal() {
+        let broken = section({ $0.resolution = .none }, screens: .failure(DeviceReadError("no screen")))
+        #expect(broken.screensError == "The screens cannot be read: no screen")
+        #expect(broken.total == audioOnly.total)
+    }
+
+    /// A screen not recorded keeps its name's column, the `Screen <n> - ` part blank, as an audio source not recorded does.
+    @Test func atTheResolutionNoneTheTextKeepsTheScreensNamesColumn() {
+        #expect(section({ $0.resolution = .none }, audioInputs: []).text == """
+            What will be recorded
+              Settings: resolution None (no screen is recorded), audio mode Default microphone (only the default microphone is recorded), system audio on
+              Source                              Looks like  Drawn at   Records at  GB/h max
+              ───────────────────────────────────────────────────────────────────────────────
+                         Built-in Retina Display  1728×1117   3456×2234  -                  -
+                         LG HDR 4K                3840×2160   3840×2160  -                  -
+              ───────────────────────────────────────────────────────────────────────────────
+              Audio 0 - System                                           stereo           0.1
+              ───────────────────────────────────────────────────────────────────────────────
+              Total                                                                       0.1
+              2 hours need 0.2 GB, 3.1 GB free.
+              Files go to ~/Movies/Multi Screen Recorder
+
+            """)
+    }
 }

@@ -35,6 +35,6 @@ import Testing
     }
 
     @Test func resolutionShownNames() {
-        #expect(RecordingResolution.allCases.map(\.shownName) == ["Native", "4K", "1440p", "1200p", "1080p", "720p"])
+        #expect(RecordingResolution.allCases.map(\.shownName) == ["Native", "4K", "1440p", "1200p", "1080p", "720p", "None"])
     }
 }

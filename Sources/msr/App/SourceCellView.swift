@@ -2,11 +2,11 @@ import RecorderLogic
 import SwiftUI
 
 /// A source in the Source column (D55): an icon for its kind, then its
-/// number, if it is recorded (an audio source not recorded keeps the
-/// number's width blank), and its name.
+/// number, if it is recorded (a source not recorded keeps the number's
+/// width blank), and its name.
 struct SourceCellView: View {
     let cell: SourceCell
-    /// The digits of the highest number in the table, the width an audio source not recorded keeps blank.
+    /// The digits of the highest number in the table, the width a source not recorded keeps blank.
     var numberDigits = 1
 
     var body: some View {
@@ -21,12 +21,10 @@ struct SourceCellView: View {
         }
     }
 
-    /// The number and the name; an audio source not recorded has no number, and its name starts where the others' do.
+    /// The number and the name; a source not recorded has no number, and its name starts where the others' do.
     @ViewBuilder private var nameText: some View {
         if let number = cell.number {
             Text("\(number) \(cell.name)")
-        } else if cell.kind == .screen {
-            Text(cell.name)
         } else {
             HStack(spacing: 0) {
                 Text(String(repeating: "0", count: numberDigits) + " ").hidden()

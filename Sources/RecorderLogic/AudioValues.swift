@@ -16,6 +16,10 @@ extension RecorderValues {
     public static let guideTrackDelay = Duration.milliseconds(200)
     /// How often the guide tracks are mixed and handed to the screen files.
     public static let guideTrackInterval = Duration.milliseconds(100)
+    /// How much audio an audio file's writer takes in one append, about
+    /// 100 ms as the guide tracks: one append per buffer of 512 samples cost
+    /// more than the encoder, and a crash loses up to this much more.
+    public static let audioFileAppendSamples = audioSampleRate / 10
     /// How often the CPU use of our process is sampled.
     public static let cpuSampleInterval = Duration.seconds(1)
 }

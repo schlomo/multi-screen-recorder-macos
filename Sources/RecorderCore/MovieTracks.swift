@@ -126,13 +126,12 @@ func pcmFormat(channels: Int) throws(MovieTrackError) -> CMAudioFormatDescriptio
     return format
 }
 
-/// A buffer of PCM in `format` from one array of samples per channel, interleaved into it.
+/// A buffer of PCM in `format` from one array of samples per channel,
+/// interleaved straight into the buffer's memory.
 func pcmSample(_ channels: ArraySlice<[Float]>, format: CMAudioFormatDescription, at time: CMTime) throws(MovieTrackError) -> CMSampleBuffer {
     let frameCount = channels.first?.count ?? 0
-    let interleaved = channels.count == 1
-        ? channels.first!
-        : (0..<frameCount).flatMap { frame in channels.map { $0[frame] } }
-    let length = interleaved.count * MemoryLayout<Float>.size
+    let channelCount = channels.count
+    let length = frameCount * channelCount * MemoryLayout<Float>.size
     var block: CMBlockBuffer?
     var status = CMBlockBufferCreateWithMemoryBlock(
         allocator: nil, memoryBlock: nil, blockLength: length, blockAllocator: nil, customBlockSource: nil,
@@ -140,8 +139,15 @@ func pcmSample(_ channels: ArraySlice<[Float]>, format: CMAudioFormatDescription
     guard status == noErr, let block else {
         throw MovieTrackError(description: "cannot make an audio sample (error \(status))")
     }
-    status = interleaved.withUnsafeBytes { bytes in
-        CMBlockBufferReplaceDataBytes(with: bytes.baseAddress!, blockBuffer: block, offsetIntoDestination: 0, dataLength: length)
+    var data: UnsafeMutablePointer<CChar>?
+    status = CMBlockBufferGetDataPointer(block, atOffset: 0, lengthAtOffsetOut: nil, totalLengthOut: nil, dataPointerOut: &data)
+    if status == noErr, let data {
+        let samples = UnsafeMutableRawPointer(data).bindMemory(to: Float.self, capacity: frameCount * channelCount)
+        for (offset, channel) in channels.enumerated() {
+            channel.withUnsafeBufferPointer { source in
+                for frame in 0..<frameCount { samples[frame * channelCount + offset] = source[frame] }
+            }
+        }
     }
     var sample: CMSampleBuffer?
     if status == noErr {

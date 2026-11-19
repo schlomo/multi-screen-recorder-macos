@@ -267,7 +267,7 @@ import Testing
     @Test func theStandardErrorLineNamesEverythingIgnoredInKeyOrder() throws {
         let result = read(#"{"resolution": "999p", "agc": true}"#)
         #expect(result.note == "Settings file: ignored agc (unknown key),"
-            + " resolution (invalid value, expected one of native, 4k, 1440p, 1200p, 1080p, 720p);"
+            + " resolution (invalid value, expected one of native, 4k, 1440p, 1200p, 1080p, 720p, none);"
             + " using defaults for those.")
     }
 
@@ -306,6 +306,19 @@ import Testing
         let settings = try Settings.defaults.applying(flags: [key: value])
         #expect(settings.auto == false)
         #expect(key == .resolution ? settings.resolution == .p1080 : settings.audioMode == .allInputs)
+    }
+
+    /// Audio only: `--resolution none` and `"resolution": "none"`; auto mode stays Native.
+    @Test func theResolutionNoneIsAFlagValueAndASettingAndAutoModeStaysNative() throws {
+        let flagged = try Settings.defaults.applying(flags: [.resolution: "none"])
+        #expect(flagged.auto == false)
+        #expect(flagged.effectiveResolution == RecordingResolution.none)
+        #expect(Settings.read(json: Data(#"{"auto": false, "resolution": "none"}"#.utf8)).settings.effectiveResolution
+            == RecordingResolution.none)
+        var file = Settings.defaults
+        file.resolution = .none
+        #expect(file.effectiveResolution == .native)
+        #expect(String(decoding: try flagged.jsonData(), as: UTF8.self).contains(#""resolution" : "none","#))
     }
 
     @Test func otherFlagsKeepAuto() throws {

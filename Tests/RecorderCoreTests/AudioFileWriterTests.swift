@@ -46,11 +46,13 @@ import Testing
         }
     }
 
-    /// Writes buffers of 512 samples from `position` on, waiting for the writer.
-    private func writeTone(_ writer: AudioFileWriter, channels: Int, from position: Int64, samples: Int) async throws {
+    /// Writes buffers of `bufferSize` samples from `position` on, waiting for the writer.
+    private func writeTone(
+        _ writer: AudioFileWriter, channels: Int, from position: Int64, samples: Int, bufferSize: Int = 512
+    ) async throws {
         var written = 0
         while written < samples {
-            let count = min(512, samples - written)
+            let count = min(bufferSize, samples - written)
             let at = position + Int64(written)
             while try !writer.append(tone(channels: channels, from: at, count: count), at: at) {
                 try await Task.sleep(for: .milliseconds(1))
@@ -126,6 +128,44 @@ import Testing
         }
         #expect(error?.description.contains("2 channels") == true)
         try? await writer.finish(endPosition: nil)
+    }
+
+    /// The audio capture appends about 100 ms at a time instead of each
+    /// buffer of 512 samples: the file's audio is the same, sample for sample.
+    @Test(arguments: [1, 2])
+    func appendsOf100MillisecondsGiveTheSameAudioAsAppendsOf512Samples(channels: Int) async throws {
+        defer { removeScratch() }
+        var decoded: [[[Float]]] = []
+        for bufferSize in [512, RecorderValues.audioFileAppendSamples] {
+            let url = scratch.appending(path: "appends of \(bufferSize).mov")
+            let description = channels == 2
+                ? AudioFileDescription(source: .systemAudio, recordingStarted: started, app: app) : microphone(channels: 1)
+            let writer = try AudioFileWriter(url: url, description: description, firstTick: 0, timecode: Timecode(start: start, timeZone: berlin))
+            try await writeTone(writer, channels: channels, from: 0, samples: 3 * rate, bufferSize: bufferSize)
+            try await writer.finish(endPosition: Int64(3 * rate))
+            let asset = AVURLAsset(url: url)
+            let track = try #require(try await asset.loadTracks(withMediaType: .audio).first)
+            decoded.append(try decodedChannels(of: track, asset: asset))
+        }
+        #expect(decoded[0].count == channels)
+        #expect(decoded[0].first?.count == 3 * rate)
+        #expect(decoded[0] == decoded[1])
+    }
+
+    /// A stereo track's PCM is interleaved: left, right, left, right.
+    @Test func aStereoSampleIsInterleaved() throws {
+        let sample = try pcmSample([[1, 2, 3], [4, 5, 6]], format: pcmFormat(channels: 2), at: .zero)
+        #expect(CMSampleBufferGetNumSamples(sample) == 3)
+        #expect(try bytes(of: sample) == [1, 4, 2, 5, 3, 6])
+        let mono = try pcmSample([[7, 8, 9]], format: pcmFormat(channels: 1), at: .zero)
+        #expect(try bytes(of: mono) == [7, 8, 9])
+    }
+
+    private func bytes(of sample: CMSampleBuffer) throws -> [Float] {
+        let block = try #require(CMSampleBufferGetDataBuffer(sample))
+        var values = [Float](repeating: 0, count: CMBlockBufferGetDataLength(block) / 4)
+        CMBlockBufferCopyDataBytes(block, atOffset: 0, dataLength: values.count * 4, destination: &values)
+        return values
     }
 
     /// A filled gap is silence of exactly its length at its place.
@@ -210,6 +250,11 @@ import Testing
 
     /// The first channel's samples, decoded to 32-bit floats.
     private func decodedSamples(of track: AVAssetTrack, asset: AVAsset) throws -> [Float] {
+        try decodedChannels(of: track, asset: asset).first ?? []
+    }
+
+    /// Every channel's samples, decoded to 32-bit floats.
+    private func decodedChannels(of track: AVAssetTrack, asset: AVAsset) throws -> [[Float]] {
         let reader = try AVAssetReader(asset: asset)
         let output = AVAssetReaderTrackOutput(track: track, outputSettings: [
             AVFormatIDKey: kAudioFormatLinearPCM, AVLinearPCMBitDepthKey: 32, AVLinearPCMIsFloatKey: true,
@@ -217,16 +262,19 @@ import Testing
         ])
         reader.add(output)
         #expect(reader.startReading())
-        var samples: [Float] = []
+        var channels: [[Float]] = []
         while let sample = output.copyNextSampleBuffer() {
             guard let block = CMSampleBufferGetDataBuffer(sample) else { continue }
             let frames = CMSampleBufferGetNumSamples(sample)
             var buffer = [Float](repeating: 0, count: CMBlockBufferGetDataLength(block) / 4)
             CMBlockBufferCopyDataBytes(block, atOffset: 0, dataLength: buffer.count * 4, destination: &buffer)
-            let channels = buffer.count / max(1, frames)
-            samples += stride(from: 0, to: buffer.count, by: channels).map { buffer[$0] }
+            let count = buffer.count / max(1, frames)
+            if channels.isEmpty { channels = Array(repeating: [], count: count) }
+            for channel in 0..<count {
+                channels[channel] += stride(from: channel, to: buffer.count, by: count).map { buffer[$0] }
+            }
         }
         #expect(reader.status == .completed)
-        return samples
+        return channels
     }
 }

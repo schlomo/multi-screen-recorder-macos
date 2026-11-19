@@ -8,6 +8,7 @@ public enum DebugLine {
         case .granted: "granted"
         case .notGranted: "not granted"
         case .failed(let error): "failed (\(error))"
+        case nil: "not asked"
         }
         let microphone = facts.microphoneGranted.map { $0 ? "granted" : "not granted" } ?? "not asked"
         let screens = switch facts.screens {

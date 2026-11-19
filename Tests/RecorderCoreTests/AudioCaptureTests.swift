@@ -37,8 +37,9 @@ import Testing
 
     final class StandInWriter: AudioFileWriting, @unchecked Sendable {
         private let state = Mutex<(
-            isReady: Bool, refusalsLeft: Int?, samples: Int64, silence: Int64, endPosition: Int64??, appends: Int, failsAtAppend: Int?
-        )>((true, nil, 0, 0, nil, 0, nil))
+            isReady: Bool, refusalsLeft: Int?, samples: Int64, silence: Int64, endPosition: Int64??, appends: Int, failsAtAppend: Int?,
+            taken: [Int]
+        )>((true, nil, 0, 0, nil, 0, nil, []))
 
         var isReady: Bool {
             get { state.withLock { $0.isReady } }
@@ -59,6 +60,8 @@ import Testing
         var refusalsLeft: Int? { state.withLock { $0.refusalsLeft } }
         var appends: Int { state.withLock { $0.appends } }
         var samples: Int64 { state.withLock { $0.samples } }
+        /// The samples of each append the writer took, in order.
+        var taken: [Int] { state.withLock { $0.taken } }
         var endPosition: Int64?? { state.withLock { $0.endPosition } }
 
         func append(_ channels: [[Float]], at position: Int64) throws(AudioFileWriterError) -> Bool {
@@ -75,6 +78,7 @@ import Testing
                 }
                 guard state.isReady else { return false }
                 state.samples += Int64(channels[0].count)
+                state.taken.append(channels[0].count)
                 return true
             }
         }
@@ -111,6 +115,16 @@ import Testing
                 event: { event in self.state.withLock { $0.events.append(event) } },
                 clockDrift: { status in self.state.withLock { $0.clockDrift.append(status) } },
                 ended: { end in self.state.withLock { $0.end = end } })
+        }
+
+        /// Waits until `count` file ends were reported, for at most 5 s.
+        func waitForFileEnds(_ count: Int) async throws {
+            for _ in 0..<500 {
+                if ended.count >= count { return }
+                try await Task.sleep(for: .milliseconds(10))
+            }
+            Issue.record("\(ended.count) of \(count) file ends were reported")
+            throw CancellationError()
         }
 
         /// Waits until the capture said it ended, for at most 5 s.
@@ -161,6 +175,13 @@ import Testing
         return try pcmSample(samples[...], format: pcmFormat(channels: channels), at: time)
     }
 
+    /// The samples of one append to the writer: about 100 ms.
+    private let appendSamples = RecorderValues.audioFileAppendSamples
+
+    /// Buffers of a run without gaps until the writer took its first append:
+    /// the corrected samples then reach `appendSamples`.
+    private var buffersUntilTheFirstAppend: Int { (appendSamples + heldBack) / samplesPerBuffer + 1 }
+
     /// The nanoseconds of the `index`th buffer of a run without gaps.
     private func time(ofBuffer index: Int) -> Int64 {
         Int64(index * samplesPerBuffer) * 1_000_000_000 / Int64(RecorderValues.audioSampleRate)
@@ -189,14 +210,15 @@ import Testing
 
     @Test func samplesTheWriterNeverTookAreNotCountedAndToldAsLost() async throws {
         let capture = capture(drainTimeout: .milliseconds(50))
-        source.send(try buffer(at: 0))
+        let first = buffersUntilTheFirstAppend
+        for index in 0..<first { source.send(try buffer(at: time(ofBuffer: index))) }
         writer.isReady = false
-        source.send(try buffer(at: time(ofBuffer: 1)))
+        source.send(try buffer(at: time(ofBuffer: first)))
         await capture.stop()
         let ends = reported.ended
         let end = try #require(ends.first)
-        // The first buffer's samples but those held back for the second were written.
-        let written = samplesPerBuffer - heldBack
+        // The first append's samples, all but those held back for the next buffer, were written.
+        let written = first * samplesPerBuffer - heldBack
         let lost = samplesPerBuffer + heldBack
         #expect(writer.endPosition == .some(Int64(written)))
         #expect(end.file.end == end.file.start + Double(written) / Double(RecorderValues.audioSampleRate))
@@ -255,6 +277,8 @@ import Testing
         let capture = capture(drainTimeout: .milliseconds(10))
         source.send(try buffer(at: 0))
         source.send(try buffer(at: 2_000_000_000))
+        // The first file's samples, gathered for an append, are written as it ends; the writer stays ready until then.
+        try await reported.waitForFileEnds(1)
         writer.isReady = false
         source.send(try buffer(at: 2_000_000_000 + time(ofBuffer: 1)))
         await capture.stop()
@@ -324,10 +348,11 @@ import Testing
     /// holds back reach the file at Stop.
     @Test func theFileEndCarriesItsClockDriftCorrection() async throws {
         let capture = capture()
-        for index in 0..<3 { source.send(try buffer(at: time(ofBuffer: index))) }
-        #expect(writer.samples == 3 * Int64(samplesPerBuffer) - Int64(heldBack))
+        let sent = buffersUntilTheFirstAppend
+        for index in 0..<sent { source.send(try buffer(at: time(ofBuffer: index))) }
+        #expect(writer.samples == Int64(sent * samplesPerBuffer - heldBack))
         await capture.stop()
-        #expect(writer.samples == 3 * Int64(samplesPerBuffer))
+        #expect(writer.samples == Int64(sent * samplesPerBuffer))
         let end = try #require(reported.ended.first)
         // Too short for a clock drift; the correction is known.
         #expect(end.file.clockDriftPpm == nil)
@@ -434,12 +459,13 @@ import Testing
     /// A capture that ends by itself writes the correction's held-back samples.
     @Test func aCaptureThatEndsByItselfWritesTheCorrectionsTail() async throws {
         let capture = capture()
-        for index in 0..<3 { source.send(try buffer(at: time(ofBuffer: index))) }
-        #expect(writer.samples == 3 * Int64(samplesPerBuffer) - Int64(heldBack))
+        let sent = buffersUntilTheFirstAppend
+        for index in 0..<sent { source.send(try buffer(at: time(ofBuffer: index))) }
+        #expect(writer.samples == Int64(sent * samplesPerBuffer - heldBack))
         source.lose(.disconnected)
         _ = try await reported.waitForCaptureEnd()
         withExtendedLifetime(capture) {}
-        #expect(writer.samples == 3 * Int64(samplesPerBuffer))
+        #expect(writer.samples == Int64(sent * samplesPerBuffer))
     }
 
     /// A writer that failed ends the capture without the tail, and a Stop
@@ -448,10 +474,9 @@ import Testing
     /// next tick and open a file.
     @Test func aFailedWriterEndsTheCaptureWithoutItsTail() async throws {
         let capture = capture()
-        // The first buffer ends before the first tick: the second is the first append.
+        // The first buffer ends before the first tick, so one more buffer is needed for the first append.
         writer.fails(atAppend: 1)
-        source.send(try buffer(at: 500_000))
-        source.send(try buffer(at: 500_000 + time(ofBuffer: 1)))
+        for index in 0...buffersUntilTheFirstAppend { source.send(try buffer(at: 500_000 + time(ofBuffer: index))) }
         let end = try await reported.waitForCaptureEnd()
         let samples = writer.samples
         guard case .writerFailed(let error) = end else {
@@ -485,5 +510,29 @@ import Testing
         #expect(end == .writerFellBehind)
         #expect(reported.started.count == 1)
         #expect(reported.ended.count == 1)
+    }
+
+    // MARK: Appends of about 100 ms
+
+    /// A microphone's buffers of 512 samples reach the writer in appends of
+    /// about 100 ms, not one append per buffer: the appends, not the encoder,
+    /// cost the most (backlog item 6). Stop writes the rest.
+    @Test func theWriterTakesTheAudioInAppendsOfAbout100Milliseconds() async throws {
+        let capture = capture()
+        let perBuffer = 512
+        let buffers = 200
+        for index in 0..<buffers {
+            let nanoseconds = Int64(index * perBuffer) * 1_000_000_000 / Int64(RecorderValues.audioSampleRate)
+            source.send(try buffer(at: nanoseconds, count: perBuffer))
+        }
+        let taken = writer.taken
+        // Less than one append's samples still wait.
+        #expect((0..<appendSamples).contains(buffers * perBuffer - heldBack - taken.reduce(0, +)))
+        #expect(taken.count >= 15)
+        #expect(taken.allSatisfy { (appendSamples..<appendSamples + perBuffer).contains($0) }, "\(taken)")
+        await capture.stop()
+        #expect(writer.samples == Int64(buffers * perBuffer))
+        #expect(writer.taken.dropLast().allSatisfy { $0 >= appendSamples })
+        #expect(RecorderValues.audioFileAppendSamples == RecorderValues.audioSampleRate / 10)
     }
 }

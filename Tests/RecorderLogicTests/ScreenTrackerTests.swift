@@ -285,4 +285,21 @@ import Testing
         #expect(screens.streamEnded(Self.builtIn.uuid, .streamFailed("x"), connected: [Self.builtIn], at: second)
             == ScreenTracker.Step())
     }
+
+    /// Audio only: at the recording resolution None no screen gets a stream, a number,
+    /// an event or a row, whatever the screens do; sleep and wake are still told.
+    @Test func atTheResolutionNoneNoScreenIsRecordedOrTold() {
+        var screens = tracker(.none)
+        let begun = screens.begin([Self.builtIn, Self.lg], at: 0)
+        #expect(begun == ScreenTracker.Step())
+        #expect(screens.observe([Self.builtIn, Self.lg, Self.left], at: second) == ScreenTracker.Step())
+        #expect(screens.observe([Self.lg], at: 2 * second) == ScreenTracker.Step())
+        #expect(screens.due(at: 60 * second) == ScreenTracker.Step())
+        #expect(screens.nextDueTime() == nil)
+        #expect(screens.sleep(at: 70 * second).events.map(\.event) == [.sleep])
+        #expect(screens.wake([Self.builtIn], at: 80 * second).events.map(\.event) == [.wake])
+        #expect(screens.due(at: 90 * second) == ScreenTracker.Step())
+        #expect(screens.sources.isEmpty)
+        #expect(screens.stopAll().isEmpty)
+    }
 }
