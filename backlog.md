@@ -585,6 +585,14 @@ Still open from D34: what AGC does and whether it is on in auto mode;
    2026-11-19): the fixes for printing a failure once were verified by
    reading only, since `Recorder` has no unit tests.
 
+32. **A homepage collage from the end-to-end captures** (the owner,
+   2026-11-19: "From that we can then assemble the collage and
+   potentially think about animation the status window for added
+   coolness"): PR #23 makes the end-to-end run capture the start
+   window, the status window (PNG and a 5 s video) and the Finder window
+   of the recording folder, light and dark. Assemble them into the
+   homepage's picture; maybe animate the status window. Needs a design.
+
 ## Deliberately deferred
 
 - **A software-encoder fallback after a hardware encoder failure**
