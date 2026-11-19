@@ -439,11 +439,11 @@ public final class Recorder {
     /// the capture ended by itself while the recorder stopped it.
     private func fileEnded(_ end: ScreenFileEnd?, captureNumber: Int, screen: String, reason: ScreenTracker.StreamEnd?) {
         let before = manifest
-        let problem = endReports.record(
+        let report = endReports.record(
             captureNumber: captureNumber, reason: reason, end: end, screen: screen, at: context.now(), into: &manifest)
         if manifest != before { try? writeManifest() }
         told(Array(manifest.events.dropFirst(before.events.count)))
-        if let problem { told(problem) }
+        if let problem = report?.problem { told(problem, ofAnEvent: report?.event != nil) }
         // Both end paths may report the same end: said once.
         if let end, manifest.files != before.files {
             RecorderLog.detail("file ended: \(end.file.name), \(end.file.state.rawValue)", category: "recorder")
@@ -563,9 +563,12 @@ public final class Recorder {
     private func audioFileStarted(_ file: RecordingManifest.AudioFile, id: AudioTracker.SourceID, name: String) {
         guard manifest.state != .finalized else { return }
         RecorderLog.detail("file started: \(file.name)", category: "recorder")
-        audioTracker.fileStarted(id)
+        let started = audioTracker.fileStarted(id, at: Int64((file.start * 1_000_000_000).rounded()))
         problemsTold.cleared(.audioSourceFailed(name))
-        if manifest.audioFileStarted(file) { try? writeManifest() }
+        let listed = manifest.audioFileStarted(file)
+        if !started.isEmpty { _ = manifest.record(started) }
+        if listed || !started.isEmpty { try? writeManifest() }
+        told(started)
     }
 
     private func audioFileEnded(_ end: AudioFileEnd) {
@@ -579,7 +582,7 @@ public final class Recorder {
             let at = Int64(((end.file.end ?? end.file.start) * 1_000_000_000).rounded())
             tell(RecordingProblem(at: at, problem: "Audio file \(end.file.name)",
                                   error: end.error?.detail ?? "its writer fell behind"),
-                 kind: .audioFileFailed(end.file.name))
+                 kind: .audioFileFailed(end.file.name), ofAnEvent: end.toldByAnEvent)
         }
     }
 

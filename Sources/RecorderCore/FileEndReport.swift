@@ -54,12 +54,13 @@ struct CaptureEndReports {
     private var told: Set<Int> = []
 
     /// Updates the file's entry, adds the event and the problem of this
-    /// end of capture `captureNumber` unless it was told; the problem to
-    /// tell the person, if any.
+    /// end of capture `captureNumber` unless it was told; the report to
+    /// tell, if any: its problem for the person, told by its event when it
+    /// has one (D65).
     mutating func record(
         captureNumber: Int, reason: ScreenTracker.StreamEnd?, end: ScreenFileEnd?, screen: String, at now: Int64,
         into manifest: inout RecordingManifest
-    ) -> RecordingProblem? {
+    ) -> FileEndReport? {
         if let end {
             if let index = manifest.files.firstIndex(where: { $0.name == end.file.name }) {
                 manifest.files[index] = end.file
@@ -71,6 +72,6 @@ struct CaptureEndReports {
         guard report.event != nil || report.problem != nil, told.insert(captureNumber).inserted else { return nil }
         if let event = report.event { manifest.events.append(event) }
         if let problem = report.problem { manifest.problems.append(problem) }
-        return report.problem
+        return report
     }
 }

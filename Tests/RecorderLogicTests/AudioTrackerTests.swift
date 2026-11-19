@@ -100,7 +100,14 @@ import Testing
         #expect(tracker.due(at: 3 * second).actions.count == 1)
         _ = tracker.captureEnded(.input("BuiltIn"), .captureFailed("boom"), at: 4 * second)
         #expect(tracker.nextDueTime() == 6 * second)
-        tracker.fileStarted(.input("BuiltIn"))
+        #expect(tracker.fileStarted(.input("BuiltIn"), at: 6 * second).isEmpty)
+    }
+
+    @Test func everyCaptureEndButADisconnectIsAFailure() {
+        #expect(!AudioTracker.CaptureEnd.disconnected.isFailure)
+        for end: AudioTracker.CaptureEnd in [.captureFailed("x"), .writerFailed("x"), .writerFellBehind, .diskFull] {
+            #expect(end.isFailure)
+        }
     }
 
     @Test func aDisconnectIsNoFailure() {
@@ -119,8 +126,29 @@ import Testing
         #expect(names(moved.events) == ["system audio stopped: System audio"])
         #expect(moved.actions == [.stop(.systemAudio)])
         let started = tracker.due(at: 3 * second)
-        #expect(names(started.events) == ["system audio started: System audio"])
+        #expect(started.events.isEmpty)
         #expect(started.actions == [.startSystemAudio])
+        #expect(names(tracker.fileStarted(.systemAudio, at: 4 * second)) == ["system audio started: System audio"])
+        #expect(tracker.fileStarted(.systemAudio, at: 5 * second).isEmpty)
+    }
+
+    /// An event says what happened: a restart that fails before its file
+    /// starts tells only its failure, so the failures are repeats (D65).
+    @Test func theSystemAudioStartedOnlyOnceItsFileStarted() {
+        var tracker = AudioTracker(settings: settings(.none, systemAudio: true))
+        _ = tracker.begin(inputs: [], mainDisplayID: 1, screens: [1], at: 0)
+        #expect(tracker.fileStarted(.systemAudio, at: 0).isEmpty)
+        var events: [RecordingEvent] = []
+        var now: Int64 = second
+        for _ in 0..<4 {
+            events += tracker.captureEnded(.systemAudio, .writerFailed("cannot start writing"), at: now).events
+            now = tracker.nextDueTime() ?? now
+            let restart = tracker.due(at: now)
+            #expect(restart.actions == [.startSystemAudio])
+            events += restart.events
+        }
+        #expect(names(events) == Array(repeating: "audio file writer failed: System audio", count: 4))
+        #expect(names(tracker.fileStarted(.systemAudio, at: now + second)) == ["system audio started: System audio"])
     }
 
     @Test func anEventAboutAnAudioSourceNamesItAsAudioSourceNeverAsScreen() {

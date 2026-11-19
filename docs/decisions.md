@@ -2167,8 +2167,14 @@ architect's reading.
   4. Unchanged: `recording.log`, the unified log and `recording.json`
      keep every event; the status line, the status window and the
      summary count as before.
-- **Consequences:** a source that recovers by a start event (the system
-  audio's `system audio started`) between failures ends the
-  count each time, so its failures print each time.
+  5. An event says what happened (the architect's review, 2026-11-19):
+     `system audio started` is told once the system audio's file has
+     started, at the file's start, not at each restart attempt; an
+     attempt that fails tells only its failure, which then counts as a
+     repeat. Audio inputs tell no start event at a restart.
+- **Consequences:** a lasting failure of a source prints its first
+  failure and one count line. A problem told by its event includes a
+  screen file's or an audio file's end that a failure event tells.
 - **Evidence:** [design/recorder.md](design/recorder.md), "Logging";
-  `RepeatedFailuresTests`, `RecordOutputTests`.
+  `RepeatedFailuresTests`, `RecordOutputTests`, `CaptureEndReportsTests`,
+  `AudioCaptureTests`, `AudioTrackerTests`.

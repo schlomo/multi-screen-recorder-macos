@@ -12,6 +12,13 @@ public struct AudioFileEnd: Equatable, Sendable {
     public var file: RecordingManifest.AudioFile
     public var error: AudioFileWriterError?
     public var lostSamples: Int64 = 0
+    /// The capture ended by a failure (`AudioTracker.CaptureEnd.isFailure`),
+    /// which ended this file: the capture's failure event tells it.
+    public var endedByFailedCapture = false
+
+    /// Its failure is told by an event, its own or the capture's, so its
+    /// problem is not printed again (D65).
+    public var toldByAnEvent: Bool { !events.isEmpty || endedByFailedCapture }
 
     /// Samples lost at the end are `audio file writer fell behind`, a
     /// failure (D47), at the file's end.
@@ -272,7 +279,7 @@ final class AudioCapture: @unchecked Sendable {
         guard !isEnding else { return }
         isEnding = true
         if keepTail { flushCorrection() }
-        finishFile()
+        finishFile(endedByFailedCapture: reason.isFailure)
         leaveGuide()
         let tasks = finishing
         let reports = reports
@@ -413,7 +420,7 @@ final class AudioCapture: @unchecked Sendable {
     /// Ends the current file, if any: the samples still waiting are written
     /// for at most the drain timeout, then it is finalized. Its end counts
     /// only what the writer took; the rest is lost (`lostSamples`).
-    private func finishFile() {
+    private func finishFile(endedByFailedCapture: Bool = false) {
         let fileCorrection = fileApplied.end - fileApplied.start
         let clockDriftPpm = correction.status.clockDriftPpm
         timeline = nil
@@ -438,7 +445,8 @@ final class AudioCapture: @unchecked Sendable {
             let duration = Double(file.written) / Double(RecorderValues.audioSampleRate)
             entry.end = entry.start + duration
             entry.clockDrift(correction: fileCorrection, ppm: clockDriftPpm)
-            reports.fileEnded(AudioFileEnd(file: entry, error: failure, lostSamples: lost))
+            reports.fileEnded(AudioFileEnd(
+                file: entry, error: failure, lostSamples: lost, endedByFailedCapture: endedByFailedCapture))
         })
     }
 

@@ -98,8 +98,8 @@ import Testing
         let razer = AudioInputInfo(name: "Razer Seiren V3 Mini", channelCount: 1, isDefault: true, transport: .usb, uid: "R")
         let caldigit = AudioInputInfo(name: "CalDigit Thunderbolt 3 Audio", channelCount: 2, isDefault: false, transport: .usb, uid: "C")
         _ = tracker.begin(inputs: [razer, caldigit], mainDisplayID: 1, screens: [1], at: 0)
-        tracker.fileStarted(.input("R"))
-        tracker.fileStarted(.input("C"))
+        _ = tracker.fileStarted(.input("R"), at: 0)
+        _ = tracker.fileStarted(.input("C"), at: 0)
         _ = tracker.captureEnded(.systemAudio, .captureFailed("-3805"), at: 1)
         let rows = RecordingStatusTable.audioRows(sources: tracker.sourcesShown, files: [], bytes: [:], clockDrift: [
             .input("R"): ClockDriftCorrection.Status(clockDriftPpm: -116.12, applied: 0.03494, remaining: 0.00004),

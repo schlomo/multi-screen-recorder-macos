@@ -966,7 +966,9 @@ the metadata items (see "Output on disk").
   audio with it. The stream reads the main screen each time it
   starts, never an older reading. When the system audio's screen goes,
   its stream starts again on the new main screen, with the events
-  `system audio stopped` and `system audio started`. Which audio inputs are recorded
+  `system audio stopped` and `system audio started`; `system audio
+  started` is told once its file has started, at the file's start, so a
+  restart that fails tells only its failure (D65). Which audio inputs are recorded
   follows the audio mode (D44): `none` none, `default-microphone` the
   default one, `wired` the default one plus every built-in and wired one
   (transport type built-in, USB, FireWire, PCI, Thunderbolt, HDMI,
@@ -1280,8 +1282,9 @@ error: the local time, the offset from the recording's start, the event
 and its screen, and the details it has, such as `22:14:40 +9.2s screen
 connected: Wacom One 13T` or `22:15:32 +61.3s screen stream failed: LG
 (-3811)`. A failure is printed once (D65): a problem whose failure an
-event tells (a screen's or an audio source's failure) is printed as that
-event's line with its error, not again as the problem; a problem that
+event tells (a screen's or an audio source's failure, and a screen file
+or an audio file ended by a failure event or by its capture's failure)
+is printed as that event's line with its error, not again as the problem; a problem that
 is no event is printed as before. A repeat, the same failure event of
 the same subject with the same chain of error domains and codes (the
 error's text does not count, as it holds the changing file name), is

@@ -97,7 +97,7 @@ private func failedEvent(at seconds: Double, error: ErrorDetail) -> RecordingEve
         let told = [
             reports.record(captureNumber: 1, reason: failed, end: fileEnd(writerError("cannot write f.mov")), screen: "LG", at: 5 * second, into: &manifest),
             reports.record(captureNumber: 1, reason: nil, end: fileEnd(writerError("cannot write f.mov")), screen: "LG", at: 6 * second, into: &manifest),
-        ].compactMap(\.self)
+        ].compactMap { $0?.problem }
         #expect(manifest.events == [failedEvent(at: 12.5, error: "cannot write f.mov")])
         #expect(manifest.problems.count == 1)
         #expect(told == manifest.problems)
@@ -110,7 +110,7 @@ private func failedEvent(at seconds: Double, error: ErrorDetail) -> RecordingEve
         let told = [
             reports.record(captureNumber: 1, reason: nil, end: fileEnd(fullDisk), screen: "LG", at: 5 * second, into: &manifest),
             reports.record(captureNumber: 1, reason: .diskFull, end: nil, screen: "LG", at: 6 * second, into: &manifest),
-        ].compactMap(\.self)
+        ].compactMap { $0?.problem }
         #expect(manifest.events.map(\.event) == [.diskFull])
         #expect(manifest.problems.count == 1)
         #expect(told == manifest.problems)
@@ -124,7 +124,8 @@ private func failedEvent(at seconds: Double, error: ErrorDetail) -> RecordingEve
         let told = reports.record(captureNumber: 1, reason: .diskFull, end: nil, screen: "LG", at: 5 * second, into: &manifest)
         #expect(manifest.events == [RecordingEvent(at: 5 * second, event: .diskFull, screen: "LG")])
         #expect(manifest.problems == [RecordingProblem(at: 5 * second, problem: "Screen LG", error: "the disk is full")])
-        #expect(told == manifest.problems.first)
+        #expect(told?.problem == manifest.problems.first)
+        #expect(told?.event != nil)
     }
 
     @Test func aStopWithNothingToTellLeavesTheTellingToTheReasonPath() {
@@ -147,5 +148,28 @@ private func failedEvent(at seconds: Double, error: ErrorDetail) -> RecordingEve
         _ = reports.record(captureNumber: 1, reason: nil, end: fileEnd(nil), screen: "LG", at: 13 * second, into: &manifest)
         #expect(manifest.files.map(\.end) == [12.5])
         #expect(manifest.events.isEmpty && manifest.problems.isEmpty)
+    }
+
+    /// A screen writer that keeps failing (D65): its event tells the first
+    /// failure, not its problem too; the repeats are one count line.
+    @Test func aRepeatedScreenWriterFailurePrintsOneLineAndTheCount() {
+        var reports = CaptureEndReports()
+        var repeats = RepeatedFailures()
+        var manifest = manifest()
+        var printed: [String] = []
+        for capture in 1...3 {
+            var end = fileEnd(writerError("cannot write f\(capture).mov"), endsAt: Double(capture * 10))
+            end.file.name = "f\(capture).mov"
+            let report = reports.record(
+                captureNumber: capture, reason: .writerFailed(ErrorDetail(message: "cannot write f\(capture).mov")), end: end,
+                screen: "LG", at: Int64(capture * 10) * second, into: &manifest)
+            let event = try! #require(report?.event)
+            printed += repeats.lines(for: event, line: "event \(capture)", started: .now, timeZone: .gmt)
+            #expect(report?.problem != nil)
+        }
+        printed += repeats.stop(at: 40, started: .now, timeZone: .gmt)
+        #expect(printed.count == 2)
+        #expect(printed[0] == "event 1")
+        #expect(printed[1].contains("screen file writer failed repeated 2 times since"))
     }
 }
