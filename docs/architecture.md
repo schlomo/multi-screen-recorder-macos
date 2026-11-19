@@ -83,6 +83,7 @@ D28).
   with a portrait screen (D11, D25); a screen whose frame size
   changes gets a new screen file (D30); HEVC in `.mov`, no tick ever
   dropped, a timecode track in every file (D21, D31); always SDR (D24).
+  The recording resolution None records no screen: audio only (D62).
 - Screens (built in PR #11, D45, D46, D47): a screen is known by its
   UUID; a stream starts only after a settle time; every frame is
   checked against its screen and a screen showing another screen's
@@ -102,7 +103,8 @@ D28).
   and AGC as separate switches (D12, D44); one audio file per source, every
   input channel its own mono track (D22, D31); each screen file
   carries two guide tracks, microphones and system audio, for playback
-  and syncing (D31).
+  and syncing (D31); audio only has no screen file, so no guide track,
+  and its system audio still needs a readable main screen (D62).
 - Built (PR #9, D44): auto mode, on by default, records every screen
   at Native (its "looks like" size; the drawn-at size is never
   recorded) with the audio mode wired; a Bluetooth or virtual input
@@ -114,7 +116,8 @@ D28).
   open (D34).
 - A recording folder and one recording manifest per recording;
   recordings into different folders may run in parallel (D20).
-- Safeguards: a ready check before Start, low-disk warnings,
+- Safeguards: a ready check before Start (it refuses a recording with
+  nothing to record, D62), low-disk warnings,
   crash-safe fragmented files, keeping the Mac awake (D14). The window
   shows what will be recorded and what it costs in disk space (D26,
   D33), and follows screens and audio inputs as they change (D36).

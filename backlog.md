@@ -2,34 +2,30 @@
 
 ## Next session starts here
 
-The first tester release is out: release `v0.20261116.43` (PR #14),
-the homepage with screenshots of both windows (PR #15) and the tester
-guide's "What to test and send" (PR #16), all merged 2026-11-16. The
-owner shares it with colleagues, who email a screenshot of the start
-window, `recording.json` of every recording and a few sentences; the
-architect triages what comes back into this backlog. First feedback,
-2026-11-18: a colleague on a MacBook Air (built-in screen, an LG
-2560×1440 screen, system audio, the built-in microphone and a
-Logitech BCC950 ConferenceCam, auto mode) recorded 15 minutes with
-release `v0.20261117.52`: result `ok`, no problems, no frame repeated
-for lateness; "all happy, worked as expected and no surprise". Its
-facts are in items 6 and 12; it closed item 18 (dark mode). PR #19 (the
-clock drift correction, the status line and the command line polish)
-merged 2026-11-17 as release `v0.20261117.51`; PR #20 (the homepage
-collage, dark mode, `scripts/install-app`) merged the same evening as
-release `v0.20261117.52`. The order, agreed with the owner on
-2026-11-18, one PR each: item 17, the local-first rule (signed off);
-item 1a, audio only, together with item 6's first step and the
-icon's dark-mode frame (all signed off); item 21, audio level meters; item 3, the end-to-end tests; item
-4, the simplification; item 7, auto-recovery from disturbances; item
-12, cameras; item 22, the lip sync calibration; the rest of item 6;
-then item 16, the Mac App Store and Homebrew (the owner, 2026-11-16:
-"sandbox then comes after the optimizations"). Items 21, 12 and 22
-each need a design signed off before building. Item 17 waits for the
-owner's go to start. Agents may run `msr record` on the owner's Mac (D48;
-the owner's go-ahead in the session, 2026-11-16), and BetterDisplay's
-command line with the owner's virtual screen "Virtual 16:9"; by
-D56, before an agent starts a recording or plays a sound on the owner's Mac, the session running or briefing that test tells the owner, once before the test's first run.
+PR #21 (audio only, the first CPU step, the icon's dark-mode frame,
+D62) and PR #22 (rounds pushed with the skip-ci marker, one unmarked
+commit starts the one pipeline run; the setup skill removed, D61)
+merged 2026-11-19. The next job, in a fresh session: item 21, the
+audio level meters, together with not writing an input that delivers
+only exact zeros; it needs a design signed off by the owner first.
+Then, in the order agreed on 2026-11-18, one PR each: item 3, the
+end-to-end tests; item 4, the simplification; item 7, auto-recovery
+from disturbances; item 12, cameras; item 22, the lip sync
+calibration; the rest of item 6; then item 16, the Mac App Store and
+Homebrew. Items 21, 12 and 22 each need a design signed off before
+building.
+
+The first PR under D61 checks two things nobody has observed yet:
+that a push with the skip-ci marker starts no run here, and whether
+Cloudflare Workers Builds still builds a homepage preview for a
+marked push (only a homepage PR shows it). Testers have release
+`v0.20261117.52` and, after PR #21's merge, the release from `main`;
+first feedback (2026-11-18) is in items 6 and 12. Agents may run
+`msr record` on the owner's Mac (D48), and BetterDisplay's command
+line with the owner's virtual screen "Virtual 16:9"; by D56, before
+an agent starts a recording or plays a sound on the owner's Mac, the
+session running or briefing that test tells the owner, once before
+the test's first run.
 
 Still open from D34: what AGC does and whether it is on in auto mode;
 "AGC can also come as an improvement after the recorder" (the owner,
@@ -41,28 +37,6 @@ Nothing.
 
 ## Queued
 
-1a. **Audio only** (the owner, 2026-11-16: "video resolution needs a
-   none mode to disable screen recording and record audio only. cost
-   nothing and adds use cases and I accept the potential misnomer,
-   application name stays for now"): a recording resolution None,
-   in the window's slider and as `--resolution none`, records no
-   screen. The owner signed off these details (2026-11-16: "yes to the
-   audio only PR details"): auto mode stays Native; without screens
-   the ready check still needs the Screen & System Audio Recording
-   permission for system audio, and the microphone alone does not; no
-   screen file means no guide tracks; a recording with neither
-   screens nor audio refuses to start. Ships in one PR with item 6's
-   first step (the owner, 2026-11-18), so CPU is measured before
-   meters and cameras add load. The same PR carries one nit, signed
-   off by the owner (2026-11-18): in dark mode the icon's graphite
-   tile has almost no edge against the window and looks ragged (a
-   tester's 1x screenshot); `AppHeader` (`StartView.swift`) draws a
-   slim light frame around the tile in dark mode only: white at about
-   25 % opacity, 1 pt, following the tile's shape in
-   `assets/icon/app-icon.svg` (in the 48 pt image: inset 4.7 pt,
-   corner radius 8.6 pt, derived from the SVG's 300-unit tile, rx 67,
-   viewBox 372.82). Light mode and the icon file stay unchanged; a dark
-   icon variant belongs to item 14.
 2. **Toolchain catch-up** (D28): the pipeline builds with Xcode 26.6,
    Swift 6.3 and Python 3.15, the newest on GitHub's generally
    available runner image (D32 for Python), while the owner's Mac has
@@ -200,13 +174,24 @@ Nothing.
    redundant work will be a good 1st step, without adding extra
    complexity": the audio files' appends batched to about 100 ms, the
    stereo interleave without per-sample arrays, no zeros written (item
-   9), and the colour-space work dropped if the pixels stay identical.
+   11), and the colour-space work dropped if the pixels stay identical.
    Not in the first step: a cheaper AAC setting, shared guide tracks,
    24 kHz guides. The design docs get these findings with that PR.
    A tester's MacBook Air (2026-11-18; two displays, system audio, a
    mono and a stereo input, 15 minutes): 41.7 % average, 137.5 %
    peak, no frame repeated for lateness. A MacBook Air has no fan, so
    a long recording falls behind there first if anywhere [ASSUMED].
+   The first step shipped in PR #21 (2026-11-19): appends of about
+   100 ms and the stereo interleave in place; auto mode on the owner's
+   Mac went from about 43 % to about 32 % of one core (steady, from
+   30 s on, 3-minute runs, two screens, system audio, three inputs).
+   The colour space was left unchanged: set to BT.709 it made the
+   picture about 6 of 255 levels lighter, so the pixels did not stay
+   identical. Not writing zeros moved to item 21 (the owner,
+   2026-11-18). A 30-minute run with the PR's build (2026-11-18, two
+   screens, system audio, four inputs, a radio in the room, the Razer
+   unplugged and replugged): `result: ok`, every file finalized, CPU
+   40 % on average and 186 % at the peak.
 7. **Auto-recovery from disturbances** (the owner, 2026-11-16: "if
    after a few seconds the recording is again good then I'd accept
    that. Main goal is auto-recovery after changes and continuing the
@@ -274,6 +259,10 @@ Nothing.
      repeat runs with `--debug` to settle whether the app's front end
      adds to the stall (msr logged "skipping cycle due to overload" only
      in the app run).
+   Found in PR #21's review (2026-11-18), older than it: after a wake
+   with screens that cannot be read, the recorder returns before the
+   audio's wake, so the system audio does not come back, at every
+   resolution (`Recorder.swift`, `didWake`).
 8. **Audio after v0** (D12, D18): AGC, in its own PR, with its own
    design, its column in the window's table and the HDMI test.
    What AGC does is open (D34). Recording all audio inputs is no
@@ -454,34 +443,6 @@ Nothing.
      App Store (address, phone, email; DSA), tax, and a lawyer's look
      at the contributor clause.
 
-17. **Local first, one pipeline run per PR, tightened** (the owner,
-   2026-11-17: "make sure that the AI working docs know that we do
-   local builds and tests first and then ideally just one CI run at
-   the end"). "Iterate locally; wait for the pipeline once" (D56)
-   already says so, but PR #19 still ran CI four times at its end:
-   every pushed round starts a run, recording the owner's answers came
-   after the final run, and two runs lost their runner. A first
-   proposal (rounds stay local, the branch pushed once) was signed off
-   on 2026-11-18 and replaced the same day, after review, by GitHub's
-   skip-ci marker; the owner set squash merges to use the PR title and
-   description (2026-11-18: "I'll change the GH merge to use only the
-   PR description and not the collated commit messages so that you can
-   use skip ci"). The rule the owner signed off ("agree with 17,
-   continue", 2026-11-18): (1) each round is gated by the local run of
-   what the pipeline runs, then pushed with the skip-ci marker in its
-   commit message, so it starts no run; (2) reviews read the pushed
-   commit, and the draft PR opens at the first push; (3) the commit
-   about to be marked ready carries no marker (an empty commit if
-   needed) and starts the one pipeline run, waited for before ready;
-   (4) the owner's open questions are settled and recorded before that
-   commit; (5) a run GitHub cancels for want of a runner is re-run,
-   never answered by a push; (6) a fix after the one run is again a
-   commit without the marker, named in the description; (7) a PR
-   description never contains the marker verbatim. In the same PR, the
-   setup skill is removed (the owner, 2026-11-18: "let's remove the
-   setup skill here, it is leftover from the ai working model setup
-   process"). A principle change: its own PR with a decisions entry.
-   The rule only; the re-run mechanism is item 20.
 19. **The crash dialog offers only the app's own crashes.** On
    2026-11-17 the owner's freshly installed app showed the crash dialog
    for four `msr-*.ips` reports that a test's stand-in program (a copy
@@ -506,7 +467,7 @@ Nothing.
    of PR code. Needs the owner's sign-off of the design. The pushed
    branch `troubleshooting-ci-runner` holds two troubleshooting entries
    (no macOS runner; a crash dialog for crash reports the tests wrote):
-   they ship with this item, or earlier with item 17's PR.
+   they ship with this item.
 21. **Audio level meters, with an input gain slider** (the owner,
    2026-11-18, as the first step towards AGC, item 8): each audio
    input's level shown live in the status window, and a slider that
@@ -518,8 +479,12 @@ Nothing.
    some USB interfaces and HDMI inputs have none]. Every gain change
    is written to `recording.json`; AGC later moves the same control
    (the owner's "turning up input volume till before it clips", D34).
-   Levels come from the 100 ms batches of item 6's first step. Design
-   first.
+   Levels come from the 100 ms batches of item 6's first step. With
+   the meters, an input is not written while it delivers only exact
+   zeros (item 11; the owner, 2026-11-18: "OK to defer the audio zeros
+   to the meters feature, good idea"). In the 30-minute run of
+   2026-11-18 the MacBook microphone, its lid closed, delivered exact
+   zeros for the whole run and still got a file. Design first.
 22. **Lip sync calibration** (the owner, 2026-11-18: measured AV
    offsets between cameras and microphones; fixing them by hand in
    Resolve is "super tedious", so worth automating): a support tool
@@ -535,7 +500,9 @@ Nothing.
    video at 30 fps only by 33 ms frames (D11), so the correction moves
    audio; a webcam's delay may change with its exposure in low light
    [CONJECTURE], so the design says when a stored offset is measured
-   again. Needs item 12. Design first.
+   again. Needs item 12. Design first. Measured 2026-11-18 (30 minutes,
+   a radio in the room): the Razer and the BRIO stay a constant 17 to
+   18 ms apart, before and after a replug of the Razer, with no drift.
 
 ## Deliberately deferred
 
@@ -678,6 +645,24 @@ Nothing.
 
 ## Done (recent)
 
+- 2026-11-19: PR #22 merged by the owner (Markdown only, no release):
+  item 17. Rounds are pushed with the skip-ci marker, so they start
+  no run; the commit about to be marked ready carries no marker and
+  starts the one pipeline run; a PR title or description never holds
+  one of GitHub's skip strings, since squash merges take the PR title
+  and description (the owner's repository setting, 2026-11-18). The
+  setup skill is removed. D61, superseding D56 in part. A first
+  design (rounds kept local, pushed once) was signed off and replaced
+  the same day after a top-tier review. Reviews: three top-tier
+  rounds.
+- 2026-11-19: PR #21 merged by the owner: item 1a, audio only (the
+  recording resolution None; at None the system audio needs a
+  readable main screen, a microphone-only recording reads no screen;
+  nothing to record refuses to start), item 6's first step and the
+  icon's dark-mode frame. D62. Verified: the tests, the build and
+  the smoke test locally and in one pipeline run; live runs at None;
+  a 30-minute run with a replug (item 6). Reviews: a top-tier review
+  and its full re-review.
 - 2026-11-18: item 18, dark mode in the app, closed by the owner
   without a change: a tester's screenshots showed the start and
   status windows in dark mode, readable, the dimmed rows included.
