@@ -3,6 +3,17 @@ import Foundation
 /// The detail lines, written to be read: always in the recording log, and
 /// with `--debug` also on standard error (D64).
 public enum DetailLine {
+    /// A detail line before its time and prefix are added.
+    public struct Entry: Equatable, Sendable {
+        public var category: String
+        public var message: String
+
+        public init(category: String, message: String) {
+            self.category = category
+            self.message = message
+        }
+    }
+
     /// A detail line on standard error, with the time since the start
     /// as an event line has it while a recording runs: "detail recorder:
     /// +27.9s start Screen 3 - LG".

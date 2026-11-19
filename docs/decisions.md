@@ -1989,6 +1989,16 @@ architect's reading.
   check, "What will be recorded" and the detail lines) go through the
   error detail too; the ready check facts' strings are the error
   detail's text already.
+- **The starting situation (2026-11-19, the owner):** "Error reporting
+  as you suggest via the same GH issue template, I hope the log
+  contains enough context to figure out what happened". Point 3 becomes
+  its own change, through the problem report form. The recording log
+  starts, before the first event, with detail lines of the starting
+  situation: the app's version, macOS's version and build and the Mac's
+  model identifier, the settings as the manifest has them, "What will
+  be recorded" as `msr record` prints it, and the ready check's facts
+  and result; nothing that names the person, the host or a serial
+  number.
 - **Consequences:** a recording folder holds one more file, about
   0.4 MB per hour (measured: 6.8 kB for 1 minute of 2 screens and 5
   audio sources). Point 3's button is not built in this change: when it

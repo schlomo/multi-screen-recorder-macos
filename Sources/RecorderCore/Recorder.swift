@@ -123,7 +123,6 @@ public final class Recorder {
             reason: "Multi Screen Recorder is recording")
         let context = context
         startRecordingLog(app: app, readyCheckFacts: readyCheckFacts)
-        RecorderLog.recording(since: { Double(context.now()) / 1_000_000_000 }, log: recordingLog)
         registerForChanges()
         context.update(screens, lastScreenChange: nil)
         guides.start()
@@ -672,10 +671,19 @@ public final class Recorder {
 
     // MARK: Manifest and recording log
 
-    /// Creates the recording log and writes its first lines; one that cannot
+    /// Creates the recording log and starts it with the starting situation
+    /// (`RecordingLogStart`), detail lines like any other; one that cannot
     /// be created or written is a problem, and the recording goes on.
     private func startRecordingLog(app: String, readyCheckFacts: ReadyCheckFacts) {
         let context = context
+        defer {
+            RecorderLog.recording(since: { Double(context.now()) / 1_000_000_000 }, log: recordingLog)
+            let start = RecordingLogStart.lines(
+                app: app, recordingFolder: folder.lastPathComponent,
+                macOS: ProcessInfo.processInfo.operatingSystemVersionString, macModel: macModel(), settings: settings,
+                facts: readyCheckFacts)
+            for line in start { RecorderLog.detail(line.message, category: line.category) }
+        }
         do {
             let file = try AppendOnlyFile(creating: folder.appending(path: RecordingNames.recordingLog))
             recordingLog = RecordingLog(
@@ -685,10 +693,7 @@ public final class Recorder {
                 })
         } catch {
             recordingLogWriting(ErrorDetail(error))
-            return
         }
-        recordingLog?.detail("started: \(app), recording folder \(folder.lastPathComponent)", category: "recorder")
-        recordingLog?.detail(DetailLine.facts(readyCheckFacts), category: "ready check")
     }
 
     private func recordingLogWriting(_ failure: ErrorDetail?) {
