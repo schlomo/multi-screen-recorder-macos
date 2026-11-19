@@ -31,8 +31,8 @@ Keep this current when any of it changes.
   scripts in `scripts/` on hosted Apple-silicon macOS runners: job
   `test-and-build` tests, builds and smoke-tests without any secret;
   after it, job `end-to-end-test` runs the end-to-end tests against
-  that build, also without any secret, and after both a separate
-  signing job signs and publishes, for every push to a
+  that build, also without any secret, and after both one of two
+  separate signing jobs signs and publishes, for every push to a
   PR without the skip-ci marker the PR's snapshot release (a pre-release tagged `pr-<n>`), for a
   push to `main` that changes more than Markdown files and the homepage
   (`homepage/`) a release `v0.<DATE>.<N>`, so a homepage-only push makes

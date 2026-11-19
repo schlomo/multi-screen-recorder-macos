@@ -62,8 +62,7 @@ struct Run: ParsableCommand {
         Interruption.shared.watch()
         setvbuf(stdout, nil, _IOLBF, 0)
         print("msr-end-to-end: \(driver.version), \(scenarios.count) scenarios; the Mac cannot be used until they end")
-        var failed = 0
-        var stopped: Error?
+        var tally = RunTally(total: scenarios.count)
         for scenario in scenarios {
             let began = Date()
             do {
@@ -71,35 +70,39 @@ struct Run: ParsableCommand {
                 let took = String(format: "%.0f s", Date().timeIntervalSince(began))
                 let folder = scratchFolder.appending(path: scenario.name)
                 if failures.isEmpty {
+                    tally.passed()
                     print("ok    \(scenario.name) (\(took)): \(scenario.summary)")
                     try? FileManager.default.removeItem(at: folder)
                 } else {
-                    failed += 1
+                    tally.failed()
                     printError("FAIL  \(scenario.name) (\(took)): \(scenario.summary)")
                     for failure in failures { printError("      \(failure)") }
                     printError("      kept: \(folder.path)")
                 }
                 if let margin = driver.margin { print("      margin: \(margin)") }
             } catch {
-                stopped = error
+                tally.stopped("\(scenario.name): \(error)")
                 printError("STOP  \(scenario.name): \(error); kept: \(scratchFolder.appending(path: scenario.name).path)")
                 break
             }
-            guard restore(driver, keepingFile: true) else { break }
+            guard restore(driver, keepingFile: true) else {
+                tally.stopped("the restore after \(scenario.name) failed")
+                printError("STOP  the restore after \(scenario.name) failed")
+                break
+            }
             if Interruption.shared.happened {
-                stopped = DriverError("interrupted")
+                tally.stopped("interrupted after \(scenario.name)")
                 printError("STOP  interrupted after \(scenario.name)")
                 break
             }
         }
-        let restored = restore(driver, keepingFile: false)
-        if let stopped { throw stopped }
-        if !restored { throw ExitCode.failure }
-        if failed > 0 {
-            printError("msr-end-to-end: \(failed) of \(scenarios.count) scenarios failed")
+        switch tally.verdict(finalRestoreSucceeded: restore(driver, keepingFile: false)) {
+        case .passed(let line):
+            print(line)
+        case .failed(let lines):
+            for line in lines { printError(line) }
             throw ExitCode.failure
         }
-        print("msr-end-to-end: all \(scenarios.count) scenarios passed")
     }
 
     /// Runs `restore` in a process of its own, as a person would, so it
