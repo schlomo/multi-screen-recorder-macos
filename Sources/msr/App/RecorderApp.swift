@@ -42,8 +42,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         startWindow?.makeKeyAndOrderFront(nil)
         NSApp.activate()
         model.load()
-        offerCrashReport(homeFolder: model.homeFolder)
-        offerProblemReport(homeFolder: model.homeFolder)
+        offerReports(homeFolder: model.homeFolder)
     }
 
     /// Start: the window closes; the Dock icon shows "!" when something needs the person.
@@ -150,29 +149,43 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         return window
     }
 
+    /// The crash report offer, then the notice of the last recording's
+    /// problems, from one read of the state file: one that cannot be read is
+    /// one alert, and nothing is offered.
+    private func offerReports(homeFolder: URL) {
+        let stateFile = StateFile(homeFolder: homeFolder)
+        let state: AppState
+        do { state = try stateFile.load() } catch {
+            showAlert("Cannot offer to report a crash or a recording's problems", ErrorDetail(error).text)
+            return
+        }
+        offerProblemReport(state: offerCrashReport(state: state, stateFile: stateFile, homeFolder: homeFolder),
+                           stateFile: stateFile)
+    }
+
     /// Offers the newest crash report of `msr` that was not offered before:
     /// opens a new GitHub issue in the browser and shows a text copy of the
     /// crash report in Finder. The app opens no connection itself (D15).
-    private func offerCrashReport(homeFolder: URL) {
+    /// Gives the state as the offer left it.
+    private func offerCrashReport(state: AppState, stateFile: StateFile, homeFolder: URL) -> AppState {
         do {
-            let stateFile = StateFile(homeFolder: homeFolder)
-            let state = try stateFile.load()
             guard let name = CrashReport.toOffer(
                 fileNames: try crashReportFileNames(homeFolder: homeFolder),
                 lastOffered: state.lastOfferedCrashReport)
-            else { return }
+            else { return state }
             // Marked before the dialog, so a crash while it is open, or a quit, never offers it twice.
-            try stateFile.save(state.offering(name))
+            let offered = state.offering(name)
+            try stateFile.save(offered)
             let alert = NSAlert()
             alert.messageText = "Multi Screen Recorder quit unexpectedly"
             alert.informativeText = CrashReport.dialogText
             alert.addButton(withTitle: "Report on GitHub")
             alert.addButton(withTitle: "Not Now")
-            guard alert.runModal() == .alertFirstButtonReturn else { return }
+            guard alert.runModal() == .alertFirstButtonReturn else { return offered }
             let copy: URL
             do { copy = try makeTextCopy(of: name, homeFolder: homeFolder) } catch {
                 showAlert("Cannot copy the crash report", ErrorDetail(error).text)
-                return
+                return offered
             }
             let issue = CrashReport.issueURL(
                 crashReportName: name, version: runningVersion.description,
@@ -181,17 +194,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             if !NSWorkspace.shared.open(issue) {
                 showAlert("Cannot open the browser", "Open this address yourself:\n\(issue.absoluteString)")
             }
+            return offered
         } catch {
             showAlert("Cannot offer the crash report", ErrorDetail(error).text)
+            return state
         }
     }
 
     /// Tells, once, that the last recording had problems, and offers to
     /// report them: Report a problem runs `ProblemReportAction` (D64).
-    private func offerProblemReport(homeFolder: URL) {
+    private func offerProblemReport(state: AppState, stateFile: StateFile) {
         do {
-            let stateFile = StateFile(homeFolder: homeFolder)
-            let state = try stateFile.load()
             guard let folder = state.problemsNoticeFolder(folderExists: { FileManager.default.fileExists(atPath: $0) })
             else { return }
             // Marked before the notice, so a crash while it is open, or a quit, never shows it twice.

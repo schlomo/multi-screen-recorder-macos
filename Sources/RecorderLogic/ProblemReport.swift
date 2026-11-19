@@ -17,8 +17,13 @@ public enum ProblemReport {
     public static let reportButton = "Report a problem"
     public static let dismissButton = "Dismiss"
 
+    /// A recording folder's path as the notice and `msr record`'s summary show it: without a trailing slash.
+    public static func shownPath(_ recordingFolder: String) -> String {
+        recordingFolder.count > 1 && recordingFolder.hasSuffix("/") ? String(recordingFolder.dropLast()) : recordingFolder
+    }
+
     public static func noticeText(recordingFolder: String) -> String {
-        "Its recording folder is \(recordingFolder).\n\nYou can report it on GitHub, which needs a GitHub account. Your browser opens a new issue with the version and what went wrong filled in, and Finder shows the recording's \(RecordingNames.manifest) and \(RecordingNames.recordingLog) for you to drag into it. Issues are public: both files name your screens and audio devices, and the recording folder's path can hold your Mac's user name. Check them before you attach them."
+        "Its recording folder is \(shownPath(recordingFolder)).\n\nYou can report it on GitHub, which needs a GitHub account. Your browser opens a new issue with the version and what went wrong filled in, and Finder shows the recording's \(RecordingNames.manifest) and \(RecordingNames.recordingLog) for you to drag into it. Issues are public: both files name your screens and audio devices, and the recording folder's path can hold your Mac's user name. Check them before you attach them."
     }
 
     /// The link to a new problem report: as many of `whatWentWrong`, the last

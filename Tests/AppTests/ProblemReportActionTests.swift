@@ -57,12 +57,23 @@ import Testing
         #expect(try whatHappened(#require(notOpened))?.contains("recording.json cannot be read: ") == true)
     }
 
-    @Test func aManifestWithoutAnEndSaysSo() throws {
+    /// As in the summary of `msr record`, the missing end is the last thing that went wrong, so it is listed first.
+    @Test func aManifestWithoutAnEndSaysSoFirst() throws {
         let folder = try recordingFolder()
         defer { try? FileManager.default.removeItem(at: folder) }
-        try RecordingManifest(app: "a", started: Date(), timeZone: .gmt, settings: .defaults).jsonData()
-            .write(to: folder.appending(path: RecordingNames.manifest))
+        var manifest = RecordingManifest(app: "a", started: Date(), timeZone: .gmt, settings: .defaults)
+        manifest.problems = [RecordingProblem(atSeconds: 65, problem: "The screens cannot be read", error: "denied")]
+        try manifest.jsonData().write(to: folder.appending(path: RecordingNames.manifest))
         let text = try whatHappened(ProblemReportAction(recordingFolder: folder, version: "v").issueURL)
-        #expect(text?.contains(RecordingSummary.manifestNotWrittenLine) == true)
+        #expect(text == "The recording ended with problems. What went wrong, the last first:\n"
+            + "\(RecordingSummary.manifestNotWrittenLine)\nProblem at 1m05s: The screens cannot be read: denied")
+    }
+
+    @Test func withBothFilesGoneFinderShowsTheFolder() throws {
+        let folder = try recordingFolder()
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let standIn = StandIn()
+        #expect(ProblemReportAction(recordingFolder: folder, version: "v").run(opener: standIn) == nil)
+        #expect(standIn.revealed == [[folder]])
     }
 }

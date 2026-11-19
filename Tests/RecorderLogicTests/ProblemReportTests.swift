@@ -54,6 +54,16 @@ import Testing
             .absoluteString.count > ProblemReport.maximumLinkLength)
     }
 
+    /// The state file keeps the recorder's folder path, which ends in a slash; the notice and the summary show it without.
+    @Test func theNoticeAndTheSummaryShowTheFolderAlike() {
+        let path = "/out/2026-11-19 14.10.46/"
+        #expect(ProblemReport.noticeText(recordingFolder: path).hasPrefix("Its recording folder is /out/2026-11-19 14.10.46.\n"))
+        let manifest = RecordingManifest(app: "a", started: Date(), timeZone: .gmt, settings: .manual)
+        let summary = RecordingSummary(manifest: manifest, recordingFolder: path, seconds: 1, manifestWritten: true)
+        #expect(summary.reportText(version: "v").contains("\nAttach: /out/2026-11-19 14.10.46/recording.log and"))
+        #expect(ProblemReport.shownPath(path) == ProblemReport.shownPath("/out/2026-11-19 14.10.46"))
+    }
+
     @Test func theNoticeNamesTheFolderAndTheFiles() {
         let text = ProblemReport.noticeText(recordingFolder: "/Users/a/Movies/2026-11-19 10-00-00")
         #expect(text.contains("/Users/a/Movies/2026-11-19 10-00-00"))

@@ -38,29 +38,32 @@ public struct RecordingSummary: Equatable, Sendable {
         return lines.joined(separator: "\n") + "\n"
     }
 
-    /// The events that are errors, then the problems, as the summary tells them, each with its seconds from the start.
-    public static func whatWentWrong(_ manifest: RecordingManifest) -> [(at: Double, line: String)] {
+    /// The events that are errors, then the problems, then, if `endMissing`,
+    /// that the manifest has no end, each with its seconds from the start:
+    /// the missing end at the latest of them, as the last thing that went wrong.
+    public static func failureLines(of manifest: RecordingManifest, endMissing: Bool) -> [(at: Double, line: String)] {
         let errors = manifest.events.filter(\.event.isFailure).map { event in
             (event.at, "Error at \(elapsed(seconds: event.at)): \(event.event.rawValue)"
                 + (event.subject.map { ", \($0)" } ?? "") + (event.error.map { " (\($0))" } ?? ""))
         }
         let problems = manifest.problems.map { ($0.at, "Problem at \(elapsed(seconds: $0.at)): \($0.text)") }
-        return errors + problems
+        let lines: [(at: Double, line: String)] = errors + problems
+        guard endMissing else { return lines }
+        return lines + [(lines.map(\.at).max() ?? 0, manifestNotWrittenLine)]
     }
 
     public static let manifestNotWrittenLine = "The recording manifest could not be written at the end: \(RecordingNames.manifest) has no end."
 
     /// What the summary tells went wrong, each with its seconds from the start.
     public var whatWentWrong: [(at: Double, line: String)] {
-        Self.whatWentWrong(manifest) + (manifestWritten ? [] : [(seconds, Self.manifestNotWrittenLine)])
+        Self.failureLines(of: manifest, endMissing: !manifestWritten)
     }
 
     /// The end of the summary of a recording that ended with an error: the
     /// link to report it, with what went wrong, and what to attach (D64).
     public func reportText(version: String) -> String {
-        let folder = recordingFolder.hasSuffix("/") ? recordingFolder : recordingFolder + "/"
-        return "Report it: \(ProblemReport.issueURL(whatWentWrong: whatWentWrong, version: version).absoluteString)\n"
-            + "Attach: \(folder)\(RecordingNames.recordingLog) and \(RecordingNames.manifest)\n"
+        "Report it: \(ProblemReport.issueURL(whatWentWrong: whatWentWrong, version: version).absoluteString)\n"
+            + "Attach: \(ProblemReport.shownPath(recordingFolder))/\(RecordingNames.recordingLog) and \(RecordingNames.manifest)\n"
     }
 
     /// "1h02m05s", "2m05s" or "5s".

@@ -27,11 +27,12 @@ struct ProblemReportAction {
         ProblemReport.issueURL(whatWentWrong: whatWentWrong, version: version)
     }
 
-    /// The recording manifest and the recording log that are there.
+    /// The recording manifest and the recording log that are there, or the recording folder if neither is.
     var files: [URL] {
-        [RecordingNames.manifest, RecordingNames.recordingLog]
+        let there = [RecordingNames.manifest, RecordingNames.recordingLog]
             .map { recordingFolder.appending(path: $0) }
             .filter { FileManager.default.fileExists(atPath: $0.path(percentEncoded: false)) }
+        return there.isEmpty ? [recordingFolder] : there
     }
 
     /// What the recording manifest tells went wrong, or why it cannot be read.
@@ -42,8 +43,7 @@ struct ProblemReportAction {
         } catch {
             return [(0, "\(RecordingNames.manifest) cannot be read: \(ErrorDetail(error).text)")]
         }
-        let notEnded = manifest.ended == nil ? [(0.0, RecordingSummary.manifestNotWrittenLine)] : []
-        return RecordingSummary.whatWentWrong(manifest) + notEnded
+        return RecordingSummary.failureLines(of: manifest, endMissing: manifest.ended == nil)
     }
 
     /// Opens the link and shows the files; the link if the browser did not take it.

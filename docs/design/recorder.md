@@ -794,10 +794,12 @@ checked, reported or rewritten at the next start (D47).
   the `.ips` name), and shows the text copy in Finder for the person
   to drag into the issue; the dialog asks, for a crash while recording,
   for that recording's `recording.json` and `recording.log` too (D64); GitHub takes no file through a link. The app
-  opens no connection itself (D15, D40). A crash report folder or a
-  state file that cannot be read or decoded, or a failed write
-  shows an alert "Cannot offer the crash report" with the error, and
-  nothing is offered that start; a failed text copy (the dialog was
+  opens no connection itself (D15, D40). The state file is read once
+  for this offer and the problem report offer below; one that cannot be
+  read or decoded shows one alert "Cannot offer to report a crash or a
+  recording's problems" with the error, and nothing is offered that
+  start. A crash report folder that cannot be read, or a failed write,
+  shows an alert "Cannot offer the crash report" with the error; a failed text copy (the dialog was
   already answered) shows "Cannot copy the crash report" with the
   error; a browser that cannot be opened shows
   an alert with the address.
