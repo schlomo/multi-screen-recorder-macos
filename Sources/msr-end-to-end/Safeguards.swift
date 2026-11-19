@@ -95,18 +95,18 @@ struct Restorer {
             guard let path = executablePath(of: process.pid),
                   URL(filePath: path).resolvingSymlinksInPath() == URL(filePath: process.executable).resolvingSymlinksInPath()
             else { continue }
-            print("restore: ending \(process.executable) (\(process.pid))")
+            RunLog.out("restore: ending \(process.executable) (\(process.pid))")
             kill(process.pid, process.stopSignal)
             let deadline = Date().addingTimeInterval(30)
             while kill(process.pid, 0) == 0, Date() < deadline { Thread.sleep(forTimeInterval: 0.05) }
             if kill(process.pid, 0) == 0 { kill(process.pid, SIGKILL) }
         }
         try VirtualScreenHelper.waitUntilNoVirtualScreen(seconds: 5)
-        for uid in try Machine.removeTestAggregateDevices() { print("restore: removed the aggregate device \(uid)") }
+        for uid in try Machine.removeTestAggregateDevices() { RunLog.out("restore: removed the aggregate device \(uid)") }
         let plan = RestorePlan(saved: restore.saved, current: try Machine.state())
         try Machine.apply(plan, saved: restore.saved)
         if !plan.actions.isEmpty {
-            print("restore: put back \(plan.actions.map { "\($0)" }.joined(separator: ", "))")
+            RunLog.out("restore: put back \(plan.actions.map { "\($0)" }.joined(separator: ", "))")
             Thread.sleep(forTimeInterval: 1)
         }
         let differences = restore.saved.differences(to: try Machine.freshState())

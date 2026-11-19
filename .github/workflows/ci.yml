@@ -64,7 +64,13 @@ jobs:
           path: ${{ runner.temp }}/artifact
       - run: scripts/unpack-app "$RUNNER_TEMP/artifact/msr-app.tar"
       - run: scripts/ci-install-end-to-end-tools
-      - run: scripts/end-to-end-test
+      - run: scripts/end-to-end-test --scratch-folder "$RUNNER_TEMP/end-to-end"
+      - if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: end-to-end-scratch
+          path: ${{ runner.temp }}/end-to-end
+          retention-days: 14
 
   snapshot-release:
     # Signing job: never compiles, never restores a cache, and never executes

@@ -51,7 +51,7 @@ compiled code (D29), and the end-to-end tests in a third (D63):
 | Job | Holds | Does |
 |---|---|---|
 | `test-and-build` | the checkout, read access; no secret, no token | `scripts/test`, `scripts/build-app`, `scripts/smoke-test`; uploads `build/msr-app.tar` as a workflow artifact (kept 1 day) |
-| `end-to-end-test` | the checkout, read access; no secret, no token | downloads the artifact, `scripts/unpack-app`, `scripts/ci-install-end-to-end-tools`, `scripts/end-to-end-test`; the runner image grants both permissions |
+| `end-to-end-test` | the checkout, read access; no secret, no token | downloads the artifact, `scripts/unpack-app`, `scripts/ci-install-end-to-end-tools`, `scripts/end-to-end-test` with its scratch folder in `$RUNNER_TEMP/end-to-end`; the runner image grants both permissions. When it fails, it uploads that folder (the kept scenario folders, the restore file if left, the driver's log `run.log`) as the workflow artifact `end-to-end-scratch`, kept 14 days |
 | `snapshot-release`, `release` (the signing jobs) | the checkout, write access, the signing secret in the import step only, the token in the publish step only | downloads the artifact, `scripts/unpack-app`, `scripts/ci-import-signing-certificate`, `scripts/sign-app`, then `scripts/publish-snapshot-release` or `scripts/publish-release` |
 
 | When | What runs |

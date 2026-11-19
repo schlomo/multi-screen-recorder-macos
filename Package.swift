@@ -73,7 +73,7 @@ let package = Package(
         ),
         .testTarget(
             name: "CommandTests",
-            dependencies: ["msr"],
+            dependencies: ["msr", "msr-end-to-end"],
             swiftSettings: strictSettings
         ),
     ]

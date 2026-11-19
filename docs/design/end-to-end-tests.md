@@ -113,7 +113,10 @@ unasked (`AGENTS.md`, "Facts that bite"). Not part of
 whose image grants both permissions (D63): the job `end-to-end-test`
 after `test-and-build`, with ffmpeg and BlackHole installed at fixed
 versions by `scripts/ci-install-end-to-end-tools`; the signing jobs
-wait for it, so nothing that failed it is signed or published.
+wait for it, so nothing that failed it is signed or published. When it
+fails, the job keeps the driver's scratch folder as the workflow
+artifact `end-to-end-scratch` for 14 days: the failed scenarios'
+folders, the restore file if one is left, and `run.log`.
 
 ### Built so far
 
@@ -143,7 +146,8 @@ owner confirmed it (D63).
 
 The driver writes its error lines (`FAIL`, `STOP`, `restore: FAILED`,
 `restore: NOT RESTORED`) to standard error and its progress and `ok`
-lines to standard output. Its targets are exempt from the app's rule
+lines to standard output, and every one of them also to `run.log` in
+the scratch folder (a run starts it afresh, `restore` adds to it). Its targets are exempt from the app's rule
 that only one writer writes to standard error, which protects the app's
 status line (D63).
 

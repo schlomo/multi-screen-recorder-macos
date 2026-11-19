@@ -21,12 +21,22 @@ struct EndToEndCommand: ParsableCommand {
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         return folder.resolvingSymlinksInPath()
     }
-}
 
-/// An error line: on standard error, where a program's errors go; progress
-/// and `ok` lines stay on standard output.
-func printError(_ line: String) {
-    FileHandle.standardError.write(Data("\(line)\n".utf8))
+    /// Runs a subcommand's body with the log open in the scratch folder; an
+    /// error is logged on standard error and the exit is non-zero.
+    static func logged(scratch: String?, fresh: Bool, _ body: (URL) throws -> Void) throws {
+        setvbuf(stdout, nil, _IOLBF, 0)
+        let folder = try scratchFolder(scratch)
+        try RunLog.open(scratch: folder, fresh: fresh)
+        do {
+            try body(folder)
+        } catch let exit as ExitCode {
+            throw exit
+        } catch {
+            RunLog.error("msr-end-to-end: \(error)")
+            throw ExitCode.failure
+        }
+    }
 }
 
 struct ScratchOption: ParsableArguments {
@@ -52,16 +62,18 @@ struct Run: ParsableCommand {
     }
 
     func run() throws {
+        try EndToEndCommand.logged(scratch: scratch.scratchFolder, fresh: true, run(in:))
+    }
+
+    private func run(in scratchFolder: URL) throws {
         let scenarios = scenarioNames.isEmpty ? Scenario.named : Scenario.named.filter { scenarioNames.contains($0.name) }
-        let scratchFolder = try EndToEndCommand.scratchFolder(scratch.scratchFolder)
         let media = try Media(scratch: scratchFolder)
         try Driver.requirePreconditions()
         let restorer = Restorer(scratch: scratchFolder)
         let driver = try Driver(app: URL(filePath: app), scratch: scratchFolder, restorer: restorer, media: media)
         _ = try restorer.save()
         Interruption.shared.watch()
-        setvbuf(stdout, nil, _IOLBF, 0)
-        print("msr-end-to-end: \(driver.version), \(scenarios.count) scenarios; the Mac cannot be used until they end")
+        RunLog.out("msr-end-to-end: \(driver.version), \(scenarios.count) scenarios; the Mac cannot be used until they end")
         var tally = RunTally(total: scenarios.count)
         for scenario in scenarios {
             let began = Date()
@@ -71,36 +83,36 @@ struct Run: ParsableCommand {
                 let folder = scratchFolder.appending(path: scenario.name)
                 if failures.isEmpty {
                     tally.passed()
-                    print("ok    \(scenario.name) (\(took)): \(scenario.summary)")
+                    RunLog.out("ok    \(scenario.name) (\(took)): \(scenario.summary)")
                     try? FileManager.default.removeItem(at: folder)
                 } else {
                     tally.failed()
-                    printError("FAIL  \(scenario.name) (\(took)): \(scenario.summary)")
-                    for failure in failures { printError("      \(failure)") }
-                    printError("      kept: \(folder.path)")
+                    RunLog.error("FAIL  \(scenario.name) (\(took)): \(scenario.summary)")
+                    for failure in failures { RunLog.error("      \(failure)") }
+                    RunLog.error("      kept: \(folder.path)")
                 }
-                if let margin = driver.margin { print("      margin: \(margin)") }
+                if let margin = driver.margin { RunLog.out("      margin: \(margin)") }
             } catch {
                 tally.stopped("\(scenario.name): \(error)")
-                printError("STOP  \(scenario.name): \(error); kept: \(scratchFolder.appending(path: scenario.name).path)")
+                RunLog.error("STOP  \(scenario.name): \(error); kept: \(scratchFolder.appending(path: scenario.name).path)")
                 break
             }
             guard restore(driver, keepingFile: true) else {
                 tally.stopped("the restore after \(scenario.name) failed")
-                printError("STOP  the restore after \(scenario.name) failed")
+                RunLog.error("STOP  the restore after \(scenario.name) failed")
                 break
             }
             if Interruption.shared.happened {
                 tally.stopped("interrupted after \(scenario.name)")
-                printError("STOP  interrupted after \(scenario.name)")
+                RunLog.error("STOP  interrupted after \(scenario.name)")
                 break
             }
         }
         switch tally.verdict(finalRestoreSucceeded: restore(driver, keepingFile: false)) {
         case .passed(let line):
-            print(line)
+            RunLog.out(line)
         case .failed(let lines):
-            for line in lines { printError(line) }
+            for line in lines { RunLog.error(line) }
             throw ExitCode.failure
         }
     }
@@ -116,10 +128,10 @@ struct Run: ParsableCommand {
             try process.run()
             process.waitUntilExit()
         } catch {
-            printError("restore: FAILED to start: \(error); run scripts/end-to-end-test restore")
+            RunLog.error("restore: FAILED to start: \(error); run scripts/end-to-end-test restore")
             return false
         }
-        if process.terminationStatus != 0 { printError("restore: FAILED; run scripts/end-to-end-test restore") }
+        if process.terminationStatus != 0 { RunLog.error("restore: FAILED; run scripts/end-to-end-test restore") }
         return process.terminationStatus == 0
     }
 }
@@ -136,19 +148,23 @@ struct Restore: ParsableCommand {
     func run() throws {
         // A Ctrl-C meant for the driver must never cut a restore short.
         signal(SIGINT, SIG_IGN)
-        let restorer = Restorer(scratch: try EndToEndCommand.scratchFolder(scratch.scratchFolder))
+        try EndToEndCommand.logged(scratch: scratch.scratchFolder, fresh: false, run(in:))
+    }
+
+    private func run(in scratchFolder: URL) throws {
+        let restorer = Restorer(scratch: scratchFolder)
         guard restorer.exists else {
-            print("restore: no restore file, nothing to restore (\(restorer.file.path))")
+            RunLog.out("restore: no restore file, nothing to restore (\(restorer.file.path))")
             try VirtualScreenHelper.waitUntilNoVirtualScreen(seconds: 0)
             return
         }
         let still = try restorer.restore(removingFile: !keepRestoreFile)
-        for line in still { printError("restore: NOT RESTORED  \(line)") }
+        for line in still { RunLog.error("restore: NOT RESTORED  \(line)") }
         if !still.isEmpty {
-            printError("restore: the restore file is kept: \(restorer.file.path)")
+            RunLog.error("restore: the restore file is kept: \(restorer.file.path)")
             throw ExitCode.failure
         }
-        if !keepRestoreFile { print("restore: the Mac is as it was before the run") }
+        if !keepRestoreFile { RunLog.out("restore: the Mac is as it was before the run") }
     }
 }
 
