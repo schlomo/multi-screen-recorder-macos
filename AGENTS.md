@@ -7,9 +7,10 @@ sources change.
 
 ## Project setup
 
-Recorded by the setup skill; re-run it when any of this changes.
+Keep this current when any of it changes.
 
-- **Starter:** `928aeb2`, set up 2026-11-12.
+- **Starter:** `928aeb2`, the template repository's commit this project was set up
+  from, on 2026-11-12.
 - **Git:** GitHub, `schlomo/multi-screen-recorder-macos`, trunk `main`;
   squash merges, so a branch catches up by merging the trunk in.
 - **Agent writes:** push work branches and open draft PRs, and mark a
@@ -30,10 +31,12 @@ Recorded by the setup skill; re-run it when any of this changes.
   scripts in `scripts/` on hosted Apple-silicon macOS runners: job
   `test-and-build` tests, builds and smoke-tests without any secret,
   then a separate signing job signs and publishes, for every push to a
-  PR the PR's snapshot release (a pre-release tagged `pr-<n>`), for a
+  PR without the skip-ci marker the PR's snapshot release (a pre-release tagged `pr-<n>`), for a
   push to `main` that changes more than Markdown files and the homepage
   (`homepage/`) a release `v0.<DATE>.<N>`, so a homepage-only push makes
-  no release; a closed PR's snapshot release is removed. PRs from
+  no release; a closed PR's snapshot release is removed (a head commit
+  with the skip-ci marker first needs an unmarked empty commit, see
+  "Work branches"). PRs from
   forks and Dependabot are tested, built and smoke-tested, never signed
   or published. Signing needs the repository secret
   `SIGNING_CERTIFICATE_P12` ([delivery.md](docs/design/delivery.md)).
@@ -68,7 +71,7 @@ standard (below).
   request; a paid run (its own model or per-use API calls) touches
   the paying account, so its go-ahead names it. The one standing
   go-ahead: the host's automated review of the MRs/PRs agents open,
-  where setup recorded it. [Live systems](docs/principles/ai-working-process.md#live-systems-need-a-humans-go-ahead)
+  where recorded in this file. [Live systems](docs/principles/ai-working-process.md#live-systems-need-a-humans-go-ahead)
 - Code never obtains, parses or relays a credential; each tool reads
   its own. [Credentials](docs/principles/engineering.md#credentials-are-pure-injection)
 - Test first; never weaken a test; tests and CI gate every change.
@@ -76,7 +79,7 @@ standard (below).
 - Work happens on a work branch, never directly on the trunk
   (architect-maintained docs excepted). An agent at most pushes it,
   opens a draft MR/PR and, once it is fully reviewed, marks it ready,
-  or less at the write level setup recorded;
+  or less at the write level recorded in this file;
   credentials being present is not consent. A delegated agent uses a
   fresh clone of its own, never a human's working copy or a worktree
   of it. [Work branches](docs/principles/ai-working-process.md#work-branches)
@@ -161,8 +164,9 @@ it becomes a mechanical check (lint, CI gate) once one exists.
   word diff someone else has read; feedback that adds content gets its
   own review; until then, UNREVIEWED.
   [Adversarial review](docs/principles/ai-working-process.md#every-change-gets-an-adversarial-review)
-- Each round is gated by the local run of what the pipeline runs;
-  the pipeline is waited for once per MR/PR, before ready.
+- Each round is gated by the local run and pushed with the skip-ci
+  marker; the one unmarked commit starts the one pipeline run, waited
+  for before ready.
   [Iterate locally](docs/principles/ai-working-process.md#iterate-locally-wait-for-the-pipeline-once)
 - A series of rule edits ends with one top-tier consistency pass.
   [Consistency pass](docs/principles/ai-working-process.md#finish-a-series-of-rule-edits-with-one-consistency-pass)
@@ -187,7 +191,7 @@ it becomes a mechanical check (lint, CI gate) once one exists.
 
 ## Where things are
 
-Each doc role's line names its path; setup may map a role to a file or
+Each doc role's line names its path; a role may map to a file or
 folder the project already had. Agents find each role here.
 
 - `README.md` (write one if it doesn't exist yet): what this project
@@ -200,7 +204,7 @@ folder the project already had. Agents find each role here.
 - Backlog, [backlog.md](backlog.md): skim the headers; read "Deliberately
   deferred" in full before reopening something.
 - Architect-maintained (this list is the authority), edited only by
-  an architect session or by setup's seeding change: the architecture
+  an architect session: the architecture
   doc and the backlog. The decisions log is append-only, written in
   the change it records.
 - Glossary, [docs/glossary.md](docs/glossary.md): terms defined once.
@@ -218,7 +222,7 @@ folder the project already had. Agents find each role here.
   Kubernetes/ArgoCD, Python, Terraform, test harnesses, static sites
   (the homepage).
 - `.claude/agents/`: narrow-lane helpers, each definition stating its
-  lane, model and effort; `.claude/skills/`: architect, setup.
+  lane, model and effort; `.claude/skills/`: architect.
 - `.claude/rules/`: Claude Code's rules for one area of the tree,
   scoped by path; how-to every agent needs goes into
   `docs/principles/` instead (D56). Their loading is not reliable, so
@@ -242,7 +246,7 @@ this is how they map per tool.
   `.claude/settings.json`). `attribution` stays unset: Claude Code then
   credits the model on commits and MRs/PRs, a default a personal
   instruction defeats; only managed settings or a CI trailer check
-  enforce it (why: setup's `edits.md`).
+  enforce it.
 
 ## Running the tests
 

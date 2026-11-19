@@ -36,8 +36,8 @@ The scripts that take arguments (`scripts/test`, `scripts/version`,
 | `scripts/sign-app` | Checks the bundle's version, commit and identifier, re-signs it, checks the signature, identifier, hardened runtime and entitlements, and zips it into `build/` |
 | `scripts/install-app` | Installs the app into `/Applications` from a local build, the latest release (`--release`), a PR's snapshot release (`--snapshot <n>`) or a zip; see "Installing the app on the developer's Mac" below |
 | `scripts/ci-import-signing-certificate` | CI only: puts the certificate from the secret into a temporary keychain |
-| `scripts/publish-snapshot-release` | Creates or replaces a PR's snapshot release; removes it once the PR is closed |
-| `scripts/remove-snapshot-release` | Removes a closed PR's snapshot release |
+| `scripts/publish-snapshot-release` | Creates or replaces a PR's snapshot release; removes it once the PR is closed (a marked head commit needs an unmarked empty commit first, see [Work branches](../principles/ai-working-process.md#work-branches)) |
+| `scripts/remove-snapshot-release` | Removes a closed PR's snapshot release (see [Work branches](../principles/ai-working-process.md#work-branches) for a marked head commit) |
 | `scripts/publish-release` | Publishes the release for a merge to `main` |
 
 **Pipeline** (`.github/workflows/ci.yml`, GitHub Actions on a hosted
@@ -51,8 +51,8 @@ jobs so the key never meets compiled code (D29):
 
 | When | What runs |
 |---|---|
-| Every push to a PR | `test-and-build`, then `snapshot-release` |
-| A PR is closed | `remove-snapshot-release` |
+| Every push to a PR without the skip-ci marker | `test-and-build`, then `snapshot-release` |
+| A PR is closed (not skipped only if its head commit carries no skip-ci marker, see [Work branches](../principles/ai-working-process.md#work-branches)) | `remove-snapshot-release` |
 | A push to `main` that changes more than Markdown files and the homepage (`homepage/`) | `test-and-build`, then `release` |
 | A PR from a fork or from Dependabot | `test-and-build` only: tested, built and smoke-tested, never signed or published |
 
@@ -82,11 +82,12 @@ zip keeps no file permissions, so `msr` would lose its executable bit
 ([upload-artifact, "Permission Loss"](https://github.com/actions/upload-artifact#permission-loss)).
 
 **Snapshot release:** one GitHub pre-release per PR, tag `pr-<number>`,
-replaced on every push, titled `Snapshot PR #<n>: <version>`. A
+replaced on every push without the skip-ci marker, titled `Snapshot PR #<n>: <version>`. A
 pre-release rather than a draft, which only collaborators can see and
 which has no stable download link. It is published only while the PR
 is open and its head is the commit built; a run for a superseded push
-publishes nothing and succeeds. A run for a closed PR publishes nothing,
+publishes nothing and succeeds. A run for a closed PR (it does not run if the head commit carries the
+skip-ci marker, see [Work branches](../principles/ai-working-process.md#work-branches)) publishes nothing,
 removes the PR's snapshot release if one is left, and succeeds: GitHub
 keeps one job waiting per concurrency group and cancels it when another
 is queued, so a snapshot run queued after the close can replace the

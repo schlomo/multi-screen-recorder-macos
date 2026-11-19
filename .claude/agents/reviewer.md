@@ -26,7 +26,8 @@ change judged only against the design it implements can only be found
 consistent with it. A brief's focus items add to the review and never
 narrow it; its constraints are context, not the yardstick.
 
-Review the pushed state, fetched fresh: a local working tree, a branch
+Review the pushed state, fetched fresh (a round's commit usually carries the
+skip-ci marker, so it has no pipeline run): a local working tree, a branch
 name or an author's "done" is a claim, not evidence; the diff is. List
 the claims (the description, the commit messages, each assertion a doc
 change adds, every "verified" statement) and verify each against code

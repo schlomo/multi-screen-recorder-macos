@@ -38,13 +38,14 @@ so rather than silently picking a side.
   repository's default branch), merged through review, deleted after
   — never directly on the trunk. The architect-maintained docs are the
   one exception ("Docs completeness is part of being done" below).
-- How far an agent writes to the repo is chosen at setup, one of
+- How far an agent writes to the repo is chosen per project (recorded in
+  `AGENTS.md`), one of
   three levels: it pushes work branches and opens draft MRs/PRs
   (recommended), optionally also marking the ones agents opened ready
   once they are fully reviewed; it commits locally only and a human
   pushes; or it writes nothing to the repo without a per-change
-  instruction. The recommended level lets an agent push its rounds and
-  read the pipeline's result by itself, once per MR/PR ("Iterate
+  instruction. The recommended level lets an agent push its rounds
+  and read the pipeline's result by itself, once per MR/PR ("Iterate
   locally; wait for the pipeline once" below), before a human spends
   review time on it. With the option, the session that
   owns an MR/PR an agent opened (it opened it, briefed the agent that
@@ -56,7 +57,7 @@ so rather than silently picking a side.
   host start an automated review, the MR/PR says not to merge until
   that review is handled. An agent never marks a human's draft ready.
   Where the host runs an automated review, it can be billed per use,
-  so setup records the option there only with a go-ahead naming the
+  so the option is recorded there only with a go-ahead naming the
   account that pays ("Live systems need a human's go-ahead"). At every level,
   credentials that happen to be present are not consent, and neither
   is a request to "fix it": the level and
@@ -82,13 +83,21 @@ so rather than silently picking a side.
   is rewritten. Beyond rebasing an unshared branch (below), a forced
   push is only for scrubbing an accidentally committed secret.
 - When the trunk moves under an open branch, how the branch catches
-  up follows the repo's merge method, recorded at setup. What decides
+  up follows the repo's merge method, recorded in `AGENTS.md`. What decides
   it is whether the trunk must stay linear without squashing:
-  - **Squash merges** (the setup default): bring the trunk in with a
-    plain `git merge` and push that like any other commit. Fetch
-    right before it (`git fetch origin`, then
-    `git merge origin/<trunk>`), and before pushing check that the
-    trunk is an ancestor of the branch with
+  - **Squash merges** (the default): bring the trunk in with a
+    plain `git merge` and push that like any other round. Fetch right
+    before it (`git fetch origin`). Before the one pipeline run the
+    merge is a round and carries the skip-ci marker:
+    `git merge -m "Merge origin/<trunk> [skip ci]" origin/<trunk>`.
+    After the run it is unmarked like any other commit
+    (`git merge origin/<trunk>`), and the pipeline re-runs on the
+    merged result: a marked head commit at close time skips the run
+    that removes the PR's snapshot release, and its check stays
+    pending. A PR closed without merging whose head commit carries the
+    skip-ci marker gets an unmarked empty commit first, so its snapshot
+    release is removed (the architect's reading, D61). Before pushing,
+    check that the trunk is an ancestor of the branch with
     `git merge-base --is-ancestor origin/<trunk> HEAD`, and stop and
     ask if it fails: a merge against a stale trunk ref is a silent
     no-op. Once the branch is pushed, don't rebase it, and don't
@@ -115,7 +124,7 @@ so rather than silently picking a side.
   ask.
 - By default, what an agent authors says so: each commit carries a
   co-author trailer naming the model, and each MR/PR description a
-  generated-with line. Setup records the project's choice; the tool's
+  generated-with line. `AGENTS.md` records the project's choice; the tool's
   setting carries it where one exists (the root instruction file names
   it per tool). Under squash merges, the per-commit trailers reach the
   trunk only if the host's squash commit message keeps them; whether
@@ -170,7 +179,7 @@ which. So before each paid run, state what it runs, roughly what it
 costs and whether a credential is set in its environment (a presence
 check, never the value), then ask which account pays; the go-ahead
 names that account. The one standing go-ahead is for the automated
-review a host runs on the MRs/PRs agents open: setup records it once,
+review a host runs on the MRs/PRs agents open: `AGENTS.md` records it once,
 naming the account and what starts a review, and it holds until a
 human withdraws it. Where the host runs such a review, the option of
 marking MRs/PRs ready ("Work branches") needs it.
@@ -321,10 +330,27 @@ reviewer never fixes them itself.
 
 **Rule:** every round of a change (the first build, each fix round)
 is gated by running locally what the pipeline runs: the project's own
-scripts, on the round's final commit. The round is pushed without
-waiting for the pipeline, and reviews start on the pushed commit. The
-pipeline is waited for once per MR/PR: on the commit about to be
-marked ready.
+scripts, on the round's final commit. The round is then pushed with
+`[skip ci]`, the skip-ci marker, in its commit message, so it starts no
+pipeline run, and
+reviews read the pushed commit. The draft MR/PR is opened at the first
+push. The commit about to be marked ready carries no marker (an empty
+commit if need be); it starts the one pipeline run, which is waited
+for before ready. The owner's open questions are settled and recorded
+before that commit. A run GitHub cancels for want of a runner is
+re-run, never answered by a push. A fix after the one run is again a
+commit without the marker, and the description names it. An agent's
+round push uses the marker; the session that owns the MR/PR makes the
+final, unmarked commit (the architect's reading, D61). When the owner
+asks for the snapshot release, which a marked push does not make, the
+owning session pushes one unmarked commit, a named exception (the
+architect's reading, D61). An MR/PR title or description never
+contains any of GitHub's skip strings (`[skip ci]`, `[ci skip]`,
+`[no ci]`, `[skip actions]`, `[actions skip]`, and a `skip-checks: true`
+trailer; [GitHub's list](https://docs.github.com/en/actions/managing-workflow-runs-and-deployments/managing-workflow-runs/skipping-workflow-runs)):
+squash merges use them as the commit message, and GitHub skips any run
+whose commit message holds one, which would skip the release from the
+trunk.
 **Why:** the pipeline's jobs are the project's own scripts ("Thin
 CI" in [engineering.md](engineering.md)), and the owner designed it so
 that nothing on it cannot be tested locally (D56). A wait after every
@@ -334,9 +360,9 @@ runner's load (the troubleshooting log has both). The one wait before
 ready still catches those. The owner, on waiting per round: "We
 wasted way way too much time waiting on CI" (D56).
 **How:** a builder's report states the local run (commands and
-exit codes) on the commit it pushed; the delegating session relies on
-it for the round and waits for the pipeline only before marking the
-MR/PR ready. An agent that cannot run the scripts (a Linux container
+exit codes) on the commit it pushed with the marker; the delegating
+session relies on it for the round and waits for the pipeline only
+before marking the MR/PR ready. An agent that cannot run the scripts (a Linux container
 for a macOS build) says so: its round is UNVERIFIED, and the pipeline
 is its gate. A difference between the local run and the pipeline
 (another toolchain version, a missing tool) shows up at that one
@@ -370,7 +396,7 @@ dropped rather than kept.
 
 The architect-maintained docs (listed in [AGENTS.md](../../AGENTS.md),
 the one authority) are edited only by an architect session, by direct
-push to the trunk, or by setup in its one seeding change; a work
+push to the trunk; a work
 branch that invalidates something in one of them flags it instead of
 editing it. That direct-push channel carries docs only, so it can't
 smuggle in a behavior change unreviewed. An agent definition or skill
@@ -436,7 +462,7 @@ What genuinely survives a change goes to one of three places instead:
 ## Changing a principle
 
 These principles evolve with the project, but none changes silently:
-not by the architect, not by setup, not as a side effect of other
+not by the architect, not as a side effect of other
 work. Wording alone hides what a change costs, so the proposal to the
 human shows:
 
@@ -587,7 +613,8 @@ front, every time:
 1. **Completion discipline**, first, where it is read before
    anything else: run everything in the foreground; do not start a
    background watch and end the turn waiting on a notification; commit
-   and, at the recorded write level, push before reporting; if
+   and, at the recorded write level, push before reporting, the
+   round's push carrying the skip-ci marker; if
    something backgrounds anyway, collect it now and finish. A subagent left to wait on its own child task
    will report a non-result and stall the whole chain.
 2. **What to build or investigate**, and the scope boundary — what's
@@ -674,7 +701,7 @@ gives one-line commands.
   in [platform-notes/](platform-notes/) for one technology or one
   part of the tree. A tool's own files (Claude Code's `.claude/` with
   its skills, agent definitions and path-scoped rules) hold only what
-  is specific to that tool: the skills (architect, setup) with their
+  is specific to that tool: the architect skill with its
   references, the agent definitions they delegate to, and a
   path-scoped rule only for what concerns Claude Code alone.
 

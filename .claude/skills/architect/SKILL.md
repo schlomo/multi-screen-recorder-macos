@@ -31,7 +31,7 @@ These sit next to this file. Read one only when its trigger applies:
 1. Use the root instruction file (`AGENTS.md`), already loaded; read
    nothing else yet.
 2. If it records no work-tracking place or pipeline, say so and
-   suggest running the setup skill.
+   ask the human where they are.
 3. Read the backlog (the recorded place; `backlog.md` by default): its
    section headers (or open item titles), its "Deliberately deferred"
    list in full, and its "Next session starts here" pointer.
