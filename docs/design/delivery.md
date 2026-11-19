@@ -56,9 +56,9 @@ compiled code (D29), and the end-to-end tests in a third (D63):
 
 | When | What runs |
 |---|---|
-| Every push to a PR without the skip-ci marker | `test-and-build`, then `snapshot-release` and `end-to-end-test` |
+| Every push to a PR without the skip-ci marker | `test-and-build`, then `end-to-end-test`, then `snapshot-release` |
 | A PR is closed (not skipped only if its head commit carries no skip-ci marker, see [Work branches](../principles/ai-working-process.md#work-branches)) | `remove-snapshot-release` |
-| A push to `main` that changes more than Markdown files and the homepage (`homepage/`) | `test-and-build`, then `release` and `end-to-end-test` |
+| A push to `main` that changes more than Markdown files and the homepage (`homepage/`) | `test-and-build`, then `end-to-end-test`, then `release` |
 | A PR from a fork or from Dependabot | `test-and-build`, then `end-to-end-test`: tested, built, smoke-tested and end-to-end tested, never signed or published |
 
 Three things cross from `test-and-build` into a signing job, and the
@@ -108,7 +108,8 @@ finish, not the order of the pushes (see "Accepted risks").
 `test-and-build` and `end-to-end-test` stop after 20 minutes (a run of
 `test-and-build` takes about 2), so a hanging test fails the job
 instead of holding a runner for GitHub's six hours. The signing jobs
-do not wait for `end-to-end-test`; whether they should is open (D63).
+wait for `end-to-end-test` too, so nothing that failed it is signed or
+published (D63).
 
 **Versions** (D42) carry the committer date of HEAD in UTC, DATE as
 YYYYMMDD, and the number of commits on `main`, N:

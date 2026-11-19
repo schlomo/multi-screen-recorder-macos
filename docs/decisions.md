@@ -1933,9 +1933,9 @@ architect's reading.
      by their SHA-256 (`scripts/ci-install-end-to-end-tools`) and runs
      `scripts/end-to-end-test`; all behaviour lives in the scripts and
      the driver. It runs for every pipeline run `test-and-build` runs
-     for, forks and Dependabot included. Open, for the owner: whether
-     the signing jobs (snapshot release, release) wait for it; this
-     change leaves them as they were, needing `test-and-build` only.
+     for, forks and Dependabot included. The signing jobs (snapshot
+     release, release) wait for it: nothing is signed or published that
+     failed it.
   2. The same driver runs on the owner's Mac (D34, D48); what needs real
      hardware stays there.
   3. The driver is the package's executable `msr-end-to-end`, never in
@@ -1947,7 +1947,24 @@ architect's reading.
      connected, its mode switched and disconnected, the test tone through
      BlackHole (level, silent stretches, timing across files by
      timecode), the system audio, stop by Ctrl-C and by `kill -9`.
-- **Deviation from the agreed design, for the owner to confirm:** the
+  5. The restore file stays in the scratch folder, by default
+     `msr-end-to-end` in the temporary folder (`$TMPDIR`).
+  6. Standard error: the test that every write to standard error passes
+     the app's one writer protects the app's status line. It keeps
+     scanning every target under `Sources/`, so a new target is covered
+     by default, and exempts by name the end-to-end tests' targets
+     (`msr-end-to-end`, `EndToEndLogic`, `VirtualScreen`), a separate
+     program with no status line; it fails should an exempted target no
+     longer exist. The driver writes its error lines (`FAIL`, `STOP`,
+     `restore: FAILED`, `restore: NOT RESTORED`) to standard error, as
+     "Fail early and loudly" asks; progress and `ok` lines stay on
+     standard output, and the device helper's `failed` line on its
+     standard output is its protocol with the driver.
+- **Rulings of 2026-11-19:** the owner on points 1, 5 and the mode
+  switch below: "3 design choices for e2e test ok". The owner on
+  point 6: "Stderror handling think big as architect and apply common
+  sense"; point 6 is the architect's ruling under it.
+- **Deviation from the agreed design, confirmed by the owner:** the
   design makes a frame size change by replacing a virtual screen with
   one of another size. Tried on 2026-11-19 (macOS 27.2.1): macOS brings
   a virtual screen back at the last mode its identity had, whatever

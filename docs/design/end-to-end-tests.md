@@ -112,7 +112,8 @@ unasked (`AGENTS.md`, "Facts that bite"). Not part of
 `scripts/test`. The pipeline runs it too, on GitHub's hosted runner,
 whose image grants both permissions (D63): the job `end-to-end-test`
 after `test-and-build`, with ffmpeg and BlackHole installed at fixed
-versions by `scripts/ci-install-end-to-end-tools`.
+versions by `scripts/ci-install-end-to-end-tools`; the signing jobs
+wait for it, so nothing that failed it is signed or published.
 
 ### Built so far
 
@@ -136,7 +137,15 @@ screen that connected later, so every mode switch and every read of
 the state after a run is a process of its own (`switch-mode`, `state`,
 `restore`); and macOS brings a virtual screen back at the last mode its
 identity had, so the helper puts it back to its first size when it
-starts and when it ends.
+starts and when it ends. A frame size change is therefore a mode switch
+on the virtual screen, not the replacement "The design" describes; the
+owner confirmed it (D63).
+
+The driver writes its error lines (`FAIL`, `STOP`, `restore: FAILED`,
+`restore: NOT RESTORED`) to standard error and its progress and `ok`
+lines to standard output. Its targets are exempt from the app's rule
+that only one writer writes to standard error, which protects the app's
+status line (D63).
 
 Every `msr record` gets a `--duration`: the scenario's own, or for a
 scenario stopped by a signal its stop plus 120 s, a ceiling, so a
@@ -832,12 +841,6 @@ this design is built:
 
 ## Open questions
 
-- A frame size change is made by a mode switch on the virtual screen,
-  not by replacing the screen with one of another size, as "The design"
-  has it: macOS brings a replaced screen back at its identity's last
-  mode (D63). Is the mode switch the way?
-- Should the signing jobs wait for `end-to-end-test`, so nothing is
-  published that failed it (D63)?
 - Which items of the v1 gate these tests replace.
 - Does the owner's BetterDisplay HiDPI mode work through virtual
   screens ("What research found for the recorder")?

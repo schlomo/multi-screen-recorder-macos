@@ -70,7 +70,7 @@ jobs:
     # Signing job: never compiles, never restores a cache, and never executes
     # anything that came out of the artifact; its scripts come from its own
     # checkout.
-    needs: test-and-build
+    needs: [test-and-build, end-to-end-test]
     if: >-
       github.event_name == 'pull_request'
       && github.event.action != 'closed'
@@ -129,7 +129,7 @@ jobs:
     # Signing job: never compiles, never restores a cache, and never executes
     # anything that came out of the artifact; its scripts come from its own
     # checkout.
-    needs: test-and-build
+    needs: [test-and-build, end-to-end-test]
     if: github.event_name == 'push'
     runs-on: macos-26
     permissions:

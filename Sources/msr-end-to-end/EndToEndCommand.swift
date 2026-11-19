@@ -23,6 +23,12 @@ struct EndToEndCommand: ParsableCommand {
     }
 }
 
+/// An error line: on standard error, where a program's errors go; progress
+/// and `ok` lines stay on standard output.
+func printError(_ line: String) {
+    FileHandle.standardError.write(Data("\(line)\n".utf8))
+}
+
 struct ScratchOption: ParsableArguments {
     @Option(help: "The folder for the restore file and the recordings (default: msr-end-to-end in the temporary folder).")
     var scratchFolder: String?
@@ -69,20 +75,20 @@ struct Run: ParsableCommand {
                     try? FileManager.default.removeItem(at: folder)
                 } else {
                     failed += 1
-                    print("FAIL  \(scenario.name) (\(took)): \(scenario.summary)")
-                    for failure in failures { print("      \(failure)") }
-                    print("      kept: \(folder.path)")
+                    printError("FAIL  \(scenario.name) (\(took)): \(scenario.summary)")
+                    for failure in failures { printError("      \(failure)") }
+                    printError("      kept: \(folder.path)")
                 }
                 if let margin = driver.margin { print("      margin: \(margin)") }
             } catch {
                 stopped = error
-                print("STOP  \(scenario.name): \(error); kept: \(scratchFolder.appending(path: scenario.name).path)")
+                printError("STOP  \(scenario.name): \(error); kept: \(scratchFolder.appending(path: scenario.name).path)")
                 break
             }
             guard restore(driver, keepingFile: true) else { break }
             if Interruption.shared.happened {
                 stopped = DriverError("interrupted")
-                print("STOP  interrupted after \(scenario.name)")
+                printError("STOP  interrupted after \(scenario.name)")
                 break
             }
         }
@@ -90,7 +96,7 @@ struct Run: ParsableCommand {
         if let stopped { throw stopped }
         if !restored { throw ExitCode.failure }
         if failed > 0 {
-            print("msr-end-to-end: \(failed) of \(scenarios.count) scenarios failed")
+            printError("msr-end-to-end: \(failed) of \(scenarios.count) scenarios failed")
             throw ExitCode.failure
         }
         print("msr-end-to-end: all \(scenarios.count) scenarios passed")
@@ -107,10 +113,10 @@ struct Run: ParsableCommand {
             try process.run()
             process.waitUntilExit()
         } catch {
-            print("restore: FAILED to start: \(error); run scripts/end-to-end-test restore")
+            printError("restore: FAILED to start: \(error); run scripts/end-to-end-test restore")
             return false
         }
-        if process.terminationStatus != 0 { print("restore: FAILED; run scripts/end-to-end-test restore") }
+        if process.terminationStatus != 0 { printError("restore: FAILED; run scripts/end-to-end-test restore") }
         return process.terminationStatus == 0
     }
 }
@@ -134,9 +140,9 @@ struct Restore: ParsableCommand {
             return
         }
         let still = try restorer.restore(removingFile: !keepRestoreFile)
-        for line in still { print("restore: NOT RESTORED  \(line)") }
+        for line in still { printError("restore: NOT RESTORED  \(line)") }
         if !still.isEmpty {
-            print("restore: the restore file is kept: \(restorer.file.path)")
+            printError("restore: the restore file is kept: \(restorer.file.path)")
             throw ExitCode.failure
         }
         if !keepRestoreFile { print("restore: the Mac is as it was before the run") }

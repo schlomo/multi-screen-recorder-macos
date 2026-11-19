@@ -11,8 +11,6 @@ final class ChildProcess {
     let executable: String
     let standardOutput: URL
     let standardError: URL
-    /// Descriptor 2 in the child; the driver itself never writes there.
-    static let childErrorDescriptor: Int32 = 2
     private var lifeline: Int32?
     private(set) var exit: ExitStatus?
 
@@ -44,7 +42,7 @@ final class ChildProcess {
             posix_spawn_file_actions_addopen(&actions, STDIN_FILENO, "/dev/null", O_RDONLY, 0)
         }
         posix_spawn_file_actions_addopen(&actions, STDOUT_FILENO, standardOutput.path, O_WRONLY | O_CREAT | O_TRUNC, 0o644)
-        posix_spawn_file_actions_addopen(&actions, Self.childErrorDescriptor, standardError.path, O_WRONLY | O_CREAT | O_TRUNC, 0o644)
+        posix_spawn_file_actions_addopen(&actions, STDERR_FILENO, standardError.path, O_WRONLY | O_CREAT | O_TRUNC, 0o644)
         var attributes = posix_spawnattr_t(nil as OpaquePointer?)
         posix_spawnattr_init(&attributes)
         defer { posix_spawnattr_destroy(&attributes) }
