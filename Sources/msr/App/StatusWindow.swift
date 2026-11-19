@@ -99,7 +99,7 @@ struct StatusView: View {
                     ForEach(Array(model.problems.enumerated()), id: \.offset) { _, problem in
                         Text(problem).foregroundStyle(.red).fixedSize(horizontal: false, vertical: true)
                     }
-                    Text("The log of the last 2 hours, for a report, in Terminal: \(CrashReport.logCommand)")
+                    Text(RecordingNames.forAReport)
                         .font(.callout)
                         .foregroundStyle(.secondary)
                         .textSelection(.enabled)

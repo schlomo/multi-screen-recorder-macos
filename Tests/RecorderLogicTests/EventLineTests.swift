@@ -15,7 +15,7 @@ import Testing
     @Test func anEventWithoutAScreenAndWithAnError() {
         #expect(EventLine.text(RecordingEvent(at: 0, event: .sleep), started: start, timeZone: berlin) == "22:14:31 +0.0s sleep")
         var failed = RecordingEvent(at: 61_300_000_000, event: .screenStreamFailed, screen: "LG")
-        failed.error = "-3811"
+        failed.errorDetail = "-3811"
         #expect(EventLine.text(failed, started: start, timeZone: berlin) == "22:15:32 +61.3s screen stream failed: LG (-3811)")
     }
 
@@ -33,6 +33,15 @@ import Testing
         var gap = RecordingEvent(at: 0, event: .audioInputGap, audioSource: "Razer Seiren V3 Mini")
         gap.length = 0.25
         #expect(EventLine.text(gap, started: start, timeZone: berlin).hasSuffix("audio input gap: Razer Seiren V3 Mini 0.250s"))
+    }
+
+    /// The recording log's lines (D64) start, as an event's, with the local time and the offset.
+    @Test func theRecordingLogsDetailAndProblemLines() {
+        #expect(EventLine.detailText("start Screen 3 - LG", category: "recorder", seconds: 27.94, started: start, timeZone: berlin)
+            == "22:14:58 +27.9s debug recorder: start Screen 3 - LG")
+        let problem = RecordingProblem(at: 61_300_000_000, problem: "Screen file a.mov", error: "cannot write a.mov")
+        #expect(EventLine.problemText(problem, started: start, timeZone: berlin)
+            == "22:15:32 +61.3s problem: Screen file a.mov: cannot write a.mov")
     }
 
     @Test func aDebugLineCarriesTheTimeSinceTheStartAsAnEventLineDoes() {

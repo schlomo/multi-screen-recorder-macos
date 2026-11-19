@@ -32,7 +32,7 @@ struct TimecodeTrack {
             ] as CFDictionary,
             formatDescriptionOut: &format)
         guard status == noErr, let format else {
-            throw MovieTrackError(description: "cannot describe the timecode track (error \(status))")
+            throw MovieTrackError(description: "cannot describe the timecode track (error \(ErrorDetail.codeText(Int(status))))")
         }
         self.format = format
         input = AVAssetWriterInput(mediaType: .timecode, outputSettings: nil, sourceFormatHint: format)
@@ -54,7 +54,7 @@ struct TimecodeTrack {
             allocator: nil, memoryBlock: nil, blockLength: MemoryLayout<Int32>.size, blockAllocator: nil,
             customBlockSource: nil, offsetToData: 0, dataLength: MemoryLayout<Int32>.size, flags: 0, blockBufferOut: &block)
         guard status == noErr, let block else {
-            throw MovieTrackError(description: "cannot make a timecode sample (error \(status))")
+            throw MovieTrackError(description: "cannot make a timecode sample (error \(ErrorDetail.codeText(Int(status))))")
         }
         status = CMBlockBufferReplaceDataBytes(
             with: &value, blockBuffer: block, offsetIntoDestination: 0, dataLength: MemoryLayout<Int32>.size)
@@ -70,7 +70,7 @@ struct TimecodeTrack {
                 sampleSizeEntryCount: 1, sampleSizeArray: &size, sampleBufferOut: &sample)
         }
         guard status == noErr, let sample else {
-            throw MovieTrackError(description: "cannot make a timecode sample (error \(status))")
+            throw MovieTrackError(description: "cannot make a timecode sample (error \(ErrorDetail.codeText(Int(status))))")
         }
         return sample
     }
@@ -121,7 +121,7 @@ func pcmFormat(channels: Int) throws(MovieTrackError) -> CMAudioFormatDescriptio
         allocator: nil, asbd: &stream, layoutSize: 0, layout: nil, magicCookieSize: 0, magicCookie: nil,
         extensions: nil, formatDescriptionOut: &format)
     guard status == noErr, let format else {
-        throw MovieTrackError(description: "cannot describe the PCM of \(channels) channels (error \(status))")
+        throw MovieTrackError(description: "cannot describe the PCM of \(channels) channels (error \(ErrorDetail.codeText(Int(status))))")
     }
     return format
 }
@@ -137,7 +137,7 @@ func pcmSample(_ channels: ArraySlice<[Float]>, format: CMAudioFormatDescription
         allocator: nil, memoryBlock: nil, blockLength: length, blockAllocator: nil, customBlockSource: nil,
         offsetToData: 0, dataLength: length, flags: kCMBlockBufferAssureMemoryNowFlag, blockBufferOut: &block)
     guard status == noErr, let block else {
-        throw MovieTrackError(description: "cannot make an audio sample (error \(status))")
+        throw MovieTrackError(description: "cannot make an audio sample (error \(ErrorDetail.codeText(Int(status))))")
     }
     var data: UnsafeMutablePointer<CChar>?
     status = CMBlockBufferGetDataPointer(block, atOffset: 0, lengthAtOffsetOut: nil, totalLengthOut: nil, dataPointerOut: &data)
@@ -156,7 +156,7 @@ func pcmSample(_ channels: ArraySlice<[Float]>, format: CMAudioFormatDescription
             presentationTimeStamp: time, packetDescriptions: nil, sampleBufferOut: &sample)
     }
     guard status == noErr, let sample else {
-        throw MovieTrackError(description: "cannot make an audio sample (error \(status))")
+        throw MovieTrackError(description: "cannot make an audio sample (error \(ErrorDetail.codeText(Int(status))))")
     }
     return sample
 }

@@ -93,9 +93,9 @@ final class RecordCommandDelegate: NSObject, NSApplicationDelegate {
             return
         }
         do {
-            session = try RecordingSession(settings: settings, homeFolder: home, output: output)
+            session = try RecordingSession(settings: settings, homeFolder: home, readyCheckFacts: facts, output: output)
         } catch {
-            output.tell(.error, "Error: \(error)\n")
+            output.tell(.error, "Error: \(ErrorDetail(error).text)\n")
             exitStatus = recordingEndedWithErrorExitCode
             endEventLoop()
             return

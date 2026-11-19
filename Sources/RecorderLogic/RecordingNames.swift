@@ -51,6 +51,11 @@ public enum RecordingNames {
     }
 
     public static let manifest = "recording.json"
+    /// The recording log, next to the recording manifest (D64).
+    public static let recordingLog = "recording.log"
+    /// The status window's line under its problems: the two files a report needs (D64).
+    public static let forAReport =
+        "For a report, \(manifest) and \(recordingLog) in the recording folder show what happened; attach them to the issue."
 
     /// A device name as part of a file name: `/` and `:`, which a file name
     /// cannot hold or Finder shows as the other, become `-`, so a name never

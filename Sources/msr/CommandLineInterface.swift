@@ -76,7 +76,7 @@ func homeFolderOrExit() throws -> URL {
     do {
         return try homeFolder()
     } catch let error as MissingHomeFolderError {
-        StandardErrorWriter.shared.write("Error: \(error)\n")
+        StandardErrorWriter.shared.write("Error: \(ErrorDetail(error).text)\n")
         throw unsetHomeExitCode
     }
 }

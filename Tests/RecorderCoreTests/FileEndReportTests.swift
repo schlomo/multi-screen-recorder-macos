@@ -15,9 +15,9 @@ private func fileEnd(_ error: ScreenFileWriterError?, endsAt: Double = 12.5) -> 
 private func writerError(_ text: String) -> ScreenFileWriterError { ScreenFileWriterError(description: text, isDiskFull: false) }
 private let fullDisk = ScreenFileWriterError(description: "cannot write f.mov: full", isDiskFull: true)
 
-private func failedEvent(at seconds: Double, error: String) -> RecordingEvent {
+private func failedEvent(at seconds: Double, error: ErrorDetail) -> RecordingEvent {
     var event = RecordingEvent(at: Int64(seconds * 1_000_000_000), event: .screenFileWriterFailed, screen: "LG")
-    event.error = error
+    event.errorDetail = error
     return event
 }
 
@@ -31,8 +31,8 @@ private func failedEvent(at seconds: Double, error: String) -> RecordingEvent {
         #expect(report.event == nil)
         #expect(report.problem == RecordingProblem(
             at: 12_500_000_000, problem: "Screen file f.mov",
-            error: "the guide track \"Audio inputs\" ends before the video: the samples of its last mix were no longer there; "
-                + "the guide track \"System audio\" ends before the video: the writer did not take its last samples in time"))
+            error: ErrorDetail(message: "the guide track \"Audio inputs\" ends before the video: the samples of its last mix were no longer there; "
+                + "the guide track \"System audio\" ends before the video: the writer did not take its last samples in time")))
         // A writer's error says more and wins.
         var failed = fileEnd(writerError("cannot write f.mov: no luck"))
         failed.guideTracksCut = [GuideTrackCut(guide: .audioInputs, why: .samplesGone)]

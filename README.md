@@ -118,8 +118,8 @@ Then send the person who asked you to test:
   the version, your screens and audio inputs and the ready check.
   Press Shift-Command-4, then Space, then click the window;
   the screenshot lands on your desktop;
-- `recording.json` from the recording folder of every recording you
-  made, the ones that went fine too: it shows how far each audio input
+- `recording.json` and `recording.log` from the recording folder of every recording you
+  made, the ones that went fine too: they show how far each audio input
   drifted, how much the recorder corrected, and everything that happened. The recording folders are in
   the output folder the app's window shows, by default
   `~/Movies/Multi Screen Recorder/`, one folder per recording;
@@ -148,9 +148,15 @@ Use the
 (a GitHub account is needed). It asks for the output of `msr version`
 (see "Command line" below; About Multi Screen Recorder in the app's
 menu shows the same), what happened and what you expected, and the
-recording's `recording.json`. Issues are public: the form says what
-`recording.json` contains, so you can remove what you don't want to
-share.
+recording's `recording.json`. Please also drag the recording's
+`recording.json` and `recording.log` from its recording folder into the
+issue: `recording.log` is the recording log, every event and problem of
+the recording with the full error macOS gave, and what the app did and
+read meanwhile, one line each. Issues are public: the form says what
+`recording.json` contains, and `recording.log` names the same screens
+and audio inputs; open both in TextEdit and remove what you don't want
+to share. Nothing is sent automatically: you see the files and attach
+them yourself.
 
 ## Usage
 
@@ -183,13 +189,16 @@ window: each screen and audio source with its files, the data written
 and its state, the time recorded (`h:mm:ss`, every second), data and
 free space, the CPU use of Multi Screen Recorder itself (encoding and
 capture also run in macOS's own processes, which it does not include),
-and any problems in red. Stop there finalizes the files, opens the
+and any problems in red, with a line naming the two files a report
+needs. Stop there finalizes the files, opens the
 recording folder in Finder and quits; Continue keeps recording. The
 recording folder holds a video file per screen, a new one each time a
 screen comes back or changes its frame size, an audio file per audio
 source (a microphone unplugged and plugged in again gets a new one),
-and `recording.json`, which lists every file, what happened and every
-problem, and says how the recording ended.
+`recording.json`, which lists every file, what happened and every
+problem, and says how the recording ended, and `recording.log`, the
+recording log: every event and problem with the full error, and what
+the app did meanwhile, one line each.
 
 ### Command line
 
@@ -307,10 +316,14 @@ needed) and Finder shows a copy of the crash report as a text file to
 drag into it. Issues are public, and a crash report contains your Mac's
 user name: check it first.
 
-The app and `msr` write what happens during a recording (every event and
-problem) to the macOS unified log; `msr record --debug` and
-`msr check --debug` add detail. To attach the log of the last 2 hours
-to an issue, run in Terminal:
+Every recording writes what happens during it (every event and
+problem, with the full error, and what the app did meanwhile) to
+`recording.log` in its recording folder; attach it and `recording.json`
+to a report (see "Reporting a problem"). The crash report dialog asks
+for them too. The app and `msr` also write every event and problem to
+the macOS unified log; `msr record --debug` and `msr check --debug`
+show the detail on standard error. For a crash outside a recording,
+attach the log of the last 2 hours; run in Terminal:
 
 ```sh
 log show --last 2h --predicate 'subsystem == "org.schapiro.multiscreenrecorder" and process == "msr"'

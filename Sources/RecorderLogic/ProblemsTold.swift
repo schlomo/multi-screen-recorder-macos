@@ -1,6 +1,8 @@
 /// What a problem is, for telling a repeating one once (D46).
 public enum ProblemKind: Hashable, Sendable {
     case manifestNotWritten
+    /// The recording log cannot be created or written; clears when writing it works again.
+    case recordingLogNotWritten
     case screensNotRead
     case freeSpaceNotRead
     /// A screen, by its UUID, whose screen file a failure ended (its

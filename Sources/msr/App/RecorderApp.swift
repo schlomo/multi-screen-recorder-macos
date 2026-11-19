@@ -24,7 +24,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         } catch {
             let alert = NSAlert()
             alert.messageText = "Multi Screen Recorder cannot start"
-            alert.informativeText = String(describing: error)
+            alert.informativeText = ErrorDetail(error).text
             alert.runModal()
             NSApp.terminate(nil)
             return
@@ -47,11 +47,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     /// Start: the window closes; the Dock icon shows "!" when something needs the person.
     private func startRecording() {
-        guard let model, model.canStart else { return }
+        guard let model, model.canStart, let facts = model.readyCheckFacts else { return }
         do {
-            session = try RecordingSession(settings: model.settings, homeFolder: model.homeFolder, output: nil)
+            session = try RecordingSession(
+                settings: model.settings, homeFolder: model.homeFolder, readyCheckFacts: facts, output: nil)
         } catch {
-            showAlert("Cannot start the recording", error.description)
+            showAlert("Cannot start the recording", ErrorDetail(error).text)
             return
         }
         model.recordingStarted()
@@ -166,7 +167,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             guard alert.runModal() == .alertFirstButtonReturn else { return }
             let copy: URL
             do { copy = try makeTextCopy(of: name, homeFolder: homeFolder) } catch {
-                showAlert("Cannot copy the crash report", error.localizedDescription)
+                showAlert("Cannot copy the crash report", ErrorDetail(error).text)
                 return
             }
             let issue = CrashReport.issueURL(
@@ -177,7 +178,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 showAlert("Cannot open the browser", "Open this address yourself:\n\(issue.absoluteString)")
             }
         } catch {
-            showAlert("Cannot offer the crash report", error.localizedDescription)
+            showAlert("Cannot offer the crash report", ErrorDetail(error).text)
         }
     }
 

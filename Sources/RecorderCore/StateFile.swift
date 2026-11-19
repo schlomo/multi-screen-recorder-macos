@@ -22,12 +22,10 @@ public struct StateFile: Sendable {
         guard FileManager.default.fileExists(atPath: url.path(percentEncoded: false)) else { return .empty }
         let data: Data
         do { data = try Data(contentsOf: url) } catch {
-            throw StateFileError(fileURL: url, problem: error.localizedDescription)
+            throw StateFileError(fileURL: url, problem: ErrorDetail(error).text)
         }
-        do { return try AppState(json: data) } catch let error as DecodingError {
-            throw StateFileError(fileURL: url, problem: String(describing: error))
-        } catch {
-            throw StateFileError(fileURL: url, problem: error.localizedDescription)
+        do { return try AppState(json: data) } catch {
+            throw StateFileError(fileURL: url, problem: ErrorDetail(error).text)
         }
     }
 
@@ -36,7 +34,7 @@ public struct StateFile: Sendable {
             try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
             try state.jsonData().write(to: url, options: .atomic)
         } catch {
-            throw StateFileError(fileURL: url, problem: error.localizedDescription)
+            throw StateFileError(fileURL: url, problem: ErrorDetail(error).text)
         }
     }
 }

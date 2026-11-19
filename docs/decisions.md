@@ -1910,3 +1910,74 @@ architect's reading.
 - **Evidence:** [design/recorder.md](design/recorder.md), "Audio only",
   "Ready check" and "Build state"; `ReadyCheckTests`,
   `ScreenTrackerTests`, `WhatWillBeRecordedTests`.
+
+## D64: Diagnostics: the error detail everywhere, a recording log per recording, reports without Terminal (2026-11-19)
+
+- **Status:** in force; point 3 is decided but not built yet (see
+  "Consequences").
+- **Context:** A CI run of PR #23 showed `screen file writer failed …
+  The operation could not be completed` with no code: the screen file
+  writer kept only `localizedDescription`, so the cause cannot be
+  found. The owner, 2026-11-19: "The error handing pr must be smarter
+  about collection unknown and unexpected errors in general so that
+  future similar situations will give us something to analyze. Same
+  with user reports. And think about how to connect such error details
+  from GUI runs without terminal, ideally writing something into the
+  results folder"; on the design: "Rewrite log in full on every event?
+  Better append. Otherwise agree".
+- **Decision:**
+  1. **Error detail.** One type (`ErrorDetail`, pure logic in
+     `RecorderLogic`) turns any error into its full chain: domain, code
+     (a code whose four bytes are printable also as its four-character
+     code), description, failure reason, recovery suggestion and every
+     underlying error, recursively, 8 levels deep at most. Every place
+     that turns an error into text goes through it: events, problems,
+     `Error:` lines, alerts and the logs, for screens, audio, settings,
+     files and the ready check. The recording manifest's events and
+     problems with an `error` gain `errorDetail`, the structured value;
+     null (for a problem) or absent (for an event) where there is no
+     `error`. A test fails when any source file but the error detail's
+     own reads `localizedDescription`.
+  2. **Recording log.** `recording.log` in the recording folder, always
+     written, in the app and in `msr record`: every event, every
+     problem with its full error, and the detail lines that before only
+     `--debug` printed (the tracker's actions, the screens as read,
+     files started and ended, the clock drift block every 10 s, the
+     gaps, the ready check's facts). Append-only: each line is appended,
+     never rewritten; after an event's or a problem's line the file is
+     synchronized to disk; detail lines wait in memory until the next
+     event, problem or Stop, at most 10 s. Lines as on standard error,
+     with the local time and the offset from the start. `--debug` only
+     decides whether detail lines also go to standard error; the
+     unified log stays as it is. A recording log that cannot be written
+     is a problem, told once; the recording goes on. This partially
+     reverses D46 ("No log file of our own"): not an app-wide log, but
+     one bounded file per recording, next to the files it explains.
+  3. **User reports without Terminal.** When a recording ends with
+     `result` `problems`, the status window shows **Report a problem**:
+     it opens a new GitHub issue with the app version, the result and
+     the problem lines with their error chains filled in, cut to a safe
+     URL length, and reveals `recording.json` and `recording.log` in
+     Finder for the person to attach. Nothing is sent automatically.
+     The crash report dialog, the status window's problem text and the
+     README name these two files instead of the `log show` command; the
+     README keeps the command for a crash outside a recording.
+- **Details settled while building (2026-11-19, for review):** the
+  recorder's own errors have the domain `MultiScreenRecorder`, or their
+  Swift type's (`RecorderCore.ScreenFileWriterError`), and their one
+  line leaves the domain and code out; a wrapping error (`cannot write
+  <file>`) keeps the system's error as its underlying error; a problem
+  made from an event has the event's name as its error detail with the
+  event's under it; a write of the recording log that fails drops its
+  lines, and the problem clears once a write works again; the periodic
+  write of detail lines is synchronized too.
+- **Consequences:** a recording folder holds one more file, about
+  0.4 MB per hour (measured: 6.8 kB for 1 minute of 2 screens and 5
+  audio sources). Point 3's button is not built in this change: when it
+  shows (the status window closes, and the app quits, at Stop) and
+  whether the issue link fills the existing problem report form
+  (`template=problem-report.yml` and its fields) or `title` and `body`
+  are open questions for the owner.
+- **Evidence:** [design/recorder.md](design/recorder.md), "Output on
+  disk" and "Logging"; `ErrorDetailTests`, `ErrorDetailSourceTests`,
+  `RecordingLogTests`, `WriterErrorTests`, `RecordingManifestTests`.

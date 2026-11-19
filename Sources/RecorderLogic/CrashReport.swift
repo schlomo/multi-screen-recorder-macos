@@ -9,10 +9,12 @@ public enum CrashReport {
     /// The ids of the fields in `.github/ISSUE_TEMPLATE/crash-report.yml` the link fills.
     public static let versionField = "version"
     public static let macOSField = "macos"
-    /// The unified log of the last 2 hours, for the form's optional field "log" (D46).
+    /// The unified log of the last 2 hours, for the form's optional field "log" (D46), and in the
+    /// README for a crash outside a recording.
     public static let logCommand = #"log show --last 2h --predicate 'subsystem == "org.schapiro.multiscreenrecorder" and process == "msr"'"#
-    /// The informative text of the crash report dialog.
-    public static let dialogText = "You can report it on GitHub, which needs a GitHub account. Your browser opens a new issue, and Finder shows a copy of the crash report as a text file for you to drag into it. Issues are public, and a crash report contains your Mac's user name: check it before you attach it.\n\nThe log of the last 2 hours helps too; in Terminal:\n\(logCommand)"
+    /// The informative text of the crash report dialog: a crash while recording left the recording's
+    /// recording manifest and recording log (D64).
+    public static let dialogText = "You can report it on GitHub, which needs a GitHub account. Your browser opens a new issue, and Finder shows a copy of the crash report as a text file for you to drag into it. Issues are public, and a crash report contains your Mac's user name: check it before you attach it.\n\nIf it quit while recording, attach that recording's \(RecordingNames.manifest) and \(RecordingNames.recordingLog) from its recording folder too: they show what happened up to the crash."
 
     /// The newest crash report of `msr` among `fileNames`, if it is newer than
     /// `lastOffered`. Only names of exactly the shape `msr-YYYY-MM-DD-HHMMSS.ips`

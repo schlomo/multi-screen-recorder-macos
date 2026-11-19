@@ -102,13 +102,14 @@ import Testing
         var manifest = manifest()
         let isAudio = failure.rawValue.contains("audio")
         var event = RecordingEvent(at: 36_778_000_000, event: failure, screen: isAudio ? nil : "DELL", audioSource: isAudio ? "BRIO" : nil)
-        event.error = "it broke"
+        event.errorDetail = "it broke"
         manifest.events.append(event)
         manifest.finalize(ended: start + 60, timeZone: berlin)
         #expect(manifest.result == .problems)
         #expect(manifest.problems == [RecordingProblem(
-            at: 36_778_000_000, problem: "A failure was not told while recording",
-            error: "\(isAudio ? "Audio source BRIO" : "Screen DELL"): \(failure.rawValue): it broke (1 failure event, see events)")])
+            atSeconds: 36.778, problem: "A failure was not told while recording",
+            error: "\(isAudio ? "Audio source BRIO" : "Screen DELL"): \(failure.rawValue): it broke (1 failure event, see events)",
+            errorDetail: ErrorDetail(message: failure.rawValue, underlying: ["it broke"]))])
     }
 
     /// The recording `2026-11-16 12.24.51`: two `screen file writer fell
@@ -121,8 +122,9 @@ import Testing
         manifest.finalize(ended: start + 60, timeZone: berlin)
         #expect(manifest.result == .problems)
         #expect(manifest.problems == [RecordingProblem(
-            at: 36_778_000_000, problem: "A failure was not told while recording",
-            error: "Screen DELL P3421W: screen file writer fell behind (2 failure events, see events)")])
+            atSeconds: 36.778, problem: "A failure was not told while recording",
+            error: "Screen DELL P3421W: screen file writer fell behind (2 failure events, see events)",
+            errorDetail: ErrorDetail(message: "screen file writer fell behind"))])
     }
 
     @Test func repeatedSystemAudioFailuresToldLiveAddNothing() {
@@ -131,7 +133,7 @@ import Testing
         manifest.problems = [told]
         for second in [5, 9, 17] as [Int64] {
             var failed = RecordingEvent(at: second * 1_000_000_000, event: .systemAudioFailed, audioSource: "System audio")
-            failed.error = "the stream stopped"
+            failed.errorDetail = "the stream stopped"
             manifest.events.append(failed)
         }
         manifest.finalize(ended: start + 60, timeZone: berlin)
@@ -175,8 +177,9 @@ import Testing
         manifest.events.append(RecordingEvent(at: 30_000_000_000, event: .screenFileWriterFellBehind, screen: "DELL"))
         manifest.finalize(ended: start + 60, timeZone: berlin)
         #expect(manifest.problems == [RecordingProblem(
-            at: 30_000_000_000, problem: "A failure was not told while recording",
-            error: "Screen DELL: screen file writer fell behind (1 failure event, see events)")])
+            atSeconds: 30, problem: "A failure was not told while recording",
+            error: "Screen DELL: screen file writer fell behind (1 failure event, see events)",
+            errorDetail: ErrorDetail(message: "screen file writer fell behind"))])
     }
 
     @Test func aFileNotFinalizedAddsNothingWhenAProblemWasTold() {
@@ -298,6 +301,38 @@ import Testing
         #expect(RecordingProblem(at: 0, problem: "The screens cannot be read", error: nil).text == "The screens cannot be read")
         let text = String(decoding: try prettyJSON(RecordingProblem(at: 0, problem: "p", error: nil)), as: UTF8.self)
         #expect(text.contains(#""error" : null"#))
+        #expect(text.contains(#""errorDetail" : null"#))
+    }
+
+    /// D64: every event and problem with an `error` carries its `errorDetail`,
+    /// the full chain with each level's domain and code.
+    @Test func anErrorIsWrittenAsItsTextAndItsErrorDetail() throws {
+        let osStatus = NSError(domain: NSOSStatusErrorDomain, code: -12912)
+        let detail = ErrorDetail(message: "cannot write a.mov", underlying: NSError(
+            domain: "AVFoundationErrorDomain", code: -11800, userInfo: [NSUnderlyingErrorKey: osStatus]))
+        var event = RecordingEvent(at: 1_000_000_000, event: .screenFileWriterFailed, screen: "LG")
+        event.errorDetail = detail
+        var manifest = manifest()
+        manifest.events = [event, RecordingEvent(at: 2_000_000_000, event: .sleep)]
+        manifest.problems = [event.problem, RecordingProblem(at: 3_000_000_000, problem: "p", error: nil)]
+        let data = try manifest.jsonData()
+        let object = try #require(try JSONSerialization.jsonObject(with: data) as? [String: Any])
+        let events = try #require(object["events"] as? [[String: Any]])
+        #expect(events[0]["error"] as? String == detail.text)
+        let written = try #require(events[0]["errorDetail"] as? [String: Any])
+        #expect(written["description"] as? String == "cannot write a.mov")
+        let avFoundation = try #require((written["underlying"] as? [[String: Any]])?.first)
+        #expect(avFoundation["domain"] as? String == "AVFoundationErrorDomain")
+        #expect(avFoundation["code"] as? Int == -11800)
+        let status = try #require((avFoundation["underlying"] as? [[String: Any]])?.first)
+        #expect(status["code"] as? Int == -12912)
+        #expect(events[1]["error"] == nil)
+        #expect(events[1]["errorDetail"] == nil)
+        let problems = try #require(object["problems"] as? [[String: Any]])
+        #expect(problems[0]["error"] as? String == "screen file writer failed: \(detail.text)")
+        #expect((problems[0]["errorDetail"] as? [String: Any])?["description"] as? String == "screen file writer failed")
+        #expect(problems[1]["errorDetail"] is NSNull)
+        #expect(try RecordingManifest(json: data) == manifest)
     }
 
     @Test func eventsAndProblemsAreWrittenInTheOrderOfTheirTime() throws {
@@ -462,7 +497,7 @@ import Testing
     @Test func aFileNotFinalizedOrAnErrorEventIsAnError() {
         #expect(RecordingSummary(manifest: manifest([.notFinalized]), recordingFolder: "/r", seconds: 1, manifestWritten: true).endedWithError)
         var failed = RecordingEvent(at: 65_000_000_000, event: .screenStreamFailed, screen: "LG")
-        failed.error = "-3811"
+        failed.errorDetail = "-3811"
         let summary = RecordingSummary(
             manifest: manifest([.finalized, .finalized], events: [failed, RecordingEvent(at: 0, event: .sleep)]),
             recordingFolder: "/r", seconds: 70, manifestWritten: true)
@@ -531,7 +566,7 @@ import Testing
 
     @Test func aWriterThatFailedIsAnError() {
         var failed = RecordingEvent(at: 0, event: .screenFileWriterFailed, screen: "LG")
-        failed.error = "cannot write"
+        failed.errorDetail = "cannot write"
         let summary = RecordingSummary(manifest: manifest([.finalized], events: [failed]), recordingFolder: "/r", seconds: 1, manifestWritten: true)
         #expect(summary.endedWithError)
         #expect(summary.text.contains("screen file writer failed, LG (cannot write)"))

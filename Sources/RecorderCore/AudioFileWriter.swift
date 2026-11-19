@@ -2,20 +2,18 @@ import AVFoundation
 import CoreMedia
 import RecorderLogic
 
-public struct AudioFileWriterError: Error, Equatable, CustomStringConvertible {
-    public let description: String
+public struct AudioFileWriterError: ErrorWithDetail, Equatable, CustomStringConvertible {
+    /// What failed, with the error macOS gave, if any, and its full chain.
+    public let detail: ErrorDetail
     /// The disk is full: the file ends, readable up to its last fragment.
     public let isDiskFull: Bool
 
     init(_ error: (any Error)?, while doing: String) {
-        if let error {
-            description = "\(doing): \(error.localizedDescription)"
-            isDiskFull = isDiskFullError(error)
-        } else {
-            description = doing
-            isDiskFull = false
-        }
+        detail = ErrorDetail(message: doing, underlying: error)
+        isDiskFull = error.map(isDiskFullError) ?? false
     }
+
+    public var description: String { detail.text }
 }
 
 /// An audio file: AAC-LC at 48 kHz in a fragmented `.mov`, a fragment every

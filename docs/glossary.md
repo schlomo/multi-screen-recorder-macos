@@ -13,7 +13,7 @@ releases, and the recording core (recording, recording folder,
 recording manifest, problem, status window, screen file, screen
 identity, settle time, screen check, tick, timecode, audio track,
 audio file, guide track, clock drift; D45, D49), labels (D55), the
-banner.
+banner, the recording log and the error detail (D64).
 
 ## Multi Screen Recorder
 
@@ -63,12 +63,27 @@ recording claims it by creating it (D20).
 its start on the shared clock and its state, the events and the
 problems, and once finalized its end and result (D20, D46).
 
+## Recording log
+
+`recording.log` in the recording folder, beside the recording manifest:
+every event, every problem with its full error, and the detail lines,
+one line each, appended and never rewritten, synchronized to disk after
+each event and problem; written by every recording, in the app and in
+`msr record` (D64). Not the unified log, which is macOS's.
+
 ## Problem
 
 Something that went wrong in a recording and that the person is told:
 the Dock badge's "!", red in the status window, a line on standard
-error in `msr record`, and an entry in the recording manifest's
-`problems` with its time and full error (D46).
+error in `msr record`, a line in the recording log, and an entry in the
+recording manifest's `problems` with its time and full error (D46, D64).
+
+## Error detail
+
+An error with its full chain: its domain, code, description, failure
+reason and recovery suggestion, and the error detail of every
+underlying error. One line of it is the `error` of an event or problem;
+the whole is its `errorDetail` in the recording manifest (D64).
 
 ## Status window
 

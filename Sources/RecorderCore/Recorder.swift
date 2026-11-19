@@ -18,8 +18,14 @@ public protocol RecorderObserver: AnyObject {
     func recorder(_ recorder: Recorder, eventLine: String)
 }
 
-public struct RecorderStartError: Error, CustomStringConvertible {
-    public let description: String
+public struct RecorderStartError: ErrorWithDetail, CustomStringConvertible {
+    public let detail: ErrorDetail
+
+    init(_ message: String, underlying error: any Error) {
+        detail = ErrorDetail(message: message, underlying: error)
+    }
+
+    public var description: String { detail.text }
 }
 
 /// One recording: claims its recording folder, keeps its recording
@@ -66,18 +72,23 @@ public final class Recorder {
     /// The latest clock drift correction status of each audio capture, by its number among all audio captures.
     private var audioClockDrift: [AudioTracker.SourceID: (number: Int, status: ClockDriftCorrection.Status)] = [:]
     private let guides: GuideTrackFeed
-    private var clockDriftDebugSchedule = ClockDriftDebugSchedule()
+    private var clockDriftDetailSchedule = ClockDriftDetailSchedule()
+    /// Nil when it could not be created: that is a problem, and the recording goes on.
+    private var recordingLog: RecordingLog?
     private var cpu = CPUUsage()
     private var cpuTask: Task<Void, Never>?
 
-    /// Starts a recording into a new recording folder in the settings' output folder.
-    public init(settings: Settings, homeFolder: URL, app: String, observer: any RecorderObserver) throws(RecorderStartError) {
+    /// Starts a recording into a new recording folder in the settings' output
+    /// folder; the recording log starts with the ready check's facts.
+    public init(
+        settings: Settings, homeFolder: URL, app: String, readyCheckFacts: ReadyCheckFacts, observer: any RecorderObserver
+    ) throws(RecorderStartError) {
         let readsScreens = ReadyCheck.needsScreenRecording(settings)
         let screens: [ConnectedScreen]
         do {
             screens = readsScreens ? try connectedScreens() : []
         } catch {
-            throw RecorderStartError(description: "The screens cannot be read: \(error)")
+            throw RecorderStartError("The screens cannot be read", underlying: error)
         }
         let reading = readClocks()
         let started = Date()
@@ -89,8 +100,7 @@ public final class Recorder {
             // Claims the folder: refused if it already exists (D20).
             try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: false)
         } catch {
-            throw RecorderStartError(description:
-                "Cannot create the recording folder \(folder.path(percentEncoded: false)): \(error.localizedDescription)")
+            throw RecorderStartError("Cannot create the recording folder \(folder.path(percentEncoded: false))", underlying: error)
         }
         context = RecordingContext(folder: folder, started: started, timeZone: timeZone, clock: SharedClock(reading: reading), app: app)
         self.settings = settings
@@ -106,13 +116,14 @@ public final class Recorder {
             // Nothing was recorded: the start leaves nothing behind.
             try? FileManager.default.removeItem(at: folder.appending(path: RecordingNames.manifest))
             try? FileManager.default.removeItem(at: folder)
-            throw RecorderStartError(description: "Cannot start the recording in \(folder.path(percentEncoded: false)): \(error)")
+            throw RecorderStartError("Cannot start the recording in \(folder.path(percentEncoded: false))", underlying: error)
         }
         activity = ProcessInfo.processInfo.beginActivity(
             options: [.idleSystemSleepDisabled, .idleDisplaySleepDisabled, .userInitiated],
             reason: "Multi Screen Recorder is recording")
         let context = context
-        RecorderLog.timeDetail(since: { Double(context.now()) / 1_000_000_000 })
+        startRecordingLog(app: app, readyCheckFacts: readyCheckFacts)
+        RecorderLog.recording(since: { Double(context.now()) / 1_000_000_000 }, log: recordingLog)
         registerForChanges()
         context.update(screens, lastScreenChange: nil)
         guides.start()
@@ -132,6 +143,7 @@ public final class Recorder {
                 try? await Task.sleep(for: RecorderValues.cpuSampleInterval)
                 self?.sampleCPU()
                 self?.logClockDriftBlock()
+                self?.recordingLog?.flushIfDue()
             }
         }
     }
@@ -141,9 +153,9 @@ public final class Recorder {
             shown: audioTracker.sourcesShown, reports: audioClockDrift, running: audioCaptures.mapValues(\.0))
     }
 
-    /// With `--debug`, every 10 s the clock drift lines of all audio sources being recorded, together in number order.
+    /// Every 10 s the clock drift lines of all audio sources being recorded, together in number order.
     private func logClockDriftBlock() {
-        guard RecorderLog.isDebug, clockDriftDebugSchedule.due(at: context.now()) else { return }
+        guard clockDriftDetailSchedule.due(at: context.now()) else { return }
         let sources = clockDriftShown().map { (number: $0.source.number, label: $0.source.label, status: $0.status) }
         for line in DebugLine.clockDriftBlock(sources) { RecorderLog.detail(line, category: "recorder") }
     }
@@ -224,7 +236,9 @@ public final class Recorder {
                 // Told by `writeManifest`; the file on disk keeps no `ended`.
                 finalManifestWritten = false
             }
-            RecorderLog.timeDetail(since: nil)
+            RecorderLog.detail("ended: result \(manifest.result?.rawValue ?? "none")", category: "recorder")
+            RecorderLog.recording(since: nil, log: nil)
+            recordingLog?.close()
             if let activity { ProcessInfo.processInfo.endActivity(activity) }
             activity = nil
         }
@@ -251,7 +265,7 @@ public final class Recorder {
         do {
             audioWatch = try AudioInputWatch { [weak self] in self?.audioInputsChanged() }
         } catch {
-            tell("Changes of the audio inputs cannot be followed", error: error.description, kind: .audioInputsNotRead)
+            tell("Changes of the audio inputs cannot be followed", error: ErrorDetail(error), kind: .audioInputsNotRead)
         }
     }
 
@@ -295,7 +309,7 @@ public final class Recorder {
             problemsTold.cleared(.audioInputsNotRead)
             return inputs
         } catch {
-            tell("The audio inputs cannot be read", error: error.description, kind: .audioInputsNotRead)
+            tell("The audio inputs cannot be read", error: ErrorDetail(error), kind: .audioInputsNotRead)
             return nil
         }
     }
@@ -312,7 +326,7 @@ public final class Recorder {
             problemsTold.cleared(.screensNotRead)
             return screens
         } catch {
-            tell("The screens cannot be read", error: "\(error)", kind: .screensNotRead)
+            tell("The screens cannot be read", error: ErrorDetail(error), kind: .screensNotRead)
             return nil
         }
     }
@@ -443,8 +457,8 @@ public final class Recorder {
         for failure in step.events where failure.event.isFailure {
             var problem = failure.problem
             if reason == .captureSourceGone, failure.event == .screenStreamFailed {
-                problem.problem = "Screen \(screen) cannot be captured"
-                problem.error = ScreenTracker.captureSourceGoneAgain
+                problem = RecordingProblem(
+                    atSeconds: failure.at, problem: "Screen \(screen) cannot be captured", error: ScreenTracker.captureSourceGoneAgain)
             }
             tell(problem, kind: .screenNotCaptured(uuid))
         }
@@ -552,7 +566,7 @@ public final class Recorder {
         if end.error != nil || !end.events.isEmpty {
             let at = Int64(((end.file.end ?? end.file.start) * 1_000_000_000).rounded())
             tell(RecordingProblem(at: at, problem: "Audio file \(end.file.name)",
-                                  error: end.error?.description ?? "its writer fell behind"),
+                                  error: end.error?.detail ?? "its writer fell behind"),
                  kind: .audioFileFailed(end.file.name))
         }
     }
@@ -606,7 +620,7 @@ public final class Recorder {
             }
             free = bytes
         } catch {
-            tell("The free space in \(folder.path(percentEncoded: false)) cannot be read", error: error.localizedDescription,
+            tell("The free space in \(folder.path(percentEncoded: false)) cannot be read", error: ErrorDetail(error),
                  kind: .freeSpaceNotRead)
             return
         }
@@ -650,14 +664,41 @@ public final class Recorder {
         return bytesPerHour * settings.lowDiskWarningMinutes / 60
     }
 
-    // MARK: Manifest
+    // MARK: Manifest and recording log
+
+    /// Creates the recording log and writes its first lines; one that cannot
+    /// be created or written is a problem, and the recording goes on.
+    private func startRecordingLog(app: String, readyCheckFacts: ReadyCheckFacts) {
+        let context = context
+        do {
+            let file = try AppendOnlyFile(creating: folder.appending(path: RecordingNames.recordingLog))
+            recordingLog = RecordingLog(
+                file: file, started: context.started, timeZone: context.timeZone, now: { context.now() },
+                writing: { [weak self] failure in
+                    Task { @MainActor in self?.recordingLogWriting(failure) }
+                })
+        } catch {
+            recordingLogWriting(ErrorDetail(error))
+            return
+        }
+        recordingLog?.detail("started: \(app), recording folder \(folder.lastPathComponent)", category: "recorder")
+        recordingLog?.detail(DebugLine.facts(readyCheckFacts), category: "ready check")
+    }
+
+    private func recordingLogWriting(_ failure: ErrorDetail?) {
+        guard let failure else {
+            problemsTold.cleared(.recordingLogNotWritten)
+            return
+        }
+        tell("Cannot write the recording log \(RecordingNames.recordingLog)", error: failure, kind: .recordingLogNotWritten)
+    }
 
     private func writeManifest() throws {
         do {
             try manifest.jsonData().write(to: folder.appending(path: RecordingNames.manifest), options: .atomic)
             problemsTold.cleared(.manifestNotWritten)
         } catch {
-            tell("Cannot write the recording manifest", error: error.localizedDescription, kind: .manifestNotWritten)
+            tell("Cannot write the recording manifest", error: ErrorDetail(error), kind: .manifestNotWritten)
             throw error
         }
     }
@@ -665,7 +706,7 @@ public final class Recorder {
     /// A problem for the person and the manifest's `problems`, the manifest
     /// written at once (`ProblemsTold`); one that repeats is told once until
     /// it clears.
-    private func tell(_ problem: String, error: String?, kind: ProblemKind, at time: Int64? = nil) {
+    private func tell(_ problem: String, error: ErrorDetail?, kind: ProblemKind, at time: Int64? = nil) {
         tell(RecordingProblem(at: time ?? context.now(), problem: problem, error: error), kind: kind)
     }
 
@@ -677,6 +718,7 @@ public final class Recorder {
 
     private func told(_ problem: RecordingProblem) {
         RecorderLog.error("at \(problem.at)s: \(problem.text)", category: "recorder")
+        recordingLog?.problem(problem)
         observer?.recorder(self, problem: problem)
     }
 
@@ -685,6 +727,7 @@ public final class Recorder {
         for event in events {
             let line = EventLine.text(event, started: context.started, timeZone: context.timeZone)
             RecorderLog.notice(line, category: "recorder")
+            recordingLog?.event(line)
             observer?.recorder(self, eventLine: line)
         }
     }

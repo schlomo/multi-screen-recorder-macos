@@ -44,7 +44,7 @@ final class MicrophoneSource: NSObject, AudioBufferSource, AVCaptureAudioDataOut
             do {
                 try open(queue: queue)
             } catch {
-                endOnce(.captureFailed(error.localizedDescription))
+                endOnce(.captureFailed(ErrorDetail(error)))
             }
         }
     }
@@ -81,7 +81,7 @@ final class MicrophoneSource: NSObject, AudioBufferSource, AVCaptureAudioDataOut
                 let error = note.userInfo?[AVCaptureSessionErrorKey] as? NSError
                 let disconnected = error?.domain == AVFoundationErrorDomain && error?.code == AVError.Code.deviceWasDisconnected.rawValue
                 self?.endOnce(disconnected ? .disconnected : .captureFailed(
-                    error.map { "\($0.localizedDescription) (\($0.domain) \($0.code))" } ?? "the capture session stopped"))
+                    error.map(ErrorDetail.init) ?? "the capture session stopped"))
             },
             center.addObserver(forName: AVCaptureDevice.wasDisconnectedNotification, object: device, queue: nil) { [weak self] _ in
                 self?.endOnce(.disconnected)
@@ -205,7 +205,7 @@ final class SystemAudioSource: NSObject, AudioBufferSource, SCStreamOutput, SCSt
         if nsError.domain == SCStreamErrorDomain, nsError.code == SCStreamError.Code.noCaptureSource.rawValue {
             return .disconnected
         }
-        return .captureFailed("\(nsError.localizedDescription) (\(nsError.domain) \(nsError.code))")
+        return .captureFailed(ErrorDetail(error))
     }
 
     func stream(_ stream: SCStream, didOutputSampleBuffer sampleBuffer: CMSampleBuffer, of type: SCStreamOutputType) {

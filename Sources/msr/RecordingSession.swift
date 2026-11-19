@@ -18,11 +18,14 @@ final class RecordingSession: RecorderObserver {
     /// Stop is in progress: a Dock click or a quit does nothing more.
     private(set) var isStopping = false
 
-    /// Starts the recording; `output` for `msr record`.
-    init(settings: Settings, homeFolder: URL, output: RecordOutput?) throws(RecorderStartError) {
+    /// Starts the recording, the ready check's facts for its recording log; `output` for `msr record`.
+    init(
+        settings: Settings, homeFolder: URL, readyCheckFacts: ReadyCheckFacts, output: RecordOutput?
+    ) throws(RecorderStartError) {
         self.output = output
         recorder = try Recorder(
-            settings: settings, homeFolder: homeFolder, app: "Multi Screen Recorder \(runningVersion)", observer: self)
+            settings: settings, homeFolder: homeFolder, app: "Multi Screen Recorder \(runningVersion)",
+            readyCheckFacts: readyCheckFacts, observer: self)
         updateBadge()
         badgeTask = Task { [weak self] in
             while !Task.isCancelled {

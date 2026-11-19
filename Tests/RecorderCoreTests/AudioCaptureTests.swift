@@ -483,7 +483,7 @@ import Testing
             Issue.record("the capture ended with \(end)")
             return
         }
-        #expect(error.contains("writing a stand-in file"))
+        #expect(error.text.contains("writing a stand-in file"))
         await capture.stop()
         #expect(writer.appends == 1)
         #expect(writer.samples == samples)

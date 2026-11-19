@@ -343,15 +343,16 @@ public struct RecordingManifest: Codable, Equatable, Sendable {
         let failures = events.filter(\.event.isFailure).sorted { $0.at < $1.at }
         if let first = failures.first {
             let count = failures.count == 1 ? "1 failure event" : "\(failures.count) failure events"
+            let told = first.problem
             return [RecordingProblem(
                 atSeconds: first.at, problem: "A failure was not told while recording",
-                error: "\(first.problem.text) (\(count), see events)")]
+                error: "\(told.text) (\(count), see events)", errorDetail: told.errorDetail ?? ErrorDetail(message: told.text))]
         }
         let notFinalized = files.filter { $0.state != .finalized }.map { ($0.name, $0.end ?? $0.start) }
             + audioFiles.filter { $0.state != .finalized }.map { ($0.name, $0.end ?? $0.start) }
         guard let (name, at) = notFinalized.first else { return [] }
         return [RecordingProblem(
-            atSeconds: at, problem: "A file was not finalized and nothing was told while recording", error: name)]
+            atSeconds: at, problem: "A file was not finalized and nothing was told while recording", error: ErrorDetail(message: name))]
     }
 
     /// "2026-11-12T14:03:05.120+01:00".
@@ -472,8 +473,11 @@ public struct RecordingEvent: Codable, Equatable, Sendable {
     /// For `screen mirroring started`: the screen it mirrors.
     public var mirrors: String?
     /// For a failure (`screen stream failed`, `audio input failed` and the
-    /// like) and a failing writer: why.
-    public var error: String?
+    /// like) and a failing writer: why, with its full chain.
+    public var errorDetail: ErrorDetail?
+
+    /// `errorDetail` as one line, `error` in the manifest.
+    public var error: String? { errorDetail?.text }
 
     public init(at nanoseconds: Int64, event: Kind, screen: String? = nil, audioSource: String? = nil) {
         at = (Double(nanoseconds) / 1_000_000).rounded() / 1000
@@ -488,7 +492,40 @@ public struct RecordingEvent: Codable, Equatable, Sendable {
     /// The event as a problem told to the person, at its time.
     public var problem: RecordingProblem {
         let what = screen.map { "Screen \($0)" } ?? audioSource.map { "Audio source \($0)" } ?? "The recording"
-        return RecordingProblem(atSeconds: at, problem: what, error: error.map { "\(event.rawValue): \($0)" } ?? event.rawValue)
+        return RecordingProblem(
+            atSeconds: at, problem: what, error: ErrorDetail(message: event.rawValue, underlying: errorDetail.map { [$0] } ?? []))
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case at, event, screen, audioSource, from, to, length, mirrors, error, errorDetail
+    }
+
+    public init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        at = try container.decode(Double.self, forKey: .at)
+        event = try container.decode(Kind.self, forKey: .event)
+        screen = try container.decodeIfPresent(String.self, forKey: .screen)
+        audioSource = try container.decodeIfPresent(String.self, forKey: .audioSource)
+        from = try container.decodeIfPresent(Value.self, forKey: .from)
+        to = try container.decodeIfPresent(Value.self, forKey: .to)
+        length = try container.decodeIfPresent(Double.self, forKey: .length)
+        mirrors = try container.decodeIfPresent(String.self, forKey: .mirrors)
+        errorDetail = try container.decodeIfPresent(ErrorDetail.self, forKey: .errorDetail)
+    }
+
+    /// `error` and `errorDetail` are left out, like every other field, where there is none.
+    public func encode(to encoder: any Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(at, forKey: .at)
+        try container.encode(event, forKey: .event)
+        try container.encodeIfPresent(screen, forKey: .screen)
+        try container.encodeIfPresent(audioSource, forKey: .audioSource)
+        try container.encodeIfPresent(from, forKey: .from)
+        try container.encodeIfPresent(to, forKey: .to)
+        try container.encodeIfPresent(length, forKey: .length)
+        try container.encodeIfPresent(mirrors, forKey: .mirrors)
+        try container.encodeIfPresent(error, forKey: .error)
+        try container.encodeIfPresent(errorDetail, forKey: .errorDetail)
     }
 }
 
@@ -501,28 +538,41 @@ public struct RecordingProblem: Codable, Equatable, Sendable {
     public var problem: String
     /// The full error text, nil when the problem says it all.
     public var error: String?
+    /// The error with its full chain; nil exactly when `error` is nil.
+    public var errorDetail: ErrorDetail?
 
-    public init(at nanoseconds: Int64, problem: String, error: String?) {
-        at = (Double(nanoseconds) / 1_000_000).rounded() / 1000
-        self.problem = problem
-        self.error = error
+    public init(at nanoseconds: Int64, problem: String, error: ErrorDetail?) {
+        self.init(at: nanoseconds, problem: problem, error: error?.text, errorDetail: error)
     }
 
     /// `at` in seconds from the recording's start, as a manifest entry has it.
-    init(atSeconds seconds: Double, problem: String, error: String?) {
+    public init(atSeconds seconds: Double, problem: String, error: ErrorDetail?) {
         self.init(at: Int64((seconds * 1_000_000_000).rounded()), problem: problem, error: error)
+    }
+
+    /// An error text that says more than its error detail, such as a count.
+    init(atSeconds seconds: Double, problem: String, error: String, errorDetail: ErrorDetail) {
+        self.init(at: Int64((seconds * 1_000_000_000).rounded()), problem: problem, error: error, errorDetail: errorDetail)
+    }
+
+    private init(at nanoseconds: Int64, problem: String, error: String?, errorDetail: ErrorDetail?) {
+        at = (Double(nanoseconds) / 1_000_000).rounded() / 1000
+        self.problem = problem
+        self.error = error
+        self.errorDetail = errorDetail
     }
 
     /// The problem as the person reads it.
     public var text: String { error.map { "\(problem): \($0)" } ?? problem }
 
-    private enum CodingKeys: String, CodingKey { case at, problem, error }
+    private enum CodingKeys: String, CodingKey { case at, problem, error, errorDetail }
 
-    /// `error` is written as null when there is none.
+    /// `error` and `errorDetail` are written as null when there is none.
     public func encode(to encoder: any Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(at, forKey: .at)
         try container.encode(problem, forKey: .problem)
         try container.encode(error, forKey: .error)
+        try container.encode(errorDetail, forKey: .errorDetail)
     }
 }
