@@ -111,6 +111,26 @@ extension Scenario {
     static let stressSwitches = 10
     static let fixedFlags = ["--resolution", "1080p", "--audio-mode", "all-inputs"]
 
+    /// The stress scenario: its events built step by step, so no type inference has to solve them at once.
+    static let stress: Scenario = {
+        let firstSwitch: Double = 5
+        let switchSpacing: Double = 2
+        var events: [(at: Double, event: Event)] = [(at: 2, event: .connectScreen(screen))]
+        for index in 0..<stressSwitches {
+            let at: Double = firstSwitch + Double(index) * switchSpacing
+            let size: ScreenSize = screen.sizes[(index + 1) % 2]
+            events.append((at: at, event: .switchScreenMode(serialNumber: screen.serialNumber, to: size)))
+        }
+        let lastSwitch: Double = firstSwitch + Double(stressSwitches - 1) * switchSpacing
+        events.append((at: lastSwitch + 3, event: .disconnectScreen(serialNumber: screen.serialNumber)))
+        return Scenario(
+            name: "virtual-screen-stress",
+            summary: "a virtual screen connected, its mode switched ten times about 2 s apart, and disconnected",
+            flags: fixedFlags + ["--system-audio", "off", "--debug"],
+            settings: .init(resolution: "1080p", audioMode: "all-inputs", systemAudio: false),
+            events: events, stop: .interrupt, stopAt: lastSwitch + 6)
+    }()
+
     /// The named scenarios, the regression suite, in the order they run.
     public static let named: [Scenario] = [
         Scenario(
@@ -128,17 +148,7 @@ extension Scenario {
                 (14, .disconnectScreen(serialNumber: screen.serialNumber)),
             ],
             stop: .interrupt, stopAt: 17),
-        Scenario(
-            name: "virtual-screen-stress",
-            summary: "a virtual screen connected, its mode switched ten times about 2 s apart, and disconnected",
-            flags: fixedFlags + ["--system-audio", "off", "--debug"],
-            settings: .init(resolution: "1080p", audioMode: "all-inputs", systemAudio: false),
-            events: [(2, .connectScreen(screen))]
-                + (0..<stressSwitches).map { index in
-                    (5 + Double(index) * 2, .switchScreenMode(serialNumber: screen.serialNumber, to: screen.sizes[(index + 1) % 2]))
-                }
-                + [(5 + Double(stressSwitches) * 2 + 1, .disconnectScreen(serialNumber: screen.serialNumber))],
-            stop: .interrupt, stopAt: 5 + Double(stressSwitches) * 2 + 4),
+        stress,
         Scenario(
             name: "tone", summary: "the test tone in the loopback device: level, silent stretches, timing by timecode",
             flags: fixedFlags + ["--system-audio", "off"],
