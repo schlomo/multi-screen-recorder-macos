@@ -63,9 +63,9 @@ Still open from D34: what AGC does and whether it is on in auto mode;
    1 kHz tone into its file, and system audio is recorded.
    - Design: a test driver in Swift, separate from the app
      (`CGVirtualDisplay`, a private API, only there), run by
-     `scripts/end-to-end-test`; a CI job after build and tests, no
-     secrets, BlackHole and `ffmpeg` installed at fixed versions
-     (downloads in CI are fine, the owner, 2026-11-16).
+     `scripts/end-to-end-test` in a throwaway tart VM on the owner's
+     Mac (D67; first a CI job, moved off GitHub's runners), BlackHole
+     and `ffmpeg` installed at fixed versions.
    - Scenarios: a plain recording; a virtual display connected,
      disconnected and resized; an audio input appearing and vanishing
      (an aggregate device on BlackHole); a tone checked for level and
