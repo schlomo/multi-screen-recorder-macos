@@ -68,7 +68,7 @@ enum VirtualScreenHelper {
         do {
             try switchModeInOwnProcess(display, to: first)
         } catch {
-            print("failed \(error)")
+            print("\(failedPrefix)\(error)")
             exit(1)
         }
         exit(0)
@@ -169,7 +169,7 @@ enum VirtualScreenHelper {
     }
 
     /// Asks the helper to switch its screen's mode and waits until it has.
-    static func resize(_ process: ChildProcess, to size: ScreenSize) throws {
+    static func requestModeSwitch(_ process: ChildProcess, to size: ScreenSize) throws {
         let before = process.output()
         try process.send("size \(size)\n")
         let deadline = Date().addingTimeInterval(10)

@@ -29,16 +29,19 @@ Keep this current when any of it changes.
 - **Time zone:** Europe/Berlin, stated with every time shown to people.
 - **Pipeline:** GitHub Actions, `.github/workflows/ci.yml`, wiring the
   scripts in `scripts/` on hosted Apple-silicon macOS runners: job
-  `test-and-build` tests, builds and smoke-tests without any secret,
-  then a separate signing job signs and publishes, for every push to a
+  `test-and-build` tests, builds and smoke-tests without any secret;
+  after it, job `end-to-end-test` runs the end-to-end tests against
+  that build, also without any secret, and beside it a separate
+  signing job (which does not wait for `end-to-end-test`) signs and
+  publishes, for every push to a
   PR without the skip-ci marker the PR's snapshot release (a pre-release tagged `pr-<n>`), for a
   push to `main` that changes more than Markdown files and the homepage
   (`homepage/`) a release `v0.<DATE>.<N>`, so a homepage-only push makes
   no release; a closed PR's snapshot release is removed (a head commit
   with the skip-ci marker first needs an unmarked empty commit, see
   "Work branches"). PRs from
-  forks and Dependabot are tested, built and smoke-tested, never signed
-  or published. Signing needs the repository secret
+  forks and Dependabot are tested, built, smoke-tested and end-to-end
+  tested, never signed or published. Signing needs the repository secret
   `SIGNING_CERTIFICATE_P12` ([delivery.md](docs/design/delivery.md)).
   Who may register pipelines and edit branch policies: the repository
   owner.

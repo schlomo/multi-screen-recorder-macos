@@ -34,17 +34,31 @@ import Testing
         #expect(TimecodeValue("14:03:05") == nil)
     }
 
+    private func timecodes(_ started: Double, _ start: Double) -> [String] {
+        TimecodeValue.possible(recordingStarted: started, fileStart: start).map(\.description)
+    }
+
     @Test func aFilesTimecodeIsTheStartsFrameRoundedPlusItsTicks() {
-        // started 14:03:05.120: frame 3.6 rounds to 4.
-        #expect(TimecodeValue(recordingStarted: 50_585.12, fileStart: 0).description == "14:03:05:04")
-        #expect(TimecodeValue(recordingStarted: 50_585.12, fileStart: 0.3).description == "14:03:05:13")
-        #expect(TimecodeValue(recordingStarted: 50_585.12, fileStart: 2285).description == "14:41:10:04")
+        // started 14:03:05.120: frame 3.6 rounds to 4, far from a half frame, so only that one.
+        #expect(timecodes(50_585.12, 0) == ["14:03:05:04"])
+        #expect(timecodes(50_585.12, 0.3) == ["14:03:05:13"])
+        #expect(timecodes(50_585.12, 2285) == ["14:41:10:04"])
         // Seen on this Mac: started 08:00:56.434, a file 29 ticks in.
-        #expect(TimecodeValue(recordingStarted: 28_856.434, fileStart: 0.9666666666666667).description == "08:00:57:12")
+        #expect(timecodes(28_856.434, 0.9666666666666667) == ["08:00:57:12"])
+    }
+
+    @Test func aStartedNearAHalfFrameAllowsBothFrames() {
+        // started 14:03:05.017: frame 0.51; the recorder rounds the start
+        // before the millisecond was cut off, which may have been below 0.5.
+        #expect(timecodes(50_585.017, 0) == ["14:03:05:00", "14:03:05:01"])
+        #expect(timecodes(50_585.017, 0.1) == ["14:03:05:03", "14:03:05:04"])
+        // 0.48 and 0.54 of a frame are 0.7 ms and 1.3 ms from the half frame: exact again.
+        #expect(timecodes(50_585.016, 0) == ["14:03:05:00"])
+        #expect(timecodes(50_585.018, 0) == ["14:03:05:01"])
     }
 
     @Test func midnightStartsTheDayOver() {
-        #expect(TimecodeValue(recordingStarted: 86_399.99, fileStart: 0.1).description == "00:00:00:03")
+        #expect(timecodes(86_399.99, 0.1) == ["00:00:00:03"])
     }
 
     @Test func aScreenSizeIsWidthByHeight() {

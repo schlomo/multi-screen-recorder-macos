@@ -81,8 +81,8 @@ public struct ManifestExpectation: Sendable {
     public var app: String
     public var settings: Settings
     public var ending: Ending
-    /// When the recording stopped, in seconds after its start; for a kill,
-    /// the kill.
+    /// When the recording stopped, in seconds after its start: the
+    /// duration, or when the driver sent the signal; for a kill, the kill.
     public var stoppedAt: Double
     /// The Mac's own screens when the run started: they take the first numbers.
     public var ownScreenCount: Int

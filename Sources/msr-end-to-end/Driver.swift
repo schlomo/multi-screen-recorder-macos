@@ -8,7 +8,8 @@ import VirtualScreen
 /// scratch HOME and a scratch output folder, and runs the assertions.
 final class Driver {
     let msr: URL
-    let helper: String
+    /// The driver's own executable, which is also the device helper and `restore`.
+    let ownExecutable: String
     let scratch: URL
     let restorer: Restorer
     let media: Media
@@ -23,7 +24,7 @@ final class Driver {
             throw DriverError("\(msr.path) does not exist; run scripts/build-app first")
         }
         guard let executable = Bundle.main.executableURL else { throw DriverError("cannot find its own executable") }
-        helper = executable.resolvingSymlinksInPath().path
+        ownExecutable = executable.resolvingSymlinksInPath().path
         self.scratch = scratch
         self.restorer = restorer
         self.media = media
@@ -43,10 +44,10 @@ final class Driver {
     /// asked without a prompt; the loopback device; the private interface.
     static func requirePreconditions() throws {
         guard CGPreflightScreenCaptureAccess() else {
-            throw DriverError("the program running this (a terminal app) lacks the Screen & System Audio Recording permission")
+            throw DriverError("the program running this (a terminal app) lacks the Screen & System Audio Recording permission; run msr check once from this terminal to get the prompt")
         }
         guard AVCaptureDevice.authorizationStatus(for: .audio) == .authorized else {
-            throw DriverError("the program running this (a terminal app) lacks the Microphone permission")
+            throw DriverError("the program running this (a terminal app) lacks the Microphone permission; run msr check once from this terminal to get the prompt")
         }
         guard CoreAudioDevices.device(uid: Machine.loopbackUID) != nil else {
             throw DriverError("the loopback device \(Machine.loopbackName) (\(Machine.loopbackUID)) is missing; install BlackHole 2ch (brew install --cask blackhole-2ch)")
@@ -102,17 +103,17 @@ final class Driver {
             try interruption.sleep(until: begun.addingTimeInterval(at))
             switch event {
             case .connectScreen(let spec):
-                let (process, uuid) = try VirtualScreenHelper.connect(spec, executable: helper, folder: logs)
+                let (process, uuid) = try VirtualScreenHelper.connect(spec, executable: ownExecutable, folder: logs)
                 try restorer.started(process, stopSignal: SIGTERM)
                 screens[spec.serialNumber] = (process, uuid)
                 happened.append((Date(), event, uuid))
-            case .resizeScreen(let serialNumber, let size):
+            case .switchScreenMode(let serialNumber, let size):
                 guard let (process, uuid) = screens[serialNumber] else {
-                    throw DriverError("\(scenario.name): no virtual screen \(serialNumber) to resize")
+                    throw DriverError("\(scenario.name): no virtual screen \(serialNumber) for a mode switch")
                 }
-                let resized = Date()
-                try VirtualScreenHelper.resize(process, to: size)
-                happened.append((resized, event, uuid))
+                let switched = Date()
+                try VirtualScreenHelper.requestModeSwitch(process, to: size)
+                happened.append((switched, event, uuid))
             case .disconnectScreen(let serialNumber):
                 guard let (process, uuid) = screens.removeValue(forKey: serialNumber) else {
                     throw DriverError("\(scenario.name): no virtual screen \(serialNumber) to disconnect")
@@ -186,7 +187,7 @@ final class Driver {
         let virtual = Scenario.virtualScreenExpectation(
             happened.map { HappenedEvent(at: seconds($0.0), event: $0.1, screenUUID: $0.2) },
             settleTime: EndToEndValues.settleTime)
-        let stopped = seconds(stoppedAt)
+        let stopped = scenario.stop == .duration ? scenario.stopAt : seconds(stoppedAt)
         let expectation = ManifestExpectation(
             app: "Multi Screen Recorder \(version)", settings: scenario.settings,
             ending: scenario.stop == .kill ? .killed(at: stopped) : .finalized, stoppedAt: stopped,
@@ -201,6 +202,7 @@ final class Driver {
 
         var probed: [String: ProbedFile] = [:]
         for file in check.files {
+            try interruption.check()
             let url = folder.appending(path: file.name)
             guard FileManager.default.fileExists(atPath: url.path) else { continue }
             do {

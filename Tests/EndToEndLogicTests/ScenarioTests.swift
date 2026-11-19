@@ -20,7 +20,7 @@ import Testing
             for (_, event) in scenario.events {
                 switch event {
                 case .connectScreen(let spec): sizes[spec.serialNumber] = (spec.sizes[0], spec.sizes[0])
-                case .resizeScreen(let serial, let size): sizes[serial]?.now = size
+                case .switchScreenMode(let serial, let size): sizes[serial]?.now = size
                 case .disconnectScreen(let serial):
                     #expect(sizes[serial].map { $0.first == $0.now } == true)
                 }
@@ -34,14 +34,30 @@ import Testing
         let tone = Scenario.named.first { $0.name == "tone" }!
         #expect(tone.arguments(outputFolder: "/s") == [
             "record", "--output-folder", "/s", "--resolution", "1080p", "--audio-mode", "all-inputs", "--system-audio", "off",
+            "--duration", "130s",
         ])
     }
 
-    @Test func aConnectAResizeAndADisconnectGiveTheirFilesAndEvents() {
+    @Test func everyRecordingHasACeilingSoAKilledDriverNeverLeavesItRunning() throws {
+        for scenario in Scenario.named {
+            let arguments = scenario.arguments(outputFolder: "/s")
+            let index = try #require(arguments.firstIndex(of: "--duration"))
+            let ceiling = try #require(Double(arguments[index + 1].dropLast()))
+            switch scenario.stop {
+            case .duration: #expect(ceiling == scenario.stopAt)
+            case .interrupt, .kill:
+                #expect(ceiling == scenario.stopAt + Scenario.ceilingMargin)
+                #expect(scenario.stopAt < ceiling)
+            }
+        }
+        #expect(Scenario.ceilingMargin == 120)
+    }
+
+    @Test func aConnectAModeSwitchAndADisconnectGiveTheirFilesAndEvents() {
         let spec = VirtualScreenSpec(serialNumber: 101, sizes: [.init(width: 1280, height: 720), .init(width: 1600, height: 900)])
         let expectation = Scenario.virtualScreenExpectation([
             HappenedEvent(at: 2.2, event: .connectScreen(spec), screenUUID: "U"),
-            HappenedEvent(at: 6.2, event: .resizeScreen(serialNumber: 101, to: spec.sizes[1]), screenUUID: "U"),
+            HappenedEvent(at: 6.2, event: .switchScreenMode(serialNumber: 101, to: spec.sizes[1]), screenUUID: "U"),
             HappenedEvent(at: 11.2, event: .disconnectScreen(serialNumber: 101)),
         ], settleTime: 1)
         #expect(expectation.files == [

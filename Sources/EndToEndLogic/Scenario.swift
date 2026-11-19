@@ -52,7 +52,7 @@ public struct Scenario: Sendable {
     public enum Event: Sendable, Equatable {
         case connectScreen(VirtualScreenSpec)
         /// A mode switch through the public interface, to one of its sizes.
-        case resizeScreen(serialNumber: UInt32, to: ScreenSize)
+        case switchScreenMode(serialNumber: UInt32, to: ScreenSize)
         case disconnectScreen(serialNumber: UInt32)
     }
 
@@ -91,9 +91,15 @@ public struct Scenario: Sendable {
         self.stopAt = stopAt
     }
 
-    /// `msr record`'s arguments.
+    /// How long after its stop a recording stopped by a signal ends by its
+    /// own `--duration`, should the driver have been killed before sending it.
+    public static let ceilingMargin = 120.0
+
+    /// `msr record`'s arguments: every recording has a duration, the stop
+    /// itself or a ceiling past the stop.
     public func arguments(outputFolder: String) -> [String] {
-        ["record", "--output-folder", outputFolder] + flags + (stop == .duration ? ["--duration", "\(Int(stopAt))s"] : [])
+        let duration = stop == .duration ? stopAt : stopAt + Self.ceilingMargin
+        return ["record", "--output-folder", outputFolder] + flags + ["--duration", "\(Int(duration))s"]
     }
 }
 
@@ -110,13 +116,13 @@ extension Scenario {
             flags: [], settings: auto, stop: .duration, stopAt: 8),
         Scenario(
             name: "virtual-screen",
-            summary: "a virtual screen connected, resized by mode switches there and back, and disconnected",
+            summary: "a virtual screen connected, its mode switched there and back, and disconnected",
             flags: fixedFlags + ["--system-audio", "off"],
             settings: .init(resolution: "1080p", audioMode: "all-inputs", systemAudio: false),
             events: [
                 (2, .connectScreen(screen)),
-                (6, .resizeScreen(serialNumber: screen.serialNumber, to: screen.sizes[1])),
-                (10, .resizeScreen(serialNumber: screen.serialNumber, to: screen.sizes[0])),
+                (6, .switchScreenMode(serialNumber: screen.serialNumber, to: screen.sizes[1])),
+                (10, .switchScreenMode(serialNumber: screen.serialNumber, to: screen.sizes[0])),
                 (14, .disconnectScreen(serialNumber: screen.serialNumber)),
             ],
             stop: .interrupt, stopAt: 17),
@@ -156,7 +162,7 @@ public struct HappenedEvent: Sendable, Equatable {
 extension Scenario {
     /// The virtual screens' files and events the manifest must list, from
     /// what happened. A connected screen's file starts after the settle
-    /// time; a resized screen's file ends and one at the new frame size
+    /// time; at a mode switch the screen's file ends and one at the new frame size
     /// starts after the settle time, when `screen frame size changed` is
     /// written (recorder.md, "Screen identity" and the screen tracker).
     public static func virtualScreenExpectation(_ happened: [HappenedEvent], settleTime: Double)
@@ -172,7 +178,7 @@ extension Scenario {
                 files.append(.init(screenUUID: event.screenUUID ?? "?", frameSize: [spec.sizes[0].width, spec.sizes[0].height],
                                    connectedAt: event.at, disconnectedAt: nil))
                 events.append(.init(event: "screen connected", at: event.at))
-            case .resizeScreen(let serialNumber, let size):
+            case .switchScreenMode(let serialNumber, let size):
                 guard let index = open[serialNumber] else { continue }
                 let changed = event.at + settleTime
                 files[index].disconnectedAt = changed

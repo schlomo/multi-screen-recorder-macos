@@ -10,6 +10,14 @@ public struct ListedFile: Sendable, Equatable {
         public var isAudio: Bool { if case .screen = self { false } else { true } }
     }
 
+    /// The name events give its source: the screen's or the audio source's.
+    public var sourceName: String {
+        switch source {
+        case .screen(_, let name, _, _), .audioInput(_, let name, _): name
+        case .systemAudio: ManifestCheck.systemAudioSource
+        }
+    }
+
     public var name: String
     public var source: Source
     /// The label the file name carries after its stamp (`Screen 3 - MSR Test`).
@@ -57,6 +65,7 @@ public struct ManifestCheck {
         checkVirtualScreens(manifest["events"])
         checkPlayedAudioInputs(manifest["events"])
         checkFailureEvents(manifest["events"])
+        checkSpan(manifest["events"])
     }
 
     private mutating func fail(_ text: String) { failures.append(text) }
@@ -77,7 +86,14 @@ public struct ManifestCheck {
         case .finalized:
             expect(manifest["state"], .string("finalized"), "state")
             expect(manifest["result"], .string("ok"), "result")
-            if manifest["ended"]?.string.flatMap(TimeOfDay.seconds(ofTimestamp:)) == nil {
+            if let ended = manifest["ended"]?.string.flatMap(TimeOfDay.seconds(ofTimestamp:)) {
+                if let started {
+                    let ran = TimeOfDay.difference(ended, started)
+                    if abs(ran - expectation.stoppedAt) > expectation.timeTolerance {
+                        fail("the recording ran \(Self.seconds(ran)) s from started to ended, expected \(Self.seconds(expectation.stoppedAt)) s, to its stop")
+                    }
+                }
+            } else {
                 fail("ended is \(manifest["ended"] ?? .null), expected a local time with milliseconds and offset")
             }
             let cpu = manifest["cpu"]
@@ -154,9 +170,10 @@ public struct ManifestCheck {
             fail("\(name): the name's time is not the file's start, \(start) s after the recording's start")
         }
         if let started {
-            let expected = TimecodeValue(recordingStarted: started, fileStart: start)
-            if TimecodeValue(timecode) != expected {
-                fail("\(name): timecode is \(timecode), expected \(expected) from started and start")
+            let expected = TimecodeValue.possible(recordingStarted: started, fileStart: start)
+            if !expected.contains(where: { TimecodeValue(timecode) == $0 }) {
+                let wanted = expected.map(\.description).joined(separator: " or ")
+                fail("\(name): timecode is \(timecode), expected \(wanted) from started and start")
             }
         }
         return ListedFile(name: name, source: source, label: label, start: start, end: end, timecode: timecode, state: state)
@@ -308,6 +325,27 @@ public struct ManifestCheck {
             fail("the system audio has \(systemAudioFiles.count) audio files, expected \(expectedCount)")
         }
     }
+
+    // MARK: From the start to the stop
+
+    /// A file of a source no event names runs the whole recording: it starts
+    /// within the settle time of the start and, when finalized, ends at the
+    /// stop. The played audio inputs are such sources.
+    private mutating func checkSpan(_ events: JSONValue?) {
+        let named = Set((events?.array ?? []).flatMap { [$0["screen"]?.string, $0["audioSource"]?.string].compactMap(\.self) })
+        let latestStart = expectation.settleTime + expectation.timeTolerance
+        for file in files where !named.contains(file.sourceName) {
+            if file.start > latestStart {
+                fail("\(file.name): starts at \(Self.seconds(file.start)) s, expected by \(Self.seconds(latestStart)) s, the settle time and the tolerance after the start")
+            }
+            if expectation.ending == .finalized, let end = file.end, abs(end - expectation.stoppedAt) > expectation.timeTolerance {
+                fail("\(file.name): ends at \(Self.seconds(end)) s, expected \(Self.seconds(expectation.stoppedAt)) s, the stop")
+            }
+        }
+    }
+
+    /// Seconds to a tenth, for failure lines.
+    static func seconds(_ value: Double) -> String { String(format: "%.1f", value) }
 
     /// No event ends a file by a failure: they are what `result` counts.
     private mutating func checkFailureEvents(_ events: JSONValue?) {

@@ -79,6 +79,11 @@ struct Run: ParsableCommand {
                 break
             }
             guard restore(driver, keepingFile: true) else { break }
+            if Interruption.shared.happened {
+                stopped = DriverError("interrupted")
+                print("STOP  interrupted after \(scenario.name)")
+                break
+            }
         }
         let restored = restore(driver, keepingFile: false)
         if let stopped { throw stopped }
@@ -95,7 +100,7 @@ struct Run: ParsableCommand {
     private func restore(_ driver: Driver, keepingFile: Bool) -> Bool {
         let arguments = ["restore", "--scratch-folder", driver.scratch.path] + (keepingFile ? ["--keep-restore-file"] : [])
         let process = Foundation.Process()
-        process.executableURL = URL(filePath: driver.helper)
+        process.executableURL = URL(filePath: driver.ownExecutable)
         process.arguments = arguments
         do {
             try process.run()

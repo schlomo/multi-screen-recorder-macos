@@ -57,12 +57,19 @@ public struct TimecodeValue: Equatable, Sendable, CustomStringConvertible {
         self.init(frame: (hours * 3600 + minutes * 60 + seconds) * Self.framesPerSecond + frames)
     }
 
-    /// The timecode of a file that starts `start` seconds after a recording
-    /// started at `started` (seconds of the day): the frame of the day at
-    /// the start, rounded to the nearest frame, plus the file's ticks.
-    public init(recordingStarted started: Double, fileStart start: Double) {
-        let fps = Double(Self.framesPerSecond)
-        self.init(frame: Int((started * fps).rounded()) + Int((start * fps).rounded()))
+    /// The timecodes a file may have that starts `start` seconds after a
+    /// recording started at `started` (seconds of the day, as the manifest
+    /// writes it, to the millisecond): the frame of the day at the start,
+    /// rounded to the nearest frame, plus the file's ticks. The recorder
+    /// rounds the start before it is cut to the millisecond, so within half
+    /// a millisecond of a half frame both neighbouring frames are possible.
+    public static func possible(recordingStarted started: Double, fileStart start: Double) -> [TimecodeValue] {
+        let fps = Double(framesPerSecond)
+        let ticks = Int((start * fps).rounded())
+        let frames = started * fps
+        let halfMillisecond = 0.0005 * fps
+        let candidates = Set([frames - halfMillisecond, frames + halfMillisecond].map { Int($0.rounded()) })
+        return candidates.sorted().map { TimecodeValue(frame: $0 + ticks) }
     }
 
     /// The seconds of the day of the timecode's frame.

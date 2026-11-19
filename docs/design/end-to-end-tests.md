@@ -138,6 +138,11 @@ the state after a run is a process of its own (`switch-mode`, `state`,
 identity had, so the helper puts it back to its first size when it
 starts and when it ends.
 
+Every `msr record` gets a `--duration`: the scenario's own, or for a
+scenario stopped by a signal its stop plus 120 s, a ceiling, so a
+driver killed or crashed before it sends the signal never leaves the
+recorder recording the person's session.
+
 The named scenarios, each about 10 to 25 s of recording:
 
 | Scenario | What happens | What it asserts beyond every scenario's checks |
@@ -153,8 +158,14 @@ Every scenario's checks: `msr record`'s exit status, the recording
 folder's path alone on standard output, `recording.json` exactly
 (its keys, the app and the settings, its state, `ended`, `result`
 and `cpu` for how it stopped, each file's name, label, number, state,
-start, end and timecode from `started` and its start, the guide tracks,
-no failure event, the played audio input and the system audio once),
+start, end and timecode from `started` and its start (within half a
+millisecond of a half frame, either neighbouring frame, as `started` is
+written to the millisecond after the timecode is taken), the guide
+tracks, no failure event, the played audio input and the system audio
+once; the recording ran from `started` to `ended` as long as the
+driver let it, and each file of a source no event names, the played
+audio input among them, starts within the settle time of the start and
+ends at the stop),
 and every file through `ffprobe` and `ffmpeg`: it decodes without an
 error, its timecode track, its tracks and their names, the video's
 codec, frame size and 30 frames for each second of its length, an audio
@@ -818,6 +829,12 @@ this design is built:
 
 ## Open questions
 
+- A frame size change is made by a mode switch on the virtual screen,
+  not by replacing the screen with one of another size, as "The design"
+  has it: macOS brings a replaced screen back at its identity's last
+  mode (D63). Is the mode switch the way?
+- Should the signing jobs wait for `end-to-end-test`, so nothing is
+  published that failed it (D63)?
 - Which items of the v1 gate these tests replace.
 - Does the owner's BetterDisplay HiDPI mode work through virtual
   screens ("What research found for the recorder")?

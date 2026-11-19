@@ -4,7 +4,7 @@ import Testing
 
 /// A recording folder as the recorder writes it after the virtual-screen
 /// scenario with the test tone: one of the Mac's own screens, a virtual
-/// screen resized once, the loopback device and the system audio. Each
+/// screen whose mode is switched once, the loopback device and the system audio. Each
 /// test breaks one thing and expects the check to name it.
 struct SampleRecording {
     static let virtualUUID = "122787BA-50AA-4A5A-B00C-3F98867665AF"
@@ -263,5 +263,46 @@ struct SampleRecording {
         var sample = SampleRecording()
         sample.files.swapAt(3, 4)
         #expect(sample.check().failures.contains("files are not in the order of their start"))
+    }
+
+    @Test func aRecordingThatEndedTooEarlyOrTooLateFails() {
+        var sample = SampleRecording()
+        sample.manifest["ended"] = "2026-11-19T08:27:30.000+01:00"
+        #expect(sample.check().failures.contains("the recording ran 8.3 s from started to ended, expected 17.0 s, to its stop"))
+        sample.manifest["ended"] = "2026-11-19T08:27:39.600+01:00"
+        #expect(sample.check().failures.contains("the recording ran 17.9 s from started to ended, expected 17.0 s, to its stop"))
+    }
+
+    @Test func aFileWithoutEventsRunsFromTheStartToTheStop() {
+        var sample = SampleRecording()
+        sample.files[0]["start"] = 1.6
+        sample.files[0]["timecode"] = "08:27:23:09"
+        sample.files[0]["name"] = "2026-11-19 08.27.23 Screen 1 - DELL P3421W.mov"
+        sample.files[1]["end"] = 12.0
+        // Moved, the file is also out of the order of the starts: only the span lines matter here.
+        let failures = sample.check().failures.filter { $0.contains(": starts at") || $0.contains(": ends at") }
+        #expect(failures == [
+            "2026-11-19 08.27.23 Screen 1 - DELL P3421W.mov: starts at 1.6 s, expected by 1.5 s, the settle time and the tolerance after the start",
+            "2026-11-19 08.27.22 Audio 0 - System.mov: ends at 12.0 s, expected 17.0 s, the stop",
+        ])
+    }
+
+    @Test func thePlayedInputIsRecordedFromTheStart() {
+        var sample = SampleRecording()
+        sample.files[2]["start"] = 3.0
+        sample.files[2]["timecode"] = "08:27:24:21"
+        sample.files[2]["name"] = "2026-11-19 08.27.24 Audio 1 - BlackHole 2ch.mov"
+        #expect(sample.check().failures.contains(
+            "2026-11-19 08.27.24 Audio 1 - BlackHole 2ch.mov: starts at 3.0 s, expected by 1.5 s, the settle time and the tolerance after the start"))
+    }
+
+    @Test func aKilledRecordingsFilesStillStartWithIt() {
+        var sample = SampleRecording(killed: true)
+        sample.files[0]["start"] = 2.0
+        sample.files[0]["timecode"] = "08:27:23:21"
+        sample.files[0]["name"] = "2026-11-19 08.27.23 Screen 1 - DELL P3421W.mov"
+        #expect(sample.check(SampleRecording.expectation(killedAt: 12)).failures.filter { $0.contains(": starts at") } == [
+            "2026-11-19 08.27.23 Screen 1 - DELL P3421W.mov: starts at 2.0 s, expected by 1.5 s, the settle time and the tolerance after the start",
+        ])
     }
 }

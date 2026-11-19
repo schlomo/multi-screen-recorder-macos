@@ -1944,7 +1944,7 @@ architect's reading.
      `state`; its logic, the assertions included, in the library
      `EndToEndLogic` under unit tests in `scripts/test`.
   4. The first named scenarios: a plain recording, a virtual screen
-     connected, resized and disconnected, the test tone through
+     connected, its mode switched and disconnected, the test tone through
      BlackHole (level, silent stretches, timing across files by
      timecode), the system audio, stop by Ctrl-C and by `kill -9`.
 - **Deviation from the agreed design, for the owner to confirm:** the
