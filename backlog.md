@@ -11,7 +11,8 @@ never retried away, and no check is loosened. The 4th attempt on
 `298e4c9` failed on a real `screen file writer failed` at a mode
 switch; the recording log now shows its cause. The owner's ruling
 (2026-11-19): "you can do follow up fixes in 23", so item 24's
-follow-ups (item 27, once its design is signed off) go into PR #23.
+follow-ups go into PR #23 (item 27 is built there). PR #23 now works
+on item 28, the hosted runner's writer failure.
 Then, one PR each: item 23, the Resolve timeline (after the owner's
 test import of the spike `.otio` files, instructions in the session of
 2026-11-19, remade if gone); item 21, the meters (design signed off);
@@ -571,16 +572,34 @@ Still open from D34: what AGC does and whether it is on in auto mode;
    says they "cover exactly its own time". The audio files are
    complete. Decide whether it matters for editors.
 
-27. **A writer that cannot start repeats its error without end** (the
-   owner's run, 2026-11-19, folder made read-only, microphone replugged):
-   the audio file writer retries about every 10 s and each try prints
-   the full error detail on standard error, so the terminal fills with
-   the same line; the first failure is also printed twice, as "The
-   audio file of … failed: …" and as the event "audio file writer
-   failed: … (…)". Proposed: standard error prints a writer's failure
-   once and then only how often it repeated (when it recovers or at
-   Stop); the recording log keeps every line; one line per failure.
-   Needs the owner's sign-off; then into PR #23.
+28. **A screen file writer fails right after a mode switch on the
+   hosted runner** (PR #23's runs, 2026-11-19; 2 of 7 CI runs, 0 of 10
+   on the owner's Mac): AVFoundation -11800 from OSStatus -19092 about
+   0.25 s after the virtual screen's switch; `recording.json` then
+   claims the file runs 1.3 s longer than its content. Being worked in
+   PR #23: an evidence round (frame detail lines, per-input counts at a
+   failure, a failed file's true end, the system log on a failed
+   scenario, a 10-switch stress scenario), then a fix. The owner
+   (2026-11-19): "1-2 second loss around screen changes is
+   acceptible"; on BT.709 frames (item 6): "I'd have to see the
+   difference"; "PR23 must achieve good quality. Keep working on it and
+   grinding away. Eventually, if we have to give up, then the
+   alternative would be to run the e2e tests only on my Mac (or
+   potentially a paid CI offering)".
+29. **Survive a brief disconnect of a screen whose mode doesn't
+   change** (the owner, 2026-11-19: "ideally we would survive brief
+   disconnects of a display that doesn't change the resolution (e.g. a
+   shaky HDMI connector)"): today a disconnect ends the screen's file
+   and a reconnect starts a new one [ASSUMED from the design]. Needs a
+   design.
+30. **The DELL changes its colour tone when the laptop is opened** (the
+   owner, 2026-11-19; "not sure if this is related to night mode or
+   something else or the fact that the laptop screen is HDR"): find
+   out whether the recording shows it and why. Possibly related to item
+   6's colour handling [CONJECTURE].
+31. **Unit tests for `Recorder`'s wiring** (review of item 27,
+   2026-11-19): the fixes for printing a failure once were verified by
+   reading only, since `Recorder` has no unit tests.
 
 ## Deliberately deferred
 
@@ -732,6 +751,10 @@ Still open from D34: what AGC does and whether it is on in auto mode;
 
 ## Done (recent)
 
+- 2026-11-19: item 27, a failure's repeats are counted on standard
+  error, not printed (the owner: "repeat problems should be handled
+  smartly"); in PR #23, D65; `system audio started` is told once its
+  file has started.
 - 2026-11-19: PR #24 merged by the owner: item 24, diagnostics. One
   error detail for every error (domain, code, underlying errors; the
   manifest's `errorDetail`), a test against `localizedDescription`;
