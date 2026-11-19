@@ -2,17 +2,15 @@
 
 ## Next session starts here
 
-PR #24 (item 24, diagnostics) is merged (2026-11-19). Next: PR #23
-(item 3's first part) takes `main` in, and its end-to-end job is rerun
-on one commit until it passes 5 times in a row (the owner: "keep
-working till you see consistently reliable e2e tests"); every failure
-is root-caused from the uploaded artifacts and the recording log,
-never retried away, and no check is loosened. The 4th attempt on
-`298e4c9` failed on a real `screen file writer failed` at a mode
-switch; the recording log now shows its cause. The owner's ruling
-(2026-11-19): "you can do follow up fixes in 23", so item 24's
-follow-ups go into PR #23 (item 27 is built there). PR #23 now works
-on item 28, the hosted runner's writer failure.
+PR #24 (item 24, diagnostics) is merged (2026-11-19). PR #23 (item 3's
+first part) is finishing: the end-to-end tests now run manually in a
+tart VM on the owner's Mac (`scripts/end-to-end-setup`, then
+`scripts/end-to-end-test`), no longer in CI (D67; the owner: "We'll
+leave e2e a manual step that uses the VM and another script for setup.
+You'll run e2e manually when needed and mark in the pr that it
+succeeded. Kiss"). Left: the fix round for the review of the VM move,
+one CI run, 5 passing end-to-end runs in a row in the VM on the head,
+the result in the PR description, then ready.
 Then, one PR each: item 23, the Resolve timeline (after the owner's
 test import of the spike `.otio` files, instructions in the session of
 2026-11-19, remade if gone); item 21, the meters (design signed off);
@@ -35,13 +33,13 @@ Still open from D34: what AGC does and whether it is on in auto mode;
 ## In flight
 
 - **PR #23, end-to-end tests** (item 3, first part; branch
-  `end-to-end-tests`, draft): six scenarios on the owner's Mac and on
-  the hosted runner, review artifacts, a job summary and annotations.
-  Reviewed in full, every round delta-reviewed. Item 24 is merged; next,
-  5 green end-to-end runs in a row; item 24's follow-ups go here too
-  (the owner, 2026-11-19). Left for the follow-up: match a
-  screen's notice by its name, not its order, and say "misordered"
-  where "missing" is printed today (review NITs, 2026-11-19).
+  `end-to-end-tests`, draft): seven scenarios run by
+  `scripts/end-to-end-test` in a throwaway tart VM on the owner's Mac
+  (D67), review artifacts in the scratch folder; item 27 and item 28's
+  evidence round (D65, D66) are in it too. Every round reviewed. Left
+  for the follow-up: match a screen's notice by its name, not its
+  order, and say "misordered" where "missing" is printed today (review
+  NITs, 2026-11-19).
 
 ## Queued
 
@@ -572,20 +570,6 @@ Still open from D34: what AGC does and whether it is on in auto mode;
    says they "cover exactly its own time". The audio files are
    complete. Decide whether it matters for editors.
 
-28. **A screen file writer fails right after a mode switch on the
-   hosted runner** (PR #23's runs, 2026-11-19; 2 of 7 CI runs, 0 of 10
-   on the owner's Mac): AVFoundation -11800 from OSStatus -19092 about
-   0.25 s after the virtual screen's switch; `recording.json` then
-   claims the file runs 1.3 s longer than its content. Being worked in
-   PR #23: an evidence round (frame detail lines, per-input counts at a
-   failure, a failed file's true end, the system log on a failed
-   scenario, a 10-switch stress scenario), then a fix. The owner
-   (2026-11-19): "1-2 second loss around screen changes is
-   acceptible"; on BT.709 frames (item 6): "I'd have to see the
-   difference"; "PR23 must achieve good quality. Keep working on it and
-   grinding away. Eventually, if we have to give up, then the
-   alternative would be to run the e2e tests only on my Mac (or
-   potentially a paid CI offering)".
 29. **Survive a brief disconnect of a screen whose mode doesn't
    change** (the owner, 2026-11-19: "ideally we would survive brief
    disconnects of a display that doesn't change the resolution (e.g. a
@@ -602,6 +586,17 @@ Still open from D34: what AGC does and whether it is on in auto mode;
    reading only, since `Recorder` has no unit tests.
 
 ## Deliberately deferred
+
+- **A software-encoder fallback after a hardware encoder failure**
+  (item 28's analysis, 2026-11-19): the owner: "2 we won't do as all
+  Mac's have hardware encoders". Revive if a problem report shows a
+  real Mac's hardware encoder failing.
+- **The end-to-end tests on GitHub's hosted runners** (D67): their
+  host's paravirtualized video encoder stalls at a virtual screen's
+  mode switch and sometimes fails (-11800 from -19092; 2 in about 9
+  runs, 0 in 18 on the owner's Mac and in a tart VM there), and macOS
+  arm64 runners were often not available. Revive if GitHub's host
+  changes or a paid CI offering is wanted (the owner's alternative).
 
 - **A warm-up before the end-to-end scenarios** (the owner's idea,
   2026-11-19: "On the VM maybe worth warming up the system first";
@@ -751,6 +746,10 @@ Still open from D34: what AGC does and whether it is on in auto mode;
 
 ## Done (recent)
 
+- 2026-11-19: item 28, the hosted runner's writer failure: the
+  evidence round (D66) found our recorder feeds correct frames and the
+  failure is GitHub's host encoder; the end-to-end tests moved to a
+  tart VM on the owner's Mac (D67), in PR #23.
 - 2026-11-19: item 27, a failure's repeats are counted on standard
   error, not printed (the owner: "repeat problems should be handled
   smartly"); in PR #23, D65; `system audio started` is told once its
