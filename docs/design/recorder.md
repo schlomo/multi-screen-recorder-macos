@@ -25,8 +25,8 @@ signature); if that fails it exits 71 (`EX_OSERR`).
 | Command | Does | Exit code |
 |---|---|---|
 | `msr list` | Prints "What will be recorded" as `msr check` does, from the settings and the devices, without the ready check and without asking for any permission, then whether the program running `msr` may record the system audio | 0, 1 when the screens, the audio inputs or an audio input the settings record cannot be read |
-| `msr check [flags] [--debug]` | Prints the banner and "What will be recorded", then runs the ready check and prints each item; `--debug` adds detail on standard error and in the log | 0 ready, 1 not ready |
-| `msr record [flags] [--duration 1h30m] [--debug \| --quiet]` | Records the screens and the audio sources (the recording core, D45, D49). Without flags it does what Start in the window does, with the same settings file; it prints the banner (as `msr check`) and "What will be recorded" at its start, then runs the ready check, records until Ctrl-C, SIGTERM, SIGHUP, the duration or Stop in the status window (below), and prints the recording folder at the start and a summary at the end (the summary: every file with its state, the screens' by number, then the audio sources' by number with the system audio first, and our process's CPU use, average and peak). It runs as a full AppKit app without a Dock icon (the `accessory` activation policy) until the ready check passed and the recording starts, then shows the icon; a run that is not ready shows none, and an icon macOS refuses is a problem, and the recording goes on (Ctrl-C stops it); while it records, the icon shows with its badge, and clicking it or Quit opens the status window as in the app (D45, D46). When it stops, for any reason, it first prints `Stopping the recording and finalizing the files…` on standard error, then finalizes and prints the summary; a Ctrl-C while it finalizes prints `Still finalizing the files…` and does nothing more. It prints every event of the recording manifest as one line on standard error (see "Logging"). `--debug` adds detail on standard error and in the log. **Output split:** standard output carries exactly one line, the recording folder's bare path, when recording starts; everything for people goes to standard error (the banner, "What will be recorded", the ready check, `Recording into <path>`, events, the status line, the summary, debug lines), all of it, and every other line this code writes on standard error (the settings file note, `Error:` lines, debug lines; ArgumentParser writes its own usage errors, before any status line exists), through one writer so nothing prints into the middle of the status line; a failed write to standard error, SIGPIPE included, is ignored, as there is nowhere left to report it, and `msr record` ignores SIGPIPE for the whole process from its start, before it writes anything, so a closed reader of standard output does not end it. **Status line:** only when standard error is a terminal whose `TERM` is set, not empty and not `dumb`, with no option: one line redrawn once a second (`\r`, the text, `ESC[K`). Its text, joined by ` · ` as the window's line is: `<n> problems` (`1 problem`) first when there are any, counting the problems of the run (the ones the window lists; low disk space and a screen showing another screen's picture are not problems, though they set the Dock badge), nothing when there are none; then the text of the window's line (time with seconds, size written, files, free space), the CPU use when known, and `<n> screens, <m> audio` for the sources being recorded (`1 screen`), such as `1 problem · Recording 0:12:34 · 1.2 GB in 7 files · 143.8 GB free · CPU 23 % · 2 screens, 5 audio`. It is cut to the terminal's width minus 1, taking 80 columns when the width is unknown, so it does not wrap. An event or debug line clears it, prints, and it is drawn again, all in one write; at the end it is cleared and the summary follows. Not a terminal: no status line and no escape code. **`--quiet`:** no output for people (no banner, table, passing ready check, events, status line or summary); still written are the path on standard output and, on standard error, a failing ready check, `Error:` lines, the settings file note, each problem as it happens (the line the window lists) and the summary of a run that exits 3; exit codes are unchanged; with `--debug` it is a usage error. `--duration` takes hours, minutes and seconds (`1h30m`, `45m`, `90s`); a number without a suffix is minutes (`90` is 90 minutes) | 0 ok (every file finalized, no file ended by a failure, D47), 1 not ready, 3 when the recording manifest's `result` is `problems`, the finalized manifest could not be written, or the recording could not start |
+| `msr check [flags] [--debug]` | Prints the banner and "What will be recorded", then runs the ready check and prints each item; `--debug` also prints the detail lines on standard error (and at `.debug` in the unified log) | 0 ready, 1 not ready |
+| `msr record [flags] [--duration 1h30m] [--debug \| --quiet]` | Records the screens and the audio sources (the recording core, D45, D49). Without flags it does what Start in the window does, with the same settings file; it prints the banner (as `msr check`) and "What will be recorded" at its start, then runs the ready check, records until Ctrl-C, SIGTERM, SIGHUP, the duration or Stop in the status window (below), and prints the recording folder at the start and a summary at the end (the summary: every file with its state, the screens' by number, then the audio sources' by number with the system audio first, and our process's CPU use, average and peak, and, when it exits 3, the link to report it and the files to attach, see "Problem report offer"). It runs as a full AppKit app without a Dock icon (the `accessory` activation policy) until the ready check passed and the recording starts, then shows the icon; a run that is not ready shows none, and an icon macOS refuses is a problem, and the recording goes on (Ctrl-C stops it); while it records, the icon shows with its badge, and clicking it or Quit opens the status window as in the app (D45, D46). When it stops, for any reason, it first prints `Stopping the recording and finalizing the files…` on standard error, then finalizes and prints the summary; a Ctrl-C while it finalizes prints `Still finalizing the files…` and does nothing more. It prints every event of the recording manifest as one line on standard error (see "Logging"). `--debug` also prints the detail lines on standard error (and at `.debug` in the unified log); the recording log has them always (see "Logging"). **Output split:** standard output carries exactly one line, the recording folder's bare path, when recording starts; everything for people goes to standard error (the banner, "What will be recorded", the ready check, `Recording into <path>`, events, the status line, the summary, detail lines), all of it, and every other line this code writes on standard error (the settings file note, `Error:` lines, detail lines; ArgumentParser writes its own usage errors, before any status line exists), through one writer so nothing prints into the middle of the status line; a failed write to standard error, SIGPIPE included, is ignored, as there is nowhere left to report it, and `msr record` ignores SIGPIPE for the whole process from its start, before it writes anything, so a closed reader of standard output does not end it. **Status line:** only when standard error is a terminal whose `TERM` is set, not empty and not `dumb`, with no option: one line redrawn once a second (`\r`, the text, `ESC[K`). Its text, joined by ` · ` as the window's line is: `<n> problems` (`1 problem`) first when there are any, counting the problems of the run (the ones the window lists; low disk space and a screen showing another screen's picture are not problems, though they set the Dock badge), nothing when there are none; then the text of the window's line (time with seconds, size written, files, free space), the CPU use when known, and `<n> screens, <m> audio` for the sources being recorded (`1 screen`), such as `1 problem · Recording 0:12:34 · 1.2 GB in 7 files · 143.8 GB free · CPU 23 % · 2 screens, 5 audio`. It is cut to the terminal's width minus 1, taking 80 columns when the width is unknown, so it does not wrap. An event or detail line clears it, prints, and it is drawn again, all in one write; at the end it is cleared and the summary follows. Not a terminal: no status line and no escape code. **`--quiet`:** no output for people (no banner, table, passing ready check, events, status line or summary); still written are the path on standard output and, on standard error, a failing ready check, `Error:` lines, the settings file note, each problem as it happens (the line the window lists) and the summary of a run that exits 3; exit codes are unchanged; with `--debug` it is a usage error. `--duration` takes hours, minutes and seconds (`1h30m`, `45m`, `90s`); a number without a suffix is minutes (`90` is 90 minutes) | 0 ok (every file finalized, no file ended by a failure, D47), 1 not ready, 3 when the recording manifest's `result` is `problems`, the finalized manifest could not be written, or the recording could not start |
 | `msr settings [flags]` | Without flags prints the effective settings as JSON (show); with any settings flag, `--auto` included, saves the run's effective settings into the settings file and prints them (change). The only command that writes the file; the window also writes it | 0, 1 when it cannot write the file |
 | `msr version` | Prints the version and commit | 0 |
 
@@ -330,13 +330,15 @@ One recording folder per recording, named by its local start time
   2026-11-12 14.27.41 Screen 2 - LG HDR 4K.mov    ← back after a reconnect
   2026-11-12 14.41.10 Screen 1 - Built-in Retina Display.mov    ← new frame size after a mode change
   recording.json
+  recording.log
 ```
 
 One file per source, each named by its own start time and the
 source's label (D31, D55): a screen file per screen, an audio file per
 recorded audio input and one for system audio, each
 `<date time> <label>.mov`. The manifest below lists exactly these
-files.
+files; `recording.log`, the recording log, is next to it (see
+"Logging").
 
 **Labels (D55).** Every recorded source has a label,
 `<kind> <n> - <name>`: `Screen <n> - <screen name>` for a screen,
@@ -443,7 +445,13 @@ every change:
   ],
   "problems": [
     { "at": 600.0, "problem": "The free space in /Users/anna/Movies/Multi Screen Recorder cannot be read",
-      "error": "The file “Multi Screen Recorder” couldn’t be opened." }
+      "error": "The file “Multi Screen Recorder” couldn’t be opened because there is no such file. (NSCocoaErrorDomain 260; reason: The file doesn’t exist.): The operation couldn’t be completed. No such file or directory (NSPOSIXErrorDomain 2; reason: No such file or directory)",
+      "errorDetail": { "domain": "NSCocoaErrorDomain", "code": 260,
+        "description": "The file “Multi Screen Recorder” couldn’t be opened because there is no such file.",
+        "reason": "The file doesn’t exist.",
+        "underlying": [ { "domain": "NSPOSIXErrorDomain", "code": 2,
+          "description": "The operation couldn’t be completed. No such file or directory",
+          "reason": "No such file or directory", "underlying": [] } ] } }
   ]
 }
 ```
@@ -469,7 +477,8 @@ file. Their fields: `at`, `event`, `screen` or `audioSource`; `from` and
 and the old and the new default microphone for `default microphone
 changed` (either absent where there was or is none); `mirrors` (the
 screen mirrored) for `screen mirroring started`; `length` (seconds, to
-the millisecond) for `audio input gap`; `error` (why) for `screen stream
+the millisecond) for `audio input gap`; `error` (why, as one line) and
+`errorDetail` (the same error as its full chain, below) for `screen stream
 failed`, `screen file writer failed`, `audio input failed`, `system
 audio failed`, `audio file writer failed`, and `audio file writer fell
 behind` when samples were lost at a file's end. The manifest's `state`
@@ -487,8 +496,24 @@ sampled every second, to one decimal (encoding and capture in macOS's
 own processes, `VTEncoderXPCService`, `replayd`, `WindowServer`, are not
 in it); all three are null until the recording is finalized. `problems`
 lists every problem told to the person, also those that leave `result`
-`ok`, each with `at`, `problem` (what went wrong) and `error` (the full
-error text, or null). A failure is told while recording, at its event's
+`ok`, each with `at`, `problem` (what went wrong), `error` (the full
+error text, or null) and `errorDetail` (the error detail, or null when
+`error` is null). The **error detail** (D64) is the error with its full
+chain: `domain` and `code` (as macOS gives them, such as
+`AVFoundationErrorDomain` `-11800`), `description`, `reason` and
+`suggestion` where macOS gives them, and `underlying`, the error detail
+of every underlying error (`NSUnderlyingErrorKey`,
+`NSMultipleUnderlyingErrorsKey`), 8 levels deep at most; the last level
+kept has `"truncated": true` when it has more (left out otherwise). The recorder's own errors have
+the domain `MultiScreenRecorder` (or their type's, such as
+`RecorderCore.ScreenFileWriterError`) with the system's error under them,
+such as `cannot write <file>` with AVFoundation's error underneath.
+`error` is the error detail as one line: each level's description, then
+in parentheses the domain and code (left out for the recorder's own),
+with a code that is a four-character code also as one (`1852797029
+('nope')`), the reason and the suggestion, then `: ` and the underlying
+errors, and line breaks become `⏎`. A problem made from an event has the event's name as its error
+detail's description, with the event's error detail under it. A failure is told while recording, at its event's
 time. A `result` of `problems` never comes with empty `problems` (D47):
 should nothing have been told, finalizing adds one problem, "A failure
 was not told while recording", naming the first failure and how many
@@ -686,7 +711,7 @@ checked, reported or rewritten at the next start (D47).
   all is well, no timer (D47). Low disk space shows as a "!" badge and a
   bouncing Dock icon; no notification, which would need a third
   permission and is hidden by Focus modes. A recording problem (the
-  recording manifest cannot be written, the screens or the free space
+  recording manifest or the recording log cannot be written, the screens or the free space
   cannot be read, a screen file's or an audio file's writer fails, an
   audio source's capture fails) shows the same way,
   and the status window lists it in red; `msr record` also names each
@@ -712,8 +737,9 @@ checked, reported or rewritten at the next start (D47).
   use in percent of one core as Activity Monitor shows it, sampled every
   second, with the line "Encoding and capture also run in macOS's own
   processes (VTEncoderXPCService, replayd, WindowServer), which this
-  number does not include."; the problems in red, with the command for
-  the log (see "Logging"); and, in the lower right corner, Continue and
+  number does not include."; the problems in red, with a line naming
+  the recording's `recording.json` and `recording.log` for a report
+  (see "Logging"); and, in the lower right corner, Continue and
   Stop, Stop on the right in blue as the call to action. The window is
   as wide as its table, no cell wrapping or cut, and the text below,
   such as the CPU line's explanation, wraps to that width. As in the
@@ -766,14 +792,47 @@ checked, reported or rewritten at the next start (D47).
   repository with the form `.github/ISSUE_TEMPLATE/crash-report.yml`,
   its title, app version and macOS version filled in (the title keeps
   the `.ips` name), and shows the text copy in Finder for the person
-  to drag into the issue; GitHub takes no file through a link. The app
-  opens no connection itself (D15, D40). A crash report folder or a
-  state file that cannot be read or decoded, or a failed write
-  shows an alert "Cannot offer the crash report" with the error, and
-  nothing is offered that start; a failed text copy (the dialog was
+  to drag into the issue; the dialog asks, for a crash while recording,
+  for that recording's `recording.json` and `recording.log` too (D64); GitHub takes no file through a link. The app
+  opens no connection itself (D15, D40). The state file is read once
+  for this offer and the problem report offer below; one that cannot be
+  read or decoded shows one alert "Cannot offer to report a crash or a
+  recording's problems" with the error, and nothing is offered that
+  start. A crash report folder that cannot be read, or a failed write,
+  shows an alert "Cannot offer the crash report" with the error; a failed text copy (the dialog was
   already answered) shows "Cannot copy the crash report" with the
   error; a browser that cannot be opened shows
   an alert with the address.
+- **Problem report offer (D64):** at Stop, in the app and in `msr
+  record`, the state file's `lastRecording` remembers the recording
+  folder's path and how the recording ended: `result` `problems` when
+  `msr record` exits 3 for it (the manifest's `result` is `problems`
+  or the final manifest could not be written), otherwise `ok`, with
+  `noticeShown` false. A state file that cannot be read or written
+  there leaves the recording unremembered: an `Error:` line in `msr
+  record`, an alert "The recording is not remembered" after the
+  person's Stop in the app, the unified log at logout. When the app
+  starts, after the crash report offer, a last recording with
+  `problems`, not shown yet, whose folder is still there, gets the
+  notice "The last recording had problems" with its folder, [Report a
+  problem] [Dismiss]; `noticeShown` is stored before it shows, so it
+  shows once. Report a problem opens the browser on a new issue with
+  the form `.github/ISSUE_TEMPLATE/problem-report.yml`: `version` (as
+  `msr version` prints it) and `what-happened` filled, the summary's
+  `Error at` and `Problem at` lines read from the recording's
+  `recording.json`, the last first (and the line that it has no end,
+  or that it cannot be read), as many as keep the link within 8000
+  characters (*data*; GitHub's limit is about 8 kB [ASSUMED]), then `…
+  and <n> more, in recording.log and recording.json.`; and it shows
+  that recording's `recording.json` and `recording.log` in Finder for
+  the person to drag into the issue (the form's `recording-json` and
+  `recording-log` fields). Errors as in the crash report offer:
+  "Cannot offer to report the last recording", or the address when the
+  browser cannot be opened. `msr record` whose summary says it exits 3
+  ends it, also with `--quiet`, with `Report it: <the same link,
+  built from the summary's lines>` and `Attach: <recording
+  folder>/recording.log and recording.json`. Both the crash report and
+  the problem report build their links in one place (`IssueFormLink`).
 
 ## How the recorder works
 
@@ -1212,7 +1271,7 @@ screen sleep while recording.
 
 ## Logging
 
-No log file of our own (D46). The app and `msr` write every event of the
+The app and `msr` write every event of the
 recording manifest and every problem to the macOS unified log, subsystem
 `org.schapiro.multiscreenrecorder`, at `.notice` (problems at `.error`),
 levels macOS keeps on disk, with names (screens, folders) public, not
@@ -1220,19 +1279,69 @@ redacted. `msr record` also prints each event as one line on standard
 error: the local time, the offset from the recording's start, the event
 and its screen, and the details it has, such as `22:14:40 +9.2s screen
 connected: Wacom One 13T` or `22:15:32 +61.3s screen stream failed: LG
-(-3811)`. `--debug` (for `msr record` and `msr check`) adds detail lines
-(the tracker's actions, the screens as read, files started and ended,
-the ready check's facts, and every 10 s (*data*), together as one block
+(-3811)`. Detail lines are the tracker's actions, the screens as read,
+files started and ended, the ready check's facts, and every 10 s (*data*), together as one block
 in number order (the system audio, 0, first), the clock drift correction
 of each audio source being recorded, such as `Audio 3 - Razer Seiren V3 Mini: clock
 drift -116.1 ppm, corrected +34.94 ms so far, 0.04 ms off`, or `clock
 drift not measured yet`; zero is `0`, never `+0.0`, and at each gap in
 an audio source a line such as `Audio 3 - Razer Seiren V3 Mini: gap of
 100.0 ms, clock drift corrected +3.45 ms so far, lateness 12.30 ms
-before, 12.41 ms after`) on standard error and at `.debug` in the log;
-while a recording runs, each line on standard error carries the time
-since its start as the event lines do, such as `debug recorder: +27.9s
-start Screen 3 - LG`. The log of the last 2 hours, of the app and `msr`
+before, 12.41 ms after`. `--debug` (for `msr record` and `msr check`)
+also prints the detail lines on standard error, each as `detail
+<category>: …`, and writes them at `.debug` in the unified log; while a
+recording runs, each line on standard error carries the time since its
+start as the event lines do, such as `detail recorder: +27.9s start
+Screen 3 - LG`.
+
+**Recording log (D64).** Every recording, in the app and in `msr
+record`, with or without `--debug`, writes `recording.log` in its
+recording folder, next to the recording manifest: plain text, one line
+each, every event, every problem with its full error text (the error
+detail as one line, see "Output on disk"), and every detail line, and
+`finalizing the recording manifest` at its end. It starts, before the
+first event, with detail lines of the starting situation, in this
+order: `started: <app and version>, recording folder <name>`; `macOS
+<version and build>, Mac model <identifier>` (`hw.model`, such as
+`Mac15,8`); the effective settings line by line as `msr settings`
+prints them (category `settings`: the output folder, the low disk
+warning minutes and the rest); "What will be recorded" line by line as
+`msr record` prints it (category `what will be recorded`, its empty
+lines left out); and the ready check's facts and its result, line by
+line (category `ready check`), of the ready check before Start. The
+block is written and synchronized to disk before the recording starts,
+so a crash in its first seconds leaves it. It goes to the recording log
+only, also with `--debug`: `msr record` printed the table and the ready
+check already. Nothing in it names the person beyond what the files
+already carry: no user name, serial number or host name. Each line starts with the local time
+and the offset from the recording's start: an event's line is its line
+on standard error, a problem's `22:15:32 +61.3s problem: <the problem
+as the status window lists it>`, a detail line `22:14:58 +27.9s detail
+recorder: start Screen 3 - LG`. The file is created new and only
+appended to, never rewritten: after an event's or a problem's line it
+is synchronized to disk (`fsync`), so a crash leaves everything up to
+the last event or problem; detail lines wait in memory until then, until
+Stop, or until the check once a second finds 10 s (*data*) since the
+last write, so about 11 s at most. A capture thread adding a detail line
+never waits for a write or its `fsync`. A recording log that cannot be
+created or written is a problem, told once until writing it works again
+(the lines meanwhile are lost); the recording goes on. At Stop the
+recording log is written, synchronized and closed before the recording
+manifest is finalized: if that fails, it is a problem in the final
+manifest and the `result` is `problems` (exit 3 for `msr record`). A
+problem reported after the manifest is finalized (the final manifest
+that cannot be written, or a late report of the recording log) goes to
+the unified log and, in the app and in `msr record` (also with
+`--quiet`), to standard error as `Problem at the end: <the problem as
+the status window lists it>`, such as `Problem at the end: Cannot write
+the recording manifest: …`; it is printed when the problem is reported,
+before the summary of `msr record`. Its cost: a
+1-minute recording of 2 screens and 5 audio sources wrote 56 lines,
+6.8 kB [KNOWN, measured 2026-11-19], most of it the clock drift block
+(one line per audio source every 10 s), so about 0.4 MB per hour, and
+one `fsync` per event and problem and at most one per 10 s otherwise.
+
+The log of the last 2 hours, of the app and `msr`
 only (the tests log under the same subsystem on a developer's Mac):
 
 ```sh
@@ -1240,8 +1349,11 @@ log show --last 2h --predicate 'subsystem == "org.schapiro.multiscreenrecorder" 
 ```
 
 The crash report form has an optional field for its output, and the
-crash report dialog, the status window (with a problem) and the README
-name the command.
+README names the command for a crash outside a recording. The crash
+report dialog, the status window (with a problem), the problem report
+offer, the end of `msr record`'s summary when it exits 3, and the
+README name the recording's `recording.json` and `recording.log` for a
+report.
 
 ## Code layout
 
@@ -1300,21 +1412,33 @@ wander, and fast wanders as a bound on how much worse they get; the
 support line with hand-made points and the rate; the resampler's purity,
 its sample count, chunking and a rate change; clicks, gaps with the
 drift during them, and the rate and what is still off right after a gap,
-through the whole correction; when the status and the `--debug` line are
+through the whole correction; when the status and the detail line are
 due) and an audio file's `clockDriftPpm` and `clockDriftCorrection`
 (never `-0`), splitting interleaved and non-interleaved PCM, the guide
 track mixes, audio file names and metadata, our process's CPU use, the
 status window's rows, the version, the state file's content, the choice
-of the crash report to offer, the new-issue link (and that the issue
-form has the fields it fills), the name of a crash report's text copy,
+of the crash report to offer and of the last recording's problems to
+tell, the new-issue links of both (and that the issue forms have the
+fields they fill; the problem report's cut to its length), the end of
+`msr record`'s summary that offers a report, Report a problem with a
+stand-in for the browser and Finder, the name of a crash report's text copy,
 the text of the examples in this document, which the tests hold to
-the code, the status line's text and cut (it counts the problems), the badge ("!" or none), and that no
-source file writes on standard error but the one writer. The writer
+the code, the status line's text and cut (it counts the problems), the badge ("!" or none), that no
+source file writes on standard error but the one writer, the error
+detail (nested and multiple underlying errors, four-character codes,
+the depth guard, a Swift error's own text, its JSON), that no source
+file but the error detail's reads `localizedDescription`, and an
+error's `errorDetail` in the recording manifest. The writer
 itself is tested with a stand-in sink and on a pseudo-terminal, a pipe
-and a pipe without a reader, in `RecorderCoreTests`. `RecorderCoreTests` test the output folder probe against
+and a pipe without a reader, in `RecorderCoreTests`. `RecorderCoreTests` test the recording log with a stand-in file and a
+stand-in clock (appended, never rewritten, synchronized after each event
+and problem, detail lines written with the next event or after 10 s,
+a failing write told once until it works again, a detail line not held
+up by a slow synchronize, Stop's close giving its failure) and the real file it
+appends to, the writers' errors keeping the system's error chain, the output folder probe against
 scratch folders, and that this Mac's audio inputs can be read and a
 listener for their changes registered, which needs no permission and
-shows no prompt, the state file (missing, saved, broken), the listing of
+shows no prompt, the state file (missing, saved, broken, updated), the listing of
 the crash report folder (a missing one is no crash reports, an
 unreadable one an error), the text copy of a crash report, screen files
 written from synthetic frames and read back (constant frame rate,
@@ -1517,7 +1641,7 @@ peak, of one core (this process only)`.
 Built (the clock drift correction): every audio source resampled to
 follow the shared clock (see "Audio", "Clock drift"), `clockDriftPpm`
 and `clockDriftCorrection` per audio file, the status window's "Clock
-drift" column and the `--debug` lines. Tested by unit tests against
+drift" column and the detail lines. Tested by unit tests against
 simulated devices. Run on the owner's Mac on 2026-11-16 (two runs of
 90 s, wired audio mode and the system audio; their builds were not
 recorded) with one interval's smallest lateness, a follow time of 5 s
@@ -1592,7 +1716,7 @@ screens on the owner's Mac): result ok, no event; `clockDriftPpm` Razer
 -115.2, CalDigit +50.2, BRIO +2.5, MacBook +3.2, the system audio +6.3;
 `clockDriftCorrection` Razer +0.4139 s, CalDigit -0.1804 s, BRIO
 -0.0146 s, MacBook -0.0108 s, the system audio +0.0002 s; "ms off" in
-the `--debug` lines from 30 s on at most 0.21 (Razer), 0.17 (CalDigit),
+the detail lines from 30 s on at most 0.21 (Razer), 0.17 (CalDigit),
 0.83 (BRIO), 0.10 (MacBook) and 0.92 (the system audio). By room sound
 the Razer's and the BRIO's files kept the same lag, -16.1 to -16.8 ms
 in ten of twelve 60 s stretches across the hour, the other two with too

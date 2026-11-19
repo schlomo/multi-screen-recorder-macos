@@ -170,7 +170,7 @@ The named scenarios, each about 10 to 25 s of recording:
 | `stop-by-kill` | auto mode, `kill -9` | no `ended`, every file `recording` and readable up to its last fragment |
 
 Every scenario's checks: `msr record`'s exit status, the recording
-folder's path alone on standard output, `recording.json` exactly
+folder's path alone on standard output, `recording.log` present next to `recording.json`, `recording.json` exactly
 (its keys, the app and the settings, its state, `ended`, `result`
 and `cpu` for how it stopped, each file's name, label, number, state,
 start, end and timecode from `started` and its start (within half a
@@ -263,7 +263,7 @@ now, to check them" (D63). Each run writes, in its scratch folder:
 
 - `run.log`: every line the driver printed.
 - `review/<scenario>/` for each scenario, passed ones included:
-  `recording.json`; `contact-sheet.png`, a still from the middle of
+  `recording.json` and `recording.log`; `contact-sheet.png`, a still from the middle of
   each screen file (taken by `ffmpeg`) under a strip with the file's
   name; `excerpt <file>`, the first 5 s (`reviewExcerptSeconds`) of the
   smallest screen file and, in `tone` and `system-audio`, of
@@ -450,7 +450,7 @@ apart, a test cannot either:
   correction applied so far plus the device's drift during the gap (the
   kept slope over its length); a source whose timestamps jump to the
   host clock across a gap would be off by its drift until then. The
-  `--debug` line for each gap shows the drift added and the lateness
+  detail line for each gap shows the drift added and the lateness
   before and after it, which tells.
 
 All figures are the worst of 20 seeds of the tests' simulation.

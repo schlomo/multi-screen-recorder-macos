@@ -140,7 +140,7 @@ import Testing
         #expect(tracker.due(at: 2 * second).actions == [.startInput(uid: "Razer", number: 2, name: "Razer Seiren V3 Mini")])
         let again = tracker.captureEnded(.input("Razer"), .disconnected, at: 3 * second)
         #expect(names(again.events) == ["audio input failed: Razer Seiren V3 Mini"])
-        #expect(again.events.first?.error == AudioTracker.sourceLostAgain(.input("Razer")))
+        #expect(again.events.first?.errorDetail == AudioTracker.sourceLostAgain(.input("Razer")))
         #expect(again.events.first?.event.isFailure == true)
         #expect(tracker.nextDueTime() == 5 * second)
         #expect(tracker.sourcesShown.first { $0.id == .input("Razer") }?.state == .failedRetrying)
@@ -164,7 +164,7 @@ import Testing
         #expect(tracker.due(at: 2 * second).actions == [.startSystemAudio])
         let again = tracker.captureEnded(.systemAudio, .disconnected, at: 3 * second)
         #expect(names(again.events) == ["system audio failed: System audio"])
-        #expect(again.events.first?.error == AudioTracker.sourceLostAgain(.systemAudio))
+        #expect(again.events.first?.errorDetail == AudioTracker.sourceLostAgain(.systemAudio))
         // After a screen change, a lost stream is a move again, no failure.
         #expect(tracker.due(at: 10 * second).actions == [.startSystemAudio])
         _ = tracker.observeScreens(mainDisplayID: 2, connected: [1, 2], at: 11 * second)

@@ -6,7 +6,7 @@ import ImageIO
 import UniformTypeIdentifiers
 
 /// The review artifact of one scenario, in `review/<scenario>/` of the
-/// scratch folder: its `recording.json`, a contact sheet with a still from
+/// scratch folder: its `recording.json` and `recording.log`, a contact sheet with a still from
 /// the middle of each screen file, and the first seconds of one screen
 /// file and of the loopback device's audio file. What it shows is for a
 /// person to look at, not asserted.
@@ -27,6 +27,8 @@ struct Review {
     func collect(recording: URL, files: [ListedFile], probed: [String: ProbedFile], playsTone: Bool) throws {
         try FileManager.default.copyItem(at: recording.appending(path: ReviewNames.manifest),
                                          to: folder.appending(path: ReviewNames.manifest))
+        try FileManager.default.copyItem(at: recording.appending(path: ReviewNames.recordingLog),
+                                         to: folder.appending(path: ReviewNames.recordingLog))
         let screenFiles = files.filter { !$0.source.isAudio }
         try contactSheet(screenFiles.map { file in
             let length = probed[file.name]?.video.first?.duration ?? 0

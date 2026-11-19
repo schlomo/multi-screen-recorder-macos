@@ -78,7 +78,7 @@ public final class AudioInputWatch {
             let status = AudioObjectAddPropertyListenerBlock(systemObject, &address, .main, block)
             guard status == noErr else {
                 cancel()
-                throw DeviceReadError("changes of the audio devices cannot be watched (Core Audio error \(status))")
+                throw DeviceReadError("changes of the audio devices cannot be watched (Core Audio error \(ErrorDetail.codeText(Int(status))))")
             }
             listeners.append((address, block))
         }
@@ -105,10 +105,10 @@ private func audioDeviceIDs() throws(DeviceReadError) -> [AudioObjectID] {
     var address = address(kAudioHardwarePropertyDevices)
     var size: UInt32 = 0
     var status = AudioObjectGetPropertyDataSize(systemObject, &address, 0, nil, &size)
-    guard status == noErr else { throw DeviceReadError("the list of audio devices cannot be read (Core Audio error \(status))") }
+    guard status == noErr else { throw DeviceReadError("the list of audio devices cannot be read (Core Audio error \(ErrorDetail.codeText(Int(status))))") }
     var ids = [AudioObjectID](repeating: 0, count: Int(size) / MemoryLayout<AudioObjectID>.size)
     status = AudioObjectGetPropertyData(systemObject, &address, 0, nil, &size, &ids)
-    guard status == noErr else { throw DeviceReadError("the list of audio devices cannot be read (Core Audio error \(status))") }
+    guard status == noErr else { throw DeviceReadError("the list of audio devices cannot be read (Core Audio error \(ErrorDetail.codeText(Int(status))))") }
     return Array(ids.prefix(Int(size) / MemoryLayout<AudioObjectID>.size))
 }
 
@@ -117,7 +117,7 @@ private func defaultInputDeviceID() throws(DeviceReadError) -> AudioObjectID {
     var id = AudioObjectID(kAudioObjectUnknown)
     var size = UInt32(MemoryLayout<AudioObjectID>.size)
     let status = AudioObjectGetPropertyData(systemObject, &address, 0, nil, &size, &id)
-    guard status == noErr else { throw DeviceReadError("the default audio input cannot be read (Core Audio error \(status))") }
+    guard status == noErr else { throw DeviceReadError("the default audio input cannot be read (Core Audio error \(ErrorDetail.codeText(Int(status))))") }
     return id
 }
 
@@ -126,7 +126,7 @@ private func inputChannels(_ id: AudioObjectID) -> InputChannels {
     var size: UInt32 = 0
     var status = AudioObjectGetPropertyDataSize(id, &address, 0, nil, &size)
     if status == kAudioHardwareBadObjectError { return .gone }
-    guard status == noErr else { return .unreadable("Core Audio error \(status)") }
+    guard status == noErr else { return .unreadable("Core Audio error \(ErrorDetail.codeText(Int(status)))") }
 
     let byteCount = max(Int(size), MemoryLayout<AudioBufferList>.size)
     let buffer = UnsafeMutableRawPointer.allocate(byteCount: byteCount, alignment: MemoryLayout<AudioBufferList>.alignment)
@@ -134,7 +134,7 @@ private func inputChannels(_ id: AudioObjectID) -> InputChannels {
     buffer.initializeMemory(as: UInt8.self, repeating: 0, count: byteCount)
     status = AudioObjectGetPropertyData(id, &address, 0, nil, &size, buffer)
     if status == kAudioHardwareBadObjectError { return .gone }
-    guard status == noErr else { return .unreadable("Core Audio error \(status)") }
+    guard status == noErr else { return .unreadable("Core Audio error \(ErrorDetail.codeText(Int(status)))") }
 
     let buffers = UnsafeMutableAudioBufferListPointer(buffer.assumingMemoryBound(to: AudioBufferList.self))
     let buffersOffset = MemoryLayout<AudioBufferList>.offset(of: \.mBuffers) ?? 0
@@ -163,7 +163,7 @@ private func audioDeviceName(_ id: AudioObjectID) throws(DeviceReadError) -> Str
     let status = withUnsafeMutablePointer(to: &name) { AudioObjectGetPropertyData(id, &address, 0, nil, &size, $0) }
     if status == kAudioHardwareBadObjectError { return nil }
     guard status == noErr, let name else {
-        throw DeviceReadError("the audio device \(id) does not report its name (Core Audio error \(status))")
+        throw DeviceReadError("the audio device \(id) does not report its name (Core Audio error \(ErrorDetail.codeText(Int(status))))")
     }
     return name.takeRetainedValue() as String
 }

@@ -21,6 +21,8 @@ final class StartModel {
     private(set) var saveError: String?
     private(set) var whatWillBeRecorded: WhatWillBeRecorded?
     private(set) var readyCheck: ReadyCheckResult?
+    /// What the newest ready check found, for the recording log.
+    @ObservationIgnored private(set) var readyCheckFacts: ReadyCheckFacts?
     private(set) var isChecking = false
     /// From Start on: the ready check never runs while a recording runs (D45).
     private(set) var isRecording = false
@@ -62,7 +64,7 @@ final class StartModel {
             try settingsFile.save(settings)
             saveError = nil
         } catch {
-            saveError = error.description
+            saveError = ErrorDetail(error).text
         }
         check(proof: .listScreens)
     }
@@ -149,6 +151,7 @@ final class StartModel {
                 // A newer check has replaced this one and shows its own result.
                 guard number == self.checkNumber else { return }
                 self.readyCheck = ReadyCheck.evaluate(facts, settings: settings)
+                self.readyCheckFacts = facts
                 self.whatWillBeRecorded = WhatWillBeRecorded(settings: settings, facts: facts)
                 self.isChecking = false
             }

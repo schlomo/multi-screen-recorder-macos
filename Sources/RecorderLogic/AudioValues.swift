@@ -50,8 +50,8 @@ extension RecorderValues {
     public static let clockDriftShownMinimumEstimates = 10
     /// How often an audio capture reports its clock drift to the status window.
     public static let clockDriftStatusInterval = Duration.seconds(1)
-    /// How often `--debug` writes the clock drift block of all audio sources.
-    public static let clockDriftDebugInterval = Duration.seconds(10)
+    /// How often the recording log, and with `--debug` standard error, get the clock drift block of all audio sources.
+    public static let clockDriftDetailInterval = Duration.seconds(10)
     /// The resampler's filter: taps, phases between two samples, and its
     /// cutoff as a fraction of the sample rate.
     public static let clockDriftResamplerTaps = 64

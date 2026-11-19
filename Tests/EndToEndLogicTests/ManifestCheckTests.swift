@@ -65,7 +65,7 @@ struct SampleRecording {
         set { manifest["files"] = newValue }
     }
 
-    var folder: [String] { files.map { $0["name"] as! String } + ["recording.json"] }
+    var folder: [String] { files.map { $0["name"] as! String } + ["recording.json", "recording.log"] }
 
     var json: JSONValue { try! JSONValue(json: JSONSerialization.data(withJSONObject: manifest)) }
 
@@ -133,6 +133,14 @@ struct SampleRecording {
         #expect(missing == ["2026-11-19 08.27.22 Audio 0 - System.mov is in files but not in the recording folder"])
         let noManifest = sample.check(folder: sample.folder.filter { $0 != "recording.json" }).failures
         #expect(noManifest == ["the recording folder has no recording.json"])
+        let noLog = sample.check(folder: sample.folder.filter { $0 != "recording.log" }).failures
+        #expect(noLog == ["the recording folder has no recording.log"])
+    }
+
+    @Test func aProblemWithoutItsErrorDetailFails() {
+        var sample = SampleRecording()
+        sample.manifest["problems"] = [["at": 1.0, "problem": "p", "error": NSNull()]]
+        #expect(sample.check().failures.contains { $0.contains("a problem has the keys") })
     }
 
     @Test func otherSettingsOrAnotherAppFail() {

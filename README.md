@@ -118,8 +118,8 @@ Then send the person who asked you to test:
   the version, your screens and audio inputs and the ready check.
   Press Shift-Command-4, then Space, then click the window;
   the screenshot lands on your desktop;
-- `recording.json` from the recording folder of every recording you
-  made, the ones that went fine too: it shows how far each audio input
+- `recording.json` and `recording.log` from the recording folder of every recording you
+  made, the ones that went fine too: they show how far each audio input
   drifted, how much the recorder corrected, and everything that happened. The recording folders are in
   the output folder the app's window shows, by default
   `~/Movies/Multi Screen Recorder/`, one folder per recording;
@@ -143,14 +143,25 @@ also report it as below.
 
 ### Reporting a problem
 
-Use the
+When a recording had problems, the app says so the next time it
+starts: **Report a problem** opens the problem report form in your
+browser with the version and what went wrong filled in, and shows that
+recording's `recording.json` and `recording.log` in Finder. `msr record`
+ends such a recording's summary with the same link (`Report it:`) and
+the files to attach (`Attach:`). Otherwise use the
 [problem report form](https://github.com/schlomo/multi-screen-recorder-macos/issues/new?template=problem-report.yml)
 (a GitHub account is needed). It asks for the output of `msr version`
 (see "Command line" below; About Multi Screen Recorder in the app's
 menu shows the same), what happened and what you expected, and the
-recording's `recording.json`. Issues are public: the form says what
-`recording.json` contains, so you can remove what you don't want to
-share.
+recording's `recording.json`. Please also drag the recording's
+`recording.json` and `recording.log` from its recording folder into the
+issue: `recording.log` is the recording log, every event and problem of
+the recording with the full error macOS gave, and what the app did and
+read meanwhile, one line each. Issues are public: the form says what
+`recording.json` contains, and `recording.log` names the same screens
+and audio inputs; open both in TextEdit and remove what you don't want
+to share. Nothing is sent automatically: you see the files and attach
+them yourself.
 
 ## Usage
 
@@ -183,13 +194,16 @@ window: each screen and audio source with its files, the data written
 and its state, the time recorded (`h:mm:ss`, every second), data and
 free space, the CPU use of Multi Screen Recorder itself (encoding and
 capture also run in macOS's own processes, which it does not include),
-and any problems in red. Stop there finalizes the files, opens the
+and any problems in red, with a line naming the two files a report
+needs. Stop there finalizes the files, opens the
 recording folder in Finder and quits; Continue keeps recording. The
 recording folder holds a video file per screen, a new one each time a
 screen comes back or changes its frame size, an audio file per audio
 source (a microphone unplugged and plugged in again gets a new one),
-and `recording.json`, which lists every file, what happened and every
-problem, and says how the recording ended.
+`recording.json`, which lists every file, what happened and every
+problem, and says how the recording ended, and `recording.log`, the
+recording log: every event and problem with the full error, and what
+the app did meanwhile, one line each.
 
 ### Command line
 
@@ -207,7 +221,7 @@ so it shows the app's version and runs with its signature.
 |---|---|
 | `msr list` | Shows what will be recorded, the same table as `msr check` (the settings line, the screens by number, then the audio sources by number, the system audio first; an audio input not recorded comes last and is named with its reason, such as `(virtual)`), without the ready check and without asking for a permission, and whether the program running `msr` (a terminal app) may record the system audio |
 | `msr check [flags] [--debug]` | Prints the banner (name, version, build date, homepage) and what will be recorded, then runs the ready check; exits 0 when ready, 1 when not; creates the output folder if it is missing |
-| `msr record [flags] [--duration 1h30m] [--debug \| --quiet]` | Prints the banner and what will be recorded and runs the ready check, then records until Ctrl-C, the duration or Stop in the status window (click the Dock icon); shows the app's Dock icon while it records and prints each event; standard output carries one line, the recording folder's path, when recording starts, and everything for people (banner, table, ready check, events, summary, `--debug` detail) goes to standard error, where a terminal also gets the status line, redrawn once a second: the problems if any, time, size, files, free space, CPU and sources; `--quiet` leaves out all of it but the path, and on standard error a failing ready check, errors, the settings file note, each problem as it happens and the summary of a run that exits 3, and is refused together with `--debug`; `--duration` without a suffix is minutes; exits 0 when every file is finalized and no file was ended by a failure (a problem told alone, an unplugged microphone or a gap is listed but still exits 0), 1 when not ready, 3 when a file is not finalized, a file was ended by a failure, the recording manifest could not be written at the end, or the recording could not start |
+| `msr record [flags] [--duration 1h30m] [--debug \| --quiet]` | Prints the banner and what will be recorded and runs the ready check, then records until Ctrl-C, the duration or Stop in the status window (click the Dock icon); shows the app's Dock icon while it records and prints each event; standard output carries one line, the recording folder's path, when recording starts, and everything for people (banner, table, ready check, events, summary, with `--debug` the detail lines) goes to standard error, where a terminal also gets the status line, redrawn once a second: the problems if any, time, size, files, free space, CPU and sources; `--quiet` leaves out all of it but the path, and on standard error a failing ready check, errors, the settings file note, each problem as it happens and the summary of a run that exits 3, and is refused together with `--debug`; `--duration` without a suffix is minutes; exits 0 when every file is finalized and no file was ended by a failure (a problem told alone, an unplugged microphone or a gap is listed but still exits 0), 1 when not ready, 3 when a file is not finalized, a file was ended by a failure, the recording manifest could not be written at the end, or the recording could not start |
 | `msr settings [flags]` | Without flags prints the effective settings as JSON; with a settings flag saves the effective settings into the settings file and prints them, the only way a command writes it |
 | `msr version` | Prints the version and commit |
 
@@ -310,10 +324,14 @@ needed) and Finder shows a copy of the crash report as a text file to
 drag into it. Issues are public, and a crash report contains your Mac's
 user name: check it first.
 
-The app and `msr` write what happens during a recording (every event and
-problem) to the macOS unified log; `msr record --debug` and
-`msr check --debug` add detail. To attach the log of the last 2 hours
-to an issue, run in Terminal:
+Every recording writes what happens during it (every event and
+problem, with the full error, and what the app did meanwhile) to
+`recording.log` in its recording folder; attach it and `recording.json`
+to a report (see "Reporting a problem"). The crash report dialog asks
+for them too. The app and `msr` also write every event and problem to
+the macOS unified log; `msr record --debug` and `msr check --debug`
+also print the detail lines on standard error. For a crash outside a recording,
+attach the log of the last 2 hours; run in Terminal:
 
 ```sh
 log show --last 2h --predicate 'subsystem == "org.schapiro.multiscreenrecorder" and process == "msr"'

@@ -20,7 +20,7 @@ public struct AudioFileEnd: Equatable, Sendable {
         var event = RecordingEvent(
             at: Int64(((file.end ?? file.start) * 1_000_000_000).rounded()), event: .audioFileWriterFellBehind,
             audioSource: file.audioSource)
-        event.error = error?.description
+        event.errorDetail = error?.detail
         return [event]
     }
 }
@@ -292,18 +292,18 @@ final class AudioCapture: @unchecked Sendable {
         do {
             channels = try Self.channels(of: buffer)
         } catch {
-            end(.captureFailed(error.description))
+            end(.captureFailed(ErrorDetail(error)))
             return
         }
         guard channels.first?.isEmpty == false else { return }
         if id == .systemAudio, channels.count != GuideTrack.systemAudio.channelCount {
-            end(.captureFailed("the system audio came with \(channels.count) channels instead of \(GuideTrack.systemAudio.channelCount)"))
+            end(.captureFailed(ErrorDetail(message: "the system audio came with \(channels.count) channels instead of \(GuideTrack.systemAudio.channelCount)")))
             return
         }
         let pts = CMTimeConvertScale(CMSampleBufferGetPresentationTimeStamp(buffer), timescale: 1_000_000_000, method: .roundHalfAwayFromZero)
         let time = context.clock.sinceStart(host: UInt64(max(0, pts.value)))
         let (audio, gap) = correction.correct(channels, at: time, arrival: arrival)
-        if let gap { RecorderLog.detail(DebugLine.clockDriftGap(of: label, gap), category: "recorder") }
+        if let gap { RecorderLog.detail(DetailLine.clockDriftGap(of: label, gap), category: "recorder") }
         for corrected in audio where !isEnding { take(corrected) }
         reportClockDrift(at: arrival)
     }
@@ -350,7 +350,7 @@ final class AudioCapture: @unchecked Sendable {
     }
 
     /// The correction's status to the recorder about once a second; the recorder
-    /// writes the `--debug` lines of all sources together.
+    /// writes the detail lines of all sources together.
     private func reportClockDrift(at now: Int64) {
         guard clockDriftSchedule.due(at: now) else { return }
         reports.clockDrift(correction.status)
@@ -380,7 +380,7 @@ final class AudioCapture: @unchecked Sendable {
 
     private func fail(_ error: AudioFileWriterError) {
         open?.dropWaiting()
-        end(error.isDiskFull ? .diskFull : .writerFailed(error.description), keepTail: false)
+        end(error.isDiskFull ? .diskFull : .writerFailed(error.detail), keepTail: false)
     }
 
     // MARK: Files
@@ -515,7 +515,7 @@ final class AudioCapture: @unchecked Sendable {
             buffer, bufferListSizeNeededOut: nil, bufferListOut: list.assumingMemoryBound(to: AudioBufferList.self),
             bufferListSize: sizeNeeded, blockBufferAllocator: nil, blockBufferMemoryAllocator: nil,
             flags: kCMSampleBufferFlag_AudioBufferList_Assure16ByteAlignment, blockBufferOut: &block)
-        guard status == noErr else { throw PCMLayoutError(description: "an audio buffer cannot be read (error \(status))") }
+        guard status == noErr else { throw PCMLayoutError(description: "an audio buffer cannot be read (error \(ErrorDetail.codeText(Int(status))))") }
         let buffers = UnsafeMutableAudioBufferListPointer(list.assumingMemoryBound(to: AudioBufferList.self))
         let raw = buffers.map { UnsafeRawBufferPointer(start: $0.mData, count: Int($0.mDataByteSize)) }
         return try withExtendedLifetime(block) { () throws(PCMLayoutError) -> [[Float]] in

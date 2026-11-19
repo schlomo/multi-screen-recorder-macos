@@ -6,6 +6,7 @@ public enum ReviewNames {
     public static let appStep = "app"
     public static let contactSheet = "contact-sheet.png"
     public static let manifest = "recording.json"
+    public static let recordingLog = "recording.log"
 
     /// A window's screenshot. Only the light appearance is taken: the app
     /// stays light with `AppleInterfaceStyle` set in its own defaults

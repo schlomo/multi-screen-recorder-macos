@@ -389,7 +389,7 @@ public struct SettingsFile: Sendable {
             return SettingsRead(
                 settings: .defaults,
                 ignored: [IgnoredSetting(key: IgnoredSetting.wholeFile,
-                                         reason: "cannot be read: \(error.localizedDescription)")])
+                                         reason: "cannot be read: \(ErrorDetail(error).text)")])
         }
         return Settings.read(json: data)
     }
@@ -400,7 +400,7 @@ public struct SettingsFile: Sendable {
                 at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
             try settings.jsonData().write(to: url, options: .atomic)
         } catch {
-            throw SettingsFileError(fileURL: url, reason: error.localizedDescription)
+            throw SettingsFileError(fileURL: url, reason: ErrorDetail(error).text)
         }
     }
 }

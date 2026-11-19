@@ -66,7 +66,7 @@ public struct ManifestCheck {
     public private(set) var ranFor: Double?
 
     /// Checks the manifest against the expectation and the names of the
-    /// files in the recording folder, `recording.json` included.
+    /// files in the recording folder, `recording.json` and `recording.log` included.
     public init(manifest: JSONValue, folder: [String], expectation: ManifestExpectation) {
         self.expectation = expectation
         checkTopLevel(manifest)
@@ -119,8 +119,8 @@ public struct ManifestCheck {
         }
         if manifest["events"]?.array == nil { fail("events is not a list") }
         if let problems = manifest["problems"]?.array {
-            for problem in problems where problem.keys != ["at", "problem", "error"] {
-                fail("a problem has the keys \(problem.keys?.sorted() ?? []), expected at, problem and error")
+            for problem in problems where problem.keys != ["at", "problem", "error", "errorDetail"] {
+                fail("a problem has the keys \(problem.keys?.sorted() ?? []), expected at, problem, error and errorDetail")
             }
         } else {
             fail("problems is not a list")
@@ -141,8 +141,10 @@ public struct ManifestCheck {
         files = entries.compactMap { listedFile($0) }
         let names = files.map(\.name)
         if Set(names).count != names.count { fail("files lists a name twice: \(names)") }
-        let movies = Set(folder.filter { $0 != "recording.json" })
-        if !folder.contains("recording.json") { fail("the recording folder has no recording.json") }
+        let movies = Set(folder.filter { $0 != ReviewNames.manifest && $0 != ReviewNames.recordingLog })
+        for document in [ReviewNames.manifest, ReviewNames.recordingLog] where !folder.contains(document) {
+            fail("the recording folder has no \(document)")
+        }
         for missing in movies.subtracting(names).sorted() { fail("\(missing) is in the recording folder but not in files") }
         for extra in Set(names).subtracting(movies).sorted() { fail("\(extra) is in files but not in the recording folder") }
         for file in files where !file.name.hasSuffix(".mov") { fail("\(file.name) is not a .mov") }

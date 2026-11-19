@@ -195,17 +195,12 @@ public final class ScreenCapture: NSObject, @unchecked Sendable, SCStreamOutput,
         if nsError.domain == SCStreamErrorDomain, nsError.code == SCStreamError.Code.noCaptureSource.rawValue {
             return .captureSourceGone
         }
-        return .streamFailed(describe(error))
+        return .streamFailed(ErrorDetail(error))
     }
 
     private struct CaptureError: Error, LocalizedError {
         let errorDescription: String?
         init(_ text: String) { errorDescription = text }
-    }
-
-    private static func describe(_ error: any Error) -> String {
-        let nsError = error as NSError
-        return "\(nsError.localizedDescription) (\(nsError.domain) \(nsError.code))"
     }
 
     // MARK: Frames

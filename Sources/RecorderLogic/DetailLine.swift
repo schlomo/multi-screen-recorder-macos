@@ -1,7 +1,35 @@
 import Foundation
 
-/// The detail lines of `--debug`, written to be read.
-public enum DebugLine {
+/// The detail lines, written to be read: always in the recording log, and
+/// with `--debug` also on standard error (D64).
+public enum DetailLine {
+    /// A detail line before its time and prefix are added.
+    public struct Entry: Equatable, Sendable {
+        public var category: String
+        public var message: String
+
+        public init(category: String, message: String) {
+            self.category = category
+            self.message = message
+        }
+    }
+
+    /// A detail line on standard error, with the time since the start
+    /// as an event line has it while a recording runs: "detail recorder:
+    /// +27.9s start Screen 3 - LG".
+    public static func standardErrorText(_ message: String, category: String, seconds: Double?) -> String {
+        "detail \(category): " + (seconds.map { EventLine.elapsed($0) + " " } ?? "") + message
+    }
+
+    /// A detail line as the recording log has it, after the local time and
+    /// the time since the start: "22:14:58 +27.9s detail recorder: start
+    /// Screen 3 - LG".
+    public static func recordingLogText(
+        _ message: String, category: String, seconds: Double, started: Date, timeZone: TimeZone
+    ) -> String {
+        EventLine.time(seconds, started: started, timeZone: timeZone) + " detail \(category): " + message
+    }
+
     /// "screen recording granted; microphone granted; screens: DELL P3421W 3440×1440 at (0,0) main, …"
     public static func facts(_ facts: ReadyCheckFacts) -> String {
         let screen = switch facts.screenRecording {
@@ -15,11 +43,11 @@ public enum DebugLine {
         case .success(let screens): "screens: " + list(screens.map { screen in
             "\(screen.name) \(screen.sizeText) at (\(point(screen.originX)),\(point(screen.originY)))" + (screen.isMain ? " main" : "")
         })
-        case .failure(let error): "screens cannot be read (\(error))"
+        case .failure(let error): "screens cannot be read (\(ErrorDetail(error).text))"
         }
         let audioInputs = switch facts.audioInputs {
         case .success(let inputs): "audio inputs: " + list(inputs.map { "\($0.shownName) \($0.channelsText)" })
-        case .failure(let error): "audio inputs cannot be read (\(error))"
+        case .failure(let error): "audio inputs cannot be read (\(ErrorDetail(error).text))"
         }
         let folder = switch facts.outputFolder {
         case .usable(.bytes(let bytes)): "output folder usable, \(DiskEstimate.gigabytes(Double(bytes))) free"

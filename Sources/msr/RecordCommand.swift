@@ -27,7 +27,7 @@ extension CommandLineInterface {
         @Option(help: "Stop after this long: hours, minutes and seconds, such as 1h30m, 45m or 90s; a number alone is minutes.")
         var duration: RecordingDuration?
 
-        @Flag(help: "Detail on standard error and at debug level in the unified log.")
+        @Flag(help: "Also prints the detail lines on standard error, and writes them at debug level in the unified log.")
         var debug = false
 
         @Flag(help: "No output for people: only the recording folder's path on standard output, and on standard error a failing ready check, errors, the settings file note, each problem as it happens and the summary of a run that exits 3. Not with --debug.")
@@ -93,9 +93,9 @@ final class RecordCommandDelegate: NSObject, NSApplicationDelegate {
             return
         }
         do {
-            session = try RecordingSession(settings: settings, homeFolder: home, output: output)
+            session = try RecordingSession(settings: settings, homeFolder: home, readyCheckFacts: facts, output: output)
         } catch {
-            output.tell(.error, "Error: \(error)\n")
+            output.tell(.error, "Error: \(ErrorDetail(error).text)\n")
             exitStatus = recordingEndedWithErrorExitCode
             endEventLoop()
             return
@@ -169,7 +169,8 @@ final class RecordCommandDelegate: NSObject, NSApplicationDelegate {
         stopping = Task {
             if let summary = await session.stop() {
                 // The summary is the message of a run that exits 3, so `--quiet` still tells it then.
-                output.tell(.summary(endedWithError: summary.endedWithError), summary.text)
+                let report = summary.endedWithError ? summary.reportText(version: runningVersion.description) : ""
+                output.tell(.summary(endedWithError: summary.endedWithError), summary.text + report)
                 if summary.endedWithError { exitStatus = recordingEndedWithErrorExitCode }
             }
             endEventLoop()

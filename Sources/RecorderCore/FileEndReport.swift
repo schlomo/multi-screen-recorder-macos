@@ -23,17 +23,17 @@ struct FileEndReport: Equatable {
     /// `reason` is nil when the recorder stopped the capture; `now` is the
     /// time on the shared clock, the time of the report when no file ended.
     init(reason: ScreenTracker.StreamEnd?, end: ScreenFileEnd?, screen: String, at now: Int64) {
-        let reasonError: String? = switch reason {
+        let reasonError: ErrorDetail? = switch reason {
         case .writerFailed(let error): error
         case .diskFull: "the disk is full"
         case .streamFailed, .captureSourceGone, .writerFellBehind, .showsAnotherScreen, nil: nil
         }
         let fileError = end?.error
-        guard let error = fileError?.description ?? reasonError else {
+        guard let error = fileError?.detail ?? reasonError else {
             if let end, !end.guideTracksCut.isEmpty {
                 problem = RecordingProblem(
                     at: Int64(((end.file.end ?? end.file.start) * 1_000_000_000).rounded()), problem: "Screen file \(end.file.name)",
-                    error: Self.guideTracksCut(end.guideTracksCut))
+                    error: ErrorDetail(message: Self.guideTracksCut(end.guideTracksCut)))
             }
             return
         }
@@ -42,7 +42,7 @@ struct FileEndReport: Equatable {
         problem = RecordingProblem(at: time, problem: what, error: error)
         let isDiskFull = reason == .diskFull || fileError?.isDiskFull == true
         var event = RecordingEvent(at: time, event: isDiskFull ? .diskFull : .screenFileWriterFailed, screen: screen)
-        if !isDiskFull { event.error = error }
+        if !isDiskFull { event.errorDetail = error }
         self.event = event
     }
 }

@@ -83,7 +83,7 @@ public struct AudioInputInfo: Equatable, Sendable {
         switch channelCount {
         case .success(1): "1 channel"
         case .success(let count): "\(count) channels"
-        case .failure(let error): "cannot be read (\(error))"
+        case .failure(let error): "cannot be read (\(ErrorDetail(error).text))"
         }
     }
 }

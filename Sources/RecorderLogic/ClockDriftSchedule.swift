@@ -18,12 +18,12 @@ public struct ClockDriftSchedule: Sendable {
 }
 
 /// When the recorder writes the clock drift lines of all its audio sources
-/// with `--debug`, as one block: every 10 s from the first check.
-public struct ClockDriftDebugSchedule: Sendable {
+/// to the recording log, as one block: every 10 s from the first check.
+public struct ClockDriftDetailSchedule: Sendable {
     public let interval: Int64
     private var lastBlock: Int64?
 
-    public init(interval: Duration = RecorderValues.clockDriftDebugInterval) {
+    public init(interval: Duration = RecorderValues.clockDriftDetailInterval) {
         self.interval = interval.nanoseconds
     }
 

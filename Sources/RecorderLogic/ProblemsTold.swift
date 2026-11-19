@@ -1,6 +1,8 @@
 /// What a problem is, for telling a repeating one once (D46).
 public enum ProblemKind: Hashable, Sendable {
     case manifestNotWritten
+    /// The recording log cannot be created or written; clears when writing it works again.
+    case recordingLogNotWritten
     case screensNotRead
     case freeSpaceNotRead
     /// A screen, by its UUID, whose screen file a failure ended (its
@@ -27,6 +29,9 @@ public struct ProblemsTold: Sendable {
         case tell(writeManifest: Bool)
         /// The same kind stands since it was told: nothing to do.
         case alreadyTold
+        /// The manifest is finalized and changes no more: told only on
+        /// standard error and in the unified log (D64).
+        case afterTheEnd
     }
 
     private var standing: Set<ProblemKind> = []
@@ -34,6 +39,7 @@ public struct ProblemsTold: Sendable {
     public init() {}
 
     public mutating func add(_ problem: RecordingProblem, kind: ProblemKind, to manifest: inout RecordingManifest) -> Outcome {
+        guard manifest.state != .finalized else { return .afterTheEnd }
         guard standing.insert(kind).inserted else { return .alreadyTold }
         manifest.problems.append(problem)
         return .tell(writeManifest: kind != .manifestNotWritten)

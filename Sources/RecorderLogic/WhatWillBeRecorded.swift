@@ -104,7 +104,7 @@ public struct WhatWillBeRecorded: Equatable, Sendable {
         case .success(let screenInfos):
             screens = numberScreens(screenInfos).map { Self.screen($0, settings: settings) }
         case .failure(let error):
-            screensError = "The screens cannot be read: \(error)"
+            screensError = "The screens cannot be read: \(ErrorDetail(error).text)"
         }
         if case .success(let screenInfos) = screensToJudge(readScreens, settings: settings),
            case .success(let audioInputs) = audioInputsToJudge(readAudioInputs, settings: settings),
@@ -126,7 +126,7 @@ public struct WhatWillBeRecorded: Equatable, Sendable {
             }
             audio = inputs
         case .failure(let error):
-            audioError = "The audio inputs cannot be read: \(error)"
+            audioError = "The audio inputs cannot be read: \(ErrorDetail(error).text)"
         }
         // The numbered rows read 0, 1, 2 … without a gap; the inputs not recorded follow, in device order,
         // and the system audio, when it is off, goes last with the sources not recorded.
@@ -175,7 +175,7 @@ public struct WhatWillBeRecorded: Equatable, Sendable {
                       : notRecorded)
         case .failure(let error):
             Audio(source: source, channels: cannotBeRead, isRecorded: isRecorded,
-                  gigabytesPerHour: isRecorded ? unknown : notRecorded, readError: "\(error)")
+                  gigabytesPerHour: isRecorded ? unknown : notRecorded, readError: ErrorDetail(error).text)
         }
     }
 

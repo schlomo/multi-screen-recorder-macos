@@ -76,7 +76,7 @@ func homeFolderOrExit() throws -> URL {
     do {
         return try homeFolder()
     } catch let error as MissingHomeFolderError {
-        StandardErrorWriter.shared.write("Error: \(error)\n")
+        StandardErrorWriter.shared.write("Error: \(ErrorDetail(error).text)\n")
         throw unsetHomeExitCode
     }
 }
@@ -119,7 +119,7 @@ extension CommandLineInterface {
 
         @OptionGroup var flags: SettingsFlags
 
-        @Flag(help: "Detail on standard error and at debug level in the unified log.")
+        @Flag(help: "Also prints the detail lines on standard error, and writes them at debug level in the unified log.")
         var debug = false
 
         func run() async throws {

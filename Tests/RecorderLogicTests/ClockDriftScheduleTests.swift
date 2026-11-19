@@ -18,7 +18,7 @@ import Testing
 
     /// The `--debug` block of every audio source's clock drift: at the first check, then every 10 s.
     @Test func theDebugBlockComesEveryTenSecondsFromTheFirstCheck() {
-        var schedule = ClockDriftDebugSchedule()
+        var schedule = ClockDriftDetailSchedule()
         var blocks: [Int64] = []
         // A check every second for 35 s, the first at 7 s.
         for second in Int64(0)..<35 {

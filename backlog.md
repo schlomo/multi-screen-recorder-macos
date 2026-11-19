@@ -2,30 +2,30 @@
 
 ## Next session starts here
 
-PR #21 (audio only, the first CPU step, the icon's dark-mode frame,
-D62) and PR #22 (rounds pushed with the skip-ci marker, one unmarked
-commit starts the one pipeline run; the setup skill removed, D61)
-merged 2026-11-19. The next job, in a fresh session: item 21, the
-audio level meters, together with not writing an input that delivers
-only exact zeros; it needs a design signed off by the owner first.
-Then, in the order agreed on 2026-11-18, one PR each: item 3, the
-end-to-end tests; item 4, the simplification; item 7, auto-recovery
-from disturbances; item 12, cameras; item 22, the lip sync
-calibration; the rest of item 6; then item 16, the Mac App Store and
-Homebrew. Items 21, 12 and 22 each need a design signed off before
-building.
+PR #24 (item 24, diagnostics) is merged (2026-11-19). Next: PR #23
+(item 3's first part) takes `main` in, and its end-to-end job is rerun
+on one commit until it passes 5 times in a row (the owner: "keep
+working till you see consistently reliable e2e tests"); every failure
+is root-caused from the uploaded artifacts and the recording log,
+never retried away, and no check is loosened. The 4th attempt on
+`298e4c9` failed on a real `screen file writer failed` at a mode
+switch; the recording log now shows its cause. The owner's ruling
+(2026-11-19): "you can do follow up fixes in 23", so item 24's
+follow-ups (item 27, once its design is signed off) go into PR #23.
+Then, one PR each: item 23, the Resolve timeline (after the owner's
+test import of the spike `.otio` files, instructions in the session of
+2026-11-19, remade if gone); item 21, the meters (design signed off);
+item 3's follow-up; item 4; item 7; item 12; item 22; the rest of item
+6; item 16.
 
-The first PR under D61 checks two things nobody has observed yet:
-that a push with the skip-ci marker starts no run here, and whether
-Cloudflare Workers Builds still builds a homepage preview for a
-marked push (only a homepage PR shows it). Testers have release
-`v0.20261117.52` and, after PR #21's merge, the release from `main`;
-first feedback (2026-11-18) is in items 6 and 12. Agents may run
-`msr record` on the owner's Mac (D48), and BetterDisplay's command
+Agents may run `msr record` on the owner's Mac (D48), with `HOME` set
+to a scratch folder (`AGENTS.md`, "Facts that bite"), and BetterDisplay's command
 line with the owner's virtual screen "Virtual 16:9"; by D56, before
 an agent starts a recording or plays a sound on the owner's Mac, the
 session running or briefing that test tells the owner, once before
-the test's first run.
+the test's first run. The `resolve` MCP server failed to start in the
+session of 2026-11-19 (its command path is cut at the first space);
+the owner fixes it.
 
 Still open from D34: what AGC does and whether it is on in auto mode;
 "AGC can also come as an improvement after the recorder" (the owner,
@@ -33,7 +33,14 @@ Still open from D34: what AGC does and whether it is on in auto mode;
 
 ## In flight
 
-Nothing.
+- **PR #23, end-to-end tests** (item 3, first part; branch
+  `end-to-end-tests`, draft): six scenarios on the owner's Mac and on
+  the hosted runner, review artifacts, a job summary and annotations.
+  Reviewed in full, every round delta-reviewed. Item 24 is merged; next,
+  5 green end-to-end runs in a row; item 24's follow-ups go here too
+  (the owner, 2026-11-19). Left for the follow-up: match a
+  screen's notice by its name, not its order, and say "misordered"
+  where "missing" is printed today (review NITs, 2026-11-19).
 
 ## Queued
 
@@ -484,7 +491,33 @@ Nothing.
    zeros (item 11; the owner, 2026-11-18: "OK to defer the audio zeros
    to the meters feature, good idea"). In the 30-minute run of
    2026-11-18 the MacBook microphone, its lid closed, delivered exact
-   zeros for the whole run and still got a file. Design first.
+   zeros for the whole run and still got a file. Design signed off by
+   the owner on 2026-11-19 ("Yes to meters design"), as text:
+   - Meters: one bar per audio input and the system audio, sample
+     peak in dBFS on −60 to 0, a peak hold of 1.5 s, red from −1 dBFS,
+     measured per incoming buffer, drawn 10 times a second only while
+     the window is open; `msr record` gets them through its window.
+   - Input volume (macOS's word; "gain" is taken by the guide mix):
+     a slider per input that sets the device's own volume through
+     `kAudioHardwareServiceDeviceProperty_VirtualMainVolume`, shown
+     only where it can be set ("No slider conveys a clear message
+     while grey means forbidden", the owner); every change, from the
+     slider, a knob or another app, held still for 0.5 s, is the event
+     `audio input volume changed` (`from`, `to`, 0 to 1); each audio
+     file records `inputVolume` at its start; not reset at Stop.
+   - No audio: after 10 s of exact zeros ("10s silence is better as
+     trigger", the owner; 2 s would split speech pauses of a noise-gated
+     microphone into many files) an input's file ends, the window shows
+     `no audio` ("Only zero is bad UI, better say no audio"), and
+     `no audio started` and `no audio stopped` go into the manifest;
+     a new file starts when sound returns, nothing of it cut; an input
+     with no audio from the start gets no file; the system audio is
+     excluded; not a problem.
+   - No agent sets an input's volume on the owner's Mac (D48); the
+     owner checks the slider and a hardware knob by hand.
+   Unverified until built: which of the owner's inputs can be set,
+   whether lowering the volume prevents clipping, whether a knob fires
+   the listener. The analysis is in the session of 2026-11-19.
 22. **Lip sync calibration** (the owner, 2026-11-18: measured AV
    offsets between cameras and microphones; fixing them by hand in
    Resolve is "super tedious", so worth automating): a support tool
@@ -503,8 +536,62 @@ Nothing.
    again. Needs item 12. Design first. Measured 2026-11-18 (30 minutes,
    a radio in the room): the Razer and the BRIO stay a constant 17 to
    18 ms apart, before and after a replug of the Razer, with no drift.
+23. **A Resolve timeline in every recording folder** (the owner,
+   2026-11-19: "a timeline where all clips are already loaded and
+   aligned by time code … longest clip starting at the beginning as
+   track v1, all clips from the same device on the same track, track
+   named like device … goal is to make editing in resolve super easy";
+   "otio sounds great, go ahead with that"). Signed off: an
+   OpenTimelineIO file (`.otio`, open JSON; Resolve 21.1 imports it,
+   manual ch. 22 p. 527), named after the recording folder, written at
+   Stop from `recording.json` and by `msr timeline <folder>` (also
+   for older or unfinished recordings, a file's length read from the
+   file when `end` is null); a derived file, rewritten, never edited.
+   30 fps, starting at the first file's timecode; V1 the screen whose
+   file starts at the beginning and runs longest, then the screens by
+   number; one audio track per audio source, `Audio 0 - System` first;
+   each track named by its label; each file at its timecode; the
+   screen files' guide tracks left off. A spike (made with the
+   reference library in a session scratchpad) put a 30 s recording of
+   2 screens and 5 audio sources on V1, V2 and A1 to A5 as designed;
+   the owner's import into Resolve is still to come and decides: track
+   names kept, absolute vs relative paths, multichannel audio files on
+   one track, and whether only a screen file's video is placed. Then
+   built in Swift without a library, with golden-file tests.
+25. **A new screen showing a still picture gets no file until it
+   changes** (found by PR #23's runs, 2026-11-19): ScreenCaptureKit
+   delivers complete frames only on change, so a newly connected
+   screen with a static picture has no file and no event for that
+   stretch [CONJECTURE for real Macs]. Settle it with a `--debug`
+   run (now the recording log), then decide.
+26. **A screen file's guide tracks miss their start** (PR #23's runs,
+   2026-11-19): a screen file listens to the guide mix only after its
+   first frame passes the screen check (`ScreenCapture.swift`), so its
+   guide tracks start 5 to 77 ms in (an edit list), and the design
+   says they "cover exactly its own time". The audio files are
+   complete. Decide whether it matters for editors.
+
+27. **A writer that cannot start repeats its error without end** (the
+   owner's run, 2026-11-19, folder made read-only, microphone replugged):
+   the audio file writer retries about every 10 s and each try prints
+   the full error detail on standard error, so the terminal fills with
+   the same line; the first failure is also printed twice, as "The
+   audio file of … failed: …" and as the event "audio file writer
+   failed: … (…)". Proposed: standard error prints a writer's failure
+   once and then only how often it repeated (when it recovers or at
+   Stop); the recording log keeps every line; one line per failure.
+   Needs the owner's sign-off; then into PR #23.
 
 ## Deliberately deferred
+
+- **A warm-up before the end-to-end scenarios** (the owner's idea,
+  2026-11-19: "On the VM maybe worth warming up the system first";
+  then "keep the warm up in the backlog"): a throwaway recording and
+  one virtual screen's connect and mode switch before the scenarios,
+  not asserted. Deferred because runs 5 and 6 of PR #23 on the hosted
+  runner showed no first-use failure (runs 1 and 2 had a first mode
+  switch of 1.7 s and audio gaps around 3 s). Revisit when a failure
+  on a first use repeats.
 
 - **`GuideTrackFeedTests.theLastMixWaitsForSamplesThatComeLate`
   delivers its late samples from a task after 150 ms, against a 60 s
@@ -644,6 +731,19 @@ Nothing.
   the README (D46). Revisit when people struggle with it.
 
 ## Done (recent)
+
+- 2026-11-19: PR #24 merged by the owner: item 24, diagnostics. One
+  error detail for every error (domain, code, underlying errors; the
+  manifest's `errorDetail`), a test against `localizedDescription`;
+  an append-only `recording.log` in every recording folder with the
+  starting situation and the detail lines; **Report a problem**: the
+  app's next start after a recording with problems offers the
+  prefilled problem report form and shows the two files to attach,
+  and `msr record` ends its summary with the link (one link builder
+  with the crash report's). Agents testing on the owner's Mac set a
+  scratch `HOME`. D64 (partly reverses D46). The owner checked the
+  notice and the link by hand. Reviews: one top-tier review, two delta
+  reviews, the last fix diff read by the architect.
 
 - 2026-11-19: PR #22 merged by the owner (Markdown only, no release):
   item 17. Rounds are pushed with the skip-ci marker, so they start
