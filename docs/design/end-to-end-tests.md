@@ -118,26 +118,23 @@ clones Cirrus Labs' `macos-tahoe-vanilla` image to the VM
 `msr-end-to-end` (50 GB disk, 27 GB used, 4 CPUs, 8 GB memory), disables
 SIP through Recovery with Packer's `tart-cli` template
 (`scripts/end-to-end-vm/disable-sip.pkr.hcl`), writes the Screen &
-System Audio Recording and Microphone rows into the system's and the
-admin user's TCC.db the way actions/runner-images does for GitHub's
+System Audio Recording, Microphone, Accessibility and Automation rows
+into the system's and the admin user's TCC.db the way actions/runner-images does for GitHub's
 runners (`scripts/end-to-end-vm/guest-configure-tcc`), installs Python
 3.15 (its signature is checked) and then ffmpeg, ffprobe and BlackHole
 2ch at fixed versions by their SHA-256
 (`scripts/install-end-to-end-tools`). Re-running rebuilds it; it took
 3.5 minutes with the base image cached. It needs `tart` and `packer` on
 the `PATH` and installs neither. Every SSH login to the VM, the setup's
-and each run's, uses the image's published password for its admin user
-(`scripts/end-to-end-vm/askpass`): the VM is a throwaway on a NAT-only
-network that lives for minutes, so the password protects nothing that
-matters, and a key would add a lifecycle (creating, installing, keeping
-it) for no gain (D67).
+and each run's, uses the image's published default login, `admin` with
+the password `admin`, no secret (`scripts/end-to-end-vm/askpass`, D67).
 
 Per run, `scripts/end-to-end-test --scratch-folder <folder>`: builds the
 app and the driver on the Mac, clones a throwaway VM from
 `msr-end-to-end` (a copy-on-write clone, so every run starts clean),
 copies the app and the driver in, runs the driver in the admin user's
-GUI session, copies the driver's scratch folder to `<folder>` (new or
-empty) and deletes the clone, also when the run fails. Arguments other
+GUI session, copies the driver's whole scratch folder to `<folder>` (new
+or empty; "Artifacts for review") and deletes the clone, also when the run fails. Arguments other
 than `--scratch-folder` go to the driver (`--scenario <name>`). The exit
 status is the driver's. All 7 scenarios and the start window's
 screenshot took 2 minutes 10 seconds with the build. Nothing records or
@@ -149,6 +146,29 @@ the result in the PR description (`AGENTS.md`). The owner (2026-11-19):
 "We'll leave e2e a manual step that uses the VM and another script for
 setup. You'll run e2e manually when needed and mark in the pr that it
 succeeded. Kiss" (D67).
+
+### When a VM is left behind
+
+A run deletes its clone on every exit it can handle; a killed script or
+a crashed Mac can leave one. Two kinds of VM exist: the image
+`msr-end-to-end`, which **must not be deleted unless you mean to rebuild
+it** (`scripts/end-to-end-setup`, with a 28 GB download), and the
+throwaway clones `msr-end-to-end-run-<pid>`, named after the process of
+the script that made them.
+
+1. Find them: `tart list` (State `running` or `stopped`); a `tart run`
+   process shows in `ps aux | grep "tart run"`.
+2. Its IP address: `tart ip msr-end-to-end-run-<pid>` (waits with
+   `--wait 60`).
+3. Get in: `ssh admin@<ip>` with the password `admin`, the image's
+   published default login. See its screen: `open vnc://admin:admin@<ip>`
+   (macOS's Screen Sharing), or start a stopped clone with a window,
+   `tart run msr-end-to-end-run-<pid>`.
+4. Stop it: `tart stop msr-end-to-end-run-<pid>`; if it stays running,
+   end its process: `pkill -f "tart run msr-end-to-end-run-<pid>"`, and
+   `pkill -9 -f ...` if that does not end it.
+5. Delete it: `tart delete msr-end-to-end-run-<pid>`. Deleting a clone
+   frees what it wrote, not the image's 27 GB.
 
 ### Why the VM
 
@@ -279,7 +299,7 @@ the driver (not the workflow) runs `log show --style compact --start
 <the scenario's start, local time, a second early>` with a predicate on
 the subsystems whose name contains `videotoolbox`, `coremedia`,
 `avfoundation`, `screencapturekit` or `display`, and the processes
-`WindowServer` and `replayd`, and keeps the output as `logs/system.log`
+`WindowServer`, `replayd` and `coreaudiod`, and keeps the output as `logs/system.log`
 in the scenario's folder, which the copy to `--scratch-folder` takes whole. When
 `log show` fails or does not end within 300 s, that is one more failure
 line of the scenario, never skipped silently.
@@ -318,8 +338,31 @@ on the loopback device broke at <t> s (<n> samples); the recording shows
 it" (an overload the device tells of may come from the recorder's own
 input on it too). The breaks are kept in a fixed buffer, so the render
 thread never locks or allocates; more than it holds are counted.
-It is still a failure. `run.log` gives the number of playback breaks for
-each scenario with the tone.
+`run.log` gives the number of playback breaks for each scenario with
+the tone.
+
+**A break the recording shows exactly is pardoned (D67).** Run 4 of the
+VM runs at 3c8fe02 failed `tone`: the test's own player ran late, the
+loopback device carried 32 ms of zeros from 4.641 s (the player saw an
+overload at 4.643 s), the recorder recorded exactly that, and the clicks
+on either side of the hole, one lost in it, were exactly 2.000 s apart.
+That is the test equipment failing, not the recorder. A failing click
+spacing is therefore pardoned only when all of these hold: (a) the
+track holds a hole, a quiet run found at sample resolution (the 1 kHz
+tone stays below 5 % of its peak for 0.032 ms around a zero crossing,
+so a run of 1 ms or more, one tone period, is no tone), between the two
+clicks, which starts within the break margin (0.1 s) of a playback
+break the player measured, each hole having a break of its own; (b) the
+clicks on either side are a whole number of seconds apart, at least
+two, within the click period tolerance (1 ms), so the hole took whole
+clicks and moved nothing; (c) the number of pardons is at most the
+player's break count, which the one-break-per-hole matching gives. The
+expected click count is lowered by the clicks the pardoned holes took.
+`run.log` reports each pardon: `pardoned: playback broke at 4.643 s,
+31.9 ms quiet in the recording, clicks 2.000 s apart`. Anything else
+fails as before: a hole without a break, a break without a hole whose
+spacing is off, a hole at a break whose spacing is off by a fraction,
+more holes than breaks.
 
 ### Artifacts for review
 
@@ -327,9 +370,18 @@ The owner (2026-11-19): "full artifact upload now, only homepage
 screenshot automation comes later", and "No, screenshots as artifacts
 now, to check them" (D63; the pipeline's artifact upload went with the
 pipeline job, D67: the scratch folder is copied to `--scratch-folder`).
-Each run writes, in its scratch folder:
+Each run writes, in its scratch folder, all of which
+`scripts/end-to-end-test` copies to `--scratch-folder` (the owner,
+2026-11-19: "we need full export of results, screenshots and desktop
+video from the e2e runs"):
 
 - `run.log`: every line the driver printed.
+- `<scenario>/` for each scenario, passed ones included, whole: the
+  recordings (the screen files, the "desktop video", and the audio
+  files) in `recordings/`, `recording.json` and `recording.log` in
+  there, the recorder's output in `logs/` and, for a failed scenario,
+  `logs/system.log`. A run's folder is a few hundred megabytes; the
+  review folder below is the quick look.
 - `review/<scenario>/` for each scenario, passed ones included:
   `recording.json`, `recording.log` and `msr.err` (the recorder's
   standard error: its detail lines with `--debug`, and what macOS
@@ -340,23 +392,51 @@ Each run writes, in its scratch folder:
   name; `excerpt <file>`, the first 5 s (`reviewExcerptSeconds`) of the
   smallest screen file and, in `tone` and `system-audio`, of
   BlackHole's audio file, copied by `ffmpeg -c copy`, not re-encoded.
-- A screenshot of the app's real start window, taken with
-  `screencapture -l` by the window's number from
-  `CGWindowListCopyWindowInfo`: `review/app/app-start-window-light.png`,
-  the built app started as `msr` without arguments, with a scratch
-  `HOME` (its ready check, `state.json` and crash report folder are
-  there), before the scenarios, then quit (the quit Apple event when
-  macOS allows it without asking, otherwise SIGTERM, and SIGKILL after
-  15 s; the process is in the restore file meanwhile). It is part of
-  the run: when it cannot be taken, the run fails like on any other
-  failure. The status window's picture comes later, with the offscreen
-  renders for the homepage's screenshot script: opening it during a
-  recording needs the reopen Apple event, which needs the person's
-  Automation consent. Only the light appearance: `AppleInterfaceStyle` set to `Dark` in the
-  app's own defaults domain left its window light (tried 2026-11-19), so
-  dark screenshots are not taken.
-- A failed scenario's whole folder stays, as before, and a restore file
-  if one is left.
+- The app's windows, each in light and in dark, window only (macOS's own
+  window capture, `screencapture -l` by the window's number from
+  `CGWindowListCopyWindowInfo`, with its shadow: the PNG has the shadow
+  and transparent margins around the window), in `review/app/`, named
+  `app-<window>-<appearance>.<png|mov>`:
+  - `app-start-window-light.png`, `app-start-window-dark.png`: the real
+    start window, the built app started as `msr` without arguments, with
+    a scratch `HOME` (its ready check, `state.json` and crash report
+    folder are there), then quit (the quit Apple event when macOS allows
+    it without asking, otherwise SIGTERM, and SIGKILL after 15 s; the
+    process is in the restore file meanwhile).
+  - `app-status-window-<appearance>.mov` and `.png`: the app's own
+    recording, `msr record` with a scratch `HOME` (it shows the same
+    status window as the app, D46), 8 s into the recording. The driver
+    sends the app its reopen event (what a click on the Dock icon does),
+    moves the window to the screen's corner with System Events (the VM's
+    screen is small and the window first opens partly off it), and takes
+    a 5 s video of that window with `screencapture -V` (H.264, 5.000 s,
+    one frame per change, so about one a second), then the PNG right
+    after it, then sends Stop (SIGINT) and waits for the recording's
+    files. The video shows macOS's sharing indicator over the window's
+    traffic lights and the pointer; the video has no shadow.
+  - `app-finder-window-<appearance>.png`: a Finder window of the finished
+    recording folder, driven through AppleScript: list view, no sidebar,
+    no toolbar or status bar, Name, Date Modified, Size and Kind as wide
+    as their content (the Name column from the longest name, measured in
+    the 13 pt system font), the window as high as its rows (Finder keeps
+    a minimum height, so a short folder shows empty rows), closed
+    afterwards.
+  The dark ones, the status window's video and PNG and the Finder window
+  are taken only when `scripts/end-to-end-test` passes the driver
+  `--throwaway-vm` (the VM's setup grants the permissions they need:
+  Accessibility and Automation for System Events, Finder and the app, in
+  `guest-configure-tcc`); the driver switches the whole system's
+  appearance with System Events' `dark mode` and back. A run without the
+  flag changes no appearance, takes the start window in light only and
+  says so in `run.log`. Each appearance's own recording folder stays,
+  as `app-recording-light/` and `app-recording-dark/`, beside
+  `app-light/` and `app-dark/`. The start window is part of the run:
+  when a window cannot be taken, the run fails like on any other failure.
+  The status window's picture for the homepage's screenshot script comes
+  later with the offscreen renders. (Setting `AppleInterfaceStyle` in
+  the app's own defaults domain left its window light, tried
+  2026-11-19.)
+- A restore file, if one is left.
 
 Anything in the review folder that cannot be made fails the run.
 
@@ -743,9 +823,8 @@ tried:
 ## Safeguards for the person's session
 
 - A run records the Mac's own screens and audio inputs too. Its
-  recording folders live in a scratch folder, are deleted after a run
-  that passes, and kept after one that fails, which the driver says
-  with the path.
+  recording folders live in the scratch folder and are all kept, a
+  passed scenario's too (D67); a failed one says its path.
 - Before a run the driver writes to a restore file what the run may
   change: the screen arrangement, mirroring and the main screen;
   whether each of the Mac's own screens is on, with its mode and

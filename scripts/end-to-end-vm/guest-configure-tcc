@@ -27,7 +27,11 @@ clients=(
     "'$app_root/msr-end-to-end',1,NULL"
     "'org.schapiro.multiscreenrecorder',0,NULL"
 )
-services=(kTCCServiceScreenCapture kTCCServiceMicrophone)
+services=(kTCCServiceScreenCapture kTCCServiceMicrophone kTCCServiceAccessibility)
+
+# Automation (Apple events): every client above may drive System Events (the appearance), Finder
+# (its window) and the app (its reopen event, which opens its status window).
+automation_targets=(com.apple.systemevents com.apple.finder org.schapiro.multiscreenrecorder)
 
 for db in "$system_db" "$user_db"; do
     [[ -f $db ]] || die "$db is missing"
@@ -39,7 +43,13 @@ for db in "$system_db" "$user_db"; do
             sqlite "$db" "INSERT OR REPLACE INTO access VALUES('$service',$name,$type,2,4,1,$csreq,NULL,0,'UNUSED',NULL,0,$now,NULL,NULL,'UNUSED',$now);"
         done
     done
+    for client in "${clients[@]}"; do
+        IFS=, read -r name type csreq <<<"$client"
+        for target in "${automation_targets[@]}"; do
+            sqlite "$db" "INSERT OR REPLACE INTO access VALUES('kTCCServiceAppleEvents',$name,$type,2,4,1,$csreq,NULL,0,'$target',NULL,0,$now,NULL,NULL,'UNUSED',$now);"
+        done
+    done
     echo "$me: $db"
-    sqlite "$db" "SELECT service, client, auth_value FROM access WHERE service IN ('kTCCServiceScreenCapture','kTCCServiceMicrophone');"
+    sqlite "$db" "SELECT service, client, indirect_object_identifier, auth_value FROM access WHERE service IN ('kTCCServiceScreenCapture','kTCCServiceMicrophone','kTCCServiceAccessibility','kTCCServiceAppleEvents');"
 done
 chown admin:staff "$user_db"

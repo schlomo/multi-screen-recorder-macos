@@ -99,6 +99,73 @@ import Testing
         #expect(overload.first?.hasSuffix("playback on the loopback device broke at 2.100 s (an overload); the recording shows it") == true)
     }
 
+    /// The tone with a hole of zeros of `length` samples from `start`; with a hole that swallows a
+    /// click, the clicks on either side are two seconds apart.
+    private func withHole(_ start: Int, length: Int = 1_536, seconds: Double = 8, removing removed: Int = 0) -> [Float] {
+        var samples = Self.recorded(seconds: seconds)
+        for index in start..<(start + length) { samples[index] = 0 }
+        if removed > 0 { samples.removeSubrange(start..<(start + removed)) }
+        return samples
+    }
+
+    /// A hole from sample 131_000 (2.7292 s) swallows the click at 2.7428 s.
+    private let holeAt = 131_000
+    private var brokeAtTheHole: PlaybackBreak { PlaybackBreak(timeOfDay: 1000 + 2.731, samples: nil) }
+
+    @Test func aHoleAtAPlaybackBreakWithWholeSecondSpacingIsPardoned() throws {
+        let result = ToneCheck.check(played: [track("BlackHole", withHole(holeAt))], mixed: [], breaks: [brokeAtTheHole])
+        #expect(result.failures == [])
+        let line = try #require(result.pardoned.first)
+        #expect(result.pardoned.count == 1)
+        #expect(line.hasPrefix("BlackHole: pardoned: playback broke at 2.731 s, 32."), "\(line)")
+        #expect(line.hasSuffix(" ms quiet in the recording, clicks 2.000 s apart"), "\(line)")
+    }
+
+    @Test func aHoleWithoutAPlaybackBreakFails() {
+        let result = ToneCheck.check(played: [track("BlackHole", withHole(holeAt))], mixed: [], breaks: [])
+        #expect(result.failures == ["BlackHole: clicks at 1.7431 s and 3.7431 s are not one second apart"])
+        #expect(result.pardoned == [])
+    }
+
+    @Test func aBreakFarFromTheHoleDoesNotPardonIt() {
+        let result = ToneCheck.check(played: [track("BlackHole", withHole(holeAt))], mixed: [],
+                                     breaks: [PlaybackBreak(timeOfDay: 1000 + 2.9, samples: nil)])
+        #expect(result.failures.count == 1)
+        #expect(result.pardoned == [])
+    }
+
+    @Test func aBreakWithoutAHoleWhoseSpacingIsOffFails() {
+        var samples = Self.recorded(seconds: 4)
+        samples.removeSubrange(100_000..<100_480)
+        let result = ToneCheck.check(played: [track("BlackHole", samples)], mixed: [], breaks: [PlaybackBreak(timeOfDay: 1002.1, samples: nil)])
+        #expect(result.failures.count == 1)
+        #expect(result.pardoned == [])
+    }
+
+    @Test func aHoleAtABreakWhoseSpacingIsOffByAFractionFails() {
+        // 96 samples (2 ms) taken out of the hole: the clicks are 1.998 s apart, not a whole number of seconds.
+        let result = ToneCheck.check(played: [track("BlackHole", withHole(holeAt, removing: 96))], mixed: [], breaks: [brokeAtTheHole])
+        #expect(result.failures.count == 1)
+        #expect(result.pardoned == [])
+    }
+
+    @Test func moreHolesThanBreaksFail() {
+        var samples = withHole(holeAt)
+        // A second hole, swallowing the click at 5.7428 s, with no break of its own.
+        for index in 275_000..<276_536 { samples[index] = 0 }
+        let result = ToneCheck.check(played: [track("BlackHole", samples)], mixed: [], breaks: [brokeAtTheHole])
+        #expect(result.failures.count == 1)
+        #expect(result.pardoned.count == 1)
+    }
+
+    @Test func quietRunsAreFoundAtSampleResolutionAndTheToneHasNone() {
+        let samples = withHole(holeAt)
+        let runs = SignalAnalysis.quietRuns(samples, sampleRate: Self.rate, below: 0.005, atLeast: 0.001)
+        #expect(runs.count == 1)
+        #expect(abs((runs.first?.start ?? 0) - 2.7292) < 0.001 && abs((runs.first?.length ?? 0) - 0.032) < 0.001)
+        #expect(SignalAnalysis.quietRuns(Self.recorded(seconds: 4), sampleRate: Self.rate, below: 0.005, atLeast: 0.001).isEmpty)
+    }
+
     @Test func theToneFollowsTheRenderSampleTimeAcrossASkippedCycle() {
         var clock = PlaybackClock()
         #expect(clock.render(sampleTime: 5_000, frames: 512) == .init(firstIndex: 0, skipped: nil))

@@ -2271,12 +2271,36 @@ architect's reading.
      encoder's stall, not a writer fed a wrong frame. The cause in the
      runner's encoder stays unfixed; it is not a recorder fault shown by
      these tests.
-  7. SSH to the VM uses the image's published admin password for every
-     login (`scripts/end-to-end-vm/askpass`), no key: the VM is a
-     throwaway on a NAT-only network that lives for minutes, the
-     password is the image's public default and no secret the
-     credentials principle protects, and a key would add a lifecycle for
-     no gain (the architect's decision).
+  7. SSH to the VM uses the image's published default login for every
+     login (`scripts/end-to-end-vm/askpass`), no key. The owner: "Default
+     creds are no secret, obviously".
+  8. Follow-ups of the same day, the owner: "we need full export of
+     results, screenshots and desktop video from the e2e runs": every
+     scenario's whole folder (recordings, `recording.json`,
+     `recording.log`, `logs/`) stays in the scratch folder and is copied
+     back, passed or failed; the start window, the status window (a PNG and a
+     5 s video before Stop) and a Finder window of the recording folder
+     are taken in light and, when `scripts/end-to-end-test` tells the
+     driver it runs in the throwaway VM (`--throwaway-vm`), in dark; a run
+     without the flag takes the start window in light only;
+     and "Document manual steps to find, interact with, and stop the VM
+     in case it is lost" ("When a VM is left behind").
+  9. A click spacing failure of the `tone` scenario is pardoned only
+     when the recording holds a hole (a quiet run at sample resolution)
+     that starts within 0.1 s of a playback break the player measured,
+     each hole with a break of its own (so pardons never exceed the
+     break count), and the clicks on either side are a whole number of
+     seconds apart within 1 ms; each pardon is reported in `run.log`.
+     This replaces D63's "a named break is still a failure". The case:
+     run 4 of the architect's VM runs at 3c8fe02 failed `tone` because
+     the test's own player ran late (an overload at 4.643 s), the
+     loopback device carried 32 ms of zeros from 4.641 s and the
+     recorder recorded exactly that, the clicks on either side exactly
+     2.000 s apart. The owner, on reconsidering earlier rulings: "we
+     need to take a step towards quality and own the trade off, be less
+     literal about previous rulings ... New learnings mean we
+     reconsider, adapt and improve". The failed scenario's system log
+     also covers `coreaudiod`.
 - **Consequences:** the pipeline no longer gates the recorder's capture
   behaviour: a person runs the tests, and the PR description says
   whether they passed. The pipeline is faster and no longer depends on

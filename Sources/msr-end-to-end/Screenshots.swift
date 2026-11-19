@@ -24,9 +24,44 @@ enum Screenshots {
         }
     }
 
-    /// `screencapture` of one window, without its shadow and without a sound.
+    /// Runs `body` with the system in the appearance: dark is switched for the whole
+    /// user session through System Events, which also tells the windows already open
+    /// (Finder), and switched back after it. The caller changes the appearance only
+    /// where that harms nobody's session (`Appearance.taken`).
+    static func withAppearance(_ appearance: Appearance, _ body: () throws -> Void) throws {
+        guard appearance == .dark else { return try body() }
+        let set = { (dark: Bool) in
+            try AppleScript.run("tell application \"System Events\" to tell appearance preferences to set dark mode to \(dark)")
+        }
+        try set(true)
+        defer { try? set(false) }
+        try body()
+    }
+
+    /// The first on-screen window of the program `owner` whose title is `title`.
+    static func windowID(ownerName owner: String, title: String, seconds: Double, interruption: Interruption) throws -> CGWindowID {
+        let deadline = Date().addingTimeInterval(seconds)
+        while true {
+            try interruption.check()
+            let windows = (CGWindowListCopyWindowInfo([.optionOnScreenOnly], kCGNullWindowID) as? [[String: Any]]) ?? []
+            if let number = windows.first(where: {
+                ($0[kCGWindowOwnerName as String] as? String) == owner && ($0[kCGWindowName as String] as? String) == title
+            })?[kCGWindowNumber as String] as? CGWindowID {
+                return number
+            }
+            guard Date() < deadline else { throw DriverError("no window \"\(title)\" of \(owner) on screen within \(Int(seconds)) s") }
+            Thread.sleep(forTimeInterval: 0.1)
+        }
+    }
+
+    /// A video of one window's next `seconds` seconds, made by `screencapture -V`.
+    static func video(_ window: CGWindowID, seconds: Int, to mov: URL) throws {
+        try screencapture(["-x", "-l", "\(window)", "-V", "\(seconds)", mov.path], mov, what: "window \(window) as video")
+    }
+    /// `screencapture` of one window with macOS's own shadow around it (a PNG with
+    /// transparent margins), without a sound.
     static func capture(_ window: CGWindowID, to png: URL) throws {
-        try screencapture(["-x", "-o", "-l", "\(window)", png.path], png, what: "window \(window)")
+        try screencapture(["-x", "-l", "\(window)", png.path], png, what: "window \(window)")
     }
 
     private static func screencapture(_ arguments: [String], _ png: URL, what: String) throws {

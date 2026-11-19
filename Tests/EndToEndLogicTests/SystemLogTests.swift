@@ -14,6 +14,7 @@ import Testing
             #expect(arguments[6].contains("subsystem CONTAINS[c] \"\(name)\""))
         }
         #expect(arguments[6].contains("process == \"WindowServer\""))
+        #expect(arguments[6].contains("process == \"coreaudiod\""))
     }
 
     @Test func theStartIsASecondEarlyInTheGivenTimeZone() throws {

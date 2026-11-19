@@ -6,8 +6,8 @@ import Foundation
 public enum SystemLog {
     /// Subsystems whose name contains one of these, any case.
     static let subsystems = ["videotoolbox", "coremedia", "avfoundation", "screencapturekit", "display"]
-    /// Processes that log about the screens and their capture.
-    static let processes = ["WindowServer", "replayd"]
+    /// Processes that log about the screens, their capture and the audio devices.
+    static let processes = ["WindowServer", "replayd", "coreaudiod"]
 
     public static let fileName = "system.log"
 

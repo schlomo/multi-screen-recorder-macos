@@ -28,10 +28,18 @@ final class Driver {
     private(set) var playbackBreaks: [PlaybackBreak]?
     /// How many there were, those beyond what the player's log holds included.
     private(set) var playbackBreakCount: Int?
+    /// The last scenario's failing click spacings pardoned because the player broke (D67).
+    private(set) var pardons: [String] = []
     /// The last scenario's recording, for its review files.
     private var lastRecording: (folder: URL, files: [ListedFile], probed: [String: ProbedFile])?
 
-    init(app: URL, scratch: URL, restorer: Restorer, media: Media) throws {
+    /// Told by scripts/end-to-end-test: the throwaway VM, where the system appearance may be
+    /// switched and the status and Finder windows are driven.
+    let inThrowawayVM: Bool
+    var appearances: [Appearance] { Appearance.taken(inThrowawayVM: inThrowawayVM) }
+
+    init(app: URL, scratch: URL, restorer: Restorer, media: Media, inThrowawayVM: Bool) throws {
+        self.inThrowawayVM = inThrowawayVM
         msr = app.appending(path: "Contents/MacOS/msr")
         guard FileManager.default.isExecutableFile(atPath: msr.path) else {
             throw DriverError("\(msr.path) does not exist; run scripts/build-app first")
@@ -106,6 +114,7 @@ final class Driver {
         eventWindows = []
         playbackBreaks = nil
         playbackBreakCount = nil
+        pardons = []
         lastRecording = nil
         let folder = scratch.appending(path: scenario.name)
         try? FileManager.default.removeItem(at: folder)
@@ -216,11 +225,18 @@ final class Driver {
         return failures
     }
 
+    /// The app's start window in each appearance to take.
+    func startWindow() throws {
+        for appearance in appearances {
+            try Screenshots.withAppearance(appearance) { try startWindow(in: appearance) }
+        }
+    }
+
     /// The app's start window, as a person sees it on starting the app:
     /// the built app started with the scratch HOME, its window captured
-    /// into the review folder, then quit.
-    func startWindow() throws {
-        let folder = scratch.appending(path: ReviewNames.appStep)
+    /// into the review folder, then quit. Its folder stays.
+    private func startWindow(in appearance: Appearance) throws {
+        let folder = scratch.appending(path: "\(ReviewNames.appStep)-\(appearance.rawValue)")
         try? FileManager.default.removeItem(at: folder)
         let home = folder.appending(path: "home")
         try FileManager.default.createDirectory(at: home, withIntermediateDirectories: true)
@@ -242,13 +258,12 @@ final class Driver {
                 }
             }
             try? restorer.ended(app)
-            try? FileManager.default.removeItem(at: folder)
         }
         let id = try Screenshots.windowID(of: app.pid, seconds: 20, interruption: interruption)
         try interruption.sleep(until: Date().addingTimeInterval(1.5))
         let review = scratch.appending(path: ReviewNames.folder).appending(path: ReviewNames.appStep)
         try FileManager.default.createDirectory(at: review, withIntermediateDirectories: true)
-        try Screenshots.capture(id, to: review.appending(path: ReviewNames.screenshot(scenario: ReviewNames.appStep, window: "start-window")))
+        try Screenshots.capture(id, to: review.appending(path: ReviewNames.screenshot(scenario: ReviewNames.appStep, window: "start-window", appearance: appearance)))
     }
 
     /// The changed screen's last change, once it has been unchanged for the
@@ -395,7 +410,9 @@ final class Driver {
                 break
             }
         }
-        return ToneCheck.failures(played: played, mixed: mixed, breaks: playbackBreaks ?? [])
+        let result = ToneCheck.check(played: played, mixed: mixed, breaks: playbackBreaks ?? [])
+        pardons += result.pardoned
+        return result.failures
     }
 
     static func describe(_ event: Scenario.Event) -> String {

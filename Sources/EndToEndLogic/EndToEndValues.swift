@@ -36,4 +36,10 @@ public enum EndToEndValues {
     public static let clickTolerance = 0.005
     /// How far two clicks in one file may be from one second apart.
     public static let clickPeriodTolerance = 0.001
+    /// A run of samples this far below the tone's peak is a hole, in the test tone's amplitude
+    /// as a fraction: the 1 kHz sine stays below 5 % of its peak for 0.032 ms around a zero
+    /// crossing, so a run of at least `holeSeconds` cannot be the tone.
+    public static let holeBelowTonePeak = 0.05
+    /// The shortest quiet run counted as a hole: one period of the tone.
+    public static let holeSeconds = 0.001
 }

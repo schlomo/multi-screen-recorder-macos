@@ -53,6 +53,9 @@ struct Run: ParsableCommand {
     @Option(name: .customLong("scenario"), help: "A scenario to run; repeat for several. One of: \(Scenario.named.map(\.name).joined(separator: ", ")).")
     var scenarioNames: [String] = []
 
+    @Flag(help: "Told by scripts/end-to-end-test: this runs in the throwaway VM, where the driver may switch the system appearance to dark for the start window's screenshot. Without it, light only.")
+    var throwawayVM = false
+
     @OptionGroup var scratch: ScratchOption
 
     func validate() throws {
@@ -70,7 +73,9 @@ struct Run: ParsableCommand {
         let media = try Media(scratch: scratchFolder)
         try Driver.requirePreconditions()
         let restorer = Restorer(scratch: scratchFolder)
-        let driver = try Driver(app: URL(filePath: app), scratch: scratchFolder, restorer: restorer, media: media)
+        let driver = try Driver(
+            app: URL(filePath: app), scratch: scratchFolder, restorer: restorer, media: media,
+            inThrowawayVM: throwawayVM)
         _ = try restorer.save()
         Interruption.shared.watch()
         RunLog.out("msr-end-to-end: \(driver.version), \(scenarios.count) scenarios; the Mac cannot be used until they end")
@@ -78,6 +83,7 @@ struct Run: ParsableCommand {
         var tally = RunTally(total: scenarios.count)
         do {
             try driver.startWindow()
+            try driver.recordingWindows()
             RunLog.out("ok    \(ReviewNames.appStep): the start window's screenshot")
         } catch {
             let failure = "the start window's screenshot was not taken: \(error)"
@@ -98,7 +104,6 @@ struct Run: ParsableCommand {
                 if failures.isEmpty {
                     tally.passed()
                     RunLog.out("ok    \(scenario.name) (\(seconds) s): \(scenario.summary)")
-                    try? FileManager.default.removeItem(at: folder)
                 } else {
                     tally.failed()
                     RunLog.error("FAIL  \(scenario.name) (\(seconds) s): \(scenario.summary)")
@@ -108,6 +113,7 @@ struct Run: ParsableCommand {
                 if let margin = driver.margin { RunLog.out("      margin: \(margin)") }
                 for window in driver.eventWindows { RunLog.out("      window: \(window)") }
                 if let count = driver.playbackBreakCount { RunLog.out("      playback breaks: \(count)") }
+                for pardon in driver.pardons { RunLog.out("      \(pardon)") }
             } catch {
                 tally.stopped("\(scenario.name): \(error)")
                 RunLog.error("STOP  \(scenario.name): \(error); kept: \(scratchFolder.appending(path: scenario.name).path)")

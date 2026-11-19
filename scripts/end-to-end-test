@@ -11,10 +11,11 @@ me="scripts/end-to-end-test"
 if [[ ${1-} == -h || ${1-} == --help ]]; then
     echo "Runs the end-to-end tests in a throwaway clone of the VM scripts/end-to-end-setup built.
   $me --scratch-folder <folder> [driver arguments]
-                  builds, runs every scenario in the VM and copies the driver's scratch folder
-                  (run.log, review/, failed scenarios' folders) to <folder>, which must be new or
-                  empty; the driver's arguments, such as --scenario <name> (repeat for more),
-                  pass through
+                  builds, runs every scenario in the VM and copies the driver's whole scratch folder
+                  to <folder>, which must be new or empty: run.log, review/ (the quick look, with
+                  the app's windows as PNG and video in light and dark in review/app/) and, per
+                  scenario, its whole folder with the recordings, recording.json and logs; the
+                  driver's arguments, such as --scenario <name> (repeat for more), pass through
   $me --help      prints this, also -h; msr-end-to-end run --help for the driver's own
 Needs tart on the PATH and the VM msr-end-to-end (scripts/end-to-end-setup)."
     exit 0
@@ -65,7 +66,7 @@ guest "cat > '$guest_app_root/msr-end-to-end' && chmod +x '$guest_app_root/msr-e
 # The driver runs in the admin user's GUI session (logged in automatically),
 # from the folder holding build/, with the tools first on the PATH.
 guest_scratch="$guest_home/end-to-end-scratch"
-quoted_arguments=""
+quoted_arguments="--throwaway-vm "
 for argument in ${driver_arguments[@]+"${driver_arguments[@]}"}; do
     quoted_arguments+=$(printf '%q ' "$argument")
 done

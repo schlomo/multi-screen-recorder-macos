@@ -84,6 +84,25 @@ public enum SignalAnalysis {
         }
     }
 
+    /// The runs of samples whose magnitude is below `threshold` for at least
+    /// `atLeast` seconds, each as its start and length in seconds: holes in
+    /// a signal that is never quiet that long, at sample resolution.
+    public static func quietRuns(_ samples: [Float], sampleRate: Double, below threshold: Float,
+                                 atLeast: Double) -> [(start: Double, length: Double)] {
+        let shortest = Int((atLeast * sampleRate).rounded(.up))
+        var runs: [(start: Double, length: Double)] = []
+        var runStart: Int?
+        func close(at end: Int) {
+            if let start = runStart, end - start >= shortest { runs.append((Double(start) / sampleRate, Double(end - start) / sampleRate)) }
+            runStart = nil
+        }
+        for (index, sample) in samples.enumerated() {
+            if abs(sample) < threshold { if runStart == nil { runStart = index } } else { close(at: index) }
+        }
+        close(at: samples.count)
+        return runs
+    }
+
     /// For each click of `first`, how much later the nearest click of
     /// `second` is, both in seconds of the day; clicks without one within
     /// half a second are left out.
