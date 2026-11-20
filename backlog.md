@@ -2,13 +2,16 @@
 
 ## Next session starts here
 
-PR #23 (item 3's first part) is ready for the owner's merge
-(2026-11-19): 5 end-to-end runs in a row passed in the tart VM, CI is
-green, every round reviewed. The end-to-end tests are a manual step
+PR #23 (item 3's first part, end-to-end tests) is merged
+(2026-11-20). The end-to-end tests are a manual step
 (`scripts/end-to-end-setup` once, then `scripts/end-to-end-test`); the
 architect runs them before marking a PR ready that touches the recorder
-or the driver, and records the result in its description (D67). After
-the merge, start a fresh session.
+or the driver, and records the result in its description (D67). Next:
+item 23, the Resolve timeline. The owner's first import test is
+recorded there; its next step is to learn from a timeline Resolve
+exports itself what our `.otio` must write, through the `resolve` MCP
+server (fixed by the owner on 2026-11-20; a session connects to it
+only when it starts). Start it in a fresh session.
 Then, one PR each: item 23, the Resolve timeline (after the owner's
 test import of the spike `.otio` files, instructions in the session of
 2026-11-19, remade if gone); item 21, the meters (design signed off);
@@ -30,14 +33,7 @@ Still open from D34: what AGC does and whether it is on in auto mode;
 
 ## In flight
 
-- **PR #23, end-to-end tests** (item 3, first part; branch
-  `end-to-end-tests`, draft): seven scenarios run by
-  `scripts/end-to-end-test` in a throwaway tart VM on the owner's Mac
-  (D67), review artifacts in the scratch folder; item 27 and item 28's
-  evidence round (D65, D66) are in it too. Every round reviewed. Left
-  for the follow-up: match a screen's notice by its name, not its
-  order, and say "misordered" where "missing" is printed today (review
-  NITs, 2026-11-19).
+Nothing (2026-11-20).
 
 ## Queued
 
@@ -772,6 +768,13 @@ Still open from D34: what AGC does and whether it is on in auto mode;
   the README (D46). Revisit when people struggle with it.
 
 ## Done (recent)
+
+- 2026-11-20: PR #23 merged by the owner: item 3's first part, the
+  end-to-end tests (seven scenarios through `msr record` in a throwaway
+  tart VM on the owner's Mac, D63, D67), with item 27 (a failure's
+  repeats counted, D65), item 28's evidence round (D66) and the app's
+  window captures in light and dark. Reviews: top-tier full and delta
+  reviews of every round; 5 end-to-end runs in a row on e663784.
 
 - 2026-11-19: item 28, the hosted runner's writer failure: the
   evidence round (D66) found our recorder feeds correct frames and the
