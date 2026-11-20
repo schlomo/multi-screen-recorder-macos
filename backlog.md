@@ -2,19 +2,11 @@
 
 ## Next session starts here
 
-PR #23 (item 3's first part, end-to-end tests) is merged
-(2026-11-20). The end-to-end tests are a manual step
-(`scripts/end-to-end-setup` once, then `scripts/end-to-end-test`); the
-architect runs them before marking a PR ready that touches the recorder
-or the driver, and records the result in its description (D67). Next:
-item 23, the Resolve timeline. The owner's first import test is
-recorded there; its next step is to learn from a timeline Resolve
-exports itself what our `.otio` must write, through the `resolve` MCP
-server (fixed by the owner on 2026-11-20; a session connects to it
-only when it starts). Start it in a fresh session.
-Then, one PR each: item 23, the Resolve timeline (after the owner's
-test import of the spike `.otio` files, instructions in the session of
-2026-11-19, remade if gone); item 21, the meters (design signed off);
+Item 23, the Resolve timeline, is in flight as PR #25 (2026-11-20):
+the format was learnt from a timeline Resolve 21.2 exported itself
+(D68). Left on it: the owner's import of the golden `.otio`, the
+end-to-end run, the adversarial review, the unmarked commit and the
+pipeline. Then, one PR each: item 21, the meters (design signed off);
 item 3's follow-up; item 4; item 7; item 12; item 22; the rest of item
 6; item 16.
 
@@ -23,9 +15,9 @@ to a scratch folder (`AGENTS.md`, "Facts that bite"), and BetterDisplay's comman
 line with the owner's virtual screen "Virtual 16:9"; by D56, before
 an agent starts a recording or plays a sound on the owner's Mac, the
 session running or briefing that test tells the owner, once before
-the test's first run. The `resolve` MCP server failed to start in the
-session of 2026-11-19 (its command path is cut at the first space);
-the owner fixes it.
+the test's first run. The `resolve` MCP server works since 2026-11-20 (a
+session connects to it only when it starts); an agent works only in a
+Resolve project it created, and never starts or quits Resolve.
 
 Still open from D34: what AGC does and whether it is on in auto mode;
 "AGC can also come as an improvement after the recorder" (the owner,
@@ -33,7 +25,7 @@ Still open from D34: what AGC does and whether it is on in auto mode;
 
 ## In flight
 
-Nothing (2026-11-20).
+- Item 23, the Resolve timeline file: PR #25, draft (2026-11-20).
 
 ## Queued
 
@@ -561,11 +553,15 @@ Nothing (2026-11-20).
    "Import log messages as markers" is for its import errors, not
    ours (manual ch. 22 p. 513), so ours would be OTIO markers; "Use
    sizing/colour information" carry another editor's transforms and
-   grades, which a recording has none of. Next step: export a
-   hand-built timeline from Resolve as OTIO (mono and stereo
-   microphones, a marker, the resolution set) and copy what Resolve
-   writes, then a second import test. Then built in Swift without a
-   library, with golden-file tests.
+   grades, which a recording has none of. Done 2026-11-20 (D68):
+   a timeline hand-built in Resolve 21.2 and exported showed its
+   `Resolve_OTIO` keys (Audio Type Mono/Stereo, per-clip Channels,
+   Link Group ID, markers on the stack); Resolve names the timeline
+   from the file name up to its first dot, drops a clip's channel
+   mapping when the clip is a frame longer than its file, and its OTIO
+   reader takes no resolution (none in its key list, none from
+   `available_image_bounds`), so a first marker says what to set.
+   Built in Swift in PR #25.
 25. **A new screen showing a still picture gets no file until it
    changes** (found by PR #23's runs, 2026-11-19): ScreenCaptureKit
    delivers complete frames only on change, so a newly connected
