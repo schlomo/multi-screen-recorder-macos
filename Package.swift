@@ -54,6 +54,7 @@ let package = Package(
         .testTarget(
             name: "RecorderLogicTests",
             dependencies: ["RecorderLogic"],
+            exclude: ["Fixtures"],
             swiftSettings: strictSettings
         ),
         .testTarget(

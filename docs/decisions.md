@@ -2322,3 +2322,11 @@ architect's reading.
   `scripts/install-end-to-end-tools`, `scripts/end-to-end-vm/`;
   the setup and a full pass of the 7 scenarios in the VM on
   2026-11-19.
+
+## D68: A DaVinci Resolve timeline file in every recording folder (2026-11-20)
+
+- **Status:** in force
+- **Context:** The owner, 2026-11-19: "a timeline where all clips are already loaded and aligned by time code … goal is to make editing in resolve super easy"; "otio sounds great, go ahead with that". After two test imports and a reference timeline exported from Resolve 21.2, the owner, 2026-11-20: "I'd expect only one OTIO file in a recording folder so that we can be free with the naming and should make it work well and look good"; "Use only ASCII7 characters. I'd say we only use relative filenames"; "no script, setting timeline resolution manually is also fine"; "perfect, turn this into a quick PR".
+- **Decision:** At Stop, and with `msr timeline <folder>`, a derived OpenTimelineIO file is written into the recording folder, named after the folder with its dots as dashes (Resolve cuts a timeline's name at the file name's first dot), with relative media links, in the form Resolve itself exports: a video track per screen, a mono track per audio input channel with an input's channels as a linked group, a stereo track for the system audio, a marker per event, and a first marker that says the resolution to set by hand, since Resolve's OTIO reader takes no resolution (the architect's reading of Resolve 21.2's export and its program file).
+- **Consequences:** The format follows Resolve's private `Resolve_OTIO` metadata, which a Resolve update may change; the golden-file test pins what we write, and a new Resolve version needs one test import.
+- **Evidence:** PR #25; [design/recorder.md](design/recorder.md), "Output on disk"; backlog item 23.

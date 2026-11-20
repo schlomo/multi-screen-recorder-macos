@@ -1,0 +1,180 @@
+{
+  "app" : "Multi Screen Recorder 0.20261119.72-pr23+5293975 (5293975)",
+  "cpu" : {
+    "averagePercent" : 34.8,
+    "peakPercent" : 127.1
+  },
+  "ended" : "2026-11-20T12:38:18.864+01:00",
+  "events" : [
+    {
+      "at" : 89.911,
+      "event" : "default microphone changed",
+      "from" : "Razer Seiren V3 Mini",
+      "to" : "MacBook Pro Microphone"
+    },
+    {
+      "at" : 89.911,
+      "audioSource" : "Razer Seiren V3 Mini",
+      "event" : "audio input disconnected"
+    },
+    {
+      "at" : 103.797,
+      "event" : "default microphone changed",
+      "from" : "MacBook Pro Microphone",
+      "to" : "Razer Seiren V3 Mini"
+    },
+    {
+      "at" : 103.797,
+      "audioSource" : "Razer Seiren V3 Mini",
+      "event" : "audio input connected"
+    },
+    {
+      "at" : 113.216,
+      "event" : "screen connected",
+      "screen" : "Built-in Retina Display"
+    },
+    {
+      "at" : 124.605,
+      "event" : "screen disconnected",
+      "screen" : "Built-in Retina Display"
+    }
+  ],
+  "files" : [
+    {
+      "end" : 129.66666666666666,
+      "frameSize" : [
+        3440,
+        1440
+      ],
+      "framesRepeatedForLateness" : 126,
+      "guideTracks" : [
+        "Audio inputs",
+        "System audio"
+      ],
+      "name" : "2026-11-20 12.36.09 Screen 1 - DELL P3421W.mov",
+      "screen" : "DELL P3421W",
+      "screenUUID" : "A95C2BA6-2796-4EDF-919B-66A6C21CE71F",
+      "start" : 0.16666666666666666,
+      "state" : "finalized",
+      "timecode" : "12:36:09:07"
+    },
+    {
+      "end" : 129.7,
+      "frameSize" : [
+        1920,
+        1080
+      ],
+      "framesRepeatedForLateness" : 132,
+      "guideTracks" : [
+        "Audio inputs",
+        "System audio"
+      ],
+      "name" : "2026-11-20 12.36.09 Screen 2 - Wacom One 13T.mov",
+      "screen" : "Wacom One 13T",
+      "screenUUID" : "037036FB-11CB-443E-B860-302AC081D674",
+      "start" : 0.16666666666666666,
+      "state" : "finalized",
+      "timecode" : "12:36:09:07"
+    },
+    {
+      "audioSource" : "MacBook Pro Microphone",
+      "audioSourceUID" : "BuiltInMicrophoneDevice",
+      "channels" : 1,
+      "clockDriftCorrection" : -0.0001,
+      "clockDriftPpm" : 1.5,
+      "end" : 129.729,
+      "name" : "2026-11-20 12.36.09 Audio 4 - MacBook Pro Microphone.mov",
+      "start" : 0.26666666666666666,
+      "state" : "finalized",
+      "timecode" : "12:36:09:10"
+    },
+    {
+      "audioSource" : "CalDigit Thunderbolt 3 Audio",
+      "audioSourceUID" : "AppleUSBAudioEngine:CalDigit, Inc.:CalDigit Thunderbolt 3 Audio:20200000:2",
+      "channels" : 2,
+      "clockDriftCorrection" : -0.0062,
+      "clockDriftPpm" : 48.7,
+      "end" : 129.72466666666668,
+      "name" : "2026-11-20 12.36.09 Audio 1 - CalDigit Thunderbolt 3 Audio.mov",
+      "start" : 0.3,
+      "state" : "finalized",
+      "timecode" : "12:36:09:11"
+    },
+    {
+      "audioSource" : "Razer Seiren V3 Mini",
+      "audioSourceUID" : "AppleUSBAudioEngine:Razer Inc.:Razer Seiren V3 Mini:22324000:1",
+      "channels" : 1,
+      "clockDriftCorrection" : 0.0104,
+      "clockDriftPpm" : -118.2,
+      "end" : 89.74745833333333,
+      "name" : "2026-11-20 12.36.09 Audio 2 - Razer Seiren V3 Mini.mov",
+      "start" : 0.3,
+      "state" : "finalized",
+      "timecode" : "12:36:09:11"
+    },
+    {
+      "audioSource" : "System audio",
+      "channels" : "stereo",
+      "clockDriftCorrection" : 0.0172,
+      "clockDriftPpm" : 2,
+      "end" : 129.70168750000002,
+      "name" : "2026-11-20 12.36.09 Audio 0 - System.mov",
+      "start" : 0.3,
+      "state" : "finalized",
+      "timecode" : "12:36:09:11"
+    },
+    {
+      "audioSource" : "Logitech BRIO",
+      "audioSourceUID" : "AppleUSBAudioEngine:Unknown Manufacturer:Logitech BRIO:A267841D:4",
+      "channels" : 2,
+      "clockDriftCorrection" : 0.0042,
+      "clockDriftPpm" : 2.8,
+      "end" : 129.72275000000002,
+      "name" : "2026-11-20 12.36.09 Audio 3 - Logitech BRIO.mov",
+      "start" : 0.4,
+      "state" : "finalized",
+      "timecode" : "12:36:09:14"
+    },
+    {
+      "audioSource" : "Razer Seiren V3 Mini",
+      "audioSourceUID" : "AppleUSBAudioEngine:Razer Inc.:Razer Seiren V3 Mini:22324000:1",
+      "channels" : 1,
+      "clockDriftCorrection" : 0.0026,
+      "clockDriftPpm" : -116.7,
+      "end" : 129.7265625,
+      "name" : "2026-11-20 12.37.53 Audio 2 - Razer Seiren V3 Mini.mov",
+      "start" : 104.9,
+      "state" : "finalized",
+      "timecode" : "12:37:53:29"
+    },
+    {
+      "end" : 124.56666666666666,
+      "frameSize" : [
+        1512,
+        982
+      ],
+      "framesRepeatedForLateness" : 0,
+      "guideTracks" : [
+        "Audio inputs",
+        "System audio"
+      ],
+      "name" : "2026-11-20 12.38.05 Screen 3 - Built-in Retina Display.mov",
+      "screen" : "Built-in Retina Display",
+      "screenUUID" : "37D8832A-2D66-02CA-B9F7-8F30A301B230",
+      "start" : 115.93333333333334,
+      "state" : "finalized",
+      "timecode" : "12:38:05:00"
+    }
+  ],
+  "problems" : [
+
+  ],
+  "result" : "ok",
+  "settings" : {
+    "audioMode" : "wired",
+    "resolution" : "native",
+    "systemAudio" : true
+  },
+  "started" : "2026-11-20T12:36:09.076+01:00",
+  "state" : "finalized"
+}

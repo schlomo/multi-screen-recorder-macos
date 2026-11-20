@@ -251,6 +251,7 @@ public final class Recorder {
                 // Told by `writeManifest`; the file on disk keeps no `ended`.
                 finalManifestWritten = false
             }
+            if finalManifestWritten { await writeTimelineFile() }
             if let activity { ProcessInfo.processInfo.endActivity(activity) }
             activity = nil
         }
@@ -733,6 +734,16 @@ public final class Recorder {
         } catch {
             tell("Cannot write the recording manifest", error: ErrorDetail(error), kind: .manifestNotWritten)
             throw error
+        }
+    }
+
+    /// The timeline file (D68), from the final manifest on disk. Its failure leaves the recording as it is:
+    /// told like every problem after the end, which the recording log, closed by then, does not hold.
+    private func writeTimelineFile() async {
+        do {
+            try await TimelineFile.write(in: folder)
+        } catch {
+            tell("Cannot write the timeline file", error: ErrorDetail(error), kind: .timelineFileNotWritten)
         }
     }
 

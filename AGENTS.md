@@ -252,7 +252,7 @@ this is how they map per tool.
 
 `scripts/test` compiles the Python scripts, then runs the tests (Swift
 Testing, `swift test`), including those that run `msr settings`,
-`msr version` and the scripts as commands; `scripts/build-app` builds the app in `build/` (signed ad
+`msr version`, `msr timeline` and the scripts as commands; `scripts/build-app` builds the app in `build/` (signed ad
 hoc), `scripts/smoke-test` runs the bundled `msr` safely, and
 `scripts/sign-app` re-signs and zips it (`SIGNING_IDENTITY=-` signs ad
 hoc, for a local check only), and `scripts/install-app` installs it (see
@@ -303,7 +303,8 @@ records the commit and the result in the PR description.
   `~/Library/Application Support/Multi Screen Recorder`; at Stop the app
   and `msr record` write the last recording into `state.json` (`HOME`
   decides where).
-  `msr version`, `msr settings` (it writes the settings file only with
+  `msr version`, `msr timeline` (it writes only the folder's timeline
+  file), `msr settings` (it writes the settings file only with
   a settings flag; `HOME` decides where) and the tests are
   safe; the tests read the Mac's audio device list, which shows no
   prompt.

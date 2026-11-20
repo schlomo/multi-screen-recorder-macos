@@ -184,4 +184,53 @@ import Testing
         defer { home.remove() }
         #expect(try await msr("settings", "--resolution", "999p").status == 64)
     }
+
+    /// The recording the owner's Resolve imported: `recording.json` and the timeline file made from it.
+    private func timelineFixture(_ name: String) throws -> Data {
+        let root = URL(filePath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+        return try Data(contentsOf: root.appending(path: "Tests/RecorderLogicTests/Fixtures/resolve-timeline/\(name)"))
+    }
+
+    @Test func timelineWritesTheFoldersTimelineFileAndNothingElse() async throws {
+        defer { home.remove() }
+        let folder = home.url.appending(path: "2026-11-20 12.36.09", directoryHint: .isDirectory)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        try timelineFixture("recording.json").write(to: folder.appending(path: "recording.json"))
+        let other = folder.appending(path: "notes.txt")
+        try Data("keep".utf8).write(to: other)
+        let outcome = try await msr("timeline", folder.path(percentEncoded: false))
+        #expect(outcome.status == 0)
+        #expect(outcome.errors.isEmpty)
+        let file = folder.appending(path: "2026-11-20 12-36-09.otio")
+        #expect(outcome.output == file.path(percentEncoded: false) + "\n")
+        #expect(try Data(contentsOf: file) == timelineFixture("2026-11-20 12-36-09.otio"))
+        #expect(try FileManager.default.contentsOfDirectory(atPath: folder.path(percentEncoded: false)).sorted()
+            == ["2026-11-20 12-36-09.otio", "notes.txt", "recording.json"])
+        #expect(try String(contentsOf: other, encoding: .utf8) == "keep")
+    }
+
+    @Test func timelineWithoutARecordingManifestExits1NamingItAndWritesNothing() async throws {
+        defer { home.remove() }
+        let folder = home.url.appending(path: "2026-11-20 12.36.09", directoryHint: .isDirectory)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        let outcome = try await msr("timeline", folder.path(percentEncoded: false))
+        #expect(outcome.status == 1)
+        #expect(outcome.errors.hasPrefix("Error: recording.json in "))
+        #expect(outcome.errors.contains("cannot be read"))
+        #expect(outcome.output.isEmpty)
+        #expect(try FileManager.default.contentsOfDirectory(atPath: folder.path(percentEncoded: false)).isEmpty)
+    }
+
+    @Test func timelineOfAFileWithoutAnEndAndNoMediaExits1NamingTheFile() async throws {
+        defer { home.remove() }
+        let folder = home.url.appending(path: "2026-11-20 12.36.09", directoryHint: .isDirectory)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        let unfinished = try String(decoding: timelineFixture("recording.json"), as: UTF8.self)
+            .replacing(#""end" : 129.7,"#, with: #""end" : null,"#)
+        try Data(unfinished.utf8).write(to: folder.appending(path: "recording.json"))
+        let outcome = try await msr("timeline", folder.path(percentEncoded: false))
+        #expect(outcome.status == 1)
+        #expect(outcome.errors.contains("the length of 2026-11-20 12.36.09 Screen 2 - Wacom One 13T.mov cannot be read"))
+        #expect(!FileManager.default.fileExists(atPath: folder.appending(path: "2026-11-20 12-36-09.otio").path(percentEncoded: false)))
+    }
 }

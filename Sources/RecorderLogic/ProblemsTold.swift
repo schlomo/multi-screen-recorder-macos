@@ -1,6 +1,8 @@
 /// What a problem is, for telling a repeating one once (D46).
 public enum ProblemKind: Hashable, Sendable {
     case manifestNotWritten
+    /// The timeline file cannot be written at Stop.
+    case timelineFileNotWritten
     /// The recording log cannot be created or written; clears when writing it works again.
     case recordingLogNotWritten
     case screensNotRead
