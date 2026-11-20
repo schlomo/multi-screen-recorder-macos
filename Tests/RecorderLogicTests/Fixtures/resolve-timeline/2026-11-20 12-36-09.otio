@@ -1,0 +1,1079 @@
+{
+  "OTIO_SCHEMA": "Timeline.1",
+  "name": "2026-11-20 12-36-09",
+  "metadata": {
+    "Resolve_OTIO": {
+      "Resolve OTIO Meta Version": "1.0"
+    }
+  },
+  "global_start_time": {
+    "OTIO_SCHEMA": "RationalTime.1",
+    "rate": 30.0,
+    "value": 1361077.0
+  },
+  "tracks": {
+    "OTIO_SCHEMA": "Stack.1",
+    "name": "",
+    "metadata": {},
+    "source_range": null,
+    "enabled": true,
+    "effects": [],
+    "markers": [
+      {
+        "OTIO_SCHEMA": "Marker.2",
+        "name": "Recording 2026-11-20 12-36-09: set resolution 3440 x 1440",
+        "color": "RED",
+        "metadata": {
+          "Resolve_OTIO": {
+            "Keywords": [],
+            "Note": "Multi Screen Recorder, recording 2026-11-20 12:36:09 to 12:38:18 (2m09s).\nSet the timeline resolution to 3440 x 1440 (the largest screen): Timeline > Timeline Settings.\nTracks: one per screen, one per audio channel; the channels of one input are a linked group.\nMarkers: green = audio change, blue = screen change.\nProblems: none."
+          }
+        },
+        "marked_range": {
+          "OTIO_SCHEMA": "TimeRange.1",
+          "start_time": {
+            "OTIO_SCHEMA": "RationalTime.1",
+            "rate": 30.0,
+            "value": 0.0
+          },
+          "duration": {
+            "OTIO_SCHEMA": "RationalTime.1",
+            "rate": 30.0,
+            "value": 1.0
+          }
+        }
+      },
+      {
+        "OTIO_SCHEMA": "Marker.2",
+        "name": "default microphone changed; audio input disconnected",
+        "color": "GREEN",
+        "metadata": {
+          "Resolve_OTIO": {
+            "Keywords": [],
+            "Note": "12:37:38 +89.9s default microphone changed Razer Seiren V3 Mini → MacBook Pro Microphone\n12:37:38 +89.9s audio input disconnected: Razer Seiren V3 Mini"
+          }
+        },
+        "marked_range": {
+          "OTIO_SCHEMA": "TimeRange.1",
+          "start_time": {
+            "OTIO_SCHEMA": "RationalTime.1",
+            "rate": 30.0,
+            "value": 2693.0
+          },
+          "duration": {
+            "OTIO_SCHEMA": "RationalTime.1",
+            "rate": 30.0,
+            "value": 1.0
+          }
+        }
+      },
+      {
+        "OTIO_SCHEMA": "Marker.2",
+        "name": "default microphone changed; audio input connected",
+        "color": "GREEN",
+        "metadata": {
+          "Resolve_OTIO": {
+            "Keywords": [],
+            "Note": "12:37:52 +103.8s default microphone changed MacBook Pro Microphone → Razer Seiren V3 Mini\n12:37:52 +103.8s audio input connected: Razer Seiren V3 Mini"
+          }
+        },
+        "marked_range": {
+          "OTIO_SCHEMA": "TimeRange.1",
+          "start_time": {
+            "OTIO_SCHEMA": "RationalTime.1",
+            "rate": 30.0,
+            "value": 3109.0
+          },
+          "duration": {
+            "OTIO_SCHEMA": "RationalTime.1",
+            "rate": 30.0,
+            "value": 1.0
+          }
+        }
+      },
+      {
+        "OTIO_SCHEMA": "Marker.2",
+        "name": "screen connected",
+        "color": "BLUE",
+        "metadata": {
+          "Resolve_OTIO": {
+            "Keywords": [],
+            "Note": "12:38:02 +113.2s screen connected: Built-in Retina Display"
+          }
+        },
+        "marked_range": {
+          "OTIO_SCHEMA": "TimeRange.1",
+          "start_time": {
+            "OTIO_SCHEMA": "RationalTime.1",
+            "rate": 30.0,
+            "value": 3392.0
+          },
+          "duration": {
+            "OTIO_SCHEMA": "RationalTime.1",
+            "rate": 30.0,
+            "value": 1.0
+          }
+        }
+      },
+      {
+        "OTIO_SCHEMA": "Marker.2",
+        "name": "screen disconnected",
+        "color": "BLUE",
+        "metadata": {
+          "Resolve_OTIO": {
+            "Keywords": [],
+            "Note": "12:38:13 +124.6s screen disconnected: Built-in Retina Display"
+          }
+        },
+        "marked_range": {
+          "OTIO_SCHEMA": "TimeRange.1",
+          "start_time": {
+            "OTIO_SCHEMA": "RationalTime.1",
+            "rate": 30.0,
+            "value": 3733.0
+          },
+          "duration": {
+            "OTIO_SCHEMA": "RationalTime.1",
+            "rate": 30.0,
+            "value": 1.0
+          }
+        }
+      }
+    ],
+    "children": [
+      {
+        "OTIO_SCHEMA": "Track.1",
+        "name": "Screen 2 - Wacom One 13T",
+        "kind": "Video",
+        "enabled": true,
+        "metadata": {
+          "Resolve_OTIO": {
+            "Locked": false
+          }
+        },
+        "source_range": null,
+        "effects": [],
+        "markers": [],
+        "children": [
+          {
+            "OTIO_SCHEMA": "Clip.2",
+            "name": "2026-11-20 12.36.09 Screen 2 - Wacom One 13T.mov",
+            "enabled": true,
+            "metadata": {
+              "Resolve_OTIO": {}
+            },
+            "source_range": {
+              "OTIO_SCHEMA": "TimeRange.1",
+              "start_time": {
+                "OTIO_SCHEMA": "RationalTime.1",
+                "rate": 30.0,
+                "value": 1361077.0
+              },
+              "duration": {
+                "OTIO_SCHEMA": "RationalTime.1",
+                "rate": 30.0,
+                "value": 3886.0
+              }
+            },
+            "effects": [],
+            "markers": [],
+            "active_media_reference_key": "DEFAULT_MEDIA",
+            "media_references": {
+              "DEFAULT_MEDIA": {
+                "OTIO_SCHEMA": "ExternalReference.1",
+                "name": "2026-11-20 12.36.09 Screen 2 - Wacom One 13T.mov",
+                "metadata": {},
+                "available_range": {
+                  "OTIO_SCHEMA": "TimeRange.1",
+                  "start_time": {
+                    "OTIO_SCHEMA": "RationalTime.1",
+                    "rate": 30.0,
+                    "value": 1361077.0
+                  },
+                  "duration": {
+                    "OTIO_SCHEMA": "RationalTime.1",
+                    "rate": 30.0,
+                    "value": 3886.0
+                  }
+                },
+                "available_image_bounds": null,
+                "target_url": "2026-11-20 12.36.09 Screen 2 - Wacom One 13T.mov"
+              }
+            }
+          }
+        ]
+      },
+      {
+        "OTIO_SCHEMA": "Track.1",
+        "name": "Screen 1 - DELL P3421W",
+        "kind": "Video",
+        "enabled": true,
+        "metadata": {
+          "Resolve_OTIO": {
+            "Locked": false
+          }
+        },
+        "source_range": null,
+        "effects": [],
+        "markers": [],
+        "children": [
+          {
+            "OTIO_SCHEMA": "Clip.2",
+            "name": "2026-11-20 12.36.09 Screen 1 - DELL P3421W.mov",
+            "enabled": true,
+            "metadata": {
+              "Resolve_OTIO": {}
+            },
+            "source_range": {
+              "OTIO_SCHEMA": "TimeRange.1",
+              "start_time": {
+                "OTIO_SCHEMA": "RationalTime.1",
+                "rate": 30.0,
+                "value": 1361077.0
+              },
+              "duration": {
+                "OTIO_SCHEMA": "RationalTime.1",
+                "rate": 30.0,
+                "value": 3885.0
+              }
+            },
+            "effects": [],
+            "markers": [],
+            "active_media_reference_key": "DEFAULT_MEDIA",
+            "media_references": {
+              "DEFAULT_MEDIA": {
+                "OTIO_SCHEMA": "ExternalReference.1",
+                "name": "2026-11-20 12.36.09 Screen 1 - DELL P3421W.mov",
+                "metadata": {},
+                "available_range": {
+                  "OTIO_SCHEMA": "TimeRange.1",
+                  "start_time": {
+                    "OTIO_SCHEMA": "RationalTime.1",
+                    "rate": 30.0,
+                    "value": 1361077.0
+                  },
+                  "duration": {
+                    "OTIO_SCHEMA": "RationalTime.1",
+                    "rate": 30.0,
+                    "value": 3885.0
+                  }
+                },
+                "available_image_bounds": null,
+                "target_url": "2026-11-20 12.36.09 Screen 1 - DELL P3421W.mov"
+              }
+            }
+          }
+        ]
+      },
+      {
+        "OTIO_SCHEMA": "Track.1",
+        "name": "Screen 3 - Built-in Retina Display",
+        "kind": "Video",
+        "enabled": true,
+        "metadata": {
+          "Resolve_OTIO": {
+            "Locked": false
+          }
+        },
+        "source_range": null,
+        "effects": [],
+        "markers": [],
+        "children": [
+          {
+            "OTIO_SCHEMA": "Gap.1",
+            "name": "",
+            "metadata": {},
+            "enabled": true,
+            "source_range": {
+              "OTIO_SCHEMA": "TimeRange.1",
+              "start_time": {
+                "OTIO_SCHEMA": "RationalTime.1",
+                "rate": 30.0,
+                "value": 0.0
+              },
+              "duration": {
+                "OTIO_SCHEMA": "RationalTime.1",
+                "rate": 30.0,
+                "value": 3473.0
+              }
+            },
+            "effects": [],
+            "markers": []
+          },
+          {
+            "OTIO_SCHEMA": "Clip.2",
+            "name": "2026-11-20 12.38.05 Screen 3 - Built-in Retina Display.mov",
+            "enabled": true,
+            "metadata": {
+              "Resolve_OTIO": {}
+            },
+            "source_range": {
+              "OTIO_SCHEMA": "TimeRange.1",
+              "start_time": {
+                "OTIO_SCHEMA": "RationalTime.1",
+                "rate": 30.0,
+                "value": 1364550.0
+              },
+              "duration": {
+                "OTIO_SCHEMA": "RationalTime.1",
+                "rate": 30.0,
+                "value": 259.0
+              }
+            },
+            "effects": [],
+            "markers": [],
+            "active_media_reference_key": "DEFAULT_MEDIA",
+            "media_references": {
+              "DEFAULT_MEDIA": {
+                "OTIO_SCHEMA": "ExternalReference.1",
+                "name": "2026-11-20 12.38.05 Screen 3 - Built-in Retina Display.mov",
+                "metadata": {},
+                "available_range": {
+                  "OTIO_SCHEMA": "TimeRange.1",
+                  "start_time": {
+                    "OTIO_SCHEMA": "RationalTime.1",
+                    "rate": 30.0,
+                    "value": 1364550.0
+                  },
+                  "duration": {
+                    "OTIO_SCHEMA": "RationalTime.1",
+                    "rate": 30.0,
+                    "value": 259.0
+                  }
+                },
+                "available_image_bounds": null,
+                "target_url": "2026-11-20 12.38.05 Screen 3 - Built-in Retina Display.mov"
+              }
+            }
+          }
+        ]
+      },
+      {
+        "OTIO_SCHEMA": "Track.1",
+        "name": "Audio 0 - System",
+        "kind": "Audio",
+        "enabled": true,
+        "metadata": {
+          "Resolve_OTIO": {
+            "Locked": false,
+            "Audio Type": "Stereo",
+            "SoloOn": false
+          }
+        },
+        "source_range": null,
+        "effects": [],
+        "markers": [],
+        "children": [
+          {
+            "OTIO_SCHEMA": "Gap.1",
+            "name": "",
+            "metadata": {},
+            "enabled": true,
+            "source_range": {
+              "OTIO_SCHEMA": "TimeRange.1",
+              "start_time": {
+                "OTIO_SCHEMA": "RationalTime.1",
+                "rate": 30.0,
+                "value": 0.0
+              },
+              "duration": {
+                "OTIO_SCHEMA": "RationalTime.1",
+                "rate": 30.0,
+                "value": 4.0
+              }
+            },
+            "effects": [],
+            "markers": []
+          },
+          {
+            "OTIO_SCHEMA": "Clip.2",
+            "name": "2026-11-20 12.36.09 Audio 0 - System.mov",
+            "enabled": true,
+            "metadata": {
+              "Resolve_OTIO": {
+                "Channels": [
+                  {
+                    "Source Channel ID": 0,
+                    "Source Track ID": 0
+                  },
+                  {
+                    "Source Channel ID": 1,
+                    "Source Track ID": 0
+                  }
+                ]
+              }
+            },
+            "source_range": {
+              "OTIO_SCHEMA": "TimeRange.1",
+              "start_time": {
+                "OTIO_SCHEMA": "RationalTime.1",
+                "rate": 30.0,
+                "value": 1361081.0
+              },
+              "duration": {
+                "OTIO_SCHEMA": "RationalTime.1",
+                "rate": 30.0,
+                "value": 3882.0
+              }
+            },
+            "effects": [],
+            "markers": [],
+            "active_media_reference_key": "DEFAULT_MEDIA",
+            "media_references": {
+              "DEFAULT_MEDIA": {
+                "OTIO_SCHEMA": "ExternalReference.1",
+                "name": "2026-11-20 12.36.09 Audio 0 - System.mov",
+                "metadata": {},
+                "available_range": {
+                  "OTIO_SCHEMA": "TimeRange.1",
+                  "start_time": {
+                    "OTIO_SCHEMA": "RationalTime.1",
+                    "rate": 30.0,
+                    "value": 1361081.0
+                  },
+                  "duration": {
+                    "OTIO_SCHEMA": "RationalTime.1",
+                    "rate": 30.0,
+                    "value": 3882.0
+                  }
+                },
+                "available_image_bounds": null,
+                "target_url": "2026-11-20 12.36.09 Audio 0 - System.mov"
+              }
+            }
+          }
+        ]
+      },
+      {
+        "OTIO_SCHEMA": "Track.1",
+        "name": "Audio 1 - CalDigit Thunderbolt 3 Audio, channel 1",
+        "kind": "Audio",
+        "enabled": true,
+        "metadata": {
+          "Resolve_OTIO": {
+            "Locked": false,
+            "Audio Type": "Mono",
+            "SoloOn": false
+          }
+        },
+        "source_range": null,
+        "effects": [],
+        "markers": [],
+        "children": [
+          {
+            "OTIO_SCHEMA": "Gap.1",
+            "name": "",
+            "metadata": {},
+            "enabled": true,
+            "source_range": {
+              "OTIO_SCHEMA": "TimeRange.1",
+              "start_time": {
+                "OTIO_SCHEMA": "RationalTime.1",
+                "rate": 30.0,
+                "value": 0.0
+              },
+              "duration": {
+                "OTIO_SCHEMA": "RationalTime.1",
+                "rate": 30.0,
+                "value": 4.0
+              }
+            },
+            "effects": [],
+            "markers": []
+          },
+          {
+            "OTIO_SCHEMA": "Clip.2",
+            "name": "2026-11-20 12.36.09 Audio 1 - CalDigit Thunderbolt 3 Audio.mov",
+            "enabled": true,
+            "metadata": {
+              "Resolve_OTIO": {
+                "Channels": [
+                  {
+                    "Source Channel ID": 0,
+                    "Source Track ID": 0
+                  }
+                ],
+                "Link Group ID": 1
+              }
+            },
+            "source_range": {
+              "OTIO_SCHEMA": "TimeRange.1",
+              "start_time": {
+                "OTIO_SCHEMA": "RationalTime.1",
+                "rate": 30.0,
+                "value": 1361081.0
+              },
+              "duration": {
+                "OTIO_SCHEMA": "RationalTime.1",
+                "rate": 30.0,
+                "value": 3882.0
+              }
+            },
+            "effects": [],
+            "markers": [],
+            "active_media_reference_key": "DEFAULT_MEDIA",
+            "media_references": {
+              "DEFAULT_MEDIA": {
+                "OTIO_SCHEMA": "ExternalReference.1",
+                "name": "2026-11-20 12.36.09 Audio 1 - CalDigit Thunderbolt 3 Audio.mov",
+                "metadata": {},
+                "available_range": {
+                  "OTIO_SCHEMA": "TimeRange.1",
+                  "start_time": {
+                    "OTIO_SCHEMA": "RationalTime.1",
+                    "rate": 30.0,
+                    "value": 1361081.0
+                  },
+                  "duration": {
+                    "OTIO_SCHEMA": "RationalTime.1",
+                    "rate": 30.0,
+                    "value": 3882.0
+                  }
+                },
+                "available_image_bounds": null,
+                "target_url": "2026-11-20 12.36.09 Audio 1 - CalDigit Thunderbolt 3 Audio.mov"
+              }
+            }
+          }
+        ]
+      },
+      {
+        "OTIO_SCHEMA": "Track.1",
+        "name": "Audio 1 - CalDigit Thunderbolt 3 Audio, channel 2",
+        "kind": "Audio",
+        "enabled": true,
+        "metadata": {
+          "Resolve_OTIO": {
+            "Locked": false,
+            "Audio Type": "Mono",
+            "SoloOn": false
+          }
+        },
+        "source_range": null,
+        "effects": [],
+        "markers": [],
+        "children": [
+          {
+            "OTIO_SCHEMA": "Gap.1",
+            "name": "",
+            "metadata": {},
+            "enabled": true,
+            "source_range": {
+              "OTIO_SCHEMA": "TimeRange.1",
+              "start_time": {
+                "OTIO_SCHEMA": "RationalTime.1",
+                "rate": 30.0,
+                "value": 0.0
+              },
+              "duration": {
+                "OTIO_SCHEMA": "RationalTime.1",
+                "rate": 30.0,
+                "value": 4.0
+              }
+            },
+            "effects": [],
+            "markers": []
+          },
+          {
+            "OTIO_SCHEMA": "Clip.2",
+            "name": "2026-11-20 12.36.09 Audio 1 - CalDigit Thunderbolt 3 Audio.mov",
+            "enabled": true,
+            "metadata": {
+              "Resolve_OTIO": {
+                "Channels": [
+                  {
+                    "Source Channel ID": 0,
+                    "Source Track ID": 1
+                  }
+                ],
+                "Link Group ID": 1
+              }
+            },
+            "source_range": {
+              "OTIO_SCHEMA": "TimeRange.1",
+              "start_time": {
+                "OTIO_SCHEMA": "RationalTime.1",
+                "rate": 30.0,
+                "value": 1361081.0
+              },
+              "duration": {
+                "OTIO_SCHEMA": "RationalTime.1",
+                "rate": 30.0,
+                "value": 3882.0
+              }
+            },
+            "effects": [],
+            "markers": [],
+            "active_media_reference_key": "DEFAULT_MEDIA",
+            "media_references": {
+              "DEFAULT_MEDIA": {
+                "OTIO_SCHEMA": "ExternalReference.1",
+                "name": "2026-11-20 12.36.09 Audio 1 - CalDigit Thunderbolt 3 Audio.mov",
+                "metadata": {},
+                "available_range": {
+                  "OTIO_SCHEMA": "TimeRange.1",
+                  "start_time": {
+                    "OTIO_SCHEMA": "RationalTime.1",
+                    "rate": 30.0,
+                    "value": 1361081.0
+                  },
+                  "duration": {
+                    "OTIO_SCHEMA": "RationalTime.1",
+                    "rate": 30.0,
+                    "value": 3882.0
+                  }
+                },
+                "available_image_bounds": null,
+                "target_url": "2026-11-20 12.36.09 Audio 1 - CalDigit Thunderbolt 3 Audio.mov"
+              }
+            }
+          }
+        ]
+      },
+      {
+        "OTIO_SCHEMA": "Track.1",
+        "name": "Audio 2 - Razer Seiren V3 Mini",
+        "kind": "Audio",
+        "enabled": true,
+        "metadata": {
+          "Resolve_OTIO": {
+            "Locked": false,
+            "Audio Type": "Mono",
+            "SoloOn": false
+          }
+        },
+        "source_range": null,
+        "effects": [],
+        "markers": [],
+        "children": [
+          {
+            "OTIO_SCHEMA": "Gap.1",
+            "name": "",
+            "metadata": {},
+            "enabled": true,
+            "source_range": {
+              "OTIO_SCHEMA": "TimeRange.1",
+              "start_time": {
+                "OTIO_SCHEMA": "RationalTime.1",
+                "rate": 30.0,
+                "value": 0.0
+              },
+              "duration": {
+                "OTIO_SCHEMA": "RationalTime.1",
+                "rate": 30.0,
+                "value": 4.0
+              }
+            },
+            "effects": [],
+            "markers": []
+          },
+          {
+            "OTIO_SCHEMA": "Clip.2",
+            "name": "2026-11-20 12.36.09 Audio 2 - Razer Seiren V3 Mini.mov",
+            "enabled": true,
+            "metadata": {
+              "Resolve_OTIO": {
+                "Channels": [
+                  {
+                    "Source Channel ID": 0,
+                    "Source Track ID": 0
+                  }
+                ]
+              }
+            },
+            "source_range": {
+              "OTIO_SCHEMA": "TimeRange.1",
+              "start_time": {
+                "OTIO_SCHEMA": "RationalTime.1",
+                "rate": 30.0,
+                "value": 1361081.0
+              },
+              "duration": {
+                "OTIO_SCHEMA": "RationalTime.1",
+                "rate": 30.0,
+                "value": 2683.0
+              }
+            },
+            "effects": [],
+            "markers": [],
+            "active_media_reference_key": "DEFAULT_MEDIA",
+            "media_references": {
+              "DEFAULT_MEDIA": {
+                "OTIO_SCHEMA": "ExternalReference.1",
+                "name": "2026-11-20 12.36.09 Audio 2 - Razer Seiren V3 Mini.mov",
+                "metadata": {},
+                "available_range": {
+                  "OTIO_SCHEMA": "TimeRange.1",
+                  "start_time": {
+                    "OTIO_SCHEMA": "RationalTime.1",
+                    "rate": 30.0,
+                    "value": 1361081.0
+                  },
+                  "duration": {
+                    "OTIO_SCHEMA": "RationalTime.1",
+                    "rate": 30.0,
+                    "value": 2683.0
+                  }
+                },
+                "available_image_bounds": null,
+                "target_url": "2026-11-20 12.36.09 Audio 2 - Razer Seiren V3 Mini.mov"
+              }
+            }
+          },
+          {
+            "OTIO_SCHEMA": "Gap.1",
+            "name": "",
+            "metadata": {},
+            "enabled": true,
+            "source_range": {
+              "OTIO_SCHEMA": "TimeRange.1",
+              "start_time": {
+                "OTIO_SCHEMA": "RationalTime.1",
+                "rate": 30.0,
+                "value": 0.0
+              },
+              "duration": {
+                "OTIO_SCHEMA": "RationalTime.1",
+                "rate": 30.0,
+                "value": 455.0
+              }
+            },
+            "effects": [],
+            "markers": []
+          },
+          {
+            "OTIO_SCHEMA": "Clip.2",
+            "name": "2026-11-20 12.37.53 Audio 2 - Razer Seiren V3 Mini.mov",
+            "enabled": true,
+            "metadata": {
+              "Resolve_OTIO": {
+                "Channels": [
+                  {
+                    "Source Channel ID": 0,
+                    "Source Track ID": 0
+                  }
+                ]
+              }
+            },
+            "source_range": {
+              "OTIO_SCHEMA": "TimeRange.1",
+              "start_time": {
+                "OTIO_SCHEMA": "RationalTime.1",
+                "rate": 30.0,
+                "value": 1364219.0
+              },
+              "duration": {
+                "OTIO_SCHEMA": "RationalTime.1",
+                "rate": 30.0,
+                "value": 744.0
+              }
+            },
+            "effects": [],
+            "markers": [],
+            "active_media_reference_key": "DEFAULT_MEDIA",
+            "media_references": {
+              "DEFAULT_MEDIA": {
+                "OTIO_SCHEMA": "ExternalReference.1",
+                "name": "2026-11-20 12.37.53 Audio 2 - Razer Seiren V3 Mini.mov",
+                "metadata": {},
+                "available_range": {
+                  "OTIO_SCHEMA": "TimeRange.1",
+                  "start_time": {
+                    "OTIO_SCHEMA": "RationalTime.1",
+                    "rate": 30.0,
+                    "value": 1364219.0
+                  },
+                  "duration": {
+                    "OTIO_SCHEMA": "RationalTime.1",
+                    "rate": 30.0,
+                    "value": 744.0
+                  }
+                },
+                "available_image_bounds": null,
+                "target_url": "2026-11-20 12.37.53 Audio 2 - Razer Seiren V3 Mini.mov"
+              }
+            }
+          }
+        ]
+      },
+      {
+        "OTIO_SCHEMA": "Track.1",
+        "name": "Audio 3 - Logitech BRIO, channel 1",
+        "kind": "Audio",
+        "enabled": true,
+        "metadata": {
+          "Resolve_OTIO": {
+            "Locked": false,
+            "Audio Type": "Mono",
+            "SoloOn": false
+          }
+        },
+        "source_range": null,
+        "effects": [],
+        "markers": [],
+        "children": [
+          {
+            "OTIO_SCHEMA": "Gap.1",
+            "name": "",
+            "metadata": {},
+            "enabled": true,
+            "source_range": {
+              "OTIO_SCHEMA": "TimeRange.1",
+              "start_time": {
+                "OTIO_SCHEMA": "RationalTime.1",
+                "rate": 30.0,
+                "value": 0.0
+              },
+              "duration": {
+                "OTIO_SCHEMA": "RationalTime.1",
+                "rate": 30.0,
+                "value": 7.0
+              }
+            },
+            "effects": [],
+            "markers": []
+          },
+          {
+            "OTIO_SCHEMA": "Clip.2",
+            "name": "2026-11-20 12.36.09 Audio 3 - Logitech BRIO.mov",
+            "enabled": true,
+            "metadata": {
+              "Resolve_OTIO": {
+                "Channels": [
+                  {
+                    "Source Channel ID": 0,
+                    "Source Track ID": 0
+                  }
+                ],
+                "Link Group ID": 2
+              }
+            },
+            "source_range": {
+              "OTIO_SCHEMA": "TimeRange.1",
+              "start_time": {
+                "OTIO_SCHEMA": "RationalTime.1",
+                "rate": 30.0,
+                "value": 1361084.0
+              },
+              "duration": {
+                "OTIO_SCHEMA": "RationalTime.1",
+                "rate": 30.0,
+                "value": 3879.0
+              }
+            },
+            "effects": [],
+            "markers": [],
+            "active_media_reference_key": "DEFAULT_MEDIA",
+            "media_references": {
+              "DEFAULT_MEDIA": {
+                "OTIO_SCHEMA": "ExternalReference.1",
+                "name": "2026-11-20 12.36.09 Audio 3 - Logitech BRIO.mov",
+                "metadata": {},
+                "available_range": {
+                  "OTIO_SCHEMA": "TimeRange.1",
+                  "start_time": {
+                    "OTIO_SCHEMA": "RationalTime.1",
+                    "rate": 30.0,
+                    "value": 1361084.0
+                  },
+                  "duration": {
+                    "OTIO_SCHEMA": "RationalTime.1",
+                    "rate": 30.0,
+                    "value": 3879.0
+                  }
+                },
+                "available_image_bounds": null,
+                "target_url": "2026-11-20 12.36.09 Audio 3 - Logitech BRIO.mov"
+              }
+            }
+          }
+        ]
+      },
+      {
+        "OTIO_SCHEMA": "Track.1",
+        "name": "Audio 3 - Logitech BRIO, channel 2",
+        "kind": "Audio",
+        "enabled": true,
+        "metadata": {
+          "Resolve_OTIO": {
+            "Locked": false,
+            "Audio Type": "Mono",
+            "SoloOn": false
+          }
+        },
+        "source_range": null,
+        "effects": [],
+        "markers": [],
+        "children": [
+          {
+            "OTIO_SCHEMA": "Gap.1",
+            "name": "",
+            "metadata": {},
+            "enabled": true,
+            "source_range": {
+              "OTIO_SCHEMA": "TimeRange.1",
+              "start_time": {
+                "OTIO_SCHEMA": "RationalTime.1",
+                "rate": 30.0,
+                "value": 0.0
+              },
+              "duration": {
+                "OTIO_SCHEMA": "RationalTime.1",
+                "rate": 30.0,
+                "value": 7.0
+              }
+            },
+            "effects": [],
+            "markers": []
+          },
+          {
+            "OTIO_SCHEMA": "Clip.2",
+            "name": "2026-11-20 12.36.09 Audio 3 - Logitech BRIO.mov",
+            "enabled": true,
+            "metadata": {
+              "Resolve_OTIO": {
+                "Channels": [
+                  {
+                    "Source Channel ID": 0,
+                    "Source Track ID": 1
+                  }
+                ],
+                "Link Group ID": 2
+              }
+            },
+            "source_range": {
+              "OTIO_SCHEMA": "TimeRange.1",
+              "start_time": {
+                "OTIO_SCHEMA": "RationalTime.1",
+                "rate": 30.0,
+                "value": 1361084.0
+              },
+              "duration": {
+                "OTIO_SCHEMA": "RationalTime.1",
+                "rate": 30.0,
+                "value": 3879.0
+              }
+            },
+            "effects": [],
+            "markers": [],
+            "active_media_reference_key": "DEFAULT_MEDIA",
+            "media_references": {
+              "DEFAULT_MEDIA": {
+                "OTIO_SCHEMA": "ExternalReference.1",
+                "name": "2026-11-20 12.36.09 Audio 3 - Logitech BRIO.mov",
+                "metadata": {},
+                "available_range": {
+                  "OTIO_SCHEMA": "TimeRange.1",
+                  "start_time": {
+                    "OTIO_SCHEMA": "RationalTime.1",
+                    "rate": 30.0,
+                    "value": 1361084.0
+                  },
+                  "duration": {
+                    "OTIO_SCHEMA": "RationalTime.1",
+                    "rate": 30.0,
+                    "value": 3879.0
+                  }
+                },
+                "available_image_bounds": null,
+                "target_url": "2026-11-20 12.36.09 Audio 3 - Logitech BRIO.mov"
+              }
+            }
+          }
+        ]
+      },
+      {
+        "OTIO_SCHEMA": "Track.1",
+        "name": "Audio 4 - MacBook Pro Microphone",
+        "kind": "Audio",
+        "enabled": true,
+        "metadata": {
+          "Resolve_OTIO": {
+            "Locked": false,
+            "Audio Type": "Mono",
+            "SoloOn": false
+          }
+        },
+        "source_range": null,
+        "effects": [],
+        "markers": [],
+        "children": [
+          {
+            "OTIO_SCHEMA": "Gap.1",
+            "name": "",
+            "metadata": {},
+            "enabled": true,
+            "source_range": {
+              "OTIO_SCHEMA": "TimeRange.1",
+              "start_time": {
+                "OTIO_SCHEMA": "RationalTime.1",
+                "rate": 30.0,
+                "value": 0.0
+              },
+              "duration": {
+                "OTIO_SCHEMA": "RationalTime.1",
+                "rate": 30.0,
+                "value": 3.0
+              }
+            },
+            "effects": [],
+            "markers": []
+          },
+          {
+            "OTIO_SCHEMA": "Clip.2",
+            "name": "2026-11-20 12.36.09 Audio 4 - MacBook Pro Microphone.mov",
+            "enabled": true,
+            "metadata": {
+              "Resolve_OTIO": {
+                "Channels": [
+                  {
+                    "Source Channel ID": 0,
+                    "Source Track ID": 0
+                  }
+                ]
+              }
+            },
+            "source_range": {
+              "OTIO_SCHEMA": "TimeRange.1",
+              "start_time": {
+                "OTIO_SCHEMA": "RationalTime.1",
+                "rate": 30.0,
+                "value": 1361080.0
+              },
+              "duration": {
+                "OTIO_SCHEMA": "RationalTime.1",
+                "rate": 30.0,
+                "value": 3883.0
+              }
+            },
+            "effects": [],
+            "markers": [],
+            "active_media_reference_key": "DEFAULT_MEDIA",
+            "media_references": {
+              "DEFAULT_MEDIA": {
+                "OTIO_SCHEMA": "ExternalReference.1",
+                "name": "2026-11-20 12.36.09 Audio 4 - MacBook Pro Microphone.mov",
+                "metadata": {},
+                "available_range": {
+                  "OTIO_SCHEMA": "TimeRange.1",
+                  "start_time": {
+                    "OTIO_SCHEMA": "RationalTime.1",
+                    "rate": 30.0,
+                    "value": 1361080.0
+                  },
+                  "duration": {
+                    "OTIO_SCHEMA": "RationalTime.1",
+                    "rate": 30.0,
+                    "value": 3883.0
+                  }
+                },
+                "available_image_bounds": null,
+                "target_url": "2026-11-20 12.36.09 Audio 4 - MacBook Pro Microphone.mov"
+              }
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

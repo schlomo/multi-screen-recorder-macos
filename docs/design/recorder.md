@@ -28,11 +28,12 @@ signature); if that fails it exits 71 (`EX_OSERR`).
 | `msr check [flags] [--debug]` | Prints the banner and "What will be recorded", then runs the ready check and prints each item; `--debug` also prints the detail lines on standard error (and at `.debug` in the unified log) | 0 ready, 1 not ready |
 | `msr record [flags] [--duration 1h30m] [--debug \| --quiet]` | Records the screens and the audio sources (the recording core, D45, D49). Without flags it does what Start in the window does, with the same settings file; it prints the banner (as `msr check`) and "What will be recorded" at its start, then runs the ready check, records until Ctrl-C, SIGTERM, SIGHUP, the duration or Stop in the status window (below), and prints the recording folder at the start and a summary at the end (the summary: every file with its state, the screens' by number, then the audio sources' by number with the system audio first, and our process's CPU use, average and peak, and, when it exits 3, the link to report it and the files to attach, see "Problem report offer"). It runs as a full AppKit app without a Dock icon (the `accessory` activation policy) until the ready check passed and the recording starts, then shows the icon; a run that is not ready shows none, and an icon macOS refuses is a problem, and the recording goes on (Ctrl-C stops it); while it records, the icon shows with its badge, and clicking it or Quit opens the status window as in the app (D45, D46). When it stops, for any reason, it first prints `Stopping the recording and finalizing the files…` on standard error, then finalizes and prints the summary; a Ctrl-C while it finalizes prints `Still finalizing the files…` and does nothing more. It prints every event of the recording manifest as one line on standard error, a failure's repeats counted instead (see "Logging"). `--debug` also prints the detail lines on standard error (and at `.debug` in the unified log); the recording log has them always (see "Logging"). **Output split:** standard output carries exactly one line, the recording folder's bare path, when recording starts; everything for people goes to standard error (the banner, "What will be recorded", the ready check, `Recording into <path>`, events, the status line, the summary, detail lines), all of it, and every other line this code writes on standard error (the settings file note, `Error:` lines, detail lines; ArgumentParser writes its own usage errors, before any status line exists), through one writer so nothing prints into the middle of the status line; a failed write to standard error, SIGPIPE included, is ignored, as there is nowhere left to report it, and `msr record` ignores SIGPIPE for the whole process from its start, before it writes anything, so a closed reader of standard output does not end it. **Status line:** only when standard error is a terminal whose `TERM` is set, not empty and not `dumb`, with no option: one line redrawn once a second (`\r`, the text, `ESC[K`). Its text, joined by ` · ` as the window's line is: `<n> problems` (`1 problem`) first when there are any, counting the problems of the run (the ones the window lists; low disk space and a screen showing another screen's picture are not problems, though they set the Dock badge), nothing when there are none; then the text of the window's line (time with seconds, size written, files, free space), the CPU use when known, and `<n> screens, <m> audio` for the sources being recorded (`1 screen`), such as `1 problem · Recording 0:12:34 · 1.2 GB in 7 files · 143.8 GB free · CPU 23 % · 2 screens, 5 audio`. It is cut to the terminal's width minus 1, taking 80 columns when the width is unknown, so it does not wrap. An event or detail line clears it, prints, and it is drawn again, all in one write; at the end it is cleared and the summary follows. Not a terminal: no status line and no escape code. **`--quiet`:** no output for people (no banner, table, passing ready check, events, status line or summary); still written are the path on standard output and, on standard error, a failing ready check, `Error:` lines, the settings file note, each failure as it happens (its event line, or the line the window lists for a problem no event tells) with the count of its repeats, and the summary of a run that exits 3; exit codes are unchanged; with `--debug` it is a usage error. `--duration` takes hours, minutes and seconds (`1h30m`, `45m`, `90s`); a number without a suffix is minutes (`90` is 90 minutes) | 0 ok (every file finalized, no file ended by a failure, D47), 1 not ready, 3 when the recording manifest's `result` is `problems`, the finalized manifest could not be written, or the recording could not start |
 | `msr settings [flags]` | Without flags prints the effective settings as JSON (show); with any settings flag, `--auto` included, saves the run's effective settings into the settings file and prints them (change). The only command that writes the file; the window also writes it | 0, 1 when it cannot write the file |
+| `msr timeline <folder>` | Writes the recording folder's timeline file (see "Output on disk") from its `recording.json`, replacing an older one, and prints its path. Reads no settings. Writes nothing else and deletes nothing. A file without an end gets its length from the media file | 0, 1 with the error on standard error when `recording.json` or a file's length cannot be read, or the file cannot be written |
 | `msr version` | Prints the version and commit | 0 |
 
 A usage error (unknown command or flag, invalid value) prints a usage
 message and exits 64, the convention of Swift Argument Parser. Every
-command that reads the settings (all but `msr version`) exits 78
+command that reads the settings (all but `msr version` and `msr timeline`) exits 78
 (`EX_CONFIG`) when `HOME` is not set, and for nothing else: a settings
 file is never refused (see "Settings file"), so `msr check` exiting 1
 means only "not ready".
@@ -331,6 +332,7 @@ One recording folder per recording, named by its local start time
   2026-11-12 14.41.10 Screen 1 - Built-in Retina Display.mov    ← new frame size after a mode change
   recording.json
   recording.log
+  2026-11-12 14-03-05.otio    ← the timeline file
 ```
 
 One file per source, each named by its own start time and the
@@ -339,6 +341,40 @@ recorded audio input and one for system audio, each
 `<date time> <label>.mov`. The manifest below lists exactly these
 files; `recording.log`, the recording log, is next to it (see
 "Logging").
+
+**The timeline file (D68).** `<folder name>.otio` is an OpenTimelineIO
+file, plain JSON written by our own code, in the form DaVinci Resolve 21.2
+exports and reads: File > Import > Timeline loads every file of the
+recording on its own track, in place by its timecode, at 30 frames per
+second. Its name is the folder's name with every `.` replaced by `-`, and
+every character outside printable ASCII and `/` and `:` too, since Resolve
+names the imported timeline after the file name up to its first dot. It
+is derived, rewritten whole every time and never read back. It is written
+at Stop, by the app and by `msr record`, from the final `recording.json`
+once that is written; if writing it fails the recording is unaffected, and
+the error is told like a problem after the end, on standard error and in
+the unified log (the recording log is closed by then). `msr timeline
+<folder>` writes it from a folder's `recording.json`. A file without an
+`end` (an unfinished recording) is measured from the media file itself.
+Media are linked by file name only, relative to the timeline file.
+
+- **Lengths** are the file's `end - start` in frames, rounded down, never
+  up: Resolve drops the channel mapping of a clip one frame longer than
+  its file. A file's first frame is its timecode in frames; the timeline
+  starts at the smallest of them.
+- **Tracks:** a video track per screen (the guide tracks are left off),
+  V1 the screen whose file starts at the timeline's start and runs
+  longest, then the others by number; then the audio tracks by source
+  number: one stereo track for the system audio, and for an audio input
+  with n channels n mono tracks, `<label>` for one and `<label>, channel
+  <k>` for more. The channels of one file are a linked group in Resolve.
+  A gap fills each space before a clip, none follows the last clip.
+- **Markers,** all on the timeline: the first, red, at frame 0, says in its
+  name the resolution to set (the largest screen's frame size, which
+  Resolve's reader has no key for) and in its note when it was recorded, how
+  to read the markers and the problems; then one per frame that has events,
+  blue if one of them is about a screen, else green, its note the events'
+  lines; an event on frame 0 is added to the first marker's note.
 
 **Labels (D55).** Every recorded source has a label,
 `<kind> <n> - <name>`: `Screen <n> - <screen name>` for a screen,

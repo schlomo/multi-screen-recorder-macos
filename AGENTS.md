@@ -303,7 +303,8 @@ records the commit and the result in the PR description.
   `~/Library/Application Support/Multi Screen Recorder`; at Stop the app
   and `msr record` write the last recording into `state.json` (`HOME`
   decides where).
-  `msr version`, `msr settings` (it writes the settings file only with
+  `msr version`, `msr timeline` (it writes only the folder's timeline
+  file), `msr settings` (it writes the settings file only with
   a settings flag; `HOME` decides where) and the tests are
   safe; the tests read the Mac's audio device list, which shows no
   prompt.

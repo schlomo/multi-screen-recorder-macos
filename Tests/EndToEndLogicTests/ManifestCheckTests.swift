@@ -125,6 +125,11 @@ struct SampleRecording {
         #expect(failures.contains { $0.hasSuffix("end after a kill is 17.08, expected null") })
     }
 
+    @Test func theTimelineFileIsNoRecordedFile() {
+        let sample = SampleRecording()
+        #expect(sample.check(folder: sample.folder + ["2026-11-19 08-27-30.otio"]).failures.isEmpty)
+    }
+
     @Test func aFileMissingFromTheManifestOrTheFolderFails() {
         let sample = SampleRecording()
         let extra = sample.check(folder: sample.folder + ["2026-11-19 08.27.30 Screen 3 - Other.mov"]).failures

@@ -237,7 +237,7 @@ The named scenarios, each about 10 to 25 s of recording:
 | `stop-by-kill` | auto mode, `kill -9` | no `ended`, every file `recording` and readable up to its last fragment |
 
 Every scenario's checks: `msr record`'s exit status, the recording
-folder's path alone on standard output, `recording.log` present next to `recording.json`, `recording.json` exactly
+folder's path alone on standard output, `recording.log` present next to `recording.json`, the timeline file (D68) in the folder not counted as a recorded file (its content is not checked here), `recording.json` exactly
 (its keys, the app and the settings, its state, `ended`, `result`
 and `cpu` for how it stopped, each file's name, label, number, state,
 start, end and timecode from `started` and its start (within half a

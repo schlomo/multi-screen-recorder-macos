@@ -7,6 +7,8 @@ public enum ReviewNames {
     public static let contactSheet = "contact-sheet.png"
     public static let manifest = "recording.json"
     public static let recordingLog = "recording.log"
+    /// The recording folder's timeline file (D68) is no recorded file.
+    public static let timelineFileExtension = "otio"
     /// `msr record`'s standard error, as the driver captured it.
     public static let standardError = "msr.err"
 
