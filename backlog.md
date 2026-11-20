@@ -608,6 +608,16 @@ Nothing (2026-11-20).
    window; the video's title bar (the recording indicator) replaced by
    the screenshot's. All feasible in the VM [ASSUMED].
 
+33. **Free space read as 0 bytes** (the `main` run after PR #23's
+   merge, 2026-11-20, run 44731919234): on the hosted runner,
+   `volumeAvailableCapacityForImportantUsage` gave 0 bytes for the
+   scratch folder, so `OutputFolderProbeTests` failed (two tests) and
+   no release was made; the same tests passed on every PR run before.
+   On a real Mac a spurious 0 would make the ready check refuse to
+   record for lack of space [ASSUMED]. Find out when macOS returns 0
+   (compare with `volumeAvailableCapacity` and `statfs` in the failing
+   situation) and fix the reading at its root; never retry it away.
+
 ## Deliberately deferred
 
 - **A software-encoder fallback after a hardware encoder failure**
