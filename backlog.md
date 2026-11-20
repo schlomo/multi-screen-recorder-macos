@@ -551,10 +551,25 @@ Still open from D34: what AGC does and whether it is on in auto mode;
    screen files' guide tracks left off. A spike (made with the
    reference library in a session scratchpad) put a 30 s recording of
    2 screens and 5 audio sources on V1, V2 and A1 to A5 as designed;
-   the owner's import into Resolve is still to come and decides: track
-   names kept, absolute vs relative paths, multichannel audio files on
-   one track, and whether only a screen file's video is placed. Then
-   built in Swift without a library, with golden-file tests.
+   the owner's import into Resolve (2026-11-20, a 2 h recording, the
+   relative variant): "the timeline itself was really good, all in
+   sync"; the Razer, unplugged and plugged back, came back in sync
+   with the BRIO after a few seconds. To fix: the Load OTIO dialog
+   cuts the timeline name at its first dot ("2026-11-20 12"), it must
+   be the folder's name; each microphone got an L and an R track with
+   the R empty, though the Razer's file is mono and the BRIO's stereo
+   with both sides alike; the timeline resolution should be the
+   largest frame size (the dialog proposed 2560x1080); the owner wants
+   the multi-channel tracks as linked groups and the recording's
+   events (screen and device changes) as markers. Resolve's own
+   "Import log messages as markers" is for its import errors, not
+   ours (manual ch. 22 p. 513), so ours would be OTIO markers; "Use
+   sizing/colour information" carry another editor's transforms and
+   grades, which a recording has none of. Next step: export a
+   hand-built timeline from Resolve as OTIO (mono and stereo
+   microphones, a marker, the resolution set) and copy what Resolve
+   writes, then a second import test. Then built in Swift without a
+   library, with golden-file tests.
 25. **A new screen showing a still picture gets no file until it
    changes** (found by PR #23's runs, 2026-11-19): ScreenCaptureKit
    delivers complete frames only on change, so a newly connected
@@ -590,6 +605,12 @@ Still open from D34: what AGC does and whether it is on in auto mode;
    window, the status window (PNG and a 5 s video) and the Finder window
    of the recording folder, light and dark. Assemble them into the
    homepage's picture; maybe animate the status window. Needs a design.
+   The owner's review of the captures (2026-11-20): "very nice", and
+   for the collage: more devices connected, as on the owner's Mac, and
+   some that went and came back so a file count is above 1; the start
+   and status windows active during the capture, like the Finder
+   window; the video's title bar (the recording indicator) replaced by
+   the screenshot's. All feasible in the VM [ASSUMED].
 
 ## Deliberately deferred
 
