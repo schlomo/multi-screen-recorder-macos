@@ -364,10 +364,10 @@ Media are linked by file name only, relative to the timeline file.
   starts at the smallest of them. A file after midnight is placed a day
   later than its timecode says, so it follows the earlier files; its clip
   keeps its own timecode (the files' own timecodes across midnight stay
-  deferred).
+  deferred). A file of zero frames gets no clip and no gap.
 - **Tracks:** a video track per screen (the guide tracks are left off),
-  V1 the screen whose file starts at the timeline's start and runs
-  longest, then the others by number; then the audio tracks by source
+  V1 the longest of the screen files that start first (an audio file
+  may start earlier), then the others by number; then the audio tracks by source
   number: one stereo track for the system audio, and for an audio input
   with n channels n mono tracks, `<label>` for one and `<label>, channel
   <k>` for more. The channels of one file are a linked group in Resolve.
