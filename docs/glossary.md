@@ -13,7 +13,9 @@ releases, and the recording core (recording, recording folder,
 recording manifest, problem, status window, screen file, screen
 identity, settle time, screen check, tick, timecode, audio track,
 audio file, guide track, clock drift; D45, D49), labels (D55), the
-banner, the recording log and the error detail (D64).
+banner, the recording log and the error detail (D64), and the end-to-end
+tests' first named scenarios, with the restore file, virtual screens and
+the test tone (D63).
 
 ## Multi Screen Recorder
 
@@ -78,7 +80,9 @@ ready check, beyond the events and problems: the starting situation at
 the head of the recording log (the app, macOS and the Mac model, the
 effective settings, "What will be recorded" and the ready check), the
 tracker's actions, the screens as read, files started and ended, the
-ready check's facts, the clock drift block and the gaps. Always in the
+ready check's facts, the clock drift block and the gaps, and the
+`capture` lines about a screen capture's frames and its writer's inputs
+(D66). Always in the
 recording log, as `detail <category>: …`; with `--debug` also on
 standard error, except the starting situation, which `msr record` has
 printed already (D64).
@@ -347,11 +351,36 @@ replaces D7's GitHub Pages branch).
 
 ## End-to-end test
 
-An automated test that runs the built app through a recording on a Mac
-while screens and audio inputs change, and examines the recording
-folder afterwards. Designed in
+An automated test that runs the built app through a recording in a tart
+VM on a Mac (`scripts/end-to-end-test`, a manual step, D67) while
+screens and audio inputs change, and examines the recording folder
+afterwards. Designed in
 [design/end-to-end-tests.md](design/end-to-end-tests.md) (D37). Not an
 acceptance test, which a person carries out for the v1 gate.
+
+## Scenario
+
+One end-to-end test: a recording, the events fired while it runs, how
+it stops, and the assertions after it
+([design/end-to-end-tests.md](design/end-to-end-tests.md)).
+
+## Virtual screen
+
+A screen that exists only in macOS, made by the end-to-end tests'
+device helper through Apple's private `CGVirtualDisplay` interface; it
+disappears when the helper's process ends.
+
+## Loopback device
+
+An audio device whose output comes back as its input, such as BlackHole
+2ch: the end-to-end tests play the test tone into it and record it as
+an audio input.
+
+## Test tone
+
+The known sound of the end-to-end tests: a 1 kHz tone at −20 dBFS peak
+with a click at the start of every second, played into the loopback
+device.
 
 ## Error class
 

@@ -29,16 +29,16 @@ Keep this current when any of it changes.
 - **Time zone:** Europe/Berlin, stated with every time shown to people.
 - **Pipeline:** GitHub Actions, `.github/workflows/ci.yml`, wiring the
   scripts in `scripts/` on hosted Apple-silicon macOS runners: job
-  `test-and-build` tests, builds and smoke-tests without any secret,
-  then a separate signing job signs and publishes, for every push to a
+  `test-and-build` tests, builds and smoke-tests without any secret;
+  after it one of two separate signing jobs signs and publishes, for every push to a
   PR without the skip-ci marker the PR's snapshot release (a pre-release tagged `pr-<n>`), for a
   push to `main` that changes more than Markdown files and the homepage
   (`homepage/`) a release `v0.<DATE>.<N>`, so a homepage-only push makes
   no release; a closed PR's snapshot release is removed (a head commit
   with the skip-ci marker first needs an unmarked empty commit, see
   "Work branches"). PRs from
-  forks and Dependabot are tested, built and smoke-tested, never signed
-  or published. Signing needs the repository secret
+  forks and Dependabot are tested, built, smoke-tested and end-to-end
+  tested, never signed or published. Signing needs the repository secret
   `SIGNING_CERTIFICATE_P12` ([delivery.md](docs/design/delivery.md)).
   Who may register pipelines and edit branch policies: the repository
   owner.
@@ -256,7 +256,19 @@ Testing, `swift test`), including those that run `msr settings`,
 hoc), `scripts/smoke-test` runs the bundled `msr` safely, and
 `scripts/sign-app` re-signs and zips it (`SIGNING_IDENTITY=-` signs ad
 hoc, for a local check only), and `scripts/install-app` installs it (see
-below).
+below). The end-to-end tests are a manual step, not in the pipeline
+(D67): `scripts/end-to-end-setup` builds a tart VM once (needs `tart`
+and `packer` on the `PATH`), and `scripts/end-to-end-test
+--scratch-folder <folder>` builds the app and the driver, runs the
+driver in a throwaway clone of that VM (it records with the built app
+while it adds a virtual screen and plays a tone into BlackHole, then
+examines the recording folders and takes a screenshot of the app's
+window) and copies its scratch folder back; its exit status is the
+driver's
+([end-to-end-tests.md](docs/design/end-to-end-tests.md)). Before a PR
+that touches the recorder or the end-to-end driver is marked ready,
+the architect runs `scripts/end-to-end-test` on the PR's head and
+records the commit and the result in the PR description.
 
 ## Facts that bite
 
@@ -300,8 +312,12 @@ below).
   go-ahead for that install (to hand over a try-out build), and never
   while the owner records.
 - Real capture needs the Screen & System Audio Recording and
-  Microphone permissions, granted by a person on the Mac. Capture
-  behaviour is verified on the owner's Mac (the v1 gate in
-  `backlog.md`); capture cannot run in CI, which has no way to grant
-  the permissions [ASSUMED] ([recorder.md](docs/design/recorder.md),
-  "Tests").
+  Microphone permissions, granted by a person on the Mac (in the
+  end-to-end VM, by `scripts/end-to-end-setup`, which writes them into
+  its TCC database). Capture behaviour is verified on the owner's Mac
+  (the v1 gate in `backlog.md`) and by the end-to-end tests in that VM
+  (D67). They run nowhere else: GitHub's hosted runner stalls its own
+  video encoder at a virtual screen's mode switch
+  ([end-to-end-tests.md](docs/design/end-to-end-tests.md), "Why the
+  VM"). A run records and plays sound inside the VM only, never on
+  the Mac; the VM takes about 30 GB of its disk.

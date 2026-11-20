@@ -8,7 +8,9 @@ if [[ ${1-} == -h || ${1-} == --help ]]; then
     echo "Compiles the Python scripts, then runs the unit tests (swift test).
   scripts/test               runs all tests
   scripts/test <arguments>   passes the arguments to swift test, such as
-                             --filter InstallAppScriptTests
+                             --filter InstallAppScriptTests, or
+                             --xunit-output <file> for JUnit XML (Swift
+                             Testing's results go to <file>-swift-testing.xml)
   scripts/test --help        prints this, also -h; swift test --help for its own"
     exit 0
 fi
@@ -23,6 +25,18 @@ if ! xcodebuild -license check >/dev/null; then
 fi
 
 cd "$(dirname "$0")/.."
+# swift test before 6.4 does not create the JUnit file's folder; after the
+# cd, as swift test reads a relative path from here
+arguments=("$@")
+for index in "${!arguments[@]}"; do
+    case ${arguments[index]} in
+        --xunit-output) xunit=${arguments[index + 1]:?"scripts/test: --xunit-output needs a path"} ;;
+        --xunit-output=*) xunit=${arguments[index]#--xunit-output=} ;;
+        *) continue ;;
+    esac
+    mkdir -p "$(dirname "$xunit")"
+done
+
 python3 -I -m py_compile scripts/version scripts/unpack-app scripts/sign-app scripts/smoke-test \
     scripts/publish-snapshot-release
 swift test "$@"

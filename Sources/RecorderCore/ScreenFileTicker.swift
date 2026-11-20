@@ -16,11 +16,15 @@ public protocol ScreenFileWriting: AnyObject {
 
 /// How a screen file ended, for the recording manifest: its entry with
 /// its end, state and late frames, the writer's error, if any, and the
-/// guide tracks that end before its video.
+/// guide tracks that end before its video. A file whose writer failed
+/// ends where the file really ends; `failedAt` is the end its writer was
+/// given, the time of the failure, and `lost` says what the file lacks (D66).
 public struct ScreenFileEnd: Equatable, Sendable {
     public var file: RecordingManifest.ScreenFile
     public var error: ScreenFileWriterError?
     public var guideTracksCut: [GuideTrackCut] = []
+    public var failedAt: Double?
+    public var lost: String?
 }
 
 /// A guide track that ends before its screen file's video, and why.

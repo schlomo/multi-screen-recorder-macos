@@ -24,10 +24,15 @@ public enum EventLine {
 
     /// The local time and the time since the start: "22:14:40 +9.2s".
     static func time(_ seconds: Double, started: Date, timeZone: TimeZone) -> String {
+        clock(seconds, started: started, timeZone: timeZone) + " " + elapsed(seconds)
+    }
+
+    /// The local time: "22:14:40".
+    static func clock(_ seconds: Double, started: Date, timeZone: TimeZone) -> String {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = timeZone
         let time = calendar.dateComponents([.hour, .minute, .second], from: started + seconds)
-        return String(format: "%02d:%02d:%02d ", time.hour ?? 0, time.minute ?? 0, time.second ?? 0) + elapsed(seconds)
+        return String(format: "%02d:%02d:%02d", time.hour ?? 0, time.minute ?? 0, time.second ?? 0)
     }
 
     /// "+9.2s".

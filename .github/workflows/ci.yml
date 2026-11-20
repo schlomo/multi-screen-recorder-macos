@@ -32,7 +32,13 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
           persist-credentials: false
-      - run: scripts/test
+      - run: scripts/test --xunit-output "$RUNNER_TEMP/unit-tests-junit/unit-tests.xml"
+      - if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: unit-tests-junit
+          path: ${{ runner.temp }}/unit-tests-junit
+          retention-days: 14
       - run: scripts/build-app
       - run: scripts/smoke-test
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

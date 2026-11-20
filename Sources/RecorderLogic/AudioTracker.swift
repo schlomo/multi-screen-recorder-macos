@@ -31,6 +31,9 @@ public struct AudioTracker: Sendable {
         /// The writer took none of the samples of `audioWaitBoundSeconds`.
         case writerFellBehind
         case diskFull
+
+        /// The tracker tells it as a failure event; a disconnect only when lost again.
+        public var isFailure: Bool { self != .disconnected }
     }
 
     public struct Step: Equatable, Sendable {
@@ -79,6 +82,9 @@ public struct AudioTracker: Sendable {
         var wasRecorded = false
         /// Its capture saw it disconnect, which was told; the device list may follow.
         var disconnectTold = false
+        /// Started again after it was recorded: `system audio started` is
+        /// told once its file starts.
+        var startToTell = false
         /// A capture may end as disconnected without a failure: true until
         /// one did, and again once the device list or the screens changed.
         var mayLoseCaptureSource = true
@@ -242,9 +248,15 @@ public struct AudioTracker: Sendable {
             : "AVFoundation lost the audio input again without a change of the audio devices")
     }
 
-    /// A file of the source started: its restart delay starts over.
-    public mutating func fileStarted(_ id: SourceID) {
+    /// A file of the source started: its restart delay starts over, and
+    /// the system audio started again is told now, not at the attempt, so
+    /// an attempt that fails tells only its failure (D65).
+    public mutating func fileStarted(_ id: SourceID, at now: Int64) -> [RecordingEvent] {
+        guard let tracked = sources[id] else { return [] }
         sources[id]?.restartDelay = firstRestartDelay
+        guard tracked.startToTell else { return [] }
+        sources[id]?.startToTell = false
+        return [RecordingEvent(at: now, event: .systemAudioStarted, audioSource: tracked.name)]
     }
 
     /// A capture ended by itself.
@@ -306,9 +318,7 @@ public struct AudioTracker: Sendable {
             case .systemAudio:
                 // A screen to capture is known; the stream reads the main one as it starts.
                 guard mainDisplayID != nil else { continue }
-                if tracked.wasRecorded {
-                    step.events.append(RecordingEvent(at: now, event: .systemAudioStarted, audioSource: tracked.name))
-                }
+                if tracked.wasRecorded { sources[id]?.startToTell = true }
                 systemAudioDisplayID = nil
                 step.actions.append(.startSystemAudio)
             }

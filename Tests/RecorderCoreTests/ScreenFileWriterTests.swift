@@ -2,8 +2,17 @@ import AVFoundation
 import CoreMedia
 import Foundation
 import RecorderLogic
+import Synchronization
 import Testing
 @testable import RecorderCore
+
+private final class CollectingFile: RecordingLogFile {
+    private let text = Mutex("")
+    var appended: String { text.withLock { $0 } }
+    func append(_ data: Data) throws { text.withLock { $0 += String(decoding: data, as: UTF8.self) } }
+    func synchronize() throws {}
+    func close() throws {}
+}
 
 /// Writes screen files from synthetic frames and reads them back with
 /// AVFoundation: no screen, no permission.
@@ -191,6 +200,70 @@ import Testing
 
     /// A file the process never finalized, as after a crash, is readable up
     /// to its last fragment of 2 s.
+    @Test func aWriterTellsItsVideoSettingsAndWhatItsInputsTookWhenItFails() async throws {
+        defer { removeScratch() }
+        let file = CollectingFile()
+        let log = RecordingLog(file: file, started: Date(), timeZone: berlin, now: { 0 }, writing: { _ in })
+        RecorderLog.recording(since: { 0 }, log: log)
+        defer { RecorderLog.recording(since: nil, log: nil) }
+        let timecode = Timecode(start: try startDate(), timeZone: berlin)
+        let writer = try ScreenFileWriter(
+            url: scratch.appending(path: "failing.mov"), frameSize: frameSize, firstTick: 0, timecode: timecode,
+            metadata: metadata)
+        let picture = try frame(brightness: 90)
+        for tick in 100..<103 {
+            while try !writer.append(picture, tick: Int64(tick)) { try await Task.sleep(for: .milliseconds(1)) }
+        }
+        // A frame before the last one makes the writer fail, after the append returned.
+        var failure: ScreenFileWriterError?
+        for attempt in 0..<200 where failure == nil {
+            do { _ = try writer.append(picture, tick: Int64(5 + attempt)) } catch { failure = error }
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        _ = try #require(failure)
+        log.synchronize()
+        let lines = file.appended
+        #expect(lines.contains("detail capture: video settings of failing.mov: {"))
+        #expect(lines.contains("detail capture: writer of failing.mov failed: status failed, error "))
+        #expect(lines.contains("samples, last at 0."))
+        #expect(lines.contains("last buffer 320×180, IOSurface ID "))
+        #expect(lines.contains("a repeat of the one before: yes"))
+        #expect(lines.contains("detail capture: video encoders for hvc1: "))
+        #expect(lines.contains("timecode: 1 sample, last at 0.000 s"))
+        // Which way it fails is the encoder's: on its own behind an append that
+        // returned true, or by refusing the append (the hosted runner's, 2026-11-19).
+        // The line tells which, never both.
+        let failedOnItsOwn = lines.contains("no append returned false")
+        let refused = lines.contains("the first append that returned false: video")
+        #expect(failedOnItsOwn != refused)
+    }
+
+    @Test func aChangeOfOnlyTheColourPrimariesChangesTheFrameKeyAndIsTold() throws {
+        let before = try frame(brightness: 90)
+        let after = try frame(brightness: 90)
+        #expect(FrameKey(before, info: [:], screenCheck: "passes") == FrameKey(after, info: [:], screenCheck: "passes"))
+        CVBufferSetAttachment(after, kCVImageBufferColorPrimariesKey, kCVImageBufferColorPrimaries_P3_D65, .shouldPropagate)
+        #expect(FrameKey(before, info: [:], screenCheck: "passes") != FrameKey(after, info: [:], screenCheck: "passes"))
+        let told = try #require(FrameFacts(after, info: [:]).changes(from: FrameFacts(before, info: [:])))
+        #expect(told == "primaries ITU_R_709_2 → P3_D65")
+    }
+
+    @Test func aChangeOfOnlyTheICCProfileBytesIsTold() throws {
+        let before = try frame(brightness: 90)
+        let after = try frame(brightness: 90)
+        CVBufferSetAttachment(before, kCVImageBufferICCProfileKey, Data([1, 2, 3, 4]) as CFData, .shouldPropagate)
+        CVBufferSetAttachment(after, kCVImageBufferICCProfileKey, Data([1, 2, 3, 5]) as CFData, .shouldPropagate)
+        #expect(FrameKey(before, info: [:], screenCheck: "passes") != FrameKey(after, info: [:], screenCheck: "passes"))
+        let told = try #require(FrameFacts(after, info: [:]).changes(from: FrameFacts(before, info: [:])))
+        #expect(told.hasPrefix("ICC profile attached (4 bytes, checksum "), "\(told)")
+    }
+
+    @Test func aFrameTellsItsFacts() throws {
+        let facts = FrameFacts(try frame(brightness: 90), info: [:])
+        #expect(facts.text == "320×180 420v, primaries ITU_R_709_2, transfer function ITU_R_709_2, matrix ITU_R_709_2, "
+            + "ICC profile none, content rect none, scale factor none, screen check not judged")
+    }
+
     @Test func anUnfinalizedScreenFileIsReadableUpToItsLastFragment() async throws {
         defer { removeScratch() }
         let rate = RecorderValues.framesPerSecond
@@ -209,6 +282,9 @@ import Testing
         let times = try readTimes(of: video, asset: asset)
         let lost = 9 - Double(times.count) / Double(rate)
         #expect(lost <= Double(RecorderValues.fragmentSeconds), "\(times.count) frames of \(9 * rate)")
+        // What the failed-file end reads (D66): the unfinalized file's own duration, the fragments' sum.
+        let duration = try await AssetDurationReader().duration(of: copy)
+        #expect(duration > 9 - Double(RecorderValues.fragmentSeconds) - 0.1 && duration <= 9.1, "\(duration) s")
         // The one timecode sample of the file is in it before the file is finalized.
         let timecodeTrack = try #require(try await asset.loadTracks(withMediaType: .timecode).first)
         #expect(try readFirstTimecodeFrame(of: timecodeTrack, asset: asset) == Int32(timecode.frame(ofTick: 0)))

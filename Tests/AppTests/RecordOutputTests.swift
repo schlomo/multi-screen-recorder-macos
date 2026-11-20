@@ -32,12 +32,12 @@ import Testing
     }
 
     @Test(arguments: [RecordOutput.Kind.banner, .whatWillBeRecorded, .readyCheckPassed, .recordingFolderNotice,
-                      .stopMessage, .event, .problem, .summary, .summaryOfFailedRun, .readyCheckFailed, .error])
+                      .stopMessage, .event, .failureEvent, .problem, .summary, .summaryOfFailedRun, .readyCheckFailed, .error])
     func everythingForPeopleGoesToStandardErrorUnlessQuiet(kind: RecordOutput.Kind) {
         #expect(destination(kind, quiet: false) == .standardError)
     }
 
-    @Test(arguments: [RecordOutput.Kind.readyCheckFailed, .problem, .summaryOfFailedRun, .error])
+    @Test(arguments: [RecordOutput.Kind.readyCheckFailed, .failureEvent, .problem, .summaryOfFailedRun, .error])
     func quietStillWritesFailuresAndProblems(kind: RecordOutput.Kind) {
         #expect(destination(kind, quiet: true) == .standardError)
     }
@@ -46,6 +46,18 @@ import Testing
                       .stopMessage, .event, .summary])
     func quietWritesNothingElse(kind: RecordOutput.Kind) {
         #expect(destination(kind, quiet: true) == .nowhere)
+    }
+
+    /// A failure that is an event and a problem is printed once, as its event line (D65).
+    @Test func aProblemOfAnEventIsNeverPrinted() {
+        for quiet in [false, true] {
+            #expect(destination(.problemOfAnEvent, quiet: quiet) == .nowhere)
+            #expect(destination(.failureEvent, quiet: quiet) == .standardError)
+            let (output, _, err) = output(quiet: quiet, isTerminal: false)
+            output.tell(.failureEvent, "15:35:31 +90.7s audio file writer failed: Razer Seiren V3 Mini (cannot start writing a.mov)\n")
+            output.tell(.problemOfAnEvent, "The audio file of Razer Seiren V3 Mini failed: cannot start writing a.mov\n")
+            #expect(err.all == ["15:35:31 +90.7s audio file writer failed: Razer Seiren V3 Mini (cannot start writing a.mov)\n"])
+        }
     }
 
     @Test func theReadyCheckAndTheSummaryAreToldByTheirResult() {

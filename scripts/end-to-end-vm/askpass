@@ -1,0 +1,3 @@
+#!/bin/sh
+# The Cirrus Labs images' published default login, admin with this password, for every SSH login (D67).
+echo admin

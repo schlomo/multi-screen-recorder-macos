@@ -32,6 +32,25 @@ let package = Package(
             ],
             swiftSettings: strictSettings
         ),
+        // The end-to-end tests (docs/design/end-to-end-tests.md): test
+        // equipment, never in the app bundle.
+        .target(
+            name: "VirtualScreen",
+            cSettings: [.unsafeFlags(["-Werror"])]
+        ),
+        .target(
+            name: "EndToEndLogic",
+            swiftSettings: strictSettings
+        ),
+        .executableTarget(
+            name: "msr-end-to-end",
+            dependencies: [
+                "EndToEndLogic",
+                "VirtualScreen",
+                .product(name: "ArgumentParser", package: "swift-argument-parser"),
+            ],
+            swiftSettings: strictSettings
+        ),
         .testTarget(
             name: "RecorderLogicTests",
             dependencies: ["RecorderLogic"],
@@ -48,8 +67,13 @@ let package = Package(
             swiftSettings: strictSettings
         ),
         .testTarget(
+            name: "EndToEndLogicTests",
+            dependencies: ["EndToEndLogic"],
+            swiftSettings: strictSettings
+        ),
+        .testTarget(
             name: "CommandTests",
-            dependencies: ["msr"],
+            dependencies: ["msr", "msr-end-to-end"],
             swiftSettings: strictSettings
         ),
     ]

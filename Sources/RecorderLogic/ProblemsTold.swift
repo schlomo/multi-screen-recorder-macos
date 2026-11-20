@@ -19,6 +19,8 @@ public enum ProblemKind: Hashable, Sendable {
     case audioSourceFailed(String)
     /// An audio file whose writer failed, by its name.
     case audioFileFailed(String)
+    /// An audio file whose writer failed and that lacks what its writer was given, by its name (D66).
+    case audioFileLost(String)
 }
 
 /// The problems a recording has told: each goes into the recording

@@ -7,18 +7,29 @@ import Synchronization
 
 /// How an audio file ended, for the recording manifest: its entry with its
 /// end, state, clock drift and clock drift correction, the writer's error, if any, and the samples
-/// the writer never took at the end.
+/// the writer never took at the end. A file whose writer failed ends where
+/// the file really ends; `failedAt` is the end its writer was given, the
+/// time of the failure, and `lost` says what the file lacks (D66).
 public struct AudioFileEnd: Equatable, Sendable {
     public var file: RecordingManifest.AudioFile
     public var error: AudioFileWriterError?
     public var lostSamples: Int64 = 0
+    public var failedAt: Double?
+    public var lost: String?
+    /// The capture ended by a failure (`AudioTracker.CaptureEnd.isFailure`),
+    /// which ended this file: the capture's failure event tells it.
+    public var endedByFailedCapture = false
+
+    /// Its failure is told by an event, its own or the capture's, so its
+    /// problem is not printed again (D65).
+    public var toldByAnEvent: Bool { !events.isEmpty || endedByFailedCapture }
 
     /// Samples lost at the end are `audio file writer fell behind`, a
     /// failure (D47), at the file's end.
     public var events: [RecordingEvent] {
         guard lostSamples > 0 else { return [] }
         var event = RecordingEvent(
-            at: Int64(((file.end ?? file.start) * 1_000_000_000).rounded()), event: .audioFileWriterFellBehind,
+            at: Int64((failureSeconds * 1_000_000_000).rounded()), event: .audioFileWriterFellBehind,
             audioSource: file.audioSource)
         event.errorDetail = error?.detail
         return [event]
@@ -272,7 +283,7 @@ final class AudioCapture: @unchecked Sendable {
         guard !isEnding else { return }
         isEnding = true
         if keepTail { flushCorrection() }
-        finishFile()
+        finishFile(endedByFailedCapture: reason.isFailure)
         leaveGuide()
         let tasks = finishing
         let reports = reports
@@ -413,7 +424,7 @@ final class AudioCapture: @unchecked Sendable {
     /// Ends the current file, if any: the samples still waiting are written
     /// for at most the drain timeout, then it is finalized. Its end counts
     /// only what the writer took; the rest is lost (`lostSamples`).
-    private func finishFile() {
+    private func finishFile(endedByFailedCapture: Bool = false) {
         let fileCorrection = fileApplied.end - fileApplied.start
         let clockDriftPpm = correction.status.clockDriftPpm
         timeline = nil
@@ -422,6 +433,7 @@ final class AudioCapture: @unchecked Sendable {
         let reports = reports
         let drainTimeout = drainTimeout
         let name = name
+        let folder = context.folder
         finishing.append(Task {
             // No longer open: only this task uses the writer from here on.
             var file = file
@@ -438,7 +450,9 @@ final class AudioCapture: @unchecked Sendable {
             let duration = Double(file.written) / Double(RecorderValues.audioSampleRate)
             entry.end = entry.start + duration
             entry.clockDrift(correction: fileCorrection, ppm: clockDriftPpm)
-            reports.fileEnded(AudioFileEnd(file: entry, error: failure, lostSamples: lost))
+            let end = await AudioFileEnd(file: entry, error: failure, lostSamples: lost, endedByFailedCapture: endedByFailedCapture)
+                .readingItsFile(in: folder)
+            reports.fileEnded(end)
         })
     }
 

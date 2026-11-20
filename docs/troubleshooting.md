@@ -28,6 +28,8 @@ One row per entry, the error text exactly as in the entry.
 | The prompt for the Screen & System Audio Recording permission comes back each time the window is clicked (symptom, no error text) | [Screen recording prompt comes back with an ad hoc signed build](#screen-recording-prompt-comes-back-with-an-ad-hoc-signed-build) |
 | `the writer took none of the last 4800 samples (0.100 s) of Razer Seiren V3 Mini within 2.0 seconds; they are lost` | [A timing test fails on CI while command tests run](#a-timing-test-fails-on-ci-while-command-tests-run) |
 | `Expectation failed: (made.guides.map(\.2).reduce(0, +) → 0) == (videoSamples → 49600)` | [Async tests time out on CI while simulation tests run](#async-tests-time-out-on-ci-while-simulation-tests-run) |
+| `the virtual screen 24 is not active at 1280x720 within 5 s, but 1600x900` | [A virtual screen comes back at its last mode](#a-virtual-screen-comes-back-at-its-last-mode) |
+| `the virtual screen 122787BA-50AA-4A5A-B00C-3F98867665AF has no mode 1600x900: []` | [A long-running process sees no modes of a new screen](#a-long-running-process-sees-no-modes-of-a-new-screen) |
 
 ## Format
 
@@ -186,3 +188,40 @@ One row per entry, the error text exactly as in the entry.
 - **Verify:** CI's `scripts/test` passes on the pushed head.
 - **Observed:** 2026-11-17, PR #19; resolved, CI passed with the fix
   (run 44125362376).
+
+## A virtual screen comes back at its last mode
+
+- **Error:** `the virtual screen 24 is not active at 1280x720 within 5 s, but 1600x900`
+- **Symptom:** `scripts/end-to-end-test`, the scenario `virtual-screen`
+  stops when its screen connects (the number varies), after an earlier
+  run switched that screen's mode and was killed, or with a helper that
+  does not put the mode back.
+- **Why:** macOS brings a virtual screen back at the last mode its
+  identity (vendor, product, serial number) had, whatever modes it is
+  given, also after a switch for the app only [KNOWN: tried on the
+  owner's Mac, 2026-11-19, macOS 27.2.1]. A switch within about a
+  second of the screen appearing is undone as macOS applies that mode.
+- **Fix:** the device helper puts its screen back to its first size
+  when it starts (after a second) and when it ends (SIGTERM, SIGINT or
+  its standard input closing), so the next screen of that identity
+  starts there; a scenario switches back before it disconnects.
+- **Verify:** a helper switched to 1600x900 and ended by SIGTERM; the
+  next helper of that identity connects at 1280x720 within 0.4 s.
+- **Observed:** 2026-11-19, macOS 27.2.1; open.
+
+## A long-running process sees no modes of a new screen
+
+- **Error:** `the virtual screen 122787BA-50AA-4A5A-B00C-3F98867665AF has no mode 1600x900: []`
+- **Symptom:** the driver could not switch a virtual screen's mode:
+  `CGDisplayCopyAllDisplayModes` and `CGDisplayCopyDisplayMode` gave
+  nothing for a screen that connected after the process had read the
+  modes of the Mac's own screens, while `CGDisplayBounds` was right.
+- **Why:** a process keeps the screens' modes it read first and does
+  not learn a new screen's; a pass of the run loop did not change that
+  [KNOWN: tried on the owner's Mac, 2026-11-19, macOS 27.2.1].
+- **Fix:** every mode switch is a process of its own
+  (`msr-end-to-end switch-mode`), and so is every read of the state
+  after a run (`state`, `restore`).
+- **Verify:** `scripts/end-to-end-test --scratch-folder <folder> --scenario virtual-screen`
+  passes, with its three screen files at 1280x720, 1600x900, 1280x720.
+- **Observed:** 2026-11-19, macOS 27.2.1; open.

@@ -1,11 +1,21 @@
 # End-to-end tests
 
-**Status: agreed (D37), nothing built.** The owner asked for this
+**Status: agreed (D37); the first part built, run by hand in a tart VM
+(D67; D63's pipeline job is gone).** The owner asked for this
 document (2026-11-13) after ruling that automated end-to-end tests run
 on the owner's Mac first (D34), ruled on five of its open questions
 (D35) and merged it, which by the rule this status line stated before
 is the sign-off (D37); two questions stay open ("Open questions").
-Corrected after an automated review (D38).
+Corrected after an automated review (D38). D63 put the tests in
+the pipeline, on GitHub's hosted runner; D67 took them out again and
+made them a manual step in a VM ("Running them", "Why the VM"). Built (backlog item 3,
+first PR): the driver, the device helper's virtual screens and mode
+switches, the test tone, the restore file and `restore`, and six named
+scenarios ("Built so far"). Not built yet: the picture's pattern and
+its assertions, combinations and random runs, the self-test, audio
+inputs appearing and vanishing, broken settings files, a full disk,
+an unwritable folder, the clock scenario set, BetterDisplay and real
+hardware.
 
 Every statement about what a tool or macOS does comes from web
 research of 2026-11-13 (sources at the end) and is UNVERIFIED on this
@@ -57,7 +67,7 @@ any scenario. So three kinds of scenario use the same code:
 the language to the architect, D35; the reasons are under "Why not
 otherwise"). They are one executable of its own, never in the app
 bundle, which `scripts/build-app` assembles from `msr` alone.
-`scripts/end-to-end-test` is a few lines that build and start it;
+`scripts/end-to-end-test` builds it and starts it in a VM ("Running them");
 `scripts/` holds scripts only, so the tests' code and data live in the
 package (D35).
 
@@ -97,10 +107,344 @@ inputs it asserts only that their files are readable and listed.
 
 **Run in a person's own session** (D35). A run adds
 screens, covers every screen with a pattern and changes the default
-microphone: the Mac cannot be used meanwhile. On the owner's Mac an
-agent may start one to test the roadmap's work (D48); elsewhere never
-unasked (`AGENTS.md`, "Facts that bite"). Not part of
-`scripts/test`, not part of the pipeline.
+microphone, which since D67 happens in a VM, not on the Mac the tests
+are started from. Not part of `scripts/test` and not part of the
+pipeline.
+
+### Running them
+
+Once, `brew install openai/tools/tart hashicorp/tap/packer` and `scripts/end-to-end-setup`: it
+clones Cirrus Labs' `macos-tahoe-vanilla` image to the VM
+`msr-end-to-end` (50 GB disk, 27 GB used, 4 CPUs, 8 GB memory), disables
+SIP through Recovery with Packer's `tart-cli` template
+(`scripts/end-to-end-vm/disable-sip.pkr.hcl`), writes the Screen &
+System Audio Recording, Microphone, Accessibility and Automation rows
+into the system's and the admin user's TCC.db the way actions/runner-images does for GitHub's
+runners (`scripts/end-to-end-vm/guest-configure-tcc`), installs Python
+3.15 (its signature is checked) and then ffmpeg, ffprobe and BlackHole
+2ch at fixed versions by their SHA-256
+(`scripts/install-end-to-end-tools`). Re-running rebuilds it; it took
+3.5 minutes with the base image cached. It needs `tart` and `packer` on
+the `PATH` and installs neither. Every SSH login to the VM, the setup's
+and each run's, uses the image's published default login, `admin` with
+the password `admin`, no secret (`scripts/end-to-end-vm/askpass`, D67).
+
+Per run, `scripts/end-to-end-test --scratch-folder <folder>`: builds the
+app and the driver on the Mac, clones a throwaway VM from
+`msr-end-to-end` (a copy-on-write clone, so every run starts clean),
+copies the app and the driver in, runs the driver in the admin user's
+GUI session, copies the driver's whole scratch folder to `<folder>` (new
+or empty; "Artifacts for review") and deletes the clone, also when the run fails. Arguments other
+than `--scratch-folder` go to the driver (`--scenario <name>`). The exit
+status is the driver's. All 7 scenarios and the start window's
+screenshot took 2 minutes 10 seconds with the build. Nothing records or
+plays sound on the Mac itself.
+
+**When:** before a PR that touches the recorder or the driver is marked
+ready, the architect runs it on the PR's head and records the commit and
+the result in the PR description (`AGENTS.md`). The owner (2026-11-19):
+"We'll leave e2e a manual step that uses the VM and another script for
+setup. You'll run e2e manually when needed and mark in the pr that it
+succeeded. Kiss" (D67).
+
+### When a VM is left behind
+
+A run deletes its clone on every exit it can handle; a killed script or
+a crashed Mac can leave one. Two kinds of VM exist: the image
+`msr-end-to-end`, which **must not be deleted unless you mean to rebuild
+it** (`scripts/end-to-end-setup`, with a 28 GB download), and the
+throwaway clones `msr-end-to-end-run-<pid>`, named after the process of
+the script that made them.
+
+1. Find them: `tart list` (State `running` or `stopped`); a running
+   one has a `tart run --no-graphics msr-end-to-end-run-<pid>` process,
+   `pgrep -fl "tart run"`.
+2. Its IP address: `tart ip msr-end-to-end-run-<pid>` (waits with
+   `--wait 60`).
+3. Get in: `ssh admin@<ip>` with the password `admin`, the image's
+   published default login. See its screen: `open vnc://admin:admin@<ip>`
+   (macOS's Screen Sharing; the guest's port 5900 answers), or, for a
+   stopped clone, start it with a window: `tart run msr-end-to-end-run-<pid>`.
+4. Stop it: `tart stop msr-end-to-end-run-<pid>`; if it stays running,
+   end its process: `pkill -f "tart run .*msr-end-to-end-run-<pid>"`, and
+   `pkill -9 -f ...` if that does not end it.
+5. Delete it: `tart delete msr-end-to-end-run-<pid>`. Deleting a clone
+   frees what it wrote, not the image's 27 GB.
+
+### Why the VM
+
+On GitHub's hosted macOS runner the video encoder stalls at a virtual
+screen's mode switch and sometimes fails: in about 2 of 9 runs the
+screen file writer failed with `-11800` from `-19092`, inside a stall of
+the encoder at +6.6 to +7.0 s into the recording, which hit both screen
+files at once (the old one and the new one, so no fault of one
+writer's input). That did not happen in 18 runs on the owner's Mac and
+in a tart VM (0 failures). Hosted macOS arm64 runners are also often
+unavailable, which holds the pipeline up for something that is not the
+code. So the runner is not a place for these tests; the VM is the same
+macOS with permissions and SIP set the way the runner has them.
+
+### Built so far
+
+The executable is `msr-end-to-end`; `scripts/end-to-end-test` builds it
+and passes its arguments on. Its subcommands: `run` (the default: the
+named scenarios, or those given with `--scenario`), `restore`, `state`
+(prints what the restore file saves), and the device helper's
+`virtual-screen` (one virtual screen, held until SIGTERM or until its
+standard input closes, which happens when the driver ends in any way;
+a line `size <width>x<height>` switches its mode) and `switch-mode`.
+Its logic is the library `EndToEndLogic`, under unit tests in
+`scripts/test` (`EndToEndLogicTests`): the scenarios, what the manifest
+must say, the assertions on the manifest, on `ffprobe`'s output and on
+decoded sound, the timecode maths, and the restore file and its plan.
+The private interface is declared in the Objective-C target
+`VirtualScreen` and looked up when it runs.
+
+Two facts of macOS shape it (tried 2026-11-19, macOS 27.2.1): a process
+that has read the screens' modes keeps what it read, and sees none of a
+screen that connected later, so every mode switch and every read of
+the state after a run is a process of its own (`switch-mode`, `state`,
+`restore`); and macOS brings a virtual screen back at the last mode its
+identity had, so the helper puts it back to its first size when it
+starts and when it ends. A frame size change is therefore a mode switch
+on the virtual screen, not the replacement "The design" describes; the
+owner confirmed it (D63).
+
+The review files and screenshots: "Artifacts for review".
+
+The driver writes its error lines (`FAIL`, `STOP`, `restore: FAILED`,
+`restore: NOT RESTORED`) to standard error and its progress and `ok`
+lines to standard output, and every one of them also to `run.log` in
+the scratch folder (a run starts it afresh, `restore` adds to it). Its targets are exempt from the app's rule
+that only one writer writes to standard error, which protects the app's
+status line (D63).
+
+Every `msr record` gets a `--duration`: the scenario's own, or for a
+scenario stopped by a signal its stop plus 120 s, a ceiling, so a
+driver killed or crashed before it sends the signal never leaves the
+recorder recording the person's session.
+
+The named scenarios, each about 10 to 25 s of recording:
+
+| Scenario | What happens | What it asserts beyond every scenario's checks |
+|---|---|---|
+| `plain-recording` | auto mode, ended by `--duration` | exit 0 |
+| `virtual-screen` | a virtual screen of 1280 × 720 connects, switches to 1600 × 900 and back, disconnects; stopped by SIGINT | the screen's three files, frame sizes, number and times, and its events in order at their times |
+| `virtual-screen-stress` | a virtual screen of 1280 × 720 connects, its mode is switched ten times, 1280 × 720 ↔ 1600 × 900, about 2 s apart (the next switch waits for the screen to settle, so at least that), and it disconnects; stopped by SIGINT | as `virtual-screen`, as strictly: no failure event, a `screen frame size changed` per switch, no lost content. Added to make the writer failure of `OSStatus -19092` happen often enough to study (D66); it passed on the hosted runner, and no frame of the new size reached the old file (D67) |
+| `tone` | the test tone in BlackHole, all audio inputs recorded, no system audio | the tone's level, no silent stretch and a click every second in each of BlackHole's tracks; the clicks at the same time of day, by timecode, in every screen file's guide track "Audio inputs" |
+| `system-audio` | as `tone`, with the system audio | the system audio's file: one stereo track, its length |
+| `stop-by-ctrl-c` | auto mode, SIGINT | exit 0, finalized |
+| `stop-by-kill` | auto mode, `kill -9` | no `ended`, every file `recording` and readable up to its last fragment |
+
+Every scenario's checks: `msr record`'s exit status, the recording
+folder's path alone on standard output, `recording.log` present next to `recording.json`, `recording.json` exactly
+(its keys, the app and the settings, its state, `ended`, `result`
+and `cpu` for how it stopped, each file's name, label, number, state,
+start, end and timecode from `started` and its start (within half a
+millisecond of a half frame, either neighbouring frame, as `started` is
+written to the millisecond after the timecode is taken), the guide
+tracks, no failure event, the played audio input and the system audio
+once; the recording ran from `started` to `ended` as long as the
+driver let it, and each file of a source no event names, the played
+audio input among them, starts within the settle time of the start;
+both end not before the stop and at most a finalize allowance of 3 s
+after it, as `ended` follows the finalizing of every file; each
+scenario prints that margin, so the runs calibrate the
+allowance),
+and every file through `ffprobe` and `ffmpeg`: it decodes without an
+error, its timecode track, its tracks and their names, the video's
+codec, frame size and 30 frames for each second of its length, an audio
+file's length. The tolerances are data (`EndToEndValues`), calibrated
+on the owner's Mac: a time in the manifest within the change's window,
+the tone within 1 dB, a click within 5 ms across files (measured: within
+1 ms) and 1 ms of one second apart in BlackHole's file. A run of the six
+took 97 s on the owner's Mac.
+
+**A change's window.** For each connect, mode switch and disconnect the
+driver keeps when it asked for the change and when it saw it done (the
+helper reported the screen active or the mode switched; for a
+disconnect, the helper has ended and the screen is gone from the active
+screens). From just before the ask a thread reads every screen's place
+and size every 20 ms; the changed screen's last change is the last
+reading in which its own place, size or presence differed from the one
+before, once it has been unchanged for the settle time after it. The
+recorder's settle time is per screen and starts again with each change
+of that screen's own reading, a knock-on one included (on the runner a
+connect switched the own screen from 1024 × 768 to 1920 × 1080, which
+can move the virtual screen too); another screen's change does not
+count. A screen that has not settled within 15 s of the done fails the
+scenario. A time the recorder writes for the change lies in one of two
+windows, widened by the 0.5 s tolerance: **immediate** (`screen
+connected`, `screen disconnected`, a file's end at a disconnect) from
+the ask to the done; **settled** (a screen file's start, `screen frame
+size changed`, a file's end at a mode switch) the settle time after the
+change's anchor, and a screen file's start, which waits for the new
+stream's first frame, up to the first-frame limit, 1 s, instead of the
+tolerance late (recorder.md, "Screens coming and going"). The anchor is the later of the screen's last change and
+the recorder's notice of the change: for a connect, its `screen
+connected` time, which the recorder writes when macOS tells it of the
+screen, measured up to about 0.5 s after the screen is in the active
+display list; a mode switch has no notice, as the recorder writes
+`screen frame size changed` only at the settle (its own notice
+measured 0.03 to 0.08 s after the screen's last change). A connect's
+file start is checked only against a notice that passed its own check;
+a missing or misplaced notice fails the start too, naming it. `run.log`
+shows each change's times, the screen's last change, the anchor and
+where it came from, the windows' widths and, after a connect or mode
+switch, how long after the settle time its file started. The `virtual-screen`
+scenarios record with `--debug`, so their `msr.err` keeps the recorder's detail;
+it changes only standard error, which nothing asserts.
+
+**The system log of a failed scenario (D66).** When a scenario fails,
+the driver (not the workflow) runs `log show --style compact --start
+<the scenario's start, local time, a second early>` with a predicate on
+the subsystems whose name contains `videotoolbox`, `coremedia`,
+`avfoundation`, `screencapturekit` or `display`, and the processes
+`WindowServer`, `replayd` and `coreaudiod`, and keeps the output as `logs/system.log`
+in the scenario's folder, which the copy to `--scratch-folder` takes whole. When
+`log show` fails or does not end within 300 s, that is one more failure
+line of the scenario, never skipped silently.
+
+**A failed file's end (D66).** The recorder now writes the end of a
+file whose writer failed from what the file holds (recorder.md, "A
+failed file's end"). The driver's checks are unchanged and none loosened:
+such a file is still `not finalized` and a failure event is still a
+failure, so the scenario fails on those as before; its frame count and
+its length are now compared with the file's real end, so they no longer
+add a mismatch of their own to the failure lines, and the problems list
+gains the problem that tells what was lost (the check of problems' keys
+is unchanged).
+
+**Moving content.** Screen capture delivers a frame only when the
+picture changes, so a virtual screen showing a static picture gives its
+file no frame to start with (seen on the runner: 26 identical black
+frames, the file's start only after the next mode switch). The device
+helper therefore puts a borderless window on its virtual screen only,
+following its bounds through mode switches, with a block that moves and
+a frame counter, redrawn 60 times a second; the window never takes the
+focus or the mouse and ends with the helper. The full pattern of "Known
+content" is not built.
+
+**Placing decoded sound.** A track's samples start at its first sample,
+which an edit list may put after the file's start (the guide track
+"Audio inputs" by a few to about 80 ms): ffprobe's `start_time` for the
+stream is added to the file's timecode before clicks are compared.
+
+**Playback breaks.** The tone player takes the tone from each render
+cycle's sample time, so a cycle the output skips does not shift the
+tone; each skip, and each overload the loopback device tells of, is kept
+with its time of day. When a click spacing in BlackHole's file fails and
+a break lies in it (within 0.1 s), the failure line says so: "playback
+on the loopback device broke at <t> s (<n> samples); the recording shows
+it" (an overload the device tells of may come from the recorder's own
+input on it too). The breaks are kept in a fixed buffer, so the render
+thread never locks or allocates; more than it holds are counted.
+`run.log` gives the number of playback breaks for each scenario with
+the tone.
+
+**A break the recording shows exactly is pardoned (D67).** Run 4 of the
+VM runs at 3c8fe02 failed `tone`: the test's own player ran late, the
+loopback device carried 32 ms of zeros from 4.641 s (the player saw an
+overload at 4.643 s), the recorder recorded exactly that, and the clicks
+on either side of the hole, one lost in it, were exactly 2.000 s apart.
+That is the test equipment failing, not the recorder. A failing click
+spacing is therefore pardoned only when all of these hold: (a) the
+track holds a hole, a quiet run found at sample resolution (the 1 kHz
+tone stays below 5 % of its peak for 0.032 ms around a zero crossing,
+so a run of 1 ms or more, one tone period, is no tone), between the two
+clicks, which starts within the break margin (0.1 s) of a playback
+break the player measured, each hole having a break of its own; (b) the
+clicks on either side are a whole number of seconds apart, at least
+two, within the click period tolerance (1 ms), so the hole took whole
+clicks and moved nothing; (c) the number of pardons is at most the
+player's break count, counted per played track (every track of the
+loopback device's file records the same playback, so each shows the
+same holes and uses the player's breaks once; a count over the scenario
+would charge the one break once per track), which the one-break-per-hole
+matching gives. The
+expected click count is lowered by the clicks the pardoned holes took.
+`run.log` reports each pardon: `pardoned: playback broke at 4.643 s,
+31.9 ms quiet in the recording, clicks 2.000 s apart`. Anything else
+fails as before: a hole without a break, a break without a hole whose
+spacing is off, a hole at a break whose spacing is off by a fraction,
+more holes than breaks.
+
+### Artifacts for review
+
+The owner (2026-11-19): "full artifact upload now, only homepage
+screenshot automation comes later", and "No, screenshots as artifacts
+now, to check them" (D63; the pipeline's artifact upload went with the
+pipeline job, D67: the scratch folder is copied to `--scratch-folder`).
+Each run writes, in its scratch folder, all of which
+`scripts/end-to-end-test` copies to `--scratch-folder` (the owner,
+2026-11-19: "we need full export of results, screenshots and desktop
+video from the e2e runs"):
+
+- `run.log`: every line the driver printed.
+- `<scenario>/` for each scenario, passed ones included, whole: the
+  recordings (the screen files, the "desktop video", and the audio
+  files) in `recordings/`, `recording.json` and `recording.log` in
+  there, the recorder's output in `logs/` and, for a failed scenario,
+  `logs/system.log`. A run's folder is a few hundred megabytes; the
+  review folder below is the quick look.
+- `review/<scenario>/` for each scenario, passed ones included:
+  `recording.json`, `recording.log` and `msr.err` (the recorder's
+  standard error: its detail lines with `--debug`, and what macOS
+  prints into it, such as `IOServiceMatchingfailed for:
+  AppleM2ScalerParavirtDriver`, so passing runs show it too, D66; it
+  is text, a few hundred kilobytes at most); `contact-sheet.png`, a still from the middle of
+  each screen file (taken by `ffmpeg`) under a strip with the file's
+  name; `excerpt <file>`, the first 5 s (`reviewExcerptSeconds`) of the
+  smallest screen file and, in `tone` and `system-audio`, of
+  BlackHole's audio file, copied by `ffmpeg -c copy`, not re-encoded.
+- The app's windows, each in light and in dark, window only (macOS's own
+  window capture, `screencapture -l` by the window's number from
+  `CGWindowListCopyWindowInfo`, with its shadow: the PNG has the shadow
+  and transparent margins around the window), in `review/app/`, named
+  `app-<window>-<appearance>.<png|mov>`:
+  - `app-start-window-light.png`, `app-start-window-dark.png`: the real
+    start window, the built app started as `msr` without arguments, with
+    a scratch `HOME` (its ready check, `state.json` and crash report
+    folder are there), then quit (the quit Apple event when macOS allows
+    it without asking, otherwise SIGTERM, and SIGKILL after 15 s; the
+    process is in the restore file meanwhile).
+  - `app-status-window-<appearance>.mov` and `.png`: the app's own
+    recording, `msr record` with a scratch `HOME` (it shows the same
+    status window as the app, D46), 8 s into the recording. The driver
+    sends the app its reopen event (what a click on the Dock icon does),
+    moves the window to the screen's corner with System Events (the VM's
+    screen is small and the window first opens partly off it), and takes
+    a 5 s video of that window with `screencapture -V` (H.264, 5.000 s,
+    one frame per change, so about one a second), then the PNG right
+    after it, then sends Stop (SIGINT) and waits for the recording's
+    files. The video shows macOS's sharing indicator over the window's
+    traffic lights and the pointer; the video has no shadow, its margin is
+    black.
+  - `app-finder-window-<appearance>.png`: a Finder window of the finished
+    recording folder, driven through AppleScript: list view, no sidebar,
+    no toolbar or status bar, Name, Date Modified, Size and Kind as wide
+    as their content (the Name column from the longest name, measured in
+    the 13 pt system font), the window as high as its rows (Finder keeps
+    a minimum height, so a short folder shows empty rows), closed
+    afterwards.
+  The dark ones, the status window's video and PNG and the Finder window
+  are taken only when `scripts/end-to-end-test` passes the driver
+  `--throwaway-vm` (the VM's setup grants the permissions they need:
+  Accessibility and Automation for System Events, Finder and the app, in
+  `guest-configure-tcc`); the driver switches the whole system's
+  appearance with System Events' `dark mode` and back. A run without the
+  flag changes no appearance, takes the start window in light only and
+  says so in `run.log`. Each appearance's own recording folder stays,
+  as `app-recording-light/` and `app-recording-dark/`, beside
+  `app-light/` and `app-dark/`. The start window is part of the run:
+  when a window cannot be taken, the run fails like on any other failure.
+  The status window's picture for the homepage's screenshot script comes
+  later with the offscreen renders. (Setting `AppleInterfaceStyle` in
+  the app's own defaults domain left its window light, tried
+  2026-11-19.)
+- A restore file, if one is left.
+
+Anything in the review folder that cannot be made fails the run.
 
 ### Known content
 
@@ -164,7 +508,7 @@ only if that falls short. See "Unknowns".
 | Event | How it is made | Needs |
 |---|---|---|
 | Screen connects, disconnects | the helper creates a virtual screen through Apple's private `CGVirtualDisplay` interface; ending its process removes it | private interface |
-| Frame size changes, HiDPI | the helper replaces a virtual screen by one of another size (a mode switch on a virtual screen is reported to leave it unremovable); on one of the Mac's own screens, a mode change through the public interface | |
+| Frame size changes, HiDPI | a mode switch of the virtual screen through the public interface, in a process of its own (D63; replacing it by one of another size does not work, as macOS brings an identity back at its last mode, and the screen was removed after every mode switch, both tried 2026-11-19); on one of the Mac's own screens, a mode change through the public interface | |
 | Mirroring, arrangement, main screen | the helper, through the public display configuration interface (Apple's) | |
 | Rotation; one of the Mac's own screens switched off and on | BetterDisplay's command line | BetterDisplay Pro, a paid licence (the owner: "I have BetterDisplay Pro if it helps we can use it"); a scenario set of its own, asked for by name, which stops with an error where BetterDisplay is missing |
 | Audio input appears, vanishes, changes its channel count | the helper creates and removes an aggregate device around BlackHole through the public CoreAudio interface | BlackHole installed once (administrator) |
@@ -485,9 +829,8 @@ tried:
 ## Safeguards for the person's session
 
 - A run records the Mac's own screens and audio inputs too. Its
-  recording folders live in a scratch folder, are deleted after a run
-  that passes, and kept after one that fails, which the driver says
-  with the path.
+  recording folders live in the scratch folder and are all kept, a
+  passed scenario's too (D67); a failed one says its path.
 - Before a run the driver writes to a restore file what the run may
   change: the screen arrangement, mirroring and the main screen;
   whether each of the Mac's own screens is on, with its mode and
@@ -507,9 +850,23 @@ tried:
   lost: `restore` restores the rest and says that the time is the
   person's to set, unless it is set automatically again. Untried (see
   "Unknowns").
+- As built (D63): the restore file is `restore.json` in the scratch
+  folder (`--scratch-folder`, by default `msr-end-to-end` in the
+  temporary folder), with the processes the run started (`msr record`
+  and the helpers), so `restore` ends them should the driver be killed;
+  a run refuses to start while a restore file is left. The driver runs
+  `restore` as a process of its own after each scenario and at the end;
+  it puts back what an interface can put back, reads the state back and
+  names every difference, keeping the restore file until there is none.
+  Whether a screen is on and its rotation are only compared: putting
+  them back needs BetterDisplay, which no scenario uses yet. The time,
+  the time zone and whether the time is set automatically are not in it
+  yet: no scenario set changes them. The helpers end when the driver
+  ends in any way (their standard input closes).
 - Virtual screens use a small fixed set of identities: macOS keeps an
   arrangement and a colour profile (owned by root, never removed) per
-  identity.
+  identity; the scenarios use one, serial number 101 of the tests'
+  vendor and product.
 - Nothing switches off the built-in screen: a helper killed while
   holding it off is reported to leave it off until logout.
 - Nothing sends keystrokes or asks for the person's password.
@@ -519,26 +876,25 @@ tried:
 ## Cost
 
 No money beyond BetterDisplay Pro, which the owner has. The named
-scenarios should take minutes, combinations and random runs as long as
-their time budget; the Mac is not usable during a run. Once: installing
-BlackHole and `ffmpeg`. Building the helper, the driver and the first
+scenarios take about 2 minutes in the VM, combinations and random runs
+as long as their time budget; the Mac stays usable during a run. Once:
+the VM, 27 GB of disk and 3.5 minutes. Building the helper, the driver and the first
 scenarios is the larger cost, estimated at one PR the size of the
 skeleton PR; the pattern decoder is the uncertain part. The pipeline
 compiles and unit-tests the tests' code with every push, which adds to
-its run time.
+its run time; it does not run the scenarios (D67).
 
 ## Why not otherwise
 
-- **A macOS virtual machine** (Parallels Desktop, Tart): the guest has
-  one screen, one sound device tied to the host's default microphone,
-  no USB audio and no hardware HEVC encoder, so screen changes need
-  the same virtual screens as on the Mac itself, and the encoder under
-  test is another one. It would give a clean start and permissions
-  granted once in an image; the owner's Mac has both without it.
-  Parallels adds nothing over free tools here.
-- **GitHub's hosted runners:** deferred (`backlog.md`); permissions are
-  granted there by writing into the permission database, which breaks
-  with macOS versions.
+- **The owner's Mac itself:** the Mac cannot be used during a run, and
+  the permissions are the terminal's. A tart VM gives a clean start per
+  run (D67); what needs real hardware or BetterDisplay stays on the
+  owner's Mac. The guest has one screen and no USB audio, so screen
+  changes use the same virtual screens, and the encoder under test is
+  the guest's.
+- **GitHub's hosted runners:** they ran the tests from D63 to D67 and
+  stalled the video encoder at a virtual screen's mode switch ("Why the
+  VM").
 - **A self-hosted runner on the owner's Mac:** GitHub advises against
   one for a public repository; a pull request could run code on the
   Mac.
@@ -580,7 +936,12 @@ its run time.
 - Fast connect and disconnect cycles are reported flaky in macOS
   itself; a failure there must be told apart from a recorder fault,
   and a flake is root-caused, never retried blindly.
-- The pipeline does not gate the self-test, which needs `ffmpeg` and
+- The tests are not a gate: a person runs them (D67), and a PR
+  that touches the recorder or the driver may be ready without a run if
+  nobody remembers; `AGENTS.md` says when they run. The VM's setup
+  depends on the download sites of the base image, Packer's tart
+  plugin, ffmpeg, BlackHole and Python being reachable.
+- The pipeline does not gate the self-test (not built yet), which needs `ffmpeg` and
   runs on a Mac, before a run and when the driver changes. What it
   alone covers is whether an assertion still fails on real files
   broken on purpose; a change that breaks that is seen at the next
@@ -724,7 +1085,11 @@ this design is built:
   tone;
 - BetterDisplay's command line returns only when the change is done;
 - a tone played into the loopback device is, or is not, in system
-  audio and on the speakers;
+  audio and on the speakers. **Tried** for the system audio
+  (2026-11-19, two runs on the owner's Mac, macOS 27.2.1): the system
+  audio's file held only zeros while the driver played the test tone
+  into BlackHole, so it is not in the system audio; the speakers were
+  not checked;
 - the time can be put back after the clock scenario set: a clock that
   counts sleep and that setting the time does not move, and setting
   the time from the driver.

@@ -491,6 +491,33 @@ import Testing
         #expect(reported.ended.count == 1)
     }
 
+    /// The file a failed writer ends is told by the capture's failure event,
+    /// not by a problem of its own on standard error (D65); a stop's is not.
+    @Test func aFileEndedByAFailedCaptureIsToldByItsEvent() async throws {
+        let failing = capture()
+        writer.fails(atAppend: 1)
+        for index in 0...buffersUntilTheFirstAppend { source.send(try buffer(at: 500_000 + time(ofBuffer: index))) }
+        _ = try await reported.waitForCaptureEnd()
+        await failing.stop()
+        #expect(reported.ended.first?.endedByFailedCapture == true)
+        #expect(reported.ended.first?.toldByAnEvent == true)
+    }
+
+    @Test func aFileEndedByAStopIsNotToldByAnEvent() async throws {
+        let capture = capture()
+        source.send(try buffer(at: 0))
+        await capture.stop()
+        #expect(reported.ended.first?.endedByFailedCapture == false)
+        #expect(reported.ended.first?.toldByAnEvent == false)
+    }
+
+    @Test func lostSamplesAreToldByTheirEvent() {
+        let file = RecordingManifest.AudioFile(
+            name: "a.mov", audioSource: "Mic", audioSourceUID: "u", channels: .mono(1), start: 0, timecode: "t")
+        #expect(AudioFileEnd(file: file, error: nil, lostSamples: 5).toldByAnEvent)
+        #expect(!AudioFileEnd(file: file, error: AudioFileWriterError(nil, while: "x"), lostSamples: 0).toldByAnEvent)
+    }
+
     /// The tail at a gap pushes the waiting samples over the audio wait
     /// bound: the capture ends, and nothing after the gap starts a file.
     @Test func aTailThatEndsTheCaptureWritesNothingAfterIt() async throws {

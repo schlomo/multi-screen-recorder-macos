@@ -1912,6 +1912,112 @@ architect's reading.
   "Ready check" and "Build state"; `ReadyCheckTests`,
   `ScreenTrackerTests`, `WhatWillBeRecordedTests`.
 
+## D63: End-to-end tests run in the pipeline too, on the hosted runner (2026-11-19)
+
+- **Status:** in force except point 1's pipeline job and point 7's
+  artifact upload, superseded by D67; replaces D37's "out of the
+  pipeline" (the agreed design's "not part of the pipeline", and D34
+  point 5's tests in the pipeline deferred). The first part is built:
+  backlog item 3's first PR.
+- **Context:** An experiment on 2026-11-16 (three runs on GitHub's
+  hosted `macos-26` arm64 runner, image 20261102, macOS 26.7.2) showed
+  that the image grants Screen Recording and Microphone, `msr check`
+  passes, a `CGVirtualDisplay` connected and disconnected during a
+  recording gives the right files and events, BlackHole installed with
+  brew carries a 1 kHz tone into its file, and system audio is recorded
+  (`backlog.md`, item 3). The owner signed off the design as text on
+  2026-11-16: "Yes to both CI questions and plan for that", and on the
+  tools: downloads in CI are fine.
+- **Decision:**
+  1. A job `end-to-end-test` in `.github/workflows/ci.yml`, after
+     `test-and-build` and holding no secret, unpacks the app that job
+     built, installs ffmpeg and BlackHole 2ch at fixed versions checked
+     by their SHA-256 (`scripts/ci-install-end-to-end-tools`) and runs
+     `scripts/end-to-end-test`; all behaviour lives in the scripts and
+     the driver. It runs for every pipeline run `test-and-build` runs
+     for, forks and Dependabot included. The signing jobs (snapshot
+     release, release) wait for it: nothing is signed or published that
+     failed it.
+  2. The same driver runs on the owner's Mac (D34, D48); what needs real
+     hardware stays there.
+  3. The driver is the package's executable `msr-end-to-end`, never in
+     the app bundle (D35): the driver, the device helper as its
+     subcommands `virtual-screen` and `switch-mode`, `restore` and
+     `state`; its logic, the assertions included, in the library
+     `EndToEndLogic` under unit tests in `scripts/test`.
+  4. The first named scenarios: a plain recording, a virtual screen
+     connected, its mode switched and disconnected, the test tone through
+     BlackHole (level, silent stretches, timing across files by
+     timecode), the system audio, stop by Ctrl-C and by `kill -9`.
+  5. The restore file stays in the scratch folder, by default
+     `msr-end-to-end` in the temporary folder (`$TMPDIR`).
+  6. Standard error: the test that every write to standard error passes
+     the app's one writer protects the app's status line. It keeps
+     scanning every target under `Sources/`, so a new target is covered
+     by default, and exempts by name the end-to-end tests' targets
+     (`msr-end-to-end`, `EndToEndLogic`, `VirtualScreen`), a separate
+     program with no status line; it fails should an exempted target no
+     longer exist. The driver writes its error lines (`FAIL`, `STOP`,
+     `restore: FAILED`, `restore: NOT RESTORED`) to standard error, as
+     "Fail early and loudly" asks; progress and `ok` lines stay on
+     standard output, and the device helper's `failed` line on its
+     standard output is its protocol with the driver.
+  7. Every run of `end-to-end-test` uploads its scratch folder as the
+     artifact `end-to-end-review` (14 days): the driver's log, each
+     scenario's `recording.json`, a contact sheet and the first 5 s of a
+     screen file and of BlackHole's file, and a screenshot of the app's
+     real start window taken during the run, which fails the run when
+     it cannot be taken; the driver writes the job summary's table and
+     an annotation per failure, on standard error; `test-and-build`
+     uploads the unit tests' JUnit XML as `unit-tests-junit`. The
+     status window's picture comes later with the homepage's offscreen
+     renders: opening it during a recording needs the reopen Apple
+     event and with it the person's Automation consent. Only light screenshots:
+     `AppleInterfaceStyle` in the app's own defaults domain left the
+     window light. Rendering windows from made-up devices stays for the
+     homepage's screenshot script.
+- **Rulings of 2026-11-19:** the owner on points 1, 5 and the mode
+  switch below: "3 design choices for e2e test ok". The owner on
+  point 6: "Stderror handling think big as architect and apply common
+  sense"; point 6 is the architect's ruling under it. The owner on
+  point 7: "full artifact upload now, only homepage screenshot
+  automation comes later", "No, screenshots as artifacts now, to check
+  them", and "And also in dark mode if easy to have"; real windows
+  during the run, not offscreen renders, the start window only, and no
+  exception from "Fail early and loudly" for it, are the architect's
+  calls.
+- **First-frame limit, owner's ruling of 2026-11-19:** a pipeline run
+  had a mode switch's new stream take 0.55 s to its first frame (other
+  restarts 0.10 to 0.32 s), and the recorder's design set no limit. On
+  a proposed 1 s limit the owner: "1s sounds good, and we see where we
+  go from there". recorder.md now sets the target that a screen's file
+  starts within 1 s after its settle time ends; the end-to-end tests
+  let a screen file's start lie up to that limit, not the 0.5 s
+  tolerance, after its anchor's settle time, with the lower bound
+  unchanged, and `run.log` prints each start-up time.
+- **Deviation from the agreed design, confirmed by the owner:** the
+  design makes a frame size change by replacing a virtual screen with
+  one of another size. Tried on 2026-11-19 (macOS 27.2.1): macOS brings
+  a virtual screen back at the last mode its identity had, whatever
+  modes it is given, so a replacement comes back at the old size. The
+  helper switches the screen's mode through the public interface
+  instead, and puts it back to its first size when it starts and when
+  it ends, so the next screen of that identity starts there; the
+  screen was removed every time its helper ended (all runs of
+  2026-11-19). A mode switch is what the design names for the Mac's own
+  screens, and it gives the recorder's `screen frame size changed`.
+- **Consequences:** Every pipeline run that runs `test-and-build`
+  takes one more macOS runner for some minutes, free for a public
+  repository; it depends on the runner image granting the permissions
+  and on the two download sites being reachable, which the owner
+  accepted for downloads. Capture is exercised by the pipeline, not
+  only by a person.
+- **Evidence:** `backlog.md` item 3;
+  [design/end-to-end-tests.md](design/end-to-end-tests.md);
+  `scripts/end-to-end-test`, `scripts/ci-install-end-to-end-tools`,
+  `Sources/msr-end-to-end/`, `Sources/EndToEndLogic/`,
+  `Tests/EndToEndLogicTests/`.
+
 ## D64: Diagnostics: the error detail everywhere, a recording log per recording, reports without Terminal (2026-11-19)
 
 - **Status:** in force; point 3 as "Report a problem" below has it.
@@ -2033,3 +2139,186 @@ architect's reading.
   `RecordingLogTests`, `WriterErrorTests`, `RecordingManifestTests`,
   `ProblemsToldTests`, `StatusTextTests`, `ProblemReportTests`,
   `ProblemReportActionTests`, `AppStateTests`, `StateFileTests`.
+
+## D65: Standard error tells a failure once and counts its repeats (2026-11-19)
+
+- **Status:** in force.
+- **Context:** The owner's run on 2026-11-19: with the recording folder
+  made read-only, a microphone was replugged. Its audio file writer then
+  failed again about every 10 s, and each try printed the full error on
+  standard error; the first failure was printed twice, as the problem
+  "The audio file of Razer Seiren V3 Mini failed: cannot start writing
+  …" and as the event line "15:35:31 +90.7s audio file writer failed:
+  Razer Seiren V3 Mini (…)". The owner: "repeat problems should be
+  handled smartly", signing off the design below.
+- **Decision:**
+  1. A repeat is the same failure event (`isFailure`) of the same
+     subject with the same chain of error domains and codes; the
+     message text does not count, as it holds the changing file name.
+     This holds for every failure event.
+  2. On standard error the first failure prints as before; repeats are
+     counted, not printed. The subject's next event that is no repeat
+     (it recovered, or failed differently), or Stop, first prints one
+     line in the event line's format: `<event> repeated N times since
+     HH:MM:SS: <subject>`; with N = 0 nothing more.
+  3. A failure that is both an event and a problem prints once, as its
+     event line with the error; a problem that is no event prints as
+     before. With `--quiet` too: it prints the failure event lines and
+     the counts in place of those problems.
+  4. Unchanged: `recording.log`, the unified log and `recording.json`
+     keep every event; the status line, the status window and the
+     summary count as before.
+  5. An event says what happened (the architect's review, 2026-11-19):
+     `system audio started` is told once the system audio's file has
+     started, at the file's start, not at each restart attempt; an
+     attempt that fails tells only its failure, which then counts as a
+     repeat. Audio inputs tell no start event at a restart.
+- **Consequences:** a lasting failure of a source prints its first
+  failure and one count line. A problem told by its event includes a
+  screen file's or an audio file's end that a failure event tells.
+- **Evidence:** [design/recorder.md](design/recorder.md), "Logging";
+  `RepeatedFailuresTests`, `RecordOutputTests`, `CaptureEndReportsTests`,
+  `AudioCaptureTests`, `AudioTrackerTests`.
+
+## D66: A failed file ends where it really ends; the capture's frames and writer are logged (2026-11-19)
+
+- **Status:** in force.
+  Point 3's "expected to fail on the runner" and the context's cause
+  are corrected by D67.
+- **Context:** The end-to-end scenario `virtual-screen` of PR #23 fails
+  on the hosted macOS runner in about 2 of 7 runs: about 0.25 s after a
+  new virtual screen's mode switch (1280×720 to 1600×900) the screen
+  file writer fails with `AVFoundationErrorDomain -11800` from `OSStatus
+  -19092`. The file keeps its first 2 s fragment and decodes, but
+  `recording.json` says it ends at 6.933 s while its content ends at
+  5.667 s; the owner's Mac shows 0 failures in 10 runs. The owner:
+  "PR23 must achieve good quality. Keep working on it and grinding
+  away", wanting it root-caused, not retried away. This round collects
+  evidence and fixes the one lie; it changes no capture behaviour.
+- **Decision:**
+  1. When a screen file's or an audio file's writer fails, the file's
+     end in `recording.json` is what the file holds: after the file is
+     closed its duration is read (`AVURLAsset`, loaded asynchronously)
+     and the end is the start plus that. A problem says how many
+     seconds were lost, from the real end to the failure's time. A file
+     that cannot be read ends at its start, and the problem says so.
+  2. The recording log gets detail lines of category `capture`: each
+     screen capture's frame facts (size, pixel format, colour
+     attachments, ICC profile, content rect, scale factor, the screen
+     check's verdict) at the first frame and at each change; per screen
+     file the video settings, the HEVC encoders VideoToolbox lists and
+     each change of the video input's readiness; and, when a writer
+     fails, what each of its inputs took, which append returned false
+     first and the last buffer's IOSurface ID and whether it was a
+     repeat.
+  3. A failed end-to-end scenario saves the system log of its time
+     (`logs/system.log`), the review artifact keeps every scenario's
+     `msr.err`, and a stress scenario, `virtual-screen-stress`, makes
+     the mode switch happen ten times; it is expected to fail on the
+     runner until the cause is found and fixed.
+- **Consequences:** a failed file's manifest entry is truthful; no
+  capture behaviour changed. The cause stays open: whether a
+  post-switch frame of the new size reaches a writer set to the old one
+  is logged, not yet fixed.
+- **Evidence:** [design/recorder.md](design/recorder.md), "Logging" and
+  "A failed file's end"; [design/end-to-end-tests.md](design/end-to-end-tests.md);
+  `FailedFileEndTests`, `FailedFileEndsTests`, `FrameFactsTests`,
+  `ScreenFileWriterTests`, `SystemLogTests`, `ScenarioTests`.
+
+## D67: The end-to-end tests are a manual step in a tart VM, not a pipeline job (2026-11-19)
+
+- **Status:** in force; supersedes D63's pipeline job (point 1) and its
+  artifact upload (point 7), and corrects D66.
+- **Context:** The end-to-end scenario `virtual-screen` failed on
+  GitHub's hosted macOS runner in about 2 of 9 runs: at a virtual
+  screen's mode switch the runner's video encoder stalled at +6.6 to
+  +7.0 s into the recording, in both screen files at once, and the
+  screen file writer failed inside the stall with `-11800` from
+  `-19092`. It did not happen in 18 runs on the owner's Mac and in a
+  tart VM (0 failures). Hosted macOS arm64 runners are also often
+  unavailable. The owner (2026-11-19): "We'll leave e2e a manual step
+  that uses the VM and another script for setup. You'll run e2e
+  manually when needed and mark in the pr that it succeeded. Kiss".
+- **Decision:**
+  1. The job `end-to-end-test` is removed from `.github/workflows/ci.yml`;
+     `snapshot-release` and `release` need only `test-and-build`.
+  2. `scripts/end-to-end-setup` builds the tart VM `msr-end-to-end`
+     (Cirrus Labs' `macos-tahoe-vanilla`, SIP disabled through Recovery
+     by Packer, the TCC rows as actions/runner-images writes them,
+     Python 3.15, ffmpeg, ffprobe and BlackHole 2ch); re-running rebuilds
+     it. It needs `tart` and `packer` on the `PATH` and installs
+     neither. Its helper files are in `scripts/end-to-end-vm/`.
+  3. `scripts/ci-install-end-to-end-tools` is now
+     `scripts/install-end-to-end-tools`, takes the folder for ffmpeg and
+     ffprobe as its argument, keeps its SHA-256 checks and runs inside
+     the VM.
+  4. `scripts/end-to-end-test --scratch-folder <folder>` is the one way
+     to run the tests: it builds on the Mac, runs the driver in a
+     throwaway clone of the VM, copies the scratch folder back, deletes
+     the clone also on failure and exits with the driver's status; the
+     driver's other arguments pass through. `restore` and `state` are no
+     longer reached through it: a run changes only the clone (the
+     driver's own messages name `msr-end-to-end restore --scratch-folder
+     <folder>`, to run in the VM).
+  5. Before a PR that touches the recorder or the end-to-end driver is
+     marked ready, the architect runs the tests on the PR's head and
+     records the commit and the result in the PR description
+     (`AGENTS.md`). The unit tests of the driver's logic stay in
+     `scripts/test`.
+  6. Correction of D66: the stress scenario `virtual-screen-stress` was
+     "expected to fail on the runner" but passed there, and no frame of
+     the new size ever reached the old file; the failure is the
+     encoder's stall, not a writer fed a wrong frame. The cause in the
+     runner's encoder stays unfixed; it is not a recorder fault shown by
+     these tests.
+  7. The VM's TCC rows are not narrowed: Screen & System Audio Recording,
+     Microphone and Accessibility go to bash, sshd-keygen-wrapper, the
+     app's `msr`, the driver and the app's bundle id, and Automation
+     from each of those to System Events, Finder and the app; in a
+     SIP-disabled throwaway VM narrowing buys no security and would cost
+     an image rebuild (the architect's decision).
+  8. SSH to the VM uses the image's published default login for every
+     login (`scripts/end-to-end-vm/askpass`), no key. The owner: "Default
+     creds are no secret, obviously".
+  9. Follow-ups of the same day, the owner: "we need full export of
+     results, screenshots and desktop video from the e2e runs": every
+     scenario's whole folder (recordings, `recording.json`,
+     `recording.log`, `logs/`) stays in the scratch folder and is copied
+     back, passed or failed; the start window, the status window (a PNG and a
+     5 s video before Stop) and a Finder window of the recording folder
+     are taken in light and, when `scripts/end-to-end-test` tells the
+     driver it runs in the throwaway VM (`--throwaway-vm`), in dark; a run
+     without the flag takes the start window in light only;
+     and "Document manual steps to find, interact with, and stop the VM
+     in case it is lost" ("When a VM is left behind").
+  10. A click spacing failure of the `tone` scenario is pardoned only
+     when the recording holds a hole (a quiet run at sample resolution)
+     that starts within 0.1 s of a playback break the player measured,
+     each hole with a break of its own (so pardons never exceed the
+     break count, counted per played track: the tracks of the loopback
+     device's file record the same playback, each showing the same holes), and the clicks on either side are a whole number of
+     seconds apart within 1 ms; each pardon is reported in `run.log`.
+     This replaces D63's "a named break is still a failure". The case:
+     run 4 of the architect's VM runs at 3c8fe02 failed `tone` because
+     the test's own player ran late (an overload at 4.643 s), the
+     loopback device carried 32 ms of zeros from 4.641 s and the
+     recorder recorded exactly that, the clicks on either side exactly
+     2.000 s apart. The owner, on reconsidering earlier rulings: "we
+     need to take a step towards quality and own the trade off, be less
+     literal about previous rulings ... New learnings mean we
+     reconsider, adapt and improve". The failed scenario's system log
+     also covers `coreaudiod`.
+- **Consequences:** the pipeline no longer gates the recorder's capture
+  behaviour: a person runs the tests, and the PR description says
+  whether they passed. The pipeline is faster and no longer depends on
+  a macOS runner's encoder. The VM takes 27 GB of the owner's disk and
+  3.5 minutes to build; a run takes about 2 minutes and nothing records
+  on the Mac itself. The driver's GitHub job summary and annotations
+  (`GitHubOutput`, `GitHubReport`) are removed, as nothing would use
+  them.
+- **Evidence:** [design/end-to-end-tests.md](design/end-to-end-tests.md),
+  "Running them" and "Why the VM"; [design/delivery.md](design/delivery.md);
+  `scripts/end-to-end-setup`, `scripts/end-to-end-test`,
+  `scripts/install-end-to-end-tools`, `scripts/end-to-end-vm/`;
+  the setup and a full pass of the 7 scenarios in the VM on
+  2026-11-19.

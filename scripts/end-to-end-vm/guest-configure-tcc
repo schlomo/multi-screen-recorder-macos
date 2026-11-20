@@ -1,0 +1,60 @@
+#!/bin/bash
+# Runs as root INSIDE the VM (SIP disabled): grants Screen & System Audio
+# Recording and Microphone in the system and the admin user's TCC.db, row
+# for row in the form actions/runner-images' configure-tccdb-macos.sh writes
+# for GitHub's runners (17 columns, client by path, allowed). Screen & System
+# Audio Recording, Microphone and Accessibility go to bash, sshd-keygen-wrapper
+# (what ssh sessions are attributed to), the app's msr, the driver and the app's
+# bundle id; Automation (Apple events) from each of those clients to System
+# Events, Finder and the app. Not narrowed: in a SIP-disabled throwaway VM that
+# buys no security and would cost an image rebuild (D67).
+#   guest-configure-tcc <app root>   <app root>: the folder holding build/ and the driver
+set -euo pipefail
+me="guest-configure-tcc"
+die() { echo "$me: $*" >&2; exit 1; }
+
+[[ $# == 1 ]] || die "usage: $me <app root>"
+[[ $EUID == 0 ]] || die "runs as root"
+[[ $(csrutil status) == *disabled* ]] || die "SIP is enabled; TCC.db cannot be written"
+command -v sqlite3 >/dev/null || die "sqlite3 is not on the PATH"
+# tccd may hold the database for a moment after the boot.
+sqlite() { sqlite3 -cmd ".timeout 30000" "$@"; }
+app_root="$1"
+system_db="/Library/Application Support/com.apple.TCC/TCC.db"
+user_db="/Users/admin/Library/Application Support/com.apple.TCC/TCC.db"
+sshd_csreq="X'fade0c000000003c0000000100000006000000020000001d636f6d2e6170706c652e737368642d6b657967656e2d7772617070657200000000000003'"
+now=$(date +%s)
+
+clients=(
+    "'/bin/bash',1,NULL"
+    "'/usr/libexec/sshd-keygen-wrapper',1,$sshd_csreq"
+    "'$app_root/build/Multi Screen Recorder.app/Contents/MacOS/msr',1,NULL"
+    "'$app_root/msr-end-to-end',1,NULL"
+    "'org.schapiro.multiscreenrecorder',0,NULL"
+)
+services=(kTCCServiceScreenCapture kTCCServiceMicrophone kTCCServiceAccessibility)
+
+# Automation (Apple events): every client above may drive System Events (the appearance), Finder
+# (its window) and the app (its reopen event, which opens its status window).
+automation_targets=(com.apple.systemevents com.apple.finder org.schapiro.multiscreenrecorder)
+
+for db in "$system_db" "$user_db"; do
+    [[ -f $db ]] || die "$db is missing"
+    columns=$(sqlite "$db" "SELECT count(*) FROM pragma_table_info('access');")
+    [[ $columns == 17 ]] || die "$db's access table has $columns columns, not the 17 the runner image writes"
+    for service in "${services[@]}"; do
+        for client in "${clients[@]}"; do
+            IFS=, read -r name type csreq <<<"$client"
+            sqlite "$db" "INSERT OR REPLACE INTO access VALUES('$service',$name,$type,2,4,1,$csreq,NULL,0,'UNUSED',NULL,0,$now,NULL,NULL,'UNUSED',$now);"
+        done
+    done
+    for client in "${clients[@]}"; do
+        IFS=, read -r name type csreq <<<"$client"
+        for target in "${automation_targets[@]}"; do
+            sqlite "$db" "INSERT OR REPLACE INTO access VALUES('kTCCServiceAppleEvents',$name,$type,2,4,1,$csreq,NULL,0,'$target',NULL,0,$now,NULL,NULL,'UNUSED',$now);"
+        done
+    done
+    echo "$me: $db"
+    sqlite "$db" "SELECT service, client, indirect_object_identifier, auth_value FROM access WHERE service IN ('kTCCServiceScreenCapture','kTCCServiceMicrophone','kTCCServiceAccessibility','kTCCServiceAppleEvents');"
+done
+chown admin:staff "$user_db"
