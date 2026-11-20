@@ -59,8 +59,9 @@ end to end on a Mac: [design/end-to-end-tests.md](design/end-to-end-tests.md)
   (window, Dock icon) and the command line (D13, D19).
 - **Settings:** one JSON file shared by both front ends (D13).
 - **Output:** a recording folder per recording, holding the screen
-  files of each screen, the audio files of each audio source, and the
-  recording manifest (D20, D31).
+  files of each screen, the audio files of each audio source, the
+  recording manifest (D20, D31) and a timeline file for DaVinci
+  Resolve (D68).
 
 ## 3. Decisions in force
 
@@ -116,6 +117,10 @@ D28).
   open (D34).
 - A recording folder and one recording manifest per recording;
   recordings into different folders may run in parallel (D20).
+- A timeline file (OpenTimelineIO, in the form Resolve 21.2 exports)
+  in every recording folder, written at Stop and by `msr timeline`;
+  Resolve takes no resolution from it, so its first marker says
+  what to set (D68).
 - Safeguards: a ready check before Start (it refuses a recording with
   nothing to record, D62), low-disk warnings,
   crash-safe fragmented files, keeping the Mac awake (D14). The window

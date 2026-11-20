@@ -157,7 +157,7 @@ extension CommandLineInterface {
             abstract: "Write a recording folder's DaVinci Resolve timeline file.",
             discussion: "Reads the folder's recording.json and writes the timeline file next to it, replacing an older one; "
                 + "writes and deletes nothing else. Prints the file's path. Exits 1 with the error on standard error when "
-                + "recording.json cannot be read or a file's length cannot be read.")
+                + "recording.json cannot be read, a file's length cannot be read or the file cannot be written.")
 
         @Argument(help: "The recording folder.", completion: .directory)
         var folder: String

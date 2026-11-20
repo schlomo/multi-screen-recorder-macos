@@ -361,7 +361,10 @@ Media are linked by file name only, relative to the timeline file.
 - **Lengths** are the file's `end - start` in frames, rounded down, never
   up: Resolve drops the channel mapping of a clip one frame longer than
   its file. A file's first frame is its timecode in frames; the timeline
-  starts at the smallest of them.
+  starts at the smallest of them. A file after midnight is placed a day
+  later than its timecode says, so it follows the earlier files; its clip
+  keeps its own timecode (the files' own timecodes across midnight stay
+  deferred).
 - **Tracks:** a video track per screen (the guide tracks are left off),
   V1 the screen whose file starts at the timeline's start and runs
   longest, then the others by number; then the audio tracks by source

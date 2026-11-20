@@ -11,11 +11,11 @@ func timelineFixture(_ name: String) throws -> String {
 
 /// A manifest from the JSON parts of a recording that started 2026-11-20 10:00:00.000 in Berlin.
 private func manifest(
-    ended: String? = "2026-11-20T10:02:10.000+01:00", files: [String], events: [String] = [], problems: [String] = []
+    started: String = "2026-11-20T10:00:00.000+01:00", ended: String? = "2026-11-20T10:02:10.000+01:00", files: [String], events: [String] = [], problems: [String] = []
 ) throws -> RecordingManifest {
     let end = ended.map { "\"\($0)\"" } ?? "null"
     let json = """
-        {"app": "test", "state": "finalized", "started": "2026-11-20T10:00:00.000+01:00", "ended": \(end),
+        {"app": "test", "state": "finalized", "started": "\(started)", "ended": \(end),
          "settings": {"audioMode": "wired", "resolution": "native", "systemAudio": true},
          "files": [\(files.joined(separator: ","))], "events": [\(events.joined(separator: ","))],
          "problems": [\(problems.joined(separator: ","))]}
@@ -27,9 +27,10 @@ private func screen(
     _ stamp: String = "10.00.00", _ label: String, timecode: String = "10:00:00:00", start: Double = 0, end: Double? = 10,
     size: (Int, Int) = (1920, 1080), suffix: String = ""
 ) -> String {
+    let source = label.components(separatedBy: " - ").dropFirst().joined(separator: " - ")
     let endText = end.map { String($0) } ?? "null"
     return """
-        {"name": "2026-11-20 \(stamp) \(label)\(suffix).mov", "screen": "x", "screenUUID": "u", "frameSize": [\(size.0), \(size.1)],
+        {"name": "2026-11-20 \(stamp) \(label)\(suffix).mov", "screen": "\(source)", "screenUUID": "u", "frameSize": [\(size.0), \(size.1)],
          "start": \(start), "end": \(endText), "timecode": "\(timecode)", "state": "finalized", "guideTracks": [],
          "framesRepeatedForLateness": 0}
         """
@@ -39,9 +40,10 @@ private func audio(
     _ stamp: String = "10.00.00", _ label: String, channels: String, timecode: String = "10:00:00:00", start: Double = 0,
     end: Double? = 10, suffix: String = ""
 ) -> String {
+    let source = label.components(separatedBy: " - ").dropFirst().joined(separator: " - ")
     let endText = end.map { String($0) } ?? "null"
     return """
-        {"name": "2026-11-20 \(stamp) \(label)\(suffix).mov", "audioSource": "x", "channels": \(channels), "start": \(start),
+        {"name": "2026-11-20 \(stamp) \(label)\(suffix).mov", "audioSource": "\(source)", "channels": \(channels), "start": \(start),
          "end": \(endText), "timecode": "\(timecode)", "state": "finalized"}
         """
 }
@@ -142,7 +144,7 @@ private extension Dictionary where Key == String, Value == Any {
             Multi Screen Recorder, recording 2026-11-20 10:00:00 to 10:02:10 (2m10s).
             Set the timeline resolution to 3440 x 1440 (the largest screen): Timeline > Timeline Settings.
             Tracks: one per screen, one per audio channel; the channels of one input are a linked group.
-            Markers: green = audio change, blue = screen change.
+            Markers: blue = screen change, green = audio and other changes.
             Problems:
             10:00:03 +3.5s problem: Screen LG: stream failed
             """)
@@ -171,13 +173,22 @@ private extension Dictionary where Key == String, Value == Any {
         #expect(result.tracks[0].resolve["Locked"] as? Bool == false)
     }
 
-    @Test func withoutAScreenAtTheTimelineStartTheScreensGoByNumber() throws {
+    @Test func v1IsChosenAmongTheScreensThatStartFirstNotAmongAllFiles() throws {
+        let result = try timeline(manifest(files: [
+            audio("09.59.59", "Audio 1 - M", channels: "1", timecode: "09:59:59:29", start: 0, end: 70),
+            screen("10.00.00", "Screen 1 - A", end: 8),
+            screen("10.00.00", "Screen 2 - B", end: 9),
+        ]))
+        #expect(result.trackNames == ["Screen 2 - B", "Screen 1 - A", "Audio 1 - M"])
+    }
+
+    @Test func withoutAScreenAtTheTimelineStartTheEarliestScreenIsV1() throws {
         let result = try timeline(manifest(files: [
             screen("10.00.05", "Screen 2 - B", timecode: "10:00:05:00", start: 5, end: 60),
             screen("10.00.06", "Screen 1 - A", timecode: "10:00:06:00", start: 6, end: 10),
             audio("10.00.00", "Audio 1 - M", channels: "1", end: 70),
         ]))
-        #expect(result.trackNames == ["Screen 1 - A", "Screen 2 - B", "Audio 1 - M"])
+        #expect(result.trackNames == ["Screen 2 - B", "Screen 1 - A", "Audio 1 - M"])
     }
 
     @Test func eventsOnOneFrameMakeOneMarkerAndAnEventAtFrameZeroJoinsTheInfoMarker() throws {
@@ -230,6 +241,45 @@ private extension Dictionary where Key == String, Value == Any {
             screen("10.00.00", "Screen 1 - A", suffix: " (2)"), audio("10.00.00", "Audio 3 - Cam (Pro)", channels: "1", suffix: " (3)"),
         ]))
         #expect(result.trackNames == ["Screen 1 - A", "Audio 3 - Cam (Pro)"])
+    }
+
+    @Test func aScreenNamedWithACopySuffixKeepsItInItsTrackName() throws {
+        let result = try timeline(manifest(files: [
+            screen("10.00.00", "Screen 1 - DELL U2720Q (2)"),
+            screen("10.00.05", "Screen 1 - DELL U2720Q (2)", timecode: "10:00:05:00", start: 5, suffix: " (2)"),
+        ]))
+        #expect(result.trackNames == ["Screen 1 - DELL U2720Q (2)"])
+    }
+
+    @Test func aFileOfZeroFramesGetsNoClipAndNoGap() throws {
+        let result = try timeline(manifest(files: [
+            audio("10.00.00", "Audio 1 - M", channels: "1", timecode: "10:00:01:00", start: 1, end: 5),
+            audio("10.00.06", "Audio 1 - M", channels: "1", timecode: "10:00:06:00", start: 6, end: 6.02),
+            audio("10.00.08", "Audio 1 - M", channels: "1", timecode: "10:00:08:00", start: 8, end: 9),
+            screen("10.00.00", "Screen 2 - Z", end: 0.01),
+        ]))
+        #expect(result.trackNames == ["Audio 1 - M"])
+        let kinds = result.tracks[0].children.map { $0["OTIO_SCHEMA"] as! String }
+        #expect(kinds == ["Clip.2", "Gap.1", "Clip.2"])
+        #expect(result.tracks[0].children[1].frames == (0, 90))
+        #expect(result["global_start_time"] != nil)
+    }
+
+    @Test func aFileAfterMidnightIsPlacedAfterTheEarlierFilesAndKeepsItsOwnTimecode() throws {
+        let result = try timeline(manifest(
+            started: "2026-11-20T23:50:00.000+01:00", ended: "2026-11-21T00:02:00.000+01:00",
+            files: [
+                screen("23.50.00", "Screen 1 - A", timecode: "23:50:00:00", end: 700),
+                audio("00.01.10", "Audio 1 - M", channels: "1", timecode: "00:01:10:00", start: 670, end: 700),
+            ],
+            events: [event("screen connected", at: 680, extra: #", "screen": "LG""#)]))
+        let startOfScreen = ((23 * 60 + 50) * 60) * 30.0
+        func start(_ clip: JSON) -> Double { (((clip["source_range"] as! JSON)["start_time"] as! JSON)["value"] as! Double) }
+        #expect(((result["global_start_time"] as! JSON)["value"] as! Double) == startOfScreen)
+        #expect(result.tracks[1].children.map { $0["OTIO_SCHEMA"] as! String } == ["Gap.1", "Clip.2"])
+        #expect(result.tracks[1].children[0].frames == (0, 20100))
+        #expect(start(result.tracks[1].clips[0]) == 2100)
+        #expect(result.stack.markers[1].frames == (20400, 1))
     }
 
     @Test func audioTracksFollowTheSourceNumberWithLinkedChannelsAndTheStereoSystemAudio() throws {

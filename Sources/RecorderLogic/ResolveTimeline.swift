@@ -50,17 +50,19 @@ public enum ResolveTimeline {
         manifest: RecordingManifest, folderName: String, mediaSeconds: [String: Double]
     ) throws -> Data {
         let name = timelineName(forFolder: folderName)
+        let recordingStart = Int((try Moment(manifest.started).secondsOfDay * rate).rounded())
         let screens = try manifest.files.map { file in
             try Placed(
-                name: file.name, timecode: file.timecode, start: file.start, end: file.end, mediaSeconds: mediaSeconds[file.name],
-                channels: nil)
-        }
+                name: file.name, source: file.screen, timecode: file.timecode, start: file.start, end: file.end,
+                mediaSeconds: mediaSeconds[file.name], channels: nil, recordingStart: recordingStart)
+        }.filter { $0.frames > 0 }
         let audios = try manifest.audioFiles.map { file in
             try Placed(
-                name: file.name, timecode: file.timecode, start: file.start, end: file.end, mediaSeconds: mediaSeconds[file.name],
-                channels: file.channels)
-        }
-        let timelineStart = (screens + audios).map(\.startFrame).min() ?? 0
+                name: file.name, source: file.audioSource, timecode: file.timecode, start: file.start, end: file.end,
+                mediaSeconds: mediaSeconds[file.name], channels: file.channels, recordingStart: recordingStart)
+        }.filter { $0.frames > 0 }
+        let earliest = (screens + audios).min { $0.startFrame < $1.startFrame }
+        let timelineStart = earliest?.startFrame ?? 0
         let videoTracks = Self.videoTracks(screens, timelineStart: timelineStart)
         let audioTracks = Self.audioTracks(audios, timelineStart: timelineStart)
         let markers = try Self.markers(manifest: manifest, name: name, timelineStart: timelineStart)
@@ -68,7 +70,7 @@ public enum ResolveTimeline {
             ("OTIO_SCHEMA", "Timeline.1"),
             ("name", .string(name)),
             ("metadata", .object([("Resolve_OTIO", .object([("Resolve OTIO Meta Version", "1.0")]))])),
-            ("global_start_time", time(timelineStart)),
+            ("global_start_time", time(earliest?.timecodeFrame ?? 0)),
             ("tracks", .object([
                 ("OTIO_SCHEMA", "Stack.1"),
                 ("name", ""),
@@ -87,25 +89,33 @@ public enum ResolveTimeline {
 
     private struct Placed {
         let name: String
+        /// Where the file goes on the timeline: its timecode in frames, a day later for a file after midnight.
         let startFrame: Int
+        /// The file's own timecode in frames, which its clip's source range keeps.
+        let timecodeFrame: Int
         let frames: Int
         let channels: RecordingManifest.AudioFile.Channels?
         let label: String
         let number: Int
 
         init(
-            name: String, timecode: String, start: Double, end: Double?, mediaSeconds: Double?,
-            channels: RecordingManifest.AudioFile.Channels?
+            name: String, source: String, timecode: String, start: Double, end: Double?, mediaSeconds: Double?,
+            channels: RecordingManifest.AudioFile.Channels?, recordingStart: Int
         ) throws {
             guard let match = timecode.wholeMatch(of: /(\d+):(\d+):(\d+):(\d+)/),
                   let hours = Int(match.1), let minutes = Int(match.2), let seconds = Int(match.3), let frames = Int(match.4)
             else { throw Failure.unreadable(what: "the timecode of \(name)", text: timecode) }
             self.name = name
-            startFrame = ((hours * 60 + minutes) * 60 + seconds) * RecorderValues.framesPerSecond + frames
+            let framesPerDay = 24 * 60 * 60 * RecorderValues.framesPerSecond
+            timecodeFrame = ((hours * 60 + minutes) * 60 + seconds) * RecorderValues.framesPerSecond + frames
+            // Past midnight, the timecode starts over: a timecode half a day or more before where the file
+            // starts after the recording's start is on the next day.
+            let expected = recordingStart + Int((start * ResolveTimeline.rate).rounded())
+            startFrame = timecodeFrame + (timecodeFrame + framesPerDay / 2 <= expected ? framesPerDay : 0)
             guard let length = end.map({ $0 - start }) ?? mediaSeconds else { throw Failure.lengthMissing(file: name) }
             self.frames = ResolveTimeline.frames(seconds: length)
             self.channels = channels
-            label = Self.label(ofFileName: name)
+            label = Self.label(ofFileName: name, source: source)
             number = SourceLabel.listPosition(ofFileName: name).number
         }
 
@@ -124,9 +134,10 @@ public enum ResolveTimeline {
         }
 
         /// "Screen 1 - DELL P3421W": the file name without its time stamp, its extension and a " (2)" suffix.
-        static func label(ofFileName name: String) -> String {
-            name.replacing(/^\d{4}-\d{2}-\d{2}\ \d{2}\.\d{2}\.\d{2}\ /, with: "")
-                .replacing(/\.mov$/, with: "").replacing(/\ \(\d+\)$/, with: "")
+        static func label(ofFileName name: String, source: String) -> String {
+            let base = name.replacing(/^\d{4}-\d{2}-\d{2}\ \d{2}\.\d{2}\.\d{2}\ /, with: "").replacing(/\.mov$/, with: "")
+            // A source's own name can end in " (2)"; only a suffix beyond it marks a file name made unique.
+            return base.hasSuffix(RecordingNames.fileNamePart(source)) ? base : base.replacing(/\ \(\d+\)$/, with: "")
         }
     }
 
@@ -134,7 +145,8 @@ public enum ResolveTimeline {
 
     private static func videoTracks(_ screens: [Placed], timelineStart: Int) -> [Node] {
         let bySource = Dictionary(grouping: screens, by: \.number)
-        let first = screens.filter { $0.startFrame == timelineStart }
+        let earliestScreenStart = screens.map(\.startFrame).min()
+        let first = screens.filter { $0.startFrame == earliestScreenStart }
             .max { ($0.frames, -$0.number) < ($1.frames, -$1.number) }?.number
         let order = (first.map { [$0] } ?? []) + bySource.keys.sorted().filter { $0 != first }
         return order.map { number in
@@ -210,7 +222,7 @@ public enum ResolveTimeline {
     }
 
     private static func clip(_ file: Placed, metadata: Node) -> Node {
-        let available = range(start: file.startFrame, frames: file.frames)
+        let available = range(start: file.timecodeFrame, frames: file.frames)
         return .object([
             ("OTIO_SCHEMA", "Clip.2"),
             ("name", .string(file.name)),
@@ -251,7 +263,7 @@ public enum ResolveTimeline {
             note.append("Set the timeline resolution to \(size) (the largest screen): Timeline > Timeline Settings.")
         }
         note.append("Tracks: one per screen, one per audio channel; the channels of one input are a linked group.")
-        note.append("Markers: green = audio change, blue = screen change.")
+        note.append("Markers: blue = screen change, green = audio and other changes.")
         note.append(manifest.problems.isEmpty ? "Problems: none." : "Problems:")
         note += manifest.problems.map { EventLine.problemText($0, started: started.date, timeZone: started.timeZone) }
         note += (eventsByFrame[0] ?? []).map(eventText)

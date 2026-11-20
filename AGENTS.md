@@ -252,7 +252,7 @@ this is how they map per tool.
 
 `scripts/test` compiles the Python scripts, then runs the tests (Swift
 Testing, `swift test`), including those that run `msr settings`,
-`msr version` and the scripts as commands; `scripts/build-app` builds the app in `build/` (signed ad
+`msr version`, `msr timeline` and the scripts as commands; `scripts/build-app` builds the app in `build/` (signed ad
 hoc), `scripts/smoke-test` runs the bundled `msr` safely, and
 `scripts/sign-app` re-signs and zips it (`SIGNING_IDENTITY=-` signs ad
 hoc, for a local check only), and `scripts/install-app` installs it (see
