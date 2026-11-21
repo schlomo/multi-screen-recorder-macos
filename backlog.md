@@ -2,11 +2,11 @@
 
 ## Next session starts here
 
-Item 23, the Resolve timeline, is in flight as PR #25 (2026-11-20):
-the format was learnt from a timeline Resolve 21.2 exported itself
-(D68). Left on it: the owner's import of the golden `.otio`, the
-end-to-end run, the adversarial review, the unmarked commit and the
-pipeline. Then, one PR each: item 21, the meters (design signed off);
+Item 23, the Resolve timeline, is PR #25, ready for the owner's merge
+(2026-11-21): reviewed, end-to-end tests passed on c5a4bbc, pipeline
+green on 2dc00a4. Left: the owner's import of
+`2026-11-20 12-36-09.otio` from the example recording into Resolve,
+and the merge. Then, one PR each: item 21, the meters (design signed off);
 item 3's follow-up; item 4; item 7; item 12; item 22; the rest of item
 6; item 16.
 
@@ -25,7 +25,7 @@ Still open from D34: what AGC does and whether it is on in auto mode;
 
 ## In flight
 
-- Item 23, the Resolve timeline file: PR #25, draft (2026-11-20).
+- Item 23, the Resolve timeline file: PR #25, ready for the owner's merge (2026-11-21).
 
 ## Queued
 
@@ -613,6 +613,17 @@ Still open from D34: what AGC does and whether it is on in auto mode;
    record for lack of space [ASSUMED]. Find out when macOS returns 0
    (compare with `volumeAvailableCapacity` and `statfs` in the failing
    situation) and fix the reading at its root; never retry it away.
+34. **The end-to-end driver's Microphone precondition fails at random**
+   (PR #25, 2026-11-21): two runs of `scripts/end-to-end-test` on the
+   branch stopped before any scenario with "the program running this
+   (a terminal app) lacks the Microphone permission" inside the freshly
+   booted VM clone, although the Screen Recording precondition just
+   before it passed; `main` and a third run of the same branch then
+   passed all 7 scenarios on the same image. Find out what the
+   Microphone check sees right after the boot (tccd not ready, the
+   attributed client) and fix it at its root; add the error text to
+   `docs/troubleshooting.md`. Running `msr check` on the Mac does not
+   help: the check runs in the VM.
 
 ## Deliberately deferred
 
