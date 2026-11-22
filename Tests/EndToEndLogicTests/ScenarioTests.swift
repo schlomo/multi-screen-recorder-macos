@@ -127,4 +127,32 @@ import Testing
         #expect(expectation.events.map(\.event) == ["screen connected"])
         #expect(spec.name == "MSR Test 102")
     }
+
+    @Test func theStatusWindowsScreensComeBackSoAFileCountIsAboveOne() {
+        let events = Scenario.statusWindowScreenEvents
+        #expect(events.map(\.at) == events.map(\.at).sorted())
+        var connected: Set<UInt32> = []
+        var connects: [UInt32: Int] = [:]
+        for (_, event) in events {
+            switch event {
+            case .connectScreen(let spec):
+                #expect(connected.insert(spec.serialNumber).inserted)
+                connects[spec.serialNumber, default: 0] += 1
+            case .disconnectScreen(let serial): #expect(connected.remove(serial) != nil)
+            case .switchScreenMode: Issue.record("the status window's screens switch no mode")
+            }
+        }
+        #expect(connected.count >= 2, "several screens are connected at the capture")
+        #expect(connects.values.contains { $0 > 1 }, "one screen came back")
+    }
+
+    @Test func theStatusWindowsScreensHaveIdentitiesOfTheirOwn() {
+        let scenarioSerials = Scenario.named.flatMap(\.events).compactMap { _, event -> UInt32? in
+            if case .connectScreen(let spec) = event { spec.serialNumber } else { nil }
+        }
+        let ownSerials = Scenario.statusWindowScreenEvents.compactMap { _, event -> UInt32? in
+            if case .connectScreen(let spec) = event { spec.serialNumber } else { nil }
+        }
+        #expect(Set(ownSerials).isDisjoint(with: scenarioSerials))
+    }
 }

@@ -233,8 +233,8 @@ final class Driver {
     }
 
     /// The app's start window, as a person sees it on starting the app:
-    /// the built app started with the scratch HOME, its window captured
-    /// into the review folder, then quit. Its folder stays.
+    /// the built app started with the scratch HOME, brought to the front,
+    /// its window captured into the review folder, then quit. Its folder stays.
     private func startWindow(in appearance: Appearance) throws {
         let folder = scratch.appending(path: "\(ReviewNames.appStep)-\(appearance.rawValue)")
         try? FileManager.default.removeItem(at: folder)
@@ -260,6 +260,7 @@ final class Driver {
             try? restorer.ended(app)
         }
         let id = try Screenshots.windowID(of: app.pid, seconds: 20, interruption: interruption)
+        try Screenshots.bringToFront(app.pid)
         try interruption.sleep(until: Date().addingTimeInterval(1.5))
         let review = scratch.appending(path: ReviewNames.folder).appending(path: ReviewNames.appStep)
         try FileManager.default.createDirectory(at: review, withIntermediateDirectories: true)

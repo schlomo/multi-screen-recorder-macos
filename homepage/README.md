@@ -49,16 +49,17 @@ repository, and the requirements.
   together as tall as it. A click opens the picture full size in a new tab
   (`images/collage.svg`). Below it, three numbered steps say what the
   pictures show; they are in `layouts/home.html`.
-- **Updating the screenshots:**
-  1. Make the windows show what the page should show: the start window
-     with several screens and audio sources, the status window during a
-     recording, the recording folder's Finder window in list view.
-  2. Take each with macOS's screenshot tool: Shift-Command-4, then Space,
-     then Option-click the window (Option leaves out the shadow; the
-     collage draws its own).
-  3. Save them over the three files above, under the same names. Their
-     pixel density and size do not matter.
-  4. Preview with `hugo server` (below) and check that the arrows still
+- **Updating the screenshots:** they come from the end-to-end run (D70),
+  which captures each window active and without macOS's shadow (the
+  collage draws its own), with more screens connected and one of them
+  back after a disconnect.
+  1. Run `scripts/end-to-end-test --scratch-folder <folder>` from the
+     repository's root ([end-to-end-tests.md](../docs/design/end-to-end-tests.md)).
+  2. After a passing run, `scripts/update-homepage-screenshots <folder>`
+     copies its three light captures (`review/app/app-start-window-light.png`,
+     `app-status-window-light.png`, `app-finder-window-light.png`) over
+     the three files above; the PNG diff is the review.
+  3. Preview with `hugo server` (below) and check that the arrows still
      start beside Start and Stop and end at the next window. They point at
      fractions of each screenshot (`$startY`, `$stopY` and the others in
      `collage.html`); only a window whose layout moved those buttons needs

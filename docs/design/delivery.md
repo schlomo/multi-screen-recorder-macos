@@ -10,12 +10,14 @@ delivery, and the one-time developer setup. What the app does is in [recorder.md
 
 **Scripts hold the behaviour; the pipeline only wires them** (thin CI).
 Each script but the CI-only one (`scripts/ci-import-signing-certificate`),
-the end-to-end ones (`scripts/end-to-end-setup`, `scripts/end-to-end-test`),
+the end-to-end ones (`scripts/end-to-end-setup`, `scripts/end-to-end-test`,
+and `scripts/update-homepage-screenshots`, which reads a run's result),
 which run on a developer's Mac only, and the one that runs inside their VM
 (`scripts/install-end-to-end-tools`) runs the same on a developer's Mac and
-in CI. Five are Python (D32): `scripts/version`, `scripts/unpack-app`,
-`scripts/sign-app`, `scripts/smoke-test` and
-`scripts/publish-snapshot-release`; the rest are bash glue around a few
+in CI. Six are Python (D32): `scripts/version`, `scripts/unpack-app`,
+`scripts/sign-app`, `scripts/smoke-test`,
+`scripts/publish-snapshot-release` and
+`scripts/update-homepage-screenshots`; the rest are bash glue around a few
 commands. The Python scripts use the standard library only, so nothing
 is installed, and need Python 3.15 or later, the `python3` on the
 `PATH` of the `macos-26` arm64 runner image (its software list in
@@ -26,7 +28,7 @@ when it moves.
 
 The scripts that take arguments (`scripts/test`, `scripts/version`,
 `scripts/unpack-app`, `scripts/install-app`, `scripts/end-to-end-setup`,
-`scripts/end-to-end-test`) print how to use them with `--help` or `-h`.
+`scripts/end-to-end-test`, `scripts/update-homepage-screenshots`) print how to use them with `--help` or `-h`.
 
 | Script | Does |
 |---|---|
@@ -40,6 +42,7 @@ The scripts that take arguments (`scripts/test`, `scripts/version`,
 | `scripts/install-app` | Installs the app into `/Applications` from a local build, the latest release (`--release`), a PR's snapshot release (`--snapshot <n>`) or a zip; see "Installing the app on the developer's Mac" below |
 | `scripts/end-to-end-setup` | Not in the pipeline, run by hand once: builds the tart VM `msr-end-to-end` the end-to-end tests run in (Cirrus Labs' macOS 26 vanilla image, SIP disabled through Recovery by Packer, the Screen & System Audio Recording, Microphone, Accessibility and Automation rows written into TCC.db, Python 3.15 and `scripts/install-end-to-end-tools`); re-running replaces it. Needs `tart` and `packer` on the `PATH`; its helper files are in `scripts/end-to-end-vm/` ([end-to-end-tests.md](end-to-end-tests.md), "Running them") |
 | `scripts/end-to-end-test` | Not in the pipeline: builds the app (`scripts/build-app`) and the end-to-end tests' driver (`msr-end-to-end`, never in the bundle) on the Mac, clones a throwaway VM from `msr-end-to-end`, runs the driver there against the app, copies its whole scratch folder (recordings included) to `--scratch-folder` and deletes the clone, also when the run fails; its exit status is the driver's ([end-to-end-tests.md](end-to-end-tests.md)) |
+| `scripts/update-homepage-screenshots` | Not in the pipeline, run by hand after a passing `scripts/end-to-end-test`: copies the run's three light window captures from its scratch folder (`review/app/`) over the homepage's screenshots in `homepage/assets/images/`, after checking that each capture is a PNG and each screenshot exists, so it changes none or all three ([homepage/README.md](../../homepage/README.md), D70) |
 | `scripts/ci-import-signing-certificate` | CI only: puts the certificate from the secret into a temporary keychain |
 | `scripts/install-end-to-end-tools` | Run inside the VM by `scripts/end-to-end-setup`: downloads ffmpeg and ffprobe (static builds) and BlackHole 2ch at fixed versions, checks each against its SHA-256, puts ffmpeg and ffprobe into the folder given as its argument, installs BlackHole and waits until Core Audio lists it |
 | `scripts/publish-snapshot-release` | Creates or replaces a PR's snapshot release; removes it once the PR is closed (a marked head commit needs an unmarked empty commit first, see [Work branches](../principles/ai-working-process.md#work-branches)) |
