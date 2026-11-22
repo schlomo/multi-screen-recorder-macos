@@ -49,17 +49,26 @@ repository, and the requirements.
   together as tall as it. A click opens the picture full size in a new tab
   (`images/collage.svg`). Below it, three numbered steps say what the
   pictures show; they are in `layouts/home.html`.
-- **Updating the screenshots:** they come from the end-to-end run (D70),
-  which captures each window active and without macOS's shadow (the
-  collage draws its own), with more screens connected and one of them
-  back after a disconnect.
-  1. Run `scripts/end-to-end-test --scratch-folder <folder>` from the
-     repository's root ([end-to-end-tests.md](../docs/design/end-to-end-tests.md)).
-  2. After a passing run, `scripts/update-homepage-screenshots <folder>`
-     copies its three light captures (`review/app/app-start-window-light.png`,
-     `app-status-window-light.png`, `app-finder-window-light.png`) over
-     the three files above; the PNG diff is the review.
-  3. Preview with `hugo server` (below) and check that the arrows still
+- **Updating the screenshots:** they come from the end-to-end run of the
+  published app (D70, D72), which captures each window active and without
+  macOS's shadow (the collage draws its own), with more screens connected
+  and one of them back after a disconnect; so the homepage shows the
+  version it offers. A feature PR does not commit them; a homepage-only
+  follow-up does, on the owner's Mac (the end-to-end VM,
+  [end-to-end-tests.md](../docs/design/end-to-end-tests.md)):
+  1. After a release, `scripts/update-homepage-screenshots --release`
+     runs `scripts/end-to-end-test --release` of `origin/main` in a
+     temporary worktree, copies its three light captures
+     (`review/app/app-start-window-light.png`, `app-status-window-light.png`,
+     `app-finder-window-light.png`) over the three files above, commits
+     them onto `origin/main` as the branch `homepage-screenshots-v<version>`,
+     pushes it and opens a draft PR; the PNG diff is the review, and a
+     human merges it. For a PR's preview, `--snapshot <n>` does the same
+     with PR n's snapshot release and pushes onto PR n's head branch. The
+     commit carries no skip-ci marker, so the preview is built.
+     `scripts/update-homepage-screenshots <folder>` only copies from the
+     scratch folder of a passing run into this checkout.
+  2. Preview with `hugo server` (below) and check that the arrows still
      start beside Start and Stop and end at the next window. They point at
      fractions of each screenshot (`$startY`, `$stopY` and the others in
      `collage.html`); only a window whose layout moved those buttons needs

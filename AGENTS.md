@@ -265,10 +265,16 @@ while it adds a virtual screen and plays a tone into BlackHole, then
 examines the recording folders and takes a screenshot of the app's
 window) and copies its scratch folder back; its exit status is the
 driver's
-([end-to-end-tests.md](docs/design/end-to-end-tests.md)). Before a PR
+([end-to-end-tests.md](docs/design/end-to-end-tests.md)); with
+`--release` or `--snapshot <n>` it runs that published app instead of
+the built one. Before a PR
 that touches the recorder or the end-to-end driver is marked ready,
 the architect runs `scripts/end-to-end-test` on the PR's head and
-records the commit and the result in the PR description.
+records the commit and the result in the PR description. The
+homepage's screenshots come from a published app's run, as a
+homepage-only follow-up that `scripts/update-homepage-screenshots
+--release` (or `--snapshot <n>`) commits, pushes and, for a release,
+opens as a draft PR (D72).
 
 ## Facts that bite
 

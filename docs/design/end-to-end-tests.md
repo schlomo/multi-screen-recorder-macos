@@ -138,8 +138,18 @@ their GUI session runs; SSH answers before that, and until then the
 Microphone permission reads as denied, see
 [troubleshooting.md](../troubleshooting.md)), runs the driver in the admin user's
 GUI session, copies the driver's whole scratch folder to `<folder>` (new
-or empty; "Artifacts for review") and deletes the clone, also when the run fails. Arguments other
-than `--scratch-folder` go to the driver (`--scenario <name>`). The exit
+or empty; "Artifacts for review") and deletes the clone, also when the run fails. With
+`--release` or `--snapshot <n>` it runs the published app instead of
+building one: the latest release's zip or PR n's snapshot release's
+(tag `pr-<n>`), downloaded by `scripts/install-app` into a folder of the
+run's own (signature checked, quarantine removed), signed with the
+owner's certificate; the driver is still built on the Mac, from the
+checkout, so it must be of the app's commit (a driver that expects what
+the app lacks fails its scenarios). The VM's permissions, granted by
+path and bundle id with no code requirement, hold for it too (a
+`--release` run of 0.20261122.79 on 2026-11-22 passed, no prompt; D72).
+Arguments other than `--scratch-folder`, `--release` and `--snapshot`
+go to the driver (`--scenario <name>`). The exit
 status is the driver's. All 7 scenarios and the start window's
 screenshot took 2 minutes 10 seconds with the build. Nothing records or
 plays sound on the Mac itself.
@@ -407,8 +417,8 @@ video from the e2e runs"):
   collage draws its own, D70), each brought to the front first so it is
   captured active, in `review/app/`, named
   `app-<window>-<appearance>.<png|mov>`; `scripts/update-homepage-screenshots`
-  copies the three light PNGs over the homepage's screenshots
-  ([homepage/README.md](../../homepage/README.md)):
+  puts the three light PNGs of a published app's run onto the homepage's
+  screenshots (D72, [homepage/README.md](../../homepage/README.md)):
   - `app-start-window-light.png`, `app-start-window-dark.png`: the real
     start window, the built app started as `msr` without arguments, with
     a scratch `HOME` (its ready check, `state.json` and crash report
