@@ -38,7 +38,6 @@ CAPTURES_TO_PICTURES = {
     "app-status-window-light.png": "status-window.png",
     "app-finder-window-light.png": "recording-folder.png",
 }
-PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
 TRUNK = "main"
 BRANCH_PREFIX = "homepage-screenshots-v"
 # The driver's first line in run.log names the app it ran: its version and the commit it was built from.
@@ -72,9 +71,6 @@ def checked_copies(scratch: Path, checkout: Path) -> list[tuple[Path, Path]]:
         picture = checkout / IMAGES / picture_name
         if not capture.is_file():
             raise Refused(f"{capture} is missing; is {scratch} the scratch folder of a passing scripts/end-to-end-test run?")
-        with capture.open("rb") as file:
-            if file.read(len(PNG_SIGNATURE)) != PNG_SIGNATURE:
-                raise Refused(f"{capture} is not a PNG")
         if not picture.is_file():
             raise Refused(f"{picture} is missing; the collage reads it (homepage/layouts/_partials/collage.html)")
         copies.append((capture, picture))

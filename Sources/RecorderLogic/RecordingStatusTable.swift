@@ -89,7 +89,7 @@ public enum RecordingStatusTable {
                 ? .systemAudio(isRecorded: true) : .audioInput(source.number, name: source.name)
             return Row(
                 source: cell, recordsAt: channels, files: own.count, written: written, state: text(source.state),
-                clockDrift: source.state == .recording ? clockDriftText(clockDrift[source.id]) : "", audioSource: source.id)
+                clockDrift: source.state == .recording || source.state == .noAudio ? clockDriftText(clockDrift[source.id]) : "", audioSource: source.id)
         }
     }
 

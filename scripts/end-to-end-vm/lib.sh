@@ -49,15 +49,17 @@ vm_start() {
 # the console and the tccd of their GUI session runs. SSH answers before that,
 # and until then the user's own permissions (Microphone) read as denied.
 vm_wait_for_login() {
-    for waited in $(seq 0 119); do
+    local deadline=120
+    SECONDS=0
+    while ((SECONDS < deadline)); do
         if guest "[[ \$(stat -f %Su /dev/console) == $guest_user ]] &&
             launchctl print gui/\$(id -u)/com.apple.tccd 2>/dev/null | grep -q '^[[:space:]]*state = running'"; then
-            echo "$me: $guest_user is logged in, after $waited waits of 1 s"
+            echo "$me: $guest_user is logged in, after $SECONDS s"
             return 0
         fi
         sleep 1
     done
-    vm_failed "$vm_booted: $guest_user was not logged in with tccd running within 120 s"
+    vm_failed "$vm_booted: $guest_user was not logged in with tccd running within $deadline s"
 }
 
 # Dies with the reason and the tail of the VM's output, which the exit trap deletes with $work.

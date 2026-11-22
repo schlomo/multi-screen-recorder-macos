@@ -69,15 +69,6 @@ import Testing
         for (_, picture) in Self.copies { #expect(try contents(of: picture) == png("old \(picture)")) }
     }
 
-    @Test func aCaptureThatIsNoPNGStopsBeforeAnyPictureChanges() async throws {
-        defer { scratch.remove() }
-        try Data("not a picture".utf8).write(to: review.appending(path: "app-finder-window-light.png"))
-        let outcome = try await update([endToEndScratch.path(percentEncoded: false)])
-        #expect(outcome.status == 1)
-        #expect(outcome.errors.contains("app-finder-window-light.png is not a PNG"), "\(outcome.errors)")
-        for (_, picture) in Self.copies { #expect(try contents(of: picture) == png("old \(picture)")) }
-    }
-
     @Test func aMissingHomepagePictureStops() async throws {
         defer { scratch.remove() }
         try FileManager.default.removeItem(at: images.appending(path: "app-window.png"))

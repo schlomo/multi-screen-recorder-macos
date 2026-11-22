@@ -118,7 +118,7 @@ import Testing
     }
 
     /// An audio row knows its source, for its level meter and its input
-    /// volume; an input with no audio says so, without a clock drift (D69).
+    /// volume; an input with no audio says so, and shows its clock drift, as the correction keeps running (D69).
     @Test func anAudioInputWithNoAudioSaysSo() {
         var settings = Settings.defaults
         settings.auto = false
@@ -132,7 +132,7 @@ import Testing
             .input("R"): ClockDriftCorrection.Status(clockDriftPpm: -116.12, applied: 0.03494, remaining: 0.00004),
         ])
         #expect(rows.map(\.state) == ["no audio"])
-        #expect(rows.map(\.clockDrift) == [""])
+        #expect(rows.map(\.clockDrift) == ["-116 ppm (+34.9 ms)"])
         #expect(rows.map(\.audioSource) == [.input("R")])
         let screens = RecordingStatusTable.rows(sources: [], files: [], bytes: [:])
         #expect(screens.isEmpty)

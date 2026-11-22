@@ -192,13 +192,6 @@ public final class Recorder {
                 self?.recordingLog?.flushIfDue()
             }
         }
-        inputVolumeTask = Task { [weak self] in
-            while !Task.isCancelled {
-                try? await Task.sleep(for: RecorderValues.inputVolumeReadInterval)
-                guard let self else { return }
-                for uid in inputVolumes.keys { readInputVolume(uid) }
-            }
-        }
     }
 
     private func clockDriftShown() -> [(source: AudioTracker.Source, status: ClockDriftCorrection.Status)] {
@@ -297,7 +290,7 @@ public final class Recorder {
             audioDueTask?.cancel()
             freeSpaceTask?.cancel()
             cpuTask?.cancel()
-            inputVolumeTask?.cancel()
+            stopReadingInputVolumes()
             sampleCPU()
             unregisterForChanges()
             for action in tracker.stopAll() { perform(action) }
@@ -642,6 +635,7 @@ public final class Recorder {
         inputVolumes[uid] = InputVolumeFollow(
             control: control, name: name, captureNumber: captureNumber, changes: InputVolumeChanges(volume: volume),
             latest: volume)
+        startReadingInputVolumes()
         do throws(InputVolumeError) {
             try control.watch { [weak self] in
                 Task { @MainActor in self?.readInputVolume(uid) }
@@ -653,10 +647,29 @@ public final class Recorder {
         }
     }
 
+    /// The followed volumes are read every `inputVolumeReadInterval` from the
+    /// first follow to the last unfollow: a knob may not reach Core Audio's listener.
+    private func startReadingInputVolumes() {
+        guard inputVolumeTask == nil, !isStopped else { return }
+        inputVolumeTask = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: RecorderValues.inputVolumeReadInterval)
+                guard let self else { return }
+                for uid in inputVolumes.keys { readInputVolume(uid) }
+            }
+        }
+    }
+
+    private func stopReadingInputVolumes() {
+        inputVolumeTask?.cancel()
+        inputVolumeTask = nil
+    }
+
     /// The capture ended: a change not told yet is told now.
     private func unfollowInputVolume(_ id: AudioTracker.SourceID, captureNumber: Int) {
         guard case .input(let uid) = id, let follow = inputVolumes[uid], follow.captureNumber == captureNumber else { return }
         inputVolumes[uid] = nil
+        if inputVolumes.isEmpty { stopReadingInputVolumes() }
         follow.control.cancel()
         follow.dueTask?.cancel()
         var changes = follow.changes

@@ -1091,7 +1091,10 @@ the metadata items (see "Output on disk").
   the start gets no file, and one whose file ended for another reason
   (a gap, a change of the channel count) starts its next file with
   its next sound; zeros shorter than 10 s within a file stay in it.
-  This is decided on the corrected audio, which keeps zeros exact. The
+  This is decided on the corrected audio, which keeps zeros exact.
+  Each capture of an input detects no audio on its own: after a
+  capture restart a continuing silence is reported as `no audio
+  started` again, without a `no audio stopped` in between. The
   system audio is excluded: silence is normal there. No audio is no
   problem and no failure: nothing red, no problem entry, `result`
   unchanged. 2 s would have split the speech pauses of a noise-gated
