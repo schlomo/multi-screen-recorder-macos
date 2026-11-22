@@ -72,9 +72,10 @@ public struct CameraTracker: Sendable {
 
     /// Whether a recording records `camera`, the one rule wherever a camera
     /// counts as recorded: the recording resolution records video (None is
-    /// audio only), the camera mode includes it, and it lists a format.
+    /// audio only), the camera mode includes it, it lists a format and is not suspended.
     public static func records(_ camera: CameraInfo, settings: Settings) -> Bool {
         settings.effectiveResolution.recordsScreens && settings.cameraModeIncludes(camera) && camera.chosenFormat != nil
+            && !camera.isSuspended
     }
 
     public init(

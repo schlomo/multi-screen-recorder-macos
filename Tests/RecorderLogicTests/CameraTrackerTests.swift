@@ -51,6 +51,13 @@ import Testing
         #expect(!CameraTracker.records(Self.builtIn, settings: settings))
     }
 
+    /// A suspended camera, such as a laptop's with its lid closed, delivers no picture (D74).
+    @Test func aSuspendedCameraIsNotRecorded() {
+        var camera = Self.builtIn
+        camera.isSuspended = true
+        #expect(!CameraTracker.records(camera, settings: .defaults))
+    }
+
     @Test func aCameraWithoutAFormatIsNotRecorded() {
         var camera = Self.builtIn
         camera.formats = []

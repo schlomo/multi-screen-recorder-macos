@@ -1,5 +1,4 @@
 import AppKit
-import AVFoundation
 import CoreGraphics
 import Foundation
 import RecorderLogic
@@ -102,7 +101,7 @@ public final class Recorder {
     private var freeSpaceTask: Task<Void, Never>?
     private var activity: (any NSObjectProtocol)?
     private var notificationTokens: [any NSObjectProtocol] = []
-    private var cameraTokens: [any NSObjectProtocol] = []
+    private var cameraWatch: CameraWatch?
     private var isLowOnDisk = false
     private var isStopped = false
     private var screenChangePending = false
@@ -122,6 +121,7 @@ public final class Recorder {
     private var cpu = CPUUsage()
     private var cpuTask: Task<Void, Never>?
     private let devices: RecorderDevices
+    private let cameraFrameWatch: CameraFrameWatch
     /// The input volume of each audio input with a running capture, by its UID (D69).
     private var inputVolumes: [String: InputVolumeFollow] = [:]
     private var inputVolumeTask: Task<Void, Never>?
@@ -152,9 +152,10 @@ public final class Recorder {
 
     init(
         settings: Settings, homeFolder: URL, app: String, readyCheckFacts: ReadyCheckFacts, observer: any RecorderObserver,
-        devices: RecorderDevices
+        devices: RecorderDevices, cameraFrameWatch: CameraFrameWatch = CameraFrameWatch()
     ) throws(RecorderStartError) {
         self.devices = devices
+        self.cameraFrameWatch = cameraFrameWatch
         let readsScreens = ReadyCheck.needsScreenRecording(settings)
         let screens: [ConnectedScreen]
         do {
@@ -375,13 +376,7 @@ public final class Recorder {
                 MainActor.assumeIsolated { self?.didWake() }
             },
         ]
-        if readsCameras {
-            cameraTokens = [AVCaptureDevice.wasConnectedNotification, AVCaptureDevice.wasDisconnectedNotification].map { name in
-                NotificationCenter.default.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
-                    MainActor.assumeIsolated { self?.camerasChanged() }
-                }
-            }
-        }
+        if readsCameras { cameraWatch = CameraWatch { [weak self] in self?.camerasChanged() } }
         do {
             audioWatch = try AudioInputWatch { [weak self] in self?.audioInputsChanged() }
         } catch {
@@ -395,8 +390,7 @@ public final class Recorder {
         }
         for token in notificationTokens { NSWorkspace.shared.notificationCenter.removeObserver(token) }
         notificationTokens = []
-        for token in cameraTokens { NotificationCenter.default.removeObserver(token) }
-        cameraTokens = []
+        cameraWatch?.cancel()
         audioWatch?.cancel()
         audioWatch = nil
     }
@@ -631,7 +625,7 @@ public final class Recorder {
         }
     }
 
-    /// AVFoundation reported a camera connected or disconnected, or the Camera permission was answered.
+    /// AVFoundation reported a camera connected, disconnected, suspended or resumed, or the Camera permission was answered.
     func camerasChanged() {
         guard readsCameras, !isStopped else { return }
         applyCameras(cameraTracker.observe(readCameras(), at: context.now()))
@@ -670,6 +664,7 @@ public final class Recorder {
             let capture = CameraCapture(
                 uniqueID: uniqueID, number: number, name: name, frameSize: frameSize,
                 source: devices.cameraSource(uniqueID, format, frameSize), context: context, guides: guides,
+                frameWatch: cameraFrameWatch,
                 onFileStarted: { [weak self] file in
                     Task { @MainActor in self?.cameraFileStarted(file, uniqueID: uniqueID) }
                 },

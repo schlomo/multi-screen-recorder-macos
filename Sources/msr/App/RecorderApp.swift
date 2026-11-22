@@ -1,5 +1,4 @@
 import AppKit
-import AVFoundation
 import RecorderCore
 import RecorderLogic
 import SwiftUI
@@ -15,6 +14,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var stopping: Task<Void, Never>?
     /// For the rest of the process's life.
     private var audioWatch: AudioInputWatch?
+    private var cameraWatch: CameraWatch?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.mainMenu = makeMainMenu()
@@ -36,11 +36,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         ) { _ in
             MainActor.assumeIsolated { model.devicesChanged() }
         }
-        for name in [AVCaptureDevice.wasConnectedNotification, AVCaptureDevice.wasDisconnectedNotification] {
-            _ = NotificationCenter.default.addObserver(forName: name, object: nil, queue: .main) { _ in
-                MainActor.assumeIsolated { model.devicesChanged() }
-            }
-        }
+        cameraWatch = CameraWatch { model.devicesChanged() }
         self.model = model
         startWindow = makeWindow(
             title: "Multi Screen Recorder", content: StartView(model: model) { [weak self] in self?.startRecording() })

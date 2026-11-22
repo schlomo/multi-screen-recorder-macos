@@ -126,6 +126,33 @@ public func probeMicrophonePermission() async -> Bool {
     }
 }
 
+/// The Camera permission as macOS has it, read without asking (D74).
+enum CameraPermission: Equatable, Sendable {
+    case granted
+    case denied
+    case notAsked
+}
+
+func readCameraPermission() -> CameraPermission {
+    switch AVCaptureDevice.authorizationStatus(for: .video) {
+    case .authorized: .granted
+    case .notDetermined: .notAsked
+    case .denied, .restricted: .denied
+    @unknown default: .denied
+    }
+}
+
+/// Asks for the Camera permission if never asked, so macOS shows its
+/// prompt, and says whether it is granted. Like the Microphone permission
+/// it is read, and no camera is opened.
+func askForCameraPermission() async -> Bool {
+    switch readCameraPermission() {
+    case .granted: true
+    case .notAsked: await AVCaptureDevice.requestAccess(for: .video)
+    case .denied: false
+    }
+}
+
 /// Creates the output folder with its parents if it is missing, then writes
 /// and deletes a file in it; if that works, measures the free space there.
 public func probeOutputFolder(_ folder: URL) -> OutputFolderProbe {

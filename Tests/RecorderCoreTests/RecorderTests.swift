@@ -185,7 +185,9 @@ extension GlobalRecordingLog {
             try? FileManager.default.removeItem(at: home)
         }
 
-        private func start(readsScreens: Bool = false, cameraMode: CameraMode = .none) throws {
+        private func start(
+            readsScreens: Bool = false, cameraMode: CameraMode = .none, cameraFrameWatch: CameraFrameWatch = CameraFrameWatch()
+        ) throws {
             var settings = Settings.defaults
             settings.auto = false
             settings.resolution = readsScreens || cameraMode != .none ? .p1080 : RecordingResolution.none
@@ -231,7 +233,7 @@ extension GlobalRecordingLog {
                 outputFolder: .unusable("not probed by the tests"))
             recorder = try Recorder(
                 settings: settings, homeFolder: home, app: "Multi Screen Recorder (tests)", readyCheckFacts: facts, observer: observer,
-                devices: devices)
+                devices: devices, cameraFrameWatch: cameraFrameWatch)
         }
 
         private var source: AudioCaptureTests.StandInSource { sources.last }
@@ -366,6 +368,37 @@ extension GlobalRecordingLog {
             let summary = await stop()
             #expect(summary.manifest.result == .problems)
             #expect(summary.manifest.cameraFiles.map(\.state) == [.finalized])
+        }
+
+        /// Limits short enough for a test.
+        private static let quickFrameWatch = CameraFrameWatch(firstFrameLimit: .milliseconds(300), frameGapLimit: .milliseconds(200))
+
+        /// A camera that delivers nothing is failing, not showing a still picture.
+        @Test func aCameraThatDeliversNoFirstFrameIsAFailingStreamAndStartsAgain() async throws {
+            cameras.connected.withLock { $0 = [Self.camera] }
+            try start(cameraMode: .real, cameraFrameWatch: Self.quickFrameWatch)
+            try await wait("the failure") { (try? manifestOnDisk().events.first?.event) == .cameraStreamFailed }
+            let failure = try #require(try manifestOnDisk().events.first)
+            #expect(failure.errorDetail == "the camera delivered no frame within 0.3 s of its start")
+            #expect(failure.camera == "Stand-in camera")
+            #expect(observer.problems.map(\.problem.problem) == ["Camera Stand-in camera"])
+            #expect(cameras.opened.withLock { $0.first?.isStopped } == true)
+            try await wait("the restart") { cameras.opened.withLock { $0.count } >= 2 }
+            let summary = await stop()
+            #expect(summary.manifest.cameraFiles.isEmpty)
+        }
+
+        @Test func aCameraThatStopsDeliveringFramesEndsItsFileAsAFailingStream() async throws {
+            cameras.connected.withLock { $0 = [Self.camera] }
+            try start(cameraMode: .real, cameraFrameWatch: Self.quickFrameWatch)
+            let camera = try #require(cameras.last)
+            try await sendFrames(camera, until: "the camera file") { (try? manifestOnDisk().cameraFiles.count) == 1 }
+            try await wait("the failure") { (try? manifestOnDisk().events.first?.event) == .cameraStreamFailed }
+            #expect(try manifestOnDisk().events.first?.errorDetail == "the camera delivered no frame for 0.2 s")
+            try await wait("the file's end") { (try? manifestOnDisk().cameraFiles.first?.state) == .finalized }
+            #expect(camera.isStopped)
+            let summary = await stop()
+            #expect(summary.manifest.result == .problems)
         }
 
         /// The writer takes only decoded pictures; a frame without one ends the capture, never silently.

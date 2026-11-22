@@ -163,13 +163,18 @@ public struct CameraInfo: Equatable, Sendable {
     /// A camera made by software, such as OBS Virtual Camera, not a device.
     public var isVirtual: Bool
     public var formats: [CameraFormat]
+    /// Suspended by macOS, as a laptop's camera with its lid closed: it delivers no picture.
+    public var isSuspended: Bool
 
-    public init(uniqueID: String, name: String, isDefault: Bool, isVirtual: Bool, formats: [CameraFormat]) {
+    public init(
+        uniqueID: String, name: String, isDefault: Bool, isVirtual: Bool, formats: [CameraFormat], isSuspended: Bool = false
+    ) {
         self.uniqueID = uniqueID
         self.name = name
         self.isDefault = isDefault
         self.isVirtual = isVirtual
         self.formats = formats
+        self.isSuspended = isSuspended
     }
 
     /// The format a recording opens the camera with: its largest that

@@ -401,6 +401,14 @@ import Testing
         #expect(audioOnly.cameraRows.map(\.cells) == [["OBS Virtual Camera", "", "", "-", "-"]])
     }
 
+    @Test func aSuspendedCameraIsNotRecordedAndSaysSo() {
+        var suspended = Self.builtInCamera
+        suspended.isSuspended = true
+        let section = WhatWillBeRecorded(
+            settings: .defaults, screens: .success([]), audioInputs: .success([]), cameras: [suspended], outputFolder: nil)
+        #expect(section.cameraRows.map(\.cells) == [["FaceTime HD Camera (default) (suspended)", "", "", "-", "-"]])
+    }
+
     @Test func anInputNotRecordedKeepsItsNamesColumnAndSaysWhy() {
         var settings = Settings.defaults
         let blackHole = AudioInputInfo(name: "BlackHole 2ch", channelCount: 2, isDefault: false, transport: .virtual, uid: "BH")

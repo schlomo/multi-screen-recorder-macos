@@ -15,6 +15,7 @@ protocol CameraFrameSource: AnyObject, Sendable {
 
 /// One camera's stream and its camera file (D74): the camera's frames go
 /// to the camera file's feed as a screen's do, with no screen check. A
+/// camera that delivers no frames is failing (`CameraFrameWatch`). A
 /// capture has at most one camera file; a new file needs a new capture.
 /// Everything runs on its own queue until the capture ends.
 final class CameraCapture: @unchecked Sendable {
@@ -26,15 +27,19 @@ final class CameraCapture: @unchecked Sendable {
     private let queue: DispatchQueue
     private let source: any CameraFrameSource
     private var feed: VideoFileFeed<RecordingManifest.CameraFile>!
-    /// The first frame was told in a detail line. Confined to `queue`.
-    private var firstFrameTold = false
+    private let frameWatch: CameraFrameWatch
+    // Confined to `queue`.
+    private var startedAt: Int64 = 0
+    /// When the last frame came, on the shared clock; nil before the first.
+    private var lastFrameAt: Int64?
+    private var watchTimer: DispatchSourceTimer?
 
     /// The error of a frame without a picture, which the writer cannot take.
     static let frameWithoutPicture: ErrorDetail = "the camera delivered a frame without a decoded picture"
 
     init(
         uniqueID: String, number: Int, name: String, frameSize: FrameSize, source: any CameraFrameSource,
-        context: RecordingContext, guides: GuideTrackFeed,
+        context: RecordingContext, guides: GuideTrackFeed, frameWatch: CameraFrameWatch,
         onFileStarted: @escaping @Sendable (RecordingManifest.CameraFile) -> Void,
         onEnded: @escaping @Sendable (VideoStreamEnd, VideoFileEnd<RecordingManifest.CameraFile>?) -> Void
     ) {
@@ -44,6 +49,7 @@ final class CameraCapture: @unchecked Sendable {
         self.frameSize = frameSize
         self.source = source
         self.context = context
+        self.frameWatch = frameWatch
         queue = DispatchQueue(label: "msr.camera.\(number)", qos: .userInteractive)
         let ticker = VideoFileTicker<RecordingManifest.CameraFile>(captureStart: context.now()) {
             [context, uniqueID, number, name, frameSize, guides] firstTick throws(VideoFileWriterError) in
@@ -66,8 +72,17 @@ final class CameraCapture: @unchecked Sendable {
             onFileStarted: onFileStarted, onEnded: onEnded)
     }
 
-    /// Starts the camera's stream; its failure ends the capture as a failing stream.
+    /// Starts the camera's stream and watches that it delivers; its failure ends the capture as a failing stream.
     func start() {
+        queue.sync {
+            startedAt = context.now()
+            let timer = DispatchSource.makeTimerSource(queue: queue)
+            let interval = DispatchTimeInterval.nanoseconds(Int(frameWatch.checkInterval.nanoseconds))
+            timer.schedule(deadline: .now() + interval, repeating: interval)
+            timer.setEventHandler { [weak self] in self?.watchFrames() }
+            timer.resume()
+            watchTimer = timer
+        }
         source.start(
             queue: queue,
             deliver: { [weak self] buffer in self?.take(buffer) },
@@ -87,21 +102,35 @@ final class CameraCapture: @unchecked Sendable {
             feed.end(.streamFailed(Self.frameWithoutPicture))
             return
         }
-        if !firstFrameTold {
-            firstFrameTold = true
+        if lastFrameAt == nil {
             RecorderLog.detail(
                 "Camera \(number) \(name): first frame \(CVPixelBufferGetWidth(pixelBuffer))×\(CVPixelBufferGetHeight(pixelBuffer)) "
                     + FrameFacts.fourCharacterCode(CVPixelBufferGetPixelFormatType(pixelBuffer)),
                 category: VideoFileWriter.detailCategory)
         }
+        lastFrameAt = context.now()
         let pts = CMTimeConvertScale(CMSampleBufferGetPresentationTimeStamp(buffer), timescale: 1_000_000_000, method: .roundHalfAwayFromZero)
         feed.receive(pixelBuffer, capturedAt: context.clock.sinceStart(host: UInt64(max(0, pts.value))))
+    }
+
+    /// On the queue: a camera that delivers no frames ends the capture.
+    private func watchFrames() {
+        guard !feed.isEnding else { return stopWatching() }
+        guard let failure = frameWatch.failure(startedAt: startedAt, lastFrameAt: lastFrameAt, now: context.now()) else { return }
+        stopWatching()
+        feed.end(.streamFailed(failure))
+    }
+
+    private func stopWatching() {
+        watchTimer?.cancel()
+        watchTimer = nil
     }
 
     /// Stops the capture at the recorder's request and finalizes its file;
     /// if the capture is already ending by itself, waits for that.
     func stop() async -> VideoFileEnd<RecordingManifest.CameraFile>? {
-        await feed.stop()
+        queue.sync { stopWatching() }
+        return await feed.stop()
     }
 }
 
@@ -110,10 +139,13 @@ final class CameraCapture: @unchecked Sendable {
 /// size in the pixel format the screens deliver. An unplug ends it with
 /// `AVCaptureDevice.wasDisconnectedNotification` or the session's runtime
 /// error `deviceWasDisconnected`, as an audio input's (`MicrophoneSource`).
+/// The session is opened, started and stopped on a queue of its own, as
+/// `startRunning` and `stopRunning` block.
 final class CameraSource: NSObject, CameraFrameSource, AVCaptureVideoDataOutputSampleBufferDelegate, @unchecked Sendable {
     let uniqueID: String
     let format: CameraFormat
     let frameSize: FrameSize
+    private let sessionQueue: DispatchQueue
     private let lock = NSLock()
     /// Guarded by `lock`.
     private var state = State()
@@ -130,6 +162,7 @@ final class CameraSource: NSObject, CameraFrameSource, AVCaptureVideoDataOutputS
         self.uniqueID = uniqueID
         self.format = format
         self.frameSize = frameSize
+        sessionQueue = DispatchQueue(label: "msr.camera.session", qos: .userInitiated)
     }
 
     private func withState<Result>(_ body: (inout State) -> Result) -> Result {
@@ -144,7 +177,7 @@ final class CameraSource: NSObject, CameraFrameSource, AVCaptureVideoDataOutputS
             $0.deliver = deliver
             $0.ended = ended
         }
-        DispatchQueue.global(qos: .userInitiated).async { [self] in
+        sessionQueue.async { [self] in
             do {
                 try open(queue: queue)
             } catch {
@@ -162,7 +195,7 @@ final class CameraSource: NSObject, CameraFrameSource, AVCaptureVideoDataOutputS
             endOnce(.captureSourceGone)
             return
         }
-        guard let deviceFormat = device.formats.first(where: { Self.cameraFormat(of: $0) == format }) else {
+        guard let deviceFormat = device.formats.first(where: { cameraFormat(of: $0) == format }) else {
             throw SourceError(errorDescription: "the camera no longer offers the format \(format)")
         }
         let input = try AVCaptureDeviceInput(device: device)
@@ -199,8 +232,8 @@ final class CameraSource: NSObject, CameraFrameSource, AVCaptureVideoDataOutputS
             },
         ]
         let proceed = withState { state -> Bool in
-            state.observers = observers
             guard !state.isStopped else { return false }
+            state.observers = observers
             state.session = session
             return true
         }
@@ -209,6 +242,8 @@ final class CameraSource: NSObject, CameraFrameSource, AVCaptureVideoDataOutputS
             return
         }
         session.startRunning()
+        // A stop that came while it started has run already, on this queue after this.
+        if withState({ $0.isStopped }) { session.stopRunning() }
     }
 
     func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
@@ -223,6 +258,7 @@ final class CameraSource: NSObject, CameraFrameSource, AVCaptureVideoDataOutputS
         ended?(end)
     }
 
+    /// Stops the session on its own queue, never blocking a task's thread.
     func stop() async {
         let (session, observers) = withState { state in
             state.isStopped = true
@@ -235,77 +271,14 @@ final class CameraSource: NSObject, CameraFrameSource, AVCaptureVideoDataOutputS
             return (state.session, state.observers)
         }
         observers.forEach(NotificationCenter.default.removeObserver)
-        session?.stopRunning()
-    }
-
-    /// A device format as the recording knows it: its size and its highest frame rate.
-    static func cameraFormat(of format: AVCaptureDevice.Format) -> CameraFormat {
-        let dimensions = CMVideoFormatDescriptionGetDimensions(format.formatDescription)
-        return CameraFormat(
-            size: FrameSize(width: Int(dimensions.width), height: Int(dimensions.height)),
-            maxFramesPerSecond: format.videoSupportedFrameRateRanges.map(\.maxFrameRate).max() ?? 0)
-    }
-}
-
-// MARK: The cameras
-
-/// The kinds of camera device AVFoundation lists on a Mac.
-private let cameraDeviceTypes: [AVCaptureDevice.DeviceType] = [.builtInWideAngleCamera, .continuityCamera, .deskViewCamera, .external]
-
-/// The cameras AVFoundation lists now, with their formats; listing them asks
-/// for no permission and opens none. The default camera is
-/// `AVCaptureDevice.default(for: .video)`.
-public func currentCameras() -> [CameraInfo] {
-    let devices = AVCaptureDevice.DiscoverySession(deviceTypes: cameraDeviceTypes, mediaType: .video, position: .unspecified).devices
-    let defaultID = AVCaptureDevice.default(for: .video)?.uniqueID
-    return devices.map { device in
-        var largestRate: [FrameSize: CameraFormat] = [:]
-        for format in device.formats.map(CameraSource.cameraFormat) where format.maxFramesPerSecond > (largestRate[format.size]?.maxFramesPerSecond ?? 0) {
-            largestRate[format.size] = format
+        // Handed to the session's queue, which alone uses it from here on.
+        nonisolated(unsafe) let running = session
+        guard running != nil else { return }
+        await withCheckedContinuation { (done: CheckedContinuation<Void, Never>) in
+            sessionQueue.async {
+                running?.stopRunning()
+                done.resume()
+            }
         }
-        return CameraInfo(
-            uniqueID: device.uniqueID, name: device.localizedName, isDefault: device.uniqueID == defaultID,
-            isVirtual: cameraIsVirtual(deviceType: device.deviceType, transportType: device.transportType),
-            formats: largestRate.values.sorted { ($0.size.pixelCount, $0.maxFramesPerSecond) < ($1.size.pixelCount, $1.maxFramesPerSecond) })
-    }
-}
-
-/// Whether a camera is virtual, made by software such as OBS Virtual Camera
-/// (a CoreMediaIO extension): a camera is real when AVFoundation lists it
-/// as built in, as a Continuity Camera or Desk View, or connected by
-/// built-in, USB, FireWire, PCI, Thunderbolt or Continuity Capture, as Core
-/// Audio's transport types say it (`AVCaptureDevice.transportType`); every
-/// other transport, virtual and unknown ones included, is virtual (D74).
-func cameraIsVirtual(deviceType: AVCaptureDevice.DeviceType, transportType: Int32) -> Bool {
-    if [.builtInWideAngleCamera, .continuityCamera, .deskViewCamera].contains(deviceType) { return false }
-    return switch audioTransport(coreAudioValue: UInt32(bitPattern: transportType)) {
-    case .builtIn, .usb, .fireWire, .pci, .thunderbolt, .continuityCapture: false
-    case .hdmi, .displayPort, .bluetooth, .bluetoothLE, .virtual, .aggregate, .airPlay, .unknown, .unreadable: true
-    }
-}
-
-/// The Camera permission as macOS has it, read without asking.
-enum CameraPermission: Equatable, Sendable {
-    case granted
-    case denied
-    case notAsked
-}
-
-func readCameraPermission() -> CameraPermission {
-    switch AVCaptureDevice.authorizationStatus(for: .video) {
-    case .authorized: .granted
-    case .notDetermined: .notAsked
-    case .denied, .restricted: .denied
-    @unknown default: .denied
-    }
-}
-
-/// Asks for the Camera permission if never asked, so macOS shows its
-/// prompt, and says whether it is granted.
-func askForCameraPermission() async -> Bool {
-    switch readCameraPermission() {
-    case .granted: true
-    case .notAsked: await AVCaptureDevice.requestAccess(for: .video)
-    case .denied: false
     }
 }
