@@ -2,11 +2,11 @@
 <img src="assets/icon/app-icon-fancy-256.jpeg" alt="Multi Screen Recorder app icon" width="96" align="right">
 
 A reliable multi-source screen and audio recorder for macOS. It
-captures every screen and audio source, never loses a recording, and
-keeps going when screens, resolutions or audio sources change.
+captures every screen, camera and audio source, never loses a recording,
+and keeps going when screens, resolutions or audio sources change.
 
-**Status:** in development. Builds record every screen and audio
-source. The app shows its settings and the ready check and records with
+**Status:** in development. Builds record every screen, camera and
+audio source. The app shows its settings and the ready check and records with
 Start, and the command line lists screens and audio inputs, runs the
 ready check, records and manages the settings. An audio input with its
 own clock is resampled continuously to stay with the screen files
@@ -15,8 +15,8 @@ own clock is resampled continuously to stay with the screen files
 ## What it does
 
 - **One click, nothing missed.** Start the app, check what will be
-  recorded, click Start: every screen and every audio source is
-  recorded until you click the Dock icon, then Stop. A check before you
+  recorded, click Start: every screen, every camera and every
+  audio source is recorded until you click the Dock icon, then Stop. A check before you
   start, warnings when disk space runs low, files that stay readable
   after a crash.
 - **Every screen, as screens come and go.** Each screen gets its own

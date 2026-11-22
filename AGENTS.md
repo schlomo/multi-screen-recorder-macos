@@ -1,7 +1,7 @@
 # AGENTS.md
 
 Multi Screen Recorder: a reliable multi-source screen and audio
-recorder for macOS. It captures every screen and audio source, never
+recorder for macOS. It captures every screen, camera and audio source, never
 loses a recording, and keeps going when screens, resolutions or audio
 sources change.
 
