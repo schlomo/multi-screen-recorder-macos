@@ -13,7 +13,8 @@ releases, and the recording core (recording, recording folder,
 recording manifest, problem, status window, screen file, screen
 identity, settle time, screen check, tick, timecode, audio track,
 audio file, guide track, clock drift; D45, D49), labels (D55), the
-banner, the recording log and the error detail (D64), and the end-to-end
+banner, the recording log and the error detail (D64), the timeline file
+(D68), and the end-to-end
 tests' first named scenarios, with the restore file, virtual screens and
 the test tone (D63).
 
@@ -72,6 +73,14 @@ every event, every problem with its full error, and the detail lines,
 one line each, appended and never rewritten, synchronized to disk after
 each event and problem; written by every recording, in the app and in
 `msr record` (D64). Not the unified log, which is macOS's.
+
+## Timeline file
+
+`<recording folder name>.otio` in the recording folder: a derived
+OpenTimelineIO file, plain JSON in the form DaVinci Resolve exports, that
+puts every file of the recording on one timeline by its timecode, with a
+marker per event and a first marker that says the resolution to set. Written
+whole at Stop and by `msr timeline`, never read back (D68).
 
 ## Detail line
 

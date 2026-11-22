@@ -141,7 +141,9 @@ public struct ManifestCheck {
         files = entries.compactMap { listedFile($0) }
         let names = files.map(\.name)
         if Set(names).count != names.count { fail("files lists a name twice: \(names)") }
-        let movies = Set(folder.filter { $0 != ReviewNames.manifest && $0 != ReviewNames.recordingLog })
+        let movies = Set(folder.filter {
+            $0 != ReviewNames.manifest && $0 != ReviewNames.recordingLog && !$0.hasSuffix(".\(ReviewNames.timelineFileExtension)")
+        })
         for document in [ReviewNames.manifest, ReviewNames.recordingLog] where !folder.contains(document) {
             fail("the recording folder has no \(document)")
         }

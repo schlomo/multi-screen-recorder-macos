@@ -42,6 +42,10 @@ own clock is resampled continuously to stay with the screen files
     1080p or 720p, or None for audio only), only ever scaled down.
     Native is the size macOS shows as "looks like" for the screen, not
     the size it is drawn at.
+  - A ready-made [OpenTimelineIO](http://opentimeline.io/) timeline in every recording folder
+    (`<folder name>.otio`): a video track per screen, an audio track per
+    channel with the channels of one input linked, the system audio, a
+    marker per screen or audio change. The OTIO file can be imported in DaVinci Resolve, [Kdenlive](https://docs.kdenlive.org/en/user_interface/menu/file_menu.html#opentimelineio-import) and others.
   - Two guide tracks in every screen file, the audio inputs and the
     system audio, for playback and for syncing by waveform with a
     separate recording.
@@ -223,6 +227,7 @@ so it shows the app's version and runs with its signature.
 | `msr check [flags] [--debug]` | Prints the banner (name, version, build date, homepage) and what will be recorded, then runs the ready check; exits 0 when ready, 1 when not; creates the output folder if it is missing |
 | `msr record [flags] [--duration 1h30m] [--debug \| --quiet]` | Prints the banner and what will be recorded and runs the ready check, then records until Ctrl-C, the duration or Stop in the status window (click the Dock icon); shows the app's Dock icon while it records and prints each event; standard output carries one line, the recording folder's path, when recording starts, and everything for people (banner, table, ready check, events, summary, with `--debug` the detail lines) goes to standard error, where a terminal also gets the status line, redrawn once a second: the problems if any, time, size, files, free space, CPU and sources; `--quiet` leaves out all of it but the path, and on standard error a failing ready check, errors, the settings file note, each failure as it happens (a repeat of it counted, not printed) and the summary of a run that exits 3, and is refused together with `--debug`; `--duration` without a suffix is minutes; exits 0 when every file is finalized and no file was ended by a failure (a problem told alone, an unplugged microphone or a gap is listed but still exits 0), 1 when not ready, 3 when a file is not finalized, a file was ended by a failure, the recording manifest could not be written at the end, or the recording could not start |
 | `msr settings [flags]` | Without flags prints the effective settings as JSON; with a settings flag saves the effective settings into the settings file and prints them, the only way a command writes it |
+| `msr timeline <folder>` | Writes the [OpenTimelineIO](http://opentimeline.io/) timeline file of a recording folder from its `recording.json` (the app and `msr record` write it at Stop), replacing an older one, and prints its path; writes nothing else; exits 1 with the error when `recording.json` cannot be read, a file's length cannot be read or the file cannot be written |
 | `msr version` | Prints the version and commit |
 
 Without flags a command uses the settings as they are. Each flag changes

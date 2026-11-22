@@ -11,7 +11,7 @@ struct CommandLineInterface: AsyncParsableCommand {
             Without arguments, msr starts the app. A settings flag changes the settings for that one run; only `msr settings` saves them. \
             An unset HOME makes every command that reads the settings exit 78.
             """,
-        subcommands: [List.self, Check.self, Record.self, SettingsCommand.self, Version.self]
+        subcommands: [List.self, Check.self, Record.self, SettingsCommand.self, Timeline.self, Version.self]
     )
 }
 
@@ -149,6 +149,27 @@ extension CommandLineInterface {
             let settings = try flags.effectiveSettings(from: file)
             if flags.isGiven { try file.save(settings) }
             print(String(decoding: try settings.jsonData(), as: UTF8.self), terminator: "")
+        }
+    }
+
+    struct Timeline: AsyncParsableCommand {
+        static let configuration = CommandConfiguration(
+            abstract: "Write a recording folder's DaVinci Resolve timeline file.",
+            discussion: "Reads the folder's recording.json and writes the timeline file next to it, replacing an older one; "
+                + "writes and deletes nothing else. Prints the file's path. Exits 1 with the error on standard error when "
+                + "recording.json cannot be read, a file's length cannot be read or the file cannot be written.")
+
+        @Argument(help: "The recording folder.", completion: .directory)
+        var folder: String
+
+        func run() async throws {
+            do {
+                let file = try await TimelineFile.write(in: URL(filePath: folder, directoryHint: .isDirectory).standardizedFileURL)
+                print(file.path(percentEncoded: false))
+            } catch {
+                StandardErrorWriter.shared.write("Error: \(ErrorDetail(error).text)\n")
+                throw ExitCode(1)
+            }
         }
     }
 
