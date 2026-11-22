@@ -2,23 +2,18 @@
 
 ## Next session starts here
 
-PR #26 (draft, branch `audio-meters`) holds item 21 with items 31,
-35, 19, 33, 34 and 32 (D69 to D72; the owner's rulings of 2026-11-22
-are quoted there). State at 2026-11-22 Europe/Berlin: head 2acebf0.
-The fixes of the review of 8aff7b5 are on it: B3 (d6bb6f6: after a gap
-or a channel-count change an audio input's next file starts only with
-sound) and the NITs (2acebf0); N3 is documented, not fixed; N4 is
-closed, the owner did not see the slider snap back; N6 is watched on
-the pipeline. The owner tried the meters build: good. A top-tier review
-of `8aff7b5..2acebf0` runs; it also settles whether
-`ScreenFileWriterTests.aWriterTellsItsVideoSettingsAndWhatItsInputsTookWhenItFails`
-(failed in 3 of 4 full runs on 2acebf0) was made flaky by the branch.
-Next: post its findings on the PR, fix them, the architect's
-end-to-end run, rewrite the description (B1), one unmarked commit for
-the pipeline, `update-homepage-screenshots --snapshot 26` for the
-owner's Cloudflare preview. After PR #26, one PR each: item 3's
-follow-up; item 4; item 7; item 12; item 22; the rest of item 6;
-item 16.
+PR #26 (branch `audio-meters`, item 21 with items 31, 35, 19, 33, 34
+and 32; D69 to D72) is READY at 86a1897, waiting for the owner's merge
+(2026-11-22 Europe/Berlin). Reviewed: two top-tier reviews and a delta
+review (comments on the PR), the description checked against the
+diff; the end-to-end tests passed on 0a77368 (7 of 7); the pipeline is
+green on 8180cdc and 86a1897; the homepage screenshots come from the
+snapshot 0.20261122.87 (`update-homepage-screenshots --snapshot 26`).
+Open with the owner: whether exact zeros on both sides of a gap add up
+to the 10 s of no audio (today they do not; the files are the same
+either way, only the event and the State differ). After the merge, one
+PR each: item 3's follow-up; item 4; item 7; item 12; item 22; the
+rest of item 6; item 16; item 36.
 
 Agents may run `msr record` on the owner's Mac (D48), with `HOME` set
 to a scratch folder (`AGENTS.md`, "Facts that bite"), and BetterDisplay's command
