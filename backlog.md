@@ -4,21 +4,21 @@
 
 PR #26 (draft, branch `audio-meters`) holds item 21 with items 31,
 35, 19, 33, 34 and 32 (D69 to D72; the owner's rulings of 2026-11-22
-are quoted there). State at 2026-11-22 17:20 Europe/Berlin: on the branch up to f7aee7f
-(everything above, plus D71 free space, unreadable crash reports
-skipped, and the screenshot flow of D72: `end-to-end-test --release |
---snapshot <n>`, `update-homepage-screenshots --release | --snapshot
-<n>`, the homepage PNGs back to `main`'s; a `--release` run passed
-with `main`'s driver, 7 of 7). "No snapshot release for a homepage-only PR" is deferred (D72).
-Next: a builder fixes the review's B3 and NITs (the PR comment). The top-tier review of 8aff7b5 is done: its findings
-and their planned outcomes are a comment on PR #26 (B3 and the NITs
-to fix; B1, the description, before ready). Then: a delta review of
-everything after 8aff7b5, the architect's end-to-end run,
-one unmarked commit for the pipeline, `update-homepage-screenshots
---snapshot 26` for the owner's Cloudflare preview. The meters build
-4d89314 is installed in `/Applications` for the owner's try-out. After
-PR #26, one PR each: item 3's follow-up; item 4; item 7; item 12; item
-22; the rest of item 6; item 16.
+are quoted there). State at 2026-11-22 Europe/Berlin: head 2acebf0.
+The fixes of the review of 8aff7b5 are on it: B3 (d6bb6f6: after a gap
+or a channel-count change an audio input's next file starts only with
+sound) and the NITs (2acebf0); N3 is documented, not fixed; N4 is
+closed, the owner did not see the slider snap back; N6 is watched on
+the pipeline. The owner tried the meters build: good. A top-tier review
+of `8aff7b5..2acebf0` runs; it also settles whether
+`ScreenFileWriterTests.aWriterTellsItsVideoSettingsAndWhatItsInputsTookWhenItFails`
+(failed in 3 of 4 full runs on 2acebf0) was made flaky by the branch.
+Next: post its findings on the PR, fix them, the architect's
+end-to-end run, rewrite the description (B1), one unmarked commit for
+the pipeline, `update-homepage-screenshots --snapshot 26` for the
+owner's Cloudflare preview. After PR #26, one PR each: item 3's
+follow-up; item 4; item 7; item 12; item 22; the rest of item 6;
+item 16.
 
 Agents may run `msr record` on the owner's Mac (D48), with `HOME` set
 to a scratch folder (`AGENTS.md`, "Facts that bite"), and BetterDisplay's command
@@ -608,6 +608,12 @@ Still open from D34: what AGC does and whether it is on in auto mode;
    recording of the morning]. Measure the start of each audio input
    over more recordings (the recording log has `startInput` and `file
    started`); if it recurs, find what the session waits for.
+
+36. **The VM's SSH wait undercounts its bound** (found by the builder on
+   PR #26, 2026-11-22): `vm_start` in `scripts/end-to-end-vm/lib.sh`
+   counts `seq 60` rounds of `sleep 5` plus one SSH call, so its
+   "300 s" is longer in fact; PR #26 made `vm_wait_for_login` a real
+   deadline with `SECONDS`. Do the same for `vm_start`.
 
 ## Deliberately deferred
 
