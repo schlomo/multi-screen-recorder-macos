@@ -1,8 +1,8 @@
 import Testing
 @testable import RecorderLogic
 
-@Suite struct ScreenFileMetadataTests {
-    private let metadata = ScreenFileMetadata(
+@Suite struct VideoFileMetadataTests {
+    private let metadata = VideoFileMetadata(
         screenUUID: "U", screenNumber: 2, screenName: "LG HDR 4K", frameSize: FrameSize(width: 1920, height: 1080),
         recordingStarted: "2026-11-12T14:03:05.120+01:00", app: "Multi Screen Recorder 1")
 
@@ -21,7 +21,7 @@ import Testing
 }
 
 @Suite struct CameraFileMetadataTests {
-    private let metadata = ScreenFileMetadata(
+    private let metadata = VideoFileMetadata(
         source: .camera(uniqueID: "C", number: 1, name: "FaceTime HD Camera"), frameSize: FrameSize(width: 1920, height: 1080),
         recordingStarted: "2026-11-12T14:03:05.120+01:00", app: "Multi Screen Recorder 1")
 

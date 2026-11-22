@@ -11,8 +11,8 @@ import Testing
         NSUnderlyingErrorKey: NSError(domain: NSOSStatusErrorDomain, code: -12912),
     ])
 
-    @Test func aScreenFileWritersErrorKeepsTheChain() {
-        let error = ScreenFileWriterError(avError, while: "cannot write f.mov")
+    @Test func aVideoFileWritersErrorKeepsTheChain() {
+        let error = VideoFileWriterError(avError, while: "cannot write f.mov")
         #expect(error.detail == ErrorDetail(message: "cannot write f.mov", underlying: [ErrorDetail(avError)]))
         #expect(error.description.hasPrefix("cannot write f.mov: The operation could not be completed (AVFoundationErrorDomain -11800)"))
         #expect(error.description.hasSuffix("(NSOSStatusErrorDomain -12912)"))
@@ -30,7 +30,7 @@ import Testing
         let full = NSError(domain: AVFoundationErrorDomain, code: -11800, userInfo: [
             NSUnderlyingErrorKey: NSError(domain: NSPOSIXErrorDomain, code: Int(ENOSPC)),
         ])
-        #expect(ScreenFileWriterError(full, while: "cannot write f.mov").isDiskFull)
+        #expect(VideoFileWriterError(full, while: "cannot write f.mov").isDiskFull)
         #expect(AudioFileWriterError(full, while: "cannot write a.mov").isDiskFull)
     }
 }

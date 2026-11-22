@@ -20,7 +20,7 @@ final class VideoFileFeed<File: VideoFileEntry>: @unchecked Sendable {
     /// The file started; reports its manifest entry.
     private let onFileStarted: @Sendable (File) -> Void
     /// The capture ended by itself, after its file was ended.
-    private let onEnded: @Sendable (ScreenTracker.StreamEnd, VideoFileEnd<File>?) -> Void
+    private let onEnded: @Sendable (VideoStreamEnd, VideoFileEnd<File>?) -> Void
 
     // Confined to `queue`.
     private var ticker: VideoFileTicker<File>?
@@ -38,7 +38,7 @@ final class VideoFileFeed<File: VideoFileEntry>: @unchecked Sendable {
         queue: DispatchQueue, context: RecordingContext, guides: GuideTrackFeed, ticker: VideoFileTicker<File>,
         stopStream: @escaping @Sendable () async -> Void,
         onFileStarted: @escaping @Sendable (File) -> Void,
-        onEnded: @escaping @Sendable (ScreenTracker.StreamEnd, VideoFileEnd<File>?) -> Void
+        onEnded: @escaping @Sendable (VideoStreamEnd, VideoFileEnd<File>?) -> Void
     ) {
         self.queue = queue
         self.context = context
@@ -89,7 +89,7 @@ final class VideoFileFeed<File: VideoFileEntry>: @unchecked Sendable {
     }
 
     /// Ends the capture by itself, then reports why; unless the recorder stopped it first. On the queue.
-    func end(_ reason: ScreenTracker.StreamEnd) {
+    func end(_ reason: VideoStreamEnd) {
         guard !isEnding else { return }
         guard let finishing = beginFinishing(writeWaitingTicks: reason != .writerFellBehind) else { return }
         Task { onEnded(reason, await finishing.value) }

@@ -2,7 +2,7 @@
 /// timecode track, and metadata items under `keyPrefix`, the app also
 /// under the standard QuickTime software key, the reel name also under the
 /// pro apps keys for the reel and the camera name.
-public struct ScreenFileMetadata: Equatable, Sendable {
+public struct VideoFileMetadata: Equatable, Sendable {
     public static let keyPrefix = "org.schapiro.multiscreenrecorder."
     public static let softwareKey = "com.apple.quicktime.software"
     /// Pro apps keys that may hold the reel name and the camera [CONJECTURE: DaVinci Resolve reads them].

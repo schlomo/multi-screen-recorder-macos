@@ -694,7 +694,7 @@ public struct RecordingProblem: Codable, Equatable, Sendable {
 }
 
 /// A screen file or a camera file, as the writer path keeps its entry
-/// (`ScreenFileTicker`): the two are made the same way (D74).
+/// (`VideoFileTicker<RecordingManifest.ScreenFile>`): the two are made the same way (D74).
 public protocol VideoFileEntry: Codable, Equatable, Sendable {
     /// "Screen" or "Camera": the word its problems name the file and the source by.
     static var sourceWord: String { get }

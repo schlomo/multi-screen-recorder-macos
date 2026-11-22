@@ -4,7 +4,7 @@ import IOSurface
 import RecorderLogic
 import VideoToolbox
 
-public struct ScreenFileWriterError: ErrorWithDetail, Equatable, CustomStringConvertible {
+public struct VideoFileWriterError: ErrorWithDetail, Equatable, CustomStringConvertible {
     /// What failed, with the error macOS gave, if any, and its full chain.
     public let detail: ErrorDetail
     /// The disk is full: the file ends, readable up to its last fragment.
@@ -26,12 +26,12 @@ public struct ScreenFileWriterError: ErrorWithDetail, Equatable, CustomStringCon
     public var description: String { detail.text }
 }
 
-/// A screen file: HEVC 8-bit in a fragmented `.mov`, a keyframe and a
+/// A video file, a screen file or a camera file: HEVC 8-bit in a fragmented `.mov`, a keyframe and a
 /// fragment every 2 s, tagged BT.709, with the timecode track carrying the
 /// reel name, its guide tracks, and metadata items (D21, D24, D31, D46,
 /// D49). Every frame carries exactly its tick's time on the shared clock.
 /// Not thread-safe: one queue uses it.
-public final class ScreenFileWriter: ScreenFileWriting {
+public final class VideoFileWriter: VideoFileWriting {
     public let url: URL
     public let firstTick: Int64
     private let grid: TickGrid
@@ -50,9 +50,9 @@ public final class ScreenFileWriter: ScreenFileWriting {
     private let guides: [GuideTrack: (track: AVAssetWriterInput, pcm: CMAudioFormatDescription)]
 
     public init(
-        url: URL, frameSize: FrameSize, firstTick: Int64, timecode: Timecode, metadata: ScreenFileMetadata,
+        url: URL, frameSize: FrameSize, firstTick: Int64, timecode: Timecode, metadata: VideoFileMetadata,
         guideTracks: [GuideTrack] = [], grid: TickGrid = .recording
-    ) throws(ScreenFileWriterError) {
+    ) throws(VideoFileWriterError) {
         precondition(timecode.framesPerSecond == grid.framesPerSecond, "the timecode counts the tick grid's frames")
         self.url = url
         self.firstTick = firstTick
@@ -61,7 +61,7 @@ public final class ScreenFileWriter: ScreenFileWriting {
         do {
             writer = try AVAssetWriter(outputURL: url, fileType: .mov)
         } catch {
-            throw ScreenFileWriterError(error, while: "cannot create \(url.lastPathComponent)")
+            throw VideoFileWriterError(error, while: "cannot create \(url.lastPathComponent)")
         }
         writer.movieFragmentInterval = CMTime(value: CMTimeValue(RecorderValues.fragmentSeconds), timescale: 1)
         writer.shouldOptimizeForNetworkUse = false
@@ -80,21 +80,21 @@ public final class ScreenFileWriter: ScreenFileWriting {
                                  try pcmFormat(channels: guide.channelCount))
             }
         } catch {
-            throw ScreenFileWriterError(nil, while: error.description)
+            throw VideoFileWriterError(nil, while: error.description)
         }
         self.guides = guides
         appends = InputAppends(inputs: [Self.videoName] + guideTracks.map(Self.name(of:)) + [Self.timecodeName])
 
         let guideInputs = guideTracks.compactMap { guides[$0]?.0 }
         guard writer.canAdd(video), writer.canAdd(timecodeTrack.input), guideInputs.allSatisfy(writer.canAdd) else {
-            throw ScreenFileWriterError(nil, while: "cannot add the tracks to \(url.lastPathComponent)")
+            throw VideoFileWriterError(nil, while: "cannot add the tracks to \(url.lastPathComponent)")
         }
         writer.add(video)
         guideInputs.forEach(writer.add)
         writer.add(timecodeTrack.input)
         video.addTrackAssociation(withTrackOf: timecodeTrack.input, type: AVAssetTrack.AssociationType.timecode.rawValue)
         guard writer.startWriting() else {
-            throw ScreenFileWriterError(writer.error, while: "cannot start writing \(url.lastPathComponent)")
+            throw VideoFileWriterError(writer.error, while: "cannot start writing \(url.lastPathComponent)")
         }
         writer.startSession(atSourceTime: time(ofTick: firstTick))
         RecorderLog.detail("video settings of \(url.lastPathComponent): \(SettingsText.text(settings))", category: Self.detailCategory)
@@ -171,7 +171,7 @@ public final class ScreenFileWriter: ScreenFileWriting {
 
     /// Writes a tick's frame with exactly the tick's time and its timecode;
     /// false when the writer is not ready, so the tick waits.
-    public func append(_ pixelBuffer: CVPixelBuffer, tick: Int64) throws(ScreenFileWriterError) -> Bool {
+    public func append(_ pixelBuffer: CVPixelBuffer, tick: Int64) throws(VideoFileWriterError) -> Bool {
         try checkStatus()
         tellVideoReadiness()
         guard isReady else { return false }
@@ -181,7 +181,7 @@ public final class ScreenFileWriter: ScreenFileWriting {
             do {
                 wrote = try timecodeTrack.write(timecode, tick: firstTick)
             } catch {
-                throw ScreenFileWriterError(nil, while: error.description)
+                throw VideoFileWriterError(nil, while: error.description)
             }
             guard wrote else {
                 appends.refused(Self.timecodeName)
@@ -203,7 +203,7 @@ public final class ScreenFileWriter: ScreenFileWriting {
     /// `position` samples from the file's first tick; false when the track
     /// is not ready, so they wait. A guide track the file does not have
     /// takes nothing.
-    public func appendGuide(_ guide: GuideTrack, _ channels: [[Float]], at position: Int64) throws(ScreenFileWriterError) -> Bool {
+    public func appendGuide(_ guide: GuideTrack, _ channels: [[Float]], at position: Int64) throws(VideoFileWriterError) -> Bool {
         try checkStatus()
         guard let (track, pcm) = guides[guide] else { return true }
         guard channels.first?.isEmpty == false else { return true }
@@ -213,7 +213,7 @@ public final class ScreenFileWriter: ScreenFileWriting {
         do {
             sample = try pcmSample(channels[...], format: pcm, at: time)
         } catch {
-            throw ScreenFileWriterError(nil, while: error.description)
+            throw VideoFileWriterError(nil, while: error.description)
         }
         guard track.append(sample) else {
             appends.refused(Self.name(of: guide))
@@ -223,13 +223,13 @@ public final class ScreenFileWriter: ScreenFileWriting {
         return true
     }
 
-    private func checkStatus() throws(ScreenFileWriterError) {
+    private func checkStatus() throws(VideoFileWriterError) {
         if writer.status == .failed { throw failed("cannot write \(url.lastPathComponent)") }
     }
 
     /// The writer's error as the recorder's, with one detail line, the first time, on what
     /// each input took (D66).
-    private func failed(_ doing: String) -> ScreenFileWriterError {
+    private func failed(_ doing: String) -> VideoFileWriterError {
         if !failureTold {
             failureTold = true
             let error = writer.error.map { ErrorDetail($0).text } ?? "none"
@@ -237,7 +237,7 @@ public final class ScreenFileWriter: ScreenFileWriting {
                 "writer of \(url.lastPathComponent) failed: status \(Self.statusName(writer.status)), error \(error); \(appends.text); \(lastBufferText)",
                 category: Self.detailCategory)
         }
-        return ScreenFileWriterError(writer.error, while: doing)
+        return VideoFileWriterError(writer.error, while: doing)
     }
 
     /// "last buffer 1600×900, IOSurface ID 4711, a repeat of the one before: no"
@@ -260,7 +260,7 @@ public final class ScreenFileWriter: ScreenFileWriting {
     }
 
     /// Finalizes the file after its last tick.
-    public func finish(lastTick: Int64?) async throws(ScreenFileWriterError) {
+    public func finish(lastTick: Int64?) async throws(VideoFileWriterError) {
         try checkStatus()
         if let lastTick { writer.endSession(atSourceTime: time(ofTick: lastTick + 1)) }
         video.markAsFinished()

@@ -6,10 +6,10 @@ public enum RecorderValues {
     /// many frames per second (D11, D21).
     public static let framesPerSecond = 30
     /// How long ticks may wait for a writer that is not ready before its
-    /// screen file ends with `screen file writer fell behind`, and how
-    /// long the waiting ticks and the last guide track samples are written
-    /// at a screen file's end (D53).
-    public static let screenFileLateTickSeconds = 6
+    /// video file ends with `screen file writer fell behind` or `camera file
+    /// writer fell behind`, and how long the waiting ticks and the last guide
+    /// track samples are written at a video file's end (D53).
+    public static let videoFileLateTickSeconds = 6
     /// How long audio waits: guide track samples for a screen file's
     /// writer, a screen file's last mix for its sources' sound up to the
     /// video's end, and an audio file's samples for its writer, also at its end.
@@ -34,6 +34,6 @@ public enum RecorderValues {
     /// whole points, so this only absorbs rounding.
     public static let screenCheckTolerancePoints = 0.5
 
-    public static let lateTickBound = screenFileLateTickSeconds * framesPerSecond
+    public static let lateTickBound = videoFileLateTickSeconds * framesPerSecond
     public static let screenCheckFailuresInARow = screenCheckFailureSeconds * framesPerSecond
 }

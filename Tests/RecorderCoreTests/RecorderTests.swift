@@ -93,7 +93,7 @@ extension GlobalRecordingLog {
             let frameSize: FrameSize
             private let state = Mutex<(
                 queue: DispatchQueue?, deliver: (@Sendable (CMSampleBuffer) -> Void)?,
-                ended: (@Sendable (ScreenTracker.StreamEnd) -> Void)?, stopped: Bool
+                ended: (@Sendable (VideoStreamEnd) -> Void)?, stopped: Bool
             )>((nil, nil, nil, false))
 
             init(frameSize: FrameSize) {
@@ -104,7 +104,7 @@ extension GlobalRecordingLog {
 
             func start(
                 queue: DispatchQueue, deliver: @escaping @Sendable (CMSampleBuffer) -> Void,
-                ended: @escaping @Sendable (ScreenTracker.StreamEnd) -> Void
+                ended: @escaping @Sendable (VideoStreamEnd) -> Void
             ) {
                 state.withLock { $0 = (queue, deliver, ended, false) }
             }
@@ -141,7 +141,7 @@ extension GlobalRecordingLog {
                 deliver(try #require(buffer))
             }
 
-            func lose(_ end: ScreenTracker.StreamEnd) {
+            func lose(_ end: VideoStreamEnd) {
                 state.withLock { $0.ended }?(end)
             }
 

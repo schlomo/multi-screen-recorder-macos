@@ -369,12 +369,12 @@ import Testing
         let shown = WhatWillBeRecorded(
             settings: .defaults, screens: .success(DesignExample.screens), audioInputs: .success(DesignExample.audioInputs),
             cameras: [Self.obs, Self.brio, Self.builtInCamera], outputFolder: nil)
-        let screenFileRate = { (size: FrameSize) in
-            DiskEstimate.gigabytesPerHour(DiskEstimate.screenFileBytesPerHour(frameSize: size, settings: .defaults))
+        let videoFileRate = { (size: FrameSize) in
+            DiskEstimate.gigabytesPerHour(DiskEstimate.videoFileBytesPerHour(frameSize: size, settings: .defaults))
         }
         #expect(shown.cameraRows.map(\.cells) == [
-            ["Camera 1 - FaceTime HD Camera (default)", "", "", "1920×1080", screenFileRate(FrameSize(width: 1920, height: 1080))],
-            ["Camera 2 - Logitech BRIO", "", "", "3840×2160", screenFileRate(FrameSize(width: 3840, height: 2160))],
+            ["Camera 1 - FaceTime HD Camera (default)", "", "", "1920×1080", videoFileRate(FrameSize(width: 1920, height: 1080))],
+            ["Camera 2 - Logitech BRIO", "", "", "3840×2160", videoFileRate(FrameSize(width: 3840, height: 2160))],
             ["OBS Virtual Camera (virtual)", "", "", "-", "-"],
         ])
         #expect(shown.cameraRows.map(\.isRecorded) == [true, true, false])

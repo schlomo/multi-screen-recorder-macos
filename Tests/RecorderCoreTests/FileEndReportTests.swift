@@ -5,16 +5,16 @@ import Testing
 
 private let second: Int64 = 1_000_000_000
 
-private func fileEnd(_ error: ScreenFileWriterError?, endsAt: Double = 12.5) -> ScreenFileEnd {
+private func fileEnd(_ error: VideoFileWriterError?, endsAt: Double = 12.5) -> VideoFileEnd<RecordingManifest.ScreenFile> {
     var file = RecordingManifest.ScreenFile(
         name: "f.mov", screen: "LG", screenUUID: "U", frameSize: FrameSize(width: 2, height: 2), start: 0,
         timecode: "00:00:00:00")
     file.end = endsAt
-    return ScreenFileEnd(file: file, error: error)
+    return VideoFileEnd<RecordingManifest.ScreenFile>(file: file, error: error)
 }
 
-private func writerError(_ text: String) -> ScreenFileWriterError { ScreenFileWriterError(description: text, isDiskFull: false) }
-private let fullDisk = ScreenFileWriterError(description: "cannot write f.mov: full", isDiskFull: true)
+private func writerError(_ text: String) -> VideoFileWriterError { VideoFileWriterError(description: text, isDiskFull: false) }
+private let fullDisk = VideoFileWriterError(description: "cannot write f.mov: full", isDiskFull: true)
 
 private func failedEvent(at seconds: Double, error: ErrorDetail) -> RecordingEvent {
     var event = RecordingEvent(at: Int64(seconds * 1_000_000_000), event: .screenFileWriterFailed, screen: "LG")
@@ -86,7 +86,7 @@ private func failedEvent(at seconds: Double, error: ErrorDetail) -> RecordingEve
 /// manifest, whichever path comes first and whether or not the tracker
 /// still runs; the recorder tells the person the problem returned.
 @Suite struct CaptureEndReportsTests {
-    private let failed = ScreenTracker.StreamEnd.writerFailed("cannot write f.mov")
+    private let failed = VideoStreamEnd.writerFailed("cannot write f.mov")
 
     private func manifest() -> RecordingManifest {
         RecordingManifest(app: "x", started: .now, timeZone: .current, settings: .defaults)
@@ -177,12 +177,12 @@ private func failedEvent(at seconds: Double, error: ErrorDetail) -> RecordingEve
 
 /// A camera file's end tells as a screen file's, in the camera's words (D74).
 @Suite struct CameraFileEndReportTests {
-    private func cameraEnd(_ error: ScreenFileWriterError?) -> CameraFileEnd {
+    private func cameraEnd(_ error: VideoFileWriterError?) -> VideoFileEnd<RecordingManifest.CameraFile> {
         var file = RecordingManifest.CameraFile(
             name: "c.mov", camera: "FaceTime", cameraUniqueID: "C", frameSize: FrameSize(width: 2, height: 2), start: 0,
             timecode: "00:00:00:00")
         file.end = 12.5
-        return CameraFileEnd(file: file, error: error)
+        return VideoFileEnd<RecordingManifest.CameraFile>(file: file, error: error)
     }
 
     @Test func aFailedWriterIsACameraFileWriterFailedEventAndAProblemOfTheCameraFile() {
@@ -195,7 +195,7 @@ private func failedEvent(at seconds: Double, error: ErrorDetail) -> RecordingEve
 
     @Test func aWriterThatCouldNotStartIsAProblemOfTheCamera() {
         let report = FileEndReport(
-            reason: .writerFailed("cannot create c.mov"), end: Optional<CameraFileEnd>.none, source: "FaceTime", at: 3 * second)
+            reason: .writerFailed("cannot create c.mov"), end: Optional<VideoFileEnd<RecordingManifest.CameraFile>>.none, source: "FaceTime", at: 3 * second)
         #expect(report.problem?.problem == "Camera FaceTime")
         #expect(report.event?.camera == "FaceTime")
     }

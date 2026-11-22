@@ -218,7 +218,7 @@ public struct WhatWillBeRecorded: Equatable, Sendable {
         }
         return Camera(
             source: .camera(number, name: camera.shownName), recordsAt: "\(frameSize)",
-            gigabytesPerHour: DiskEstimate.gigabytesPerHour(DiskEstimate.screenFileBytesPerHour(frameSize: frameSize, settings: settings)))
+            gigabytesPerHour: DiskEstimate.gigabytesPerHour(DiskEstimate.videoFileBytesPerHour(frameSize: frameSize, settings: settings)))
     }
 
     /// At the recording resolution None a screen not recorded: no number, `-` for Records at and GB/h max.
@@ -234,7 +234,7 @@ public struct WhatWillBeRecorded: Equatable, Sendable {
             looksLike: "\(screen.pointSize)", drawnAt: "\(screen.pixelSize)",
             recordsAt: "\(frameSize)",
             gigabytesPerHour: DiskEstimate.gigabytesPerHour(
-                DiskEstimate.screenFileBytesPerHour(frameSize: frameSize, settings: settings)))
+                DiskEstimate.videoFileBytesPerHour(frameSize: frameSize, settings: settings)))
     }
 
     /// "2.2" and "2 hours need 4.3 GB, 3.1 GB free."

@@ -119,7 +119,7 @@ public final class ScreenCapture: NSObject, @unchecked Sendable, SCStreamOutput,
         uuid: String, displayID: UInt32, number: Int, name: String, frameSize: FrameSize, context: RecordingContext,
         guides: GuideTrackFeed,
         onFileStarted: @escaping @Sendable (RecordingManifest.ScreenFile) -> Void,
-        onEnded: @escaping @Sendable (ScreenTracker.StreamEnd, ScreenFileEnd?) -> Void
+        onEnded: @escaping @Sendable (VideoStreamEnd, VideoFileEnd<RecordingManifest.ScreenFile>?) -> Void
     ) {
         self.uuid = uuid
         self.displayID = displayID
@@ -129,12 +129,12 @@ public final class ScreenCapture: NSObject, @unchecked Sendable, SCStreamOutput,
         self.context = context
         queue = DispatchQueue(label: "msr.screen.\(number)", qos: .userInteractive)
         super.init()
-        let ticker = ScreenFileTicker(captureStart: context.now()) { [context, uuid, number, name, frameSize, guides] firstTick throws(ScreenFileWriterError) in
+        let ticker = VideoFileTicker<RecordingManifest.ScreenFile>(captureStart: context.now()) { [context, uuid, number, name, frameSize, guides] firstTick throws(VideoFileWriterError) in
             let fileName = context.claimFileName(tick: firstTick, number: number, screen: name)
-            let writer = try ScreenFileWriter(
+            let writer = try VideoFileWriter(
                 url: context.folder.appending(path: fileName), frameSize: frameSize, firstTick: firstTick,
                 timecode: context.timecode,
-                metadata: ScreenFileMetadata(
+                metadata: VideoFileMetadata(
                     screenUUID: uuid, screenNumber: number, screenName: name, frameSize: frameSize,
                     recordingStarted: context.startedText, app: context.app),
                 guideTracks: guides.tracks)
@@ -184,7 +184,7 @@ public final class ScreenCapture: NSObject, @unchecked Sendable, SCStreamOutput,
 
     /// A stream's error as the end of its capture: ScreenCaptureKit's
     /// `noCaptureSource` (-3815), the screen gone, is no failure (F4).
-    static func streamEnd(for error: any Error) -> ScreenTracker.StreamEnd {
+    static func streamEnd(for error: any Error) -> VideoStreamEnd {
         let nsError = error as NSError
         if nsError.domain == SCStreamErrorDomain, nsError.code == SCStreamError.Code.noCaptureSource.rawValue {
             return .captureSourceGone
@@ -245,11 +245,11 @@ public final class ScreenCapture: NSObject, @unchecked Sendable, SCStreamOutput,
         defer { frameFacts = facts }
         let label = "Screen \(number) \(name)"
         guard let before = frameFacts else {
-            RecorderLog.detail("\(label): first frame \(facts.text)", category: ScreenFileWriter.detailCategory)
+            RecorderLog.detail("\(label): first frame \(facts.text)", category: VideoFileWriter.detailCategory)
             return
         }
         guard let changes = facts.changes(from: before) else { return }
-        RecorderLog.detail("\(label): frame changed: \(changes)", category: ScreenFileWriter.detailCategory)
+        RecorderLog.detail("\(label): frame changed: \(changes)", category: VideoFileWriter.detailCategory)
     }
 
     public func stream(_ stream: SCStream, didStopWithError error: any Error) {
@@ -260,7 +260,7 @@ public final class ScreenCapture: NSObject, @unchecked Sendable, SCStreamOutput,
 
     /// Stops the capture at the recorder's request and finalizes its file;
     /// if the capture is already ending by itself, waits for that.
-    func stop() async -> ScreenFileEnd? {
+    func stop() async -> VideoFileEnd<RecordingManifest.ScreenFile>? {
         await feed.stop()
     }
 

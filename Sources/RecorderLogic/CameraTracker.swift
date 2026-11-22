@@ -195,7 +195,7 @@ public struct CameraTracker: Sendable {
     /// A stream ended by itself; `connected` is the cameras as read now. A
     /// failing writer and a full disk have their event from the recorder.
     public mutating func streamEnded(
-        _ uniqueID: String, _ end: ScreenTracker.StreamEnd, connected: [CameraInfo], at now: Int64
+        _ uniqueID: String, _ end: VideoStreamEnd, connected: [CameraInfo], at now: Int64
     ) -> Step {
         guard let tracked = cameras[uniqueID], case .recording = tracked.phase else { return Step() }
         var step = Step()

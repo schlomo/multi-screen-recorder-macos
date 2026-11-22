@@ -20,12 +20,12 @@ private struct Reader: FileDurationReader {
 
 private let folder = URL(filePath: "/recording")
 
-private func screenEnd(state: RecordingManifest.State) -> ScreenFileEnd {
+private func screenEnd(state: RecordingManifest.State) -> VideoFileEnd<RecordingManifest.ScreenFile> {
     var file = RecordingManifest.ScreenFile(
         name: "s.mov", screen: "LG", screenUUID: "U", frameSize: FrameSize(width: 2, height: 2), start: 1, timecode: "00:00:01:00")
     file.end = 6.933
     file.state = state
-    return ScreenFileEnd(file: file, error: ScreenFileWriterError(description: "cannot write s.mov", isDiskFull: false))
+    return VideoFileEnd<RecordingManifest.ScreenFile>(file: file, error: VideoFileWriterError(description: "cannot write s.mov", isDiskFull: false))
 }
 
 private func audioEnd(state: RecordingManifest.State) -> AudioFileEnd {

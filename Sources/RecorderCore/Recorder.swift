@@ -554,12 +554,12 @@ public final class Recorder {
     /// entry, so the file is listed even when its start was not reported
     /// yet. Its event and problem are recorded once per capture, also when
     /// the capture ended by itself while the recorder stopped it.
-    private func fileEnded(_ end: ScreenFileEnd?, captureNumber: Int, screen: String, reason: ScreenTracker.StreamEnd?) {
+    private func fileEnded(_ end: VideoFileEnd<RecordingManifest.ScreenFile>?, captureNumber: Int, screen: String, reason: VideoStreamEnd?) {
         videoFileEnded(end, captureNumber: captureNumber, source: screen, reason: reason)
     }
 
     /// A screen file or a camera file ended, as `fileEnded` says; `source` is the screen's or the camera's name.
-    private func videoFileEnded<File>(_ end: VideoFileEnd<File>?, captureNumber: Int, source: String, reason: ScreenTracker.StreamEnd?) {
+    private func videoFileEnded<File>(_ end: VideoFileEnd<File>?, captureNumber: Int, source: String, reason: VideoStreamEnd?) {
         let before = manifest
         let report = endReports.record(
             captureNumber: captureNumber, reason: reason, end: end, source: source, at: context.now(), into: &manifest)
@@ -574,7 +574,7 @@ public final class Recorder {
     }
 
     private func captureEnded(
-        uuid: String, captureNumber: Int, screen: String, reason: ScreenTracker.StreamEnd, file: ScreenFileEnd?
+        uuid: String, captureNumber: Int, screen: String, reason: VideoStreamEnd, file: VideoFileEnd<RecordingManifest.ScreenFile>?
     ) {
         fileEnded(file, captureNumber: captureNumber, screen: screen, reason: reason)
         // One the recorder already stopped, or replaced, changes nothing more.
@@ -701,7 +701,7 @@ public final class Recorder {
 
     /// As a screen capture's end by itself (`captureEnded`).
     private func cameraCaptureEnded(
-        uniqueID: String, captureNumber: Int, camera: String, reason: ScreenTracker.StreamEnd, file: CameraFileEnd?
+        uniqueID: String, captureNumber: Int, camera: String, reason: VideoStreamEnd, file: VideoFileEnd<RecordingManifest.CameraFile>?
     ) {
         videoFileEnded(file, captureNumber: captureNumber, source: camera, reason: reason)
         guard !isStopped, let (current, _) = cameraCaptures[uniqueID], current == captureNumber else { return }
@@ -1016,7 +1016,7 @@ public final class Recorder {
             }
         }
         let bytesPerHour = newestFrameSize.values.reduce(audioBytesPerHour) {
-            $0 + DiskEstimate.screenFileBytesPerHour(frameSize: $1, settings: settings)
+            $0 + DiskEstimate.videoFileBytesPerHour(frameSize: $1, settings: settings)
         }
         return bytesPerHour * settings.lowDiskWarningMinutes / 60
     }

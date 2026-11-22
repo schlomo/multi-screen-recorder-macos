@@ -25,18 +25,6 @@ public struct ScreenTracker: Sendable {
         case stop(uuid: String, ending: Ending)
     }
 
-    /// Why a stream ended by itself; the recorder reports it.
-    public enum StreamEnd: Equatable, Sendable {
-        case streamFailed(ErrorDetail)
-        /// The screen the stream captured is gone, as on an unplug, often
-        /// seconds before macOS's screen-change notice: no failure (F4).
-        case captureSourceGone
-        case writerFailed(ErrorDetail)
-        case writerFellBehind
-        case diskFull
-        case showsAnotherScreen
-    }
-
     public struct Step: Equatable, Sendable {
         public var events: [RecordingEvent] = []
         public var actions: [Action] = []
@@ -237,7 +225,7 @@ public struct ScreenTracker: Sendable {
     /// A stream ended by itself; `connected` is the screens as read now.
     /// A failing writer and a full disk have their event from the recorder,
     /// once per capture end, also when the tracker no longer follows it.
-    public mutating func streamEnded(_ uuid: String, _ end: StreamEnd, connected: [ConnectedScreen], at now: Int64) -> Step {
+    public mutating func streamEnded(_ uuid: String, _ end: VideoStreamEnd, connected: [ConnectedScreen], at now: Int64) -> Step {
         guard let tracked = screens[uuid], case .recording = tracked.phase else { return Step() }
         var step = Step()
         let isPresent = connected.contains { $0.uuid == uuid && !$0.isMirroring }

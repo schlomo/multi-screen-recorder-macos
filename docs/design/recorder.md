@@ -616,7 +616,7 @@ of every underlying error (`NSUnderlyingErrorKey`,
 `NSMultipleUnderlyingErrorsKey`), 8 levels deep at most; the last level
 kept has `"truncated": true` when it has more (left out otherwise). The recorder's own errors have
 the domain `MultiScreenRecorder` (or their type's, such as
-`RecorderCore.ScreenFileWriterError`) with the system's error under them,
+`RecorderCore.VideoFileWriterError`) with the system's error under them,
 such as `cannot write <file>` with AVFoundation's error underneath.
 `error` is the error detail as one line: each level's description, then
 in parentheses the domain and code (left out for the recorder's own),

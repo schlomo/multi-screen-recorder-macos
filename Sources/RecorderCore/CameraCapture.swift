@@ -9,7 +9,7 @@ protocol CameraFrameSource: AnyObject, Sendable {
     /// Starts delivering frames to `deliver` on `queue`; `ended` when it ends by itself.
     func start(
         queue: DispatchQueue, deliver: @escaping @Sendable (CMSampleBuffer) -> Void,
-        ended: @escaping @Sendable (ScreenTracker.StreamEnd) -> Void)
+        ended: @escaping @Sendable (VideoStreamEnd) -> Void)
     func stop() async
 }
 
@@ -36,7 +36,7 @@ final class CameraCapture: @unchecked Sendable {
         uniqueID: String, number: Int, name: String, frameSize: FrameSize, source: any CameraFrameSource,
         context: RecordingContext, guides: GuideTrackFeed,
         onFileStarted: @escaping @Sendable (RecordingManifest.CameraFile) -> Void,
-        onEnded: @escaping @Sendable (ScreenTracker.StreamEnd, CameraFileEnd?) -> Void
+        onEnded: @escaping @Sendable (VideoStreamEnd, VideoFileEnd<RecordingManifest.CameraFile>?) -> Void
     ) {
         self.uniqueID = uniqueID
         self.number = number
@@ -46,12 +46,12 @@ final class CameraCapture: @unchecked Sendable {
         self.context = context
         queue = DispatchQueue(label: "msr.camera.\(number)", qos: .userInteractive)
         let ticker = VideoFileTicker<RecordingManifest.CameraFile>(captureStart: context.now()) {
-            [context, uniqueID, number, name, frameSize, guides] firstTick throws(ScreenFileWriterError) in
+            [context, uniqueID, number, name, frameSize, guides] firstTick throws(VideoFileWriterError) in
             let fileName = context.claimCameraFileName(tick: firstTick, number: number, camera: name)
-            let writer = try ScreenFileWriter(
+            let writer = try VideoFileWriter(
                 url: context.folder.appending(path: fileName), frameSize: frameSize, firstTick: firstTick,
                 timecode: context.timecode,
-                metadata: ScreenFileMetadata(
+                metadata: VideoFileMetadata(
                     source: .camera(uniqueID: uniqueID, number: number, name: name), frameSize: frameSize,
                     recordingStarted: context.startedText, app: context.app),
                 guideTracks: guides.tracks)
@@ -92,7 +92,7 @@ final class CameraCapture: @unchecked Sendable {
             RecorderLog.detail(
                 "Camera \(number) \(name): first frame \(CVPixelBufferGetWidth(pixelBuffer))×\(CVPixelBufferGetHeight(pixelBuffer)) "
                     + FrameFacts.fourCharacterCode(CVPixelBufferGetPixelFormatType(pixelBuffer)),
-                category: ScreenFileWriter.detailCategory)
+                category: VideoFileWriter.detailCategory)
         }
         let pts = CMTimeConvertScale(CMSampleBufferGetPresentationTimeStamp(buffer), timescale: 1_000_000_000, method: .roundHalfAwayFromZero)
         feed.receive(pixelBuffer, capturedAt: context.clock.sinceStart(host: UInt64(max(0, pts.value))))
@@ -100,7 +100,7 @@ final class CameraCapture: @unchecked Sendable {
 
     /// Stops the capture at the recorder's request and finalizes its file;
     /// if the capture is already ending by itself, waits for that.
-    func stop() async -> CameraFileEnd? {
+    func stop() async -> VideoFileEnd<RecordingManifest.CameraFile>? {
         await feed.stop()
     }
 }
@@ -121,7 +121,7 @@ final class CameraSource: NSObject, CameraFrameSource, AVCaptureVideoDataOutputS
     private struct State {
         var session: AVCaptureSession?
         var deliver: (@Sendable (CMSampleBuffer) -> Void)?
-        var ended: (@Sendable (ScreenTracker.StreamEnd) -> Void)?
+        var ended: (@Sendable (VideoStreamEnd) -> Void)?
         var observers: [any NSObjectProtocol] = []
         var isStopped = false
     }
@@ -138,7 +138,7 @@ final class CameraSource: NSObject, CameraFrameSource, AVCaptureVideoDataOutputS
 
     func start(
         queue: DispatchQueue, deliver: @escaping @Sendable (CMSampleBuffer) -> Void,
-        ended: @escaping @Sendable (ScreenTracker.StreamEnd) -> Void
+        ended: @escaping @Sendable (VideoStreamEnd) -> Void
     ) {
         withState {
             $0.deliver = deliver
@@ -215,8 +215,8 @@ final class CameraSource: NSObject, CameraFrameSource, AVCaptureVideoDataOutputS
         withState { $0.deliver }?(sampleBuffer)
     }
 
-    private func endOnce(_ end: ScreenTracker.StreamEnd) {
-        let ended = withState { state -> (@Sendable (ScreenTracker.StreamEnd) -> Void)? in
+    private func endOnce(_ end: VideoStreamEnd) {
+        let ended = withState { state -> (@Sendable (VideoStreamEnd) -> Void)? in
             defer { state.ended = nil }
             return state.isStopped ? nil : state.ended
         }
