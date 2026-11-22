@@ -4,17 +4,14 @@
 
 PR #26 (draft, branch `audio-meters`) holds item 21 with items 31,
 35, 19, 33, 34 and 32 (D69 to D72; the owner's rulings of 2026-11-22
-are quoted there). State at 2026-11-22 16:40 Europe/Berlin, interrupted
-by a laptop restart: on the branch up to 1297380 (meters, Recorder
-tests, crash filter, VM login wait, free space plain reading D71,
-unreadable crash reports skipped); not yet built: the signed-off
-screenshot flow (D72 to write): `scripts/end-to-end-test --release` /
-`--snapshot <n>` runs the published zip in the VM (check first whether
-the VM's permissions accept the certificate-signed app),
-`scripts/update-homepage-screenshots --release|--snapshot <n>` commits
-the captures unmarked (a homepage-only PR off `main`, or onto PR n),
-no snapshot release for a homepage-only PR, the homepage PNGs restored
-to `main`'s in PR #26. The top-tier review of 8aff7b5 is done: its findings
+are quoted there). State at 2026-11-22 17:20 Europe/Berlin: on the branch up to f7aee7f
+(everything above, plus D71 free space, unreadable crash reports
+skipped, and the screenshot flow of D72: `end-to-end-test --release |
+--snapshot <n>`, `update-homepage-screenshots --release | --snapshot
+<n>`, the homepage PNGs back to `main`'s; a `--release` run passed
+with `main`'s driver, 7 of 7). Open: "no snapshot release for a
+homepage-only PR" is not built (the rule is `paths-ignore` in
+`ci.yml`; options in the builder's report, an owner's decision). The top-tier review of 8aff7b5 is done: its findings
 and their planned outcomes are a comment on PR #26 (B3 and the NITs
 to fix; B1, the description, before ready). Then: a delta review of
 everything after 8aff7b5, the architect's end-to-end run,
