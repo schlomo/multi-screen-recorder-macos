@@ -28,14 +28,14 @@ credited for the reference implementation.
 ## 1. Guiding principles
 
 - **Never lose a recording.** Every failure mode (a crash, a full disk,
-  a failed stream, a screen or audio source that disappears) leaves
-  readable screen files and audio files and, where possible, keeps
+  a failed stream, a screen, camera or audio source that disappears)
+  leaves readable video files and audio files and, where possible, keeps
   recording (D14, D31).
 - **Correct by content, not by timestamp.** A frame shows what was on
   the screen at its time; this is verified by looking at the picture,
   because a recorder whose timestamps looked right was off by up to
   76 s in content (D11).
-- **Edit-ready output.** Constant 30 fps, one frame size per screen
+- **Edit-ready output.** Constant 30 fps, one frame size per video
   file, each audio source in its own audio file with every channel on
   its own track, and timecode in every file, so the files drop into a
   30 fps editing timeline and line up (D11, D21, D30, D31).
@@ -45,21 +45,22 @@ credited for the reference implementation.
 
 The skeleton is built (the app window with the ready check and the
 table of what will be recorded, auto mode, the command line without `record`, the
-pipeline), and so is recording the screens (PR #11) and the audio
-(PR #12). The designs:
+pipeline), and so is recording the screens (PR #11), the audio
+(PR #12) and the cameras (PR #27, D74). The designs:
 [design/recorder.md](design/recorder.md) and
 [design/delivery.md](design/delivery.md); how the recorder is tested
 end to end on a Mac: [design/end-to-end-tests.md](design/end-to-end-tests.md)
 (D35, D37).
 
 - **Recorder core:** one capture stream and one file writer per
-  screen, plus the audio sources; it watches screens and audio
-  sources as they come and go.
+  screen and per camera, sharing one video file path, plus the audio
+  sources; it watches screens, cameras and audio sources as they come
+  and go.
 - **Two front ends** over the same core, in one executable: the app
   (window, Dock icon) and the command line (D13, D19).
 - **Settings:** one JSON file shared by both front ends (D13).
 - **Output:** a recording folder per recording, holding the screen
-  files of each screen, the audio files of each audio source, the
+  files of each screen, the camera files of each camera, the audio files of each audio source, the
   recording manifest (D20, D31) and a timeline file for DaVinci
   Resolve (D68).
 
@@ -84,7 +85,16 @@ D28).
   with a portrait screen (D11, D25); a screen whose frame size
   changes gets a new screen file (D30); HEVC in `.mov`, no tick ever
   dropped, a timecode track in every file (D21, D31); always SDR (D24).
-  The recording resolution None records no screen: audio only (D62).
+  The recording resolution None records no screen and no camera:
+  audio only (D62, D74).
+- Cameras (built in PR #27, D74): the camera mode none, default
+  camera, all real (the default and auto mode's) or all (virtual
+  cameras too); one camera file per camera, made like a screen file,
+  with the same two guide tracks; each camera at 30 fps in its largest
+  format that fits the recording resolution, 16:9 preferred; a camera
+  that sends no frames is a failing stream, a suspended one is not
+  recorded; the Camera permission is asked only when a camera would be
+  recorded. A camera's own H.264 stream is not taken as-is (deferred).
 - Screens (built in PR #11, D45, D46, D47): a screen is known by its
   UUID; a stream starts only after a settle time; every frame is
   checked against its screen and a screen showing another screen's
@@ -105,12 +115,14 @@ D28).
   input channel its own mono track (D22, D31); each screen file
   carries two guide tracks, microphones and system audio, for playback
   and syncing (D31); audio only has no screen file, so no guide track,
-  and its system audio still needs a readable main screen (D62).
+  and its system audio still needs a readable main screen (D62). Camera
+  files carry the same two guide tracks (D74).
 - Built (PR #9, D44): auto mode, on by default, records every screen
   at Native (its "looks like" size; the drawn-at size is never
   recorded) with the audio mode wired; a Bluetooth or virtual input
   only under "all inputs" or as the default microphone; a Mac without
-  a microphone records screens and system audio. The settings file is
+  a microphone records screens and system audio; auto mode records
+  every real camera (D74). The settings file is
   only read, never refused or repaired, and written only by the window
   and by `msr settings` with flags. A recording follows a change of
   the default microphone (D34, built in PR #12). What AGC does is
@@ -125,7 +137,8 @@ D28).
   nothing to record, D62), low-disk warnings,
   crash-safe fragmented files, keeping the Mac awake (D14). The window
   shows what will be recorded and what it costs in disk space (D26,
-  D33), and follows screens and audio inputs as they change (D36).
+  D33), and follows screens, cameras and audio inputs as they change
+  (D36, D74).
 - No network connections; feedback goes to GitHub Issues (D15).
 
 ### Front ends
