@@ -14,8 +14,10 @@ the VM's permissions accept the certificate-signed app),
 `scripts/update-homepage-screenshots --release|--snapshot <n>` commits
 the captures unmarked (a homepage-only PR off `main`, or onto PR n),
 no snapshot release for a homepage-only PR, the homepage PNGs restored
-to `main`'s in PR #26. Then: the top-tier review of the whole PR (a
-first one on 8aff7b5 was interrupted), the architect's end-to-end run,
+to `main`'s in PR #26. The top-tier review of 8aff7b5 is done: its findings
+and their planned outcomes are a comment on PR #26 (B3 and the NITs
+to fix; B1, the description, before ready). Then: a delta review of
+everything after 8aff7b5, the architect's end-to-end run,
 one unmarked commit for the pipeline, `update-homepage-screenshots
 --snapshot 26` for the owner's Cloudflare preview. The meters build
 4d89314 is installed in `/Applications` for the owner's try-out. After
