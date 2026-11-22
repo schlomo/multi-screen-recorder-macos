@@ -9,9 +9,8 @@ are quoted there). State at 2026-11-22 17:20 Europe/Berlin: on the branch up to 
 skipped, and the screenshot flow of D72: `end-to-end-test --release |
 --snapshot <n>`, `update-homepage-screenshots --release | --snapshot
 <n>`, the homepage PNGs back to `main`'s; a `--release` run passed
-with `main`'s driver, 7 of 7). Open: "no snapshot release for a
-homepage-only PR" is not built (the rule is `paths-ignore` in
-`ci.yml`; options in the builder's report, an owner's decision). The top-tier review of 8aff7b5 is done: its findings
+with `main`'s driver, 7 of 7). "No snapshot release for a homepage-only PR" is deferred (D72).
+Next: a builder fixes the review's B3 and NITs (the PR comment). The top-tier review of 8aff7b5 is done: its findings
 and their planned outcomes are a comment on PR #26 (B3 and the NITs
 to fix; B1, the description, before ready). Then: a delta review of
 everything after 8aff7b5, the architect's end-to-end run,
@@ -612,6 +611,13 @@ Still open from D34: what AGC does and whether it is on in auto mode;
 
 ## Deliberately deferred
 
+- **No snapshot release for a homepage-only PR** (D72): a homepage-only
+  PR builds a throwaway `pr-<n>`, removed at close, and a screenshot
+  commit on a feature PR rebuilds its snapshot, so the pictures show
+  the build one commit before. `paths-ignore` compares a whole PR; a
+  robust rule is a tested script comparing the push with the commit the
+  current `pr-<n>` was built from. The owner, 2026-11-22: "Defer it".
+  Revive if the extra runs cost real time or money.
 - **A software-encoder fallback after a hardware encoder failure**
   (item 28's analysis, 2026-11-19): the owner: "2 we won't do as all
   Mac's have hardware encoders". Revive if a problem report shows a
