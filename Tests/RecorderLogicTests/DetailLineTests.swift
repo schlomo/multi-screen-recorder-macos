@@ -13,17 +13,31 @@ import Testing
             screenRecording: .granted, microphoneGranted: true, screens: .success([dell, retina]),
             audioInputs: .success([AudioInputInfo(name: "MacBook Pro Microphone", channelCount: 1, isDefault: true)]),
             outputFolder: .usable(.bytes(120_400_000_000)))
-        #expect(DetailLine.facts(facts) == "screen recording granted; microphone granted; "
+        #expect(DetailLine.facts(facts) == "screen recording granted; microphone granted; camera not asked; "
             + "screens: DELL P3421W 3440×1440 at (0,0) main, Built-in Retina Display looks like 1728×1117, drawn at 3456×2234 at (3440,0); "
-            + "audio inputs: MacBook Pro Microphone (default) 1 channel; output folder usable, 120.4 GB free")
+            + "audio inputs: MacBook Pro Microphone (default) 1 channel; cameras: none; output folder usable, 120.4 GB free")
+    }
+
+    @Test func theCamerasAndTheCameraPermissionAreInTheFacts() {
+        let facts = ReadyCheckFacts(
+            screenRecording: .granted, microphoneGranted: nil, screens: .success([]), audioInputs: .success([]),
+            outputFolder: .unusable("read-only"), cameraGranted: false,
+            cameras: [
+                CameraInfo(uniqueID: "A", name: "FaceTime HD Camera", isDefault: true, isVirtual: false,
+                           formats: [CameraFormat(size: FrameSize(width: 1920, height: 1080), maxFramesPerSecond: 30)]),
+                CameraInfo(uniqueID: "C", name: "OBS Virtual Camera", isDefault: false, isVirtual: true, formats: []),
+            ])
+        #expect(DetailLine.facts(facts) == "screen recording granted; microphone not asked; camera not granted; screens: none; "
+            + "audio inputs: none; cameras: FaceTime HD Camera (default) 1920×1080 at 30 fps, OBS Virtual Camera virtual no format; "
+            + "output folder unusable (read-only)")
     }
 
     @Test func whatCouldNotBeReadSaysWhy() {
         let facts = ReadyCheckFacts(
             screenRecording: .failed("-3801"), microphoneGranted: nil, screens: .failure(DeviceReadError("no list")),
             audioInputs: .success([]), outputFolder: .unusable("read-only"))
-        #expect(DetailLine.facts(facts) == "screen recording failed (-3801); microphone not asked; screens cannot be read (no list); "
-            + "audio inputs: none; output folder unusable (read-only)")
+        #expect(DetailLine.facts(facts) == "screen recording failed (-3801); microphone not asked; camera not asked; "
+            + "screens cannot be read (no list); audio inputs: none; cameras: none; output folder unusable (read-only)")
     }
 
     /// Audio only with the microphone alone: the screen permission was not asked.

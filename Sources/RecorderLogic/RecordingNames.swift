@@ -27,6 +27,13 @@ public enum RecordingNames {
         file(start: start, timeZone: timeZone, label: SourceLabel.screen(number, name: screen), taken: taken)
     }
 
+    /// "2026-11-12 14.03.05 Camera 1 - FaceTime HD Camera.mov": as a screen file, with the camera's label (D74).
+    public static func cameraFile(
+        start: Date, timeZone: TimeZone, number: Int, camera: String, taken: Set<String> = []
+    ) -> String {
+        file(start: start, timeZone: timeZone, label: SourceLabel.camera(number, name: camera), taken: taken)
+    }
+
     /// "2026-11-12 14.03.05 Audio 1 - MacBook Pro Microphone.mov",
     /// "2026-11-12 14.03.05 Audio 0 - System.mov"; a taken name as for a
     /// screen file.

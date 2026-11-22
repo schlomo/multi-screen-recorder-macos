@@ -71,7 +71,7 @@ System Audio Recording permission`. For the devices below:
 
 ```
 What will be recorded
-  Settings: Auto (resolution Native, audio mode Wired), system audio on
+  Settings: Auto (resolution Native, audio mode Wired, camera mode All real), system audio on
   Source                                      Looks like  Drawn at   Records at  GB/h max
   ───────────────────────────────────────────────────────────────────────────────────────
   Screen 1 - Built-in Retina Display          1728×1117   3456×2234  1728×1116        1.0
@@ -139,7 +139,7 @@ line's text), and `Ready.` or `Not ready.` last. For the devices of the
 
 ```
 What will be recorded
-  Settings: Auto (resolution Native, audio mode Wired), system audio on
+  Settings: Auto (resolution Native, audio mode Wired, camera mode All real), system audio on
   Source                                      Looks like  Drawn at   Records at  GB/h max
   ───────────────────────────────────────────────────────────────────────────────────────
   Screen 1 - Built-in Retina Display          1728×1117   3456×2234  1728×1116        1.0
@@ -188,6 +188,7 @@ saves, so a fresh Mac has none and the defaults apply:
 {
   "audioMode" : "wired",
   "auto" : true,
+  "cameraMode" : "real",
   "lowDiskWarningMinutes" : 20,
   "outputFolder" : "~/Movies/Multi Screen Recorder",
   "requiredRecordingHours" : 2,
@@ -504,27 +505,33 @@ shared clock. A screen file's `screenUUID` is its screen's identity (see
 disconnected`, `screen frame size changed`, `screen mirroring started`,
 `screen mirroring stopped`, `main screen changed`, `screen stream
 failed`, `screen shows another screen's picture`, `screen file writer
-fell behind`, `screen file writer failed`, `disk full`, `sleep`, `wake`,
+fell behind`, `screen file writer failed`, for cameras (D74) `camera
+connected`, `camera disconnected`, `default camera changed`, `camera
+stream failed`, `camera file writer fell behind`, `camera file writer
+failed`, then `disk full`, `sleep`, `wake`,
 and for audio `audio input connected`, `audio input disconnected`,
 `system audio started`, `system audio stopped`, `default microphone
 changed`, `audio input gap`, `audio input failed`, `system audio
 failed`, `audio file writer failed`, `audio file writer fell behind`,
 `audio input volume changed`, `no audio started`, `no audio stopped`;
-each names its screen (`screen`) or its audio source (`audioSource`)
-where it is about one; `screen` always means a screen. `audio file
+each names its screen (`screen`), its camera (`camera`) or its audio
+source (`audioSource`) where it is about one; `screen` always means a
+screen. `audio file
 writer fell behind` comes in two shapes: without `error` when a capture
 ended because its writer fell behind, and with `error` when samples were
 lost at a file's end, so one recording can have it twice for the same
-file. Their fields: `at`, `event`, `screen` or `audioSource`; `from` and
+file. Their fields: `at`, `event`, `screen`, `camera` or `audioSource`; `from` and
 `to` (the old and the new frame size) for `screen frame size changed`,
 the old and the new default microphone for `default microphone
+changed` and the old and the new default camera for `default camera
 changed` (either absent where there was or is none), and the old and
 the new input volume, 0 to 1, for `audio input volume changed` (D69);
 `mirrors` (the
 screen mirrored) for `screen mirroring started`; `length` (seconds, to
 the millisecond) for `audio input gap`; `error` (why, as one line) and
 `errorDetail` (the same error as its full chain, below) for `screen stream
-failed`, `screen file writer failed`, `audio input failed`, `system
+failed`, `screen file writer failed`, `camera stream failed`, `camera
+file writer failed`, `audio input failed`, `system
 audio failed`, `audio file writer failed`, and `audio file writer fell
 behind` when samples were lost at a file's end. The manifest's `state`
 is `recording` or `finalized`; a file's `state` is `recording`,

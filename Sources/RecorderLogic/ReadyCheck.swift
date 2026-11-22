@@ -31,19 +31,27 @@ public struct ReadyCheckFacts: Sendable {
     public var screens: Result<[ScreenInfo], DeviceReadError>
     public var audioInputs: Result<[AudioInputInfo], DeviceReadError>
     public var outputFolder: OutputFolderProbe
+    /// Whether the Camera permission is granted; nil when the recording
+    /// records no connected camera, so it was not asked (D74).
+    public var cameraGranted: Bool?
+    public var cameras: [CameraInfo]
 
     public init(
         screenRecording: PermissionProbe?,
         microphoneGranted: Bool?,
         screens: Result<[ScreenInfo], DeviceReadError>,
         audioInputs: Result<[AudioInputInfo], DeviceReadError>,
-        outputFolder: OutputFolderProbe
+        outputFolder: OutputFolderProbe,
+        cameraGranted: Bool? = nil,
+        cameras: [CameraInfo] = []
     ) {
         self.screenRecording = screenRecording
         self.microphoneGranted = microphoneGranted
         self.screens = screens
         self.audioInputs = audioInputs
         self.outputFolder = outputFolder
+        self.cameraGranted = cameraGranted
+        self.cameras = cameras
     }
 }
 
@@ -86,6 +94,7 @@ public struct ReadyCheckResult: Equatable, Sendable {
 public enum ReadyCheck {
     static let screenRecordingTitle = "Screen & System Audio Recording permission"
     static let microphoneTitle = "Microphone permission"
+    static let cameraTitle = "Camera permission"
     static let restartNote = "quit Multi Screen Recorder and start it again. "
     static let terminalNote = "If it was started from a terminal, then the terminal app needs the permission."
 
@@ -97,6 +106,13 @@ public enum ReadyCheck {
     ) -> Bool {
         guard case .success(let inputs) = audioInputs else { return false }
         return inputs.contains { AudioTracker.records($0, settings: settings) }
+    }
+
+    /// Whether a recording with these settings records at least one of the
+    /// cameras connected: only then the Camera permission is asked for and
+    /// part of the check (D74).
+    public static func recordsCamera(_ cameras: [CameraInfo], settings: Settings) -> Bool {
+        cameras.contains { CameraTracker.records($0, settings: settings) }
     }
 
     /// Whether a recording with these settings needs the Screen & System
@@ -128,6 +144,9 @@ public enum ReadyCheck {
         if recordsAudioInput(facts.audioInputs, settings: settings) {
             items.append(microphoneItem(granted: facts.microphoneGranted ?? false))
         }
+        if recordsCamera(facts.cameras, settings: settings) {
+            items.append(cameraItem(granted: facts.cameraGranted ?? false))
+        }
         let recordsScreens = settings.effectiveResolution.recordsScreens
         if recordsScreens {
             items.append(screensItem(facts.screens))
@@ -144,7 +163,8 @@ public enum ReadyCheck {
         if case .success(let screens) = screensToJudge(facts.screens, settings: settings),
            case .usable(let freeSpace) = facts.outputFolder,
            case .success(let audioInputs) = audioInputsToJudge(facts.audioInputs, settings: settings),
-           let bytesPerHour = DiskEstimate.bytesPerHour(settings: settings, screens: screens, audioInputs: audioInputs) {
+           let bytesPerHour = DiskEstimate.bytesPerHour(
+               settings: settings, screens: screens, audioInputs: audioInputs, cameras: facts.cameras) {
             items.append(diskItem(freeSpace, bytesPerHour: bytesPerHour, settings: settings))
         }
         return ReadyCheckResult(items: items)
@@ -167,6 +187,13 @@ public enum ReadyCheck {
             title: microphoneTitle, passed: granted,
             fix: granted ? nil : "allow it in System Settings › Privacy & Security › Microphone, then "
                 + restartNote + terminalNote)
+    }
+
+    private static func cameraItem(granted: Bool) -> ReadyCheckItem {
+        ReadyCheckItem(
+            title: cameraTitle, passed: granted,
+            fix: granted ? nil : "allow it in System Settings › Privacy & Security › Camera, then " + restartNote + terminalNote
+                + " Or record no camera (--camera-mode none).")
     }
 
     private static func screensItem(_ screens: Result<[ScreenInfo], DeviceReadError>) -> ReadyCheckItem {

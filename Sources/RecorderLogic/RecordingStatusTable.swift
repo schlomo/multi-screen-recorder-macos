@@ -1,7 +1,7 @@
 import Foundation
 
-/// The status window of a running recording (D46): a row per screen and
-/// per audio source with its files, the data written, its state and its
+/// The status window of a running recording (D46): a row per screen, per
+/// camera (D74) and per audio source with its files, the data written, its state and its
 /// clock drift (an audio row also has its level meter and input volume,
 /// which the window draws, D69), and a line with the elapsed time, the data, the files and the free space.
 public enum RecordingStatusTable {
@@ -64,7 +64,25 @@ public enum RecordingStatusTable {
         }
     }
 
-    /// The audio sources' rows, below the screens': Records at is the
+    /// The cameras' rows, below the screens', as a screen's: `bytes` by the camera file's name.
+    public static func cameraRows(
+        sources: [CameraTracker.Source], files: [RecordingManifest.CameraFile], bytes: [String: Int64]
+    ) -> [Row] {
+        sources.map { source in
+            let own = files.filter { $0.cameraUniqueID == source.uniqueID }
+            let frameSize: FrameSize? = if case .recording(let size) = source.state { size } else {
+                own.last.map { FrameSize(width: $0.frameSize[0], height: $0.frameSize[1]) }
+            }
+            return Row(
+                source: .camera(source.number, name: source.name),
+                recordsAt: frameSize.map { "\($0.width)×\($0.height)" } ?? "",
+                files: own.count,
+                written: writtenText(own.map { bytes[$0.name] }),
+                state: text(source.state))
+        }
+    }
+
+    /// The audio sources' rows, below the cameras': Records at is the
     /// channels of the source's newest audio file; `clockDrift` the latest
     /// clock drift correction status of each source's running capture.
     public static func audioRows(
@@ -130,6 +148,19 @@ public enum RecordingStatusTable {
         let text: StateText = switch state {
         case .recording: .recording
         case .noAudio: .noAudio
+        case .waiting: .waiting
+        case .failedRetrying: .failedRetrying
+        case .diskFull: .diskFull
+        case .disconnected: .disconnected
+        case .notRecorded: .notRecorded
+        case .asleep: .asleep
+        }
+        return text.rawValue
+    }
+
+    static func text(_ state: CameraTracker.Source.State) -> String {
+        let text: StateText = switch state {
+        case .recording: .recording
         case .waiting: .waiting
         case .failedRetrying: .failedRetrying
         case .diskFull: .diskFull

@@ -123,9 +123,12 @@ public func renderList(
     settings: Settings,
     screens: [ScreenInfo],
     audioInputs: [AudioInputInfo],
+    cameras: [CameraInfo],
     systemAudioAvailable: Bool
 ) -> String {
-    WhatWillBeRecorded(settings: settings, screens: .success(screens), audioInputs: .success(audioInputs), outputFolder: nil).text
+    WhatWillBeRecorded(
+        settings: settings, screens: .success(screens), audioInputs: .success(audioInputs), cameras: cameras, outputFolder: nil
+    ).text
         + (systemAudioAvailable
             ? "System audio: available\n"
             : "System audio: not available, the program running msr (a terminal app) lacks the Screen & System Audio Recording permission\n")
@@ -133,4 +136,60 @@ public func renderList(
 
 func padded(_ text: String, _ width: Int) -> String {
     text + String(repeating: " ", count: max(0, width - text.count))
+}
+
+/// One way a camera can deliver its picture: its size in pixels and the
+/// highest frame rate it delivers at that size.
+public struct CameraFormat: Equatable, Sendable, CustomStringConvertible {
+    public var size: FrameSize
+    public var maxFramesPerSecond: Double
+
+    public init(size: FrameSize, maxFramesPerSecond: Double) {
+        self.size = size
+        self.maxFramesPerSecond = maxFramesPerSecond
+    }
+
+    /// "1920×1080 at 30 fps".
+    public var description: String { "\(size) at \(String(format: "%g", maxFramesPerSecond)) fps" }
+}
+
+/// A camera as AVFoundation lists it, known by its unique ID (D74).
+public struct CameraInfo: Equatable, Sendable {
+    /// AVFoundation's unique ID, by which a recording knows the camera and opens it.
+    public var uniqueID: String
+    public var name: String
+    /// The Mac's default camera.
+    public var isDefault: Bool
+    /// A camera made by software, such as OBS Virtual Camera, not a device.
+    public var isVirtual: Bool
+    public var formats: [CameraFormat]
+
+    public init(uniqueID: String, name: String, isDefault: Bool, isVirtual: Bool, formats: [CameraFormat]) {
+        self.uniqueID = uniqueID
+        self.name = name
+        self.isDefault = isDefault
+        self.isVirtual = isVirtual
+        self.formats = formats
+    }
+
+    /// The format a recording opens the camera with: its largest that
+    /// delivers the tick grid's frame rate, a rate rounded to whole frames
+    /// per second; a camera with none such delivers its fastest, the largest
+    /// of those. Nil for a camera that lists no format.
+    public var chosenFormat: CameraFormat? {
+        let wanted = Double(TickGrid.recording.framesPerSecond)
+        return formats.max { lhs, rhs in
+            (min(lhs.maxFramesPerSecond.rounded(), wanted), lhs.size.pixelCount)
+                < (min(rhs.maxFramesPerSecond.rounded(), wanted), rhs.size.pixelCount)
+        }
+    }
+
+    /// The frame size of the camera's file: its chosen format's size fitted
+    /// into the recording resolution's box, as a screen's looks-like size is.
+    public func frameSize(resolution: RecordingResolution) -> FrameSize? {
+        chosenFormat.map { resolution.frameSize(forLooksLike: $0.size) }
+    }
+
+    /// "FaceTime HD Camera (default)" or just the name.
+    public var shownName: String { isDefault ? "\(name) (default)" : name }
 }

@@ -7,8 +7,9 @@ import Testing
 
 extension GlobalRecordingLog {
     /// A recorder's wiring, audio only with one stand-in audio input and its
-    /// stand-in input volume: what reaches the observer, the recording
-    /// manifest and the status window. Nested in `GlobalRecordingLog`: a recorder
+    /// stand-in input volume, or with stand-in cameras and the Camera
+    /// permission: what reaches the observer, the recording manifest and the
+    /// status window. Nested in `GlobalRecordingLog`: a recorder
     /// writes the one recording log of the process.
     @MainActor
     @Suite final class RecorderTests {
@@ -86,6 +87,93 @@ extension GlobalRecordingLog {
 
         private let screensReadable = Switch()
         private var recorder: Recorder!
+
+        /// A camera's frames, sent by the test with the host time of now.
+        final class StandInCamera: CameraFrameSource, @unchecked Sendable {
+            let frameSize: FrameSize
+            private let state = Mutex<(
+                queue: DispatchQueue?, deliver: (@Sendable (CMSampleBuffer) -> Void)?,
+                ended: (@Sendable (ScreenTracker.StreamEnd) -> Void)?, stopped: Bool
+            )>((nil, nil, nil, false))
+
+            init(frameSize: FrameSize) {
+                self.frameSize = frameSize
+            }
+
+            var isStopped: Bool { state.withLock { $0.stopped } }
+
+            func start(
+                queue: DispatchQueue, deliver: @escaping @Sendable (CMSampleBuffer) -> Void,
+                ended: @escaping @Sendable (ScreenTracker.StreamEnd) -> Void
+            ) {
+                state.withLock { $0 = (queue, deliver, ended, false) }
+            }
+
+            func stop() async {
+                state.withLock { $0.stopped = true }
+            }
+
+            /// A decoded frame, handed to the capture on its queue.
+            func sendFrame() throws {
+                var pixelBuffer: CVPixelBuffer?
+                CVPixelBufferCreate(
+                    nil, frameSize.width, frameSize.height, kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange,
+                    [kCVPixelBufferIOSurfacePropertiesKey: [:]] as CFDictionary, &pixelBuffer)
+                let picture = try #require(pixelBuffer)
+                var format: CMVideoFormatDescription?
+                CMVideoFormatDescriptionCreateForImageBuffer(allocator: nil, imageBuffer: picture, formatDescriptionOut: &format)
+                var timing = Self.timingNow()
+                var buffer: CMSampleBuffer?
+                CMSampleBufferCreateReadyWithImageBuffer(
+                    allocator: nil, imageBuffer: picture, formatDescription: try #require(format), sampleTiming: &timing,
+                    sampleBufferOut: &buffer)
+                deliver(try #require(buffer))
+            }
+
+            /// A frame without a decoded picture, as a camera's compressed stream would come.
+            func sendFrameWithoutPicture() throws {
+                var timing = Self.timingNow()
+                var buffer: CMSampleBuffer?
+                CMSampleBufferCreate(
+                    allocator: nil, dataBuffer: nil, dataReady: true, makeDataReadyCallback: nil, refcon: nil, formatDescription: nil,
+                    sampleCount: 1, sampleTimingEntryCount: 1, sampleTimingArray: &timing, sampleSizeEntryCount: 0, sampleSizeArray: nil,
+                    sampleBufferOut: &buffer)
+                deliver(try #require(buffer))
+            }
+
+            func lose(_ end: ScreenTracker.StreamEnd) {
+                state.withLock { $0.ended }?(end)
+            }
+
+            private func deliver(_ buffer: CMSampleBuffer) {
+                let (queue, deliver) = state.withLock { ($0.queue, $0.deliver) }
+                queue?.sync { deliver?(buffer) }
+            }
+
+            private static func timingNow() -> CMSampleTimingInfo {
+                CMSampleTimingInfo(
+                    duration: CMTime(value: 1, timescale: 30),
+                    presentationTimeStamp: CMTime(value: CMTimeValue(readClocks().host), timescale: 1_000_000_000),
+                    decodeTimeStamp: .invalid)
+            }
+        }
+
+        /// The cameras connected, the Camera permission and what the recorder asked of them.
+        final class CameraStandIns: Sendable {
+            let connected = Mutex<[CameraInfo]>([])
+            let permission = Mutex(CameraPermission.granted)
+            /// What the request answers: the permission after it.
+            let answer = Mutex(CameraPermission.granted)
+            let requests = Mutex(0)
+            let reads = Mutex(0)
+            let opened = Mutex<[StandInCamera]>([])
+            var last: StandInCamera? { opened.withLock { $0.last } }
+        }
+
+        private let cameras = CameraStandIns()
+        private static let camera = CameraInfo(
+            uniqueID: "StandInCamera", name: "Stand-in camera", isDefault: true, isVirtual: false,
+            formats: [CameraFormat(size: FrameSize(width: 320, height: 180), maxFramesPerSecond: 30)])
         private let samplesPerBuffer = 1600
 
         init() throws {
@@ -97,10 +185,11 @@ extension GlobalRecordingLog {
             try? FileManager.default.removeItem(at: home)
         }
 
-        private func start(readsScreens: Bool = false) throws {
+        private func start(readsScreens: Bool = false, cameraMode: CameraMode = .none) throws {
             var settings = Settings.defaults
             settings.auto = false
-            settings.resolution = readsScreens ? .p1080 : RecordingResolution.none
+            settings.resolution = readsScreens || cameraMode != .none ? .p1080 : RecordingResolution.none
+            settings.cameraMode = cameraMode
             settings.audioMode = .defaultMicrophone
             settings.systemAudio = false
             settings.outputFolder = home.path(percentEncoded: false)
@@ -108,6 +197,7 @@ extension GlobalRecordingLog {
             let sources = sources
             let volume = volume
             let screensReadable = screensReadable
+            let cameras = cameras
             let devices = RecorderDevices(
                 screens: { () throws(DeviceReadError) -> [ConnectedScreen] in
                     if screensReadable.isOn.withLock({ $0 }) { return [] }
@@ -119,7 +209,23 @@ extension GlobalRecordingLog {
                     sources.list.withLock { $0.append(source) }
                     return source
                 },
-                inputVolume: { _, _ in volume })
+                inputVolume: { _, _ in volume },
+                cameras: {
+                    cameras.reads.withLock { $0 += 1 }
+                    return cameras.connected.withLock { $0 }
+                },
+                cameraSource: { _, format, _ in
+                    let camera = StandInCamera(frameSize: format.size)
+                    cameras.opened.withLock { $0.append(camera) }
+                    return camera
+                },
+                cameraPermission: { cameras.permission.withLock { $0 } },
+                requestCameraPermission: {
+                    cameras.requests.withLock { $0 += 1 }
+                    let answer = cameras.answer.withLock { $0 }
+                    cameras.permission.withLock { $0 = answer }
+                    return answer == .granted
+                })
             let facts = ReadyCheckFacts(
                 screenRecording: nil, microphoneGranted: true, screens: .success([]), audioInputs: .success([input]),
                 outputFolder: .unusable("not probed by the tests"))
@@ -201,6 +307,132 @@ extension GlobalRecordingLog {
             try await wait("the audio input's restart") { sources.count == 2 }
             #expect(observer.problems.map(\.problem.problem) == ["The screens cannot be read"])
             _ = await stop()
+        }
+
+        // MARK: Cameras (D74)
+
+        /// Sends a frame every 30 ms until `condition` holds, for at most 5 s.
+        private func sendFrames(_ camera: StandInCamera, until what: String, _ condition: () -> Bool) async throws {
+            try await wait(what) {
+                try? camera.sendFrame()
+                return condition()
+            }
+        }
+
+        @Test func aCameraThatAppearsAndVanishesStartsAndEndsItsCameraFileWithEvents() async throws {
+            try start(cameraMode: .real)
+            #expect(cameras.opened.withLock { $0.isEmpty })
+            cameras.connected.withLock { $0 = [Self.camera] }
+            recorder.camerasChanged()
+            try await wait("the camera's start after the settle time") { cameras.last != nil }
+            let camera = try #require(cameras.last)
+            try await sendFrames(camera, until: "the camera file") { (try? manifestOnDisk().cameraFiles.count) == 1 }
+            let started = try #require(try manifestOnDisk().cameraFiles.first)
+            #expect(started.name.hasSuffix(" Camera 1 - Stand-in camera.mov"))
+            #expect(started.camera == "Stand-in camera")
+            #expect(started.cameraUniqueID == "StandInCamera")
+            #expect(started.frameSize == [320, 180])
+            #expect(started.guideTracks == ["Audio inputs"])
+            #expect(started.state == .recording)
+            #expect(recorder.status().rows.contains { $0.source == .camera(1, name: "Stand-in camera") && $0.state == "recording" })
+
+            cameras.connected.withLock { $0 = [] }
+            recorder.camerasChanged()
+            try await wait("the camera file's end") { (try? manifestOnDisk().cameraFiles.first?.state) == .finalized }
+            #expect(camera.isStopped)
+            let summary = await stop()
+            #expect(summary.manifest.events.map(\.event) == [.cameraConnected, .cameraDisconnected])
+            #expect(summary.manifest.events.map(\.camera) == ["Stand-in camera", "Stand-in camera"])
+            #expect(summary.manifest.settings.cameraMode == "real")
+            #expect(summary.manifest.result == .ok)
+            #expect(FileManager.default.fileExists(atPath: recorder.folder.appending(path: started.name).path(percentEncoded: false)))
+            let timeline = try String(contentsOf: recorder.folder.appending(
+                path: ResolveTimeline.fileName(forFolder: recorder.folder.lastPathComponent)), encoding: .utf8)
+            #expect(timeline.contains(#""name": "Camera 1 - Stand-in camera""#))
+        }
+
+        @Test func aCameraThatFailsIsAFailureToldOnceAndStartsAgain() async throws {
+            cameras.connected.withLock { $0 = [Self.camera] }
+            try start(cameraMode: .real)
+            let first = try #require(cameras.last)
+            try await sendFrames(first, until: "the camera file") { (try? manifestOnDisk().cameraFiles.count) == 1 }
+            first.lose(.streamFailed("the stand-in failed"))
+            try await wait("the problem") { !observer.problems.isEmpty }
+            #expect(observer.problems.count == 1)
+            #expect(observer.problems.first?.ofAnEvent == true)
+            #expect(observer.problems.first?.problem.problem == "Camera Stand-in camera")
+            #expect(try manifestOnDisk().events.map(\.event) == [.cameraStreamFailed])
+            try await wait("the restart") { cameras.opened.withLock { $0.count } == 2 }
+            let summary = await stop()
+            #expect(summary.manifest.result == .problems)
+            #expect(summary.manifest.cameraFiles.map(\.state) == [.finalized])
+        }
+
+        /// The writer takes only decoded pictures; a frame without one ends the capture, never silently.
+        @Test func aFrameWithoutAPictureEndsTheCaptureAsAFailure() async throws {
+            cameras.connected.withLock { $0 = [Self.camera] }
+            try start(cameraMode: .real)
+            let camera = try #require(cameras.last)
+            try camera.sendFrameWithoutPicture()
+            try await wait("the failure") { (try? manifestOnDisk().events.map(\.event)) == [.cameraStreamFailed] }
+            #expect(try manifestOnDisk().events.first?.errorDetail == CameraCapture.frameWithoutPicture)
+            _ = await stop()
+        }
+
+        @Test func theCameraPermissionNeverAskedIsAskedOnceAndTheCameraRecordedOnceGranted() async throws {
+            cameras.connected.withLock { $0 = [Self.camera] }
+            cameras.permission.withLock { $0 = .notAsked }
+            try start(cameraMode: .real)
+            try await wait("the request") { cameras.requests.withLock { $0 } == 1 }
+            try await wait("the camera's start") { cameras.last != nil }
+            #expect(cameras.requests.withLock { $0 } == 1)
+            #expect(observer.problems.isEmpty)
+            _ = await stop()
+        }
+
+        @Test func aDeniedCameraPermissionIsAProblemToldOnce() async throws {
+            cameras.connected.withLock { $0 = [Self.camera] }
+            cameras.permission.withLock { $0 = .denied }
+            try start(cameraMode: .real)
+            recorder.camerasChanged()
+            recorder.camerasChanged()
+            #expect(observer.problems.map(\.problem.problem) == ["The Camera permission is missing"])
+            #expect(cameras.requests.withLock { $0 } == 0)
+            #expect(cameras.opened.withLock { $0.isEmpty })
+            let summary = await stop()
+            #expect(summary.manifest.problems.count == 1)
+        }
+
+        @Test func aDenialAtTheRequestIsAProblem() async throws {
+            cameras.connected.withLock { $0 = [Self.camera] }
+            cameras.permission.withLock { $0 = .notAsked }
+            cameras.answer.withLock { $0 = .denied }
+            try start(cameraMode: .real)
+            try await wait("the problem") { !observer.problems.isEmpty }
+            #expect(observer.problems.map(\.problem.problem) == ["The Camera permission is missing"])
+            #expect(cameras.opened.withLock { $0.isEmpty })
+            _ = await stop()
+        }
+
+        /// As in the test VM: no camera, no request, no problem, no camera file.
+        @Test func withoutACameraNothingIsAskedOrTold() async throws {
+            cameras.permission.withLock { $0 = .notAsked }
+            try start(cameraMode: .real)
+            recorder.camerasChanged()
+            let summary = await stop()
+            #expect(cameras.requests.withLock { $0 } == 0)
+            #expect(summary.manifest.cameraFiles.isEmpty)
+            #expect(summary.manifest.problems.isEmpty)
+            #expect(summary.manifest.events.isEmpty)
+        }
+
+        @Test func theCameraModeNoneNeverReadsTheCameras() async throws {
+            cameras.connected.withLock { $0 = [Self.camera] }
+            try start(readsScreens: true)
+            recorder.camerasChanged()
+            _ = await stop()
+            #expect(cameras.reads.withLock { $0 } == 0)
+            #expect(cameras.opened.withLock { $0.isEmpty })
         }
 
         // MARK: Input volume (D69)

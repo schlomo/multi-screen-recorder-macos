@@ -42,7 +42,8 @@ public enum ResolveTimeline {
 
     /// The files whose length the media file must tell: those without an end.
     public static func filesWithoutEnd(in manifest: RecordingManifest) -> [String] {
-        manifest.files.filter { $0.end == nil }.map(\.name) + manifest.audioFiles.filter { $0.end == nil }.map(\.name)
+        manifest.files.filter { $0.end == nil }.map(\.name) + manifest.cameraFiles.filter { $0.end == nil }.map(\.name)
+            + manifest.audioFiles.filter { $0.end == nil }.map(\.name)
     }
 
     /// The timeline file's content; `mediaSeconds` holds the media file's duration of each file in `filesWithoutEnd`.
@@ -56,14 +57,20 @@ public enum ResolveTimeline {
                 name: file.name, source: file.screen, timecode: file.timecode, start: file.start, end: file.end,
                 mediaSeconds: mediaSeconds[file.name], channels: nil, recordingStart: recordingStart)
         }.filter { $0.frames > 0 }
+        let cameras = try manifest.cameraFiles.map { file in
+            try Placed(
+                name: file.name, source: file.camera, timecode: file.timecode, start: file.start, end: file.end,
+                mediaSeconds: mediaSeconds[file.name], channels: nil, recordingStart: recordingStart)
+        }.filter { $0.frames > 0 }
         let audios = try manifest.audioFiles.map { file in
             try Placed(
                 name: file.name, source: file.audioSource, timecode: file.timecode, start: file.start, end: file.end,
                 mediaSeconds: mediaSeconds[file.name], channels: file.channels, recordingStart: recordingStart)
         }.filter { $0.frames > 0 }
-        let earliest = (screens + audios).min { $0.startFrame < $1.startFrame }
+        let earliest = (screens + cameras + audios).min { $0.startFrame < $1.startFrame }
         let timelineStart = earliest?.startFrame ?? 0
         let videoTracks = Self.videoTracks(screens, timelineStart: timelineStart)
+            + Self.videoTracks(cameras, timelineStart: timelineStart)
         let audioTracks = Self.audioTracks(audios, timelineStart: timelineStart)
         let markers = try Self.markers(manifest: manifest, name: name, timelineStart: timelineStart)
         let timeline = Node.object([
@@ -262,7 +269,9 @@ public enum ResolveTimeline {
             title += ": set resolution \(size)"
             note.append("Set the timeline resolution to \(size) (the largest screen): Timeline > Timeline Settings.")
         }
-        note.append("Tracks: one per screen, one per audio channel; the channels of one input are a linked group.")
+        note.append(manifest.cameraFiles.isEmpty
+            ? "Tracks: one per screen, one per audio channel; the channels of one input are a linked group."
+            : "Tracks: one per screen, then one per camera, one per audio channel; the channels of one input are a linked group.")
         note.append("Markers: blue = screen change, green = audio and other changes.")
         note.append(manifest.problems.isEmpty ? "Problems: none." : "Problems:")
         note += manifest.problems.map { EventLine.problemText($0, started: started.date, timeZone: started.timeZone) }

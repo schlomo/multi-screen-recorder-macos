@@ -39,6 +39,7 @@ public enum DetailLine {
         case nil: "not asked"
         }
         let microphone = facts.microphoneGranted.map { $0 ? "granted" : "not granted" } ?? "not asked"
+        let camera = facts.cameraGranted.map { $0 ? "granted" : "not granted" } ?? "not asked"
         let screens = switch facts.screens {
         case .success(let screens): "screens: " + list(screens.map { screen in
             "\(screen.name) \(screen.sizeText) at (\(point(screen.originX)),\(point(screen.originY)))" + (screen.isMain ? " main" : "")
@@ -54,7 +55,9 @@ public enum DetailLine {
         case .usable(.unreadable(let error)): "output folder usable, free space cannot be read (\(error))"
         case .unusable(let error): "output folder unusable (\(error))"
         }
-        return ["screen recording \(screen)", "microphone \(microphone)", screens, audioInputs, folder].joined(separator: "; ")
+        let cameras = "cameras: " + Self.cameras(facts.cameras)
+        return ["screen recording \(screen)", "microphone \(microphone)", "camera \(camera)", screens, audioInputs, cameras, folder]
+            .joined(separator: "; ")
     }
 
     /// "start Screen 2 Wacom One 13T (UUID 037036FB…, display ID 2) at 1920×1080";
@@ -66,6 +69,24 @@ public enum DetailLine {
         case .stop(let uuid, let ending):
             "stop \(names[uuid] ?? "screen \(uuid.prefix(8))…") (\(text(ending)))"
         }
+    }
+
+    /// "start Camera 1 FaceTime HD Camera (unique ID 0x14100…) in 1920×1080 at 30 fps at 1920×1080";
+    /// `names` gives a stopped camera's "Camera <n> <name>".
+    public static func cameraAction(_ action: CameraTracker.Action, names: [String: String]) -> String {
+        switch action {
+        case .start(let uniqueID, let format, let frameSize, let number, let name):
+            "start Camera \(number) \(name) (unique ID \(uniqueID.prefix(8))…) in \(format) at \(frameSize)"
+        case .stop(let uniqueID):
+            "stop \(names[uniqueID] ?? "camera \(uniqueID.prefix(8))…")"
+        }
+    }
+
+    /// "FaceTime HD Camera (default) 1920×1080 at 30 fps, OBS Virtual Camera virtual 1280×720 at 30 fps"
+    public static func cameras(_ cameras: [CameraInfo]) -> String {
+        list(cameras.map { camera in
+            camera.shownName + (camera.isVirtual ? " virtual" : "") + (camera.chosenFormat.map { " \($0)" } ?? " no format")
+        })
     }
 
     /// "DELL P3421W 3440×1440 at (0,0) main (display ID 1), …"

@@ -6,7 +6,7 @@ import RecorderLogic
 struct CommandLineInterface: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "msr",
-        abstract: "Multi Screen Recorder: records every screen and audio source.",
+        abstract: "Multi Screen Recorder: records every screen, camera and audio source.",
         discussion: """
             Without arguments, msr starts the app. A settings flag changes the settings for that one run; only `msr settings` saves them. \
             An unset HOME makes every command that reads the settings exit 78.
@@ -17,14 +17,17 @@ struct CommandLineInterface: AsyncParsableCommand {
 
 /// One flag per settings key, changing it for this run; `msr settings` saves the result.
 struct SettingsFlags: ParsableArguments {
-    @Flag(help: "Auto mode for this run, whatever the settings file says: every screen at Native, the audio mode Wired. Not with --resolution or --audio-mode.")
+    @Flag(help: "Auto mode for this run, whatever the settings file says: every screen at Native, the audio mode Wired, the camera mode real. Not with --resolution, --audio-mode or --camera-mode.")
     var auto = false
 
-    @Option(help: "Recording resolution: native, 4k, 1440p, 1200p, 1080p, 720p or none (audio only: no screen is recorded). Turns auto mode off for this run.")
+    @Option(help: "Recording resolution: native, 4k, 1440p, 1200p, 1080p, 720p or none (audio only: no screen and no camera is recorded). Turns auto mode off for this run.")
     var resolution: String?
 
     @Option(help: "Audio mode: none, default-microphone, wired or all-inputs. Turns auto mode off for this run.")
     var audioMode: String?
+
+    @Option(help: "Camera mode: none, default-camera, real or all-cameras (virtual cameras too). Turns auto mode off for this run.")
+    var cameraMode: String?
 
     @Option(help: "System audio: on or off.")
     var systemAudio: String?
@@ -45,6 +48,7 @@ struct SettingsFlags: ParsableArguments {
         let pairs: [(SettingKey, String?)] = [
             (.resolution, resolution),
             (.audioMode, audioMode),
+            (.cameraMode, cameraMode),
             (.systemAudio, systemAudio),
             (.outputFolder, outputFolder),
             (.requiredRecordingHours, requiredRecordingHours),
@@ -95,7 +99,7 @@ func standardSettingsFile() throws -> SettingsFile {
 extension CommandLineInterface {
     struct List: AsyncParsableCommand {
         static let configuration = CommandConfiguration(
-            abstract: "Show what will be recorded: the settings, the screens, the audio inputs and the system audio. Asks for no permission.")
+            abstract: "Show what will be recorded: the settings, the screens, the cameras, the audio inputs and the system audio. Asks for no permission.")
 
         func run() async throws {
             let file = try standardSettingsFile()
@@ -106,6 +110,7 @@ extension CommandLineInterface {
                 settings: settings,
                 screens: screens,
                 audioInputs: audioInputs,
+                cameras: currentCameras(),
                 systemAudioAvailable: screenRecordingIsGranted()
             ), terminator: "")
             if !unreadableRecordedInputs(audioInputs, settings: settings).isEmpty { throw ExitCode(1) }

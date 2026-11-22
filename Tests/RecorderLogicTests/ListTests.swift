@@ -37,12 +37,12 @@ import Testing
         screens: [ScreenInfo] = DesignExample.screens, audioInputs: [AudioInputInfo] = DesignExample.audioInputs,
         settings: Settings = .defaults, systemAudioAvailable: Bool = true
     ) -> String {
-        renderList(settings: settings, screens: screens, audioInputs: audioInputs, systemAudioAvailable: systemAudioAvailable)
+        renderList(settings: settings, screens: screens, audioInputs: audioInputs, cameras: [], systemAudioAvailable: systemAudioAvailable)
     }
 
     static let designExample = """
         What will be recorded
-          Settings: Auto (resolution Native, audio mode Wired), system audio on
+          Settings: Auto (resolution Native, audio mode Wired, camera mode All real), system audio on
           Source                                      Looks like  Drawn at   Records at  GB/h max
           ───────────────────────────────────────────────────────────────────────────────────────
           Screen 1 - Built-in Retina Display          1728×1117   3456×2234  1728×1116        1.0

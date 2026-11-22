@@ -8,6 +8,7 @@ import Testing
         #expect(defaults.auto == true)
         #expect(defaults.resolution == .native)
         #expect(defaults.audioMode == .wired)
+        #expect(defaults.cameraMode == .real)
         #expect(defaults.systemAudio == true)
         #expect(defaults.outputFolder == "~/Movies/Multi Screen Recorder")
         #expect(defaults.requiredRecordingHours == 2)
@@ -18,6 +19,7 @@ import Testing
         {
           "audioMode" : "wired",
           "auto" : true,
+          "cameraMode" : "real",
           "lowDiskWarningMinutes" : 20,
           "outputFolder" : "~/Movies/Multi Screen Recorder",
           "requiredRecordingHours" : 2,
@@ -37,7 +39,7 @@ import Testing
 
     @Test func flagNamesAreTheKeysInKebabCase() {
         #expect(SettingKey.allCases.map(\.flagName) == [
-            "--resolution", "--audio-mode", "--system-audio", "--output-folder",
+            "--resolution", "--audio-mode", "--camera-mode", "--system-audio", "--output-folder",
             "--required-recording-hours", "--low-disk-warning-minutes",
         ])
     }
@@ -50,6 +52,7 @@ import Testing
     @Test func autoModesChoicesAreTheDefaultsOfTheTwoSliders() {
         #expect(Settings.defaults.resolution == Settings.autoResolution)
         #expect(Settings.defaults.audioMode == Settings.autoAudioMode)
+        #expect(Settings.defaults.cameraMode == Settings.autoCameraMode)
     }
 }
 
@@ -290,6 +293,7 @@ import Testing
             auto: false,
             resolution: .p720,
             audioMode: .none,
+            cameraMode: .real,
             systemAudio: false,
             outputFolder: "~/Desktop/Recordings",
             requiredRecordingHours: 0.5,
@@ -301,11 +305,29 @@ import Testing
         #expect(try Settings.defaults.applying(flags: [:]) == .defaults)
     }
 
-    @Test(arguments: [(SettingKey.resolution, "1080p"), (.audioMode, "all-inputs")])
+    @Test(arguments: [(SettingKey.resolution, "1080p"), (.audioMode, "all-inputs"), (.cameraMode, "all-cameras")])
     func aChoiceFlagTurnsAutoOffForTheRunAndSetsTheChoice(key: SettingKey, value: String) throws {
         let settings = try Settings.defaults.applying(flags: [key: value])
         #expect(settings.auto == false)
-        #expect(key == .resolution ? settings.resolution == .p1080 : settings.audioMode == .allInputs)
+        switch key {
+        case .resolution: #expect(settings.resolution == .p1080)
+        case .audioMode: #expect(settings.audioMode == .allInputs)
+        default: #expect(settings.cameraMode == .allCameras)
+        }
+    }
+
+    @Test func theCameraModeIsAFlagAndASettingAndAnInvalidOneIsRefusedOrIgnored() throws {
+        #expect(Settings.read(json: Data(#"{"auto": false, "cameraMode": "default-camera"}"#.utf8)).settings.effectiveCameraMode
+            == .defaultCamera)
+        #expect(Settings.read(json: Data(#"{"cameraMode": "webcams"}"#.utf8)).ignored == [IgnoredSetting(
+            key: "cameraMode", reason: "invalid value, expected one of none, default-camera, real, all-cameras")])
+        #expect(throws: SettingsError.invalidFlagValue(
+            flag: "--camera-mode", value: "webcams", expected: "one of none, default-camera, real, all-cameras")) {
+            try Settings.defaults.applying(flags: [.cameraMode: "webcams"])
+        }
+        #expect(throws: SettingsError.conflictingFlags(flag: "--camera-mode")) {
+            try Settings.defaults.applying(flags: [.cameraMode: "none"], auto: true)
+        }
     }
 
     /// Audio only: `--resolution none` and `"resolution": "none"`; auto mode stays Native.

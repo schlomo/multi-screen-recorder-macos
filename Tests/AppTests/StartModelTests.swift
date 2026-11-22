@@ -55,7 +55,9 @@ import Testing
             microphonePermission: { true },
             screens: { .success(DesignExample.screens) },
             audioInputs: { .success(DesignExample.audioInputs) },
-            outputFolder: { _ in .usable(.bytes(100_000_000_000)) })
+            outputFolder: { _ in .usable(.bytes(100_000_000_000)) },
+            cameras: { [] },
+            cameraPermission: { true })
         let menu = menu
         return StartModel(
             homeFolder: home, probes: probes, settleTime: settleTime,

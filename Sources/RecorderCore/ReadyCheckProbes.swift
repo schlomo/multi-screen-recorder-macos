@@ -13,19 +13,25 @@ public struct ReadyCheckProbes: Sendable {
     public var screens: @MainActor @Sendable () -> Result<[ScreenInfo], DeviceReadError>
     public var audioInputs: @Sendable () -> Result<[AudioInputInfo], DeviceReadError>
     public var outputFolder: @Sendable (URL) -> OutputFolderProbe
+    public var cameras: @Sendable () -> [CameraInfo]
+    public var cameraPermission: @Sendable () async -> Bool
 
     public init(
         screenRecording: @escaping @Sendable (ScreenRecordingProof) async -> PermissionProbe,
         microphonePermission: @escaping @Sendable () async -> Bool,
         screens: @escaping @MainActor @Sendable () -> Result<[ScreenInfo], DeviceReadError>,
         audioInputs: @escaping @Sendable () -> Result<[AudioInputInfo], DeviceReadError>,
-        outputFolder: @escaping @Sendable (URL) -> OutputFolderProbe
+        outputFolder: @escaping @Sendable (URL) -> OutputFolderProbe,
+        cameras: @escaping @Sendable () -> [CameraInfo],
+        cameraPermission: @escaping @Sendable () async -> Bool
     ) {
         self.screenRecording = screenRecording
         self.microphonePermission = microphonePermission
         self.screens = screens
         self.audioInputs = audioInputs
         self.outputFolder = outputFolder
+        self.cameras = cameras
+        self.cameraPermission = cameraPermission
     }
 
     /// This Mac. A permission that was never asked for is requested, so macOS
@@ -35,12 +41,15 @@ public struct ReadyCheckProbes: Sendable {
         microphonePermission: probeMicrophonePermission,
         screens: { Result { () throws(DeviceReadError) in try currentScreens() } },
         audioInputs: { Result { () throws(DeviceReadError) in try currentAudioInputs() } },
-        outputFolder: probeOutputFolder)
+        outputFolder: probeOutputFolder,
+        cameras: currentCameras,
+        cameraPermission: askForCameraPermission)
 }
 
 /// Runs the ready check's probes. The microphone permission is asked only
 /// when the recording records an audio input, the Screen & System Audio
-/// Recording permission only when it records a screen or the system audio.
+/// Recording permission only when it records a screen or the system audio,
+/// the Camera permission only when it records a connected camera (D74).
 @concurrent
 public func probeReadyCheckFacts(
     proof: ScreenRecordingProof, settings: Settings, homeFolder: URL, probes: ReadyCheckProbes = .system
@@ -49,13 +58,17 @@ public func probeReadyCheckFacts(
     let audioInputs = probes.audioInputs()
     let microphoneGranted = ReadyCheck.recordsAudioInput(audioInputs, settings: settings)
         ? await probes.microphonePermission() : nil
+    let cameras = probes.cameras()
+    let cameraGranted = ReadyCheck.recordsCamera(cameras, settings: settings) ? await probes.cameraPermission() : nil
     let screens = await probes.screens()
     let facts = ReadyCheckFacts(
         screenRecording: screenRecording,
         microphoneGranted: microphoneGranted,
         screens: screens,
         audioInputs: audioInputs,
-        outputFolder: probes.outputFolder(settings.outputFolderURL(homeFolder: homeFolder)))
+        outputFolder: probes.outputFolder(settings.outputFolderURL(homeFolder: homeFolder)),
+        cameraGranted: cameraGranted,
+        cameras: cameras)
     RecorderLog.detail(DetailLine.facts(facts), category: "ready check")
     return facts
 }

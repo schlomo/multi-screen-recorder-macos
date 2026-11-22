@@ -173,6 +173,22 @@ private extension Dictionary where Key == String, Value == Any {
         #expect(result.tracks[0].resolve["Locked"] as? Bool == false)
     }
 
+    /// D74: a camera file is a video track like a screen file, the cameras' tracks after the screens'.
+    @Test func theCamerasAreVideoTracksAfterTheScreens() throws {
+        let camera = """
+            {"name": "2026-11-20 10.00.01 Camera 1 - FaceTime HD Camera.mov", "camera": "FaceTime HD Camera",
+             "cameraUniqueID": "c", "frameSize": [1920, 1080], "start": 1, "end": 9, "timecode": "10:00:01:00",
+             "state": "finalized", "guideTracks": [], "framesRepeatedForLateness": 0}
+            """
+        let result = try timeline(manifest(files: [
+            screen("10.00.00", "Screen 1 - A", end: 8),
+            camera,
+            audio("10.00.00", "Audio 1 - M", channels: "1", end: 70),
+        ]))
+        #expect(result.trackNames == ["Screen 1 - A", "Camera 1 - FaceTime HD Camera", "Audio 1 - M"])
+        #expect(result.tracks.map { $0["kind"] as! String } == ["Video", "Video", "Audio"])
+    }
+
     @Test func v1IsChosenAmongTheScreensThatStartFirstNotAmongAllFiles() throws {
         let result = try timeline(manifest(files: [
             audio("09.59.59", "Audio 1 - M", channels: "1", timecode: "09:59:59:29", start: 0, end: 70),

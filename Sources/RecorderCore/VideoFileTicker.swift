@@ -3,7 +3,7 @@ import Foundation
 import Synchronization
 import RecorderLogic
 
-/// What a screen file needs of its writer; `ScreenFileWriter` in a
+/// What a video file needs of its writer; `ScreenFileWriter` in a
 /// recording, a stand-in in tests.
 public protocol ScreenFileWriting: AnyObject {
     var firstTick: Int64 { get }
@@ -14,20 +14,23 @@ public protocol ScreenFileWriting: AnyObject {
     func finish(lastTick: Int64?) async throws(ScreenFileWriterError)
 }
 
-/// How a screen file ended, for the recording manifest: its entry with
+/// How a video file ended, for the recording manifest: its entry with
 /// its end, state and late frames, the writer's error, if any, and the
 /// guide tracks that end before its video. A file whose writer failed
 /// ends where the file really ends; `failedAt` is the end its writer was
 /// given, the time of the failure, and `lost` says what the file lacks (D66).
-public struct ScreenFileEnd: Equatable, Sendable {
-    public var file: RecordingManifest.ScreenFile
+public struct VideoFileEnd<File: VideoFileEntry>: Equatable, Sendable {
+    public var file: File
     public var error: ScreenFileWriterError?
     public var guideTracksCut: [GuideTrackCut] = []
     public var failedAt: Double?
     public var lost: String?
 }
 
-/// A guide track that ends before its screen file's video, and why.
+public typealias ScreenFileEnd = VideoFileEnd<RecordingManifest.ScreenFile>
+public typealias CameraFileEnd = VideoFileEnd<RecordingManifest.CameraFile>
+
+/// A guide track that ends before its video file's video, and why.
 public struct GuideTrackCut: Equatable, Sendable {
     public enum Why: Equatable, Sendable {
         /// The samples of its last mix were no longer there.
@@ -45,7 +48,7 @@ public struct GuideTrackCut: Equatable, Sendable {
     }
 }
 
-/// A screen file's last mix: the hand-overs that reached it while it
+/// A video file's last mix: the hand-overs that reached it while it
 /// ended, then a peek per guide track at the samples the feed has not
 /// mixed yet, up to the end of its video.
 public struct GuideLastMix: Sendable {
@@ -80,17 +83,17 @@ public struct GuideLastMix: Sendable {
     }
 }
 
-/// One screen file's ticks: frames that passed the screen check go in,
-/// every tick writes the newest, and at the end the file is finalized. Not
-/// thread-safe: the capture's queue uses it, and once the capture ends only
-/// `finish` does.
-public final class ScreenFileTicker {
+/// One video file's ticks: a screen's frames that passed the screen check,
+/// or a camera's frames, go in, every tick writes the newest, and at the end
+/// the file is finalized. Not thread-safe: the capture's queue uses it, and
+/// once the capture ends only `finish` does.
+public final class VideoFileTicker<File: VideoFileEntry> {
     public typealias MakeWriter = (_ firstTick: Int64) throws(ScreenFileWriterError)
-        -> (writer: any ScreenFileWriting, entry: RecordingManifest.ScreenFile)
+        -> (writer: any ScreenFileWriting, entry: File)
 
     public enum Outcome: Equatable, Sendable {
         case none
-        case fileStarted(RecordingManifest.ScreenFile)
+        case fileStarted(File)
         case ended(ScreenTracker.StreamEnd)
     }
 
@@ -98,7 +101,7 @@ public final class ScreenFileTicker {
     private let drainTimeout: Duration
     private var ticks: TickLoop<CVPixelBuffer>
     private var writer: (any ScreenFileWriting)?
-    private var entry: RecordingManifest.ScreenFile?
+    private var entry: File?
     /// The writer's first error, for the manifest and the person.
     private var writerError: ScreenFileWriterError?
     /// Per guide track, the end of the samples received, from t0.
@@ -109,7 +112,7 @@ public final class ScreenFileTicker {
     private let guideWaitBound = Int(RecorderValues.audioWaitBoundSeconds * 1000 / Int(RecorderValues.guideTrackInterval.nanoseconds / 1_000_000))
 
     /// How long the end waits for the writer: as long as ticks may wait (D53).
-    public static let defaultDrainTimeout = Duration.seconds(RecorderValues.screenFileLateTickSeconds)
+    public static var defaultDrainTimeout: Duration { .seconds(RecorderValues.screenFileLateTickSeconds) }
 
     /// `captureStart` in nanoseconds from t0: the file's first tick is never before it.
     public init(
@@ -121,7 +124,7 @@ public final class ScreenFileTicker {
         ticks = TickLoop(notBefore: captureStart)
     }
 
-    /// A frame that passed the screen check; the first starts the file.
+    /// A frame to write: a screen's that passed the screen check, or a camera's; the first starts the file.
     public func receive(_ frame: CVPixelBuffer, capturedAt time: Int64) -> Outcome {
         ticks.receive(frame, capturedAt: time)
         guard writer == nil, let firstTick = ticks.firstTick else { return .none }
@@ -199,7 +202,7 @@ public final class ScreenFileTicker {
     public func finish(
         now: Int64, writeWaitingTicks: Bool,
         lastMix: (_ videoEnd: Int64) async -> GuideLastMix = { _ in GuideLastMix(pending: [], peeks: [:]) }
-    ) async -> ScreenFileEnd? {
+    ) async -> VideoFileEnd<File>? {
         guard let writer, var file = entry else { return nil }
         var cut: [GuideTrackCut] = []
         if writerError == nil, writeWaitingTicks {
@@ -242,7 +245,7 @@ public final class ScreenFileTicker {
         file.framesRepeatedForLateness = ticks.framesRepeatedForLateness
         self.writer = nil
         ticks = TickLoop(notBefore: ticks.notBefore)
-        return ScreenFileEnd(file: file, error: writerError, guideTracksCut: cut)
+        return VideoFileEnd(file: file, error: writerError, guideTracksCut: cut)
     }
 
     /// The parts of a last mix, in order, joined from the sample position
@@ -294,6 +297,8 @@ public final class ScreenFileTicker {
         }
     }
 }
+
+public typealias ScreenFileTicker = VideoFileTicker<RecordingManifest.ScreenFile>
 
 /// What the stream lifecycle needs of a stream; `SCStream` in a recording.
 public protocol CaptureStream: AnyObject, Sendable {

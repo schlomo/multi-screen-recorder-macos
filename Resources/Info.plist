@@ -21,6 +21,8 @@
 	<string>APPL</string>
 	<key>LSMinimumSystemVersion</key>
 	<string>26.0</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Multi Screen Recorder records the cameras together with the screens.</string>
 	<key>NSHighResolutionCapable</key>
 	<true/>
 	<key>NSMicrophoneUsageDescription</key>

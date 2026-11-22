@@ -60,7 +60,7 @@ import Testing
         let probes = ReadyCheckProbes(
             screenRecording: { _ in .granted }, microphonePermission: { true },
             screens: { .success(screens) }, audioInputs: { .success(inputs) },
-            outputFolder: { _ in .usable(.bytes(100_000_000_000)) })
+            outputFolder: { _ in .usable(.bytes(100_000_000_000)) }, cameras: { [] }, cameraPermission: { true })
         let model = StartModel(homeFolder: home, probes: probes, whenContentMayChange: { $0() })
         model.load()
         model.change(edit)

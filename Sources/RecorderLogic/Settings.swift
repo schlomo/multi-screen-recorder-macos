@@ -33,11 +33,43 @@ public enum AudioMode: String, CaseIterable, Sendable, Encodable {
     }
 }
 
+/// Which cameras are recorded, as the steps of the window's slider (D74).
+public enum CameraMode: String, CaseIterable, Sendable, Encodable {
+    case none
+    case defaultCamera = "default-camera"
+    case real
+    case allCameras = "all-cameras"
+
+    /// The word on the slider.
+    public var shownName: String {
+        switch self {
+        case .none: "None"
+        case .defaultCamera: "Default camera"
+        case .real: "All real"
+        case .allCameras: "All"
+        }
+    }
+
+    /// Said under the slider.
+    public static let virtualNote =
+        "Virtual cameras are recorded only under All: a virtual camera often carries a copy of a screen or of another camera."
+
+    /// The position of this camera mode on the slider, which runs over `allCases`.
+    public var sliderIndex: Double { indexOnSlider(of: self, in: Self.allCases) }
+
+    /// The camera mode the slider's `position` selects (rounded, kept in range),
+    /// or nil when that is this one: nothing to change, save or check.
+    public func choosing(sliderPosition position: Double) -> CameraMode? {
+        sliderChoice(at: position, in: Self.allCases, current: self)
+    }
+}
+
 /// A key of the settings file that has a flag with a value, of the same name
 /// in kebab case. `auto` is the plain flag `--auto`, see `Settings.autoKey`.
 public enum SettingKey: String, CaseIterable, Sendable {
     case resolution
     case audioMode
+    case cameraMode
     case systemAudio
     case outputFolder
     case requiredRecordingHours
@@ -49,11 +81,12 @@ public enum SettingKey: String, CaseIterable, Sendable {
 }
 
 public struct Settings: Equatable, Sendable, Encodable {
-    /// Auto mode: every screen at Native and the audio mode Wired,
-    /// whatever `resolution` and `audioMode` say.
+    /// Auto mode: every screen at Native, the audio mode Wired and the
+    /// camera mode All real, whatever `resolution`, `audioMode` and `cameraMode` say.
     public var auto: Bool
     public var resolution: RecordingResolution
     public var audioMode: AudioMode
+    public var cameraMode: CameraMode
     public var systemAudio: Bool
     /// As written in the settings file, possibly starting with `~`.
     public var outputFolder: String
@@ -64,6 +97,7 @@ public struct Settings: Equatable, Sendable, Encodable {
         auto: Bool,
         resolution: RecordingResolution,
         audioMode: AudioMode,
+        cameraMode: CameraMode,
         systemAudio: Bool,
         outputFolder: String,
         requiredRecordingHours: Double,
@@ -72,6 +106,7 @@ public struct Settings: Equatable, Sendable, Encodable {
         self.auto = auto
         self.resolution = resolution
         self.audioMode = audioMode
+        self.cameraMode = cameraMode
         self.systemAudio = systemAudio
         self.outputFolder = outputFolder
         self.requiredRecordingHours = requiredRecordingHours
@@ -81,15 +116,17 @@ public struct Settings: Equatable, Sendable, Encodable {
     /// The settings file's key of `auto`, which has no value flag.
     public static let autoKey = "auto"
 
-    /// What auto mode chooses; also the defaults of the two sliders, so
+    /// What auto mode chooses; also the defaults of the three sliders, so
     /// turning auto mode off changes nothing until a slider is moved.
     public static let autoResolution = RecordingResolution.native
     public static let autoAudioMode = AudioMode.wired
+    public static let autoCameraMode = CameraMode.real
 
     public static let defaults = Settings(
         auto: true,
         resolution: autoResolution,
         audioMode: autoAudioMode,
+        cameraMode: autoCameraMode,
         systemAudio: true,
         outputFolder: "~/Movies/Multi Screen Recorder",
         requiredRecordingHours: 2,
@@ -101,6 +138,20 @@ public struct Settings: Equatable, Sendable, Encodable {
 
     /// The audio mode a recording with these settings uses.
     public var effectiveAudioMode: AudioMode { auto ? Self.autoAudioMode : audioMode }
+
+    /// The camera mode a recording with these settings uses.
+    public var effectiveCameraMode: CameraMode { auto ? Self.autoCameraMode : cameraMode }
+
+    /// Whether the camera mode includes the camera, the one rule for which
+    /// cameras a recording records: a virtual camera only under All (D74).
+    public func cameraModeIncludes(_ camera: CameraInfo) -> Bool {
+        switch effectiveCameraMode {
+        case .none: false
+        case .defaultCamera: camera.isDefault && !camera.isVirtual
+        case .real: !camera.isVirtual
+        case .allCameras: true
+        }
+    }
 
     /// Whether the audio mode includes the audio input: the settings' part
     /// of `AudioTracker.records`, the one rule for what a recording records.
@@ -172,6 +223,7 @@ private enum Expected {
     static func oneOf(_ words: [String]) -> String { "one of " + words.joined(separator: ", ") }
     static let resolution = oneOf(RecordingResolution.allCases.map(\.rawValue))
     static let audioMode = oneOf(AudioMode.allCases.map(\.rawValue))
+    static let cameraMode = oneOf(CameraMode.allCases.map(\.rawValue))
     static let jsonSwitch = "true or false"
     static let flagSwitch = "on or off"
     static let folder = "a folder path starting with / or ~"
@@ -288,6 +340,10 @@ extension Settings {
             guard let parsed = AudioMode(rawValue: text) else { return Expected.audioMode }
             audioMode = parsed
         case (.audioMode, _): return Expected.audioMode
+        case (.cameraMode, .string(let text)):
+            guard let parsed = CameraMode(rawValue: text) else { return Expected.cameraMode }
+            cameraMode = parsed
+        case (.cameraMode, _): return Expected.cameraMode
         case (.systemAudio, .bool(let flag)): systemAudio = flag
         case (.systemAudio, _): return Expected.jsonSwitch
         case (.outputFolder, .string(let text)):
@@ -312,10 +368,10 @@ extension Settings {
     }
 
     /// The settings with command-line flag values applied, keyed by setting.
-    /// A choice flag (`--resolution`, `--audio-mode`) turns auto mode off for the run; `--auto` turns it on
+    /// A choice flag (`--resolution`, `--audio-mode`, `--camera-mode`) turns auto mode off for the run; `--auto` turns it on
     /// and cannot be combined with a choice flag.
     public func applying(flags: [SettingKey: String], auto forceAuto: Bool = false) throws(SettingsError) -> Settings {
-        if forceAuto, let choice = [SettingKey.resolution, .audioMode].first(where: { flags[$0] != nil }) {
+        if forceAuto, let choice = [SettingKey.resolution, .audioMode, .cameraMode].first(where: { flags[$0] != nil }) {
             throw .conflictingFlags(flag: choice.flagName)
         }
         var settings = self
@@ -333,6 +389,10 @@ extension Settings {
             case .audioMode:
                 guard let parsed = AudioMode(rawValue: text) else { throw invalid(Expected.audioMode) }
                 settings.audioMode = parsed
+                settings.auto = false
+            case .cameraMode:
+                guard let parsed = CameraMode(rawValue: text) else { throw invalid(Expected.cameraMode) }
+                settings.cameraMode = parsed
                 settings.auto = false
             case .systemAudio:
                 switch text {

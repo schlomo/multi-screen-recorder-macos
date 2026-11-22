@@ -39,13 +39,13 @@ extension FailedFileEnd {
     }
 }
 
-extension ScreenFileEnd {
+extension VideoFileEnd {
     /// The time of the failure that ended the file: the end its writer was given.
     var failureSeconds: Double { failedAt ?? file.end ?? file.start }
 
     /// A file whose writer failed (not finalized) ends where it really
     /// ends (D66); any other file is returned as it is.
-    func readingItsFile(in folder: URL, with reader: any FileDurationReader = AssetDurationReader()) async -> ScreenFileEnd {
+    func readingItsFile(in folder: URL, with reader: any FileDurationReader = AssetDurationReader()) async -> VideoFileEnd {
         guard file.state == .notFinalized else { return self }
         let real = await FailedFileEnd.read(
             folder.appending(path: file.name), start: file.start, failedAt: file.end ?? file.start, with: reader)
@@ -61,7 +61,7 @@ extension AudioFileEnd {
     /// The time of the failure that ended the file: the end its writer was given.
     var failureSeconds: Double { failedAt ?? file.end ?? file.start }
 
-    /// As `ScreenFileEnd.readingItsFile`.
+    /// As `VideoFileEnd.readingItsFile`.
     func readingItsFile(in folder: URL, with reader: any FileDurationReader = AssetDurationReader()) async -> AudioFileEnd {
         guard file.state == .notFinalized else { return self }
         let real = await FailedFileEnd.read(

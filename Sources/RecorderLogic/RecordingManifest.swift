@@ -14,17 +14,30 @@ public struct RecordingManifest: Codable, Equatable, Sendable {
     public struct RecordedSettings: Codable, Equatable, Sendable {
         public var resolution: String
         public var audioMode: String
+        public var cameraMode: String
         public var systemAudio: Bool
 
         public init(_ settings: Settings) {
             resolution = settings.effectiveResolution.rawValue
             audioMode = settings.effectiveAudioMode.rawValue
+            cameraMode = settings.effectiveCameraMode.rawValue
             systemAudio = settings.systemAudio
+        }
+
+        private enum CodingKeys: String, CodingKey { case resolution, audioMode, cameraMode, systemAudio }
+
+        /// A manifest from before cameras were recorded (D74) has no `cameraMode`: it recorded none.
+        public init(from decoder: any Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            resolution = try container.decode(String.self, forKey: .resolution)
+            audioMode = try container.decode(String.self, forKey: .audioMode)
+            cameraMode = try container.decodeIfPresent(String.self, forKey: .cameraMode) ?? CameraMode.none.rawValue
+            systemAudio = try container.decode(Bool.self, forKey: .systemAudio)
         }
     }
 
     /// A screen file, with its guide tracks.
-    public struct ScreenFile: Codable, Equatable, Sendable {
+    public struct ScreenFile: VideoFileEntry {
         public var name: String
         public var screen: String
         public var screenUUID: String
@@ -64,6 +77,58 @@ public struct RecordingManifest: Codable, Equatable, Sendable {
             try container.encode(name, forKey: .name)
             try container.encode(screen, forKey: .screen)
             try container.encode(screenUUID, forKey: .screenUUID)
+            try container.encode(frameSize, forKey: .frameSize)
+            try container.encode(start, forKey: .start)
+            try container.encode(end, forKey: .end)
+            try container.encode(timecode, forKey: .timecode)
+            try container.encode(state, forKey: .state)
+            try container.encode(guideTracks, forKey: .guideTracks)
+            try container.encode(framesRepeatedForLateness, forKey: .framesRepeatedForLateness)
+        }
+    }
+
+    /// A camera file, with its guide tracks: made as a screen file is (D74).
+    public struct CameraFile: VideoFileEntry {
+        public var name: String
+        public var camera: String
+        /// AVFoundation's unique ID of the camera.
+        public var cameraUniqueID: String
+        public var frameSize: [Int]
+        /// Seconds from the recording's start on the shared clock.
+        public var start: Double
+        /// Nil while the file is being written.
+        public var end: Double?
+        public var timecode: String
+        public var state: State
+        public var guideTracks: [String]
+        public var framesRepeatedForLateness: Int
+
+        public init(
+            name: String, camera: String, cameraUniqueID: String, frameSize: FrameSize, start: Double, timecode: String,
+            guideTracks: [String] = []
+        ) {
+            self.name = name
+            self.camera = camera
+            self.cameraUniqueID = cameraUniqueID
+            self.frameSize = [frameSize.width, frameSize.height]
+            self.start = start
+            end = nil
+            self.timecode = timecode
+            state = .recording
+            self.guideTracks = guideTracks
+            framesRepeatedForLateness = 0
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case name, camera, cameraUniqueID, frameSize, start, end, timecode, state, guideTracks, framesRepeatedForLateness
+        }
+
+        /// `end` is written as null while the file is being written.
+        public func encode(to encoder: any Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encode(name, forKey: .name)
+            try container.encode(camera, forKey: .camera)
+            try container.encode(cameraUniqueID, forKey: .cameraUniqueID)
             try container.encode(frameSize, forKey: .frameSize)
             try container.encode(start, forKey: .start)
             try container.encode(end, forKey: .end)
@@ -206,9 +271,10 @@ public struct RecordingManifest: Codable, Equatable, Sendable {
     /// Nil until the recording is finalized.
     public var cpu: CPU?
     public var settings: RecordedSettings
-    /// The screen files; `files` in the JSON lists them with the audio
-    /// files, in the order of their start.
+    /// The screen files; `files` in the JSON lists them with the camera
+    /// files and the audio files, in the order of their start.
     public var files: [ScreenFile]
+    public var cameraFiles: [CameraFile]
     public var audioFiles: [AudioFile]
     public var events: [RecordingEvent]
     /// Every problem told to the person.
@@ -220,6 +286,7 @@ public struct RecordingManifest: Codable, Equatable, Sendable {
         self.started = Self.timestamp(started, timeZone: timeZone)
         self.settings = RecordedSettings(settings)
         files = []
+        cameraFiles = []
         audioFiles = []
         events = []
         problems = []
@@ -229,21 +296,29 @@ public struct RecordingManifest: Codable, Equatable, Sendable {
         case app, state, started, ended, result, cpu, settings, files, events, problems
     }
 
-    /// One entry of `files`: an audio file has `audioSource`, a screen file not.
+    /// One entry of `files`: an audio file has `audioSource`, a camera file `camera`, a screen file neither.
     private enum FileEntry: Codable {
         case screen(ScreenFile)
+        case camera(CameraFile)
         case audio(AudioFile)
 
-        private enum Keys: String, CodingKey { case audioSource }
+        private enum Keys: String, CodingKey { case audioSource, camera }
 
         init(from decoder: any Decoder) throws {
             let keys = try decoder.container(keyedBy: Keys.self)
-            self = keys.contains(.audioSource) ? .audio(try AudioFile(from: decoder)) : .screen(try ScreenFile(from: decoder))
+            self = if keys.contains(.audioSource) {
+                .audio(try AudioFile(from: decoder))
+            } else if keys.contains(.camera) {
+                .camera(try CameraFile(from: decoder))
+            } else {
+                .screen(try ScreenFile(from: decoder))
+            }
         }
 
         func encode(to encoder: any Encoder) throws {
             switch self {
             case .screen(let file): try file.encode(to: encoder)
+            case .camera(let file): try file.encode(to: encoder)
             case .audio(let file): try file.encode(to: encoder)
             }
         }
@@ -251,6 +326,7 @@ public struct RecordingManifest: Codable, Equatable, Sendable {
         var start: Double {
             switch self {
             case .screen(let file): file.start
+            case .camera(let file): file.start
             case .audio(let file): file.start
             }
         }
@@ -267,6 +343,7 @@ public struct RecordingManifest: Codable, Equatable, Sendable {
         settings = try container.decode(RecordedSettings.self, forKey: .settings)
         let entries = try container.decode([FileEntry].self, forKey: .files)
         files = entries.compactMap { if case .screen(let file) = $0 { file } else { nil } }
+        cameraFiles = entries.compactMap { if case .camera(let file) = $0 { file } else { nil } }
         audioFiles = entries.compactMap { if case .audio(let file) = $0 { file } else { nil } }
         events = try container.decode([RecordingEvent].self, forKey: .events)
         problems = try container.decode([RecordingProblem].self, forKey: .problems)
@@ -284,7 +361,7 @@ public struct RecordingManifest: Codable, Equatable, Sendable {
         try container.encode(result, forKey: .result)
         try container.encode(cpu, forKey: .cpu)
         try container.encode(settings, forKey: .settings)
-        let entries = files.map(FileEntry.screen) + audioFiles.map(FileEntry.audio)
+        let entries = files.map(FileEntry.screen) + cameraFiles.map(FileEntry.camera) + audioFiles.map(FileEntry.audio)
         try container.encode(Self.inTimeOrder(entries, at: \.start), forKey: .files)
         try container.encode(Self.inTimeOrder(events, at: \.at), forKey: .events)
         try container.encode(Self.inTimeOrder(problems, at: \.at), forKey: .problems)
@@ -300,7 +377,8 @@ public struct RecordingManifest: Codable, Equatable, Sendable {
     /// Whether nothing was lost: every file is finalized and no file was
     /// ended by a failure. A problem told alone changes nothing (D47).
     public var endedWell: Bool {
-        files.allSatisfy { $0.state == .finalized } && audioFiles.allSatisfy { $0.state == .finalized }
+        files.allSatisfy { $0.state == .finalized } && cameraFiles.allSatisfy { $0.state == .finalized }
+            && audioFiles.allSatisfy { $0.state == .finalized }
             && !events.contains(where: \.event.isFailure)
     }
 
@@ -356,6 +434,7 @@ public struct RecordingManifest: Codable, Equatable, Sendable {
                 error: "\(first.problem.text) (\(count), see events)", errorDetail: first.problemErrorDetail)]
         }
         let notFinalized = files.filter { $0.state != .finalized }.map { ($0.name, $0.end ?? $0.start) }
+            + cameraFiles.filter { $0.state != .finalized }.map { ($0.name, $0.end ?? $0.start) }
             + audioFiles.filter { $0.state != .finalized }.map { ($0.name, $0.end ?? $0.start) }
         guard let (name, at) = notFinalized.first else { return [] }
         return [RecordingProblem(
@@ -402,6 +481,12 @@ public struct RecordingEvent: Codable, Equatable, Sendable {
         case screenShowsAnotherScreensPicture = "screen shows another screen's picture"
         case screenFileWriterFellBehind = "screen file writer fell behind"
         case screenFileWriterFailed = "screen file writer failed"
+        case cameraConnected = "camera connected"
+        case cameraDisconnected = "camera disconnected"
+        case defaultCameraChanged = "default camera changed"
+        case cameraStreamFailed = "camera stream failed"
+        case cameraFileWriterFellBehind = "camera file writer fell behind"
+        case cameraFileWriterFailed = "camera file writer failed"
         case diskFull = "disk full"
         case sleep
         case wake
@@ -425,7 +510,8 @@ public struct RecordingEvent: Codable, Equatable, Sendable {
         public var isFailure: Bool {
             switch self {
             case .screenStreamFailed, .screenShowsAnotherScreensPicture, .screenFileWriterFellBehind,
-                 .screenFileWriterFailed, .diskFull, .audioInputFailed, .systemAudioFailed, .audioFileWriterFailed,
+                 .screenFileWriterFailed, .cameraStreamFailed, .cameraFileWriterFellBehind, .cameraFileWriterFailed, .diskFull,
+                 .audioInputFailed, .systemAudioFailed, .audioFileWriterFailed,
                  .audioFileWriterFellBehind: true
             default: false
             }
@@ -477,11 +563,14 @@ public struct RecordingEvent: Codable, Equatable, Sendable {
     public var event: Kind
     /// The screen the event is about, where it is about one.
     public var screen: String?
+    /// The camera the event is about, where it is about one.
+    public var camera: String?
     /// The audio source the event is about, where it is about one.
     public var audioSource: String?
     /// For `screen frame size changed`: the old and the new frame size;
     /// for `default microphone changed`: the old and the new default
-    /// microphone, absent where there was or is none; for `audio input
+    /// microphone, absent where there was or is none, and as such for `default
+    /// camera changed`; for `audio input
     /// volume changed`: the old and the new input volume.
     public var from: Value?
     public var to: Value?
@@ -496,19 +585,21 @@ public struct RecordingEvent: Codable, Equatable, Sendable {
     /// `errorDetail` as one line, `error` in the manifest.
     public var error: String? { errorDetail?.text }
 
-    public init(at nanoseconds: Int64, event: Kind, screen: String? = nil, audioSource: String? = nil) {
+    public init(at nanoseconds: Int64, event: Kind, screen: String? = nil, camera: String? = nil, audioSource: String? = nil) {
         at = (Double(nanoseconds) / 1_000_000).rounded() / 1000
         self.event = event
         self.screen = screen
+        self.camera = camera
         self.audioSource = audioSource
     }
 
-    /// The screen or audio source the event is about, if any.
-    public var subject: String? { screen ?? audioSource }
+    /// The screen, camera or audio source the event is about, if any.
+    public var subject: String? { screen ?? camera ?? audioSource }
 
     /// The event as a problem told to the person, at its time.
     public var problem: RecordingProblem {
-        let what = screen.map { "Screen \($0)" } ?? audioSource.map { "Audio source \($0)" } ?? "The recording"
+        let what = screen.map { "Screen \($0)" } ?? camera.map { "Camera \($0)" } ?? audioSource.map { "Audio source \($0)" }
+            ?? "The recording"
         return RecordingProblem(atSeconds: at, problem: what, error: problemErrorDetail)
     }
 
@@ -518,7 +609,7 @@ public struct RecordingEvent: Codable, Equatable, Sendable {
     }
 
     private enum CodingKeys: String, CodingKey {
-        case at, event, screen, audioSource, from, to, length, mirrors, error, errorDetail
+        case at, event, screen, camera, audioSource, from, to, length, mirrors, error, errorDetail
     }
 
     public init(from decoder: any Decoder) throws {
@@ -526,6 +617,7 @@ public struct RecordingEvent: Codable, Equatable, Sendable {
         at = try container.decode(Double.self, forKey: .at)
         event = try container.decode(Kind.self, forKey: .event)
         screen = try container.decodeIfPresent(String.self, forKey: .screen)
+        camera = try container.decodeIfPresent(String.self, forKey: .camera)
         audioSource = try container.decodeIfPresent(String.self, forKey: .audioSource)
         from = try container.decodeIfPresent(Value.self, forKey: .from)
         to = try container.decodeIfPresent(Value.self, forKey: .to)
@@ -542,6 +634,7 @@ public struct RecordingEvent: Codable, Equatable, Sendable {
         try container.encode(at, forKey: .at)
         try container.encode(event, forKey: .event)
         try container.encodeIfPresent(screen, forKey: .screen)
+        try container.encodeIfPresent(camera, forKey: .camera)
         try container.encodeIfPresent(audioSource, forKey: .audioSource)
         try container.encodeIfPresent(from, forKey: .from)
         try container.encodeIfPresent(to, forKey: .to)
@@ -598,4 +691,37 @@ public struct RecordingProblem: Codable, Equatable, Sendable {
         try container.encode(error, forKey: .error)
         try container.encode(errorDetail, forKey: .errorDetail)
     }
+}
+
+/// A screen file or a camera file, as the writer path keeps its entry
+/// (`ScreenFileTicker`): the two are made the same way (D74).
+public protocol VideoFileEntry: Codable, Equatable, Sendable {
+    /// "Screen" or "Camera": the word its problems name the file and the source by.
+    static var sourceWord: String { get }
+    /// The event of its failing writer.
+    static var writerFailedEvent: RecordingEvent.Kind { get }
+    /// Where an event names its source.
+    static var eventSubject: WritableKeyPath<RecordingEvent, String?> { get }
+    /// Where the recording manifest lists such files.
+    static var manifestFiles: WritableKeyPath<RecordingManifest, [Self]> { get }
+    var name: String { get }
+    var frameSize: [Int] { get }
+    var start: Double { get }
+    var end: Double? { get set }
+    var state: RecordingManifest.State { get set }
+    var framesRepeatedForLateness: Int { get set }
+}
+
+extension RecordingManifest.ScreenFile {
+    public static let sourceWord = "Screen"
+    public static let writerFailedEvent = RecordingEvent.Kind.screenFileWriterFailed
+    public static var eventSubject: WritableKeyPath<RecordingEvent, String?> { \.screen }
+    public static var manifestFiles: WritableKeyPath<RecordingManifest, [Self]> { \.files }
+}
+
+extension RecordingManifest.CameraFile {
+    public static let sourceWord = "Camera"
+    public static let writerFailedEvent = RecordingEvent.Kind.cameraFileWriterFailed
+    public static var eventSubject: WritableKeyPath<RecordingEvent, String?> { \.camera }
+    public static var manifestFiles: WritableKeyPath<RecordingManifest, [Self]> { \.cameraFiles }
 }

@@ -2,15 +2,17 @@
 /// second, of what the status window shows.
 public enum StatusLine {
     /// "1 problem · Recording 0:12:34 · 1.2 GB in 7 files · 143.8 GB free · CPU 23 % · 2 screens, 5 audio";
+    /// with a camera being recorded "2 screens, 1 camera, 5 audio";
     /// `line` is the window's line, `rows` its table: the sources being recorded are the rows that say "recording".
     /// The problems are the status's `problems`; none are not mentioned.
     public static func text(line: String, cpu: String?, rows: [RecordingStatusTable.Row], status: RecordingStatus) -> String {
         let recording = rows.filter { $0.state == RecordingStatusTable.StateText.recording.rawValue }
         let screens = recording.filter { $0.source.kind == .screen }.count
-        let audioSources = recording.count - screens
+        let cameras = recording.filter { $0.source.kind == .camera }.count
+        let audioSources = recording.count - screens - cameras
         let problems = status.problems.count
-        return [problems == 0 ? nil : count(problems, "problem"), line, cpu,
-                "\(count(screens, "screen")), \(audioSources) audio"]
+        let sources = [count(screens, "screen")] + (cameras == 0 ? [] : [count(cameras, "camera")]) + ["\(audioSources) audio"]
+        return [problems == 0 ? nil : count(problems, "problem"), line, cpu, sources.joined(separator: ", ")]
             .compactMap(\.self).joined(separator: " · ")
     }
 
