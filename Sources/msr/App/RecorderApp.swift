@@ -169,10 +169,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// Gives the state as the offer left it.
     private func offerCrashReport(state: AppState, stateFile: StateFile, homeFolder: URL) -> AppState {
         do {
-            guard let name = try CrashReport.toOffer(
+            guard let name = CrashReport.toOffer(
                 fileNames: try crashReportFileNames(homeFolder: homeFolder),
                 lastOffered: state.lastOfferedCrashReport,
-                procPath: { try crashReportProcPath(of: $0, homeFolder: homeFolder) })
+                procPath: { crashReportProcPath(of: $0, homeFolder: homeFolder) })
             else { return state }
             // Marked before the dialog, so a crash while it is open, or a quit, never offers it twice.
             let offered = state.offering(name)

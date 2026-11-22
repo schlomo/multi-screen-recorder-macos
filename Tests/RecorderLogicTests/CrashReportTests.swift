@@ -63,11 +63,9 @@ import Testing
         #expect(read == [newer])
     }
 
-    @Test func aReportThatCannotBeReadIsAnError() {
-        struct Unreadable: Error {}
-        #expect(throws: Unreadable.self) {
-            try CrashReport.toOffer(fileNames: [newer], lastOffered: nil, procPath: { _ in throw Unreadable() })
-        }
+    @Test func aReportThatCannotBeReadIsSkipped() {
+        #expect(CrashReport.toOffer(fileNames: [newer, older], lastOffered: nil, procPath: { $0 == newer ? nil : installed }) == older)
+        #expect(CrashReport.toOffer(fileNames: [newer], lastOffered: nil, procPath: { _ in nil }) == nil)
     }
 
     @Test func theProcPathIsReadFromTheReportsBody() throws {
@@ -78,13 +76,13 @@ import Testing
               "procName" : "msr"
             }
             """#
-        #expect(try CrashReport.procPath(reportText: report, reportName: newer) == installed)
+        #expect(CrashReport.procPath(reportText: report) == installed)
     }
 
-    @Test func aReportWithoutAProcPathIsAnError() {
+    @Test func aReportWithoutAProcPathHasNone() {
         let header = #"{"app_name":"msr","bug_type":"309"}"#
         for report in ["", header, header + "\n{}", header + "\nnot json", header + "\n" + #"{"procPath":3}"#] {
-            #expect(throws: CrashReportError.self) { try CrashReport.procPath(reportText: report, reportName: newer) }
+            #expect(CrashReport.procPath(reportText: report) == nil)
         }
     }
 

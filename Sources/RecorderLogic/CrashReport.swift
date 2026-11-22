@@ -24,16 +24,16 @@ public enum CrashReport {
     /// `msr-YYYY-MM-DD-HHMMSS.ips` count, and they sort chronologically; a
     /// report whose `procPath` (the path of the program that crashed) is not
     /// inside the app's bundle, such as a test run's or a stray `msr`'s, is
-    /// skipped. `procPath` reads it from a report, newest first, until one is
-    /// the app's.
+    /// skipped, and so is a report it cannot be read from (D70). `procPath`
+    /// reads it from a report, newest first, until one is the app's; nil
+    /// when it cannot.
     public static func toOffer(fileNames: [String], lastOffered: String?,
-                               procPath: (String) throws -> String) rethrows -> String? {
+                               procPath: (String) -> String?) -> String? {
         let candidates = fileNames
             .filter { $0.hasSuffix(nameSuffix) && $0.dropLast(nameSuffix.count).wholeMatch(of: nameShape) != nil }
             .filter { name in lastOffered.map { name > $0 } ?? true }
             .sorted(by: >)
-        for name in candidates where isTheApps(procPath: try procPath(name)) { return name }
-        return nil
+        return candidates.first { name in procPath(name).map(isTheApps) ?? false }
     }
 
     /// Whether the program at `procPath` is inside a bundle named `appBundleName`.
@@ -42,13 +42,12 @@ public enum CrashReport {
     }
 
     /// The `procPath` of a crash report: an `.ips` file is a line of JSON,
-    /// its header, then the JSON of the report, which holds it.
-    public static func procPath(reportText: String, reportName: String) throws(CrashReportError) -> String {
+    /// its header, then the JSON of the report, which holds it. Nil when
+    /// the report names none.
+    public static func procPath(reportText: String) -> String? {
         let body = reportText.split(separator: "\n", maxSplits: 1, omittingEmptySubsequences: false).dropFirst().first ?? ""
-        guard let object = try? JSONSerialization.jsonObject(with: Data(body.utf8)) as? [String: Any],
-              let path = object["procPath"] as? String
-        else { throw CrashReportError(description: "The crash report \(reportName) names no program (procPath)") }
-        return path
+        let object = try? JSONSerialization.jsonObject(with: Data(body.utf8)) as? [String: Any]
+        return object?["procPath"] as? String
     }
 
     /// The name of the text copy of a crash report, which GitHub accepts as
@@ -62,8 +61,4 @@ public enum CrashReport {
         IssueFormLink.url(template: template, title: "Crash: \(crashReportName)",
                           fields: [(versionField, version), (macOSField, macOSVersion)])
     }
-}
-
-public struct CrashReportError: Error, Equatable, CustomStringConvertible {
-    public let description: String
 }

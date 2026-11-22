@@ -834,7 +834,8 @@ checked, reported or rewritten at the next start (D47).
   the path of the program that crashed, is inside a bundle named
   `Multi Screen Recorder.app` (D70); a report of any other `msr` (a test
   run, a stray `msr`, `msr` run from `.build/`) is skipped silently, and
-  is read again at the next start. If there is one, a dialog "Multi
+  is read again at the next start; so is a crash report that cannot be
+  read or names no program (no `procPath` in it), with no alert. If there is one, a dialog "Multi
   Screen Recorder quit unexpectedly" offers [Report on GitHub] [Not
   Now], and the name is stored whatever the answer, so a crash is
   offered once; a crash whose name sorts before the last offered one is
@@ -856,8 +857,7 @@ checked, reported or rewritten at the next start (D47).
   for this offer and the problem report offer below; one that cannot be
   read or decoded shows one alert "Cannot offer to report a crash or a
   recording's problems" with the error, and nothing is offered that
-  start. A crash report folder or a crash report that cannot be read
-  (no `procPath` in it), or a failed write,
+  start. A crash report folder that cannot be read, or a failed write,
   shows an alert "Cannot offer the crash report" with the error; a failed text copy (the dialog was
   already answered) shows "Cannot copy the crash report" with the
   error; a browser that cannot be opened shows

@@ -24,10 +24,11 @@ public func makeTextCopy(of name: String, homeFolder: URL) throws -> URL {
     return copy
 }
 
-/// The path of the program that crashed, from the crash report `name`.
-public func crashReportProcPath(of name: String, homeFolder: URL) throws -> String {
+/// The path of the program that crashed, from the crash report `name`; nil
+/// when the report cannot be read or names none.
+public func crashReportProcPath(of name: String, homeFolder: URL) -> String? {
     let report = crashReportFolder(homeFolder: homeFolder).appending(path: name)
-    return try CrashReport.procPath(reportText: String(contentsOf: report, encoding: .utf8), reportName: name)
+    return (try? String(contentsOf: report, encoding: .utf8)).flatMap(CrashReport.procPath(reportText:))
 }
 
 /// The names of the entries directly in the crash report folder. A missing
