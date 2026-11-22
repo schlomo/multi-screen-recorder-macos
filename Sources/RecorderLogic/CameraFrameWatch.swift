@@ -1,36 +1,52 @@
 import Foundation
 
-/// Whether a camera's stream still delivers (D74): no first frame within
-/// `firstFrameLimit` of the capture's start, or no frame for
-/// `frameGapLimit`, is a failing stream, not a still picture; a camera
-/// delivers frames whether its picture changes or not.
+/// Whether a camera's stream still delivers (D74); a camera delivers frames
+/// whether its picture changes or not. No first frame within
+/// `firstFrameLimit` of the capture's start, an iPhone camera's
+/// (`isContinuity`) `continuityFirstFrameLimit`, or no frame for
+/// `frameGapLimit` is a failing stream; no frame for `stallLimit` is a
+/// stall: the stream may recover by itself, and the file goes on.
 public struct CameraFrameWatch: Equatable, Sendable {
+    public enum Verdict: Equatable, Sendable {
+        case delivering
+        case stalled
+        case failed(ErrorDetail)
+    }
+
     public var firstFrameLimit: Duration
+    public var continuityFirstFrameLimit: Duration
+    public var stallLimit: Duration
     public var frameGapLimit: Duration
 
     public init(
         firstFrameLimit: Duration = RecorderValues.cameraFirstFrameLimit,
+        continuityFirstFrameLimit: Duration = RecorderValues.continuityCameraFirstFrameLimit,
+        stallLimit: Duration = RecorderValues.cameraStallLimit,
         frameGapLimit: Duration = RecorderValues.cameraFrameGapLimit
     ) {
         self.firstFrameLimit = firstFrameLimit
+        self.continuityFirstFrameLimit = continuityFirstFrameLimit
+        self.stallLimit = stallLimit
         self.frameGapLimit = frameGapLimit
     }
 
-    /// The failure at `now`, nil while the camera delivers; times are
-    /// nanoseconds on the shared clock.
-    public func failure(startedAt: Int64, lastFrameAt: Int64?, now: Int64) -> ErrorDetail? {
+    /// The stream's state at `now`; times are nanoseconds on the shared clock.
+    public func verdict(startedAt: Int64, lastFrameAt: Int64?, now: Int64, isContinuity: Bool) -> Verdict {
         if let lastFrameAt {
-            guard now - lastFrameAt >= frameGapLimit.nanoseconds else { return nil }
-            return ErrorDetail(message: "the camera delivered no frame for \(Self.text(frameGapLimit))")
+            if now - lastFrameAt >= frameGapLimit.nanoseconds {
+                return .failed(ErrorDetail(message: "the camera delivered no frame for \(Self.text(frameGapLimit))"))
+            }
+            return now - lastFrameAt >= stallLimit.nanoseconds ? .stalled : .delivering
         }
-        guard now - startedAt >= firstFrameLimit.nanoseconds else { return nil }
-        return ErrorDetail(message: "the camera delivered no frame within \(Self.text(firstFrameLimit)) of its start")
+        let limit = isContinuity ? continuityFirstFrameLimit : firstFrameLimit
+        guard now - startedAt >= limit.nanoseconds else { return .delivering }
+        return .failed(ErrorDetail(message: "the camera delivered no frame within \(Self.text(limit)) of its start"))
     }
 
     /// How often the capture looks.
-    public var checkInterval: Duration { min(firstFrameLimit, frameGapLimit) / 4 }
+    public var checkInterval: Duration { min(firstFrameLimit, stallLimit) / 4 }
 
-    private static func text(_ duration: Duration) -> String {
+    public static func text(_ duration: Duration) -> String {
         String(format: "%g s", Double(duration.nanoseconds) / 1e9)
     }
 }

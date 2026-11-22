@@ -86,8 +86,13 @@ import Testing
         let audioStates: [AudioTracker.Source.State] = [
             .recording, .noAudio, .waiting, .failedRetrying, .diskFull, .disconnected, .notRecorded, .asleep,
         ]
+        let cameraStates: [CameraTracker.Source.State] = [
+            .recording(FrameSize(width: 1, height: 1)), .stalled(FrameSize(width: 1, height: 1)), .waiting, .failedRetrying,
+            .diskFull, .disconnected, .notRecorded, .asleep,
+        ]
         let texts = Set(RecordingStatusTable.StateText.allCases.map(\.rawValue))
         #expect(Set(screenStates.map { RecordingStatusTable.text($0) }).union(audioStates.map { RecordingStatusTable.text($0) })
+            .union(cameraStates.map { RecordingStatusTable.text($0) })
             .union(RecordingStatusTable.cameraRowsWithoutPermission([camera("A", "A")]).map(\.state)) == texts)
         #expect(texts.contains("shows another screen"))
     }

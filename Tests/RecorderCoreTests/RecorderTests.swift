@@ -419,7 +419,9 @@ extension GlobalRecordingLog {
         }
 
         /// Limits short enough for a test.
-        private static let quickFrameWatch = CameraFrameWatch(firstFrameLimit: .milliseconds(300), frameGapLimit: .milliseconds(200))
+        private static let quickFrameWatch = CameraFrameWatch(
+            firstFrameLimit: .milliseconds(300), continuityFirstFrameLimit: .milliseconds(300), stallLimit: .milliseconds(200),
+            frameGapLimit: .milliseconds(600))
 
         /// A camera that delivers nothing is failing, not showing a still picture.
         @Test func aCameraThatDeliversNoFirstFrameIsAFailingStreamAndStartsAgain() async throws {
@@ -441,12 +443,37 @@ extension GlobalRecordingLog {
             try start(cameraMode: .real, cameraFrameWatch: Self.quickFrameWatch)
             let camera = try #require(cameras.last)
             try await sendFrames(camera, until: "the camera file") { (try? manifestOnDisk().cameraFiles.count) == 1 }
-            try await wait("the failure") { (try? manifestOnDisk().events.first?.event) == .cameraStreamFailed }
-            #expect(try manifestOnDisk().events.first?.errorDetail == "the camera delivered no frame for 0.2 s")
+            try await wait("the failure") { (try? manifestOnDisk().events.last?.event) == .cameraStreamFailed }
+            let events = try manifestOnDisk().events
+            #expect(events.map(\.event) == [.cameraStalled, .cameraStreamFailed])
+            #expect(events.last?.errorDetail == "the camera delivered no frame for 0.6 s")
             try await wait("the file's end") { (try? manifestOnDisk().cameraFiles.first?.state) == .finalized }
             #expect(camera.isStopped)
             let summary = await stop()
             #expect(summary.manifest.result == .problems)
+        }
+
+        /// A camera that pauses is stalled: its file goes on, the stall is
+        /// told once, and its end comes with its length; no restart.
+        @Test func aCameraThatPausesIsStalledAndItsFileGoesOn() async throws {
+            cameras.connected.withLock { $0 = [Self.camera] }
+            try start(cameraMode: .real, cameraFrameWatch: Self.quickFrameWatch)
+            let camera = try #require(cameras.last)
+            try await sendFrames(camera, until: "the camera file") { (try? manifestOnDisk().cameraFiles.count) == 1 }
+            try await wait("the stall") { (try? manifestOnDisk().events.map(\.event)) == [.cameraStalled] }
+            #expect(recorder.status().rows.contains { $0.source == .camera(1, name: "Stand-in camera") && $0.state == "stalled" })
+            #expect(observer.problems.map(\.problem.text) == ["Camera Stand-in camera: camera stalled: \(CameraTracker.stalledError.text)"])
+            try await sendFrames(camera, until: "the stall's end") { (try? manifestOnDisk().events.count) == 2 }
+            let ended = try #require(try manifestOnDisk().events.last)
+            #expect(ended.event == .cameraStallEnded)
+            #expect(try #require(ended.length) >= 0.2)
+            #expect(recorder.status().rows.contains { $0.source == .camera(1, name: "Stand-in camera") && $0.state == "recording" })
+            let summary = await stop()
+            #expect(cameras.opened.withLock { $0.count } == 1)
+            #expect(summary.manifest.cameraFiles.map(\.state) == [.finalized])
+            #expect(summary.manifest.problems.count == 1)
+            // No file ended by a failure (D47).
+            #expect(summary.manifest.result == .ok)
         }
 
         /// The writer takes only decoded pictures; a frame without one ends the capture, never silently.

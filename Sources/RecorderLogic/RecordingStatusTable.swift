@@ -70,8 +70,9 @@ public enum RecordingStatusTable {
     ) -> [Row] {
         sources.map { source in
             let own = files.filter { $0.cameraUniqueID == source.uniqueID }
-            let frameSize: FrameSize? = if case .recording(let size) = source.state { size } else {
-                own.last.map { FrameSize(width: $0.frameSize[0], height: $0.frameSize[1]) }
+            let frameSize: FrameSize? = switch source.state {
+            case .recording(let size), .stalled(let size): size
+            default: own.last.map { FrameSize(width: $0.frameSize[0], height: $0.frameSize[1]) }
             }
             return Row(
                 source: .camera(source.number, name: source.name),
@@ -152,6 +153,7 @@ public enum RecordingStatusTable {
         case notRecorded = "not recorded"
         case asleep
         case noCameraPermission = "no Camera permission"
+        case stalled
     }
 
     static func text(_ state: AudioTracker.Source.State) -> String {
@@ -171,6 +173,7 @@ public enum RecordingStatusTable {
     static func text(_ state: CameraTracker.Source.State) -> String {
         let text: StateText = switch state {
         case .recording: .recording
+        case .stalled: .stalled
         case .waiting: .waiting
         case .failedRetrying: .failedRetrying
         case .diskFull: .diskFull

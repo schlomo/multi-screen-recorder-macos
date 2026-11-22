@@ -664,15 +664,21 @@ public final class Recorder {
             DetailLine.cameraAction(action, names: cameraCaptures.mapValues { "Camera \($0.1.number) \($0.1.name)" }),
             category: "recorder")
         switch action {
-        case .start(let uniqueID, let format, let frameSize, let number, let name):
+        case .start(let uniqueID, let format, let frameSize, let number, let name, let isContinuity):
             captureCount += 1
             let captureNumber = captureCount
             let capture = CameraCapture(
-                uniqueID: uniqueID, number: number, name: name, frameSize: frameSize,
+                uniqueID: uniqueID, number: number, name: name, frameSize: frameSize, isContinuity: isContinuity,
                 source: devices.cameraSource(uniqueID, format, frameSize), context: context, guides: guides,
                 frameWatch: cameraFrameWatch,
                 onFileStarted: { [weak self] file in
                     Task { @MainActor in self?.cameraFileStarted(file, uniqueID: uniqueID) }
+                },
+                onStalled: { [weak self] in
+                    Task { @MainActor in self?.cameraStalled(uniqueID: uniqueID, captureNumber: captureNumber) }
+                },
+                onStallEnded: { [weak self] length in
+                    Task { @MainActor in self?.cameraStallEnded(uniqueID: uniqueID, captureNumber: captureNumber, length: length) }
                 },
                 onEnded: { [weak self] reason, file in
                     Task { @MainActor in
@@ -695,9 +701,24 @@ public final class Recorder {
         RecorderLog.detail("file started: \(file.name)", category: "recorder")
         cameraTracker.fileStarted(uniqueID)
         problemsTold.cleared(.cameraNotCaptured(uniqueID))
+        problemsTold.cleared(.cameraStalled(uniqueID))
         guard !manifest.cameraFiles.contains(where: { $0.name == file.name }) else { return }
         manifest.cameraFiles.append(file)
         try? writeManifest()
+    }
+
+    /// A stall of the running capture: its event, and the problem told once per stall.
+    private func cameraStalled(uniqueID: String, captureNumber: Int) {
+        guard !isStopped, cameraCaptures[uniqueID]?.0 == captureNumber else { return }
+        let step = cameraTracker.stalled(uniqueID, at: context.now())
+        applyCameras(step)
+        for stalled in step.events { tell(stalled.problem, kind: .cameraStalled(uniqueID), ofAnEvent: true) }
+    }
+
+    private func cameraStallEnded(uniqueID: String, captureNumber: Int, length: Int64) {
+        guard !isStopped, cameraCaptures[uniqueID]?.0 == captureNumber else { return }
+        problemsTold.cleared(.cameraStalled(uniqueID))
+        applyCameras(cameraTracker.stallEnded(uniqueID, length: length, at: context.now()))
     }
 
     /// As a screen capture's end by itself (`captureEnded`).

@@ -15,41 +15,51 @@ protocol CameraFrameSource: AnyObject, Sendable {
 
 /// One camera's stream and its camera file (D74): the camera's frames go
 /// to the camera file's feed as a screen's do, with no screen check. A
-/// camera that delivers no frames is failing (`CameraFrameWatch`). A
-/// capture has at most one camera file; a new file needs a new capture.
-/// Everything runs on its own queue until the capture ends.
+/// camera that pauses is stalled, and one that delivers no frames is
+/// failing (`CameraFrameWatch`). A capture has at most one camera file; a
+/// new file needs a new capture. Everything runs on its own queue until
+/// the capture ends.
 final class CameraCapture: @unchecked Sendable {
     let uniqueID: String
     let number: Int
     let name: String
     let frameSize: FrameSize
+    private let isContinuity: Bool
     private let context: RecordingContext
     private let queue: DispatchQueue
     private let source: any CameraFrameSource
     private var feed: VideoFileFeed<RecordingManifest.CameraFile>!
     private let frameWatch: CameraFrameWatch
+    private let onStalled: @Sendable () -> Void
+    private let onStallEnded: @Sendable (_ length: Int64) -> Void
     // Confined to `queue`.
     private var startedAt: Int64 = 0
     /// When the last frame came, on the shared clock; nil before the first.
     private var lastFrameAt: Int64?
+    private var isStalled = false
     private var watchTimer: DispatchSourceTimer?
 
     /// The error of a frame without a picture, which the writer cannot take.
     static let frameWithoutPicture: ErrorDetail = "the camera delivered a frame without a decoded picture"
 
     init(
-        uniqueID: String, number: Int, name: String, frameSize: FrameSize, source: any CameraFrameSource,
+        uniqueID: String, number: Int, name: String, frameSize: FrameSize, isContinuity: Bool, source: any CameraFrameSource,
         context: RecordingContext, guides: GuideTrackFeed, frameWatch: CameraFrameWatch,
         onFileStarted: @escaping @Sendable (RecordingManifest.CameraFile) -> Void,
+        onStalled: @escaping @Sendable () -> Void,
+        onStallEnded: @escaping @Sendable (_ length: Int64) -> Void,
         onEnded: @escaping @Sendable (VideoStreamEnd, VideoFileEnd<RecordingManifest.CameraFile>?) -> Void
     ) {
         self.uniqueID = uniqueID
         self.number = number
         self.name = name
         self.frameSize = frameSize
+        self.isContinuity = isContinuity
         self.source = source
         self.context = context
         self.frameWatch = frameWatch
+        self.onStalled = onStalled
+        self.onStallEnded = onStallEnded
         queue = DispatchQueue(label: "msr.camera.\(number)", qos: .userInteractive)
         let ticker = VideoFileTicker<RecordingManifest.CameraFile>(
             captureStart: context.now(), decisionDelay: RecorderValues.cameraDecisionDelay
@@ -110,17 +120,30 @@ final class CameraCapture: @unchecked Sendable {
                     + FrameFacts.fourCharacterCode(CVPixelBufferGetPixelFormatType(pixelBuffer)),
                 category: VideoFileWriter.detailCategory)
         }
-        lastFrameAt = context.now()
+        let now = context.now()
+        if isStalled, let lastFrameAt {
+            isStalled = false
+            onStallEnded(now - lastFrameAt)
+        }
+        lastFrameAt = now
         let pts = CMTimeConvertScale(CMSampleBufferGetPresentationTimeStamp(buffer), timescale: 1_000_000_000, method: .roundHalfAwayFromZero)
         feed.receive(pixelBuffer, capturedAt: context.clock.sinceStart(host: UInt64(max(0, pts.value))))
     }
 
-    /// On the queue: a camera that delivers no frames ends the capture.
+    /// On the queue: a camera that pauses is stalled once per pause, its
+    /// file going on; one that delivers no frames ends the capture.
     private func watchFrames() {
         guard !feed.isEnding else { return stopWatching() }
-        guard let failure = frameWatch.failure(startedAt: startedAt, lastFrameAt: lastFrameAt, now: context.now()) else { return }
-        stopWatching()
-        feed.end(.streamFailed(failure))
+        switch frameWatch.verdict(startedAt: startedAt, lastFrameAt: lastFrameAt, now: context.now(), isContinuity: isContinuity) {
+        case .delivering: break
+        case .stalled:
+            guard !isStalled else { return }
+            isStalled = true
+            onStalled()
+        case .failed(let failure):
+            stopWatching()
+            feed.end(.streamFailed(failure))
+        }
     }
 
     private func stopWatching() {

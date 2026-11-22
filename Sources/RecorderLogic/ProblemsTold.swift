@@ -14,6 +14,8 @@ public enum ProblemKind: Hashable, Sendable {
     case screenNotCaptured(String)
     /// A camera, by its unique ID, whose camera file a failure ended; clears when a file of it starts (D74).
     case cameraNotCaptured(String)
+    /// A camera, by its unique ID, whose stream stalled; clears when its frames come again or a file of it starts (D74).
+    case cameraStalled(String)
     /// The Camera permission is not granted while a camera is to be recorded (D74).
     case cameraPermissionMissing
     /// `msr record` could not show its Dock icon.

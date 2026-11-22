@@ -184,7 +184,7 @@ import Testing
     }
 
     private func starts(_ step: CameraTracker.Step) -> [String] {
-        step.actions.compactMap { if case .start(let uniqueID, _, _, _, _) = $0 { uniqueID } else { nil } }
+        step.actions.compactMap { if case .start(let uniqueID, _, _, _, _, _) = $0 { uniqueID } else { nil } }
     }
 
     @Test func atTheStartTheDefaultCameraIsOneAndTheVirtualOneIsLeftOut() {
@@ -192,9 +192,9 @@ import Testing
         let step = cameras.begin([Self.obs, Self.usb, Self.builtIn], at: 0)
         #expect(step.actions == [
             .start(uniqueID: "A", format: Self.builtIn.chosenFormat(resolution: .native)!, frameSize: FrameSize(width: 1920, height: 1080), number: 1,
-                   name: "FaceTime HD Camera"),
+                   name: "FaceTime HD Camera", isContinuity: false),
             .start(uniqueID: "B", format: Self.usb.chosenFormat(resolution: .native)!, frameSize: FrameSize(width: 1920, height: 1080), number: 2,
-                   name: "Logitech BRIO"),
+                   name: "Logitech BRIO", isContinuity: false),
         ])
         #expect(step.events.isEmpty)
         #expect(cameras.sources.map(\.name) == ["FaceTime HD Camera", "Logitech BRIO"])
@@ -213,7 +213,7 @@ import Testing
         large.isDefault = false
         large.formats = [CameraFormat(size: FrameSize(width: 1920, height: 1080), maxFramesPerSecond: 30)]
         let starts = cameras.begin([Self.builtIn, large], at: 0).actions.compactMap { action -> (CameraFormat, FrameSize)? in
-            guard case .start(_, let format, let frameSize, _, _) = action else { return nil }
+            guard case .start(_, let format, let frameSize, _, _, _) = action else { return nil }
             return (format, frameSize)
         }
         #expect(starts.map(\.0.size) == [FrameSize(width: 1920, height: 1080), FrameSize(width: 1920, height: 1080)])
@@ -234,7 +234,7 @@ import Testing
         #expect(cameras.due(at: 20 * second + second / 2).actions.isEmpty)
         #expect(cameras.nextDueTime() == 21 * second)
         let started = cameras.due(at: 21 * second)
-        guard case .start("B", _, _, let number, _) = started.actions.first else {
+        guard case .start("B", _, _, let number, _, _) = started.actions.first else {
             Issue.record("B did not start")
             return
         }
@@ -332,6 +332,61 @@ import Testing
         _ = cameras.begin([Self.builtIn, Self.usb], at: 0)
         #expect(cameras.stopAll() == [.stop(uniqueID: "A"), .stop(uniqueID: "B")])
         #expect(cameras.nextDueTime() == nil)
+    }
+
+    @Test func aStallIsAnEventOnceAndItsEndAnotherWithItsLengthWhileTheFileGoesOn() {
+        var cameras = tracker()
+        _ = cameras.begin([Self.builtIn], at: 0)
+        let stalled = cameras.stalled("A", at: 5 * second)
+        var stalledEvent = RecordingEvent(at: 5 * second, event: .cameraStalled, camera: "FaceTime HD Camera")
+        stalledEvent.errorDetail = CameraTracker.stalledError
+        #expect(stalled == CameraTracker.Step(events: [stalledEvent]))
+        #expect(stalledEvent.event.isFailure == false)
+        #expect(cameras.sources.first?.state == .stalled(FrameSize(width: 1920, height: 1080)))
+        #expect(cameras.stalled("A", at: 6 * second) == CameraTracker.Step())
+        let ended = cameras.stallEnded("A", length: 2_950_400_000, at: 6 * second)
+        #expect(ended.actions.isEmpty)
+        #expect(ended.events.map(\.event) == [.cameraStallEnded])
+        #expect(ended.events.first?.length == 2.95)
+        #expect(cameras.sources.first?.state == .recording(FrameSize(width: 1920, height: 1080)))
+        #expect(cameras.stallEnded("A", length: second, at: 7 * second) == CameraTracker.Step())
+    }
+
+    @Test func aStallEndsWithItsStream() {
+        var cameras = tracker()
+        _ = cameras.begin([Self.builtIn], at: 0)
+        _ = cameras.stalled("A", at: 5 * second)
+        _ = cameras.streamEnded("A", .streamFailed("no frame for 10 s"), connected: [Self.builtIn], at: 13 * second)
+        #expect(cameras.stallEnded("A", length: second, at: 14 * second) == CameraTracker.Step())
+        _ = cameras.due(at: 20 * second)
+        #expect(cameras.sources.first?.state == .recording(FrameSize(width: 1920, height: 1080)))
+    }
+
+    @Test func anIPhoneCameraStartsAsSuch() {
+        var cameras = tracker(.allCameras)
+        let step = cameras.begin([camera("I", "iPhone Camera", isContinuity: true)], at: 0)
+        guard case .start(_, _, _, _, _, let isContinuity) = step.actions.first else {
+            Issue.record("the iPhone camera did not start")
+            return
+        }
+        #expect(isContinuity)
+    }
+
+    /// A suspended camera, such as a laptop's with its lid closed, ends its
+    /// file; resumed, it starts after the settle time, never as a newly connected camera.
+    @Test func aSuspendedCameraEndsItsFileAndStartsAgainAfterTheSettleTimeWhenResumed() {
+        var cameras = tracker()
+        _ = cameras.begin([Self.builtIn], at: 0)
+        var suspended = Self.builtIn
+        suspended.isSuspended = true
+        let off = cameras.observe([suspended], at: 10 * second)
+        #expect(off.actions == [.stop(uniqueID: "A")])
+        #expect(off.events.isEmpty)
+        #expect(cameras.sources.first?.state == .notRecorded)
+        let on = cameras.observe([Self.builtIn], at: 20 * second)
+        #expect(on == CameraTracker.Step())
+        #expect(cameras.due(at: 20 * second + second / 2).actions.isEmpty)
+        #expect(starts(cameras.due(at: 21 * second)) == ["A"])
     }
 
     @Test func noCameraNoActionNoEvent() {

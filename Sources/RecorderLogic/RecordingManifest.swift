@@ -485,6 +485,8 @@ public struct RecordingEvent: Codable, Equatable, Sendable {
         case cameraDisconnected = "camera disconnected"
         case defaultCameraChanged = "default camera changed"
         case cameraStreamFailed = "camera stream failed"
+        case cameraStalled = "camera stalled"
+        case cameraStallEnded = "camera stall ended"
         case cameraFileWriterFellBehind = "camera file writer fell behind"
         case cameraFileWriterFailed = "camera file writer failed"
         case diskFull = "disk full"
@@ -574,7 +576,7 @@ public struct RecordingEvent: Codable, Equatable, Sendable {
     /// volume changed`: the old and the new input volume.
     public var from: Value?
     public var to: Value?
-    /// For `audio input gap`: its length in seconds, to the millisecond.
+    /// For `audio input gap` and `camera stall ended`: its length in seconds, to the millisecond.
     public var length: Double?
     /// For `screen mirroring started`: the screen it mirrors.
     public var mirrors: String?

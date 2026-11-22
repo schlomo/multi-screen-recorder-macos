@@ -75,7 +75,7 @@ public enum DetailLine {
     /// `names` gives a stopped camera's "Camera <n> <name>".
     public static func cameraAction(_ action: CameraTracker.Action, names: [String: String]) -> String {
         switch action {
-        case .start(let uniqueID, let format, let frameSize, let number, let name):
+        case .start(let uniqueID, let format, let frameSize, let number, let name, _):
             "start Camera \(number) \(name) (unique ID \(uniqueID.prefix(8))…) in \(format) at \(frameSize)"
         case .stop(let uniqueID):
             "stop \(names[uniqueID] ?? "camera \(uniqueID.prefix(8))…")"

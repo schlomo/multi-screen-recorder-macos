@@ -569,8 +569,8 @@ disconnected`, `screen frame size changed`, `screen mirroring started`,
 failed`, `screen shows another screen's picture`, `screen file writer
 fell behind`, `screen file writer failed`, for cameras (D74) `camera
 connected`, `camera disconnected`, `default camera changed`, `camera
-stream failed`, `camera file writer fell behind`, `camera file writer
-failed`, then `disk full`, `sleep`, `wake`,
+stream failed`, `camera stalled`, `camera stall ended`, `camera file
+writer fell behind`, `camera file writer failed`, then `disk full`, `sleep`, `wake`,
 and for audio `audio input connected`, `audio input disconnected`,
 `system audio started`, `system audio stopped`, `default microphone
 changed`, `audio input gap`, `audio input failed`, `system audio
@@ -590,10 +590,11 @@ changed` (either absent where there was or is none), and the old and
 the new input volume, 0 to 1, for `audio input volume changed` (D69);
 `mirrors` (the
 screen mirrored) for `screen mirroring started`; `length` (seconds, to
-the millisecond) for `audio input gap`; `error` (why, as one line) and
+the millisecond) for `audio input gap` and `camera stall ended` (from
+the camera's last frame before the stall to its next); `error` (why, as one line) and
 `errorDetail` (the same error as its full chain, below) for `screen stream
 failed`, `screen file writer failed`, `camera stream failed`, `camera
-file writer failed`, `audio input failed`, `system
+stalled`, `camera file writer failed`, `audio input failed`, `system
 audio failed`, `audio file writer failed`, and `audio file writer fell
 behind` when samples were lost at a file's end. The manifest's `state`
 is `recording` or `finalized`; a file's `state` is `recording`,
@@ -604,7 +605,7 @@ failed`, `disk full`, `screen file writer fell behind`, `screen shows
 another screen's picture`, `camera stream failed`, `camera file writer
 failed`, `camera file writer fell behind`, `audio input failed`, `system audio failed`,
 `audio file writer failed`, `audio file writer fell behind`; an
-unplugged audio input, a gap, a change of the input volume and no audio
+unplugged audio input, a gap, a camera's stall, a change of the input volume and no audio
 are none), otherwise `problems` (D47);
 `cpu` is our process's CPU use over the recording, `averagePercent` and
 `peakPercent` in percent of one core as Activity Monitor shows it,
@@ -856,8 +857,9 @@ checked, reported or rewritten at the next start (D47).
   `waiting`, `failed, retrying`, `shows another screen`, `disk full`,
   `mirroring`, `disconnected`, `asleep`, for an audio input no
   longer in the audio mode, such as the default microphone before a
-  change, `not recorded`, and for one with no audio `no audio`, see
-  "Audio") and "Clock drift" (an audio source's clock
+  change, `not recorded`, for one with no audio `no audio`, see
+  "Audio", and for a camera whose stream stalled `stalled`, see
+  "Cameras") and "Clock drift" (an audio source's clock
   drift while it records, with the sound the correction added so far,
   `-116 ppm (+34.9 ms)`; `measuring (+0.3 ms)` until the clock drift is
   known, `measuring` before any correction; zero is `0`, never `+0` or
@@ -1536,9 +1538,21 @@ no audio of the camera's own.
   detail line gives the count and the longest such frame took from its
   capture to its arrival. At the file's end every tick due is decided.
 - **No frames.** A camera delivers frames whether its picture changes
-  or not, so no first frame within 5 s of the capture's start or no
-  frame for 2 s (*data*, `CameraFrameWatch`) ends the capture as
-  `camera stream failed`, which starts again after the restart delay.
+  or not. No frame for 2 s while recording is a stall (event `camera
+  stalled`): the camera file goes on, repeating its last frame, the
+  status window shows the camera as `stalled`, and the problem is told
+  once per stall; when frames come again, the event `camera stall
+  ended` gives its length. A stall is no failure: the stream recovers
+  by itself, as a BRIO's 2.95 s USB stall did on the owner's Mac
+  (2026-11-22), where ending and restarting the capture only split the
+  file and left a 1.17 s hole. The capture ends as `camera stream
+  failed`, and starts again after the restart delay, only on a runtime
+  error of AVFoundation's capture session
+  (`AVCaptureSession.runtimeErrorNotification`), when no first frame
+  came within 5 s of the capture's start (10 s for an iPhone camera,
+  whose stream takes longer to start), or after no frame for 10 s (all
+  *data*, `CameraFrameWatch`); a disconnect ends it as `camera
+  disconnected`.
 - **Coming and going.** As screens: a camera that appears (event
   `camera connected`) starts its file after the settle time; one that
   vanishes ends it (`camera disconnected`); a failing stream or writer

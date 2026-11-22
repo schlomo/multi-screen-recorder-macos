@@ -10,8 +10,9 @@ import Foundation
 public struct CameraTracker: Sendable {
     /// What the recorder does for a camera.
     public enum Action: Equatable, Sendable {
-        /// Open the camera in `format` and start its camera file at `frameSize` with its first frame.
-        case start(uniqueID: String, format: CameraFormat, frameSize: FrameSize, number: Int, name: String)
+        /// Open the camera in `format` and start its camera file at `frameSize` with its first frame;
+        /// an iPhone camera (`isContinuity`) may take longer to its first frame.
+        case start(uniqueID: String, format: CameraFormat, frameSize: FrameSize, number: Int, name: String, isContinuity: Bool)
         /// End the camera's stream and finalize its camera file.
         case stop(uniqueID: String)
     }
@@ -54,6 +55,8 @@ public struct CameraTracker: Sendable {
         /// Whether its stream may end once with the camera gone without a
         /// failure: until it does, and again after each change of the cameras.
         var mayLoseCaptureSource = true
+        /// While its recording stream delivers no frames, but has not failed.
+        var isStalled = false
     }
 
     public let settings: Settings
@@ -223,6 +226,30 @@ public struct CameraTracker: Sendable {
         return step
     }
 
+    /// The recording stream of `uniqueID` delivered no frame for the stall
+    /// limit (`CameraFrameWatch`): its file goes on, repeating its last frame.
+    public mutating func stalled(_ uniqueID: String, at now: Int64) -> Step {
+        guard let tracked = cameras[uniqueID], case .recording = tracked.phase, !tracked.isStalled else { return Step() }
+        cameras[uniqueID]?.isStalled = true
+        var stalled = event(.cameraStalled, uniqueID, at: now)
+        stalled.errorDetail = Self.stalledError
+        return Step(events: [stalled])
+    }
+
+    /// The stalled stream of `uniqueID` delivers again, `length` nanoseconds after its last frame.
+    public mutating func stallEnded(_ uniqueID: String, length: Int64, at now: Int64) -> Step {
+        guard let tracked = cameras[uniqueID], case .recording = tracked.phase, tracked.isStalled else { return Step() }
+        cameras[uniqueID]?.isStalled = false
+        var ended = event(.cameraStallEnded, uniqueID, at: now)
+        ended.length = (Double(length) / 1_000_000).rounded() / 1000
+        return Step(events: [ended])
+    }
+
+    /// Why a stall is a problem: the camera file repeats its last frame meanwhile.
+    public static let stalledError = ErrorDetail(
+        message: "the camera delivered no frame for \(CameraFrameWatch.text(RecorderValues.cameraStallLimit)); "
+            + "its file repeats the last frame until frames come again")
+
     /// The error of a stream that lost its camera again without a change of the cameras: a failure.
     public static let captureSourceGoneAgain: ErrorDetail =
         "AVFoundation lost the camera again without a change of the cameras"
@@ -282,8 +309,11 @@ public struct CameraTracker: Sendable {
         let format = reading.chosenFormat(resolution: settings.effectiveResolution)!
         let frameSize = settings.effectiveResolution.frameSize(forLooksLike: format.size)
         tracked.phase = .recording(frameSize: frameSize)
+        tracked.isStalled = false
         cameras[uniqueID] = tracked
-        return .start(uniqueID: uniqueID, format: format, frameSize: frameSize, number: tracked.number!, name: tracked.name)
+        return .start(
+            uniqueID: uniqueID, format: format, frameSize: frameSize, number: tracked.number!, name: tracked.name,
+            isContinuity: reading.isContinuity)
     }
 
     private mutating func streamFailed(_ uniqueID: String, error: ErrorDetail, isPresent: Bool, at now: Int64) -> Step {
@@ -311,6 +341,8 @@ public struct CameraTracker: Sendable {
     public struct Source: Equatable, Sendable {
         public enum State: Equatable, Sendable {
             case recording(FrameSize)
+            /// Recording, but its stream delivers no frames for now: the file repeats its last frame.
+            case stalled(FrameSize)
             /// Waits to start: the settle time after a change.
             case waiting
             /// Its file ended with an error; it starts again after the back-off.
@@ -333,7 +365,7 @@ public struct CameraTracker: Sendable {
         order.compactMap { uniqueID in
             guard let tracked = cameras[uniqueID] else { return nil }
             let state: Source.State = switch tracked.phase {
-            case .recording(let frameSize): .recording(frameSize)
+            case .recording(let frameSize): tracked.isStalled ? .stalled(frameSize) : .recording(frameSize)
             case .waitingToRestart: .failedRetrying
             case .waitingForRoom: .diskFull
             case .idle where tracked.reading == nil: .disconnected
