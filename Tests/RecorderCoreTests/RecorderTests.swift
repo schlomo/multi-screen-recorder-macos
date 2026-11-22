@@ -314,7 +314,7 @@ extension GlobalRecordingLog {
 
         // MARK: Cameras (D74)
 
-        /// Sends a frame every 30 ms until `condition` holds, for at most 5 s.
+        /// Sends a frame at each of `wait`'s checks, about every 10 ms, until `condition` holds.
         private func sendFrames(_ camera: StandInCamera, until what: String, _ condition: () -> Bool) async throws {
             try await wait(what) {
                 try? camera.sendFrame()

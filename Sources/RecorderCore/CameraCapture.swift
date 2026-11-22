@@ -224,8 +224,17 @@ final class CameraSource: NSObject, CameraFrameSource, AVCaptureVideoDataOutputS
             endOnce(.captureSourceGone)
             return
         }
-        guard let deviceFormat = device.formats.first(where: { cameraFormat(of: $0) == format }) else {
+        let matching = device.formats.filter { cameraFormat(of: $0) == format }
+        guard let deviceFormat = matching.first(where: { !Self.isMJPEG($0) }) ?? matching.first else {
             throw SourceError(errorDescription: "the camera no longer offers the format \(format)")
+        }
+        if matching.count > 1 {
+            RecorderLog.detail(
+                "camera \(uniqueID): \(matching.count) formats are \(format) ("
+                    + matching.map { FrameFacts.fourCharacterCode(CMFormatDescriptionGetMediaSubType($0.formatDescription)) }
+                        .joined(separator: ", ")
+                    + "), opened in \(FrameFacts.fourCharacterCode(CMFormatDescriptionGetMediaSubType(deviceFormat.formatDescription)))",
+                category: VideoFileWriter.detailCategory)
         }
         let input = try AVCaptureDeviceInput(device: device)
         let session = AVCaptureSession()
@@ -245,7 +254,7 @@ final class CameraSource: NSObject, CameraFrameSource, AVCaptureVideoDataOutputS
         session.addOutput(output)
         // After the input is added, so the session keeps the format and the frame rate.
         let wanted = Double(TickGrid.recording.framesPerSecond)
-        let frameDuration = Self.frameDuration(closestTo: wanted, of: deviceFormat)
+        let frameDuration = Self.frameDuration(closestTo: TickGrid.recording.framesPerSecond, of: deviceFormat)
         try device.lockForConfiguration()
         device.activeFormat = deviceFormat
         if let frameDuration {
@@ -294,6 +303,12 @@ final class CameraSource: NSObject, CameraFrameSource, AVCaptureVideoDataOutputS
             category: VideoFileWriter.detailCategory)
     }
 
+    /// A format the camera sends as JPEG pictures, which AVFoundation must decode.
+    private static func isMJPEG(_ format: AVCaptureDevice.Format) -> Bool {
+        let subtype = CMFormatDescriptionGetMediaSubType(format.formatDescription)
+        return subtype == kCMVideoCodecType_JPEG || subtype == kCMVideoCodecType_JPEG_OpenDML
+    }
+
     /// "1920×1080 420v, frame duration 1/30 s to 1/30 s".
     private static func formatText(_ device: AVCaptureDevice) -> String {
         let active = device.activeFormat
@@ -304,14 +319,14 @@ final class CameraSource: NSObject, CameraFrameSource, AVCaptureVideoDataOutputS
     /// The frame duration for `wanted` frames per second where one of the
     /// format's ranges allows it, otherwise the range's bound closest to it,
     /// as the format gives it, so the device takes it.
-    private static func frameDuration(closestTo wanted: Double, of format: AVCaptureDevice.Format) -> CMTime? {
+    private static func frameDuration(closestTo wanted: Int, of format: AVCaptureDevice.Format) -> CMTime? {
         let ranges = format.videoSupportedFrameRateRanges
-        guard let rate = CameraFormat.frameRate(closestTo: wanted, in: ranges.map { $0.minFrameRate...$0.maxFrameRate }),
-              let range = ranges.first(where: { ($0.minFrameRate...$0.maxFrameRate).contains(rate) })
-        else { return nil }
-        if rate == range.maxFrameRate { return range.minFrameDuration }
-        if rate == range.minFrameRate { return range.maxFrameDuration }
-        return CMTime(value: 1, timescale: CMTimeScale(wanted))
+        return switch CameraFormat.frameDuration(closestTo: wanted, in: ranges.map { $0.minFrameRate...$0.maxFrameRate }) {
+        case .shortestOf(let range): ranges[range].minFrameDuration
+        case .longestOf(let range): ranges[range].maxFrameDuration
+        case .oneOver(let rate): CMTime(value: 1, timescale: CMTimeScale(rate))
+        case nil: nil
+        }
     }
 
     /// "1/30 s".

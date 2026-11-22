@@ -132,8 +132,8 @@ permission is denied (`msr list` reads the permission without asking); under Non
 recording resolution None, and for a real camera not the default under
 Default camera nothing, as the settings line gives the reason. A
 camera's Records at is the frame size of its chosen format (see
-"Cameras"), capped by the recording resolution; Looks like and Drawn at
-stay empty.
+"Cameras") fitted into the recording resolution's box as a screen's
+looks-like size is; Looks like and Drawn at stay empty.
 
 In the table the "Looks like" column is what macOS calls "looks like" (a
 screen's size in points) and "Drawn at" the size it is drawn at (its
@@ -1515,14 +1515,20 @@ no audio of the camera's own.
   as a screen's looks-like size is (never enlarged, a portrait format
   against the box turned upright); the format with the largest recorded
   size is chosen, and of formats with that same recorded size the
-  smallest, the least to decode. At Native the largest. So at 720p a
+  smallest, the least to decode. At Native the largest. Of formats that
+  record as much and are as large (such as 1280×720 and 720×1280), the
+  narrower is opened, the order being fixed whatever the camera lists
+  first. So at 720p a
   camera with 640×480 and 1920×1080 records 1920×1080 scaled to
   1280×720, and a BRIO with 4096×2160, 3840×2160 and 1920×1080 records
   1920×1080 as it is at 1080p. A camera with no format
   reaching 30 fps records its fastest, the largest of those. The
   camera's frame duration is set to 1/30 s where the format's ranges
   allow it, otherwise to the allowed rate closest to 30, told in a
-  detail line. AVFoundation decodes the format (an MJPEG one too) and
+  detail line. Where the camera lists several formats of that size and
+  rate (such as MJPEG and 420v), the one that needs no decoding is
+  opened (420v or 420f), else the first, with a detail line naming
+  them. AVFoundation decodes the format (an MJPEG one too) and
   scales its frames to the camera file's frame size. A frame without a
   decoded picture ends the capture as a failing stream.
 - **Placement.** A camera's frames arrive late more often than a

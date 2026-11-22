@@ -157,14 +157,37 @@ public struct CameraFormat: Equatable, Sendable, CustomStringConvertible {
     /// Whether it delivers the tick grid's frame rate, a rate rounded to whole frames per second.
     var deliversTheTickRate: Bool { maxFramesPerSecond.rounded() >= Double(TickGrid.recording.framesPerSecond) }
 
-    /// One format per frame size, smallest first, of a camera's formats as
-    /// listed: the variant with the lowest rate that still delivers the tick
-    /// grid's frame rate, or the fastest where none does (D74).
+    /// One format per frame size, smallest first (of equal pixel counts the
+    /// narrower, then the lower), of a camera's formats as listed: the
+    /// variant with the lowest rate that still delivers the tick grid's
+    /// frame rate, or the fastest where none does (D74).
     public static func preferred(_ listed: [CameraFormat]) -> [CameraFormat] {
         Dictionary(grouping: listed, by: \.size).values.compactMap { variants in
             variants.filter(\.deliversTheTickRate).min { $0.maxFramesPerSecond < $1.maxFramesPerSecond }
                 ?? variants.max { $0.maxFramesPerSecond < $1.maxFramesPerSecond }
-        }.sorted { $0.size.pixelCount < $1.size.pixelCount }
+        }.sorted { ($0.size.pixelCount, $0.size.width, $0.size.height) < ($1.size.pixelCount, $1.size.width, $1.size.height) }
+    }
+
+    /// How to set the frame duration for `wanted` frames per second
+    /// (`frameRate(closestTo:in:)`): a rate at a range's bound takes the
+    /// bound's own duration as the device lists it, so the device takes it;
+    /// a rate inside a range is 1/`wanted`.
+    public enum FrameDuration: Equatable, Sendable {
+        /// The range's shortest frame duration, its highest rate.
+        case shortestOf(range: Int)
+        /// The range's longest frame duration, its lowest rate.
+        case longestOf(range: Int)
+        case oneOver(Int)
+    }
+
+    /// The frame duration to set for `wanted` frames per second, nil without a range.
+    public static func frameDuration(closestTo wanted: Int, in ranges: [ClosedRange<Double>]) -> FrameDuration? {
+        guard let rate = frameRate(closestTo: Double(wanted), in: ranges),
+              let range = ranges.firstIndex(where: { $0.contains(rate) })
+        else { return nil }
+        if rate == ranges[range].upperBound { return .shortestOf(range: range) }
+        if rate == ranges[range].lowerBound { return .longestOf(range: range) }
+        return .oneOver(wanted)
     }
 
     /// The frame rate to set: `wanted` where one of the format's ranges

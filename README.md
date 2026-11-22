@@ -114,8 +114,8 @@ confirmed yet.
 - **USB docks:** plugging a USB device into a dock while recording can
   cause a few seconds of silence or repeated audio in the USB audio
   inputs.
-- **Cameras:** recording from a real camera is not yet checked on real
-  hardware; the tests use a stand-in camera.
+- **Cameras:** checked on one Mac with a Logitech BRIO and a DJI Osmo
+  Pocket; disconnects, sleep and other cameras not yet checked.
 
 ### What to test and send
 

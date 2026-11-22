@@ -57,7 +57,6 @@ import Testing
         #expect(try repositoryFile("docs/design/recorder.md").contains("```\n\(Self.designExample)```\n"))
     }
 
-    /// A denied Camera permission fails the check, with the fix in System Settings or no camera (D74).
     /// A denied Camera permission does not stop a recording: it records no camera, says so, and how to change it (D74).
     @Test func aDeniedCameraPermissionPassesAndSaysNoCameraIsRecorded() throws {
         let result = ReadyCheck.evaluate(facts(cameras: DesignExample.cameras, cameraGranted: false), settings: .manual)

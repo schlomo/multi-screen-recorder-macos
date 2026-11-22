@@ -151,6 +151,23 @@ import Testing
         #expect(CameraFormat.preferred(listed) == [format(1280, 720, 60), format(1920, 1080, 29.97), format(3840, 2160, 24)])
     }
 
+    @Test func sizesOfTheSamePixelCountAreInAFixedOrder() {
+        let landscape = format(1280, 720, 30)
+        let portrait = format(720, 1280, 30)
+        #expect(CameraFormat.preferred([landscape, portrait]) == [portrait, landscape])
+        #expect(CameraFormat.preferred([portrait, landscape]) == [portrait, landscape])
+    }
+
+    /// A bound of a range is set as the range's own duration, a rate inside one as 1/30 s.
+    @Test func theFrameDurationIsARangesBoundOrOneOverThirty() {
+        #expect(CameraFormat.frameDuration(closestTo: 30, in: [5...60]) == .oneOver(30))
+        #expect(CameraFormat.frameDuration(closestTo: 30, in: [60...60, 15...30]) == .shortestOf(range: 1))
+        #expect(CameraFormat.frameDuration(closestTo: 30, in: [29.97...29.97]) == .shortestOf(range: 0))
+        #expect(CameraFormat.frameDuration(closestTo: 30, in: [50...60]) == .longestOf(range: 0))
+        #expect(CameraFormat.frameDuration(closestTo: 30, in: [15...25, 50...60]) == .shortestOf(range: 0))
+        #expect(CameraFormat.frameDuration(closestTo: 30, in: []) == nil)
+    }
+
     @Test func theFrameRateIsThirtyWhereARangeAllowsItOtherwiseTheClosest() {
         #expect(CameraFormat.frameRate(closestTo: 30, in: [5...60]) == 30)
         #expect(CameraFormat.frameRate(closestTo: 30, in: [30...30, 60...60]) == 30)

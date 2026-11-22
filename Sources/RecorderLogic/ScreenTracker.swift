@@ -168,12 +168,17 @@ public struct ScreenTracker: Sendable {
         }
         if needsReading {
             needsReading = false
-            for uuid in screens.keys where screens[uuid]?.reading != nil {
-                screens[uuid]?.changedAt = now
-            }
-            lastScreenChange = now
+            settleEveryScreen(at: now)
         }
         return step
+    }
+
+    /// Every screen present starts its settle time anew, as after a wake.
+    private mutating func settleEveryScreen(at now: Int64) {
+        for uuid in screens.keys where screens[uuid]?.reading != nil {
+            screens[uuid]?.changedAt = now
+        }
+        lastScreenChange = now
     }
 
     /// What is due at `now`: screens unchanged for the settle time start,
@@ -291,10 +296,7 @@ public struct ScreenTracker: Sendable {
         isAsleep = false
         var step = Step(events: [RecordingEvent(at: now, event: .wake)])
         step.append(observe(connected, at: now))
-        for uuid in screens.keys where screens[uuid]?.reading != nil {
-            screens[uuid]?.changedAt = now
-        }
-        lastScreenChange = now
+        settleEveryScreen(at: now)
         return step
     }
 

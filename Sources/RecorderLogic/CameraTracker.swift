@@ -349,7 +349,8 @@ public struct CameraTracker: Sendable {
             case failedRetrying
             case diskFull
             case disconnected
-            /// Connected, but the camera mode no longer records it, as a former default camera.
+            /// Connected, but not recorded: suspended, or no longer in the
+            /// camera mode, as a former default camera.
             case notRecorded
             case asleep
         }
