@@ -1,13 +1,28 @@
 #!/usr/bin/env -S python3 -I
-"""Copies the end-to-end run's three light window captures over the
-homepage collage's pictures in homepage/assets/images/ of this checkout
-(homepage/README.md, "Screenshots"); the PNG diff is the review boundary.
-Every capture and picture is checked before any picture is replaced.
+"""Puts the end-to-end run's three light window captures onto the homepage
+collage's pictures in homepage/assets/images/ (homepage/README.md,
+"Screenshots", D72); the PNG diff is the review boundary. Every capture and
+picture is checked before any picture is replaced.
+
+With a scratch folder it only copies, into this checkout. With --release or
+--snapshot <n> it takes the screenshots from the published app: in a
+temporary worktree at the commit the screenshots go onto (origin/main, or PR
+<n>'s head), it runs that commit's scripts/end-to-end-test with the same flag
+(the driver built there), copies the captures and commits them, with no
+skip-ci marker, so the homepage's preview is built. --release pushes the
+commit as the new branch homepage-screenshots-v<version> and opens a draft PR
+for it; --snapshot <n> pushes it onto PR <n>'s head branch. git and gh read
+their own credentials.
 """
 
 import argparse
+import json
+import re
 import shutil
+import subprocess
 import sys
+import tempfile
+from dataclasses import dataclass
 from pathlib import Path
 
 ME = "scripts/update-homepage-screenshots"
@@ -24,6 +39,11 @@ CAPTURES_TO_PICTURES = {
     "app-finder-window-light.png": "recording-folder.png",
 }
 PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
+TRUNK = "main"
+BRANCH_PREFIX = "homepage-screenshots-v"
+# The driver's first line in run.log names the app it ran: its version and the commit it was built from.
+RUN_LOG_APP = re.compile(r"^msr-end-to-end: (?P<version>\S+) \((?P<commit>[0-9a-f]+)\), ", re.MULTILINE)
+RELEASE_VERSION = re.compile(r"[0-9]+\.[0-9]{8}\.[0-9]+")
 
 
 class Refused(Exception):
@@ -34,6 +54,15 @@ class ArgumentParser(argparse.ArgumentParser):
     def error(self, message: str) -> None:
         self.print_usage(sys.stderr)
         sys.exit(f"{ME}: {message}")
+
+
+@dataclass(frozen=True)
+class Target:
+    """Where the screenshots go: the commit they are put onto and the branch it is pushed to."""
+    flag: list[str]
+    base: str
+    branch: str | None
+    pr_number: int | None = None
 
 
 def checked_copies(scratch: Path, checkout: Path) -> list[tuple[Path, Path]]:
@@ -52,21 +81,130 @@ def checked_copies(scratch: Path, checkout: Path) -> list[tuple[Path, Path]]:
     return copies
 
 
+def copy_screenshots(scratch: Path, checkout: Path) -> None:
+    for capture, picture in checked_copies(scratch, checkout):
+        shutil.copyfile(capture, picture)
+        print(picture.relative_to(checkout))
+
+
+def run(*arguments: str, cwd: Path) -> str:
+    try:
+        return subprocess.run(arguments, cwd=cwd, check=True, stdout=subprocess.PIPE, text=True).stdout.strip()
+    except subprocess.CalledProcessError as failure:
+        raise Refused(f"{' '.join(arguments[:2])} failed with exit status {failure.returncode}") from None
+
+
+def fetched(checkout: Path, branch: str) -> str:
+    run("git", "fetch", "--quiet", "origin", f"refs/heads/{branch}", cwd=checkout)
+    return run("git", "rev-parse", "FETCH_HEAD", cwd=checkout)
+
+
+def release_target(checkout: Path) -> Target:
+    return Target(flag=["--release"], base=fetched(checkout, TRUNK), branch=None)
+
+
+def snapshot_target(checkout: Path, pr_number: int) -> Target:
+    pr = json.loads(run("gh", "pr", "view", str(pr_number), "--json", "state,headRefName,headRefOid,isCrossRepository",
+                        cwd=checkout))
+    if pr["state"] != "OPEN":
+        raise Refused(f"PR #{pr_number} is {pr['state']}, not open")
+    if pr["isCrossRepository"]:
+        raise Refused(f"PR #{pr_number} comes from a fork, which has no snapshot release")
+    head = fetched(checkout, pr["headRefName"])
+    if head != pr["headRefOid"]:
+        raise Refused(f"PR #{pr_number}'s branch {pr['headRefName']} is at {head}, GitHub says {pr['headRefOid']}; run again")
+    return Target(flag=["--snapshot", str(pr_number)], base=head, branch=pr["headRefName"], pr_number=pr_number)
+
+
+def app_of_run(scratch: Path) -> tuple[str, str]:
+    """The version and commit of the app the end-to-end run ran, from its run.log."""
+    try:
+        found = RUN_LOG_APP.search((scratch / "run.log").read_text(encoding="utf-8"))
+    except OSError as error:
+        raise Refused(f"cannot read the end-to-end run's run.log: {error}") from None
+    if found is None:
+        raise Refused(f"{scratch / 'run.log'} does not name the app it ran")
+    return found["version"], found["commit"]
+
+
+def take_screenshots(target: Target, worktree: Path, scratch: Path) -> str:
+    """Runs the end-to-end tests on the published app; gives its version once it is the one the target needs."""
+    status = subprocess.run([str(worktree / "scripts/end-to-end-test"), *target.flag, "--scratch-folder", str(scratch)],
+                            cwd=worktree).returncode
+    if status != 0:
+        raise Refused(f"scripts/end-to-end-test ended with exit status {status}; its scratch folder is {scratch}")
+    version, commit = app_of_run(scratch)
+    if target.pr_number is None:
+        if RELEASE_VERSION.fullmatch(version) is None:
+            raise Refused(f"the latest release's app says it is {version}, not a release version")
+    elif not target.base.startswith(commit):
+        raise Refused(f"PR #{target.pr_number}'s snapshot release was built from {commit}, its head is {target.base};"
+                      " wait for the snapshot release of the head, then run again")
+    return version
+
+
+def commit_and_publish(target: Target, worktree: Path, version: str) -> None:
+    run("git", "add", "--", *(str(IMAGES / picture) for picture in CAPTURES_TO_PICTURES.values()), cwd=worktree)
+    if subprocess.run(["git", "diff", "--cached", "--quiet"], cwd=worktree).returncode == 0:
+        raise Refused(f"the screenshots of {version} are the ones the homepage has; nothing to commit")
+    run("git", "commit", "--quiet", "--message", f"Homepage screenshots from {version}\n\n"
+        f"Taken by {ME} {' '.join(target.flag)} from the published app's end-to-end run.", cwd=worktree)
+    if target.branch is not None:
+        run("git", "push", "--quiet", "origin", f"HEAD:refs/heads/{target.branch}", cwd=worktree)
+        print(f"{ME}: pushed the screenshots of {version} onto PR #{target.pr_number}'s branch {target.branch}")
+        return
+    branch = BRANCH_PREFIX + version
+    run("git", "push", "--quiet", "origin", f"HEAD:refs/heads/{branch}", cwd=worktree)
+    print(run("gh", "pr", "create", "--draft", "--base", TRUNK, "--head", branch,
+              "--title", f"Homepage screenshots from {version}",
+              "--body", f"The homepage's screenshots from the end-to-end run of release v{version}"
+                        f" ({ME} --release). Homepage only, so it makes no release.", cwd=worktree))
+
+
+def publish_screenshots(target: Target, checkout: Path) -> None:
+    folder = Path(tempfile.mkdtemp(prefix="update-homepage-screenshots-"))
+    worktree, scratch = folder / "checkout", folder / "end-to-end"
+    run("git", "worktree", "add", "--quiet", "--detach", str(worktree), target.base, cwd=checkout)
+    try:
+        version = take_screenshots(target, worktree, scratch)
+        copy_screenshots(scratch, worktree)
+        commit_and_publish(target, worktree, version)
+    finally:
+        run("git", "worktree", "remove", "--force", str(worktree), cwd=checkout)
+        print(f"{ME}: the end-to-end run's scratch folder is {scratch}")
+
+
 def main() -> None:
-    parser = ArgumentParser(prog=ME, description="Copies the end-to-end run's light window captures over the homepage's"
-                                                 " screenshots.")
-    parser.add_argument("scratch_folder", type=Path, help="the --scratch-folder of a passing scripts/end-to-end-test run")
-    scratch = parser.parse_args().scratch_folder.absolute()
+    parser = ArgumentParser(prog=ME, description="Puts the end-to-end run's light window captures onto the homepage's"
+                                                 " screenshots: copies them from a run's scratch folder into this"
+                                                 " checkout, or runs the end-to-end tests on a published app and"
+                                                 " commits and pushes them.")
+    source = parser.add_mutually_exclusive_group(required=True)
+    source.add_argument("scratch_folder", type=Path, nargs="?",
+                        help="the --scratch-folder of a passing scripts/end-to-end-test run; copies only")
+    source.add_argument("--release", action="store_true",
+                        help="the latest release's app; pushes a new branch off origin/main and opens a draft PR")
+    source.add_argument("--snapshot", type=int, metavar="N",
+                        help="PR N's snapshot release's app (tag pr-N); pushes onto PR N's head branch")
+    arguments = parser.parse_args()
+    if arguments.snapshot is not None and arguments.snapshot < 1:
+        parser.error(f"--snapshot takes a PR number, such as 20, not {arguments.snapshot}")
     checkout = Path(__file__).resolve().parent.parent
     try:
-        copies = checked_copies(scratch, checkout)
-        for capture, picture in copies:
-            shutil.copyfile(capture, picture)
-            print(picture.relative_to(checkout))
+        if arguments.scratch_folder is not None:
+            copy_screenshots(arguments.scratch_folder.absolute(), checkout)
+            return
+        for tool in ("git", "gh"):
+            if shutil.which(tool) is None:
+                raise Refused(f"{tool} is not on the PATH")
+        if arguments.release:
+            publish_screenshots(release_target(checkout), checkout)
+        else:
+            publish_screenshots(snapshot_target(checkout, arguments.snapshot), checkout)
     except Refused as refusal:
         sys.exit(f"{ME}: {refusal}")
     except OSError as error:
-        sys.exit(f"{ME}: cannot copy the screenshots: {error}")
+        sys.exit(f"{ME}: cannot put the screenshots onto the homepage: {error}")
 
 
 if __name__ == "__main__":
