@@ -362,6 +362,8 @@ final class AudioCapture: @unchecked Sendable {
         var offset = 0
         chunk: while offset < channels[0].count {
             let rest = offset == 0 ? channels : channels.map { Array($0[offset...]) }
+            // A step that ended the file is the first of its pass: the detector starts the pass again from here.
+            let beforePass = detector
             for step in detector.steps(for: rest, isPlacing: timeline != nil) {
                 // A failure while placing ended the capture.
                 guard isEnding == wasEnding else { break chunk }
@@ -374,6 +376,7 @@ final class AudioCapture: @unchecked Sendable {
                     guard place(placed, at: time(first - leadingZeros), appliedBefore: corrected.appliedAtStart,
                                 applied: corrected.applied)
                     else {
+                        detector = beforePass
                         detector.fileEnded()
                         offset = first
                         continue chunk

@@ -384,8 +384,10 @@ replaces D7's GitHub Pages branch).
 
 ## End-to-end test
 
-An automated test that runs the built app through a recording in a tart
-VM on a Mac (`scripts/end-to-end-test`, a manual step, D67) while
+An automated test that runs the app, built or published
+(`scripts/end-to-end-test`, or with `--release` or `--snapshot <n>` the
+app of that release, D72), through a recording in a tart
+VM on a Mac (a manual step, D67) while
 screens and audio inputs change, and examines the recording folder
 afterwards. Designed in
 [design/end-to-end-tests.md](design/end-to-end-tests.md) (D37). Not an

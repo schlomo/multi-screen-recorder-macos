@@ -678,23 +678,48 @@ import Testing
         Int(RecorderValues.longestFilledAudioGap.nanoseconds * Int64(RecorderValues.audioSampleRate) / 1_000_000_000) / samplesPerBuffer + 20
     }
 
+    /// The samples of zeros before the sound in the buffer that has it: the sound starts partway into a tick.
+    private let zerosBeforeTheSound = 700
+
+    /// The leading zeros of a file starting before sound: two ticks.
+    private var leadingZeros: Int { 2 * samplesPerBuffer }
+
+    /// A buffer at the `index`th buffer's time whose first `zeros` samples are zero, the rest sound.
+    private func buffer(index: Int, zeros: Int, channels: Int = 1) throws -> CMSampleBuffer {
+        let one = [Float](repeating: 0, count: zeros) + [Float](repeating: 0.25, count: samplesPerBuffer - zeros)
+        let time = CMTime(value: CMTimeValue(reading.host) + time(ofBuffer: index), timescale: 1_000_000_000)
+        return try pcmSample(Array(repeating: one, count: channels)[...], format: pcmFormat(channels: channels), at: time)
+    }
+
+    /// The first sound at `index` after `zerosBeforeTheSound` samples of zeros, then sound for `buffers` buffers.
+    private func sendSound(startingAt index: Int, buffers: Int, channels: Int = 1) throws {
+        arrival.time.withLock { $0 = time(ofBuffer: index) + 1_000_000 }
+        source.send(try buffer(index: index, zeros: zerosBeforeTheSound, channels: channels))
+        try send(0.25, buffers: (index + 1)..<(index + buffers), channels: channels)
+    }
+
+    /// The new file's start, in seconds from t0, must lie between the leading zeros and the sound.
+    private func expectStart(_ start: Double, forSoundAt index: Int, after zeroBuffers: Int) {
+        let rate = Double(RecorderValues.audioSampleRate)
+        let sound = Double(time(ofBuffer: index)) / 1_000_000_000 + Double(zerosBeforeTheSound) / rate
+        #expect(start <= sound, "\(start) \(sound)")
+        #expect(start >= sound - Double(leadingZeros) / rate, "\(start) \(sound)")
+        #expect(start >= Double(time(ofBuffer: zeroBuffers)) / 1_000_000_000, "\(start) is before the zeros after the end")
+    }
+
     @Test func aFileEndedByAGapStartsAgainOnlyWithSoundAfterTheZeros() async throws {
         let capture = capture()
         try send(0.25, buffers: 0..<10)
         let afterGap = 10 + buffersOfALongGap
         try send(0, buffers: afterGap..<(afterGap + 5))
         let restart = afterGap + 5
-        try send(0.25, buffers: restart..<(restart + 10))
+        try sendSound(startingAt: restart, buffers: 10)
         await capture.stop()
         #expect(reported.started.count == 2)
         #expect(reported.ended.count == 2)
         #expect(!kinds(reported.events).contains(.noAudioStarted))
         let second = try #require(reported.ended.map(\.file).max { $0.start < $1.start })
-        let soundStarts = Double(time(ofBuffer: restart)) / 1_000_000_000
-        // At most the leading zeros before the sound, none of the zeros before the gap.
-        #expect(second.start <= soundStarts)
-        #expect(soundStarts - second.start < 0.07, "\(second.start) \(soundStarts)")
-        #expect(second.start >= Double(time(ofBuffer: afterGap)) / 1_000_000_000)
+        expectStart(second.start, forSoundAt: restart, after: afterGap)
     }
 
     @Test func zerosAfterAGapThatEndedTheFileStartNone() async throws {
@@ -711,14 +736,35 @@ import Testing
         let capture = capture()
         try send(0.25, buffers: 0..<10)
         try send(0, buffers: 10..<15, channels: 2)
-        try send(0.25, buffers: 15..<25, channels: 2)
+        try sendSound(startingAt: 15, buffers: 10, channels: 2)
         await capture.stop()
         #expect(reported.started.count == 2)
         let second = try #require(reported.ended.map(\.file).first { $0.channels == .mono(2) })
-        let soundStarts = Double(time(ofBuffer: 15)) / 1_000_000_000
-        #expect(second.start <= soundStarts)
-        #expect(soundStarts - second.start < 0.07, "\(second.start) \(soundStarts)")
-        #expect(second.start >= Double(time(ofBuffer: 10)) / 1_000_000_000)
+        expectStart(second.start, forSoundAt: 15, after: 10)
+    }
+
+    /// Zeros that reached almost the no audio time, a gap that ended the file, then zeros that would have completed it.
+    @Test func noAudioReachedRightAfterAGapThatEndedTheFileIsToldOnce() async throws {
+        let capture = capture()
+        try send(0.25, buffers: 0..<10)
+        let zerosInFile = buffersOfNoAudio - 1
+        try send(0, buffers: 10..<(10 + zerosInFile))
+        // Half a buffer less than the no audio time in the file; the resampler's delay needs the margin.
+        let lastZeros = 10 + zerosInFile
+        arrival.time.withLock { $0 = time(ofBuffer: lastZeros) + 1_000_000 }
+        source.send(try buffer(at: time(ofBuffer: lastZeros), count: samplesPerBuffer / 2, value: 0))
+        let afterGap = lastZeros + 1 + buffersOfALongGap
+        // The zeros before the gap count for nothing: the no audio time runs again from the gap.
+        let quiet = buffersOfNoAudio + 10
+        try send(0, buffers: afterGap..<(afterGap + quiet))
+        let restart = afterGap + quiet
+        try sendSound(startingAt: restart, buffers: 10)
+        await capture.stop()
+        #expect(kinds(reported.events).filter { $0 == .noAudioStarted || $0 == .noAudioStopped } == [.noAudioStarted, .noAudioStopped])
+        #expect(reported.noAudio == [true, false])
+        #expect(reported.started.count == 2)
+        let second = try #require(reported.ended.map(\.file).max { $0.start < $1.start })
+        expectStart(second.start, forSoundAt: restart, after: afterGap)
     }
 
     @Test func theSystemAudioIsExcluded() async throws {
