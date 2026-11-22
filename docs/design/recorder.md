@@ -1091,6 +1091,10 @@ the metadata items (see "Output on disk").
   the start gets no file, and one whose file ended for another reason
   (a gap, a change of the channel count) starts its next file with
   its next sound; zeros shorter than 10 s within a file stay in it.
+  The 10 s count from the recording's start or from the last file
+  end: zeros before a gap or a change of the channel count count for
+  nothing after it, so an input that alternates shorter zeros with
+  gaps is never no audio, and each gap is its `audio input gap` event.
   This is decided on the corrected audio, which keeps zeros exact.
   Each capture of an input detects no audio on its own: after a
   capture restart a continuing silence is reported as `no audio
