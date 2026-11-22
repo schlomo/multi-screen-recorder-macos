@@ -65,6 +65,7 @@ guest "cat > '$guest_app_root/msr-end-to-end' && chmod +x '$guest_app_root/msr-e
 
 # The driver runs in the admin user's GUI session (logged in automatically),
 # from the folder holding build/, with the tools first on the PATH.
+vm_wait_for_login
 guest_scratch="$guest_home/end-to-end-scratch"
 quoted_arguments="--throwaway-vm "
 for argument in ${driver_arguments[@]+"${driver_arguments[@]}"}; do

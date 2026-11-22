@@ -281,7 +281,7 @@ records the commit and the result in the PR description.
 - The Command Line Tools alone build the package but cannot run the
   tests: Swift Testing needs Xcode, selected and with its licence
   accepted (`scripts/test` checks this first).
-- Five scripts are Python, standard library only, and need Python 3.15
+- Six scripts are Python, standard library only, and need Python 3.15
   or later as `python3` on the `PATH` (the runner image's; macOS ships
   an older one); see [delivery.md](docs/design/delivery.md).
 - `msr` without arguments starts the app, and the app, `msr check` and

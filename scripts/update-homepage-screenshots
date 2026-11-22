@@ -1,0 +1,73 @@
+#!/usr/bin/env -S python3 -I
+"""Copies the end-to-end run's three light window captures over the
+homepage collage's pictures in homepage/assets/images/ of this checkout
+(homepage/README.md, "Screenshots"); the PNG diff is the review boundary.
+Every capture and picture is checked before any picture is replaced.
+"""
+
+import argparse
+import shutil
+import sys
+from pathlib import Path
+
+ME = "scripts/update-homepage-screenshots"
+MINIMUM_PYTHON = (3, 15)
+if sys.version_info < MINIMUM_PYTHON:
+    sys.exit(f"{ME}: needs Python {'.'.join(map(str, MINIMUM_PYTHON))} or later (the python3 of the macos-26 runner image),"
+             f" not {sys.version.split()[0]}")
+
+REVIEW = Path("review/app")
+IMAGES = Path("homepage/assets/images")
+CAPTURES_TO_PICTURES = {
+    "app-start-window-light.png": "app-window.png",
+    "app-status-window-light.png": "status-window.png",
+    "app-finder-window-light.png": "recording-folder.png",
+}
+PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
+
+
+class Refused(Exception):
+    pass
+
+
+class ArgumentParser(argparse.ArgumentParser):
+    def error(self, message: str) -> None:
+        self.print_usage(sys.stderr)
+        sys.exit(f"{ME}: {message}")
+
+
+def checked_copies(scratch: Path, checkout: Path) -> list[tuple[Path, Path]]:
+    copies = []
+    for capture_name, picture_name in CAPTURES_TO_PICTURES.items():
+        capture = scratch / REVIEW / capture_name
+        picture = checkout / IMAGES / picture_name
+        if not capture.is_file():
+            raise Refused(f"{capture} is missing; is {scratch} the scratch folder of a passing scripts/end-to-end-test run?")
+        with capture.open("rb") as file:
+            if file.read(len(PNG_SIGNATURE)) != PNG_SIGNATURE:
+                raise Refused(f"{capture} is not a PNG")
+        if not picture.is_file():
+            raise Refused(f"{picture} is missing; the collage reads it (homepage/layouts/_partials/collage.html)")
+        copies.append((capture, picture))
+    return copies
+
+
+def main() -> None:
+    parser = ArgumentParser(prog=ME, description="Copies the end-to-end run's light window captures over the homepage's"
+                                                 " screenshots.")
+    parser.add_argument("scratch_folder", type=Path, help="the --scratch-folder of a passing scripts/end-to-end-test run")
+    scratch = parser.parse_args().scratch_folder.absolute()
+    checkout = Path(__file__).resolve().parent.parent
+    try:
+        copies = checked_copies(scratch, checkout)
+        for capture, picture in copies:
+            shutil.copyfile(capture, picture)
+            print(picture.relative_to(checkout))
+    except Refused as refusal:
+        sys.exit(f"{ME}: {refusal}")
+    except OSError as error:
+        sys.exit(f"{ME}: cannot copy the screenshots: {error}")
+
+
+if __name__ == "__main__":
+    main()

@@ -38,5 +38,5 @@ for index in "${!arguments[@]}"; do
 done
 
 python3 -I -m py_compile scripts/version scripts/unpack-app scripts/sign-app scripts/smoke-test \
-    scripts/publish-snapshot-release
+    scripts/publish-snapshot-release scripts/update-homepage-screenshots
 swift test "$@"

@@ -59,10 +59,17 @@ enum Screenshots {
     static func video(_ window: CGWindowID, seconds: Int, to mov: URL) throws {
         try screencapture(["-x", "-l", "\(window)", "-V", "\(seconds)", mov.path], mov, what: "window \(window) as video")
     }
-    /// `screencapture` of one window with macOS's own shadow around it (a PNG with
-    /// transparent margins), without a sound.
+    /// `screencapture` of one window without macOS's shadow (the homepage's collage draws its own),
+    /// without a sound.
     static func capture(_ window: CGWindowID, to png: URL) throws {
-        try screencapture(["-x", "-l", "\(window)", png.path], png, what: "window \(window)")
+        try screencapture(["-x", "-o", "-l", "\(window)", png.path], png, what: "window \(window)")
+    }
+
+    /// Makes the process the frontmost app, so its window is captured active, as a person sees it.
+    static func bringToFront(_ pid: pid_t) throws {
+        try AppleScript.run(
+            "tell application \"System Events\" to set frontmost of (first process whose unix id is \(pid)) to true",
+            retryingFor: 10)
     }
 
     private static func screencapture(_ arguments: [String], _ png: URL, what: String) throws {
