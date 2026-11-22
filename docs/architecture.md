@@ -91,12 +91,13 @@ D28).
   camera, all real (the default and auto mode's) or all (virtual
   cameras and iPhone cameras, Continuity Camera and Desk View, too);
   one camera file per camera, made like a screen file, with the same
-  two guide tracks; each camera at 30 fps in its largest format, of
-  any aspect ratio, that fits the recording resolution's box as a
-  screen's picture does, the smallest scaled when none fits; a camera
+  two guide tracks; each camera at 30 fps in the format, of any aspect
+  ratio, that records the largest size once fitted into the recording
+  resolution's box as a screen's picture is, the smallest of equal
+  ones; a camera
   that sends no frames is a failing stream, a suspended one is not
   recorded; the Camera permission is asked only when a camera would be
-  recorded. A camera's own H.264 stream is not taken as-is (deferred).
+  recorded, and denied it records no camera, never blocking Start. A camera's own H.264 stream is not taken as-is (deferred).
 - Screens (built in PR #11, D45, D46, D47): a screen is known by its
   UUID; a stream starts only after a settle time; every frame is
   checked against its screen and a screen showing another screen's

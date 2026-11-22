@@ -125,8 +125,10 @@ not recorded shows its name with the `Camera <n> - ` part blank and `-`
 in Records at and GB/h max; it says `(virtual)` or `(Continuity
 Camera)` when the camera modes Default camera and All real leave out a
 virtual or an iPhone camera, `(no
-format)` when it offers no format to record, and `(suspended)` when the
-camera mode would record it but it is suspended; under None, at the
+format)` when it offers no format to record, `(suspended)` when the
+camera mode would record it but it is suspended, and `(no Camera
+permission)` when the camera mode would record it but the Camera
+permission is denied (`msr list` reads the permission without asking); under None, at the
 recording resolution None, and for a real camera not the default under
 Default camera nothing, as the settings line gives the reason. A
 camera's Records at is the frame size of its chosen format (see
@@ -153,7 +155,7 @@ required recording hours need, and "Files go to <output folder>", from
 the same code (see "The app"; the window's last line, "Recording
 continues when screens, cameras or audio sources change.", is not printed), then
 one line per item of the ready check, `ok` or `FAIL`, a fix under each
-failure (wrapped at 80 columns, its continuation lines under its first
+failure and under a denied Camera permission (wrapped at 80 columns, its continuation lines under its first
 line's text), and `Ready.` or `Not ready.` last. For the devices of the
 `msr list` example, the defaults and 3.1 GB free:
 
@@ -260,10 +262,11 @@ audio input: with no audio input present, or none recorded under the
 audio mode, the item is left out and the permission is neither asked nor
 read), the Camera permission (D74: only when the camera mode records a
 camera that is connected; without one the item is left out and the
-permission is neither asked nor read; denied, it fails like the
-Microphone permission, with the fix to allow it or to record no camera:
-turn off Auto and move the Camera mode slider to None, `--camera-mode
-none`), the screens (at least one, each readable; at the recording
+permission is neither asked nor read; denied, it passes as `Camera
+permission denied: no camera is recorded`, with its fix shown all the
+same: allow it, or record no camera by turning off Auto and moving the
+Camera mode slider to None, `--camera-mode none`; the recording then
+records no camera, and the disk estimate counts none), the screens (at least one, each readable; at the recording
 resolution None, where the free disk space counts no screen file, only
 with the system audio, which is captured through the main screen:
 `Screens: 2, none recorded (the system audio needs the main screen)`,
@@ -814,7 +817,7 @@ checked, reported or rewritten at the next start (D47).
    All green,
   the ready check is one line, "Ready to record", that expands on click
   to its items; any red item shows every item, with the fix under each
-  red one. Start is disabled while the ready check fails. For the
+  red one and under a denied Camera permission. Start is disabled while the ready check fails. For the
   devices of the `msr list` example, the defaults and the free space
   of the `msr check` example, the section shows:
 
@@ -842,7 +845,9 @@ checked, reported or rewritten at the next start (D47).
 - **Status window (D46):** clicking the Dock icon while recording opens
   a small window, and Quit opens it too: a table with a row per screen,
   then a row per camera the recording records or recorded (D74; its
-  Records at its frame size, its Clock drift empty), then a row per audio source the recording records or recorded (the
+  Records at its frame size, its Clock drift empty; with the Camera
+  permission denied, each camera the camera mode would record, not
+  numbered, State `no Camera permission`), then a row per audio source the recording records or recorded (the
   system audio first, then the audio inputs by number), and the columns Source
   (as in the start window: the kind's icon, the number and the name),
   "Records at" (a screen's frame size; an audio source's `1 channel`, `2
@@ -1501,12 +1506,16 @@ no audio of the camera's own.
   observe the suspension and read the cameras again when it changes.
 - **Format.** Per frame size the variant with the lowest highest frame
   rate that still reaches 30 fps (a rate rounded to whole frames), or
-  the fastest where none does. Of the formats reaching 30 fps, of any
-  aspect ratio (16:9, 9:16, 3:2, square), the largest by its pixels
-  that fits into the recording resolution's box as a screen's picture
-  does, a portrait format against the box turned upright (at Native, the
-  largest), recorded as it is; when none fits, the smallest, scaled into
-  the box as a screen's looks-like size is (the owner, 2026-11-22). A camera with no format
+  the fastest where none does. As for screens (the owner, 2026-11-22):
+  each format reaching 30 fps, of any aspect ratio (16:9, 9:16, 3:2,
+  square), records its size fitted into the recording resolution's box
+  as a screen's looks-like size is (never enlarged, a portrait format
+  against the box turned upright); the format with the largest recorded
+  size is chosen, and of formats with that same recorded size the
+  smallest, the least to decode. At Native the largest. So at 720p a
+  camera with 640×480 and 1920×1080 records 1920×1080 scaled to
+  1280×720, and a BRIO with 4096×2160, 3840×2160 and 1920×1080 records
+  1920×1080 as it is at 1080p. A camera with no format
   reaching 30 fps records its fastest, the largest of those. The
   camera's frame duration is set to 1/30 s where the format's ranges
   allow it, otherwise to the allowed rate closest to 30, told in a
@@ -1529,9 +1538,13 @@ no audio of the camera's own.
 - **Permission.** The recorder reads the cameras only with the Camera
   permission. Never asked, it asks once, when the camera mode records a
   connected camera (at the start or when one appears), and records the
-  cameras once granted; denied, the problem "The Camera permission is
-  missing" is told once, and the screens and the audio are recorded as
-  usual.
+  cameras once granted; denied, no camera is recorded (macOS grants the
+  permission per app, so it is all cameras or none), the problem "The
+  Camera permission is missing" is told once, the status window shows
+  each camera the camera mode would record as a row with the state `no
+  Camera permission`, and the screens and the audio are recorded as
+  usual (the owner, 2026-11-22: "if a single camera can be denied and
+  others work, then yes record and show in status").
 
 **Disk (D14).** Below the warning threshold: the warning. A writer that
 fails on a full disk ends its file, readable up to the last fragment;

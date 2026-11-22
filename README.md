@@ -26,8 +26,8 @@ own clock is resampled continuously to stay with the screen files
   built-in one and those on a cable; or none, only
   the default camera, or all of them, virtual and iPhone cameras
   (Continuity Camera, Desk View) too. Each is
-  recorded like a screen, in its largest format that still delivers
-  30 frames per second and fits the recording resolution.
+  recorded like a screen, in the format that delivers 30 frames per
+  second and records the most at the recording resolution.
 - **Every audio source in its own file.** No audio, the default
   microphone, the wired or all audio inputs, plus the system audio if
   you want it; each channel its own track. Or audio only: the
@@ -89,7 +89,8 @@ A Mac with Apple silicon (M1 or later) and macOS 26 or later.
    **Microphone** (asked only when a microphone is recorded: not on a
    Mac without an audio input, nor with the audio mode None) and
    **Camera** (asked only when a camera is recorded: not on a Mac
-   without a camera, nor with the camera mode None). All are in
+   without a camera, nor with the camera mode None; denied, the recording
+   goes on without the cameras). All are in
    System Settings › Privacy & Security.
    A microphone permission allowed there, not in the prompt, counts
    only after you quit the app and start it again; if the screen

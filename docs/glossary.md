@@ -187,9 +187,10 @@ screen or of another camera (D74).
 
 The video file for one camera, made exactly as a screen file: the same
 tick grid, timecode and guide tracks, no audio of the camera's own, its
-frame size the size of the camera's chosen format: the largest one at
-30 fps, of any aspect ratio, inside the recording resolution's box,
-scaled only when none fits. A camera that disappears, is suspended, delivers no frames, or whose
+frame size its chosen format's size fitted into the recording
+resolution's box as a screen's: of the formats at 30 fps, of any aspect
+ratio, the one that records the largest size, and of those the
+smallest. A camera that disappears, is suspended, delivers no frames, or whose
 stream or writer fails ends its camera file; a new one begins when it is back
 (D74).
 
@@ -373,7 +374,7 @@ A source the settings or its own state leave out of a recording: shown
 dimmed in the window, without a number, with `-` for GB/h max (and for
 Records at, for a screen at the recording resolution None and for a
 camera), and, for an audio input or a camera whose own rule leaves it
-out, the reason in parentheses after its name (`(virtual)`, `(Continuity Camera)`, `(no device
+out, the reason in parentheses after its name (`(virtual)`, `(Continuity Camera)`, `(no Camera permission)`, `(no device
 ID)`, `(no format)`, `(suspended)`; D59, D62, D74).
 
 ## Ready check
