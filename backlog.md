@@ -22,7 +22,11 @@ Still open from D34: what AGC does and whether it is on in auto mode;
 
 ## In flight
 
-Nothing (2026-11-22).
+- Item 21, the meters (with item 11), in one PR with items 31, 35, 19,
+  33, 34 and a first shot at 32 (the owner, 2026-11-22). Branch
+  `audio-meters` (21, 31, 35) and `meters-small-fixes` (19, 33, 34,
+  32), the latter merged into the former. Designs signed off as text:
+  21 on 2026-11-19; 19 and 32 on 2026-11-22 (D69, D70 in the PR).
 
 ## Queued
 
