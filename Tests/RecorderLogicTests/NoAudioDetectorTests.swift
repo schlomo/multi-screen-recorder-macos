@@ -90,11 +90,26 @@ import Testing
         #expect(detector.steps(for: [[-0.0, 0], [0, -0.0]], isPlacing: true) == [.place(frames: 0..<2, leadingZeros: 0)])
     }
 
-    @Test func aFileThatEndedForAnotherReasonStartsAgainOnlyWithSound() {
+    @Test func aFileThatEndedForAnotherReasonStartsAgainOnlyWithSoundAfterTheEnd() {
         var detector = detector()
-        _ = detector.steps(for: sound(10), isPlacing: false)
-        // The capture's file ended (a gap, a change of the channel count): zeros start none.
+        _ = detector.steps(for: sound(10), isPlacing: true)
+        // A gap or a change of the channel count ended the file: the zeros before the end are none of the next file's.
+        _ = detector.steps(for: zeros(20), isPlacing: true)
+        detector.fileEnded()
         #expect(detector.steps(for: zeros(20), isPlacing: false).isEmpty)
         #expect(detector.steps(for: sound(5), isPlacing: false) == [.place(frames: 0..<5, leadingZeros: 8)])
+    }
+
+    @Test func zerosBeforeTheFileEndAreNoLeadingZerosOfTheNextFile() {
+        var detector = detector()
+        _ = detector.steps(for: zeros(20), isPlacing: true)
+        detector.fileEnded()
+        #expect(detector.steps(for: sound(5), isPlacing: false) == [.place(frames: 0..<5, leadingZeros: 0)])
+    }
+
+    @Test func zerosAfterTheFileEndReachTheThresholdAsNoAudio() {
+        var detector = detector()
+        detector.fileEnded()
+        #expect(detector.steps(for: zeros(100), isPlacing: false) == [.noAudioStarted(atFrame: 100)])
     }
 }

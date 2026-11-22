@@ -673,6 +673,54 @@ import Testing
         #expect(reported.ended.count == 2)
     }
 
+    /// Buffers of a gap too long to fill.
+    private var buffersOfALongGap: Int {
+        Int(RecorderValues.longestFilledAudioGap.nanoseconds * Int64(RecorderValues.audioSampleRate) / 1_000_000_000) / samplesPerBuffer + 20
+    }
+
+    @Test func aFileEndedByAGapStartsAgainOnlyWithSoundAfterTheZeros() async throws {
+        let capture = capture()
+        try send(0.25, buffers: 0..<10)
+        let afterGap = 10 + buffersOfALongGap
+        try send(0, buffers: afterGap..<(afterGap + 5))
+        let restart = afterGap + 5
+        try send(0.25, buffers: restart..<(restart + 10))
+        await capture.stop()
+        #expect(reported.started.count == 2)
+        #expect(reported.ended.count == 2)
+        #expect(!kinds(reported.events).contains(.noAudioStarted))
+        let second = try #require(reported.ended.map(\.file).max { $0.start < $1.start })
+        let soundStarts = Double(time(ofBuffer: restart)) / 1_000_000_000
+        // At most the leading zeros before the sound, none of the zeros before the gap.
+        #expect(second.start <= soundStarts)
+        #expect(soundStarts - second.start < 0.07, "\(second.start) \(soundStarts)")
+        #expect(second.start >= Double(time(ofBuffer: afterGap)) / 1_000_000_000)
+    }
+
+    @Test func zerosAfterAGapThatEndedTheFileStartNone() async throws {
+        let capture = capture()
+        try send(0.25, buffers: 0..<10)
+        let afterGap = 10 + buffersOfALongGap
+        try send(0, buffers: afterGap..<(afterGap + 5))
+        await capture.stop()
+        #expect(reported.started.count == 1)
+        #expect(reported.ended.count == 1)
+    }
+
+    @Test func aFileEndedByAChannelCountChangeStartsAgainOnlyWithSoundAfterTheZeros() async throws {
+        let capture = capture()
+        try send(0.25, buffers: 0..<10)
+        try send(0, buffers: 10..<15, channels: 2)
+        try send(0.25, buffers: 15..<25, channels: 2)
+        await capture.stop()
+        #expect(reported.started.count == 2)
+        let second = try #require(reported.ended.map(\.file).first { $0.channels == .mono(2) })
+        let soundStarts = Double(time(ofBuffer: 15)) / 1_000_000_000
+        #expect(second.start <= soundStarts)
+        #expect(soundStarts - second.start < 0.07, "\(second.start) \(soundStarts)")
+        #expect(second.start >= Double(time(ofBuffer: 10)) / 1_000_000_000)
+    }
+
     @Test func theSystemAudioIsExcluded() async throws {
         let capture = capture(.systemAudio)
         try send(0, buffers: 0..<(buffersOfNoAudio + 30), channels: 2)

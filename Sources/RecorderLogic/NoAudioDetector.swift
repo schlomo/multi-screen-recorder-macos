@@ -1,8 +1,9 @@
 /// Where an audio input has no audio (D69): after `threshold` samples of
 /// exact zeros its audio file ends, and a new one starts with the first
 /// sample that is not zero, so nothing of the sound is cut. A file starts
-/// only with sound, so an input with no audio from the start gets no file;
-/// zeros shorter than the threshold within a file stay in it. A frame
+/// only with sound, after any file end: no audio, or a gap or a change of the
+/// channel count (`fileEnded()`), so an input with no audio from the start
+/// gets no file; zeros shorter than the threshold within a file stay in it. A frame
 /// counts as zero when every channel is exactly zero.
 public struct NoAudioDetector: Sendable {
     /// What to do with a chunk of corrected audio, in order.
@@ -72,6 +73,14 @@ public struct NoAudioDetector: Sendable {
             start = end
         }
         return steps
+    }
+
+    /// The capture's file ended for another reason than no audio, at the
+    /// start of the frames it was not given: the zeros before it count for
+    /// nothing, and the next file starts with the sound after it. The
+    /// capture passes `isPlacing: false` from here on.
+    public mutating func fileEnded() {
+        zeroRun = 0
     }
 
     /// Frames that follow the ones placed before them join that step.

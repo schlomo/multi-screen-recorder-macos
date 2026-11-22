@@ -106,8 +106,9 @@ extension AudioFileWriter: AudioFileWriting {}
 /// `AudioFileWriting` in appends of about 100 ms
 /// (`audioFileAppendSamples`), and handed to the source's guide track. A gap over
 /// the longest filled gap or a change of the channel count ends the file
-/// and starts a new one, in the same capture; for an audio input, no audio
-/// ends it and its sound starts the next (`NoAudioDetector`, D69). Everything
+/// and starts a new one, in the same capture; an audio input's new file,
+/// after that or after no audio, starts only with its sound
+/// (`NoAudioDetector`, D69). Everything
 /// runs on its own queue but the level meter, which the status window reads.
 final class AudioCapture: @unchecked Sendable {
     typealias MakeWriter = @Sendable (_ url: URL, _ description: AudioFileDescription, _ firstTick: Int64)
@@ -351,56 +352,77 @@ final class AudioCapture: @unchecked Sendable {
         joinGuide(channelCount: channels.count)
         guides.receive(channels, from: label, to: guide, at: corrected.time)
         guard var detector = noAudio else {
-            place(channels, at: corrected.time, appliedBefore: corrected.appliedAtStart, applied: corrected.applied)
+            _ = place(channels, at: corrected.time, appliedBefore: corrected.appliedAtStart, applied: corrected.applied)
             return
         }
         let time = { (frame: Int) in corrected.time + Int64(frame) * 1_000_000_000 / Int64(RecorderValues.audioSampleRate) }
         // The correction's tail comes through here while the capture ends.
         let wasEnding = isEnding
-        for step in detector.steps(for: channels, isPlacing: timeline != nil) {
-            // A failure while placing ended the capture.
-            guard isEnding == wasEnding else { break }
-            switch step {
-            case .place(let frames, let leadingZeros):
-                let placed = frames == channels[0].indices && leadingZeros == 0 ? channels : channels.map {
-                    [Float](repeating: 0, count: leadingZeros) + $0[frames]
+        // A file that ended for another reason than no audio sends the rest of the chunk through the detector again.
+        var offset = 0
+        chunk: while offset < channels[0].count {
+            let rest = offset == 0 ? channels : channels.map { Array($0[offset...]) }
+            for step in detector.steps(for: rest, isPlacing: timeline != nil) {
+                // A failure while placing ended the capture.
+                guard isEnding == wasEnding else { break chunk }
+                switch step {
+                case .place(let frames, let leadingZeros):
+                    let placed = frames == rest[0].indices && leadingZeros == 0 ? rest : rest.map {
+                        [Float](repeating: 0, count: leadingZeros) + $0[frames]
+                    }
+                    let first = offset + frames.lowerBound
+                    guard place(placed, at: time(first - leadingZeros), appliedBefore: corrected.appliedAtStart,
+                                applied: corrected.applied)
+                    else {
+                        detector.fileEnded()
+                        offset = first
+                        continue chunk
+                    }
+                case .noAudioStarted(let frame):
+                    finishFile()
+                    reports.event(RecordingEvent(at: time(offset + frame), event: .noAudioStarted, audioSource: name))
+                    reports.noAudio(true)
+                case .noAudioStopped(let frame):
+                    reports.event(RecordingEvent(at: time(offset + frame), event: .noAudioStopped, audioSource: name))
+                    reports.noAudio(false)
                 }
-                place(placed, at: time(frames.lowerBound - leadingZeros), appliedBefore: corrected.appliedAtStart,
-                      applied: corrected.applied)
-            case .noAudioStarted(let frame):
-                finishFile()
-                reports.event(RecordingEvent(at: time(frame), event: .noAudioStarted, audioSource: name))
-                reports.noAudio(true)
-            case .noAudioStopped(let frame):
-                reports.event(RecordingEvent(at: time(frame), event: .noAudioStopped, audioSource: name))
-                reports.noAudio(false)
             }
+            break
         }
         noAudio = detector
     }
 
-    /// Audio placed in the audio file, its first sample at `time`.
-    private func place(_ channels: [[Float]], at time: Int64, appliedBefore: Double, applied: Double) {
+    /// Audio placed in the audio file, its first sample at `time`. False when
+    /// the audio ended the file by a gap or a change of the channel count and
+    /// was not placed: an audio input starts its next file only with sound,
+    /// which its detector decides (D69); the system audio starts it here.
+    private func place(_ channels: [[Float]], at time: Int64, appliedBefore: Double, applied: Double) -> Bool {
         let count = channels[0].count
+        let startsNextHere = noAudio == nil
         // A file starting here counts the correction from this audio's
         // start (`appliedBefore`): the drift added at a gap that ended a file is no file's.
-        if timeline != nil, channelCount != channels.count { finishFile() }
+        if timeline != nil, channelCount != channels.count {
+            finishFile()
+            if !startsNextHere { return false }
+        }
         if timeline == nil { startTimeline(channelCount: channels.count, appliedBefore: appliedBefore) }
         var placement = timeline!.place(bufferAt: time, sampleCount: count)
         if let gap = placement.gap { reports.event(gapEvent(gap, at: time)) }
         if placement.action == .endFile {
             finishFile()
+            if !startsNextHere { return false }
             startTimeline(channelCount: channels.count, appliedBefore: appliedBefore)
             placement = timeline!.place(bufferAt: time, sampleCount: count)
         }
         fileApplied.end = applied
-        guard case .write(let silence, let firstSample, let position) = placement.action else { return }
+        guard case .write(let silence, let firstSample, let position) = placement.action else { return true }
         if open == nil {
-            guard openFile(firstTick: timeline!.firstTick!) else { return }
+            guard openFile(firstTick: timeline!.firstTick!) else { return true }
         }
         if silence > 0 { open!.addSilence(silence, at: position - silence) }
         open!.gather(firstSample == 0 ? channels : channels.map { Array($0[firstSample...]) }, at: position)
         writeWaiting()
+        return true
     }
 
     private func startTimeline(channelCount: Int, appliedBefore: Double) {
