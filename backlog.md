@@ -2,18 +2,12 @@
 
 ## Next session starts here
 
-PR #26 (branch `audio-meters`, item 21 with items 31, 35, 19, 33, 34
-and 32; D69 to D72) is READY at 86a1897, waiting for the owner's merge
-(2026-11-22 Europe/Berlin). Reviewed: two top-tier reviews and a delta
-review (comments on the PR), the description checked against the
-diff; the end-to-end tests passed on 0a77368 (7 of 7); the pipeline is
-green on 8180cdc and 86a1897; the homepage screenshots come from the
-snapshot 0.20261122.87 (`update-homepage-screenshots --snapshot 26`).
-Open with the owner: whether exact zeros on both sides of a gap add up
-to the 10 s of no audio (today they do not; the files are the same
-either way, only the event and the State differ). After the merge, one
-PR each: item 3's follow-up; item 4; item 7; item 12; item 22; the
-rest of item 6; item 16; item 36; item 37 (screen names).
+PR #26 merged on 2026-11-22. Next PR, branch `cameras` (the owner,
+2026-11-22): item 12 (cameras) with item 36, item 37 and the wake bug
+below, plus the homepage's new claim, story and workflow. 1.0 means
+"record everything reliably" (item 9). Kept as it is from PR #26:
+exact zeros on both sides of a gap do not add up to the 10 s of no
+audio (the owner, 2026-11-22: "leave it as is").
 
 Agents may run `msr record` on the owner's Mac (D48), with `HOME` set
 to a scratch folder (`AGENTS.md`, "Facts that bite"), and BetterDisplay's command
@@ -30,11 +24,28 @@ Still open from D34: what AGC does and whether it is on in auto mode;
 
 ## In flight
 
-- Item 21, the meters (with item 11), in one PR with items 31, 35, 19,
-  33, 34 and a first shot at 32 (the owner, 2026-11-22). Branch
-  `audio-meters` (21, 31, 35) and `meters-small-fixes` (19, 33, 34,
-  32), the latter merged into the former. Designs signed off as text:
-  21 on 2026-11-19; 19 and 32 on 2026-11-22 (D69, D70 in the PR).
+- Branch `cameras`, one PR (the owner, 2026-11-22):
+  - Item 12, cameras: design signed off as text on 2026-11-22, except
+    which audio tracks a camera's file carries (asked).
+  - Item 36: `vm_start` in `scripts/end-to-end-vm/lib.sh` waits on a
+    real deadline (`SECONDS`), as `vm_wait_for_login` does since PR #26.
+  - Item 37 (signed off 2026-11-22): the driver's virtual screens are
+    "Desk Monitor" (1600x900) and "Portable Monitor" (1280x720),
+    recognised by vendor and product ID (`0x4D53`/`0x5254`), no
+    longer by the name prefix "MSR Test"; `ManifestCheck`'s label and
+    log lines follow; `docs/design/end-to-end-tests.md` and a decisions
+    entry. Then `update-homepage-screenshots --release` after its
+    release.
+  - The wake bug (from item 7, found in PR #21's review): after a wake
+    with screens that cannot be read, the recorder returns before the
+    audio's wake, so the system audio does not come back
+    (`Recorder.swift`, `didWake`). The owner: "one promise is that we
+    survive laptop sleep and screen changes".
+  - Homepage and claim: cameras in the claim (homepage, `README.md`,
+    `AGENTS.md`); a short story credited to Nadia Schapiro; the strong
+    hint at testing goes; a recommended workflow: record everything,
+    open the timeline file (`.otio`) in the editor, remove the tracks
+    not needed, trim start and end, done.
 
 ## Queued
 
@@ -260,15 +271,15 @@ Still open from D34: what AGC does and whether it is on in auto mode;
      repeat runs with `--debug` to settle whether the app's front end
      adds to the stall (msr logged "skipping cycle due to overload" only
      in the app run).
-   Found in PR #21's review (2026-11-18), older than it: after a wake
-   with screens that cannot be read, the recorder returns before the
-   audio's wake, so the system audio does not come back, at every
-   resolution (`Recorder.swift`, `didWake`).
 8. **Audio after v0** (D12, D18): AGC, in its own PR, with its own
    design, its column in the window's table and the HDMI test.
    What AGC does is open (D34). Recording all audio inputs is no
    longer here: auto mode brings it (D34).
-9. **v1 gate:** acceptance tests on the owner's Mac (M3 Pro, macOS 26):
+9. **v1 gate:** 1.0 means "record everything reliably" (the owner,
+   2026-11-22): every screen, camera and audio source, surviving
+   laptop sleep and screen changes. The 1.0 work, in the architect's
+   order: item 12 (cameras, in flight), item 7, item 25, item 29,
+   then these acceptance tests on the owner's Mac (M3 Pro, macOS 26):
    - Timing by content: record a full-screen clock showing
      milliseconds; across a still period of at least 60 s followed by a
      change, each sampled frame shows the time of its timestamp within
@@ -319,23 +330,6 @@ Still open from D34: what AGC does and whether it is on in auto mode;
    by throwaway scripts in a session scratchpad, so remake them if
    gone. Candidates: a WAV copy derived at Stop, or the CSV; the
    recording itself stays a fragmented `.mov`. Design first.
-11. **An input that delivers only zeros** (from the live runs,
-   2026-11-16): a broken BRIO and, during USB re-enumeration, every USB
-   input and the system-audio capture delivered exact zeros for 4 to
-   10 s, with no event (macOS's doing; the speakers kept playing). Tell
-   it as an event and a problem when an input delivers exact zeros for
-   2 s or more (system audio excluded, silence is normal there).
-   The owner (2026-11-16): "We don't need to record zeros, MacBook
-   internal mic is off on lid closed. Hardware muted mic would probably
-   be the same, we can test that with my razer". So such an input is
-   not written while it delivers only zeros (and is told), which also
-   covers the closed lid. Tested 2026-11-16: the Razer's hardware mute
-   delivers exact zeros, the same case. The status window shows per
-   input whether sound arrives, a level meter if cheap (the owner,
-   2026-11-16: "doesn't need to be a meter (would be nice though), but
-   some visual indicator"). A device that delivers broken audio sends a
-   storm of gap events (the BRIO, 28 in 5 s, 2026-11-16): tell one
-   event per episode. Design first.
 12. **Cameras** (the owner, 2026-11-16: "we'll have to add a feature to
    record cameras, same slider: none, default, all, all + virtual. Auto
    defaults to default camera if available"; 2026-11-18: keep "all +
@@ -359,6 +353,17 @@ Still open from D34: what AGC does and whether it is on in auto mode;
    that line. A test device: a tester's Logitech BCC950 ConferenceCam
    (a camera with a stereo microphone, recorded as an audio input on
    2026-11-18); whether it offers H.264 is unchecked.
+   Signed off as text on 2026-11-22: all real cameras by default, auto
+   mode included ("I'd record all real cameras by default"; no users
+   yet, so "record everything"); the setting none, default, all, all +
+   virtual; each camera's file made like a screen file (HEVC, 30 fps on
+   the host clock, its largest format at 30 fps, capped by the
+   recording resolution); a camera that comes or goes starts or ends a
+   file with an event; the ready check asks for the Camera permission;
+   one row per camera in the status window; unit tests with a stand-in
+   camera, the real check on the owner's Mac; a decisions entry
+   superseding D1's "out of scope: camera capture". Taking the H.264
+   stream as-is is deferred. Open: the camera file's audio tracks.
 13. **Presentation: the window and the terminal output** (the owner,
    2026-11-16: "if running in a terminal (try) then show the running
    status as persistent last line, recording time, CPU, recording size
@@ -402,13 +407,10 @@ Still open from D34: what AGC does and whether it is on in auto mode;
    simplified drawing below 32 px (two displays and a larger dot), from
    the owner's choice of 2026-11-12. Revisit when the owner finds the
    Dock or Finder icon lacking.
-15. **Homepage** (D7, D53): live since PR #13. Left: preview URLs on
-   PRs: on PR #20 Cloudflare's check passed but linked to a build of
-   the production Worker and no preview URL appeared, so preview
-   builds for other branches are not set up [ASSUMED from the check's
-   link]; that is the owner's, in Cloudflare. The owner's check that
+15. **Homepage** (D7, D53): live since PR #13; Cloudflare builds a
+   preview for each PR branch (seen on PR #26), which is enough (the
+   owner, 2026-11-22). Left: the owner's check that
    `schapiro.org/impressum/` covers the subdomain.
-
 16. **Mac App Store and Homebrew** (the owner, 2026-11-16: "I'd like
    to release the app through the Apple Store [...] charge like 5-10€
    via the app store while still offering the free install via
@@ -444,17 +446,6 @@ Still open from D34: what AGC does and whether it is on in auto mode;
      App Store (address, phone, email; DSA), tax, and a lawyer's look
      at the contributor clause.
 
-19. **The crash dialog offers only the app's own crashes.** On
-   2026-11-17 the owner's freshly installed app showed the crash dialog
-   for four `msr-*.ips` reports that a test's stand-in program (a copy
-   of `/bin/sleep` named `msr`, killed by macOS at launch) had written;
-   the app reads every `msr` report in `~/Library/Logs/DiagnosticReports`.
-   The stand-in is now a program of the tests' own that writes no
-   report. Left: the app could skip reports whose `procPath` is not
-   inside an app bundle named `Multi Screen Recorder.app`, so a
-   developer's test runs or a stray `msr` never prompt a report. Needs
-   a design (which paths count), signed off by the owner.
-
 20. **A re-run when GitHub has no macOS runner** (the owner,
    2026-11-17: "can we add a retry as failure path into the CI yaml?",
    then "add the idea to the backlog for later"). Twice on 2026-11-17 a
@@ -469,49 +460,6 @@ Still open from D34: what AGC does and whether it is on in auto mode;
    branch `troubleshooting-ci-runner` holds two troubleshooting entries
    (no macOS runner; a crash dialog for crash reports the tests wrote):
    they ship with this item.
-21. **Audio level meters, with an input gain slider** (the owner,
-   2026-11-18, as the first step towards AGC, item 8): each audio
-   input's level shown live in the status window, and a slider that
-   sets the input's gain. Meters also make an input that delivers only
-   zeros visible (item 11). The slider sets the device's own input
-   volume in Core Audio, because gain added after capture cannot undo
-   clipping; that changes the volume for every app on the Mac, and
-   devices without that control show the slider disabled [ASSUMED:
-   some USB interfaces and HDMI inputs have none]. Every gain change
-   is written to `recording.json`; AGC later moves the same control
-   (the owner's "turning up input volume till before it clips", D34).
-   Levels come from the 100 ms batches of item 6's first step. With
-   the meters, an input is not written while it delivers only exact
-   zeros (item 11; the owner, 2026-11-18: "OK to defer the audio zeros
-   to the meters feature, good idea"). In the 30-minute run of
-   2026-11-18 the MacBook microphone, its lid closed, delivered exact
-   zeros for the whole run and still got a file. Design signed off by
-   the owner on 2026-11-19 ("Yes to meters design"), as text:
-   - Meters: one bar per audio input and the system audio, sample
-     peak in dBFS on −60 to 0, a peak hold of 1.5 s, red from −1 dBFS,
-     measured per incoming buffer, drawn 10 times a second only while
-     the window is open; `msr record` gets them through its window.
-   - Input volume (macOS's word; "gain" is taken by the guide mix):
-     a slider per input that sets the device's own volume through
-     `kAudioHardwareServiceDeviceProperty_VirtualMainVolume`, shown
-     only where it can be set ("No slider conveys a clear message
-     while grey means forbidden", the owner); every change, from the
-     slider, a knob or another app, held still for 0.5 s, is the event
-     `audio input volume changed` (`from`, `to`, 0 to 1); each audio
-     file records `inputVolume` at its start; not reset at Stop.
-   - No audio: after 10 s of exact zeros ("10s silence is better as
-     trigger", the owner; 2 s would split speech pauses of a noise-gated
-     microphone into many files) an input's file ends, the window shows
-     `no audio` ("Only zero is bad UI, better say no audio"), and
-     `no audio started` and `no audio stopped` go into the manifest;
-     a new file starts when sound returns, nothing of it cut; an input
-     with no audio from the start gets no file; the system audio is
-     excluded; not a problem.
-   - No agent sets an input's volume on the owner's Mac (D48); the
-     owner checks the slider and a hardware knob by hand.
-   Unverified until built: which of the owner's inputs can be set,
-   whether lowering the volume prevents clipping, whether a knob fires
-   the listener. The analysis is in the session of 2026-11-19.
 22. **Lip sync calibration** (the owner, 2026-11-18: measured AV
    offsets between cameras and microphones; fixing them by hand in
    Resolve is "super tedious", so worth automating): a support tool
@@ -536,13 +484,6 @@ Still open from D34: what AGC does and whether it is on in auto mode;
    screen with a static picture has no file and no event for that
    stretch [CONJECTURE for real Macs]. Settle it with a `--debug`
    run (now the recording log), then decide.
-26. **A screen file's guide tracks miss their start** (PR #23's runs,
-   2026-11-19): a screen file listens to the guide mix only after its
-   first frame passes the screen check (`ScreenCapture.swift`), so its
-   guide tracks start 5 to 77 ms in (an edit list), and the design
-   says they "cover exactly its own time". The audio files are
-   complete. Decide whether it matters for editors.
-
 29. **Survive a brief disconnect of a screen whose mode doesn't
    change** (the owner, 2026-11-19: "ideally we would survive brief
    disconnects of a display that doesn't change the resolution (e.g. a
@@ -554,10 +495,6 @@ Still open from D34: what AGC does and whether it is on in auto mode;
    something else or the fact that the laptop screen is HDR"): find
    out whether the recording shows it and why. Possibly related to item
    6's colour handling [CONJECTURE].
-31. **Unit tests for `Recorder`'s wiring** (review of item 27,
-   2026-11-19): the fixes for printing a failure once were verified by
-   reading only, since `Recorder` has no unit tests.
-
 32. **A homepage collage from the end-to-end captures** (the owner,
    2026-11-19: "From that we can then assemble the collage and
    potentially think about animation the status window for added
@@ -572,26 +509,6 @@ Still open from D34: what AGC does and whether it is on in auto mode;
    window; the video's title bar (the recording indicator) replaced by
    the screenshot's. All feasible in the VM [ASSUMED].
 
-33. **Free space read as 0 bytes** (the `main` run after PR #23's
-   merge, 2026-11-20, run 44731919234): on the hosted runner,
-   `volumeAvailableCapacityForImportantUsage` gave 0 bytes for the
-   scratch folder, so `OutputFolderProbeTests` failed (two tests) and
-   no release was made; the same tests passed on every PR run before.
-   On a real Mac a spurious 0 would make the ready check refuse to
-   record for lack of space [ASSUMED]. Find out when macOS returns 0
-   (compare with `volumeAvailableCapacity` and `statfs` in the failing
-   situation) and fix the reading at its root; never retry it away.
-34. **The end-to-end driver's Microphone precondition fails at random**
-   (PR #25, 2026-11-21): two runs of `scripts/end-to-end-test` on the
-   branch stopped before any scenario with "the program running this
-   (a terminal app) lacks the Microphone permission" inside the freshly
-   booted VM clone, although the Screen Recording precondition just
-   before it passed; `main` and a third run of the same branch then
-   passed all 7 scenarios on the same image. Find out what the
-   Microphone check sees right after the boot (tccd not ready, the
-   attributed client) and fix it at its root; add the error text to
-   `docs/troubleshooting.md`. Running `msr check` on the Mac does not
-   help: the check runs in the VM.
 35. **Audio inputs started late once** (the owner's test of PR #25's
    build, 2026-11-22 08.25.27, a 12 s recording): the audio inputs'
    files start 1.40 to 1.63 s after the recording's start, the screens'
@@ -603,28 +520,8 @@ Still open from D34: what AGC does and whether it is on in auto mode;
    recording of the morning]. Measure the start of each audio input
    over more recordings (the recording log has `startInput` and `file
    started`); if it recurs, find what the session waits for.
-
-36. **The VM's SSH wait undercounts its bound** (found by the builder on
-   PR #26, 2026-11-22): `vm_start` in `scripts/end-to-end-vm/lib.sh`
-   counts `seq 60` rounds of `sleep 5` plus one SSH call, so its
-   "300 s" is longer in fact; PR #26 made `vm_wait_for_login` a real
-   deadline with `SECONDS`. Do the same for `vm_start`.
-
-37. **Realistic names for the end-to-end virtual screens** (the owner
-   signed off the design as text on 2026-11-22: "yes to both"). The
-   homepage screenshots show the driver's screens as "MSR Test 201/202".
-   Design: each `VirtualScreenSpec` carries its own name, "Desk
-   Monitor" (1600x900) and "Portable Monitor" (1280x720); the driver
-   recognises its own screens by the vendor and product ID it already
-   sets (`0x4D53`/`0x5254`), no longer by the name prefix "MSR Test",
-   so the names are display text only; `ManifestCheck`'s label and the
-   driver's log lines follow; docs `docs/design/end-to-end-tests.md`
-   and a decisions entry with the PR. "Apple Virtual" (the VM's own
-   display) and the audio devices stay: Apple's framework names them,
-   and a renamed BlackHole would still read as virtual. Its own PR
-   after PR #26 (both touch the driver), with the architect's
-   end-to-end run, then `update-homepage-screenshots --release` after
-   its release.
+   PR #26's runs (2026-11-22): once more 1.37 to 1.50 s in the first
+   recording of the session, within 0.8 s in the later ones.
 
 ## Deliberately deferred
 
@@ -669,10 +566,6 @@ Still open from D34: what AGC does and whether it is on in auto mode;
   "application name stays for now till somebody comes up with a
   really great improvement on the name". Revive when someone proposes
   a name the owner finds really great.
-- **Skipping the MacBook microphone while the lid is closed**: Apple
-  silicon MacBooks disconnect it in hardware then, so its file holds
-  only zeros (seen 2026-11-16). Harmless; revisit with item 11 (an input
-  that delivers only zeros) or if the files bother the owner.
 - **Developer ID signing and notarization** (D5), revived as part of
   queued item 16 after the optimizations. Deferred because the
   Apple Developer Program costs €99 a year and the owner can work with
@@ -688,48 +581,12 @@ Still open from D34: what AGC does and whether it is on in auto mode;
   its value. Deferred because nothing is released yet; an old key is
   dropped and named (D34). Revisit before the first
   change to a settings key after a release `v0.<YYYYMMDD>.<N>` that people use.
-- **End-to-end tests in the pipeline or in a virtual machine.**
-  Research on 2026-11-13: other projects grant the screen recording
-  permission on GitHub's hosted macOS runners by writing into the
-  permission database, which breaks with macOS versions; a macOS
-  virtual machine (Parallels, Tart) has one display and the host's
-  default microphone, so display changes need the same virtual
-  displays as on the Mac itself, and Parallels Desktop Business adds
-  little here. Deferred because tests on the owner's Mac are "good
-  enough for starters". Revisit when those tests exist and running
-  them by hand becomes the bottleneck; first step then is a throwaway
-  workflow that records ten seconds on a hosted runner.
-  - The owner's angle, 2026-11-15: "why won't it help to run them in a
-    VM end-end where you can also deal with the approvals via remote
-    control? you'd still use the virtual screens etc. to test the
-    recorder, but control it from the outside end-end." Kept deferred
-    on the same day ("Keep deferred").
-  - The architect's assessment, given in the session: a VM on the
-    owner's Mac, as a second tier beside the Mac, not instead of it.
-    It would leave the Mac usable during a run, start each run from a
-    copy of an image with the permissions granted, and, with the
-    host's mouse and keyboard reaching the guest as hardware input
-    [ASSUMED], make testable what the design leaves out: the
-    permission prompts of a first start, a permission taken away
-    during a recording, the monthly "continue to allow" prompt, and a
-    locked screen (unlocked with the VM's own password). It cannot
-    replace the Mac for the encoder and timing: the guest is reported
-    to have no hardware HEVC encoder, which the recorder uses (D21).
-  - First step on revival: a test of about an hour on the owner's Mac
-    (downloads a macOS image of tens of GB; Tart's licence terms to
-    check, or UTM) answering three questions: does a `CGVirtualDisplay`
-    display appear in a macOS 26 guest and can ScreenCaptureKit
-    capture it; does the guest list a hardware HEVC encoder; does a
-    click sent from the host press "Allow" on the Screen Recording
-    prompt.
-  - Not decided, the architect's recommendation: let the end-to-end
-    driver run the recorder through a remote command from the start,
-    with running it locally as a special case, so a VM tier costs
-    little later. That changes the signed-off design (D37), so it
-    needs the owner's sign-off as text.
-  - Revive also when the Mac being unusable during runs, or the
-    permission and locked-screen cases left untested, become the
-    bottleneck.
+- **A camera's own H.264 stream taken as-is**, without decoding and
+  encoding again (the owner's wish, 2026-11-18). Deferred because it
+  breaks the constant 30 fps on the host clock (D11) and the
+  resolution cap, needs a second write path, and AVFoundation
+  hands out decoded frames [ASSUMED]. Revisit when a camera
+  measurably costs too much CPU.
 - **A snapshot release left behind** by a PR closed with a merge
   conflict (GitHub may not run the removal then; inferred from its
   documentation, never seen). Deferred because the leftover is deleted
@@ -793,6 +650,14 @@ Still open from D34: what AGC does and whether it is on in auto mode;
   the README (D46). Revisit when people struggle with it.
 
 ## Done (recent)
+
+- 2026-11-22: PR #26 merged by the owner: item 21 (meters, input
+  volume, no audio; absorbs item 11, D69), item 19 (D70), item 31,
+  item 33 (D71), item 34, item 32's screenshots from the published
+  build (D72), item 35 measured. Reviews: two top-tier reviews and a
+  delta review; end-to-end tests passed on 0a77368. Closed with it:
+  item 26 (the owner, 2026-11-22: "OK to close, especially with the
+  OTIO file").
 
 - 2026-11-22: PR #25 merged by the owner: item 23, a DaVinci Resolve
   timeline file in every recording folder, written at Stop and by
