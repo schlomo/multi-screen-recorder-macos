@@ -18,6 +18,6 @@ public enum RecordingLogStart {
         return [
             DetailLine.Entry(category: "recorder", message: "started: \(app), recording folder \(recordingFolder)"),
             DetailLine.Entry(category: "recorder", message: "macOS \(macOS), Mac model \(macModel ?? "unknown")"),
-        ] + effective + table + [DetailLine.Entry(category: "ready check", message: DetailLine.facts(facts))] + readyCheck
+        ] + effective + table + [DetailLine.Entry(category: "ready check", message: DetailLine.facts(facts, resolution: settings.effectiveResolution))] + readyCheck
     }
 }

@@ -54,7 +54,7 @@ final class VideoFileFeed<File: VideoFileEntry>: @unchecked Sendable {
     /// first starts the file. On the queue.
     func receive(_ frame: CVPixelBuffer, capturedAt: Int64) {
         guard !isEnding, let ticker else { return }
-        switch ticker.receive(frame, capturedAt: capturedAt) {
+        switch ticker.receive(frame, capturedAt: capturedAt, arrivedAt: context.now()) {
         case .none: break
         case .fileStarted(let entry):
             onFileStarted(entry)

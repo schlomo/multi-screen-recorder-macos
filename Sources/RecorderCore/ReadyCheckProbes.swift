@@ -69,7 +69,7 @@ public func probeReadyCheckFacts(
         outputFolder: probes.outputFolder(settings.outputFolderURL(homeFolder: homeFolder)),
         cameraGranted: cameraGranted,
         cameras: cameras)
-    RecorderLog.detail(DetailLine.facts(facts), category: "ready check")
+    RecorderLog.detail(DetailLine.facts(facts, resolution: settings.effectiveResolution), category: "ready check")
     return facts
 }
 

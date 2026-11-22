@@ -605,7 +605,7 @@ public final class Recorder {
     /// told once. Without it the tracker sees no camera.
     private func readCameras() -> [CameraInfo] {
         let cameras = devices.cameras()
-        RecorderLog.detail("cameras: \(DetailLine.cameras(cameras))", category: "recorder")
+        RecorderLog.detail("cameras: \(DetailLine.cameras(cameras, resolution: settings.effectiveResolution))", category: "recorder")
         camerasWithoutPermission = []
         guard cameras.contains(where: { CameraTracker.records($0, settings: settings) }) else { return cameras }
         switch devices.cameraPermission() {

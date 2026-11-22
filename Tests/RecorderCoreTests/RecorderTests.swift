@@ -113,8 +113,8 @@ extension GlobalRecordingLog {
                 state.withLock { $0.stopped = true }
             }
 
-            /// A decoded frame, handed to the capture on its queue.
-            func sendFrame() throws {
+            /// A decoded frame captured `ago` before now, handed to the capture on its queue.
+            func sendFrame(capturedAgo ago: Duration = .zero) throws {
                 var pixelBuffer: CVPixelBuffer?
                 CVPixelBufferCreate(
                     nil, frameSize.width, frameSize.height, kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange,
@@ -122,7 +122,7 @@ extension GlobalRecordingLog {
                 let picture = try #require(pixelBuffer)
                 var format: CMVideoFormatDescription?
                 CMVideoFormatDescriptionCreateForImageBuffer(allocator: nil, imageBuffer: picture, formatDescriptionOut: &format)
-                var timing = Self.timingNow()
+                var timing = Self.timingNow(ago: ago)
                 var buffer: CMSampleBuffer?
                 CMSampleBufferCreateReadyWithImageBuffer(
                     allocator: nil, imageBuffer: picture, formatDescription: try #require(format), sampleTiming: &timing,
@@ -150,10 +150,10 @@ extension GlobalRecordingLog {
                 queue?.sync { deliver?(buffer) }
             }
 
-            private static func timingNow() -> CMSampleTimingInfo {
+            private static func timingNow(ago: Duration = .zero) -> CMSampleTimingInfo {
                 CMSampleTimingInfo(
                     duration: CMTime(value: 1, timescale: 30),
-                    presentationTimeStamp: CMTime(value: CMTimeValue(readClocks().host), timescale: 1_000_000_000),
+                    presentationTimeStamp: CMTime(value: CMTimeValue(readClocks().host) - ago.nanoseconds, timescale: 1_000_000_000),
                     decodeTimeStamp: .invalid)
             }
         }
@@ -400,6 +400,22 @@ extension GlobalRecordingLog {
             #expect(summary.manifest.cameraFiles.map(\.state) == [.finalized, .finalized])
             #expect(Set(summary.manifest.cameraFiles.map(\.name)).count == 2)
             #expect(summary.manifest.result == .ok)
+        }
+
+        /// A camera frame that arrives within the decision delay is not late;
+        /// one that arrives after its tick was decided is placed late and counted.
+        @Test func aCameraFrameArrivingAfterTheDecisionDelayIsCountedInTheRecordingLog() async throws {
+            cameras.connected.withLock { $0 = [Self.camera] }
+            try start(cameraMode: .real)
+            let camera = try #require(cameras.last)
+            try await sendFrames(camera, until: "the camera file") { (try? manifestOnDisk().cameraFiles.count) == 1 }
+            try await Task.sleep(for: .milliseconds(900))
+            try camera.sendFrame(capturedAgo: .milliseconds(800))
+            try camera.sendFrame(capturedAgo: .milliseconds(100))
+            let summary = await stop()
+            let name = try #require(summary.manifest.cameraFiles.first?.name)
+            let log = try String(contentsOf: recorder.folder.appending(path: RecordingNames.recordingLog), encoding: .utf8)
+            #expect(log.contains("\(name): 1 frame arrived after its tick was decided and was placed late, the latest "))
         }
 
         /// Limits short enough for a test.

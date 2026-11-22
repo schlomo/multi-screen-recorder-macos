@@ -1063,7 +1063,8 @@ it writes a variable frame rate with its own track layout.
 
 **Crash safety (D14, D21).** Files are written in fragments of 2 s
 (*data*; independent of the keyframe interval), so a crash loses at
-most the last 2 s.
+most the last 2 s; a camera file up to 0.5 s more, its ticks waiting
+for late frames (see "Cameras").
 
 **Frame size (D11, D30, D44).** A screen file's frame size is the
 screen's looks-like size (what macOS shows as "looks like", in points)
@@ -1522,6 +1523,18 @@ no audio of the camera's own.
   detail line. AVFoundation decodes the format (an MJPEG one too) and
   scales its frames to the camera file's frame size. A frame without a
   decoded picture ends the capture as a failing stream.
+- **Placement.** A camera's frames arrive late more often than a
+  screen's: USB cameras deliver them in bursts, seen 0.1 s to 1.5 s
+  after their capture when the USB bus was overloaded (a BRIO and a DJI
+  Osmo Pocket on the owner's Mac, 2026-11-22). So a camera file's tick
+  is decided once a frame captured after the tick's time has arrived, or
+  0.5 s (*data*, `RecorderValues.cameraDecisionDelay`) after the tick's
+  time, whichever is first, and shows the newest frame captured at or
+  before the tick's time; a screen file's tick is decided at its time.
+  A frame arriving after its tick was decided goes to the next tick
+  decided, as a screen's would, and is counted: at the file's end a
+  detail line gives the count and the longest such frame took from its
+  capture to its arrival. At the file's end every tick due is decided.
 - **No frames.** A camera delivers frames whether its picture changes
   or not, so no first frame within 5 s of the capture's start or no
   frame for 2 s (*data*, `CameraFrameWatch`) ends the capture as

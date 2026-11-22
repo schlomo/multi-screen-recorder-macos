@@ -25,10 +25,16 @@ public enum RecorderValues {
     /// The wait before a failed stream is started again, doubling up to the longest.
     public static let firstRestartDelay = Duration.seconds(1)
     public static let longestRestartDelay = Duration.seconds(10)
-    /// How long a camera's capture may wait for its first frame, and then
-    /// between frames, before its stream counts as failing (D74).
+    /// How long a camera's capture may wait for its first frame, an iPhone's
+    /// (Continuity Camera) longer, and then between frames, before its
+    /// stream counts as failing; no frame for `cameraStallLimit` is a stall,
+    /// the file going on (D74).
     public static let cameraFirstFrameLimit = Duration.seconds(5)
-    public static let cameraFrameGapLimit = Duration.seconds(2)
+    public static let continuityCameraFirstFrameLimit = Duration.seconds(10)
+    public static let cameraFrameGapLimit = Duration.seconds(10)
+    public static let cameraStallLimit = Duration.seconds(2)
+    /// How long a camera file's tick waits for a frame captured after it (D74).
+    public static let cameraDecisionDelay = Duration.milliseconds(500)
     /// How often the free space in the recording folder is checked.
     public static let freeSpaceCheckInterval = Duration.seconds(5)
     /// The longest detail lines wait in memory before the recording log gets them (D64).

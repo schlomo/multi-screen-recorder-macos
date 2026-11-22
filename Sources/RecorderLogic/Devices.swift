@@ -209,15 +209,13 @@ public struct CameraInfo: Equatable, Sendable {
     /// box turned upright); the format with the largest recorded size, and of
     /// those the smallest, the least to decode. At Native the largest. A
     /// camera with no format at that rate delivers its fastest, the largest
-    /// of those. Nil for a camera that lists no format.
+    /// of those. Nil for a camera that lists no format. Not at None, which records no camera.
     public func chosenFormat(resolution: RecordingResolution) -> CameraFormat? {
         let fastEnough = formats.filter(\.deliversTheTickRate)
         guard !fastEnough.isEmpty else {
             return formats.max { ($0.maxFramesPerSecond.rounded(), $0.size.pixelCount) < ($1.maxFramesPerSecond.rounded(), $1.size.pixelCount) }
         }
-        let recorded = { (format: CameraFormat) in
-            resolution.recordsScreens ? resolution.frameSize(forLooksLike: format.size).pixelCount : format.size.pixelCount
-        }
+        let recorded = { (format: CameraFormat) in resolution.frameSize(forLooksLike: format.size).pixelCount }
         return fastEnough.max { (recorded($0), -$0.size.pixelCount) < (recorded($1), -$1.size.pixelCount) }
     }
 

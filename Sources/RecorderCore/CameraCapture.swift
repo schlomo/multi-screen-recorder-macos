@@ -51,7 +51,9 @@ final class CameraCapture: @unchecked Sendable {
         self.context = context
         self.frameWatch = frameWatch
         queue = DispatchQueue(label: "msr.camera.\(number)", qos: .userInteractive)
-        let ticker = VideoFileTicker<RecordingManifest.CameraFile>(captureStart: context.now()) {
+        let ticker = VideoFileTicker<RecordingManifest.CameraFile>(
+            captureStart: context.now(), decisionDelay: RecorderValues.cameraDecisionDelay
+        ) {
             [context, uniqueID, number, name, frameSize, guides] firstTick throws(VideoFileWriterError) in
             let fileName = context.claimCameraFileName(tick: firstTick, number: number, camera: name)
             let writer = try VideoFileWriter(

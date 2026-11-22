@@ -31,7 +31,7 @@ public enum DetailLine {
     }
 
     /// "screen recording granted; microphone granted; screens: DELL P3421W 3440×1440 at (0,0) main, …"
-    public static func facts(_ facts: ReadyCheckFacts) -> String {
+    public static func facts(_ facts: ReadyCheckFacts, resolution: RecordingResolution) -> String {
         let screen = switch facts.screenRecording {
         case .granted: "granted"
         case .notGranted: "not granted"
@@ -55,7 +55,7 @@ public enum DetailLine {
         case .usable(.unreadable(let error)): "output folder usable, free space cannot be read (\(error))"
         case .unusable(let error): "output folder unusable (\(error))"
         }
-        let cameras = "cameras: " + Self.cameras(facts.cameras)
+        let cameras = "cameras: " + Self.cameras(facts.cameras, resolution: resolution)
         return ["screen recording \(screen)", "microphone \(microphone)", "camera \(camera)", screens, audioInputs, cameras, folder]
             .joined(separator: "; ")
     }
@@ -82,11 +82,21 @@ public enum DetailLine {
         }
     }
 
-    /// "FaceTime HD Camera (default) 1920×1080 at 30 fps, OBS Virtual Camera virtual 1280×720 at 30 fps"
-    public static func cameras(_ cameras: [CameraInfo]) -> String {
+    /// "FaceTime HD Camera (default) 1920×1080 at 30 fps, OBS Virtual Camera virtual 1280×720 at 30 fps":
+    /// each camera with the format it is opened with at `resolution`; none at None, which records no camera.
+    public static func cameras(_ cameras: [CameraInfo], resolution: RecordingResolution) -> String {
         list(cameras.map { camera in
-            camera.shownName + (camera.isVirtual ? " virtual" : "") + (camera.isContinuity ? " Continuity Camera" : "") + (camera.isSuspended ? " suspended" : "") + (camera.chosenFormat(resolution: .native).map { " \($0)" } ?? " no format")
+            let format = !resolution.recordsScreens ? ""
+                : camera.chosenFormat(resolution: resolution).map { " \($0)" } ?? " no format"
+            return camera.shownName + (camera.isVirtual ? " virtual" : "") + (camera.isContinuity ? " Continuity Camera" : "")
+                + (camera.isSuspended ? " suspended" : "") + format
         })
+    }
+
+    /// "2026-11-12 14.03.05 Camera 1 - BRIO.mov: 222 frames arrived after their tick was decided and were placed late, the latest 1492 ms after its capture"
+    public static func framesPlacedLate(file: String, count: Int, largestLateArrival: Int64) -> String {
+        "\(file): \(count) frame\(count == 1 ? "" : "s") arrived after \(count == 1 ? "its" : "their") tick was decided and "
+            + "\(count == 1 ? "was" : "were") placed late, the latest \(largestLateArrival / 1_000_000) ms after its capture"
     }
 
     /// "DELL P3421W 3440×1440 at (0,0) main (display ID 1), …"

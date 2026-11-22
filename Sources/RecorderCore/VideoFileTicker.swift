@@ -111,19 +111,22 @@ public final class VideoFileTicker<File: VideoFileEntry> {
     /// How long the end waits for the writer: as long as ticks may wait (D53).
     public static var defaultDrainTimeout: Duration { .seconds(RecorderValues.videoFileLateTickSeconds) }
 
-    /// `captureStart` in nanoseconds from t0: the file's first tick is never before it.
+    /// `captureStart` in nanoseconds from t0: the file's first tick is
+    /// never before it; `decisionDelay`: how long a tick waits for a frame
+    /// captured after it (`TickLoop`), none for a screen, `RecorderValues.cameraDecisionDelay` for a camera.
     public init(
-        captureStart: Int64, drainTimeout: Duration = defaultDrainTimeout,
+        captureStart: Int64, decisionDelay: Duration = .zero, drainTimeout: Duration = defaultDrainTimeout,
         makeWriter: @escaping MakeWriter
     ) {
         self.makeWriter = makeWriter
         self.drainTimeout = drainTimeout
-        ticks = TickLoop(notBefore: captureStart)
+        ticks = TickLoop(notBefore: captureStart, decisionDelay: decisionDelay.nanoseconds)
     }
 
-    /// A frame to write: a screen's that passed the screen check, or a camera's; the first starts the file.
-    public func receive(_ frame: CVPixelBuffer, capturedAt time: Int64) -> Outcome {
-        ticks.receive(frame, capturedAt: time)
+    /// A frame to write: a screen's that passed the screen check, or a
+    /// camera's, captured at `time` and arrived at `arrival`; the first starts the file.
+    public func receive(_ frame: CVPixelBuffer, capturedAt time: Int64, arrivedAt arrival: Int64) -> Outcome {
+        ticks.receive(frame, capturedAt: time, arrivedAt: arrival)
         guard writer == nil, let firstTick = ticks.firstTick else { return .none }
         do {
             let made = try makeWriter(firstTick)
@@ -136,11 +139,14 @@ public final class VideoFileTicker<File: VideoFileEntry> {
         }
     }
 
-    /// Writes the ticks due by `now`; why the file must end, if it must.
-    public func tick(now: Int64) -> VideoStreamEnd? {
+    /// Writes the ticks decided by `now`, at the file's end with
+    /// `waitingForLateFrames` false all due by then; why the file must end, if it must.
+    public func tick(now: Int64, waitingForLateFrames: Bool = true) -> VideoStreamEnd? {
         guard let writer else { return nil }
         do {
-            let outcome = try ticks.advance(to: now) { tick, frame in try writer.append(frame, tick: tick) }
+            let outcome = try ticks.advance(to: now, waitingForLateFrames: waitingForLateFrames) { tick, frame in
+                try writer.append(frame, tick: tick)
+            }
             if outcome == .writerFellBehind { return .writerFellBehind }
         } catch {
             return failed(error)
@@ -203,7 +209,7 @@ public final class VideoFileTicker<File: VideoFileEntry> {
         guard let writer, var file = entry else { return nil }
         var cut: [GuideTrackCut] = []
         if writerError == nil, writeWaitingTicks {
-            _ = tick(now: now)
+            _ = tick(now: now, waitingForLateFrames: false)
             if writerError == nil { await drain(writer) }
             if writerError == nil, let lastTick = ticks.lastWrittenTick {
                 let perTick = Int64(RecorderValues.audioSampleRate) / Int64(ticks.grid.framesPerSecond)
@@ -240,8 +246,13 @@ public final class VideoFileTicker<File: VideoFileEntry> {
         }
         file.end = ticks.grid.seconds(ofTick: (ticks.lastWrittenTick ?? writer.firstTick - 1) + 1)
         file.framesRepeatedForLateness = ticks.framesRepeatedForLateness
+        if ticks.decisionDelay > 0, ticks.framesPlacedLate > 0 {
+            RecorderLog.detail(
+                DetailLine.framesPlacedLate(file: file.name, count: ticks.framesPlacedLate, largestLateArrival: ticks.largestLateArrival),
+                category: VideoFileWriter.detailCategory)
+        }
         self.writer = nil
-        ticks = TickLoop(notBefore: ticks.notBefore)
+        ticks = TickLoop(notBefore: ticks.notBefore, decisionDelay: ticks.decisionDelay)
         return VideoFileEnd(file: file, error: writerError, guideTracksCut: cut)
     }
 
