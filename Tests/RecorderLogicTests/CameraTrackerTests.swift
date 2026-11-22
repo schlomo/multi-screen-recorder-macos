@@ -107,8 +107,9 @@ import Testing
         #expect(camera([format(1080, 1920, 30), format(1280, 720, 30)]).chosenFormat(resolution: .native) == format(1080, 1920, 30))
     }
 
-    /// A format fits the box as a screen's picture does: a portrait one against the box turned upright.
-    @Test func theLargestFormatInsideTheBoxIsChosenWhateverItsAspectRatio() {
+    /// Each format is fitted into the box as a screen's picture is (a portrait one against the box
+    /// turned upright, never enlarged); the largest recorded size wins (D74).
+    @Test func theFormatWithTheLargestRecordedSizeIsChosenWhateverItsAspectRatio() {
         let threeByTwo = camera([format(2160, 1440, 30), format(1920, 1080, 30)])
         #expect(threeByTwo.chosenFormat(resolution: .p1440) == format(2160, 1440, 30))
         #expect(threeByTwo.chosenFormat(resolution: .p1080) == format(1920, 1080, 30))
@@ -120,14 +121,27 @@ import Testing
         #expect(portrait.frameSize(resolution: .p1080) == FrameSize(width: 1080, height: 1920))
     }
 
-    /// When no format fits into the box, the smallest is chosen and scaled.
-    @Test func withoutAFormatInsideTheBoxTheSmallestIsScaled() {
+    /// A small format that fits is not chosen over a larger one that records more once scaled.
+    @Test func aLargerFormatScaledIntoTheBoxBeatsASmallerOneThatFits() {
+        let faceTime = camera([format(640, 480, 30), format(1920, 1080, 30)])
+        #expect(faceTime.chosenFormat(resolution: .p720) == format(1920, 1080, 30))
+        #expect(faceTime.frameSize(resolution: .p720) == FrameSize(width: 1280, height: 720))
+        let threeByTwo = camera([format(3840, 2160, 30), format(2160, 1440, 30)])
+        #expect(threeByTwo.chosenFormat(resolution: .p720) == format(3840, 2160, 30))
+        #expect(threeByTwo.frameSize(resolution: .p720) == FrameSize(width: 1280, height: 720))
+    }
+
+    /// Of formats that record the same size, the smallest, the least to decode.
+    @Test func ofFormatsRecordingTheSameSizeTheSmallestIsChosen() {
+        let brio = camera([format(4096, 2160, 30), format(3840, 2160, 30), format(1920, 1080, 30), format(1280, 720, 30)])
+        #expect(brio.chosenFormat(resolution: .p1080) == format(1920, 1080, 30))
+        #expect(brio.frameSize(resolution: .p1080) == FrameSize(width: 1920, height: 1080))
+        #expect(brio.chosenFormat(resolution: .p1440) == format(3840, 2160, 30))
+        #expect(brio.frameSize(resolution: .p1440) == FrameSize(width: 2560, height: 1440))
+        #expect(brio.chosenFormat(resolution: .uhd4k) == format(3840, 2160, 30))
+        #expect(brio.chosenFormat(resolution: .native) == format(4096, 2160, 30))
         let large = camera([format(3840, 2160, 30), format(1920, 1080, 30)])
         #expect(large.chosenFormat(resolution: .p720) == format(1920, 1080, 30))
-        #expect(large.frameSize(resolution: .p720) == FrameSize(width: 1280, height: 720))
-        let threeByTwo = camera([format(3840, 2160, 30), format(2160, 1440, 30)])
-        #expect(threeByTwo.chosenFormat(resolution: .p720) == format(2160, 1440, 30))
-        #expect(threeByTwo.frameSize(resolution: .p720) == FrameSize(width: 1080, height: 720))
     }
 
     /// Of a frame size's variants the slowest that still delivers 30 fps, else the fastest (D74).
@@ -191,7 +205,7 @@ import Testing
         #expect(starts(cameras.begin([Self.builtIn, Self.obs], at: 0)) == ["A", "C"])
     }
 
-    /// The format inside the recording resolution's box is opened; only a larger one is scaled.
+    /// The format that records the most at the recording resolution is opened, scaled into its box.
     @Test func theFormatAndTheFileFollowTheRecordingResolution() {
         var cameras = tracker(resolution: .p720)
         var large = Self.builtIn
@@ -202,8 +216,8 @@ import Testing
             guard case .start(_, let format, let frameSize, _, _) = action else { return nil }
             return (format, frameSize)
         }
-        #expect(starts.map(\.0.size) == [FrameSize(width: 640, height: 480), FrameSize(width: 1920, height: 1080)])
-        #expect(starts.map(\.1) == [FrameSize(width: 640, height: 480), FrameSize(width: 1280, height: 720)])
+        #expect(starts.map(\.0.size) == [FrameSize(width: 1920, height: 1080), FrameSize(width: 1920, height: 1080)])
+        #expect(starts.map(\.1) == [FrameSize(width: 1280, height: 720), FrameSize(width: 1280, height: 720)])
     }
 
     @Test func aCameraThatGoesEndsItsFileAtOnceAndComesBackAfterTheSettleTimeWithItsNumber() {

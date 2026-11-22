@@ -200,32 +200,29 @@ public struct CameraInfo: Equatable, Sendable {
         self.isSuspended = isSuspended
     }
 
-    /// The format a recording at `resolution` opens the camera with (D74):
-    /// of the formats that deliver the tick grid's frame rate, of any aspect
-    /// ratio, the largest that fits into the resolution's box as a screen's
-    /// picture does (at Native, the largest), so it is recorded as it is;
-    /// when none fits, the smallest, scaled as a screen's. A camera with no
-    /// format at that rate delivers its fastest, the largest of those. Nil
-    /// for a camera that lists no format.
+    /// The format a recording at `resolution` opens the camera with (D74),
+    /// as for screens: each format that delivers the tick grid's frame rate,
+    /// of any aspect ratio, records its size fitted into the resolution's box
+    /// (`frameSize(forLooksLike:)`, never enlarged, a portrait one against the
+    /// box turned upright); the format with the largest recorded size, and of
+    /// those the smallest, the least to decode. At Native the largest. A
+    /// camera with no format at that rate delivers its fastest, the largest
+    /// of those. Nil for a camera that lists no format.
     public func chosenFormat(resolution: RecordingResolution) -> CameraFormat? {
         let fastEnough = formats.filter(\.deliversTheTickRate)
         guard !fastEnough.isEmpty else {
             return formats.max { ($0.maxFramesPerSecond.rounded(), $0.size.pixelCount) < ($1.maxFramesPerSecond.rounded(), $1.size.pixelCount) }
         }
-        let fitting = fastEnough.filter { Self.fits($0.size, into: resolution.box) }
-        return fitting.max { $0.size.pixelCount < $1.size.pixelCount } ?? fastEnough.min { $0.size.pixelCount < $1.size.pixelCount }
+        let recorded = { (format: CameraFormat) in
+            resolution.recordsScreens ? resolution.frameSize(forLooksLike: format.size).pixelCount : format.size.pixelCount
+        }
+        return fastEnough.max { (recorded($0), -$0.size.pixelCount) < (recorded($1), -$1.size.pixelCount) }
     }
 
     /// The frame size of the camera's file: its chosen format's size, fitted
     /// into the recording resolution's box as a screen's looks-like size is.
     public func frameSize(resolution: RecordingResolution) -> FrameSize? {
         chosenFormat(resolution: resolution).map { resolution.frameSize(forLooksLike: $0.size) }
-    }
-
-    private static func fits(_ size: FrameSize, into box: FrameSize?) -> Bool {
-        guard let box else { return true }
-        let upright = size.isPortrait ? box.rotated : box
-        return size.width <= upright.width && size.height <= upright.height
     }
 
     /// "FaceTime HD Camera (default)" or just the name.
