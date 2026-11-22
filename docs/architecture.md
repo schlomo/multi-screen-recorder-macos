@@ -89,9 +89,11 @@ D28).
   audio only (D62, D74).
 - Cameras (built in PR #27, D74): the camera mode none, default
   camera, all real (the default and auto mode's) or all (virtual
-  cameras too); one camera file per camera, made like a screen file,
-  with the same two guide tracks; each camera at 30 fps in its largest
-  format that fits the recording resolution, 16:9 preferred; a camera
+  cameras and iPhone cameras, Continuity Camera and Desk View, too);
+  one camera file per camera, made like a screen file, with the same
+  two guide tracks; each camera at 30 fps in its largest format, of
+  any aspect ratio, that fits the recording resolution's box as a
+  screen's picture does, the smallest scaled when none fits; a camera
   that sends no frames is a failing stream, a suspended one is not
   recorded; the Camera permission is asked only when a camera would be
   recorded. A camera's own H.264 stream is not taken as-is (deferred).

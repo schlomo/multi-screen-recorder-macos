@@ -23,10 +23,11 @@ own clock is resampled continuously to stay with the screen files
   video file. Plugging in a projector, removing it, closing or opening
   the laptop's lid, or switching mirroring does not stop the recording.
 - **Every camera in its own file.** All real cameras by default, the
-  built-in one, Continuity Camera and those on a cable; or none, only
-  the default camera, or all of them, virtual cameras too. Each is
+  built-in one and those on a cable; or none, only
+  the default camera, or all of them, virtual and iPhone cameras
+  (Continuity Camera, Desk View) too. Each is
   recorded like a screen, in its largest format that still delivers
-  30 frames per second.
+  30 frames per second and fits the recording resolution.
 - **Every audio source in its own file.** No audio, the default
   microphone, the wired or all audio inputs, plus the system audio if
   you want it; each channel its own track. Or audio only: the
@@ -196,7 +197,7 @@ they are enabled and show the recording resolution (None, which records
 audio only, then 720p up to Native) and the audio mode: None, Default
 microphone, Wired or All, with a note under it on Bluetooth and virtual
 microphones, and the camera mode: None, Default camera, All real or All,
-with a note under it on virtual cameras), system audio, the output folder and the ready check:
+with a note under it on virtual and iPhone cameras), system audio, the output folder and the ready check:
 "Ready to record" when every item passes, otherwise each item with a
 fix for each failing one; a recording that would record neither a
 screen nor any audio does not pass. Every change is saved at once; the ready check runs again after each change,
@@ -255,7 +256,7 @@ a setting for this run only: `--auto` (no value: auto mode, whatever the
 settings say), `--resolution` (`native`, `4k`, `1440p`, `1200p`, `1080p`,
 `720p`, `none` for audio only), `--audio-mode` (`none`, `default-microphone`, `wired`,
 `all-inputs`), `--camera-mode` (`none`, `default-camera`, `real` for all
-real cameras, `all-cameras` for virtual cameras too), `--system-audio`
+real cameras, `all-cameras` for virtual and iPhone cameras too), `--system-audio`
 (`on`, `off`), `--output-folder`, `--required-recording-hours`,
 `--low-disk-warning-minutes`. `--resolution`, `--audio-mode` and
 `--camera-mode` turn auto mode off for the run; `--auto` together with

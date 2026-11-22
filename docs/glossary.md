@@ -177,18 +177,19 @@ end it too.
 
 ## Camera
 
-A video device AVFoundation lists on the Mac: built in, a Continuity
-Camera or Desk View, or connected by cable; these are real cameras. A
-virtual camera is made by software, such as OBS Virtual Camera, and
-often carries a copy of a screen or of another camera (D74).
+A video device AVFoundation lists on the Mac. A real camera is built in
+or connected by cable. An iPhone camera is a Continuity Camera or Desk
+View, or connected by Continuity Capture. A virtual camera is made by
+software, such as OBS Virtual Camera, and often carries a copy of a
+screen or of another camera (D74).
 
 ## Camera file
 
 The video file for one camera, made exactly as a screen file: the same
 tick grid, timecode and guide tracks, no audio of the camera's own, its
-frame size the size of the camera's chosen format: the largest
-16:9 one at 30 fps inside the recording resolution's box, scaled only
-when none fits. A camera that disappears, is suspended, delivers no frames, or whose
+frame size the size of the camera's chosen format: the largest one at
+30 fps, of any aspect ratio, inside the recording resolution's box,
+scaled only when none fits. A camera that disappears, is suspended, delivers no frames, or whose
 stream or writer fails ends its camera file; a new one begins when it is back
 (D74).
 
@@ -196,8 +197,8 @@ stream or writer fails ends its camera file; a new one begins when it is back
 
 Which cameras are recorded, a slider of four steps: None (`none`),
 Default camera (`default-camera`, the default camera if it is real), All
-real (`real`, every real camera) and All (`all-cameras`, virtual
-cameras too). All real is auto mode's camera mode and the default
+real (`real`, every real camera) and All (`all-cameras`, virtual and
+iPhone cameras too). All real is auto mode's camera mode and the default
 (D74).
 
 ## Video file
@@ -372,7 +373,7 @@ A source the settings or its own state leave out of a recording: shown
 dimmed in the window, without a number, with `-` for GB/h max (and for
 Records at, for a screen at the recording resolution None and for a
 camera), and, for an audio input or a camera whose own rule leaves it
-out, the reason in parentheses after its name (`(virtual)`, `(no device
+out, the reason in parentheses after its name (`(virtual)`, `(Continuity Camera)`, `(no device
 ID)`, `(no format)`, `(suspended)`; D59, D62, D74).
 
 ## Ready check

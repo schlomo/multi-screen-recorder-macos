@@ -122,8 +122,9 @@ except that a default input without a Core Audio ID still says `(no
 device ID)` under Default microphone. An input whose channels
 cannot be read shows `cannot be read (<reason>)` in Records at. A camera
 not recorded shows its name with the `Camera <n> - ` part blank and `-`
-in Records at and GB/h max; it says `(virtual)` when the camera modes
-Default camera and All real leave out a virtual camera, `(no
+in Records at and GB/h max; it says `(virtual)` or `(Continuity
+Camera)` when the camera modes Default camera and All real leave out a
+virtual or an iPhone camera, `(no
 format)` when it offers no format to record, and `(suspended)` when the
 camera mode would record it but it is suspended; under None, at the
 recording resolution None, and for a real camera not the default under
@@ -797,8 +798,9 @@ checked, reported or rewritten at the next start (D47).
   microphone switches it to call quality, and a virtual microphone
   often carries a copy of other sound." Then the camera mode slider
   (D74, over None, Default camera, All real, All) with the chosen one's
-  name beside it, and under it: "Virtual cameras are recorded only under
-  All: a virtual camera often carries a copy of a screen or of another
+  name beside it, and under it: "Virtual cameras and iPhone cameras
+  (Continuity Camera, Desk View) are recorded only under All: a virtual
+  camera often carries a copy of a screen or of another
   camera." Then system audio and output
   folder, which stay as they are; the ready check, with "Check again";
   and, in the lower right corner, Cancel and Start, Start on the right
@@ -1483,25 +1485,28 @@ no audio of the camera's own.
 
 - **Which cameras.** The cameras are AVFoundation's video devices
   (built-in, Continuity Camera, Desk View, external). The default camera
-  is `AVCaptureDevice.default(for: .video)`. A camera is real when
-  AVFoundation lists it as built in, as a Continuity Camera or Desk View,
-  or connected by built-in, USB, FireWire, PCI, Thunderbolt or
-  Continuity Capture (the transport types as Core Audio names them);
-  any other, unknown included, is virtual, such as OBS Virtual Camera.
-  None records no camera, Default camera the default camera if it is
-  real, All real every real camera, All every camera. A suspended camera
+  is `AVCaptureDevice.default(for: .video)`. An iPhone camera is a
+  Continuity Camera or Desk View, or a camera connected by Continuity
+  Capture. A camera is virtual unless AVFoundation lists it as built in,
+  as a Continuity Camera or Desk View, or connected by built-in, USB,
+  FireWire, PCI, Thunderbolt or Continuity Capture (the transport types
+  as Core Audio names them), such as OBS Virtual Camera; an unknown
+  transport is virtual. Every other camera is real. None records no
+  camera, Default camera the default camera if it is real, All real
+  every real camera, All every camera, virtual and iPhone cameras too
+  (the owner, 2026-11-22). A suspended camera
   (`isSuspended`, such as a laptop's with its lid closed) is not
   recorded, and its file ends when it is suspended and starts again
   after the settle time when it is resumed; the recorder and the app
   observe the suspension and read the cameras again when it changes.
 - **Format.** Per frame size the variant with the lowest highest frame
   rate that still reaches 30 fps (a rate rounded to whole frames), or
-  the fastest where none does. Of the formats reaching 30 fps the 16:9
-  ones (aspect within 1 %), when there are any, so a DCI 4096×2160 or a
-  square 1552×1552 is not chosen over 3840×2160 or 1920×1080; of those
-  the largest that fits into the recording resolution's box (at Native,
-  the largest), recorded as it is; when none fits, the smallest, scaled
-  into the box as a screen's looks-like size is. A camera with no format
+  the fastest where none does. Of the formats reaching 30 fps, of any
+  aspect ratio (16:9, 9:16, 3:2, square), the largest by its pixels
+  that fits into the recording resolution's box as a screen's picture
+  does, a portrait format against the box turned upright (at Native, the
+  largest), recorded as it is; when none fits, the smallest, scaled into
+  the box as a screen's looks-like size is (the owner, 2026-11-22). A camera with no format
   reaching 30 fps records its fastest, the largest of those. The
   camera's frame duration is set to 1/30 s where the format's ranges
   allow it, otherwise to the allowed rate closest to 30, told in a
@@ -1726,8 +1731,9 @@ coming and going, an unplug told once, a replug, the default microphone
 followed, failures with the back-off, the system audio moving to the new
 main screen, a full disk, a channel count change, two inputs with the
 same name, sleep and wake), the camera mode and which camera each
-records (a suspended one not), a camera's chosen format (16:9 first,
-inside the recording resolution's box, the slowest variant at 30 fps)
+records (a suspended one not, an iPhone camera only under All), a
+camera's chosen format (any aspect ratio, inside the recording
+resolution's box, the slowest variant at 30 fps)
 and frame rate, the limits for a camera without frames,
 the camera tracker (numbers, the default camera first, a camera
 coming and going, failures with the back-off, a full disk, sleep and
