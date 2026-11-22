@@ -7,7 +7,7 @@ and keeps going when screens, resolutions or audio sources change.
 
 **Status:** in development. Builds record every screen, camera and
 audio source. The app shows its settings and the ready check and records with
-Start, and the command line lists screens and audio inputs, runs the
+Start, and the command line lists screens, cameras and audio inputs, runs the
 ready check, records and manages the settings. An audio input with its
 own clock is resampled continuously to stay with the screen files
 (clock drift correction).
@@ -22,16 +22,22 @@ own clock is resampled continuously to stay with the screen files
 - **Every screen, as screens come and go.** Each screen gets its own
   video file. Plugging in a projector, removing it, closing or opening
   the laptop's lid, or switching mirroring does not stop the recording.
+- **Every camera in its own file.** All real cameras by default, the
+  built-in one, Continuity Camera and those on a cable; or none, only
+  the default camera, or all of them, virtual cameras too. Each is
+  recorded like a screen, in its largest format that still delivers
+  30 frames per second.
 - **Every audio source in its own file.** No audio, the default
   microphone, the wired or all audio inputs, plus the system audio if
   you want it; each channel its own track. Or audio only: the
-  recording resolution None records no screen.
+  recording resolution None records no screen and no camera.
 - **In sync after hours.** The drift of each audio source's own clock
   is corrected, so audio and screen tracks are still in sync after
   hours.
 - **Auto mode.** On by default: every screen at Native, the wired audio
-  inputs and the default microphone, safe to sort out in the editor at
-  the expense of disk space. Off, you choose resolution and audio mode.
+  inputs and the default microphone, every real camera, safe to sort
+  out in the editor at the expense of disk space. Off, you choose
+  resolution, audio mode and camera mode.
 - **Edit-ready files.**
   - Timecode in every file, so an editor puts all of them on one
     timeline in place.
@@ -76,18 +82,20 @@ A Mac with Apple silicon (M1 or later) and macOS 26 or later.
    to open it the first time. Open System Settings › Privacy & Security,
    scroll to "Multi Screen Recorder was blocked", click **Open Anyway**
    and confirm.
-4. Grant the two permissions when macOS asks: **Screen & System Audio
+4. Grant the permissions when macOS asks: **Screen & System Audio
    Recording** (for the screens and the system audio; not asked for
-   audio only without the system audio) and
+   audio only without the system audio),
    **Microphone** (asked only when a microphone is recorded: not on a
-   Mac without an audio input, nor with the audio mode None). Both are in
+   Mac without an audio input, nor with the audio mode None) and
+   **Camera** (asked only when a camera is recorded: not on a Mac
+   without a camera, nor with the camera mode None). All are in
    System Settings › Privacy & Security.
    A microphone permission allowed there, not in the prompt, counts
    only after you quit the app and start it again; if the screen
    recording permission still shows as missing, do the same.
 
 Every build is signed with the same certificate, so a newer build
-installed over an older one should keep both permissions; this is not
+installed over an older one should keep its permissions; this is not
 confirmed yet.
 
 ### Known limits
@@ -173,16 +181,18 @@ Start the app from Finder: its window shows the app's icon, version
 and homepage, then what will be recorded (one
 table: the screens, with what each looks like, the size it is drawn at
 and the size it records at (dimmed and not numbered at the recording
-resolution None, which records no screen), then the audio sources, the system audio
+resolution None, which records no screen), then the cameras, each with the size it
+records at, then the audio sources, the system audio
 first and the inputs by number, then the ones not recorded, dimmed and
 with their reason (such as "(virtual)"); each row with the most disk space it can write
 per hour, "GB/h max", usually more than it writes; the total as the
 last row; below it the space the required hours need and the free
-space; the output folder, a link that opens it in Finder), then the switch "Auto" (on, the two sliders are grayed out and show Native and Wired; off,
+space; the output folder, a link that opens it in Finder), then the switch "Auto" (on, the three sliders are grayed out and show Native, Wired and All real; off,
 they are enabled and show the recording resolution (None, which records
 audio only, then 720p up to Native) and the audio mode: None, Default
 microphone, Wired or All, with a note under it on Bluetooth and virtual
-microphones), system audio, the output folder and the ready check:
+microphones, and the camera mode: None, Default camera, All real or All,
+with a note under it on virtual cameras), system audio, the output folder and the ready check:
 "Ready to record" when every item passes, otherwise each item with a
 fix for each failing one; a recording that would record neither a
 screen nor any audio does not pass. Every change is saved at once; the ready check runs again after each change,
@@ -229,7 +239,7 @@ so it shows the app's version and runs with its signature.
 
 | Command | Does |
 |---|---|
-| `msr list` | Shows what will be recorded, the same table as `msr check` (the settings line, the screens by number, then the audio sources by number, the system audio first; an audio input not recorded comes last and is named with its reason, such as `(virtual)`), without the ready check and without asking for a permission, and whether the program running `msr` (a terminal app) may record the system audio |
+| `msr list` | Shows what will be recorded, the same table as `msr check` (the settings line, the screens by number, then the cameras by number, then the audio sources by number, the system audio first; a camera or an audio input not recorded comes last and is named with its reason, such as `(virtual)`), without the ready check and without asking for a permission, and whether the program running `msr` (a terminal app) may record the system audio |
 | `msr check [flags] [--debug]` | Prints the banner (name, version, build date, homepage) and what will be recorded, then runs the ready check; exits 0 when ready, 1 when not; creates the output folder if it is missing |
 | `msr record [flags] [--duration 1h30m] [--debug \| --quiet]` | Prints the banner and what will be recorded and runs the ready check, then records until Ctrl-C, the duration or Stop in the status window (click the Dock icon); shows the app's Dock icon while it records and prints each event; standard output carries one line, the recording folder's path, when recording starts, and everything for people (banner, table, ready check, events, summary, with `--debug` the detail lines) goes to standard error, where a terminal also gets the status line, redrawn once a second: the problems if any, time, size, files, free space, CPU and sources; `--quiet` leaves out all of it but the path, and on standard error a failing ready check, errors, the settings file note, each failure as it happens (a repeat of it counted, not printed) and the summary of a run that exits 3, and is refused together with `--debug`; `--duration` without a suffix is minutes; exits 0 when every file is finalized and no file was ended by a failure (a problem told alone, an unplugged microphone, a gap, no audio or a change of an input volume is listed but still exits 0), 1 when not ready, 3 when a file is not finalized, a file was ended by a failure, the recording manifest could not be written at the end, or the recording could not start |
 | `msr settings [flags]` | Without flags prints the effective settings as JSON; with a settings flag saves the effective settings into the settings file and prints them, the only way a command writes it |
@@ -240,10 +250,12 @@ Without flags a command uses the settings as they are. Each flag changes
 a setting for this run only: `--auto` (no value: auto mode, whatever the
 settings say), `--resolution` (`native`, `4k`, `1440p`, `1200p`, `1080p`,
 `720p`, `none` for audio only), `--audio-mode` (`none`, `default-microphone`, `wired`,
-`all-inputs`), `--system-audio` (`on`, `off`), `--output-folder`,
-`--required-recording-hours`, `--low-disk-warning-minutes`.
-`--resolution` and `--audio-mode` turn auto mode off for the run; `--auto`
-together with either is a usage error. A usage error exits 64; an unset
+`all-inputs`), `--camera-mode` (`none`, `default-camera`, `real` for all
+real cameras, `all-cameras` for virtual cameras too), `--system-audio`
+(`on`, `off`), `--output-folder`, `--required-recording-hours`,
+`--low-disk-warning-minutes`. `--resolution`, `--audio-mode` and
+`--camera-mode` turn auto mode off for the run; `--auto` together with
+any of them is a usage error. A usage error exits 64; an unset
 `HOME` exits 78. The settings live in
 `~/Library/Application Support/Multi Screen Recorder/settings.json`,
 which nothing writes until you change a choice in the window or run
@@ -254,13 +266,14 @@ apply for it.
 ```sh
 msr check --audio-mode none --required-recording-hours 4
 msr record --resolution 1080p --duration 45m
-msr record --resolution none     # audio only: no screen is recorded
+msr record --resolution none     # audio only: no screen and no camera is recorded
+msr record --camera-mode none    # no camera is recorded
 msr settings                     # shows the settings
 msr settings --resolution 1440p  # saves it, and turns auto mode off
 msr settings --auto              # saves auto mode
 ```
 
-Started from a terminal, macOS attributes the two permissions to the
+Started from a terminal, macOS attributes the permissions to the
 terminal app (Terminal, iTerm and so on), not to Multi Screen Recorder:
 grant them to the terminal app for `msr check` to pass and `msr record`
 to record there. Audio only without the system audio
@@ -283,7 +296,7 @@ Once, on the Mac:
    Signing`, such as `Multi Screen Recorder Signing (<your name>)`;
    identity type Self-Signed Root, certificate type Code Signing, "Let
    me override defaults" ticked, validity 3650 days (the default is one
-   year, and a new certificate means granting both permissions again),
+   year, and a new certificate means granting the permissions again),
    the rest unchanged, in the login keychain.
 4. For the end-to-end tests: `brew install openai/tools/tart hashicorp/tap/packer`, then
    `scripts/end-to-end-setup` once, which builds the VM they run in.
@@ -318,7 +331,7 @@ fit together is in [docs/design/delivery.md](docs/design/delivery.md).
 argument it builds and signs first, `--release` installs the latest
 release, `--snapshot 20` the snapshot release of PR #20, and a zip path
 installs that zip. It refuses while the
-installed app runs, keeps both permissions (the certificate stays the
+installed app runs, keeps the permissions (the certificate stays the
 same; `SIGNING_IDENTITY=-`, ad hoc, loses them) and needs no "Open
 Anyway" (it removes the quarantine); details in
 [docs/design/delivery.md](docs/design/delivery.md).

@@ -26,7 +26,7 @@ signature); if that fails it exits 71 (`EX_OSERR`).
 |---|---|---|
 | `msr list` | Prints "What will be recorded" as `msr check` does, from the settings and the devices, without the ready check and without asking for any permission, then whether the program running `msr` may record the system audio | 0, 1 when the screens, the audio inputs or an audio input the settings record cannot be read |
 | `msr check [flags] [--debug]` | Prints the banner and "What will be recorded", then runs the ready check and prints each item; `--debug` also prints the detail lines on standard error (and at `.debug` in the unified log) | 0 ready, 1 not ready |
-| `msr record [flags] [--duration 1h30m] [--debug \| --quiet]` | Records the screens and the audio sources (the recording core, D45, D49). Without flags it does what Start in the window does, with the same settings file; it prints the banner (as `msr check`) and "What will be recorded" at its start, then runs the ready check, records until Ctrl-C, SIGTERM, SIGHUP, the duration or Stop in the status window (below), and prints the recording folder at the start and a summary at the end (the summary: every file with its state, the screens' by number, then the audio sources' by number with the system audio first, and our process's CPU use, average and peak, and, when it exits 3, the link to report it and the files to attach, see "Problem report offer"). It runs as a full AppKit app without a Dock icon (the `accessory` activation policy) until the ready check passed and the recording starts, then shows the icon; a run that is not ready shows none, and an icon macOS refuses is a problem, and the recording goes on (Ctrl-C stops it); while it records, the icon shows with its badge, and clicking it or Quit opens the status window as in the app (D45, D46). When it stops, for any reason, it first prints `Stopping the recording and finalizing the files…` on standard error, then finalizes and prints the summary; a Ctrl-C while it finalizes prints `Still finalizing the files…` and does nothing more. It prints every event of the recording manifest as one line on standard error, a failure's repeats counted instead (see "Logging"). `--debug` also prints the detail lines on standard error (and at `.debug` in the unified log); the recording log has them always (see "Logging"). **Output split:** standard output carries exactly one line, the recording folder's bare path, when recording starts; everything for people goes to standard error (the banner, "What will be recorded", the ready check, `Recording into <path>`, events, the status line, the summary, detail lines), all of it, and every other line this code writes on standard error (the settings file note, `Error:` lines, detail lines; ArgumentParser writes its own usage errors, before any status line exists), through one writer so nothing prints into the middle of the status line; a failed write to standard error, SIGPIPE included, is ignored, as there is nowhere left to report it, and `msr record` ignores SIGPIPE for the whole process from its start, before it writes anything, so a closed reader of standard output does not end it. **Status line:** only when standard error is a terminal whose `TERM` is set, not empty and not `dumb`, with no option: one line redrawn once a second (`\r`, the text, `ESC[K`). Its text, joined by ` · ` as the window's line is: `<n> problems` (`1 problem`) first when there are any, counting the problems of the run (the ones the window lists; low disk space and a screen showing another screen's picture are not problems, though they set the Dock badge), nothing when there are none; then the text of the window's line (time with seconds, size written, files, free space), the CPU use when known, and `<n> screens, <m> audio` for the sources being recorded (`1 screen`), such as `1 problem · Recording 0:12:34 · 1.2 GB in 7 files · 143.8 GB free · CPU 23 % · 2 screens, 5 audio`. It is cut to the terminal's width minus 1, taking 80 columns when the width is unknown, so it does not wrap. An event or detail line clears it, prints, and it is drawn again, all in one write; at the end it is cleared and the summary follows. Not a terminal: no status line and no escape code. **`--quiet`:** no output for people (no banner, table, passing ready check, events, status line or summary); still written are the path on standard output and, on standard error, a failing ready check, `Error:` lines, the settings file note, each failure as it happens (its event line, or the line the window lists for a problem no event tells) with the count of its repeats, and the summary of a run that exits 3; exit codes are unchanged; with `--debug` it is a usage error. `--duration` takes hours, minutes and seconds (`1h30m`, `45m`, `90s`); a number without a suffix is minutes (`90` is 90 minutes) | 0 ok (every file finalized, no file ended by a failure, D47), 1 not ready, 3 when the recording manifest's `result` is `problems`, the finalized manifest could not be written, or the recording could not start |
+| `msr record [flags] [--duration 1h30m] [--debug \| --quiet]` | Records the screens, the cameras and the audio sources (the recording core, D45, D49, D74). Without flags it does what Start in the window does, with the same settings file; it prints the banner (as `msr check`) and "What will be recorded" at its start, then runs the ready check, records until Ctrl-C, SIGTERM, SIGHUP, the duration or Stop in the status window (below), and prints the recording folder at the start and a summary at the end (the summary: every file with its state, the screens' by number, then the cameras' by number, then the audio sources' by number with the system audio first, and our process's CPU use, average and peak, and, when it exits 3, the link to report it and the files to attach, see "Problem report offer"). It runs as a full AppKit app without a Dock icon (the `accessory` activation policy) until the ready check passed and the recording starts, then shows the icon; a run that is not ready shows none, and an icon macOS refuses is a problem, and the recording goes on (Ctrl-C stops it); while it records, the icon shows with its badge, and clicking it or Quit opens the status window as in the app (D45, D46). When it stops, for any reason, it first prints `Stopping the recording and finalizing the files…` on standard error, then finalizes and prints the summary; a Ctrl-C while it finalizes prints `Still finalizing the files…` and does nothing more. It prints every event of the recording manifest as one line on standard error, a failure's repeats counted instead (see "Logging"). `--debug` also prints the detail lines on standard error (and at `.debug` in the unified log); the recording log has them always (see "Logging"). **Output split:** standard output carries exactly one line, the recording folder's bare path, when recording starts; everything for people goes to standard error (the banner, "What will be recorded", the ready check, `Recording into <path>`, events, the status line, the summary, detail lines), all of it, and every other line this code writes on standard error (the settings file note, `Error:` lines, detail lines; ArgumentParser writes its own usage errors, before any status line exists), through one writer so nothing prints into the middle of the status line; a failed write to standard error, SIGPIPE included, is ignored, as there is nowhere left to report it, and `msr record` ignores SIGPIPE for the whole process from its start, before it writes anything, so a closed reader of standard output does not end it. **Status line:** only when standard error is a terminal whose `TERM` is set, not empty and not `dumb`, with no option: one line redrawn once a second (`\r`, the text, `ESC[K`). Its text, joined by ` · ` as the window's line is: `<n> problems` (`1 problem`) first when there are any, counting the problems of the run (the ones the window lists; low disk space and a screen showing another screen's picture are not problems, though they set the Dock badge), nothing when there are none; then the text of the window's line (time with seconds, size written, files, free space), the CPU use when known, and `<n> screens, <m> audio` for the sources being recorded (`1 screen`), with `<k> cameras` between them when cameras are recorded (`2 screens, 1 camera, 5 audio`), such as `1 problem · Recording 0:12:34 · 1.2 GB in 7 files · 143.8 GB free · CPU 23 % · 2 screens, 5 audio`. It is cut to the terminal's width minus 1, taking 80 columns when the width is unknown, so it does not wrap. An event or detail line clears it, prints, and it is drawn again, all in one write; at the end it is cleared and the summary follows. Not a terminal: no status line and no escape code. **`--quiet`:** no output for people (no banner, table, passing ready check, events, status line or summary); still written are the path on standard output and, on standard error, a failing ready check, `Error:` lines, the settings file note, each failure as it happens (its event line, or the line the window lists for a problem no event tells) with the count of its repeats, and the summary of a run that exits 3; exit codes are unchanged; with `--debug` it is a usage error. `--duration` takes hours, minutes and seconds (`1h30m`, `45m`, `90s`); a number without a suffix is minutes (`90` is 90 minutes) | 0 ok (every file finalized, no file ended by a failure, D47), 1 not ready, 3 when the recording manifest's `result` is `problems`, the finalized manifest could not be written, or the recording could not start |
 | `msr settings [flags]` | Without flags prints the effective settings as JSON (show); with any settings flag, `--auto` included, saves the run's effective settings into the settings file and prints them (change). The only command that writes the file; the window also writes it | 0, 1 when it cannot write the file |
 | `msr timeline <folder>` | Writes the recording folder's timeline file (see "Output on disk") from its `recording.json`, replacing an older one, and prints its path. Reads no settings. Writes nothing else and deletes nothing. A file without an end gets its length from the media file | 0, 1 with the error on standard error when `recording.json` or a file's length cannot be read, or the file cannot be written |
 | `msr version` | Prints the version and commit | 0 |
@@ -48,13 +48,15 @@ settings` saves them (D44):
 | `--auto` | no value: auto mode for this run, whatever the settings file says |
 | `--resolution` | `native`, `4k`, `1440p`, `1200p`, `1080p`, `720p`, `none` (audio only) |
 | `--audio-mode` | `none`, `default-microphone`, `wired`, `all-inputs` |
+| `--camera-mode` | `none`, `default-camera`, `real`, `all-cameras` |
 | `--system-audio` | `on`, `off` |
 | `--output-folder` | a folder |
 | `--required-recording-hours` | a number |
 | `--low-disk-warning-minutes` | a number |
 
-`--resolution` and `--audio-mode` set a choice and so turn auto mode
-off for the run; `--auto` together with either is a usage error (exit
+`--resolution`, `--audio-mode` and `--camera-mode` set a choice and so
+turn auto mode off for the run; `--auto` together with any of them is a
+usage error (exit
 64). `msr settings --resolution 1080p` writes `resolution: 1080p` and
 `auto: false`, `msr settings --auto` writes `auto: true`: `msr settings`
 with a flag writes the run's effective settings. There is no `--save`
@@ -77,23 +79,30 @@ What will be recorded
   Screen 1 - Built-in Retina Display          1728×1117   3456×2234  1728×1116        1.0
   Screen 2 - LG HDR 4K                        3840×2160   3840×2160  3840×2160        4.1
   ───────────────────────────────────────────────────────────────────────────────────────
+  Camera 1 - FaceTime HD Camera (default)                            1920×1080        1.1
+  ───────────────────────────────────────────────────────────────────────────────────────
   Audio 0 - System                                                   stereo           0.1
   Audio 1 - MacBook Pro Microphone (default)                         1 channel        0.1
   Audio 2 - RØDE Wireless GO II RX                                   2 channels       0.1
   ───────────────────────────────────────────────────────────────────────────────────────
-  Total                                                                               5.3
-  2 hours need 10.7 GB.
+  Total                                                                               6.4
+  2 hours need 12.8 GB.
   Files go to ~/Movies/Multi Screen Recorder
 System audio: available
 ```
 
 The settings line says the effective settings, flags applied: `Auto
-(resolution Native, audio mode Wired)` in auto mode, otherwise
-`resolution 1080p, audio mode …`; at the recording resolution None it
-adds that no screen is recorded (`resolution None (no screen is
-recorded)`), and under the audio modes None and Default microphone why
-the inputs are not recorded (`audio mode None (no audio input is
-recorded)`). The screens are listed by number, then the
+(resolution Native, audio mode Wired, camera mode All real)` in auto
+mode, otherwise `resolution 1080p, audio mode …, camera mode …`; at the
+recording resolution None it adds that no screen and no camera is
+recorded (`resolution None (no screen and no camera is recorded)`),
+under the audio modes None and Default microphone why the inputs are
+not recorded (`audio mode None (no audio input is recorded)`), and
+under the camera modes None and Default camera why the cameras are not
+(`camera mode None (no camera is recorded)`, `camera mode Default camera
+(only the default camera is recorded)`). The screens are listed by
+number, then the cameras by number (D74), the recorded ones first, then
+those not recorded in device order, then the
 audio sources by number, the system audio (0) first, then the audio
 inputs not recorded in device order (the system audio too, last, when it
 is off), so the numbers read 0, 1, 2 … without a gap. A source not
@@ -111,7 +120,16 @@ the recording opens an input by it; under None and
 Default microphone nothing, as the settings line gives the reason,
 except that a default input without a Core Audio ID still says `(no
 device ID)` under Default microphone. An input whose channels
-cannot be read shows `cannot be read (<reason>)` in Records at.
+cannot be read shows `cannot be read (<reason>)` in Records at. A camera
+not recorded shows its name with the `Camera <n> - ` part blank and `-`
+in Records at and GB/h max; it says `(virtual)` when the camera modes
+Default camera and All real leave out a virtual camera, and `(no
+format)` when it offers no format to record; under None, at the
+recording resolution None, and for a real camera not the default under
+Default camera nothing, as the settings line gives the reason. A
+camera's Records at is the frame size of its chosen format (see
+"Cameras"), capped by the recording resolution; Looks like and Drawn at
+stay empty.
 
 In the table the "Looks like" column is what macOS calls "looks like" (a
 screen's size in points) and "Drawn at" the size it is drawn at (its
@@ -131,7 +149,7 @@ banner first). Then it prints "What will be recorded": the window's
 one table with its header row and total row, the line of what the
 required recording hours need, and "Files go to <output folder>", from
 the same code (see "The app"; the window's last line, "Recording
-continues when screens or audio sources change.", is not printed), then
+continues when screens, cameras or audio sources change.", is not printed), then
 one line per item of the ready check, `ok` or `FAIL`, a fix under each
 failure (wrapped at 80 columns, its continuation lines under its first
 line's text), and `Ready.` or `Not ready.` last. For the devices of the
@@ -145,12 +163,14 @@ What will be recorded
   Screen 1 - Built-in Retina Display          1728×1117   3456×2234  1728×1116        1.0
   Screen 2 - LG HDR 4K                        3840×2160   3840×2160  3840×2160        4.1
   ───────────────────────────────────────────────────────────────────────────────────────
+  Camera 1 - FaceTime HD Camera (default)                            1920×1080        1.1
+  ───────────────────────────────────────────────────────────────────────────────────────
   Audio 0 - System                                                   stereo           0.1
   Audio 1 - MacBook Pro Microphone (default)                         1 channel        0.1
   Audio 2 - RØDE Wireless GO II RX                                   2 channels       0.1
   ───────────────────────────────────────────────────────────────────────────────────────
-  Total                                                                               5.3
-  2 hours need 10.7 GB, 3.1 GB free.
+  Total                                                                               6.4
+  2 hours need 12.8 GB, 3.1 GB free.
   Files go to ~/Movies/Multi Screen Recorder
 ```
 
@@ -159,10 +179,11 @@ then:
 ```
 ok    Screen & System Audio Recording permission
 ok    Microphone permission
+ok    Camera permission
 ok    Screens: 2
 ok    Audio: system audio, MacBook Pro Microphone (default), RØDE Wireless GO II RX
 ok    Output folder: ~/Movies/Multi Screen Recorder
-FAIL  Free disk space: 3.1 GB in ~/Movies/Multi Screen Recorder, 10.7 GB needed for 2 hours
+FAIL  Free disk space: 3.1 GB in ~/Movies/Multi Screen Recorder, 12.8 GB needed for 2 hours
       Fix: free up space, or lower --required-recording-hours
 Not ready.
 ```
@@ -198,10 +219,15 @@ saves, so a fresh Mac has none and the defaults apply:
 ```
 
 - **Auto mode.** `auto` is on by default. With it on, a recording uses
-  Native and the audio mode Wired whatever `resolution` and `audioMode`
-  say, and system audio as its own switch says. The defaults of
-  `resolution` (`native`) and `audioMode` (`wired`) are auto mode's
+  Native, the audio mode Wired and the camera mode All real whatever
+  `resolution`, `audioMode` and `cameraMode` say, and system audio as
+  its own switch says. The defaults of `resolution` (`native`),
+  `audioMode` (`wired`) and `cameraMode` (`real`) are auto mode's
   choices, so turning auto off changes nothing until a slider is moved.
+- **Camera mode (D74).** `cameraMode` chooses the cameras recorded:
+  `none`, `default-camera` (the default camera only, if it is real),
+  `real` (every real camera) or `all-cameras` (every camera, the
+  virtual ones too).
 - **Read what is valid, never refuse.** A missing key takes its default;
   an unknown key and an invalid value are ignored (the key takes its
   default); a file that cannot be read, is no JSON or no JSON object
@@ -230,7 +256,11 @@ out and the permission is neither asked nor proven, D62), the
 Microphone permission (only when the recording records at least one
 audio input: with no audio input present, or none recorded under the
 audio mode, the item is left out and the permission is neither asked nor
-read), the screens (at least one, each readable; at the recording
+read), the Camera permission (D74: only when the camera mode records a
+camera that is connected; without one the item is left out and the
+permission is neither asked nor read; denied, it fails like the
+Microphone permission, with the fix to allow it or to record no camera,
+`--camera-mode none`), the screens (at least one, each readable; at the recording
 resolution None, where the free disk space counts no screen file, only
 with the system audio, which is captured through the main screen:
 `Screens: 2, none recorded (the system audio needs the main screen)`,
@@ -275,17 +305,21 @@ output folder, and free disk space in the output folder for
   creates no capture object; if that list, the default audio input or
   the name of an audio input cannot be read, the audio item fails with
   the reason and `msr list` stops with it.
+  The Camera permission is read the same way, and no camera is opened
+  by the check; the cameras are read from AVFoundation's device list
+  (D74).
 - Output folder: the check creates it with its parents if it is
   missing, then writes and deletes a file in it; a failure names the
   path and the reason.
 - Free disk space is measured on the output folder itself. Disk
   estimate, file by file at the encoding rates (*data*, see "Encoding"):
   a screen file is its video, 1 GB per hour at 1080p scaled by the
-  pixel count of its frame size, plus its guide tracks; an audio file is
+  pixel count of its frame size, plus its guide tracks; a camera file
+  is estimated as a screen file of its frame size; an audio file is
   its tracks' bit rates. The item compares the total of every file the
   recording would write, for `requiredRecordingHours`, with the free
   space. For the devices of the `msr list` example at the defaults that
-  is 5.3 GB per hour, 10.7 GB for 2 hours (the table in "The app" shows
+  is 6.4 GB per hour, 12.8 GB for 2 hours (the table in "The app" shows
   each file).
 - One cause, one red item: when the output folder fails, or the
   screens, the audio inputs or an audio input the recording records
@@ -327,6 +361,7 @@ One recording folder per recording, named by its local start time
 ~/Movies/Multi Screen Recorder/2026-11-12 14.03.05/
   2026-11-12 14.03.05 Screen 1 - Built-in Retina Display.mov
   2026-11-12 14.03.05 Screen 2 - LG HDR 4K.mov
+  2026-11-12 14.03.05 Camera 1 - FaceTime HD Camera.mov
   2026-11-12 14.03.05 Audio 1 - MacBook Pro Microphone.mov
   2026-11-12 14.03.05 Audio 0 - System.mov
   2026-11-12 14.27.41 Screen 2 - LG HDR 4K.mov    ← back after a reconnect
@@ -337,8 +372,9 @@ One recording folder per recording, named by its local start time
 ```
 
 One file per source, each named by its own start time and the
-source's label (D31, D55): a screen file per screen, an audio file per
-recorded audio input and one for system audio, each
+source's label (D31, D55): a screen file per screen, a camera file per
+recorded camera (D74), an audio file per recorded audio input and one
+for system audio, each
 `<date time> <label>.mov`. The manifest below lists exactly these
 files; `recording.log`, the recording log, is next to it (see
 "Logging").
@@ -368,7 +404,8 @@ Media are linked by file name only, relative to the timeline file.
   deferred). A file of zero frames gets no clip and no gap.
 - **Tracks:** a video track per screen (the guide tracks are left off),
   V1 the longest of the screen files that start first (an audio file
-  may start earlier), then the others by number; then the audio tracks by source
+  may start earlier), then the others by number; then a video track per
+  camera by number, placed as the screens' (D74); then the audio tracks by source
   number: one stereo track for the system audio, and for an audio input
   with n channels n mono tracks, `<label>` for one and `<label>, channel
   <k>` for more. The channels of one file are a linked group in Resolve.
@@ -382,14 +419,17 @@ Media are linked by file name only, relative to the timeline file.
 
 **Labels (D55).** Every recorded source has a label,
 `<kind> <n> - <name>`: `Screen <n> - <screen name>` for a screen,
+`Camera <n> - <device name>` for a camera (D74),
 `Audio <n> - <device name>` for an audio input, and always
 `Audio 0 - System` for the system audio. The numbers count per kind
 from 1. Screen 1 is the main screen; the others are numbered left to
 right, later arrivals in order of appearance. Audio inputs are
 numbered in the order they are first recorded, those at the start in
-Core Audio's order. A source keeps its number for the whole recording,
-also when it comes back: a screen by its UUID, an audio input by its
-Core Audio UID. So two audio inputs with the same name have different
+Core Audio's order. Cameras are numbered in the order they are first
+recorded, those at the start the default camera first, then in
+AVFoundation's order. A source keeps its number for the whole recording,
+also when it comes back: a screen by its UUID, a camera by its
+AVFoundation unique ID, an audio input by its Core Audio UID. So two audio inputs with the same name have different
 numbers and nothing else tells them apart in a name.
 
 `recording.json` is the recording manifest, rewritten atomically on
@@ -403,7 +443,7 @@ every change:
   "ended": null,
   "result": null,
   "cpu": null,
-  "settings": { "resolution": "1080p", "audioMode": "default-microphone", "systemAudio": true },
+  "settings": { "resolution": "1080p", "audioMode": "default-microphone", "systemAudio": true, "cameraMode": "real" },
   "files": [
     {
       "name": "2026-11-12 14.03.05 Screen 1 - Built-in Retina Display.mov",
@@ -426,6 +466,18 @@ every change:
       "end": 1446.2,
       "timecode": "14:03:05:04",
       "state": "finalized",
+      "guideTracks": ["Audio inputs", "System audio"],
+      "framesRepeatedForLateness": 0
+    },
+    {
+      "name": "2026-11-12 14.03.05 Camera 1 - FaceTime HD Camera.mov",
+      "camera": "FaceTime HD Camera",
+      "cameraUniqueID": "47B4B64B70674B9CAD2BAE273A71F4B5",
+      "frameSize": [1920, 1080],
+      "start": 0.0,
+      "end": null,
+      "timecode": "14:03:05:04",
+      "state": "recording",
       "guideTracks": ["Audio inputs", "System audio"],
       "framesRepeatedForLateness": 0
     },
@@ -501,7 +553,11 @@ every change:
 
 `start`, `end` and `at` are seconds from the recording's start on the
 shared clock. A screen file's `screenUUID` is its screen's identity (see
-"Screen identity"). The events: `screen connected`, `screen
+"Screen identity"). A camera file (D74) has the keys of a screen file,
+with `camera` (the camera's device name) and `cameraUniqueID`
+(AVFoundation's unique ID of the camera, its identity) in place of
+`screen` and `screenUUID`; `settings.cameraMode` is the camera mode, and
+a manifest written before cameras, without it, reads as `none`. The events: `screen connected`, `screen
 disconnected`, `screen frame size changed`, `screen mirroring started`,
 `screen mirroring stopped`, `main screen changed`, `screen stream
 failed`, `screen shows another screen's picture`, `screen file writer
@@ -539,7 +595,8 @@ is `recording` or `finalized`; a file's `state` is `recording`,
 `started`, and `result` is `ok` when every file is finalized and no file
 was ended by a failure (`screen stream failed`, `screen file writer
 failed`, `disk full`, `screen file writer fell behind`, `screen shows
-another screen's picture`, `audio input failed`, `system audio failed`,
+another screen's picture`, `camera stream failed`, `camera file writer
+failed`, `camera file writer fell behind`, `audio input failed`, `system audio failed`,
 `audio file writer failed`, `audio file writer fell behind`; an
 unplugged audio input, a gap, a change of the input volume and no audio
 are none), otherwise `problems` (D47);
@@ -587,7 +644,7 @@ as shown at the file's end (see "Audio"), to 0.1 ppm, null until the
 file ends and if it was not measured by then; `inputVolume` an audio
 input's input volume at the file's start, 0 to 1 to the thousandth,
 null when it cannot be read, absent for the system audio (D69). `files` lists the screen
-files and the audio files in the order of their start.
+files, the camera files and the audio files in the order of their start.
 
 **Names in a file name (D49, D55).** In a file name, `/` and `:` in a
 label become `-`, so a device name never stops a source from
@@ -606,7 +663,9 @@ or, for the system audio, `Audio 0 - System`. A screen file's QuickTime
 metadata items, all text, under `org.schapiro.multiscreenrecorder.`:
 `screenUUID`, `screenNumber`, `screenName`, `frameSize`
 (`1920x1080`), `recordingStarted` (as the manifest's `started`) and
-`app` (as the manifest's `app`); an audio file's: `audioSource`,
+`app` (as the manifest's `app`); a camera file's the same with
+`cameraUniqueID`, `cameraNumber` and `cameraName` in place of the
+screen's three (D74); an audio file's: `audioSource`,
 `audioSourceUID` (not for the system audio), `channels` (as in the
 manifest), `recordingStarted` and `app`; in every file the app also
 under the standard `com.apple.quicktime.software`; the reel name also under
@@ -722,11 +781,11 @@ checked, reported or rewritten at the next start (D47).
     recording resolution None) and every recorded audio input can
     be read. The ready check's items stay as they are.
 
-  Then a switch "Auto", on by default: the two sliders are always shown, so
+  Then a switch "Auto", on by default: the three sliders are always shown, so
   that the switch shifts nothing: on, they are disabled (grayed out) and
-  show auto mode's choices, Native and Wired, not the saved values, and
-  a caption says what auto mode records (every screen at Native, the
-  audio mode Wired); off, they are enabled and show the saved values: the recording resolution (over None,
+  show auto mode's choices, Native, Wired and All real, not the saved values, and
+  a caption says what auto mode records ("Every screen at Native, the
+  audio mode Wired, the camera mode All real."); off, they are enabled and show the saved values: the recording resolution (over None,
   which records no screen (D62), then 720p, 1080p, 1200p, 1440p, 4K,
   Native, smallest to largest) and the audio
   mode (over None, Default microphone, Wired, All), each with the chosen
@@ -734,7 +793,11 @@ checked, reported or rewritten at the next start (D47).
   "Bluetooth and virtual microphones are recorded only under All, or
   when they are the default microphone: recording a Bluetooth headset's
   microphone switches it to call quality, and a virtual microphone
-  often carries a copy of other sound." Then system audio and output
+  often carries a copy of other sound." Then the camera mode slider
+  (D74, over None, Default camera, All real, All) with the chosen one's
+  name beside it, and under it: "Virtual cameras are recorded only under
+  All: a virtual camera often carries a copy of a screen or of another
+  camera." Then system audio and output
   folder, which stay as they are; the ready check, with "Check again";
   and, in the lower right corner, Cancel and Start, Start on the right
   in blue as the call to action. Cancel quits the app without
@@ -755,12 +818,13 @@ checked, reported or rewritten at the next start (D47).
 |---|---|---|---|---|
 | Screen 1 - Built-in Retina Display | 1728×1117 | 3456×2234 | 1728×1116 | 1.0 |
 | Screen 2 - LG HDR 4K | 3840×2160 | 3840×2160 | 3840×2160 | 4.1 |
+| Camera 1 - FaceTime HD Camera (default) |  |  | 1920×1080 | 1.1 |
 | Audio 0 - System |  |  | stereo | 0.1 |
 | Audio 1 - MacBook Pro Microphone (default) |  |  | 1 channel | 0.1 |
 | Audio 2 - RØDE Wireless GO II RX |  |  | 2 channels | 0.1 |
-| Total |  |  |  | 5.3 |
+| Total |  |  |  | 6.4 |
 
-2 hours need 10.7 GB, 3.1 GB free.
+2 hours need 12.8 GB, 3.1 GB free.
 
 - **Recording:** the window closes; the Dock icon has no badge while
   all is well, no timer (D47). Low disk space shows as a "!" badge and a
@@ -773,7 +837,8 @@ checked, reported or rewritten at the next start (D47).
   on standard error.
 - **Status window (D46):** clicking the Dock icon while recording opens
   a small window, and Quit opens it too: a table with a row per screen,
-  then a row per audio source the recording records or recorded (the
+  then a row per camera the recording records or recorded (D74; its
+  Records at its frame size, its Clock drift empty), then a row per audio source the recording records or recorded (the
   system audio first, then the audio inputs by number), and the columns Source
   (as in the start window: the kind's icon, the number and the name),
   "Records at" (a screen's frame size; an audio source's `1 channel`, `2
@@ -930,7 +995,9 @@ tracker follows no screen: no stream, no screen file, no screen event
 and no screen row in the status window. With the system audio the
 screens are still read, as its stream follows the main screen; without
 it the recorder neither reads the screens nor follows their changes, so
-a microphone recording never fails for a screen. Everything else runs
+a microphone recording never fails for a screen. No camera is recorded
+either (D74): the cameras are not read and the Camera permission is not
+asked. Everything else runs
 as with screens: the audio files, `recording.json` (its settings say
 `"resolution": "none"`), sleep and wake.
 
@@ -1404,6 +1471,43 @@ check cannot see that. That `screenRect` and `CGDisplayBounds` are
 comparable as they are, in points and the same coordinates, is
 [ASSUMED]; the builder checks it with real frames.
 
+**Cameras (D74).** Each camera the camera mode records gets a camera
+file made exactly as a screen file: the same writer, the same 30 fps
+tick grid on the shared clock (the newest frame at each tick, repeated
+when the camera delivers none), HEVC, timecode, the same guide tracks,
+no audio of the camera's own.
+
+- **Which cameras.** The cameras are AVFoundation's video devices
+  (built-in, Continuity Camera, Desk View, external). The default camera
+  is `AVCaptureDevice.default(for: .video)`. A camera is real when
+  AVFoundation lists it as built in, as a Continuity Camera or Desk View,
+  or connected by built-in, USB, FireWire, PCI, Thunderbolt or
+  Continuity Capture (the transport types as Core Audio names them);
+  any other, unknown included, is virtual, such as OBS Virtual Camera.
+  None records no camera, Default camera the default camera if it is
+  real, All real every real camera, All every camera.
+- **Format.** Of a camera's formats the one with the largest frame size
+  among those reaching 30 fps (the highest frame rate rounded), or the
+  fastest when none does; the camera runs at the format's own frame
+  rate. AVFoundation decodes and scales its frames to the camera file's
+  frame size, the format's size capped by the recording resolution as a
+  screen's looks-like size is (Native keeps it). A frame without a
+  decoded picture ends the capture as a failing stream.
+- **Coming and going.** As screens: a camera that appears (event
+  `camera connected`) starts its file after the settle time; one that
+  vanishes ends it (`camera disconnected`); a failing stream or writer
+  ends the file with its event and the capture starts again after the
+  restart delay; disk full, sleep and wake as for screens. Under Default
+  camera a change of the default camera is the event `default camera
+  changed`. A camera keeps its number by its unique ID. There is no
+  mirroring, main camera or screen check for cameras.
+- **Permission.** The recorder reads the cameras only with the Camera
+  permission. Never asked, it asks once, when the camera mode records a
+  connected camera (at the start or when one appears), and records the
+  cameras once granted; denied, the problem "The Camera permission is
+  missing" is told once, and the screens and the audio are recorded as
+  usual.
+
 **Disk (D14).** Below the warning threshold: the warning. A writer that
 fails on a full disk ends its file, readable up to the last fragment;
 the recorder checks free space every 5 s and starts new screen files
@@ -1590,7 +1694,12 @@ problems of a recording, the audio tracker (the audio modes, inputs
 coming and going, an unplug told once, a replug, the default microphone
 followed, failures with the back-off, the system audio moving to the new
 main screen, a full disk, a channel count change, two inputs with the
-same name, sleep and wake), the audio file's placement on the tick grid
+same name, sleep and wake), the camera mode and which camera each
+records, a camera's chosen format with the recording resolution's cap,
+the camera tracker (numbers, the default camera first, a camera
+coming and going, failures with the back-off, a full disk, sleep and
+wake), camera files in the manifest, the timeline and the status
+window (D74), the audio file's placement on the tick grid
 (trimming, gaps filled or ending the file, jitter within 32 ms), the
 clock drift correction (the tracker against simulated devices, seeds 1
 to 3: steady, also for 30 minutes, sources in bursts like the system
@@ -1656,7 +1765,10 @@ file, the system audio excluded), the input volume against a stand-in
 for Core Audio (its property's address, a set clamped to 0 to 1, a
 refusal, the listener; no test reads or sets a real device's volume), a
 recorder audio only with a stand-in audio input and input volume
-and a stand-in for the screens (`RecorderDevices.screens`; a wake whose
+and a stand-in for the screens, and with stand-in cameras (a camera
+appearing and vanishing, its stream failing, a frame without a picture,
+and the Camera permission never asked, granted, denied, refused at the
+request, not asked without a camera or under the camera mode None) (`RecorderDevices.screens`; a wake whose
 screens cannot be read still restarts the audio inputs) (`RecorderTests`: a failure told once by its event and its repeats
 counted at Stop, D65; `inputVolume`, a change told once it held still,
 also one Core Audio does not report, the slider's set, a refused set as
@@ -1667,7 +1779,7 @@ Core Audio's transport types, and the ready check's probes with
 stand-ins (the output folder's file access is off the main thread). The
 recorder's filter of the clock drift status by capture number, which
 drops a status from a capture already replaced, has no unit test yet;
-`RecorderTests` record no screen. `AppTests` run the
+`RecorderTests` record no screen and open no camera. `AppTests` run the
 start window's model with stand-in probes and a stand-in for the hold:
 one check per burst of device changes, nothing applied while a menu is
 open, a stale queued refresh does nothing, choices saved only when
@@ -1987,6 +2099,14 @@ higher on both screens (108.1 against 114.5 on the LG, 114.8 against
 120.8 on the built-in display), where two unchanged builds recording
 together differed by under 0.05.
 
+Built (cameras, D74): the camera mode (`--camera-mode`, the setting
+`cameraMode`, the slider), a camera file per recorded camera on the
+screen files' writer path (see "Cameras"), the Camera permission in the
+ready check and while recording, cameras in "What will be recorded",
+`recording.json`, the timeline file, the status window, the status line
+and the summary. Capture from a real camera is UNVERIFIED: no test opens
+a camera, and the end-to-end VM has none.
+
 Details the design left open, as built and confirmed by the owner
 (D25, D28, D44): a key missing from the settings file takes its default;
 the output folder must start with `/` or `~`; the two number settings
@@ -2001,7 +2121,7 @@ commit gives the same banner; a bundle without it says `built (build
 date missing from Info.plist)`, and outside a bundle the banner has no
 build date. The
 settings file is found through `HOME`. The disk estimate follows its
-rule, file by file (10.7 GB in the `msr check` example above). The
+rule, file by file (12.8 GB in the `msr check` example above). The
 recording resolution box turns with a portrait screen (1080×1920 for a
 2160×3840 screen at 1080p).
 

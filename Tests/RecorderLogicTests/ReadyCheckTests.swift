@@ -13,14 +13,17 @@ import Testing
         screens: Result<[ScreenInfo], DeviceReadError>? = nil,
         audioInputs: [AudioInputInfo] = builtInMicrophoneOnly,
         audioInputsError: DeviceReadError? = nil,
-        outputFolder: OutputFolderProbe = .usable(.bytes(100_000_000_000))
+        outputFolder: OutputFolderProbe = .usable(.bytes(100_000_000_000)),
+        cameras: [CameraInfo] = []
     ) -> ReadyCheckFacts {
         ReadyCheckFacts(
             screenRecording: screenRecording,
             microphoneGranted: microphoneGranted,
             screens: screens ?? .success(fullHDScreens),
             audioInputs: audioInputsError.map { .failure($0) } ?? .success(audioInputs),
-            outputFolder: outputFolder
+            outputFolder: outputFolder,
+            cameraGranted: cameras.isEmpty ? nil : true,
+            cameras: cameras
         )
     }
 
@@ -30,10 +33,11 @@ import Testing
     static let designExample = """
         ok    Screen & System Audio Recording permission
         ok    Microphone permission
+        ok    Camera permission
         ok    Screens: 2
         ok    Audio: system audio, MacBook Pro Microphone (default), RØDE Wireless GO II RX
         ok    Output folder: ~/Movies/Multi Screen Recorder
-        FAIL  Free disk space: 3.1 GB in ~/Movies/Multi Screen Recorder, 10.7 GB needed for 2 hours
+        FAIL  Free disk space: 3.1 GB in ~/Movies/Multi Screen Recorder, 12.8 GB needed for 2 hours
               Fix: free up space, or lower --required-recording-hours
         Not ready.
 
@@ -42,7 +46,7 @@ import Testing
     @Test func rendersExactlyAsTheDesign() {
         let result = ReadyCheck.evaluate(
             facts(screens: .success(DesignExample.screens), audioInputs: DesignExample.audioInputs,
-                  outputFolder: .usable(.bytes(3_100_000_000))),
+                  outputFolder: .usable(.bytes(3_100_000_000)), cameras: DesignExample.cameras),
             settings: .defaults)
         #expect(result.text == Self.designExample)
         #expect(!result.isReady)

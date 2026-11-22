@@ -38,7 +38,7 @@ architect's reading.
 
 ## D1: An independent product, written from scratch (2026-11-12)
 
-- **Status:** in force
+- **Status:** in force; "camera capture" out of scope superseded by D74
 - **Context:** The owner started from a fork of
   `UBA-PSI/psi-screencapture-macos` (MIT, Dominik Herrmann, PSI chair,
   University of Bamberg) and decided to "disconnect from upstream and
@@ -2370,3 +2370,11 @@ architect's reading.
 - **Decision:** Each `VirtualScreenSpec` carries its name, display text only: "Desk Monitor" (1600x900) and "Portable Monitor" (1280x720). The driver recognises its screens by the vendor and product ID it sets (`0x4D53`, `0x5254`), never by name; `ManifestCheck` matches the recorder's screen names against the names of the screens the scenario connects. Replaces the name prefix "MSR Test".
 - **Consequences:** A screen's name is not unique (the scenarios' screen and one of the status window's share "Portable Monitor"); screens are told apart by UUID and serial number. "Apple Virtual" (the VM's own display) and the audio devices' names stay.
 - **Evidence:** [design/end-to-end-tests.md](design/end-to-end-tests.md), "Virtual screens use a small fixed set of identities"; `Tests/EndToEndLogicTests`; backlog item 37.
+
+## D74: Cameras are recorded, each in its own camera file made as a screen file (2026-11-22)
+
+- **Status:** in force
+- **Context:** D1 left camera capture out of scope. The owner, 2026-11-16: "we'll have to add a feature to record cameras, same slider: none, default, all, all + virtual"; 2026-11-18, each camera in "its largest format that still delivers the wanted frame rate"; 2026-11-22: "I'd record all real cameras by default", on the permission "I don't think we have users so we go for the 'record everything'", and on audio "I agree with identical guide tracks on every video".
+- **Decision:** A setting `cameraMode` (`--camera-mode`, a slider): None, Default camera, All real (`real`, auto mode's and the default), All (`all-cameras`, virtual cameras too). Each recorded camera gets a camera file made exactly as a screen file: the same writer and 30 fps tick grid on the shared clock, HEVC, timecode, the same two guide tracks, no camera microphone track; its format is the largest reaching 30 fps, capped by the recording resolution as a screen. Labels `Camera <n> - <device name>`; cameras come and go as screens, with their own events, in `recording.json`, the timeline file and the status window. The Camera permission is asked only when the camera mode records a connected camera, at the ready check or when one appears; denied, a problem told once. Replaces D1's "camera capture" out of scope. The architect's reading, decided while building, for the owner to confirm: the recording resolution None records no camera either; a camera is virtual unless AVFoundation lists it as built in, Continuity Camera or Desk View or by a built-in, USB, FireWire, PCI, Thunderbolt or Continuity Capture transport; a camera with no format reaching 30 fps records its fastest; the default camera is `AVCaptureDevice.default(for: .video)`, and a virtual default camera is not recorded under Default camera; the event `default camera changed` only under Default camera; a denied Camera permission fails the ready check as the Microphone permission does.
+- **Consequences:** A camera costs about as much disk and encoder as a screen of its frame size, and every camera of a Mac is recorded by default. H.264 pass-through of a camera's own stream is deferred: every format is decoded and encoded again. Capture from a real camera is not covered by any test: the end-to-end VM has no camera.
+- **Evidence:** [design/recorder.md](design/recorder.md), "Cameras"; `Sources/RecorderLogic/CameraTracker.swift`, `Sources/RecorderCore/CameraCapture.swift`; backlog item 12.

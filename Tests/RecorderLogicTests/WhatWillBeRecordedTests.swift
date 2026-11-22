@@ -24,6 +24,13 @@ import Testing
             audioInputs: .success(DesignExample.audioInputs), outputFolder: Self.designFolder)
     }
 
+    /// The design's examples, which add the camera.
+    private var designSection: WhatWillBeRecorded {
+        WhatWillBeRecorded(
+            settings: .defaults, screens: .success(DesignExample.screens),
+            audioInputs: .success(DesignExample.audioInputs), cameras: DesignExample.cameras, outputFolder: Self.designFolder)
+    }
+
     @Test func theDefaultsWithTheDesignsDevices() {
         #expect(defaultSection == WhatWillBeRecorded(
             settingsLine: "Settings: Auto (resolution Native, audio mode Wired, camera mode All real), system audio on",
@@ -59,10 +66,10 @@ import Testing
     /// The table with its total row, and the line of what the required
     /// recording hours need, in docs/design/recorder.md, as Markdown.
     @Test func theDesignShowsTheExample() throws {
-        let example = defaultSection
+        let example = designSection
         var lines = ["| " + WhatWillBeRecorded.columns.joined(separator: " | ") + " |",
                      "|" + String(repeating: "---|", count: WhatWillBeRecorded.columns.count)]
-        let rows = example.screenRows + example.audioRows + [try #require(example.totalRow)]
+        let rows = example.screenRows + example.cameraRows + example.audioRows + [try #require(example.totalRow)]
         lines += rows.map { "| " + $0.cells.joined(separator: " | ") + " |" }
         lines += ["", try #require(example.total?.need)]
         #expect(try repositoryFile("docs/design/recorder.md").contains(lines.joined(separator: "\n") + "\n"))
@@ -224,7 +231,7 @@ import Testing
     }
 
     @Test func theDesignShowsTheTextOfMSRCheck() throws {
-        #expect(try repositoryFile("docs/design/recorder.md").contains("```\n\(defaultSection.text)```\n"))
+        #expect(try repositoryFile("docs/design/recorder.md").contains("```\n\(designSection.text)```\n"))
     }
 
     // The settings line, and why an input is not recorded.

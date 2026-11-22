@@ -164,8 +164,8 @@ checks out the full history for it; the snapshot job needs only the
 commit), otherwise the local form. After signing it stops on any
 miss among: `codesign --verify --deep --strict`; the signed identifier;
 the hardened runtime flag; the entitlements equal to
-`Resources/msr.entitlements` (audio input). The hardened
-runtime is on, with the audio-input entitlement, so behaviour does not
+`Resources/msr.entitlements` (audio input, camera, D74). The hardened
+runtime is on, with the audio-input and camera entitlements, so behaviour does not
 change when Developer ID signing arrives. `scripts/build-app` already
 signs ad hoc with the same options, so the smoke-tested bundle and the
 published one differ in their signature only.
@@ -212,7 +212,7 @@ account and plan were not checked].
    Signing`, such as `Multi Screen Recorder Signing (<your name>)`;
    identity type Self-Signed Root, certificate type Code Signing, "Let
    me override defaults" ticked, validity 3650 days (the default is one
-   year, and a new certificate means granting both permissions again),
+   year, and a new certificate means granting the permissions again),
    the rest unchanged, in the login keychain.
 4. For the end-to-end tests: `brew install openai/tools/tart hashicorp/tap/packer`, then
    `scripts/end-to-end-setup` (about 4 minutes once the 28 GB base image is downloaded; 30 GB of disk).

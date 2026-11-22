@@ -433,6 +433,13 @@ import Testing
             #expect(Set(encoded.keys) == Set(file.keys))
             #expect(decoded.name == file["name"] as? String)
         }
+        let cameraFiles = files.filter { $0["camera"] != nil }
+        #expect(cameraFiles.count == 1)
+        for file in cameraFiles {
+            let decoded = try JSONDecoder().decode(RecordingManifest.CameraFile.self, from: JSONSerialization.data(withJSONObject: file))
+            let encoded = try #require(try JSONSerialization.jsonObject(with: prettyJSON(decoded)) as? [String: Any])
+            #expect(Set(encoded.keys) == Set(file.keys))
+        }
         let events = try #require(object["events"] as? [[String: Any]])
         for event in events {
             _ = try JSONDecoder().decode(RecordingEvent.self, from: JSONSerialization.data(withJSONObject: event))
@@ -449,7 +456,7 @@ import Testing
         #expect(object["ended"] is NSNull)
         #expect(object["result"] is NSNull)
         let settings = try #require(object["settings"] as? [String: Any])
-        #expect(Set(settings.keys) == ["resolution", "audioMode", "systemAudio"])
+        #expect(Set(settings.keys) == ["resolution", "audioMode", "systemAudio", "cameraMode"])
         #expect(object["started"] as? String == manifest().started)
     }
 

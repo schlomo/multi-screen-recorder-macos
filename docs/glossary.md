@@ -14,7 +14,8 @@ recording manifest, problem, status window, screen file, screen
 identity, settle time, screen check, tick, timecode, audio track,
 audio file, guide track, clock drift; D45, D49), labels (D55), the
 banner, the recording log and the error detail (D64), the timeline file
-(D68), the level meter, the input volume and no audio (D69), and the end-to-end
+(D68), the level meter, the input volume and no audio (D69), cameras,
+camera files and the camera mode (D74), and the end-to-end
 tests' first named scenarios, with the restore file, virtual screens and
 the test tone (D63).
 
@@ -159,8 +160,8 @@ says screen everywhere else (D55).
 What a recorded source is called in its file names, its reel name, its
 track names and the terminal's tables (the window shows an icon for
 the kind instead of the word):
-`Screen <n> - <name>`, `Audio <n> - <name>`, or `Audio 0 - System` for
-the system audio. The numbers count per kind from 1 in order of
+`Screen <n> - <name>`, `Camera <n> - <name>`, `Audio <n> - <name>`,
+or `Audio 0 - System` for the system audio. The numbers count per kind from 1 in order of
 appearance in the recording, and a source keeps its number when it
 comes back (D55).
 
@@ -173,6 +174,35 @@ a new one begins when it is back. A screen whose frame size changes
 also ends its file, and a new one begins after the settle time (D30,
 D45). Sleep, mirroring, a writer too far behind and the screen check
 end it too.
+
+## Camera
+
+A video device AVFoundation lists on the Mac: built in, a Continuity
+Camera or Desk View, or connected by cable; these are real cameras. A
+virtual camera is made by software, such as OBS Virtual Camera, and
+often carries a copy of a screen or of another camera (D74).
+
+## Camera file
+
+The video file for one camera, made exactly as a screen file: the same
+tick grid, timecode and guide tracks, no audio of the camera's own, its
+frame size the size of the camera's chosen format capped by the
+recording resolution. A camera that disappears or whose stream or
+writer fails ends its camera file; a new one begins when it is back
+(D74).
+
+## Camera mode
+
+Which cameras are recorded, a slider of four steps: None (`none`),
+Default camera (`default-camera`, the default camera if it is real), All
+real (`real`, every real camera) and All (`all-cameras`, virtual
+cameras too). All real is auto mode's camera mode and the default
+(D74).
+
+## Video file
+
+A screen file or a camera file: what the two share in the code (the
+writer, the ticks, the end of a file).
 
 ## Screen identity
 
@@ -200,11 +230,11 @@ even number (D11, D25, D30, D44).
 ## Tick
 
 One of the instants, 1/30 s apart from the recording's start, at which
-every screen file gets a frame (D11, D21).
+every screen file and every camera file gets a frame (D11, D21, D74).
 
 ## Timecode
 
-The time-of-day track in every screen file and every audio file, by
+The time-of-day track in every screen file, camera file and audio file, by
 which an editor places files on a timeline (D21, D31).
 
 ## Audio track
@@ -240,12 +270,12 @@ audio mode, and the default (D44).
 
 ## Auto mode
 
-The setting `auto`, on by default: every screen is recorded at Native
-and the audio mode is Wired, whatever the two sliders (`resolution`,
-`audioMode`) say; system audio, the output folder and the rest stay as
+The setting `auto`, on by default: every screen is recorded at Native,
+the audio mode is Wired and the camera mode All real, whatever the
+three sliders (`resolution`, `audioMode`, `cameraMode`) say; system audio, the output folder and the rest stay as
 set. The sliders' defaults are auto mode's choices, so turning auto mode
 off changes nothing until one is moved. In the window the switch "Auto"
-grays out the sliders, which then show Native and Wired; on the command line `--auto` forces it for one run
+grays out the sliders, which then show Native, Wired and All real; on the command line `--auto` forces it for one run
 (D34, D44).
 
 ## Audio file
@@ -261,7 +291,7 @@ starts a new one (D31, D46, D49).
 
 ## Guide track
 
-A track in a screen file for playback and waveform sync only:
+A track in a screen file or a camera file for playback and waveform sync only:
 "Audio inputs", one mono mix of the recorded audio inputs (each averaged
 to mono, summed at unity gain, through a soft limiter; D52), or
 "System audio", stereo; the two are never mixed together. Which ones a
@@ -309,15 +339,15 @@ whole file) and the sound the correction added as
 The maximum box a screen's looks-like size is shrunk to fit: 4K,
 1440p, 1200p, 1080p or 720p, turned upright for a portrait screen, or
 Native, which has no box. It never enlarges the picture (D11, D25, D44).
-Or None (`none`), first on the slider, which records no screen: audio
-only (D62). Said in full, "the recording resolution None", as the audio
+Or None (`none`), first on the slider, which records no screen and no
+camera: audio only (D62, D74). Said in full, "the recording resolution None", as the audio
 mode has a None of its own.
 
 ## Audio only
 
 A recording at the recording resolution None: its audio files and
-`recording.json`, no screen file and so no guide track. The screens are
-not recorded; a recording that would record neither a screen nor any
+`recording.json`, no screen file, no camera file and so no guide track.
+The screens and the cameras are not recorded; a recording that would record neither a screen nor any
 audio source does not pass the ready check (D62).
 
 ## Native
@@ -339,9 +369,10 @@ looks-like size; a column of the table. Never recorded (D44).
 
 A source the settings or its own state leave out of a recording: shown
 dimmed in the window, without a number, with `-` for GB/h max (and for
-Records at, for a screen at the recording resolution None), and, for an
-audio input whose own rule leaves it out, the reason in parentheses
-after its name (`(virtual)`, `(no device ID)`; D59, D62).
+Records at, for a screen at the recording resolution None and for a
+camera), and, for an audio input or a camera whose own rule leaves it
+out, the reason in parentheses after its name (`(virtual)`, `(no device
+ID)`, `(no format)`; D59, D62, D74).
 
 ## Ready check
 
