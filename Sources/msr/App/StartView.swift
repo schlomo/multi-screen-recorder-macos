@@ -155,7 +155,7 @@ private struct SettingsForm: View {
                             Text(model.settings.effectiveCameraMode.shownName).frame(width: 130, alignment: .leading)
                                 .accessibilityHidden(true)
                         }
-                        Text(CameraMode.virtualNote)
+                        Text(CameraMode.leftOutNote)
                             .font(.callout)
                             .foregroundStyle(.secondary)
                             .fixedSize(horizontal: false, vertical: true)

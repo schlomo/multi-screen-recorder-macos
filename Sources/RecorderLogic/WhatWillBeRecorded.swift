@@ -205,13 +205,15 @@ public struct WhatWillBeRecorded: Equatable, Sendable {
     }
 
     /// A camera not recorded has no number and `-` for Records at and GB/h max; after its name it says
-    /// why, where its own rule leaves it out: "OBS Virtual Camera (virtual)", "(no format)", "(suspended)".
+    /// why, where its own rule leaves it out: "OBS Virtual Camera (virtual)", "(Continuity Camera)", "(no format)", "(suspended)".
     private static func camera(_ camera: CameraInfo, number: Int?, settings: Settings) -> Camera {
         guard let number, let frameSize = camera.frameSize(resolution: settings.effectiveResolution) else {
             let leavesOutVirtual = [.defaultCamera, .real].contains(settings.effectiveCameraMode)
                 && settings.effectiveResolution.recordsScreens
             let reason: String? = if camera.formats.isEmpty { "no format" } else if camera.isVirtual && leavesOutVirtual {
                 "virtual"
+            } else if camera.isContinuity && leavesOutVirtual {
+                "Continuity Camera"
             } else if camera.isSuspended && settings.cameraModeIncludes(camera) && settings.effectiveResolution.recordsScreens {
                 "suspended"
             } else { nil }

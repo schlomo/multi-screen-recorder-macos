@@ -51,8 +51,8 @@ public enum CameraMode: String, CaseIterable, Sendable, Encodable {
     }
 
     /// Said under the slider.
-    public static let virtualNote =
-        "Virtual cameras are recorded only under All: a virtual camera often carries a copy of a screen or of another camera."
+    public static let leftOutNote = "Virtual cameras and iPhone cameras (Continuity Camera, Desk View) are recorded only under All:"
+        + " a virtual camera often carries a copy of a screen or of another camera."
 
     /// The position of this camera mode on the slider, which runs over `allCases`.
     public var sliderIndex: Double { indexOnSlider(of: self, in: Self.allCases) }
@@ -147,8 +147,8 @@ public struct Settings: Equatable, Sendable, Encodable {
     public func cameraModeIncludes(_ camera: CameraInfo) -> Bool {
         switch effectiveCameraMode {
         case .none: false
-        case .defaultCamera: camera.isDefault && !camera.isVirtual
-        case .real: !camera.isVirtual
+        case .defaultCamera: camera.isDefault && !camera.isVirtual && !camera.isContinuity
+        case .real: !camera.isVirtual && !camera.isContinuity
         case .allCameras: true
         }
     }

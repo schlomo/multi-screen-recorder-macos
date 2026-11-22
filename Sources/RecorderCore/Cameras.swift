@@ -18,6 +18,7 @@ public func currentCameras() -> [CameraInfo] {
         CameraInfo(
             uniqueID: device.uniqueID, name: device.localizedName, isDefault: device.uniqueID == defaultID,
             isVirtual: cameraIsVirtual(deviceType: device.deviceType, transportType: device.transportType),
+            isContinuity: cameraIsContinuity(deviceType: device.deviceType, transportType: device.transportType),
             formats: CameraFormat.preferred(device.formats.map(cameraFormat)),
             isSuspended: device.isSuspended)
     }
@@ -32,8 +33,9 @@ func cameraFormat(of format: AVCaptureDevice.Format) -> CameraFormat {
 }
 
 /// Whether a camera is virtual, made by software such as OBS Virtual Camera
-/// (a CoreMediaIO extension): a camera is real when AVFoundation lists it
-/// as built in, as a Continuity Camera or Desk View, or connected by
+/// (a CoreMediaIO extension): a camera is a device, not virtual, when
+/// AVFoundation lists it as built in, as a Continuity Camera or Desk View,
+/// or connected by
 /// built-in, USB, FireWire, PCI, Thunderbolt or Continuity Capture, as Core
 /// Audio's transport types say it (`AVCaptureDevice.transportType`); every
 /// other transport, virtual and unknown ones included, is virtual (D74).
@@ -43,6 +45,14 @@ func cameraIsVirtual(deviceType: AVCaptureDevice.DeviceType, transportType: Int3
     case .builtIn, .usb, .fireWire, .pci, .thunderbolt, .continuityCapture: false
     case .hdmi, .displayPort, .bluetooth, .bluetoothLE, .virtual, .aggregate, .airPlay, .unknown, .unreadable: true
     }
+}
+
+/// Whether a camera is an iPhone's: a Continuity Camera or Desk View, or
+/// connected by Continuity Capture. Recorded only under All, as a virtual
+/// one (D74).
+func cameraIsContinuity(deviceType: AVCaptureDevice.DeviceType, transportType: Int32) -> Bool {
+    [.continuityCamera, .deskViewCamera].contains(deviceType)
+        || audioTransport(coreAudioValue: UInt32(bitPattern: transportType)) == .continuityCapture
 }
 
 /// Follows the cameras: one connected or disconnected (video devices only)

@@ -401,6 +401,19 @@ import Testing
         #expect(audioOnly.cameraRows.map(\.cells) == [["OBS Virtual Camera", "", "", "-", "-"]])
     }
 
+    @Test func anIPhoneCameraIsRecordedOnlyUnderAllAndSaysWhy() {
+        let iPhone = CameraInfo(
+            uniqueID: "I", name: "Anna's iPhone Camera", isDefault: false, isVirtual: false, isContinuity: true,
+            formats: [CameraFormat(size: FrameSize(width: 1920, height: 1080), maxFramesPerSecond: 30)])
+        let real = WhatWillBeRecorded(settings: .defaults, screens: .success([]), audioInputs: .success([]), cameras: [iPhone], outputFolder: nil)
+        #expect(real.cameraRows.map(\.cells) == [["Anna's iPhone Camera (Continuity Camera)", "", "", "-", "-"]])
+        var all = Settings.defaults
+        all.auto = false
+        all.cameraMode = .allCameras
+        let allShown = WhatWillBeRecorded(settings: all, screens: .success([]), audioInputs: .success([]), cameras: [iPhone], outputFolder: nil)
+        #expect(allShown.cameraRows.map(\.isRecorded) == [true])
+    }
+
     @Test func aSuspendedCameraIsNotRecordedAndSaysSo() {
         var suspended = Self.builtInCamera
         suspended.isSuspended = true

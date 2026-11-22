@@ -29,18 +29,27 @@ import Testing
     private static let usb = camera("B", "Logitech BRIO")
     private static let obs = camera("C", "OBS Virtual Camera", isVirtual: true)
     private static let virtualDefault = camera("D", "Virtual Default", isDefault: true, isVirtual: true)
+    private static let iPhone = camera("E", "Anna's iPhone Camera", isContinuity: true)
+    private static let iPhoneDefault = camera("F", "Anna's iPhone Desk View Camera", isDefault: true, isContinuity: true)
 
+    /// An iPhone's camera (Continuity Camera, Desk View) is recorded only under All, as a virtual one (D74).
     @Test(arguments: [
-        (CameraMode.none, [Bool]([false, false, false, false])),
-        (.defaultCamera, [true, false, false, false]),
-        (.real, [true, true, false, false]),
-        (.allCameras, [true, true, true, true]),
+        (CameraMode.none, [Bool]([false, false, false, false, false, false])),
+        (.defaultCamera, [true, false, false, false, false, false]),
+        (.real, [true, true, false, false, false, false]),
+        (.allCameras, [true, true, true, true, true, true]),
     ])
     func theCameraModeChoosesTheCameras(mode: CameraMode, recorded: [Bool]) {
         var settings = Settings.defaults
         settings.auto = false
         settings.cameraMode = mode
-        #expect([Self.builtIn, Self.usb, Self.obs, Self.virtualDefault].map(settings.cameraModeIncludes) == recorded)
+        #expect([Self.builtIn, Self.usb, Self.obs, Self.virtualDefault, Self.iPhone, Self.iPhoneDefault]
+            .map(settings.cameraModeIncludes) == recorded)
+    }
+
+    @Test func theNoteUnderTheSliderNamesVirtualAndIPhoneCameras() {
+        #expect(CameraMode.leftOutNote == "Virtual cameras and iPhone cameras (Continuity Camera, Desk View) are recorded only"
+            + " under All: a virtual camera often carries a copy of a screen or of another camera.")
     }
 
     @Test func theRecordingResolutionNoneRecordsNoCamera() {
@@ -90,21 +99,25 @@ import Testing
         #expect(camera([]).chosenFormat(resolution: .native) == nil)
     }
 
-    /// A DCI 4096×2160 or a square format is not chosen over a 16:9 one (D74).
-    @Test func sixteenByNineFormatsArePreferredWhenOneDeliversThirtyFramesPerSecond() {
-        let brio = camera([format(4096, 2160, 30), format(3840, 2160, 30), format(1552, 1552, 30), format(1920, 1080, 30)])
-        #expect(brio.chosenFormat(resolution: .native) == format(3840, 2160, 30))
-        #expect(camera([format(1366, 768, 30), format(1600, 1200, 30)]).chosenFormat(resolution: .native) == format(1366, 768, 30))
-        #expect(camera([format(1552, 1552, 30), format(640, 480, 30)]).chosenFormat(resolution: .native) == format(1552, 1552, 30))
+    /// Any aspect ratio: the largest format at 30 fps, by its pixels (D74).
+    @Test func theLargestFormatOfAnyAspectRatioIsChosenAtNative() {
+        #expect(camera([format(4096, 2160, 30), format(3840, 2160, 30)]).chosenFormat(resolution: .native) == format(4096, 2160, 30))
+        #expect(camera([format(1552, 1552, 30), format(1920, 1080, 30)]).chosenFormat(resolution: .native) == format(1552, 1552, 30))
+        #expect(camera([format(2160, 1440, 30), format(1920, 1080, 30)]).chosenFormat(resolution: .native) == format(2160, 1440, 30))
+        #expect(camera([format(1080, 1920, 30), format(1280, 720, 30)]).chosenFormat(resolution: .native) == format(1080, 1920, 30))
     }
 
-    /// The largest format that fits into the recording resolution's box is recorded as it is, not scaled.
-    @Test func theLargestFormatInsideTheBoxIsChosen() {
-        let brio = camera([format(4096, 2160, 30), format(3840, 2160, 30), format(1920, 1080, 30), format(1280, 720, 30)])
-        #expect(brio.chosenFormat(resolution: .p1440) == format(1920, 1080, 30))
-        #expect(brio.frameSize(resolution: .p1440) == FrameSize(width: 1920, height: 1080))
-        #expect(brio.chosenFormat(resolution: .p1080) == format(1920, 1080, 30))
-        #expect(camera([format(1552, 1552, 30), format(640, 480, 30)]).chosenFormat(resolution: .p1080) == format(640, 480, 30))
+    /// A format fits the box as a screen's picture does: a portrait one against the box turned upright.
+    @Test func theLargestFormatInsideTheBoxIsChosenWhateverItsAspectRatio() {
+        let threeByTwo = camera([format(2160, 1440, 30), format(1920, 1080, 30)])
+        #expect(threeByTwo.chosenFormat(resolution: .p1440) == format(2160, 1440, 30))
+        #expect(threeByTwo.chosenFormat(resolution: .p1080) == format(1920, 1080, 30))
+        let square = camera([format(1552, 1552, 30), format(1080, 1080, 30), format(1920, 1080, 30)])
+        #expect(square.chosenFormat(resolution: .p1080) == format(1920, 1080, 30))
+        #expect(square.chosenFormat(resolution: .uhd4k) == format(1552, 1552, 30))
+        let portrait = camera([format(1080, 1920, 30), format(1280, 720, 30)])
+        #expect(portrait.chosenFormat(resolution: .p1080) == format(1080, 1920, 30))
+        #expect(portrait.frameSize(resolution: .p1080) == FrameSize(width: 1080, height: 1920))
     }
 
     /// When no format fits into the box, the smallest is chosen and scaled.
@@ -112,6 +125,9 @@ import Testing
         let large = camera([format(3840, 2160, 30), format(1920, 1080, 30)])
         #expect(large.chosenFormat(resolution: .p720) == format(1920, 1080, 30))
         #expect(large.frameSize(resolution: .p720) == FrameSize(width: 1280, height: 720))
+        let threeByTwo = camera([format(3840, 2160, 30), format(2160, 1440, 30)])
+        #expect(threeByTwo.chosenFormat(resolution: .p720) == format(2160, 1440, 30))
+        #expect(threeByTwo.frameSize(resolution: .p720) == FrameSize(width: 1080, height: 720))
     }
 
     /// Of a frame size's variants the slowest that still delivers 30 fps, else the fastest (D74).
@@ -175,14 +191,19 @@ import Testing
         #expect(starts(cameras.begin([Self.builtIn, Self.obs], at: 0)) == ["A", "C"])
     }
 
-    @Test func theFileIsCappedByTheRecordingResolution() {
+    /// The format inside the recording resolution's box is opened; only a larger one is scaled.
+    @Test func theFormatAndTheFileFollowTheRecordingResolution() {
         var cameras = tracker(resolution: .p720)
-        let step = cameras.begin([Self.builtIn], at: 0)
-        guard case .start(_, _, let frameSize, _, _) = step.actions.first else {
-            Issue.record("no start")
-            return
+        var large = Self.builtIn
+        large.uniqueID = "L"
+        large.isDefault = false
+        large.formats = [CameraFormat(size: FrameSize(width: 1920, height: 1080), maxFramesPerSecond: 30)]
+        let starts = cameras.begin([Self.builtIn, large], at: 0).actions.compactMap { action -> (CameraFormat, FrameSize)? in
+            guard case .start(_, let format, let frameSize, _, _) = action else { return nil }
+            return (format, frameSize)
         }
-        #expect(frameSize == FrameSize(width: 1280, height: 720))
+        #expect(starts.map(\.0.size) == [FrameSize(width: 640, height: 480), FrameSize(width: 1920, height: 1080)])
+        #expect(starts.map(\.1) == [FrameSize(width: 640, height: 480), FrameSize(width: 1280, height: 720)])
     }
 
     @Test func aCameraThatGoesEndsItsFileAtOnceAndComesBackAfterTheSettleTimeWithItsNumber() {
@@ -307,9 +328,11 @@ import Testing
 }
 
 /// A camera with a 1080p format at 30 fps and smaller ones.
-func camera(_ uniqueID: String, _ name: String, isDefault: Bool = false, isVirtual: Bool = false) -> CameraInfo {
+func camera(
+    _ uniqueID: String, _ name: String, isDefault: Bool = false, isVirtual: Bool = false, isContinuity: Bool = false
+) -> CameraInfo {
     CameraInfo(
-        uniqueID: uniqueID, name: name, isDefault: isDefault, isVirtual: isVirtual,
+        uniqueID: uniqueID, name: name, isDefault: isDefault, isVirtual: isVirtual, isContinuity: isContinuity,
         formats: [
             CameraFormat(size: FrameSize(width: 640, height: 480), maxFramesPerSecond: 30),
             CameraFormat(size: FrameSize(width: 1920, height: 1080), maxFramesPerSecond: 30),

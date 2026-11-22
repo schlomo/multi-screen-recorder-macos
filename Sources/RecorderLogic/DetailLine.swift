@@ -85,7 +85,7 @@ public enum DetailLine {
     /// "FaceTime HD Camera (default) 1920×1080 at 30 fps, OBS Virtual Camera virtual 1280×720 at 30 fps"
     public static func cameras(_ cameras: [CameraInfo]) -> String {
         list(cameras.map { camera in
-            camera.shownName + (camera.isVirtual ? " virtual" : "") + (camera.isSuspended ? " suspended" : "") + (camera.chosenFormat(resolution: .native).map { " \($0)" } ?? " no format")
+            camera.shownName + (camera.isVirtual ? " virtual" : "") + (camera.isContinuity ? " Continuity Camera" : "") + (camera.isSuspended ? " suspended" : "") + (camera.chosenFormat(resolution: .native).map { " \($0)" } ?? " no format")
         })
     }
 

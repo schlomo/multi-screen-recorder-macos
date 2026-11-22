@@ -181,26 +181,30 @@ public struct CameraInfo: Equatable, Sendable {
     public var isDefault: Bool
     /// A camera made by software, such as OBS Virtual Camera, not a device.
     public var isVirtual: Bool
+    /// An iPhone's camera: a Continuity Camera or Desk View, or connected by Continuity Capture.
+    public var isContinuity: Bool
     public var formats: [CameraFormat]
     /// Suspended by macOS, as a laptop's camera with its lid closed: it delivers no picture.
     public var isSuspended: Bool
 
     public init(
-        uniqueID: String, name: String, isDefault: Bool, isVirtual: Bool, formats: [CameraFormat], isSuspended: Bool = false
+        uniqueID: String, name: String, isDefault: Bool, isVirtual: Bool, isContinuity: Bool = false, formats: [CameraFormat],
+        isSuspended: Bool = false
     ) {
         self.uniqueID = uniqueID
         self.name = name
         self.isDefault = isDefault
         self.isVirtual = isVirtual
+        self.isContinuity = isContinuity
         self.formats = formats
         self.isSuspended = isSuspended
     }
 
     /// The format a recording at `resolution` opens the camera with (D74):
-    /// of the formats that deliver the tick grid's frame rate the 16:9 ones,
-    /// if there are any, and of those the largest that fits into the
-    /// resolution's box (at Native, the largest), so it is recorded as it
-    /// is; when none fits, the smallest, which is scaled. A camera with no
+    /// of the formats that deliver the tick grid's frame rate, of any aspect
+    /// ratio, the largest that fits into the resolution's box as a screen's
+    /// picture does (at Native, the largest), so it is recorded as it is;
+    /// when none fits, the smallest, scaled as a screen's. A camera with no
     /// format at that rate delivers its fastest, the largest of those. Nil
     /// for a camera that lists no format.
     public func chosenFormat(resolution: RecordingResolution) -> CameraFormat? {
@@ -208,22 +212,14 @@ public struct CameraInfo: Equatable, Sendable {
         guard !fastEnough.isEmpty else {
             return formats.max { ($0.maxFramesPerSecond.rounded(), $0.size.pixelCount) < ($1.maxFramesPerSecond.rounded(), $1.size.pixelCount) }
         }
-        let wide = fastEnough.filter { Self.isSixteenByNine($0.size) }
-        let candidates = wide.isEmpty ? fastEnough : wide
-        let fitting = candidates.filter { Self.fits($0.size, into: resolution.box) }
-        return fitting.max { $0.size.pixelCount < $1.size.pixelCount } ?? candidates.min { $0.size.pixelCount < $1.size.pixelCount }
+        let fitting = fastEnough.filter { Self.fits($0.size, into: resolution.box) }
+        return fitting.max { $0.size.pixelCount < $1.size.pixelCount } ?? fastEnough.min { $0.size.pixelCount < $1.size.pixelCount }
     }
 
     /// The frame size of the camera's file: its chosen format's size, fitted
     /// into the recording resolution's box as a screen's looks-like size is.
     public func frameSize(resolution: RecordingResolution) -> FrameSize? {
         chosenFormat(resolution: resolution).map { resolution.frameSize(forLooksLike: $0.size) }
-    }
-
-    /// An aspect ratio within 1 % of 16:9, either way up.
-    private static func isSixteenByNine(_ size: FrameSize) -> Bool {
-        let ratio = Double(max(size.width, size.height)) / Double(max(1, min(size.width, size.height)))
-        return abs(ratio / (16.0 / 9.0) - 1) <= 0.01
     }
 
     private static func fits(_ size: FrameSize, into box: FrameSize?) -> Bool {
