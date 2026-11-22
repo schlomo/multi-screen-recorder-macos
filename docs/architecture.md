@@ -1,7 +1,7 @@
 # Multi Screen Recorder — architecture (current state)
 
 A reliable multi-source screen and audio recorder for macOS. It
-captures every screen and audio source, never loses a recording, and
+captures every screen, camera and audio source, never loses a recording, and
 keeps going when screens, resolutions or audio sources change. It is
 built for recording talks: one click to start, edit-ready files
 afterwards.

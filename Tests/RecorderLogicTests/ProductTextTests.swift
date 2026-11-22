@@ -19,8 +19,8 @@ import Testing
     /// D55: the app's header and the homepage say the same tagline, in the same two lines.
     @Test func theAppAndTheHomepageShowTheSameTagline() throws {
         let lines = Tagline.lines.map { "\"\($0)\"" }.joined(separator: ", ")
-        #expect(Tagline.lines == ["Every screen, all audio.", "Keeps going when things change."])
-        #expect(Tagline.text == "Every screen, all audio. Keeps going when things change.")
+        #expect(Tagline.lines == ["Every screen, every camera, all audio.", "Keeps going when things change."])
+        #expect(Tagline.text == "Every screen, every camera, all audio. Keeps going when things change.")
         #expect(try repositoryFile("homepage/hugo.toml").contains("tagline = [\(lines)]"))
         #expect(try repositoryFile("homepage/layouts/home.html")
             .contains("<p class=\"tagline\">{{ delimit site.Params.tagline \"<br />\" | safeHTML }}</p>"))

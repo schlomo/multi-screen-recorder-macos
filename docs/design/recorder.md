@@ -624,7 +624,7 @@ checked, reported or rewritten at the next start (D47).
 
 - **Start:** a small window. At the top, the app icon, the name, the
   version and a link to the homepage (`Homepage.url`, defined once),
-  and on the right the tagline in two lines, "Every screen, all audio."
+  and on the right the tagline in two lines, "Every screen, every camera, all audio."
   and "Keeps going when things change." (`Tagline.lines`, defined
   once; on the homepage too, in the same two lines), right-aligned,
   in italics and the secondary text colour; neither line wraps (D55).
