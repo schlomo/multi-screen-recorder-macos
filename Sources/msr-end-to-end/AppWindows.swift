@@ -43,8 +43,9 @@ enum AppleScript {
     }
 }
 
-/// The app's own recording, as a person sees it: the status window while it records and the Finder window
-/// of the finished recording folder, in each appearance. Only in the throwaway VM, which grants the
+/// The app's own recording, as a person sees it: the status window while it records, with more screens
+/// connected and one of them back after a disconnect, and the Finder window of the finished recording
+/// folder, in each appearance, each window brought to the front before its capture. Only in the throwaway VM, which grants the
 /// driver the Automation and Accessibility permissions this needs (scripts/end-to-end-vm/guest-configure-tcc).
 extension Driver {
     /// How long the status window's video is, ending just before Stop.
@@ -91,6 +92,14 @@ extension Driver {
             Thread.sleep(forTimeInterval: 0.2)
         }
         let recording = URL(filePath: recorder.output().trimmingCharacters(in: .whitespacesAndNewlines))
+        var screens: [UInt32: (process: ChildProcess, uuid: String)] = [:]
+        defer {
+            for screen in screens.values {
+                try? VirtualScreenHelper.disconnect(screen.process, uuid: screen.uuid)
+                try? restorer.ended(screen.process)
+            }
+        }
+        try connectStatusWindowScreens(into: &screens, logs: folder)
         try interruption.sleep(until: Date().addingTimeInterval(8))
 
         // The app's own reopen event, as a click on its Dock icon, opens the status window.
@@ -100,6 +109,7 @@ extension Driver {
         try AppleScript.run(
             "tell application \"System Events\" to set position of window 1 of (first process whose unix id is \(recorder.pid)) to {30, 40}",
             retryingFor: 10)
+        try Screenshots.bringToFront(recorder.pid)
         try interruption.sleep(until: Date().addingTimeInterval(2))
 
         let review = scratch.appending(path: ReviewNames.folder).appending(path: ReviewNames.appStep)
@@ -116,6 +126,29 @@ extension Driver {
         try finderWindow(of: recording, appearance: appearance, review: review)
     }
 
+    /// Connects and disconnects the virtual screens of `Scenario.statusWindowScreenEvents`, timed from
+    /// now; `screens` holds those still connected, for the caller to disconnect.
+    private func connectStatusWindowScreens(into screens: inout [UInt32: (process: ChildProcess, uuid: String)], logs: URL) throws {
+        let begun = Date()
+        for (at, event) in Scenario.statusWindowScreenEvents {
+            try interruption.sleep(until: begun.addingTimeInterval(at))
+            switch event {
+            case .connectScreen(let spec):
+                let (process, uuid) = try VirtualScreenHelper.connect(spec, executable: ownExecutable, folder: logs)
+                try restorer.started(process, stopSignal: SIGTERM)
+                screens[spec.serialNumber] = (process, uuid)
+            case .disconnectScreen(let serialNumber):
+                guard let screen = screens.removeValue(forKey: serialNumber) else {
+                    throw DriverError("no virtual screen \(serialNumber) to disconnect")
+                }
+                try VirtualScreenHelper.disconnect(screen.process, uuid: screen.uuid)
+                try restorer.ended(screen.process)
+            case .switchScreenMode:
+                throw DriverError("the status window's screens switch no mode")
+            }
+        }
+    }
+
     /// A Finder window of the finished recording folder: list view, no sidebar, no toolbar, every
     /// column as wide as its content and the window as high as its rows.
     private func finderWindow(of recording: URL, appearance: Appearance, review: URL) throws {
@@ -128,7 +161,7 @@ extension Driver {
         let nameWidth = Int(widest.rounded(.up)) + 60
         let (left, top) = (30, 40)
         let right = left + nameWidth + 181 + 97 + 125 + 20
-        let bottom = top + 52 + names.count * 20 + 10
+        let bottom = top + 66 + names.count * 20 + 10
         try AppleScript.run("""
             tell application "Finder"
               activate

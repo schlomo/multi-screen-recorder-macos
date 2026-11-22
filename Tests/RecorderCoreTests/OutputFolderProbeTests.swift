@@ -53,6 +53,32 @@ import Testing
         #expect(try contents(of: folder).isEmpty)
     }
 
+    private func hdiutil(_ arguments: String...) throws {
+        let process = Process()
+        process.executableURL = URL(filePath: "/usr/bin/env")
+        process.arguments = ["hdiutil"] + arguments + ["-quiet"]
+        try process.run()
+        process.waitUntilExit()
+        guard process.terminationStatus == 0 else {
+            throw CocoaError(.executableLoad, userInfo: [NSLocalizedDescriptionKey: "hdiutil \(arguments) failed"])
+        }
+    }
+
+    /// The volume's important-usage reading is 0 off the boot volume, such as on a disk image (D71).
+    @Test func aFolderOffTheBootVolumeHasItsFreeSpace() throws {
+        defer { try? removeScratch() }
+        let image = scratch.appending(path: "volume.dmg")
+        let mountPoint = scratch.appending(path: "Volume", directoryHint: .isDirectory)
+        try FileManager.default.createDirectory(at: mountPoint, withIntermediateDirectories: false)
+        try hdiutil("create", "-size", "20m", "-fs", "APFS", "-volname", "OutputFolderProbeTests", path(image))
+        try hdiutil("attach", "-nobrowse", "-mountpoint", path(mountPoint), path(image))
+        defer { try? hdiutil("detach", path(mountPoint)) }
+        let folder = mountPoint.appending(path: "Recordings", directoryHint: .isDirectory)
+        #expect(isUsableWithFreeSpace(probeOutputFolder(folder)))
+    }
+
+    private func path(_ url: URL) -> String { url.path(percentEncoded: false) }
+
     @Test func aReadOnlyFolderIsUnusable() throws {
         defer { try? removeScratch() }
         let folder = scratch.appending(path: "Locked", directoryHint: .isDirectory)

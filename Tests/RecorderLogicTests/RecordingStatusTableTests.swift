@@ -30,6 +30,7 @@ import Testing
             .init(source: .screen(2, name: "LG HDR 4K"), recordsAt: "1920×1080", files: 1, written: "40 MB", state: "disk full"),
         ])
         #expect(RecordingStatusTable.columns == ["Source", "Records at", "Files", "Written", "State", "Clock drift"])
+        #expect(RecordingStatusTable.audioColumns == ["Level", "Input volume"])
         #expect(rows.allSatisfy { $0.values.count == RecordingStatusTable.columns.count - 1 && $0.clockDrift.isEmpty })
     }
 
@@ -53,7 +54,7 @@ import Testing
             .mirroring, .disconnected, .asleep,
         ]
         let audioStates: [AudioTracker.Source.State] = [
-            .recording, .waiting, .failedRetrying, .diskFull, .disconnected, .notRecorded, .asleep,
+            .recording, .noAudio, .waiting, .failedRetrying, .diskFull, .disconnected, .notRecorded, .asleep,
         ]
         let texts = Set(RecordingStatusTable.StateText.allCases.map(\.rawValue))
         #expect(Set(screenStates.map { RecordingStatusTable.text($0) }).union(audioStates.map { RecordingStatusTable.text($0) })
@@ -114,6 +115,27 @@ import Testing
         #expect(text(.init(clockDriftPpm: 49.1, applied: -0.0123, remaining: 0)) == "+49 ppm (-12.3 ms)")
         // Zero is 0, never +0 or -0.0.
         #expect(text(.init(clockDriftPpm: -0.3, applied: -0.000_04, remaining: 0)) == "0 ppm (0 ms)")
+    }
+
+    /// An audio row knows its source, for its level meter and its input
+    /// volume; an input with no audio says so, and shows its clock drift, as the correction keeps running (D69).
+    @Test func anAudioInputWithNoAudioSaysSo() {
+        var settings = Settings.defaults
+        settings.auto = false
+        settings.audioMode = .allInputs
+        settings.systemAudio = false
+        var tracker = AudioTracker(settings: settings)
+        let razer = AudioInputInfo(name: "Razer Seiren V3 Mini", channelCount: 1, isDefault: true, transport: .usb, uid: "R")
+        _ = tracker.begin(inputs: [razer], mainDisplayID: 1, screens: [1], at: 0)
+        tracker.noAudio(.input("R"), true)
+        let rows = RecordingStatusTable.audioRows(sources: tracker.sourcesShown, files: [], bytes: [:], clockDrift: [
+            .input("R"): ClockDriftCorrection.Status(clockDriftPpm: -116.12, applied: 0.03494, remaining: 0.00004),
+        ])
+        #expect(rows.map(\.state) == ["no audio"])
+        #expect(rows.map(\.clockDrift) == ["-116 ppm (+34.9 ms)"])
+        #expect(rows.map(\.audioSource) == [.input("R")])
+        let screens = RecordingStatusTable.rows(sources: [], files: [], bytes: [:])
+        #expect(screens.isEmpty)
     }
 
     /// A size that cannot be read is not shown as nothing written.

@@ -14,6 +14,8 @@ final class RecordingSession: RecorderObserver {
     private let output: RecordOutput?
     private var status = RecordingStatus()
     private var badgeTask: Task<Void, Never>?
+    /// Draws the level meters while the status window is open.
+    private var meterTask: Task<Void, Never>?
     private let statusWindow = StatusWindow()
     /// Stop is in progress: a Dock click or a quit does nothing more.
     private(set) var isStopping = false
@@ -46,6 +48,7 @@ final class RecordingSession: RecorderObserver {
     func stop() async -> RecordingSummary? {
         isStopping = true
         badgeTask?.cancel()
+        meterTask?.cancel()
         output?.endStatusLine()
         statusWindow.close()
         guard let recorder else { return nil }
@@ -72,7 +75,31 @@ final class RecordingSession: RecorderObserver {
     func showStatus(onStop: @escaping () -> Void) {
         guard !isStopping else { return }
         refreshStatusWindow()
-        statusWindow.show(onStop: onStop)
+        refreshMeters()
+        statusWindow.show(onStop: onStop) { [weak self] id, volume in
+            self?.recorder?.setInputVolume(id, to: volume)
+        }
+        drawMeters()
+    }
+
+    /// The level meters and the input volumes, 10 times a second while the window is open (D69).
+    private func drawMeters() {
+        guard meterTask == nil else { return }
+        meterTask = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: RecorderValues.levelMeterInterval)
+                guard let self, statusWindow.isOpen, !isStopping else { break }
+                refreshMeters()
+            }
+            self?.meterTask = nil
+        }
+    }
+
+    private func refreshMeters() {
+        guard let recorder else { return }
+        let (levels, inputVolumes) = recorder.meters()
+        statusWindow.model.levels = levels
+        statusWindow.model.inputVolumes = inputVolumes
     }
 
     private func updateBadge() {

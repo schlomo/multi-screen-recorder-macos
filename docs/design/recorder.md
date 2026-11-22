@@ -438,7 +438,8 @@ every change:
       "timecode": "14:03:05:04",
       "state": "recording",
       "clockDriftCorrection": null,
-      "clockDriftPpm": null
+      "clockDriftPpm": null,
+      "inputVolume": 0.757
     },
     {
       "name": "2026-11-12 14.03.05 Audio 0 - System.mov",
@@ -478,6 +479,8 @@ every change:
   ],
   "events": [
     { "at": 812.4, "event": "audio input gap", "audioSource": "MacBook Pro Microphone", "length": 0.25 },
+    { "at": 1021.7, "event": "audio input volume changed", "audioSource": "MacBook Pro Microphone",
+      "from": 0.757, "to": 0.5 },
     { "at": 1446.2, "event": "screen disconnected", "screen": "LG HDR 4K" },
     { "at": 2285.0, "event": "screen frame size changed", "screen": "Built-in Retina Display",
       "from": [1670, 1080], "to": [1662, 1080] }
@@ -505,7 +508,8 @@ fell behind`, `screen file writer failed`, `disk full`, `sleep`, `wake`,
 and for audio `audio input connected`, `audio input disconnected`,
 `system audio started`, `system audio stopped`, `default microphone
 changed`, `audio input gap`, `audio input failed`, `system audio
-failed`, `audio file writer failed`, `audio file writer fell behind`;
+failed`, `audio file writer failed`, `audio file writer fell behind`,
+`audio input volume changed`, `no audio started`, `no audio stopped`;
 each names its screen (`screen`) or its audio source (`audioSource`)
 where it is about one; `screen` always means a screen. `audio file
 writer fell behind` comes in two shapes: without `error` when a capture
@@ -513,8 +517,10 @@ ended because its writer fell behind, and with `error` when samples were
 lost at a file's end, so one recording can have it twice for the same
 file. Their fields: `at`, `event`, `screen` or `audioSource`; `from` and
 `to` (the old and the new frame size) for `screen frame size changed`,
-and the old and the new default microphone for `default microphone
-changed` (either absent where there was or is none); `mirrors` (the
+the old and the new default microphone for `default microphone
+changed` (either absent where there was or is none), and the old and
+the new input volume, 0 to 1, for `audio input volume changed` (D69);
+`mirrors` (the
 screen mirrored) for `screen mirroring started`; `length` (seconds, to
 the millisecond) for `audio input gap`; `error` (why, as one line) and
 `errorDetail` (the same error as its full chain, below) for `screen stream
@@ -528,7 +534,8 @@ was ended by a failure (`screen stream failed`, `screen file writer
 failed`, `disk full`, `screen file writer fell behind`, `screen shows
 another screen's picture`, `audio input failed`, `system audio failed`,
 `audio file writer failed`, `audio file writer fell behind`; an
-unplugged audio input and a gap are none), otherwise `problems` (D47);
+unplugged audio input, a gap, a change of the input volume and no audio
+are none), otherwise `problems` (D47);
 `cpu` is our process's CPU use over the recording, `averagePercent` and
 `peakPercent` in percent of one core as Activity Monitor shows it,
 sampled every second, to one decimal (encoding and capture in macOS's
@@ -570,7 +577,9 @@ the system audio; `clockDriftCorrection` the seconds of sound the clock
 drift correction added during the file (negative: removed), to 0.0001 s,
 null until the file ends; `clockDriftPpm` its audio source's clock drift
 as shown at the file's end (see "Audio"), to 0.1 ppm, null until the
-file ends and if it was not measured by then. `files` lists the screen
+file ends and if it was not measured by then; `inputVolume` an audio
+input's input volume at the file's start, 0 to 1 to the thousandth,
+null when it cannot be read, absent for the system audio (D69). `files` lists the screen
 files and the audio files in the order of their start.
 
 **Names in a file name (D49, D55).** In a file name, `/` and `:` in a
@@ -764,13 +773,17 @@ checked, reported or rewritten at the next start (D47).
   channels` or `stereo`), Files, Written (its files on disk, below 1 GB
   in whole MB, from there in GB with one decimal), State (`recording`,
   `waiting`, `failed, retrying`, `shows another screen`, `disk full`,
-  `mirroring`, `disconnected`, `asleep`, and for an audio input no
+  `mirroring`, `disconnected`, `asleep`, for an audio input no
   longer in the audio mode, such as the default microphone before a
-  change, `not recorded`) and "Clock drift" (an audio source's clock
+  change, `not recorded`, and for one with no audio `no audio`, see
+  "Audio") and "Clock drift" (an audio source's clock
   drift while it records, with the sound the correction added so far,
   `-116 ppm (+34.9 ms)`; `measuring (+0.3 ms)` until the clock drift is
   known, `measuring` before any correction; zero is `0`, never `+0` or
-  `-0`; empty for a screen); under it the line "Recording 1:07:00 ·
+  `-0`; empty for a screen), then, drawn for an audio source only,
+  "Level" (its level meter) and "Input volume" (an audio input's
+  slider, where its input volume can be set; see "Audio", D69); under
+  it the line "Recording 1:07:00 ·
   1.3 GB in 3 files · 120.4 GB free", the elapsed time as `h:mm:ss`
   (D47) and the sizes as in Written; then "CPU 23 %", our process's CPU
   use in percent of one core as Activity Monitor shows it, sampled every
@@ -786,8 +799,10 @@ checked, reported or rewritten at the next start (D47).
   possible content (`8888×8888`, `888`, `888.8 GB`, the longest of every
   State's text, `RecordingStatusTable.StateText`, and `-8888.8 ms
   (-1000 ppm)`), so the width stays the same during a recording and
-  changes only with the source names. Esc presses Continue; Return
-  presses Stop. It refreshes every second while open; Continue closes
+  changes only with the source names; the level meter and the slider
+  are 120 points wide each. Esc presses Continue; Return
+  presses Stop. It refreshes every second while open, the level meters
+  and the sliders 10 times a second (*data*); Continue closes
   it. A screen file whose size cannot be read makes its screen's Written
   `?`, and the line's data written `? GB`. Free space that the volume
   does not report is a problem as a failing read is. A problem goes into
@@ -812,10 +827,15 @@ checked, reported or rewritten at the next start (D47).
   opens in the browser (D15, D26). The credit to the former upstream is
   in the README.
 - **Crash report offer:** when the app starts, after the window is
-  shown, it looks for the newest crash report of `msr`
+  shown, it looks for the newest crash report of the app
   (`~/Library/Logs/DiagnosticReports/msr-YYYY-MM-DD-HHMMSS.ips`, top
-  level only). If its name is greater than `lastOfferedCrashReport` in
-  the state file (nothing there: any crash report), a dialog "Multi
+  level only) whose name is greater than `lastOfferedCrashReport` in
+  the state file (nothing there: any crash report) and whose `procPath`,
+  the path of the program that crashed, is inside a bundle named
+  `Multi Screen Recorder.app` (D70); a report of any other `msr` (a test
+  run, a stray `msr`, `msr` run from `.build/`) is skipped silently, and
+  is read again at the next start; so is a crash report that cannot be
+  read or names no program (no `procPath` in it), with no alert. If there is one, a dialog "Multi
   Screen Recorder quit unexpectedly" offers [Report on GitHub] [Not
   Now], and the name is stored whatever the answer, so a crash is
   offered once; a crash whose name sorts before the last offered one is
@@ -1058,6 +1078,63 @@ the metadata items (see "Output on disk").
   (see "Build state", CPU). A crash loses up to about 0.1 s more than
   with one append per buffer, which the owner accepted (2026-11-16); the
   decoded audio is the same sample for sample (`AudioFileWriterTests`).
+- **No audio (D69).** An audio input that delivers exact zeros (every
+  channel exactly 0) for 10 s (*data*), such as the MacBook's
+  microphone with its lid closed or a microphone muted at the device,
+  has no audio: its audio file ends where the 10 s are reached, the
+  event `no audio started` is told there, and its State is `no audio`;
+  its capture keeps running. Its first sample that is not zero is the
+  event `no audio stopped` and starts a new audio file, at the tick at
+  or before that sample: the zeros of two ticks before it (*data*) are
+  placed first, so the tick grid's trim cuts nothing of the sound. An
+  audio file starts only with sound, so an input with no audio from
+  the start gets no file, and one whose file ended for another reason
+  (a gap, a change of the channel count) starts its next file with
+  its next sound; zeros shorter than 10 s within a file stay in it.
+  The 10 s count from the recording's start or from the last file
+  end: zeros before a gap or a change of the channel count count for
+  nothing after it, so an input that alternates shorter zeros with
+  gaps is never no audio, and each gap is its `audio input gap` event.
+  This is decided on the corrected audio, which keeps zeros exact.
+  Each capture of an input detects no audio on its own: after a
+  capture restart a continuing silence is reported as `no audio
+  started` again, without a `no audio stopped` in between. The
+  system audio is excluded: silence is normal there. No audio is no
+  problem and no failure: nothing red, no problem entry, `result`
+  unchanged. 2 s would have split the speech pauses of a noise-gated
+  microphone into many files.
+- **Level meters (D69).** Each audio source with a running capture,
+  the system audio included, has a level meter: the sample peak of
+  each incoming buffer (the largest absolute sample of any channel,
+  before the clock drift correction), in dBFS on the scale from −60 to
+  0 dBFS (*data*). The status window draws the highest peak since its
+  last drawing, never older than the peak hold, as a bar 10 times a
+  second while it is open, and only then; the peak hold, the highest
+  peak kept for 1.5 s (*data*) unless a higher one comes, as a mark.
+  The bar and the mark are each red from −1 dBFS (*data*), otherwise
+  green and the text colour. `msr record` has them in the same status
+  window, not on its status line.
+- **Input volume (D69).** Each audio input with a running capture has
+  its input volume followed: the device's own volume, as macOS's Sound
+  settings call it, through Core Audio's virtual main volume of its
+  input scope (`kAudioHardwareServiceDeviceProperty_VirtualMainVolume`),
+  0 to 1. Where Core Audio says it can be set, the status window shows
+  a slider that sets it; where not, no slider (a grey one reads as
+  forbidden). Setting it changes it for every app on the Mac, and Stop
+  does not reset it. Every change, from the slider, a knob or another
+  app, is read when Core Audio reports it to a listener and every
+  0.25 s (*data*, for a change that is not reported), and once the
+  volume held still for 0.5 s (*data*) it is the event `audio input
+  volume changed` with `from` and `to`, at the time it reached the new
+  volume, to the thousandth; a change that has not held still when
+  the capture ends is told then. Each audio input's file records
+  `inputVolume` at its start. A volume Core Audio refuses to set is
+  the problem `The input volume of <input> cannot be set`, and a
+  listener it refuses `Changes of the input volume of <input> cannot
+  be followed`; each clears once it works. Which inputs can be set,
+  whether a knob reaches the listener and whether lowering the volume
+  prevents clipping are checked by the owner by hand: no agent sets an
+  input's volume (D48).
   A stereo track's samples are interleaved straight into the sample
   buffer's memory.
 - **Clock drift.** An audio device runs on its own clock, up to 117 ppm
@@ -1515,7 +1592,10 @@ support line with hand-made points and the rate; the resampler's purity,
 its sample count, chunking and a rate change; clicks, gaps with the
 drift during them, and the rate and what is still off right after a gap,
 through the whole correction; when the status and the detail line are
-due) and an audio file's `clockDriftPpm` and `clockDriftCorrection`
+due), the level meter (the peak of any channel since the last reading,
+the peak hold, dBFS and the scale, red from −1 dBFS), which samples go
+into an audio file around no audio and where it starts and stops, an
+input volume's change once it held still, and an audio file's `clockDriftPpm` and `clockDriftCorrection`
 (never `-0`), splitting interleaved and non-interleaved PCM, the guide
 track mixes, audio file names and metadata, our process's CPU use, the
 status window's rows, the version, the state file's content, the choice
@@ -1559,13 +1639,24 @@ status about once a second, each file's
 second file's counted from its own start, the correction's held-back
 samples written when a capture ends by itself, dropped when its writer
 failed or fell behind, with nothing written after that, also by a Stop
-racing in), a stream stopped while it starts, that an action waiting for
+racing in; each buffer's peak in the level meter, `inputVolume` at a
+file's start, no audio from the start getting no file, a file after no
+audio starting before the sound, zeros shorter than 10 s staying in a
+file, the system audio excluded), the input volume against a stand-in
+for Core Audio (its property's address, a set clamped to 0 to 1, a
+refusal, the listener; no test reads or sets a real device's volume), a
+recorder audio only with a stand-in audio input and input volume
+(`RecorderTests`: a failure told once by its event and its repeats
+counted at Stop, D65; `inputVolume`, a change told once it held still,
+also one Core Audio does not report, the slider's set, a refused set as
+a problem, no slider where it cannot be set; the level meters; no audio
+in the window and the manifest, not a problem), a stream stopped while it starts, that an action waiting for
 the main run loop's default mode runs only there, the classification of
 Core Audio's transport types, and the ready check's probes with
 stand-ins (the output folder's file access is off the main thread). The
 recorder's filter of the clock drift status by capture number, which
-drops a status from a capture already replaced, has no unit test: the
-recorder runs on the main actor with real captures. `AppTests` run the
+drops a status from a capture already replaced, has no unit test yet;
+`RecorderTests` record no screen. `AppTests` run the
 start window's model with stand-in probes and a stand-in for the hold:
 one check per burst of device changes, nothing applied while a menu is
 open, a stale queued refresh does nothing, choices saved only when

@@ -12,24 +12,31 @@ final class StatusModel {
     /// "CPU 23 %", our process only.
     var cpu = ""
     var problems: [String] = []
+    /// Each audio source's level meter, drawn 10 times a second while the window is open (D69).
+    var levels: [AudioTracker.SourceID: AudioLevel] = [:]
+    /// The input volume of each audio input whose volume can be set: only those have a slider.
+    var inputVolumes: [AudioTracker.SourceID: Double] = [:]
 }
 
 /// The status window of a running recording (D46), in the app and in `msr
 /// record`: opened by a click on the Dock icon or by Quit. Stop ends the
-/// recording, Continue closes it.
+/// recording, Continue closes it; an audio input's slider sets its input volume (D69).
 @MainActor
 final class StatusWindow {
     let model = StatusModel()
     private var window: NSWindow?
     private var onStop: (() -> Void)?
+    private var onInputVolume: ((AudioTracker.SourceID, Double) -> Void)?
 
     var isOpen: Bool { window?.isVisible == true }
 
-    func show(onStop: @escaping () -> Void) {
+    func show(onStop: @escaping () -> Void, onInputVolume: @escaping (AudioTracker.SourceID, Double) -> Void) {
         self.onStop = onStop
+        self.onInputVolume = onInputVolume
         if window == nil {
             let hosting = NSHostingController(rootView: StatusView(
-                model: model, stop: { [weak self] in self?.stop() }, continueRecording: { [weak self] in self?.close() }))
+                model: model, stop: { [weak self] in self?.stop() }, continueRecording: { [weak self] in self?.close() },
+                setInputVolume: { [weak self] id, volume in self?.onInputVolume?(id, volume) }))
             hosting.sizingOptions = [.preferredContentSize]
             let window = NSWindow(contentViewController: hosting)
             window.title = "Multi Screen Recorder"
@@ -60,6 +67,7 @@ struct StatusView: View {
     let model: StatusModel
     let stop: () -> Void
     let continueRecording: () -> Void
+    let setInputVolume: (AudioTracker.SourceID, Double) -> Void
 
     var body: some View {
         WidthSettingStack(spacing: 12) {
@@ -73,6 +81,9 @@ struct StatusView: View {
                                 .frame(minWidth: TableLayout.statusColumnWidths[column - 1], alignment: Alignment(horizontal: Self.alignment(column), vertical: .center))
                         }
                     }
+                    ForEach(RecordingStatusTable.audioColumns, id: \.self) { header in
+                        Text(header).font(.headline)
+                    }
                 }
                 Divider()
                 ForEach(Array(model.rows.enumerated()), id: \.offset) { _, row in
@@ -83,6 +94,13 @@ struct StatusView: View {
                                 .lineLimit(1)
                                 .monospacedDigit()
                                 .gridColumnAlignment(Self.alignment(offset + 1))
+                        }
+                        if let id = row.audioSource {
+                            LevelMeterView(level: model.levels[id] ?? .silent)
+                            inputVolumeSlider(id, name: row.source.name)
+                        } else {
+                            Color.clear.frame(width: TableLayout.levelMeterWidth, height: 1)
+                            Color.clear.frame(width: TableLayout.inputVolumeWidth, height: 1)
                         }
                     }
                 }
@@ -117,6 +135,24 @@ struct StatusView: View {
             }
         }
         .padding(TableLayout.windowPadding)
+    }
+
+    /// A slider only where the input volume can be set: no slider says so
+    /// more clearly than a grey one, which reads as forbidden (D69).
+    @ViewBuilder private func inputVolumeSlider(_ id: AudioTracker.SourceID, name: String) -> some View {
+        if model.inputVolumes[id] != nil {
+            Slider(value: Binding(
+                get: { model.inputVolumes[id] ?? 0 },
+                set: { volume in
+                    model.inputVolumes[id] = volume
+                    setInputVolume(id, volume)
+                }), in: 0...1)
+                .controlSize(.small)
+                .frame(width: TableLayout.inputVolumeWidth)
+                .accessibilityLabel("Input volume of \(name)")
+        } else {
+            Color.clear.frame(width: TableLayout.inputVolumeWidth, height: 1)
+        }
     }
 
     /// Files and Written are right-aligned.

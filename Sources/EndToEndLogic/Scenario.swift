@@ -107,6 +107,19 @@ extension Scenario {
     static let auto = ManifestExpectation.Settings(resolution: "native", audioMode: "wired", systemAudio: true)
     static let screen = VirtualScreenSpec(
         serialNumber: 101, sizes: [ScreenSize(width: 1280, height: 720), ScreenSize(width: 1600, height: 900)])
+    /// The virtual screens connected while `msr record` runs for the status window's capture, so the
+    /// window shows several screens: the last one disconnects and comes back, so its file count is 2.
+    /// Times in seconds after the recording started; identities of their own, one size each.
+    public static let statusWindowScreenEvents: [(at: Double, event: Event)] = {
+        let wide = VirtualScreenSpec(serialNumber: 201, sizes: [ScreenSize(width: 1600, height: 900)])
+        let small = VirtualScreenSpec(serialNumber: 202, sizes: [ScreenSize(width: 1280, height: 720)])
+        return [
+            (at: 1, event: .connectScreen(wide)),
+            (at: 2, event: .connectScreen(small)),
+            (at: 5, event: .disconnectScreen(serialNumber: small.serialNumber)),
+            (at: 7, event: .connectScreen(small)),
+        ]
+    }()
     /// How often the stress scenario switches the screen's mode.
     static let stressSwitches = 10
     static let fixedFlags = ["--resolution", "1080p", "--audio-mode", "all-inputs"]

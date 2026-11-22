@@ -88,6 +88,8 @@ public struct AudioTracker: Sendable {
         /// A capture may end as disconnected without a failure: true until
         /// one did, and again once the device list or the screens changed.
         var mayLoseCaptureSource = true
+        /// Its running capture has no audio (D69).
+        var isNoAudio = false
     }
 
     public let settings: Settings
@@ -259,6 +261,12 @@ public struct AudioTracker: Sendable {
         return [RecordingEvent(at: now, event: .systemAudioStarted, audioSource: tracked.name)]
     }
 
+    /// The source's running capture has no audio, or its sound returned (D69).
+    public mutating func noAudio(_ id: SourceID, _ isNoAudio: Bool) {
+        guard sources[id]?.phase == .recording else { return }
+        sources[id]?.isNoAudio = isNoAudio
+    }
+
     /// A capture ended by itself.
     public mutating func captureEnded(_ id: SourceID, _ end: CaptureEnd, at now: Int64) -> Step {
         guard let tracked = sources[id], tracked.phase == .recording else { return Step() }
@@ -323,6 +331,7 @@ public struct AudioTracker: Sendable {
                 step.actions.append(.startSystemAudio)
             }
             sources[id]?.phase = .recording
+            sources[id]?.isNoAudio = false
             sources[id]?.wasRecorded = true
             sources[id]?.disconnectTold = false
         }
@@ -402,6 +411,8 @@ public struct AudioTracker: Sendable {
     public struct Source: Equatable, Sendable {
         public enum State: Equatable, Sendable {
             case recording
+            /// Its capture runs, and it delivered only exact zeros for the no audio time (D69).
+            case noAudio
             case waiting
             case failedRetrying
             case diskFull
@@ -424,6 +435,7 @@ public struct AudioTracker: Sendable {
     public var sourcesShown: [Source] {
         sources.filter { $0.value.wasRecorded || $0.value.isWanted }.map { id, tracked in
             let state: Source.State = switch tracked.phase {
+            case .recording where tracked.isNoAudio: .noAudio
             case .recording: .recording
             case .waitingToRestart where !tracked.isPresent: .disconnected
             case .waitingToRestart: .failedRetrying

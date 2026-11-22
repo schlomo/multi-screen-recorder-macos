@@ -163,7 +163,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                            stateFile: stateFile)
     }
 
-    /// Offers the newest crash report of `msr` that was not offered before:
+    /// Offers the newest crash report of the app that was not offered before:
     /// opens a new GitHub issue in the browser and shows a text copy of the
     /// crash report in Finder. The app opens no connection itself (D15).
     /// Gives the state as the offer left it.
@@ -171,7 +171,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         do {
             guard let name = CrashReport.toOffer(
                 fileNames: try crashReportFileNames(homeFolder: homeFolder),
-                lastOffered: state.lastOfferedCrashReport)
+                lastOffered: state.lastOfferedCrashReport,
+                procPath: { crashReportProcPath(of: $0, homeFolder: homeFolder) })
             else { return state }
             // Marked before the dialog, so a crash while it is open, or a quit, never offers it twice.
             let offered = state.offering(name)

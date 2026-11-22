@@ -30,6 +30,7 @@ One row per entry, the error text exactly as in the entry.
 | `Expectation failed: (made.guides.map(\.2).reduce(0, +) → 0) == (videoSamples → 49600)` | [Async tests time out on CI while simulation tests run](#async-tests-time-out-on-ci-while-simulation-tests-run) |
 | `the virtual screen 24 is not active at 1280x720 within 5 s, but 1600x900` | [A virtual screen comes back at its last mode](#a-virtual-screen-comes-back-at-its-last-mode) |
 | `the virtual screen 122787BA-50AA-4A5A-B00C-3F98867665AF has no mode 1600x900: []` | [A long-running process sees no modes of a new screen](#a-long-running-process-sees-no-modes-of-a-new-screen) |
+| `the program running this (a terminal app) lacks the Microphone permission; run msr check once from this terminal to get the prompt` | [The VM's Microphone permission reads as denied before its login](#the-vms-microphone-permission-reads-as-denied-before-its-login) |
 
 ## Format
 
@@ -225,3 +226,34 @@ One row per entry, the error text exactly as in the entry.
 - **Verify:** `scripts/end-to-end-test --scratch-folder <folder> --scenario virtual-screen`
   passes, with its three screen files at 1280x720, 1600x900, 1280x720.
 - **Observed:** 2026-11-19, macOS 27.2.1; open.
+
+## The VM's Microphone permission reads as denied before its login
+
+- **Error:** `the program running this (a terminal app) lacks the Microphone permission; run msr check once from this terminal to get the prompt`
+- **Symptom:** `scripts/end-to-end-test` stops before any scenario,
+  in a freshly booted VM clone, right after the Screen Recording
+  precondition passed; the next run on the same image passes.
+- **Why:** the VM answers over SSH before the automatic login of
+  `admin` has finished. Until then nobody owns the console (`root`),
+  the user's GUI domain (`gui/501`) and its `tccd` do not exist, and
+  `AVCaptureDevice.authorizationStatus(for: .audio)` reads denied (2)
+  for a program started with `launchctl asuser`, while
+  `CGPreflightScreenCaptureAccess`, answered by the system's `tccd`,
+  reads granted; within seconds of the login it reads authorized (3)
+  [KNOWN: a probe in four throwaway clones of the end-to-end VM,
+  2026-11-22; caught in the two whose SSH answered within 12 s of the
+  boot].
+- **Fix:** `scripts/end-to-end-test` waits, before it starts the
+  driver, until `admin` owns the console and
+  `launchctl print gui/<uid>/com.apple.tccd` says `state = running`
+  (`vm_wait_for_login` in `scripts/end-to-end-vm/lib.sh`, at most
+  120 s, then it stops with an error); it prints how many 1 s waits
+  that took.
+- **Verify:** `scripts/end-to-end-test --scratch-folder <folder>`
+  prints `admin is logged in` before the driver's first line, and the
+  run passes its preconditions. Four consecutive runs passed, each
+  logged in before the wait began (the app's copy into the VM takes
+  longer than the login), so the wait itself is verified by the probe
+  above, not by a run.
+- **Observed:** 2026-11-21 (PR #25's runs) and 2026-11-22, the
+  end-to-end VM (Cirrus Labs' `macos-tahoe-vanilla`); open.

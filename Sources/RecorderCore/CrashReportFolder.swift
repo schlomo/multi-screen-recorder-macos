@@ -24,6 +24,13 @@ public func makeTextCopy(of name: String, homeFolder: URL) throws -> URL {
     return copy
 }
 
+/// The path of the program that crashed, from the crash report `name`; nil
+/// when the report cannot be read or names none.
+public func crashReportProcPath(of name: String, homeFolder: URL) -> String? {
+    let report = crashReportFolder(homeFolder: homeFolder).appending(path: name)
+    return (try? String(contentsOf: report, encoding: .utf8)).flatMap(CrashReport.procPath(reportText:))
+}
+
 /// The names of the entries directly in the crash report folder. A missing
 /// folder means no reports; a folder that exists but cannot be read is an error.
 public func crashReportFileNames(homeFolder: URL) throws -> [String] {

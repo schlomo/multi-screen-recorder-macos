@@ -132,10 +132,24 @@ the password `admin`, no secret (`scripts/end-to-end-vm/askpass`, D67).
 Per run, `scripts/end-to-end-test --scratch-folder <folder>`: builds the
 app and the driver on the Mac, clones a throwaway VM from
 `msr-end-to-end` (a copy-on-write clone, so every run starts clean),
-copies the app and the driver in, runs the driver in the admin user's
+copies the app and the driver in, waits until the automatic login of
+the admin user has finished (the user owns the console and the tccd of
+their GUI session runs; SSH answers before that, and until then the
+Microphone permission reads as denied, see
+[troubleshooting.md](../troubleshooting.md)), runs the driver in the admin user's
 GUI session, copies the driver's whole scratch folder to `<folder>` (new
-or empty; "Artifacts for review") and deletes the clone, also when the run fails. Arguments other
-than `--scratch-folder` go to the driver (`--scenario <name>`). The exit
+or empty; "Artifacts for review") and deletes the clone, also when the run fails. With
+`--release` or `--snapshot <n>` it runs the published app instead of
+building one: the latest release's zip or PR n's snapshot release's
+(tag `pr-<n>`), downloaded by `scripts/install-app` into a folder of the
+run's own (signature checked, quarantine removed), signed with the
+owner's certificate; the driver is still built on the Mac, from the
+checkout, so it must be of the app's commit (a driver that expects what
+the app lacks fails its scenarios). The VM's permissions, granted by
+path and bundle id with no code requirement, hold for it too (a
+`--release` run of 0.20261122.79 on 2026-11-22 passed, no prompt; D72).
+Arguments other than `--scratch-folder`, `--release` and `--snapshot`
+go to the driver (`--scenario <name>`). The exit
 status is the driver's. All 7 scenarios and the start window's
 screenshot took 2 minutes 10 seconds with the build. Nothing records or
 plays sound on the Mac itself.
@@ -398,22 +412,31 @@ video from the e2e runs"):
   smallest screen file and, in `tone` and `system-audio`, of
   BlackHole's audio file, copied by `ffmpeg -c copy`, not re-encoded.
 - The app's windows, each in light and in dark, window only (macOS's own
-  window capture, `screencapture -l` by the window's number from
-  `CGWindowListCopyWindowInfo`, with its shadow: the PNG has the shadow
-  and transparent margins around the window), in `review/app/`, named
-  `app-<window>-<appearance>.<png|mov>`:
+  window capture, `screencapture -o -l` by the window's number from
+  `CGWindowListCopyWindowInfo`, without its shadow, since the homepage's
+  collage draws its own, D70), each brought to the front first so it is
+  captured active, in `review/app/`, named
+  `app-<window>-<appearance>.<png|mov>`; `scripts/update-homepage-screenshots`
+  puts the three light PNGs of a published app's run onto the homepage's
+  screenshots (D72, [homepage/README.md](../../homepage/README.md)):
   - `app-start-window-light.png`, `app-start-window-dark.png`: the real
     start window, the built app started as `msr` without arguments, with
     a scratch `HOME` (its ready check, `state.json` and crash report
     folder are there), then quit (the quit Apple event when macOS allows
     it without asking, otherwise SIGTERM, and SIGKILL after 15 s; the
-    process is in the restore file meanwhile).
+    process is in the restore file meanwhile); System Events makes it
+    the frontmost app before the capture.
   - `app-status-window-<appearance>.mov` and `.png`: the app's own
     recording, `msr record` with a scratch `HOME` (it shows the same
-    status window as the app, D46), 8 s into the recording. The driver
+    status window as the app, D46). Right after the recording starts, the
+    driver connects two virtual screens of their own identities and
+    disconnects one of them and connects it again
+    (`Scenario.statusWindowScreenEvents`), so the window shows several
+    screens and a file count of 2; 8 s after the last of those the driver
     sends the app its reopen event (what a click on the Dock icon does),
     moves the window to the screen's corner with System Events (the VM's
-    screen is small and the window first opens partly off it), and takes
+    screen is small and the window first opens partly off it), makes the
+    app the frontmost one, and takes
     a 5 s video of that window with `screencapture -V` (H.264, 5.000 s,
     one frame per change, so about one a second), then the PNG right
     after it, then sends Stop (SIGINT) and waits for the recording's
@@ -426,7 +449,8 @@ video from the e2e runs"):
     as their content (the Name column from the longest name, measured in
     the 13 pt system font), the window as high as its rows (Finder keeps
     a minimum height, so a short folder shows empty rows), closed
-    afterwards.
+    afterwards; Finder is activated with it. The two virtual screens are
+    disconnected after it.
   The dark ones, the status window's video and PNG and the Finder window
   are taken only when `scripts/end-to-end-test` passes the driver
   `--throwaway-vm` (the VM's setup grants the permissions they need:
@@ -438,8 +462,7 @@ video from the e2e runs"):
   as `app-recording-light/` and `app-recording-dark/`, beside
   `app-light/` and `app-dark/`. The start window is part of the run:
   when a window cannot be taken, the run fails like on any other failure.
-  The status window's picture for the homepage's screenshot script comes
-  later with the offscreen renders. (Setting `AppleInterfaceStyle` in
+  (Setting `AppleInterfaceStyle` in
   the app's own defaults domain left its window light, tried
   2026-11-19.)
 - A restore file, if one is left.

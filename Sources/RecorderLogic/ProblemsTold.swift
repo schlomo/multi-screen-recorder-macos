@@ -23,6 +23,10 @@ public enum ProblemKind: Hashable, Sendable {
     case audioFileFailed(String)
     /// An audio file whose writer failed and that lacks what its writer was given, by its name (D66).
     case audioFileLost(String)
+    /// An audio input whose input volume the status window's slider could not set, by its name; clears when a set works (D69).
+    case inputVolumeNotSet(String)
+    /// An audio input whose input volume changes cannot be followed, by its name; clears when following it works (D69).
+    case inputVolumeNotFollowed(String)
 }
 
 /// The problems a recording has told: each goes into the recording

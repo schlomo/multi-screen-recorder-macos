@@ -121,6 +121,9 @@ public struct RecordingManifest: Codable, Equatable, Sendable {
         /// The seconds of sound the clock drift correction added to the file
         /// (negative: removed); nil until the file ends.
         public var clockDriftCorrection: Double?
+        /// An audio input's input volume at the file's start, 0 to 1; nil
+        /// when it cannot be read, and for the system audio, which has none (D69).
+        public var inputVolume: Double?
 
         public init(
             name: String, audioSource: String, audioSourceUID: String?, channels: Channels, start: Double, timecode: String
@@ -135,6 +138,7 @@ public struct RecordingManifest: Codable, Equatable, Sendable {
             state = .recording
             clockDriftPpm = nil
             clockDriftCorrection = nil
+            inputVolume = nil
         }
 
         /// The file ended with `correction` seconds of sound added and the
@@ -148,11 +152,12 @@ public struct RecordingManifest: Codable, Equatable, Sendable {
         private static func withoutNegativeZero(_ value: Double) -> Double { value == 0 ? 0 : value }
 
         private enum CodingKeys: String, CodingKey {
-            case name, audioSource, audioSourceUID, channels, start, end, timecode, state, clockDriftPpm, clockDriftCorrection
+            case name, audioSource, audioSourceUID, channels, start, end, timecode, state, clockDriftPpm, clockDriftCorrection,
+                 inputVolume
         }
 
         /// `end`, `clockDriftPpm` and `clockDriftCorrection` are written as null until known;
-        /// `audioSourceUID` only for an audio input.
+        /// `audioSourceUID` and `inputVolume`, null when it cannot be read, only for an audio input.
         public func encode(to encoder: any Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(name, forKey: .name)
@@ -165,6 +170,7 @@ public struct RecordingManifest: Codable, Equatable, Sendable {
             try container.encode(state, forKey: .state)
             try container.encode(clockDriftPpm, forKey: .clockDriftPpm)
             try container.encode(clockDriftCorrection, forKey: .clockDriftCorrection)
+            if audioSourceUID != nil { try container.encode(inputVolume, forKey: .inputVolume) }
         }
     }
 
@@ -409,10 +415,13 @@ public struct RecordingEvent: Codable, Equatable, Sendable {
         case systemAudioFailed = "system audio failed"
         case audioFileWriterFailed = "audio file writer failed"
         case audioFileWriterFellBehind = "audio file writer fell behind"
+        case audioInputVolumeChanged = "audio input volume changed"
+        case noAudioStarted = "no audio started"
+        case noAudioStopped = "no audio stopped"
 
         /// The events of a file ended by a failure, which make the result
         /// `problems` and `msr record` exit 3 (D47). An audio input that
-        /// disconnects, and a gap, are none.
+        /// disconnects, a gap, a change of the input volume and no audio are none.
         public var isFailure: Bool {
             switch self {
             case .screenStreamFailed, .screenShowsAnotherScreensPicture, .screenFileWriterFellBehind,
@@ -423,10 +432,12 @@ public struct RecordingEvent: Codable, Equatable, Sendable {
         }
     }
 
-    /// A `from` or a `to`: a frame size, or an audio input's name.
+    /// A `from` or a `to`: a frame size, an audio input's name, or an input volume.
     public enum Value: Codable, Equatable, Sendable, ExpressibleByArrayLiteral, ExpressibleByStringLiteral {
         case frameSize([Int])
         case name(String)
+        /// 0 to 1.
+        case volume(Double)
 
         public init(arrayLiteral elements: Int...) { self = .frameSize(elements) }
         public init(stringLiteral value: String) { self = .name(value) }
@@ -435,6 +446,8 @@ public struct RecordingEvent: Codable, Equatable, Sendable {
             let container = try decoder.singleValueContainer()
             if let size = try? container.decode([Int].self) {
                 self = .frameSize(size)
+            } else if let volume = try? container.decode(Double.self) {
+                self = .volume(volume)
             } else {
                 self = .name(try container.decode(String.self))
             }
@@ -445,14 +458,16 @@ public struct RecordingEvent: Codable, Equatable, Sendable {
             switch self {
             case .frameSize(let size): try container.encode(size)
             case .name(let name): try container.encode(name)
+            case .volume(let volume): try container.encode(volume)
             }
         }
 
-        /// "1670x1080" or the name.
+        /// "1670x1080", the name, or the volume, "0.42".
         public var text: String {
             switch self {
             case .frameSize(let size): size.map(String.init).joined(separator: "x")
             case .name(let name): name
+            case .volume(let volume): String(format: "%g", volume)
             }
         }
     }
@@ -466,7 +481,8 @@ public struct RecordingEvent: Codable, Equatable, Sendable {
     public var audioSource: String?
     /// For `screen frame size changed`: the old and the new frame size;
     /// for `default microphone changed`: the old and the new default
-    /// microphone, absent where there was or is none.
+    /// microphone, absent where there was or is none; for `audio input
+    /// volume changed`: the old and the new input volume.
     public var from: Value?
     public var to: Value?
     /// For `audio input gap`: its length in seconds, to the millisecond.

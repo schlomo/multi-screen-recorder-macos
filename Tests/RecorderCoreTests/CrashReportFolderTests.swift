@@ -42,6 +42,15 @@ import Testing
         }
     }
 
+    @Test func theProcPathIsReadFromTheReportFile() throws {
+        let home = try scratchHome(["msr-2026-11-14-212425.ips"])
+        defer { try? FileManager.default.removeItem(at: home) }
+        try Data((#"{"app_name":"msr"}"# + "\n" + #"{"procPath":"\/tmp\/build\/msr"}"#).utf8)
+            .write(to: crashReportFolder(homeFolder: home).appending(path: "msr-2026-11-14-212425.ips"))
+        #expect(crashReportProcPath(of: "msr-2026-11-14-212425.ips", homeFolder: home) == "/tmp/build/msr")
+        #expect(crashReportProcPath(of: "msr-2026-11-15-000000.ips", homeFolder: home) == nil)
+    }
+
     @Test func aMissingFolderMeansNoReports() throws {
         let home = try scratchHome(nil)
         defer { try? FileManager.default.removeItem(at: home) }

@@ -37,9 +37,9 @@ public struct ManifestCheck {
     ]
     static let audioInputFileKeys: Set = [
         "name", "audioSource", "audioSourceUID", "channels", "start", "end", "timecode", "state", "clockDriftPpm",
-        "clockDriftCorrection",
+        "clockDriftCorrection", "inputVolume",
     ]
-    static let systemAudioFileKeys = audioInputFileKeys.subtracting(["audioSourceUID"])
+    static let systemAudioFileKeys = audioInputFileKeys.subtracting(["audioSourceUID", "inputVolume"])
     static let systemAudioSource = "System audio"
     static let systemAudioLabel = "Audio 0 - System"
     /// The events that end a file by a failure (recorder.md, "Output on disk").

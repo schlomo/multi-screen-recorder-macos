@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # The one way to run the end-to-end tests (docs/design/end-to-end-tests.md):
-# builds the app and the driver (msr-end-to-end, never in the app bundle) on
-# this Mac, clones a throwaway VM from the image scripts/end-to-end-setup built,
+# builds the app (or downloads a published one with scripts/install-app) and
+# the driver (msr-end-to-end, never in the app bundle) on this Mac, clones a throwaway VM from the image scripts/end-to-end-setup built,
 # runs the driver there in the GUI session, copies its scratch folder back and
 # deletes the VM, also when the run fails. Nothing records or plays sound on
 # this Mac. The exit status is the driver's.
@@ -10,23 +10,32 @@ set -euo pipefail
 me="scripts/end-to-end-test"
 if [[ ${1-} == -h || ${1-} == --help ]]; then
     echo "Runs the end-to-end tests in a throwaway clone of the VM scripts/end-to-end-setup built.
-  $me --scratch-folder <folder> [driver arguments]
+  $me --scratch-folder <folder> [--release | --snapshot <n>] [driver arguments]
                   builds, runs every scenario in the VM and copies the driver's whole scratch folder
                   to <folder>, which must be new or empty: run.log, review/ (the quick look, with
                   the app's windows as PNG and video in light and dark in review/app/) and, per
                   scenario, its whole folder with the recordings, recording.json and logs; the
                   driver's arguments, such as --scenario <name> (repeat for more), pass through
+  --release       runs the zip of the latest release instead of a fresh build (the driver is
+                  still built here), downloaded with scripts/install-app into a scratch folder
+  --snapshot <n>  runs the zip of PR <n>'s snapshot release (tag pr-<n>) instead, likewise
   $me --help      prints this, also -h; msr-end-to-end run --help for the driver's own
-Needs tart on the PATH and the VM msr-end-to-end (scripts/end-to-end-setup)."
+Needs tart on the PATH and the VM msr-end-to-end (scripts/end-to-end-setup); --release and
+--snapshot also need gh."
     exit 0
 fi
 
 scratch=""
+published=()
 driver_arguments=()
 while (( $# )); do
     case $1 in
         --scratch-folder) scratch=${2:?"$me: --scratch-folder needs a folder"}; shift 2 ;;
         --scratch-folder=*) scratch=${1#--scratch-folder=}; shift ;;
+        --release|--snapshot)
+            (( ${#published[@]} == 0 )) || { echo "$me: give one of --release and --snapshot <n>" >&2; exit 64; }
+            if [[ $1 == --release ]]; then published=(--release); shift
+            else published=(--snapshot "${2:?"$me: --snapshot needs a PR number"}"); shift 2; fi ;;
         *) driver_arguments+=("$1"); shift ;;
     esac
 done
@@ -52,19 +61,29 @@ cleanup() {
 }
 trap cleanup EXIT
 
-scripts/build-app
+# The published app goes through scripts/install-app into a folder of the run's own: the same
+# download, signature check and quarantine removal as an install, never /Applications.
+if (( ${#published[@]} )); then
+    app_folder="$work/published"
+    mkdir "$app_folder"
+    INSTALL_FOLDER="$app_folder" scripts/install-app "${published[@]}"
+else
+    scripts/build-app
+    app_folder=build
+fi
 swift build -c release --product msr-end-to-end
 driver="$(swift build -c release --show-bin-path)/msr-end-to-end"
-app="build/Multi Screen Recorder.app"
+app="Multi Screen Recorder.app"
 
 tart clone "$image_vm" "$scratch_vm"
 vm_start "$scratch_vm"
 guest "mkdir -p '$guest_app_root/build'"
-tar -C build -cf - "$(basename "$app")" | guest "tar -C '$guest_app_root/build' -xf -"
+tar -C "$app_folder" -cf - "$app" | guest "tar -C '$guest_app_root/build' -xf -"
 guest "cat > '$guest_app_root/msr-end-to-end' && chmod +x '$guest_app_root/msr-end-to-end'" <"$driver"
 
 # The driver runs in the admin user's GUI session (logged in automatically),
 # from the folder holding build/, with the tools first on the PATH.
+vm_wait_for_login
 guest_scratch="$guest_home/end-to-end-scratch"
 quoted_arguments="--throwaway-vm "
 for argument in ${driver_arguments[@]+"${driver_arguments[@]}"}; do

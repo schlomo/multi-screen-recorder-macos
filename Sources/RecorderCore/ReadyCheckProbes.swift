@@ -127,11 +127,16 @@ public func probeOutputFolder(_ folder: URL) -> OutputFolderProbe {
     return .usable(freeSpace(in: folder))
 }
 
-/// Free space for important use on the volume of the folder.
+/// The free space on the volume of the folder: its plain available capacity,
+/// as the important-usage reading is 0 off the boot volume (D71). Nil when the
+/// volume does not report it.
+func volumeFreeBytes(of folder: URL) throws -> Int64? {
+    try folder.resourceValues(forKeys: [.volumeAvailableCapacityKey]).volumeAvailableCapacity.map(Int64.init)
+}
+
 private func freeSpace(in folder: URL) -> FreeSpace {
     do {
-        let values = try folder.resourceValues(forKeys: [.volumeAvailableCapacityForImportantUsageKey])
-        guard let bytes = values.volumeAvailableCapacityForImportantUsage else {
+        guard let bytes = try volumeFreeBytes(of: folder) else {
             return .unreadable("the volume does not report its free space")
         }
         return .bytes(bytes)

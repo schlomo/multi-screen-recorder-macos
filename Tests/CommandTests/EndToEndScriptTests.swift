@@ -32,6 +32,21 @@ import Testing
         #expect(outcome.errors.hasSuffix("exists and is not an empty folder\n"), "\(outcome.errors)")
     }
 
+    @Test(arguments: [["--release", "--snapshot", "26"], ["--snapshot", "26", "--release"], ["--release", "--release"]])
+    func theTestsRunOnePublishedApp(arguments: [String]) async throws {
+        let outcome = try await run(repositoryRoot.appending(path: "scripts/end-to-end-test"),
+                                    ["--scratch-folder", "/nonexistent/e2e-scratch"] + arguments)
+        #expect(outcome.status == 64)
+        #expect(outcome.errors == "scripts/end-to-end-test: give one of --release and --snapshot <n>\n")
+    }
+
+    @Test func aSnapshotNeedsItsPRNumber() async throws {
+        let outcome = try await run(repositoryRoot.appending(path: "scripts/end-to-end-test"),
+                                    ["--scratch-folder", "/nonexistent/e2e-scratch", "--snapshot"])
+        #expect(outcome.status != 0)
+        #expect(outcome.errors.contains("--snapshot needs a PR number"), "\(outcome.errors)")
+    }
+
     @Test func theTestsNeedTart() async throws {
         let outcome = try await run(repositoryRoot.appending(path: "scripts/end-to-end-test"),
                                     ["--scratch-folder", "/nonexistent/e2e-scratch"], environment: withoutTart)

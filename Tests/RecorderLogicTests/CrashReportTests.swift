@@ -5,36 +5,85 @@ import Testing
 @Suite struct CrashReportTests {
     private let older = "msr-2026-11-13-132800.ips"
     private let newer = "msr-2026-11-14-212425.ips"
+    private let installed = "/Applications/Multi Screen Recorder.app/Contents/MacOS/msr"
+    private func appsOwn(_ name: String) -> String { installed }
 
     @Test func theNewestReportIsOfferedWhenNothingWasOfferedBefore() {
-        #expect(CrashReport.toOffer(fileNames: [newer, older], lastOffered: nil) == newer)
+        #expect(CrashReport.toOffer(fileNames: [newer, older], lastOffered: nil, procPath: appsOwn) == newer)
     }
 
     @Test func aReportIsOfferedOnlyIfNewerThanTheLastOfferedOne() {
-        #expect(CrashReport.toOffer(fileNames: [newer, older], lastOffered: older) == newer)
-        #expect(CrashReport.toOffer(fileNames: [newer, older], lastOffered: newer) == nil)
-        #expect(CrashReport.toOffer(fileNames: [older], lastOffered: newer) == nil)
+        #expect(CrashReport.toOffer(fileNames: [newer, older], lastOffered: older, procPath: appsOwn) == newer)
+        #expect(CrashReport.toOffer(fileNames: [newer, older], lastOffered: newer, procPath: appsOwn) == nil)
+        #expect(CrashReport.toOffer(fileNames: [older], lastOffered: newer, procPath: appsOwn) == nil)
     }
 
     @Test func onlyMSRReportsCount() {
         let others = ["swiftpm-testing-helper-2026-11-14-230000.ips", "msr-2026-11-15-100000.txt",
                       "xmsr-2026-11-15-100000.ips", "Retired"]
-        #expect(CrashReport.toOffer(fileNames: others, lastOffered: nil) == nil)
-        #expect(CrashReport.toOffer(fileNames: others + [older], lastOffered: nil) == older)
+        #expect(CrashReport.toOffer(fileNames: others, lastOffered: nil, procPath: appsOwn) == nil)
+        #expect(CrashReport.toOffer(fileNames: others + [older], lastOffered: nil, procPath: appsOwn) == older)
     }
 
     @Test func onlyTheExactNameShapeCounts() {
         let odd = ["msr-2026-11-14-212425.hang.ips", "msr-2026-11-14-212425.ips.bak", "msr-2026-11-14-2124.ips",
                    "msr-2026-11-14-212425-1.ips", "msr-.ips", "msr-2026-11-14-212425.IPS"]
-        #expect(CrashReport.toOffer(fileNames: odd, lastOffered: nil) == nil)
+        #expect(CrashReport.toOffer(fileNames: odd, lastOffered: nil, procPath: appsOwn) == nil)
     }
 
     @Test func aCrashDatedBeforeTheLastOfferedOneIsNotOffered() {
-        #expect(CrashReport.toOffer(fileNames: [older], lastOffered: newer) == nil)
+        #expect(CrashReport.toOffer(fileNames: [older], lastOffered: newer, procPath: appsOwn) == nil)
     }
 
     @Test func noReportsOfferNothing() {
-        #expect(CrashReport.toOffer(fileNames: [], lastOffered: nil) == nil)
+        #expect(CrashReport.toOffer(fileNames: [], lastOffered: nil, procPath: appsOwn) == nil)
+    }
+
+    @Test func onlyReportsOfAProgramInsideTheAppBundleCount() {
+        let paths = [
+            newer: "/Users/someone/src/multi-screen-recorder-macos/.build/debug/msr",
+            older: "/Users/someone/Downloads/Multi Screen Recorder.app/Contents/MacOS/msr",
+        ]
+        #expect(CrashReport.toOffer(fileNames: [newer, older], lastOffered: nil, procPath: { paths[$0]! }) == older)
+        #expect(CrashReport.toOffer(fileNames: [newer], lastOffered: nil, procPath: { paths[$0]! }) == nil)
+    }
+
+    @Test func aProgramInsideABundleNamedLikeTheAppIsTheApps() {
+        #expect(CrashReport.isTheApps(procPath: installed))
+        #expect(CrashReport.isTheApps(procPath: "/Users/someone/src/repo/build/Multi Screen Recorder.app/Contents/MacOS/msr"))
+        #expect(!CrashReport.isTheApps(procPath: "/usr/local/bin/msr"))
+        #expect(!CrashReport.isTheApps(procPath: "/Applications/Multi Screen Recorder.app"))
+        #expect(!CrashReport.isTheApps(procPath: "/Applications/Multi Screen Recorder.app.bak/Contents/MacOS/msr"))
+        #expect(!CrashReport.isTheApps(procPath: "/Applications/Old Multi Screen Recorder.app/Contents/MacOS/msr"))
+    }
+
+    @Test func onlyReportsNewerThanTheLastOfferedOneAreRead() {
+        var read: [String] = []
+        _ = CrashReport.toOffer(fileNames: [newer, older], lastOffered: older, procPath: { read.append($0); return installed })
+        #expect(read == [newer])
+    }
+
+    @Test func aReportThatCannotBeReadIsSkipped() {
+        #expect(CrashReport.toOffer(fileNames: [newer, older], lastOffered: nil, procPath: { $0 == newer ? nil : installed }) == older)
+        #expect(CrashReport.toOffer(fileNames: [newer], lastOffered: nil, procPath: { _ in nil }) == nil)
+    }
+
+    @Test func theProcPathIsReadFromTheReportsBody() throws {
+        let report = #"{"app_name":"msr","bug_type":"309","name":"msr"}"# + "\n" + #"""
+            {
+              "uptime" : 3900,
+              "procPath" : "\/Applications\/Multi Screen Recorder.app\/Contents\/MacOS\/msr",
+              "procName" : "msr"
+            }
+            """#
+        #expect(CrashReport.procPath(reportText: report) == installed)
+    }
+
+    @Test func aReportWithoutAProcPathHasNone() {
+        let header = #"{"app_name":"msr","bug_type":"309"}"#
+        for report in ["", header, header + "\n{}", header + "\nnot json", header + "\n" + #"{"procPath":3}"#] {
+            #expect(CrashReport.procPath(reportText: report) == nil)
+        }
     }
 
     @Test func theIssueURLCarriesTheFormFields() throws {

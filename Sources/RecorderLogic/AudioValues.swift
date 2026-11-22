@@ -24,6 +24,28 @@ extension RecorderValues {
     public static let cpuSampleInterval = Duration.seconds(1)
 }
 
+/// The level meters, the input volume and no audio (D69).
+extension RecorderValues {
+    /// The level meter's scale: from this many dBFS up to 0 dBFS.
+    public static let levelMeterFloorDBFS = -60.0
+    /// A level meter is red from this many dBFS on.
+    public static let levelMeterRedDBFS = -1.0
+    /// How long a level meter holds its highest peak.
+    public static let levelMeterPeakHold = Duration.milliseconds(1500)
+    /// How often the status window draws the level meters and the input
+    /// volume while it is open.
+    public static let levelMeterInterval = Duration.milliseconds(100)
+    /// How long an input volume must hold still before its change is the
+    /// event `audio input volume changed`.
+    public static let inputVolumeSettleTime = Duration.milliseconds(500)
+    /// How often the recorder reads the input volume, for a change that
+    /// Core Audio does not report to its listener.
+    public static let inputVolumeReadInterval = Duration.milliseconds(250)
+    /// How long an audio input must deliver exact zeros before it has no
+    /// audio and its audio file ends.
+    public static let noAudioTime = Duration.seconds(10)
+}
+
 /// The clock drift correction's values (*data*): the intervals the
 /// buffers' lateness is measured in, the support line through them, the
 /// rate that follows it, and the clock drift shown.

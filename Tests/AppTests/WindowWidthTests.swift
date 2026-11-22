@@ -118,14 +118,15 @@ import Testing
 
     private func statusModel(name: String, cpu: String) -> StatusModel {
         let model = StatusModel()
-        model.rows = [.init(source: .audioInput(1, name: name), recordsAt: "2 channels", files: 1, written: "40 MB", state: "recording")]
+        model.rows = [.init(source: .audioInput(1, name: name), recordsAt: "2 channels", files: 1, written: "40 MB", state: "recording",
+                            audioSource: .input("U"))]
         model.line = "0:01:00, 40 MB in 1 file, 100 GB free"
         model.cpu = cpu
         return model
     }
 
     private func status(_ model: StatusModel) -> some View {
-        StatusView(model: model, stop: {}, continueRecording: {})
+        StatusView(model: model, stop: {}, continueRecording: {}, setInputVolume: { _, _ in })
     }
 
     @Test func theCPUExplanationWrapsInsteadOfWideningTheStatusWindow() {
@@ -149,6 +150,18 @@ import Testing
             model(state: "?", written: "?", files: 9),
         ].map { width(status($0)) }
         #expect(Set(widths).count == 1, "\(widths)")
+    }
+
+    /// A level, a slider that comes or goes, or a screen row without either moves nothing (D69).
+    @Test func theLevelMeterAndTheSliderKeepTheStatusWindowsWidth() {
+        let quiet = statusModel(name: "Mic", cpu: "")
+        let loud = statusModel(name: "Mic", cpu: "")
+        loud.levels = [.input("U"): AudioLevel(peak: 1, hold: 1)]
+        loud.inputVolumes = [.input("U"): 0.5]
+        let withScreen = statusModel(name: "Mic", cpu: "")
+        withScreen.rows.append(.init(source: .screen(1, name: "LG"), recordsAt: "1920×1080", files: 1, written: "1 MB", state: "recording"))
+        #expect(width(status(quiet)) == width(status(loud)))
+        #expect(width(status(quiet)) == width(status(withScreen)))
     }
 
     @Test func theStatusWindowWidensForALongName() {

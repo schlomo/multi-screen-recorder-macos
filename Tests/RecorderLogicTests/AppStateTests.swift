@@ -26,11 +26,12 @@ import Testing
 
     @Test func aCrashReportIsOfferedOnceOnceItIsMarked() {
         let names = ["msr-2026-11-13-132800.ips", "msr-2026-11-14-212425.ips"]
-        let name = CrashReport.toOffer(fileNames: names, lastOffered: AppState.empty.lastOfferedCrashReport)
+        let installed = "/Applications/\(CrashReport.appBundleName)/Contents/MacOS/msr"
+        let name = CrashReport.toOffer(fileNames: names, lastOffered: AppState.empty.lastOfferedCrashReport, procPath: { _ in installed })
         #expect(name == "msr-2026-11-14-212425.ips")
         let marked = AppState.empty.offering(name!)
         #expect(marked.lastOfferedCrashReport == name)
-        #expect(CrashReport.toOffer(fileNames: names, lastOffered: marked.lastOfferedCrashReport) == nil)
+        #expect(CrashReport.toOffer(fileNames: names, lastOffered: marked.lastOfferedCrashReport, procPath: { _ in installed }) == nil)
     }
 
     @Test func brokenJSONIsAnError() {
