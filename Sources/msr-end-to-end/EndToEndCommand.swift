@@ -211,6 +211,7 @@ struct VirtualScreenCommand: ParsableCommand {
         abstract: "The device helper: holds one virtual screen until SIGTERM or until standard input closes.")
 
     @Option var serialNumber: UInt32
+    @Option var name: String
     @Option(name: .customLong("size"), help: "A mode, such as 1280x720; repeat for more, the first is the one it starts at.",
             transform: { text in
                 guard let size = ScreenSize(text) else { throw ValidationError("a size is <width>x<height>, not \(text)") }
@@ -219,7 +220,7 @@ struct VirtualScreenCommand: ParsableCommand {
     var sizes: [ScreenSize]
 
     func run() throws {
-        try VirtualScreenHelper.hold(VirtualScreenSpec(serialNumber: serialNumber, sizes: sizes))
+        try VirtualScreenHelper.hold(VirtualScreenSpec(serialNumber: serialNumber, name: name, sizes: sizes))
     }
 }
 

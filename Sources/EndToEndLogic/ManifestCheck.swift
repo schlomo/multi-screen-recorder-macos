@@ -20,7 +20,7 @@ public struct ListedFile: Sendable, Equatable {
 
     public var name: String
     public var source: Source
-    /// The label the file name carries after its stamp (`Screen 3 - MSR Test`).
+    /// The label the file name carries after its stamp (`Screen 3 - Desk Monitor`).
     public var label: String
     public var start: Double
     public var end: Double?
@@ -277,7 +277,7 @@ public struct ManifestCheck {
             fail("the virtual screens have \(actual.count) screen files, expected \(expected.count): \(actual.map(\.name))")
         }
         let virtualEvents = (events?.array ?? []).filter {
-            $0["screen"]?.string?.hasPrefix(expectation.virtualScreenNamePrefix) == true
+            $0["screen"]?.string.map(expectation.isVirtualScreenName) == true
         }
         let kinds = virtualEvents.map { $0["event"]?.string ?? "?" }
         let expectedKinds = expectation.virtualScreenEvents.map(\.event)
@@ -294,8 +294,8 @@ public struct ManifestCheck {
         for (index, (file, wanted)) in zip(actual, expected).enumerated() {
             guard case .screen(let uuid, let name, let size, _) = file.source else { continue }
             if uuid != wanted.screenUUID { fail("\(file.name): screen \(uuid), expected \(wanted.screenUUID)") }
-            if !name.hasPrefix(expectation.virtualScreenNamePrefix) {
-                fail("\(file.name): screen \(name), expected a name starting \(expectation.virtualScreenNamePrefix)")
+            if !expectation.isVirtualScreenName(name) {
+                fail("\(file.name): screen \(name), expected a name starting one of \(expectation.virtualScreenNames)")
             }
             if size != wanted.frameSize { fail("\(file.name): frameSize \(size), expected \(wanted.frameSize)") }
             var startedBy = wanted.startedBy

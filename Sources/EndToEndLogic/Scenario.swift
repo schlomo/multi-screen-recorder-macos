@@ -22,7 +22,7 @@ public struct ScreenSize: Sendable, Equatable, CustomStringConvertible {
 
 /// A virtual screen the device helper makes: its identity (the tests'
 /// vendor and product with this serial number, so macOS gives it the same
-/// UUID every time) and its modes, at 1x: the size it looks like first,
+/// UUID every time), its name (display text only) and its modes, at 1x: the size it looks like first,
 /// and the sizes it can be switched to. macOS keeps a mode per identity
 /// (tried 2026-11-19): a screen made again with the same identity comes
 /// back at the size it first had, whatever its modes, so a size change is a
@@ -32,18 +32,18 @@ public struct VirtualScreenSpec: Sendable, Equatable {
     /// profile per identity, so they are few and fixed.
     public static let vendorID: UInt32 = 0x4D53
     public static let productID: UInt32 = 0x5254
-    public static let namePrefix = "MSR Test"
 
     public var serialNumber: UInt32
+    /// The name macOS shows and the recorder reads; a realistic monitor name.
+    public var name: String
     /// Its modes; it starts at the first.
     public var sizes: [ScreenSize]
 
-    public init(serialNumber: UInt32, sizes: [ScreenSize]) {
+    public init(serialNumber: UInt32, name: String, sizes: [ScreenSize]) {
         self.serialNumber = serialNumber
+        self.name = name
         self.sizes = sizes
     }
-
-    public var name: String { "\(Self.namePrefix) \(serialNumber)" }
 }
 
 /// A named scenario: a recording, timed events while it runs, how it stops,
@@ -106,13 +106,13 @@ public struct Scenario: Sendable {
 extension Scenario {
     static let auto = ManifestExpectation.Settings(resolution: "native", audioMode: "wired", systemAudio: true)
     static let screen = VirtualScreenSpec(
-        serialNumber: 101, sizes: [ScreenSize(width: 1280, height: 720), ScreenSize(width: 1600, height: 900)])
+        serialNumber: 101, name: "Portable Monitor", sizes: [ScreenSize(width: 1280, height: 720), ScreenSize(width: 1600, height: 900)])
     /// The virtual screens connected while `msr record` runs for the status window's capture, so the
     /// window shows several screens: the last one disconnects and comes back, so its file count is 2.
     /// Times in seconds after the recording started; identities of their own, one size each.
     public static let statusWindowScreenEvents: [(at: Double, event: Event)] = {
-        let wide = VirtualScreenSpec(serialNumber: 201, sizes: [ScreenSize(width: 1600, height: 900)])
-        let small = VirtualScreenSpec(serialNumber: 202, sizes: [ScreenSize(width: 1280, height: 720)])
+        let wide = VirtualScreenSpec(serialNumber: 201, name: "Desk Monitor", sizes: [ScreenSize(width: 1600, height: 900)])
+        let small = VirtualScreenSpec(serialNumber: 202, name: "Portable Monitor", sizes: [ScreenSize(width: 1280, height: 720)])
         return [
             (at: 1, event: .connectScreen(wide)),
             (at: 2, event: .connectScreen(small)),
