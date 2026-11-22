@@ -80,6 +80,11 @@ extension GlobalRecordingLog {
         }
 
         private let sources = OpenedSources()
+        final class Switch: Sendable {
+            let isOn = Mutex(true)
+        }
+
+        private let screensReadable = Switch()
         private var recorder: Recorder!
         private let samplesPerBuffer = 1600
 
@@ -92,17 +97,22 @@ extension GlobalRecordingLog {
             try? FileManager.default.removeItem(at: home)
         }
 
-        private func start() throws {
+        private func start(readsScreens: Bool = false) throws {
             var settings = Settings.defaults
             settings.auto = false
-            settings.resolution = RecordingResolution.none
+            settings.resolution = readsScreens ? .p1080 : RecordingResolution.none
             settings.audioMode = .defaultMicrophone
             settings.systemAudio = false
             settings.outputFolder = home.path(percentEncoded: false)
             let input = AudioInputInfo(name: name, channelCount: 1, isDefault: true, transport: .usb, uid: uid)
             let sources = sources
             let volume = volume
+            let screensReadable = screensReadable
             let devices = RecorderDevices(
+                screens: { () throws(DeviceReadError) -> [ConnectedScreen] in
+                    if screensReadable.isOn.withLock({ $0 }) { return [] }
+                    throw DeviceReadError("the stand-in's screens cannot be read")
+                },
                 audioInputs: { [input] },
                 audioInputSource: { _ in
                     let source = AudioCaptureTests.StandInSource()
@@ -178,6 +188,19 @@ extension GlobalRecordingLog {
             let counted = observer.eventLines.filter { $0.line.contains("audio input failed repeated 1 time since") }
             #expect(counted.count == 1)
             #expect(counted.first?.isFailure == true)
+        }
+
+        // MARK: Sleep and wake
+
+        @Test func theAudioInputsRestartAtAWakeWhoseScreensCannotBeRead() async throws {
+            try start(readsScreens: true)
+            #expect(sources.count == 1)
+            recorder.willSleep()
+            screensReadable.isOn.withLock { $0 = false }
+            recorder.didWake()
+            try await wait("the audio input's restart") { sources.count == 2 }
+            #expect(observer.problems.map(\.problem.problem) == ["The screens cannot be read"])
+            _ = await stop()
         }
 
         // MARK: Input volume (D69)
