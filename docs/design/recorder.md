@@ -1651,10 +1651,25 @@ fails on some Macs only (the hosted runner, about 2 of 7 runs, with
 - Per camera capture (D74): at the session's start `camera <unique ID>:
   active format <w>×<h> <subtype>, frame duration <min> to <max>` (such
   as `1/30 s to 1/30 s`), with `the format allows no 30 fps, set to <n>
-  fps` when it cannot run at 30; at the first frame `Camera 1 FaceTime
-  HD Camera: first frame <w>×<h> <pixel format>`. In category
+  fps` when it cannot run at 30, and before it `camera <unique ID>: in
+  use by another app at the start` when another app uses the camera;
+  `camera <unique ID>: active format changed to <w>×<h> <subtype>, frame
+  duration <min> to <max>` when the open camera's active format changes;
+  `camera <unique ID>: <n> frames dropped: <reason> <count>, …` for the
+  frames AVFoundation dropped (`captureOutput(_:didDrop:from:)`, its
+  reason such as `FrameWasLate`, `OutOfBuffers` or `Discontinuity`), at
+  most one line a second with the counts since the line before, and the
+  rest at the capture's end; at the first frame `Camera 1 FaceTime
+  HD Camera: first frame <w>×<h> <pixel format>`; at a camera file's
+  end, when frames arrived after their tick was decided, `<file>: <n>
+  frames arrived after their tick was decided and were placed late, the
+  latest <ms> ms after its capture` (see "Cameras"). In category
   `recorder`, at every reading of the cameras, `cameras: <name> [virtual]
-  [suspended] <format>, …`.
+  [Continuity Camera] [suspended] <format>, …`, the format the camera is
+  opened with at the recording resolution (none at None), and when
+  another app starts or ends its use of a camera, `camera <name> (<unique
+  ID>): now in use by another app` or `no longer in use by another
+  app`.
 
 A screen's frame is never converted: its size and format go to the
 writer as they come, so a frame of a size other than the file's gets no
@@ -1848,8 +1863,9 @@ and a stand-in for the screens, and with stand-in cameras (a camera
 appearing and vanishing, its stream failing, a frame without a picture,
 and the Camera permission never asked, granted, denied, refused at the
 request, not asked without a camera or under the camera mode None; a
-camera without a first frame and one whose frames stop; Stop and sleep
-and wake with a camera file) (`RecorderDevices.screens`; a wake whose
+camera without a first frame, one whose frames stop, one that stalls
+and delivers again, and frames arriving after their tick was decided;
+Stop and sleep and wake with a camera file) (`RecorderDevices.screens`; a wake whose
 screens cannot be read still writes its wake event and restarts the
 audio inputs) (`RecorderTests`: a failure told once by its event and its repeats
 counted at Stop, D65; `inputVolume`, a change told once it held still,

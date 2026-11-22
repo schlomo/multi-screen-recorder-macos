@@ -57,12 +57,13 @@ func cameraIsContinuity(deviceType: AVCaptureDevice.DeviceType, transportType: I
 
 /// Follows the cameras: one connected or disconnected (video devices only)
 /// or suspended or resumed (`isSuspended`, observed on every camera listed)
-/// calls `changed` on the main thread.
+/// calls `changed` on the main thread. Another app starting or ending its
+/// use of a camera (`isInUseByAnotherApplication`) is a detail line.
 @MainActor
 public final class CameraWatch {
     private let changed: @MainActor () -> Void
     private var tokens: [any NSObjectProtocol] = []
-    private var suspensions: [NSKeyValueObservation] = []
+    private var observations: [NSKeyValueObservation] = []
 
     public init(changed: @escaping @MainActor () -> Void) {
         self.changed = changed
@@ -72,25 +73,31 @@ public final class CameraWatch {
                 MainActor.assumeIsolated { self?.devicesChanged() }
             }
         }
-        observeSuspensions()
+        observeDevices()
     }
 
     private func devicesChanged() {
-        observeSuspensions()
+        observeDevices()
         changed()
     }
 
-    private func observeSuspensions() {
-        suspensions = cameraDevices().map { device in
+    private func observeDevices() {
+        observations = cameraDevices().flatMap { device in [
             device.observe(\.isSuspended) { [weak self] _, _ in
                 DispatchQueue.main.async { MainActor.assumeIsolated { self?.changed() } }
-            }
-        }
+            },
+            device.observe(\.isInUseByAnotherApplication) { device, _ in
+                RecorderLog.detail(
+                    "camera \(device.localizedName) (\(device.uniqueID)): "
+                        + (device.isInUseByAnotherApplication ? "now in use by another app" : "no longer in use by another app"),
+                    category: "recorder")
+            },
+        ] }
     }
 
     public func cancel() {
         for token in tokens { NotificationCenter.default.removeObserver(token) }
         tokens = []
-        suspensions = []
+        observations = []
     }
 }

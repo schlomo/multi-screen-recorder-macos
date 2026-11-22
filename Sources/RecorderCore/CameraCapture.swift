@@ -165,7 +165,9 @@ final class CameraCapture: @unchecked Sendable {
 /// `AVCaptureDevice.wasDisconnectedNotification` or the session's runtime
 /// error `deviceWasDisconnected`, as an audio input's (`MicrophoneSource`).
 /// The session is opened, started and stopped on a queue of its own, as
-/// `startRunning` and `stopRunning` block.
+/// `startRunning` and `stopRunning` block. Dropped frames, another app
+/// using the camera at the start and a change of its active format are
+/// detail lines.
 final class CameraSource: NSObject, CameraFrameSource, AVCaptureVideoDataOutputSampleBufferDelegate, @unchecked Sendable {
     let uniqueID: String
     let format: CameraFormat
@@ -180,6 +182,8 @@ final class CameraSource: NSObject, CameraFrameSource, AVCaptureVideoDataOutputS
         var deliver: (@Sendable (CMSampleBuffer) -> Void)?
         var ended: (@Sendable (VideoStreamEnd) -> Void)?
         var observers: [any NSObjectProtocol] = []
+        var formatObservation: NSKeyValueObservation?
+        var drops = DroppedFrames()
         var isStopped = false
     }
 
@@ -262,28 +266,39 @@ final class CameraSource: NSObject, CameraFrameSource, AVCaptureVideoDataOutputS
                 self?.endOnce(.captureSourceGone)
             },
         ]
+        let formatObservation = device.observe(\.activeFormat) { [uniqueID] device, _ in
+            RecorderLog.detail("camera \(uniqueID): active format changed to \(Self.formatText(device))", category: VideoFileWriter.detailCategory)
+        }
         let proceed = withState { state -> Bool in
             guard !state.isStopped else { return false }
             state.observers = observers
+            state.formatObservation = formatObservation
             state.session = session
             return true
         }
         guard proceed else {
             observers.forEach(center.removeObserver)
+            formatObservation.invalidate()
             return
         }
+        if device.isInUseByAnotherApplication {
+            RecorderLog.detail("camera \(uniqueID): in use by another app at the start", category: VideoFileWriter.detailCategory)
+        }
+        // A stop that comes from here on stops the session on this queue, after this.
         session.startRunning()
-        // A stop that came while it started has run already, on this queue after this.
-        if withState({ $0.isStopped }) { session.stopRunning() }
-        let active = device.activeFormat
         let rate = frameDuration.map { 1 / $0.seconds }
         RecorderLog.detail(
-            "camera \(uniqueID): active format \(cameraFormat(of: active).size) "
-                + FrameFacts.fourCharacterCode(CMFormatDescriptionGetMediaSubType(active.formatDescription))
-                + ", frame duration \(Self.text(device.activeVideoMinFrameDuration)) to \(Self.text(device.activeVideoMaxFrameDuration))"
+            "camera \(uniqueID): active format \(Self.formatText(device))"
                 + (rate.map { abs($0 - wanted) < 0.001 ? "" : ", the format allows no \(Int(wanted)) fps, set to \(String(format: "%.3g", $0)) fps" }
                     ?? ", the format lists no frame rate"),
             category: VideoFileWriter.detailCategory)
+    }
+
+    /// "1920×1080 420v, frame duration 1/30 s to 1/30 s".
+    private static func formatText(_ device: AVCaptureDevice) -> String {
+        let active = device.activeFormat
+        return "\(cameraFormat(of: active).size) " + FrameFacts.fourCharacterCode(CMFormatDescriptionGetMediaSubType(active.formatDescription))
+            + ", frame duration \(text(device.activeVideoMinFrameDuration)) to \(text(device.activeVideoMaxFrameDuration))"
     }
 
     /// The frame duration for `wanted` frames per second where one of the
@@ -306,6 +321,14 @@ final class CameraSource: NSObject, CameraFrameSource, AVCaptureVideoDataOutputS
         withState { $0.deliver }?(sampleBuffer)
     }
 
+    func captureOutput(_ output: AVCaptureOutput, didDrop sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
+        let reason = CMGetAttachment(sampleBuffer, key: kCMSampleBufferAttachmentKey_DroppedFrameReason, attachmentModeOut: nil)
+            .map { "\($0)" } ?? "no reason given"
+        let now = Int64(clamping: DispatchTime.now().uptimeNanoseconds)
+        guard let line = withState({ $0.drops.dropped(reason: reason, at: now) }) else { return }
+        RecorderLog.detail("camera \(uniqueID): \(line)", category: VideoFileWriter.detailCategory)
+    }
+
     private func endOnce(_ end: VideoStreamEnd) {
         let ended = withState { state -> (@Sendable (VideoStreamEnd) -> Void)? in
             defer { state.ended = nil }
@@ -316,17 +339,20 @@ final class CameraSource: NSObject, CameraFrameSource, AVCaptureVideoDataOutputS
 
     /// Stops the session on its own queue, never blocking a task's thread.
     func stop() async {
-        let (session, observers) = withState { state in
+        let (session, observers, drops) = withState { state in
             state.isStopped = true
             state.deliver = nil
             state.ended = nil
+            state.formatObservation?.invalidate()
             defer {
                 state.session = nil
                 state.observers = []
+                state.formatObservation = nil
             }
-            return (state.session, state.observers)
+            return (state.session, state.observers, state.drops.remaining())
         }
         observers.forEach(NotificationCenter.default.removeObserver)
+        if let drops { RecorderLog.detail("camera \(uniqueID): \(drops)", category: VideoFileWriter.detailCategory) }
         // Handed to the session's queue, which alone uses it from here on.
         nonisolated(unsafe) let running = session
         guard running != nil else { return }
