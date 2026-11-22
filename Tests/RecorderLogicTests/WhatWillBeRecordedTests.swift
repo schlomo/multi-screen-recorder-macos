@@ -414,6 +414,26 @@ import Testing
         #expect(allShown.cameraRows.map(\.isRecorded) == [true])
     }
 
+    /// macOS grants the Camera permission per app: denied, no camera is recorded, and each the mode would record says why (D74).
+    @Test func underADeniedCameraPermissionEachCameraTheModeWouldRecordSaysSo() {
+        var facts = ReadyCheckFacts(
+            screenRecording: .granted, microphoneGranted: true, screens: .success(DesignExample.screens),
+            audioInputs: .success(DesignExample.audioInputs), outputFolder: .usable(.bytes(100_000_000_000)),
+            cameraGranted: false, cameras: [Self.builtInCamera, Self.obs])
+        let denied = WhatWillBeRecorded(settings: .defaults, facts: facts)
+        #expect(denied.cameraRows.map(\.cells) == [
+            ["FaceTime HD Camera (default) (no Camera permission)", "", "", "-", "-"],
+            ["OBS Virtual Camera (virtual)", "", "", "-", "-"],
+        ])
+        #expect(denied.cameraRows.map(\.isRecorded) == [false, false])
+        facts.cameras = []
+        #expect(denied.total == WhatWillBeRecorded(settings: .defaults, facts: facts).total)
+        let listed = WhatWillBeRecorded(
+            settings: .defaults, screens: .success([]), audioInputs: .success([]), cameras: [Self.builtInCamera],
+            cameraPermissionDenied: true, outputFolder: nil)
+        #expect(listed.cameraRows.map(\.cells) == [["FaceTime HD Camera (default) (no Camera permission)", "", "", "-", "-"]])
+    }
+
     @Test func aSuspendedCameraIsNotRecordedAndSaysSo() {
         var suspended = Self.builtInCamera
         suspended.isSuspended = true

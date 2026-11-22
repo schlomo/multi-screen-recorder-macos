@@ -328,7 +328,8 @@ struct WhatWillBeRecordedView: View {
 }
 
 /// All green: one line "Ready to record" that expands on click. Any red:
-/// every item, with the fix under each red one.
+/// every item. The fix under each item that has one: every red one, and a
+/// denied Camera permission, which records no camera.
 private struct ReadyCheckView: View {
     let result: ReadyCheckResult?
     let isChecking: Bool
@@ -379,7 +380,7 @@ private struct ReadyCheckItemRow: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(item.title)
                     .fixedSize(horizontal: false, vertical: true)
-                if !item.passed, let fix = item.fix {
+                if let fix = item.shownFix {
                     Text("Fix: \(fix)")
                         .font(.callout)
                         .foregroundStyle(.secondary)

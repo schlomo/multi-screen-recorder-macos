@@ -105,6 +105,7 @@ public struct WhatWillBeRecorded: Equatable, Sendable {
         screens readScreens: Result<[ScreenInfo], DeviceReadError>,
         audioInputs readAudioInputs: Result<[AudioInputInfo], DeviceReadError>,
         cameras cameraInfos: [CameraInfo] = [],
+        cameraPermissionDenied: Bool = false,
         outputFolder: OutputFolderProbe?
     ) {
         self.init(
@@ -121,13 +122,15 @@ public struct WhatWillBeRecorded: Equatable, Sendable {
         if case .success(let screenInfos) = screensToJudge(readScreens, settings: settings),
            case .success(let audioInputs) = audioInputsToJudge(readAudioInputs, settings: settings),
            let bytesPerHour = DiskEstimate.bytesPerHour(
-               settings: settings, screens: screenInfos, audioInputs: audioInputs, cameras: cameraInfos) {
+               settings: settings, screens: screenInfos, audioInputs: audioInputs,
+               cameras: cameraPermissionDenied ? [] : cameraInfos) {
             total = Self.total(bytesPerHour, settings: settings, outputFolder: outputFolder)
         }
         let ordered = cameraInfos.filter(\.isDefault) + cameraInfos.filter { !$0.isDefault }
-        let recorded = ordered.filter { CameraTracker.records($0, settings: settings) }
+        let recorded = cameraPermissionDenied ? [] : ordered.filter { CameraTracker.records($0, settings: settings) }
+        let leftOut = ordered.filter { camera in !recorded.contains { $0.uniqueID == camera.uniqueID } }
         cameras = recorded.enumerated().map { Self.camera($0.element, number: $0.offset + 1, settings: settings) }
-            + ordered.filter { !CameraTracker.records($0, settings: settings) }.map { Self.camera($0, number: nil, settings: settings) }
+            + leftOut.map { Self.camera($0, number: nil, settings: settings) }
         let systemAudio = Audio(
             source: .systemAudio(isRecorded: settings.systemAudio), channels: "stereo", isRecorded: settings.systemAudio,
             gigabytesPerHour: settings.systemAudio
@@ -183,7 +186,7 @@ public struct WhatWillBeRecorded: Equatable, Sendable {
     public init(settings: Settings, facts: ReadyCheckFacts) {
         self.init(
             settings: settings, screens: facts.screens, audioInputs: facts.audioInputs, cameras: facts.cameras,
-            outputFolder: facts.outputFolder)
+            cameraPermissionDenied: facts.cameraGranted == false, outputFolder: facts.outputFolder)
     }
 
     /// An input whose channels cannot be read says so; its GB/h max is "?" if it is recorded.
@@ -205,12 +208,15 @@ public struct WhatWillBeRecorded: Equatable, Sendable {
     }
 
     /// A camera not recorded has no number and `-` for Records at and GB/h max; after its name it says
-    /// why, where its own rule leaves it out: "OBS Virtual Camera (virtual)", "(Continuity Camera)", "(no format)", "(suspended)".
+    /// why, where its own rule leaves it out: "OBS Virtual Camera (virtual)", "(Continuity Camera)", "(no format)", "(suspended)", and one the
+    /// camera mode records "(no Camera permission)".
     private static func camera(_ camera: CameraInfo, number: Int?, settings: Settings) -> Camera {
         guard let number, let frameSize = camera.frameSize(resolution: settings.effectiveResolution) else {
             let leavesOutVirtual = [.defaultCamera, .real].contains(settings.effectiveCameraMode)
                 && settings.effectiveResolution.recordsScreens
-            let reason: String? = if camera.formats.isEmpty { "no format" } else if camera.isVirtual && leavesOutVirtual {
+            let reason: String? = if CameraTracker.records(camera, settings: settings) {
+                "no Camera permission"
+            } else if camera.formats.isEmpty { "no format" } else if camera.isVirtual && leavesOutVirtual {
                 "virtual"
             } else if camera.isContinuity && leavesOutVirtual {
                 "Continuity Camera"

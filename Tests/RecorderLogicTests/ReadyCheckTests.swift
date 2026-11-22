@@ -58,14 +58,23 @@ import Testing
     }
 
     /// A denied Camera permission fails the check, with the fix in System Settings or no camera (D74).
-    @Test func aMissingCameraPermissionFailsWithItsFix() throws {
+    /// A denied Camera permission does not stop a recording: it records no camera, says so, and how to change it (D74).
+    @Test func aDeniedCameraPermissionPassesAndSaysNoCameraIsRecorded() throws {
         let result = ReadyCheck.evaluate(facts(cameras: DesignExample.cameras, cameraGranted: false), settings: .manual)
-        #expect(!result.isReady)
-        let item = try #require(result.items.first { $0.title == "Camera permission" })
-        #expect(!item.passed)
-        #expect(item.fix == "allow it in System Settings › Privacy & Security › Camera, then " + ReadyCheck.restartNote
+        #expect(result.isReady)
+        let item = try #require(result.items.first { $0.title.hasPrefix("Camera permission") })
+        #expect(item.title == "Camera permission denied: no camera is recorded")
+        #expect(item.passed)
+        let fix = "allow it in System Settings › Privacy & Security › Camera, then " + ReadyCheck.restartNote
             + ReadyCheck.terminalNote + " Or record no camera: turn off Auto and move the Camera mode slider to None"
-            + " (--camera-mode none).")
+            + " (--camera-mode none)."
+        #expect(item.fix == fix)
+        #expect(result.text.contains("ok    Camera permission denied: no camera is recorded\n      Fix: allow it in System Settings"))
+        let withoutCameras = ReadyCheck.evaluate(facts(), settings: .manual)
+        #expect(result.items.last == withoutCameras.items.last)
+        let granted = ReadyCheck.evaluate(facts(cameras: DesignExample.cameras), settings: .manual)
+        #expect(granted.items.contains(ReadyCheckItem(title: "Camera permission", passed: true, fix: nil)))
+        #expect(granted.items.last != withoutCameras.items.last)
         var noCamera = Settings.manual
         noCamera.cameraMode = .none
         #expect(!ReadyCheck.evaluate(facts(cameras: DesignExample.cameras, cameraGranted: false), settings: noCamera)

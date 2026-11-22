@@ -142,6 +142,11 @@ func readCameraPermission() -> CameraPermission {
     }
 }
 
+/// Whether the Camera permission is denied, read without asking: `msr list` shows the cameras as not recorded then.
+public func cameraPermissionIsDenied() -> Bool {
+    readCameraPermission() == .denied
+}
+
 /// Asks for the Camera permission if never asked, so macOS shows its
 /// prompt, and says whether it is granted. Like the Microphone permission
 /// it is read, and no camera is opened.

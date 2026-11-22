@@ -90,6 +90,8 @@ public final class Recorder {
     private var cameraDueTask: Task<Void, Never>?
     /// The Camera permission was asked for while recording; it is asked once.
     private var cameraPermissionRequested = false
+    /// The cameras the camera mode would record while the Camera permission is denied, for the status window.
+    private var camerasWithoutPermission: [CameraInfo] = []
     private var endReports = CaptureEndReports()
     private var problemsTold = ProblemsTold()
     private var repeats = RepeatedFailures()
@@ -263,6 +265,7 @@ public final class Recorder {
         return (
             RecordingStatusTable.rows(sources: tracker.sources, files: manifest.files, bytes: bytes)
                 + RecordingStatusTable.cameraRows(sources: cameraTracker.sources, files: manifest.cameraFiles, bytes: bytes)
+                + RecordingStatusTable.cameraRowsWithoutPermission(camerasWithoutPermission)
                 + RecordingStatusTable.audioRows(
                     sources: audioTracker.sourcesShown, files: manifest.audioFiles, bytes: bytes, clockDrift: clockDrift),
             RecordingStatusTable.line(
@@ -603,6 +606,7 @@ public final class Recorder {
     private func readCameras() -> [CameraInfo] {
         let cameras = devices.cameras()
         RecorderLog.detail("cameras: \(DetailLine.cameras(cameras))", category: "recorder")
+        camerasWithoutPermission = []
         guard cameras.contains(where: { CameraTracker.records($0, settings: settings) }) else { return cameras }
         switch devices.cameraPermission() {
         case .granted:
@@ -619,6 +623,7 @@ public final class Recorder {
             }
             return []
         case .denied:
+            camerasWithoutPermission = cameras.filter { CameraTracker.records($0, settings: settings) }
             tell("The Camera permission is missing",
                  error: "no camera is recorded; allow it in System Settings › Privacy & Security › Camera",
                  kind: .cameraPermissionMissing)

@@ -53,6 +53,17 @@ import Testing
         ])
     }
 
+    /// Without the Camera permission each camera the mode would record is a row saying so (D74).
+    @Test func aCameraWithoutTheCameraPermissionIsARowSayingSo() {
+        let builtIn = CameraInfo(
+            uniqueID: "A", name: "FaceTime HD Camera", isDefault: true, isVirtual: false,
+            formats: [CameraFormat(size: FrameSize(width: 1920, height: 1080), maxFramesPerSecond: 30)])
+        #expect(RecordingStatusTable.cameraRowsWithoutPermission([builtIn]) == [
+            .init(source: .camera(nil, name: "FaceTime HD Camera"), recordsAt: "", files: 0, written: "", state: "no Camera permission"),
+        ])
+        #expect(RecordingStatusTable.StateText.allCases.map(\.rawValue).contains("no Camera permission"))
+    }
+
     @Test func aScreenWaitingGoneOrFailingSaysSo() {
         var tracker = ScreenTracker(resolution: .native)
         let built = screen("A", "Built-in", main: true)
@@ -77,7 +88,7 @@ import Testing
         ]
         let texts = Set(RecordingStatusTable.StateText.allCases.map(\.rawValue))
         #expect(Set(screenStates.map { RecordingStatusTable.text($0) }).union(audioStates.map { RecordingStatusTable.text($0) })
-            == texts)
+            .union(RecordingStatusTable.cameraRowsWithoutPermission([camera("A", "A")]).map(\.state)) == texts)
         #expect(texts.contains("shows another screen"))
     }
 

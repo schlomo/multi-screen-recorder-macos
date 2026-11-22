@@ -124,10 +124,12 @@ public func renderList(
     screens: [ScreenInfo],
     audioInputs: [AudioInputInfo],
     cameras: [CameraInfo],
+    cameraPermissionDenied: Bool = false,
     systemAudioAvailable: Bool
 ) -> String {
     WhatWillBeRecorded(
-        settings: settings, screens: .success(screens), audioInputs: .success(audioInputs), cameras: cameras, outputFolder: nil
+        settings: settings, screens: .success(screens), audioInputs: .success(audioInputs), cameras: cameras,
+        cameraPermissionDenied: cameraPermissionDenied, outputFolder: nil
     ).text
         + (systemAudioAvailable
             ? "System audio: available\n"

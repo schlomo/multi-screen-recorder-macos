@@ -464,6 +464,9 @@ extension GlobalRecordingLog {
             #expect(observer.problems.map(\.problem.problem) == ["The Camera permission is missing"])
             #expect(cameras.requests.withLock { $0 } == 0)
             #expect(cameras.opened.withLock { $0.isEmpty })
+            #expect(recorder.status().rows.contains {
+                $0.source == .camera(nil, name: "Stand-in camera") && $0.state == "no Camera permission"
+            })
             let summary = await stop()
             #expect(summary.manifest.problems.count == 1)
         }

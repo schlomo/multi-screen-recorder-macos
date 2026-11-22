@@ -69,6 +69,15 @@ import Testing
         #expect(rendered(cameras: DesignExample.cameras).hasPrefix(check))
     }
 
+    /// `msr list` shows a camera without the Camera permission as not recorded, saying why (D74).
+    @Test func aCameraWithoutTheCameraPermissionIsListedWithTheReason() {
+        let listed = renderList(
+            settings: .defaults, screens: [], audioInputs: [], cameras: DesignExample.cameras, cameraPermissionDenied: true,
+            systemAudioAvailable: true)
+        #expect(listed.contains("FaceTime HD Camera (default) (no Camera permission)"))
+        #expect(!listed.contains("Camera 1 - "))
+    }
+
     @Test func theDesignShowsTheExample() throws {
         #expect(try repositoryFile("docs/design/recorder.md").contains("```\n\(Self.designExample)```\n"))
     }

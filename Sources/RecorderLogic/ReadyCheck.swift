@@ -55,16 +55,27 @@ public struct ReadyCheckFacts: Sendable {
     }
 }
 
+extension ReadyCheckFacts {
+    /// The cameras a recording may record: none when the Camera permission is denied, as macOS grants it per app.
+    var camerasRecordable: [CameraInfo] { cameraGranted == false ? [] : cameras }
+}
+
 public struct ReadyCheckItem: Equatable, Sendable {
     public var title: String
     public var passed: Bool
     public var fix: String?
+    /// The fix is shown though the item passed: a denied Camera permission, which records no camera (D74).
+    public var showsFixWhenPassed: Bool
 
-    public init(title: String, passed: Bool, fix: String?) {
+    public init(title: String, passed: Bool, fix: String?, showsFixWhenPassed: Bool = false) {
         self.title = title
         self.passed = passed
         self.fix = fix
+        self.showsFixWhenPassed = showsFixWhenPassed
     }
+
+    /// The fix to show under the item: a failing item's, or one shown though it passed.
+    public var shownFix: String? { !passed || showsFixWhenPassed ? fix : nil }
 }
 
 public struct ReadyCheckResult: Equatable, Sendable {
@@ -80,7 +91,7 @@ public struct ReadyCheckResult: Equatable, Sendable {
         var lines: [String] = []
         for item in items {
             lines.append((item.passed ? "ok    " : "FAIL  ") + item.title)
-            if !item.passed, let fix = item.fix {
+            if let fix = item.shownFix {
                 let wrapped = wrappedLines(fix, width: Self.lineWidth - Self.fixLabel.count)
                 lines.append(Self.fixLabel + (wrapped.first ?? ""))
                 lines += wrapped.dropFirst().map { String(repeating: " ", count: Self.fixLabel.count) + $0 }
@@ -164,7 +175,7 @@ public enum ReadyCheck {
            case .usable(let freeSpace) = facts.outputFolder,
            case .success(let audioInputs) = audioInputsToJudge(facts.audioInputs, settings: settings),
            let bytesPerHour = DiskEstimate.bytesPerHour(
-               settings: settings, screens: screens, audioInputs: audioInputs, cameras: facts.cameras) {
+               settings: settings, screens: screens, audioInputs: audioInputs, cameras: facts.camerasRecordable) {
             items.append(diskItem(freeSpace, bytesPerHour: bytesPerHour, settings: settings))
         }
         return ReadyCheckResult(items: items)
@@ -189,11 +200,13 @@ public enum ReadyCheck {
                 + restartNote + terminalNote)
     }
 
+    /// Denied, it passes: the recording records no camera, and the fix says how to change that (D74).
     private static func cameraItem(granted: Bool) -> ReadyCheckItem {
         ReadyCheckItem(
-            title: cameraTitle, passed: granted,
+            title: granted ? cameraTitle : "\(cameraTitle) denied: no camera is recorded", passed: true,
             fix: granted ? nil : "allow it in System Settings › Privacy & Security › Camera, then " + restartNote + terminalNote
-                + " Or record no camera: turn off Auto and move the Camera mode slider to None (--camera-mode none).")
+                + " Or record no camera: turn off Auto and move the Camera mode slider to None (--camera-mode none).",
+            showsFixWhenPassed: !granted)
     }
 
     private static func screensItem(_ screens: Result<[ScreenInfo], DeviceReadError>) -> ReadyCheckItem {

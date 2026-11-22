@@ -111,6 +111,7 @@ extension CommandLineInterface {
                 screens: screens,
                 audioInputs: audioInputs,
                 cameras: currentCameras(),
+                cameraPermissionDenied: cameraPermissionIsDenied(),
                 systemAudioAvailable: screenRecordingIsGranted()
             ), terminator: "")
             if !unreadableRecordedInputs(audioInputs, settings: settings).isEmpty { throw ExitCode(1) }

@@ -82,6 +82,15 @@ public enum RecordingStatusTable {
         }
     }
 
+    /// Without the Camera permission, a row for each camera the camera mode
+    /// would record, not numbered: macOS grants it per app, so no camera is recorded (D74).
+    public static func cameraRowsWithoutPermission(_ cameras: [CameraInfo]) -> [Row] {
+        cameras.map { camera in
+            Row(source: .camera(nil, name: camera.name), recordsAt: "", files: 0, written: "",
+                state: StateText.noCameraPermission.rawValue)
+        }
+    }
+
     /// The audio sources' rows, below the cameras': Records at is the
     /// channels of the source's newest audio file; `clockDrift` the latest
     /// clock drift correction status of each source's running capture.
@@ -142,6 +151,7 @@ public enum RecordingStatusTable {
         case disconnected
         case notRecorded = "not recorded"
         case asleep
+        case noCameraPermission = "no Camera permission"
     }
 
     static func text(_ state: AudioTracker.Source.State) -> String {
