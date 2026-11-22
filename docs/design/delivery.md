@@ -267,8 +267,8 @@ build, sign and download, so no test runs them.
 ## Why
 
 - A self-signed certificate that stays the same gives every build the
-  same signature, which is what lets macOS keep the two permissions
-  across updates (D5); unverified until one snapshot release is
+  same signature, which is what lets macOS keep the three permissions
+  (Screen & System Audio Recording, Microphone, Camera) across updates (D5); unverified until one snapshot release is
   installed over another.
 - Counting commits needs no tag bookkeeping and cannot go backwards.
 - Keeping the secret out of the build and sign scripts means the tested

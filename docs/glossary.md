@@ -186,9 +186,10 @@ often carries a copy of a screen or of another camera (D74).
 
 The video file for one camera, made exactly as a screen file: the same
 tick grid, timecode and guide tracks, no audio of the camera's own, its
-frame size the size of the camera's chosen format capped by the
-recording resolution. A camera that disappears or whose stream or
-writer fails ends its camera file; a new one begins when it is back
+frame size the size of the camera's chosen format: the largest
+16:9 one at 30 fps inside the recording resolution's box, scaled only
+when none fits. A camera that disappears, is suspended, delivers no frames, or whose
+stream or writer fails ends its camera file; a new one begins when it is back
 (D74).
 
 ## Camera mode
@@ -372,7 +373,7 @@ dimmed in the window, without a number, with `-` for GB/h max (and for
 Records at, for a screen at the recording resolution None and for a
 camera), and, for an audio input or a camera whose own rule leaves it
 out, the reason in parentheses after its name (`(virtual)`, `(no device
-ID)`, `(no format)`; D59, D62, D74).
+ID)`, `(no format)`, `(suspended)`; D59, D62, D74).
 
 ## Ready check
 

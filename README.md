@@ -52,7 +52,7 @@ own clock is resampled continuously to stay with the screen files
     (`<folder name>.otio`): a video track per screen, an audio track per
     channel with the channels of one input linked, the system audio, a
     marker per screen or audio change. The OTIO file can be imported in DaVinci Resolve, [Kdenlive](https://docs.kdenlive.org/en/user_interface/menu/file_menu.html#opentimelineio-import) and others.
-  - Two guide tracks in every screen file, the audio inputs and the
+  - Two guide tracks in every video file (screen and camera), the audio inputs and the
     system audio, for playback and for syncing by waveform with a
     separate recording.
 - **Scriptable.** Everything also works from the command line.
@@ -112,6 +112,8 @@ confirmed yet.
 - **USB docks:** plugging a USB device into a dock while recording can
   cause a few seconds of silence or repeated audio in the USB audio
   inputs.
+- **Cameras:** recording from a real camera is not yet checked on real
+  hardware; the tests use a stand-in camera.
 
 ### What to test and send
 
@@ -170,9 +172,11 @@ recording's `recording.json`. Please also drag the recording's
 issue: `recording.log` is the recording log, every event and problem of
 the recording with the full error macOS gave, and what the app did and
 read meanwhile, one line each. Issues are public: the form says what
-`recording.json` contains, and `recording.log` names the same screens
-and audio inputs; open both in TextEdit and remove what you don't want
-to share. Nothing is sent automatically: you see the files and attach
+`recording.json` contains, and `recording.log` names the same screens,
+cameras and audio inputs; a camera's name can hold a person's name (a
+Continuity Camera's often does), and `cameraUniqueID` identifies the
+camera. Open both in TextEdit and remove what you don't want to share.
+The recordings themselves show what the cameras saw; attach none. Nothing is sent automatically: you see the files and attach
 them yourself.
 
 ## Usage
@@ -204,7 +208,7 @@ lower right corner beside Start, quits without recording.
 Click Start: the window closes; the Dock icon shows a "!" badge when
 the disk runs low, a screen shows another screen's picture or
 something went wrong. Click the Dock icon or quit to open the status
-window: each screen and audio source with its files, the data written
+window: each screen, camera and audio source with its files, the data written
 and its state, each audio source's level meter (red from −1 dBFS) and,
 where macOS lets it be set, a slider for an audio input's input volume
 (it changes that input's volume for every app on the Mac, and stays as

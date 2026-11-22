@@ -123,8 +123,9 @@ device ID)` under Default microphone. An input whose channels
 cannot be read shows `cannot be read (<reason>)` in Records at. A camera
 not recorded shows its name with the `Camera <n> - ` part blank and `-`
 in Records at and GB/h max; it says `(virtual)` when the camera modes
-Default camera and All real leave out a virtual camera, and `(no
-format)` when it offers no format to record; under None, at the
+Default camera and All real leave out a virtual camera, `(no
+format)` when it offers no format to record, and `(suspended)` when the
+camera mode would record it but it is suspended; under None, at the
 recording resolution None, and for a real camera not the default under
 Default camera nothing, as the settings line gives the reason. A
 camera's Records at is the frame size of its chosen format (see
@@ -259,8 +260,9 @@ audio mode, the item is left out and the permission is neither asked nor
 read), the Camera permission (D74: only when the camera mode records a
 camera that is connected; without one the item is left out and the
 permission is neither asked nor read; denied, it fails like the
-Microphone permission, with the fix to allow it or to record no camera,
-`--camera-mode none`), the screens (at least one, each readable; at the recording
+Microphone permission, with the fix to allow it or to record no camera:
+turn off Auto and move the Camera mode slider to None, `--camera-mode
+none`), the screens (at least one, each readable; at the recording
 resolution None, where the free disk space counts no screen file, only
 with the system audio, which is captured through the main screen:
 `Screens: 2, none recorded (the system audio needs the main screen)`,
@@ -411,7 +413,7 @@ Media are linked by file name only, relative to the timeline file.
   <k>` for more. The channels of one file are a linked group in Resolve.
   A gap fills each space before a clip, none follows the last clip.
 - **Markers,** all on the timeline: the first, red, at frame 0, says in its
-  name the resolution to set (the largest screen's frame size, which
+  name the resolution to set (the largest video file's frame size, which
   Resolve's reader has no key for) and in its note when it was recorded, how
   to read the markers and the problems; then one per frame that has events,
   blue if one of them is about a screen, else green, its note the events'
@@ -1344,9 +1346,9 @@ the metadata items (see "Output on disk").
   written for at most 2 s; its `end` counts only what the writer took,
   and samples left over are lost: `audio file writer fell behind` with
   its `error`, a failure, and a problem.
-- **Guide tracks.** For playback and waveform sync, every screen file
-  also carries guide tracks (audio only writes no screen file, so no
-  guide track, D62): "Audio inputs", one mono mix of the
+- **Guide tracks.** For playback and waveform sync, every video file
+  (screen file and camera file, D74) also carries guide tracks (audio
+  only writes no video file, so no guide track, D62): "Audio inputs", one mono mix of the
   recorded audio inputs, unless the audio mode is `none`; "System
   audio", stereo, unless system audio is off. The two are never mixed
   together. For "Audio inputs" each audio input is averaged to mono, the
@@ -1357,18 +1359,18 @@ the metadata items (see "Output on disk").
   its own timestamps, the mix runs 200 ms (*data*) behind real time so
   every source's buffers have arrived, and a source that is missing is
   silence in its guide track. The mix is handed to every open screen
-  file every 100 ms (*data*); a screen file's guide tracks cover
+  file every 100 ms (*data*); a video file's guide tracks cover
   exactly its own time, so a frame size change gives them the same gap
-  as the video. A screen file listens to the mix until its last mix:
+  as the video. A video file listens to the mix until its last mix:
   stopping hands it every mix handed over before, and its last mix
   takes, from the samples the sources delivered and not mixed yet, the
   rest up to the end of its video, without taking them from the other
-  screen files. Before it takes its last mix, a screen file waits
+  video files. Before it takes its last mix, a video file waits
   until every source in each guide track has delivered its samples up
   to the end of its video, for at most 2 s (`audioWaitBoundSeconds`,
   *data*); if the wait runs out, it mixes what is there, and a source's
   samples that have not come are silence in it. At Stop the audio
-  sources stop only after every screen file's last mix. Its last mix
+  sources stop only after every video file's last mix. Its last mix
   is joined into one buffer per guide track,
   cut at the end of the video, and waits for the writer as long as its
   ticks do, so its guide tracks end with the video (D51). Should the
@@ -1448,8 +1450,10 @@ stream's first frame included (D63).
 - **Sleep and wake:** at sleep every file ends (event `sleep`); at wake
   (event `wake`) new files start, the screens after the settle time.
   The audio's wake runs whether or not the screens can be read: a wake
-  whose screens cannot be read tells "The screens cannot be read" and
-  still restarts the audio inputs.
+  whose screens cannot be read tells "The screens cannot be read",
+  still writes the `wake` event and restarts the audio inputs, and the
+  screens start after the settle time from the next reading of the
+  screens that works.
 
 **Screen check (D45).** Every frame is checked before it is kept: the
 rectangle ScreenCaptureKit attaches to it (`SCStreamFrameInfo.screenRect`)
@@ -1485,19 +1489,35 @@ no audio of the camera's own.
   Continuity Capture (the transport types as Core Audio names them);
   any other, unknown included, is virtual, such as OBS Virtual Camera.
   None records no camera, Default camera the default camera if it is
-  real, All real every real camera, All every camera.
-- **Format.** Of a camera's formats the one with the largest frame size
-  among those reaching 30 fps (the highest frame rate rounded), or the
-  fastest when none does; the camera runs at the format's own frame
-  rate. AVFoundation decodes and scales its frames to the camera file's
-  frame size, the format's size capped by the recording resolution as a
-  screen's looks-like size is (Native keeps it). A frame without a
+  real, All real every real camera, All every camera. A suspended camera
+  (`isSuspended`, such as a laptop's with its lid closed) is not
+  recorded, and its file ends when it is suspended and starts again
+  after the settle time when it is resumed; the recorder and the app
+  observe the suspension and read the cameras again when it changes.
+- **Format.** Per frame size the variant with the lowest highest frame
+  rate that still reaches 30 fps (a rate rounded to whole frames), or
+  the fastest where none does. Of the formats reaching 30 fps the 16:9
+  ones (aspect within 1 %), when there are any, so a DCI 4096×2160 or a
+  square 1552×1552 is not chosen over 3840×2160 or 1920×1080; of those
+  the largest that fits into the recording resolution's box (at Native,
+  the largest), recorded as it is; when none fits, the smallest, scaled
+  into the box as a screen's looks-like size is. A camera with no format
+  reaching 30 fps records its fastest, the largest of those. The
+  camera's frame duration is set to 1/30 s where the format's ranges
+  allow it, otherwise to the allowed rate closest to 30, told in a
+  detail line. AVFoundation decodes the format (an MJPEG one too) and
+  scales its frames to the camera file's frame size. A frame without a
   decoded picture ends the capture as a failing stream.
+- **No frames.** A camera delivers frames whether its picture changes
+  or not, so no first frame within 5 s of the capture's start or no
+  frame for 2 s (*data*, `CameraFrameWatch`) ends the capture as
+  `camera stream failed`, which starts again after the restart delay.
 - **Coming and going.** As screens: a camera that appears (event
   `camera connected`) starts its file after the settle time; one that
   vanishes ends it (`camera disconnected`); a failing stream or writer
   ends the file with its event and the capture starts again after the
-  restart delay; disk full, sleep and wake as for screens. Under Default
+  restart delay; disk full, sleep and wake as for screens (the camera
+  list never fails to be read, so a wake always restarts the cameras). Under Default
   camera a change of the default camera is the event `default camera
   changed`. A camera keeps its number by its unique ID. There is no
   mirroring, main camera or screen check for cameras.
@@ -1510,10 +1530,10 @@ no audio of the camera's own.
 
 **Disk (D14).** Below the warning threshold: the warning. A writer that
 fails on a full disk ends its file, readable up to the last fragment;
-the recorder checks free space every 5 s and starts new screen files
-and audio files once there is room. The low disk warning threshold
-counts every screen's newest screen file and every audio source's
-newest audio file. Nothing written is ever deleted.
+the recorder checks free space every 5 s and starts new screen files,
+camera files and audio files once there is room. The low disk warning
+threshold counts every screen's newest screen file, every camera's
+newest camera file (D74) and every audio source's newest audio file. Nothing written is ever deleted.
 
 **Keep awake (D14).** A power assertion against idle system and
 screen sleep while recording.
@@ -1583,9 +1603,19 @@ fails on some Macs only (the hosted runner, about 2 of 7 runs, with
   before: yes or no` (the ticker appends the last passed frame again
   when the screen shows no new one).
 
-A frame is never converted: its size and format go to the writer as
-they come, so a frame of a size other than the file's gets no check
-before the writer; the lines above are what tells whether that happens.
+- Per camera capture (D74): at the session's start `camera <unique ID>:
+  active format <w>×<h> <subtype>, frame duration <min> to <max>` (such
+  as `1/30 s to 1/30 s`), with `the format allows no 30 fps, set to <n>
+  fps` when it cannot run at 30; at the first frame `Camera 1 FaceTime
+  HD Camera: first frame <w>×<h> <pixel format>`. In category
+  `recorder`, at every reading of the cameras, `cameras: <name> [virtual]
+  [suspended] <format>, …`.
+
+A screen's frame is never converted: its size and format go to the
+writer as they come, so a frame of a size other than the file's gets no
+check before the writer; the lines above are what tells whether that
+happens. A camera's frames are decoded and scaled by AVFoundation to
+the camera file's frame size, in the screens' pixel format (`420v`).
 
 **Recording log (D64).** Every recording, in the app and in `msr
 record`, with or without `--debug`, writes `recording.log` in its
@@ -1685,7 +1715,8 @@ the text `msr check` prints for "What will be recorded", file naming,
 manifest states, the screen tracker (numbers, the settle time, frame
 size changes, mirroring, the main screen, back-off, the screen check's
 fault, a full disk, sleep and wake, and no screen at the recording
-resolution None), the ready check at the recording resolution None
+resolution None, a wake without a reading that starts the screens at
+the next one), the ready check at the recording resolution None
 (the screen permission only with the system audio, no screens item,
 nothing to record refused), the screen check, the shared clock,
 the timecode (also on a daylight saving day and at a second frame rate),
@@ -1695,7 +1726,9 @@ coming and going, an unplug told once, a replug, the default microphone
 followed, failures with the back-off, the system audio moving to the new
 main screen, a full disk, a channel count change, two inputs with the
 same name, sleep and wake), the camera mode and which camera each
-records, a camera's chosen format with the recording resolution's cap,
+records (a suspended one not), a camera's chosen format (16:9 first,
+inside the recording resolution's box, the slowest variant at 30 fps)
+and frame rate, the limits for a camera without frames,
 the camera tracker (numbers, the default camera first, a camera
 coming and going, failures with the back-off, a full disk, sleep and
 wake), camera files in the manifest, the timeline and the status
@@ -1768,8 +1801,11 @@ recorder audio only with a stand-in audio input and input volume
 and a stand-in for the screens, and with stand-in cameras (a camera
 appearing and vanishing, its stream failing, a frame without a picture,
 and the Camera permission never asked, granted, denied, refused at the
-request, not asked without a camera or under the camera mode None) (`RecorderDevices.screens`; a wake whose
-screens cannot be read still restarts the audio inputs) (`RecorderTests`: a failure told once by its event and its repeats
+request, not asked without a camera or under the camera mode None; a
+camera without a first frame and one whose frames stop; Stop and sleep
+and wake with a camera file) (`RecorderDevices.screens`; a wake whose
+screens cannot be read still writes its wake event and restarts the
+audio inputs) (`RecorderTests`: a failure told once by its event and its repeats
 counted at Stop, D65; `inputVolume`, a change told once it held still,
 also one Core Audio does not report, the slider's set, a refused set as
 a problem, no slider where it cannot be set; the level meters; no audio
