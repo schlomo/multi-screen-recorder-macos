@@ -115,7 +115,7 @@ private struct SettingsForm: View {
             Form {
                 Toggle("Auto", isOn: binding(\.auto))
                 // Always shown, so that turning Auto on or off shifts nothing; Auto on disables the sliders.
-                Text("Every screen at Native, the audio mode Wired.")
+                Text("Every screen at Native, the audio mode Wired, the camera mode All real.")
                     .font(.callout)
                     .foregroundStyle(.secondary)
                     .opacity(model.settings.auto ? 1 : 0)
@@ -140,6 +140,22 @@ private struct SettingsForm: View {
                                 .accessibilityHidden(true)
                         }
                         Text(AudioMode.bluetoothAndVirtualNote)
+                            .font(.callout)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+                .disabled(model.settings.auto)
+                LabeledContent("Camera mode") {
+                    VStack(alignment: .leading, spacing: 4) {
+                        HStack {
+                            Slider(value: cameraModeIndex, in: 0...Double(CameraMode.allCases.count - 1), step: 1)
+                                .accessibilityLabel("Camera mode")
+                                .accessibilityValue(model.settings.effectiveCameraMode.shownName)
+                            Text(model.settings.effectiveCameraMode.shownName).frame(width: 130, alignment: .leading)
+                                .accessibilityHidden(true)
+                        }
+                        Text(CameraMode.virtualNote)
                             .font(.callout)
                             .foregroundStyle(.secondary)
                             .fixedSize(horizontal: false, vertical: true)
@@ -177,6 +193,15 @@ private struct SettingsForm: View {
             })
     }
 
+    private var cameraModeIndex: Binding<Double> {
+        Binding(
+            get: { model.settings.effectiveCameraMode.sliderIndex },
+            set: { position in
+                guard let chosen = model.settings.cameraMode.choosing(sliderPosition: position) else { return }
+                model.change { $0.cameraMode = chosen }
+            })
+    }
+
     private func binding<Value>(_ keyPath: WritableKeyPath<RecorderLogic.Settings, Value>) -> Binding<Value> {
         Binding(
             get: { model.settings[keyPath: keyPath] },
@@ -195,7 +220,7 @@ private struct SettingsForm: View {
 }
 
 /// One table with a header, striped rows and a border: the screens, the
-/// audio sources and the total.
+/// cameras, the audio sources and the total.
 struct WhatWillBeRecordedView: View {
     let section: WhatWillBeRecorded
     /// The output folder as the settings name it, a link that opens it in Finder.
@@ -219,10 +244,16 @@ struct WhatWillBeRecordedView: View {
                         .background(stripe(index))
                 }
                 if !section.screenRows.isEmpty { Divider() }
+                ForEach(Array(section.cameraRows.enumerated()), id: \.offset) { index, cameraRow in
+                    row(cameraRow)
+                        .foregroundStyle(cameraRow.isRecorded ? .primary : .tertiary)
+                        .background(stripe(section.screenRows.count + index))
+                }
+                if !section.cameraRows.isEmpty { Divider() }
                 ForEach(Array(section.audioRows.enumerated()), id: \.offset) { index, audioRow in
                     row(audioRow)
                         .foregroundStyle(audioRow.isRecorded ? .primary : .tertiary)
-                        .background(stripe(section.screenRows.count + index))
+                        .background(stripe(section.screenRows.count + section.cameraRows.count + index))
                 }
                 if let totalRow = section.totalRow {
                     Divider()
@@ -248,7 +279,7 @@ struct WhatWillBeRecordedView: View {
     }
 
     private var sourceWidth: CGFloat {
-        TableLayout.sourceWidth(names: (section.screenRows + section.audioRows).compactMap { $0.source?.name })
+        TableLayout.sourceWidth(names: (section.screenRows + section.cameraRows + section.audioRows).compactMap { $0.source?.name })
     }
 
     private func stripe(_ index: Int) -> Color {

@@ -1,4 +1,5 @@
 import AppKit
+import AVFoundation
 import RecorderCore
 import RecorderLogic
 import SwiftUI
@@ -34,6 +35,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             forName: NSApplication.didChangeScreenParametersNotification, object: nil, queue: .main
         ) { _ in
             MainActor.assumeIsolated { model.devicesChanged() }
+        }
+        for name in [AVCaptureDevice.wasConnectedNotification, AVCaptureDevice.wasDisconnectedNotification] {
+            _ = NotificationCenter.default.addObserver(forName: name, object: nil, queue: .main) { _ in
+                MainActor.assumeIsolated { model.devicesChanged() }
+            }
         }
         self.model = model
         startWindow = makeWindow(

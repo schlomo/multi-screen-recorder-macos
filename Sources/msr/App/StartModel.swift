@@ -80,8 +80,8 @@ final class StartModel {
         refreshSoon()
     }
 
-    /// A screen came, went or changed, an audio device came or went, or the
-    /// default audio input changed.
+    /// A screen came, went or changed, an audio device or a camera came or
+    /// went, or the default audio input changed.
     func devicesChanged() {
         guard !isRecording else { return }
         refreshSoon()
@@ -137,7 +137,8 @@ final class StartModel {
     private func check(proof: ScreenRecordingProof) {
         guard !isRecording else { return }
         whatWillBeRecorded = WhatWillBeRecorded(
-            settings: settings, screens: probes.screens(), audioInputs: probes.audioInputs(), outputFolder: nil)
+            settings: settings, screens: probes.screens(), audioInputs: probes.audioInputs(), cameras: probes.cameras(),
+            outputFolder: nil)
         checkNumber += 1
         isChecking = true
         let number = checkNumber

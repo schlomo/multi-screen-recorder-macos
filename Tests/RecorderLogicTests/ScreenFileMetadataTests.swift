@@ -19,3 +19,23 @@ import Testing
         #expect(metadata.items.first { $0.key.hasSuffix(".frameSize") }?.value == "1920x1080")
     }
 }
+
+@Suite struct CameraFileMetadataTests {
+    private let metadata = ScreenFileMetadata(
+        source: .camera(uniqueID: "C", number: 1, name: "FaceTime HD Camera"), frameSize: FrameSize(width: 1920, height: 1080),
+        recordingStarted: "2026-11-12T14:03:05.120+01:00", app: "Multi Screen Recorder 1")
+
+    @Test func theReelNameIsTheCamerasLabelAsInTheFileName() {
+        #expect(metadata.reelName == "Camera 1 - FaceTime HD Camera")
+        #expect(RecordingNames.cameraFile(start: .now, timeZone: .current, number: 1, camera: "FaceTime HD Camera")
+            .contains(metadata.reelName))
+    }
+
+    @Test func theItemsNameTheCamera() {
+        #expect(metadata.items.prefix(3).map(\.key) == [
+            "org.schapiro.multiscreenrecorder.cameraUniqueID", "org.schapiro.multiscreenrecorder.cameraNumber",
+            "org.schapiro.multiscreenrecorder.cameraName",
+        ])
+        #expect(metadata.items.suffix(2).map(\.value) == ["Camera 1 - FaceTime HD Camera", "Camera 1 - FaceTime HD Camera"])
+    }
+}

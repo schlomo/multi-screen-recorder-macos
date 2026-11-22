@@ -29,6 +29,12 @@ import Testing
         #expect(StatusLine.text(line: line, cpu: "CPU 23 %", rows: rows, status: status(problems: 1)).hasPrefix("1 problem · Recording"))
     }
 
+    @Test func camerasBeingRecordedAreCountedOnlyWhenThereAreAny() {
+        let rows = [row(.screen(1, name: "A")), row(.camera(1, name: "FaceTime")), row(.camera(2, name: "BRIO")),
+                    row(.audioInput(1, name: "Mic"))]
+        #expect(StatusLine.text(line: line, cpu: nil, rows: rows, status: status(problems: 0)).hasSuffix(" · 1 screen, 2 cameras, 1 audio"))
+    }
+
     @Test func noProblemsSaysNothingAboutProblems() {
         #expect(StatusLine.text(line: line, cpu: nil, rows: [row(.screen(1, name: "A"))], status: status(problems: 0))
             == "\(line) · 1 screen, 0 audio")

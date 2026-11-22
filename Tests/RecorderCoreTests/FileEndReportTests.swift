@@ -1,3 +1,4 @@
+import AVFoundation
 import RecorderLogic
 import Testing
 @testable import RecorderCore
@@ -171,5 +172,68 @@ private func failedEvent(at seconds: Double, error: ErrorDetail) -> RecordingEve
         #expect(printed.count == 2)
         #expect(printed[0] == "event 1")
         #expect(printed[1].contains("screen file writer failed repeated 2 times since"))
+    }
+}
+
+/// A camera file's end tells as a screen file's, in the camera's words (D74).
+@Suite struct CameraFileEndReportTests {
+    private func cameraEnd(_ error: ScreenFileWriterError?) -> CameraFileEnd {
+        var file = RecordingManifest.CameraFile(
+            name: "c.mov", camera: "FaceTime", cameraUniqueID: "C", frameSize: FrameSize(width: 2, height: 2), start: 0,
+            timecode: "00:00:00:00")
+        file.end = 12.5
+        return CameraFileEnd(file: file, error: error)
+    }
+
+    @Test func aFailedWriterIsACameraFileWriterFailedEventAndAProblemOfTheCameraFile() {
+        let report = FileEndReport(reason: nil, end: cameraEnd(writerError("cannot write c.mov")), source: "FaceTime", at: 3 * second)
+        var event = RecordingEvent(at: 12_500_000_000, event: .cameraFileWriterFailed, camera: "FaceTime")
+        event.errorDetail = "cannot write c.mov"
+        #expect(report.event == event)
+        #expect(report.problem?.problem == "Camera file c.mov")
+    }
+
+    @Test func aWriterThatCouldNotStartIsAProblemOfTheCamera() {
+        let report = FileEndReport(
+            reason: .writerFailed("cannot create c.mov"), end: Optional<CameraFileEnd>.none, source: "FaceTime", at: 3 * second)
+        #expect(report.problem?.problem == "Camera FaceTime")
+        #expect(report.event?.camera == "FaceTime")
+    }
+
+    @Test func theEndIsListedAmongTheCameraFilesOnce() {
+        var reports = CaptureEndReports()
+        var manifest = RecordingManifest(app: "test", started: .now, timeZone: .current, settings: .defaults)
+        let end = cameraEnd(writerError("cannot write c.mov"))
+        #expect(reports.record(captureNumber: 1, reason: nil, end: end, source: "FaceTime", at: 3 * second, into: &manifest) != nil)
+        #expect(reports.record(captureNumber: 1, reason: nil, end: end, source: "FaceTime", at: 3 * second, into: &manifest) == nil)
+        #expect(manifest.cameraFiles.map(\.name) == ["c.mov"])
+        #expect(manifest.files.isEmpty)
+        #expect(manifest.events.map(\.event) == [.cameraFileWriterFailed])
+    }
+}
+
+/// Which cameras are virtual, by AVFoundation's device type and Core Audio's transport type (D74).
+@Suite struct CameraIsVirtualTests {
+    private func transport(_ code: String) -> Int32 {
+        Int32(bitPattern: code.utf8.reduce(0) { $0 << 8 | UInt32($1) })
+    }
+
+    @Test func builtInContinuityAndDeskViewCamerasAreReal() {
+        for type in [AVCaptureDevice.DeviceType.builtInWideAngleCamera, .continuityCamera, .deskViewCamera] {
+            #expect(!cameraIsVirtual(deviceType: type, transportType: 0))
+        }
+    }
+
+    @Test func anExternalCameraIsRealByItsPort() {
+        for code in ["bltn", "usb ", "1394", "pci ", "thun", "ccwd", "ccwl"] {
+            #expect(!cameraIsVirtual(deviceType: .external, transportType: transport(code)), "\(code)")
+        }
+    }
+
+    @Test func anExternalCameraOfAVirtualOrUnknownTransportIsVirtual() {
+        for code in ["virt", "grup", "airp", "blue"] {
+            #expect(cameraIsVirtual(deviceType: .external, transportType: transport(code)), "\(code)")
+        }
+        #expect(cameraIsVirtual(deviceType: .external, transportType: 0))
     }
 }

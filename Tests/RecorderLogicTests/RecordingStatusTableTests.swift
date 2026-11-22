@@ -34,6 +34,25 @@ import Testing
         #expect(rows.allSatisfy { $0.values.count == RecordingStatusTable.columns.count - 1 && $0.clockDrift.isEmpty })
     }
 
+    /// D74: a camera's row is a screen's, below the screens.
+    @Test func eachCameraIsARowWithItsFilesBytesAndState() {
+        var tracker = CameraTracker(settings: .defaults)
+        let builtIn = CameraInfo(
+            uniqueID: "A", name: "FaceTime HD Camera", isDefault: true, isVirtual: false,
+            formats: [CameraFormat(size: FrameSize(width: 1920, height: 1080), maxFramesPerSecond: 30)])
+        let brio = CameraInfo(uniqueID: "B", name: "BRIO", isDefault: false, isVirtual: false, formats: builtIn.formats)
+        _ = tracker.begin([builtIn, brio], at: 0)
+        _ = tracker.observe([builtIn], at: 1)
+        let files = [RecordingManifest.CameraFile(
+            name: "c1.mov", camera: "FaceTime HD Camera", cameraUniqueID: "A", frameSize: FrameSize(width: 1920, height: 1080),
+            start: 0, timecode: "00:00:00:00")]
+        let rows = RecordingStatusTable.cameraRows(sources: tracker.sources, files: files, bytes: ["c1.mov": 40_000_000])
+        #expect(rows == [
+            .init(source: .camera(1, name: "FaceTime HD Camera"), recordsAt: "1920×1080", files: 1, written: "40 MB", state: "recording"),
+            .init(source: .camera(2, name: "BRIO"), recordsAt: "", files: 0, written: "0 MB", state: "disconnected"),
+        ])
+    }
+
     @Test func aScreenWaitingGoneOrFailingSaysSo() {
         var tracker = ScreenTracker(resolution: .native)
         let built = screen("A", "Built-in", main: true)

@@ -6,6 +6,11 @@ import Testing
 
     @Test func eachKindHasItsLabel() {
         #expect(SourceLabel.screen(2, name: "LG HDR 4K") == "Screen 2 - LG HDR 4K")
+        #expect(SourceLabel.camera(1, name: "FaceTime HD Camera") == "Camera 1 - FaceTime HD Camera")
+        #expect(SourceCell.camera(1, name: "FaceTime HD Camera").text == "Camera 1 - FaceTime HD Camera")
+        #expect(SourceLabel.listPosition(ofFileName: "2026-11-12 14.03.05 Camera 2 - BRIO.mov") == (1, 2))
+        #expect(SourceLabel.listPosition(ofFileName: "2026-11-12 14.03.05 Audio 0 - System.mov") == (2, 0))
+        #expect(SourceLabel.listPosition(ofFileName: "notes.txt") == (3, 0))
         #expect(SourceLabel.audioInput(3, name: "USB Audio") == "Audio 3 - USB Audio")
         #expect(SourceLabel.systemAudio == "Audio 0 - System")
     }
