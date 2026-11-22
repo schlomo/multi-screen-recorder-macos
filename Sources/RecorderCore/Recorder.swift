@@ -31,10 +31,25 @@ public struct RecorderStartError: ErrorWithDetail, CustomStringConvertible {
     public var description: String { detail.text }
 }
 
+/// The audio devices a recording reads and opens: `system` in every
+/// recording; `RecorderTests` stands in for them.
+struct RecorderDevices: Sendable {
+    var audioInputs: @Sendable () throws -> [AudioInputInfo]
+    var audioInputSource: @Sendable (_ uid: String) -> any AudioBufferSource
+    /// An audio input's input volume, nil when it has none (D69).
+    var inputVolume: @Sendable (_ uid: String, _ name: String) -> (any InputVolumeControl)?
+
+    static let system = RecorderDevices(
+        audioInputs: { try currentAudioInputs() },
+        audioInputSource: { MicrophoneSource(uid: $0) },
+        inputVolume: { CoreAudioInputVolume(uid: $0, name: $1) })
+}
+
 /// One recording: claims its recording folder, keeps its recording
 /// manifest, keeps the Mac awake, follows the screens as they come, go
 /// and change, with one screen capture per screen file, and the audio
-/// sources, with one audio capture per source, and its guide tracks.
+/// sources, with one audio capture per source, their level meters and the
+/// audio inputs' input volume, and its guide tracks.
 /// Needs the AppKit event loop: macOS reports screen changes only to a
 /// process running `NSApplication.run()`.
 @MainActor
@@ -81,12 +96,40 @@ public final class Recorder {
     private var recordingLog: RecordingLog?
     private var cpu = CPUUsage()
     private var cpuTask: Task<Void, Never>?
+    private let devices: RecorderDevices
+    /// The input volume of each audio input with a running capture, by its UID (D69).
+    private var inputVolumes: [String: InputVolumeFollow] = [:]
+    private var inputVolumeTask: Task<Void, Never>?
+
+    /// An audio input's input volume while its capture runs: read when Core
+    /// Audio reports a change and every `inputVolumeReadInterval`, and told
+    /// once it held still (`InputVolumeChanges`).
+    private struct InputVolumeFollow {
+        let control: any InputVolumeControl
+        let name: String
+        /// The number of the capture it follows, among all audio captures.
+        let captureNumber: Int
+        var changes: InputVolumeChanges
+        /// As read last; nil until one could be read.
+        var latest: Double?
+        var dueTask: Task<Void, Never>?
+    }
 
     /// Starts a recording into a new recording folder in the settings' output
     /// folder; the recording log starts with the ready check's facts.
-    public init(
+    public convenience init(
         settings: Settings, homeFolder: URL, app: String, readyCheckFacts: ReadyCheckFacts, observer: any RecorderObserver
     ) throws(RecorderStartError) {
+        try self.init(
+            settings: settings, homeFolder: homeFolder, app: app, readyCheckFacts: readyCheckFacts, observer: observer,
+            devices: .system)
+    }
+
+    init(
+        settings: Settings, homeFolder: URL, app: String, readyCheckFacts: ReadyCheckFacts, observer: any RecorderObserver,
+        devices: RecorderDevices
+    ) throws(RecorderStartError) {
+        self.devices = devices
         let readsScreens = ReadyCheck.needsScreenRecording(settings)
         let screens: [ConnectedScreen]
         do {
@@ -149,6 +192,13 @@ public final class Recorder {
                 self?.recordingLog?.flushIfDue()
             }
         }
+        inputVolumeTask = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: RecorderValues.inputVolumeReadInterval)
+                guard let self else { return }
+                for uid in inputVolumes.keys { readInputVolume(uid) }
+            }
+        }
     }
 
     private func clockDriftShown() -> [(source: AudioTracker.Source, status: ClockDriftCorrection.Status)] {
@@ -199,6 +249,32 @@ public final class Recorder {
             cpu.text)
     }
 
+    /// The level meter of each audio source with a running capture, read
+    /// now, and the input volume of each audio input whose volume can be set (D69).
+    public func meters() -> (levels: [AudioTracker.SourceID: AudioLevel], inputVolumes: [AudioTracker.SourceID: Double]) {
+        let now = context.now()
+        let levels = audioCaptures.mapValues { $0.1.readLevel(at: now) }
+        let volumes = inputVolumes.compactMap { uid, follow in
+            follow.control.isSettable ? follow.latest.map { (AudioTracker.SourceID.input(uid), $0) } : nil
+        }
+        return (levels, Dictionary(uniqueKeysWithValues: volumes))
+    }
+
+    /// Sets an audio input's own input volume, 0 to 1, for every app on the
+    /// Mac (D69); the change is told like any other once it held still. One
+    /// that cannot be set is a problem.
+    public func setInputVolume(_ id: AudioTracker.SourceID, to volume: Double) {
+        guard case .input(let uid) = id, let follow = inputVolumes[uid], follow.control.isSettable else { return }
+        do throws(InputVolumeError) {
+            try follow.control.set(volume)
+            problemsTold.cleared(.inputVolumeNotSet(follow.name))
+        } catch {
+            tell("The input volume of \(follow.name) cannot be set", error: ErrorDetail(message: error.description),
+                 kind: .inputVolumeNotSet(follow.name))
+        }
+        readInputVolume(uid)
+    }
+
     /// Runs a capture's stop; Stop waits for it until it is done.
     private func stopInProgress(_ work: @escaping @MainActor () async -> Void) {
         stopCount += 1
@@ -222,6 +298,7 @@ public final class Recorder {
             audioDueTask?.cancel()
             freeSpaceTask?.cancel()
             cpuTask?.cancel()
+            inputVolumeTask?.cancel()
             sampleCPU()
             unregisterForChanges()
             for action in tracker.stopAll() { perform(action) }
@@ -318,7 +395,7 @@ public final class Recorder {
 
     private func readAudioInputs() -> [AudioInputInfo]? {
         do {
-            let inputs = try currentAudioInputs()
+            let inputs = try devices.audioInputs()
             problemsTold.cleared(.audioInputsNotRead)
             return inputs
         } catch {
@@ -510,14 +587,15 @@ public final class Recorder {
         RecorderLog.detail("audio: \(action)", category: "recorder")
         switch action {
         case .startInput(let uid, let sourceNumber, let name):
-            startAudio(.input(uid), sourceNumber: sourceNumber, name: name, source: MicrophoneSource(uid: uid))
+            startAudio(.input(uid), sourceNumber: sourceNumber, name: name, source: devices.audioInputSource(uid))
         case .startSystemAudio:
             let number = audioCaptureCount + 1
             startAudio(.systemAudio, sourceNumber: 0, name: AudioFileDescription.systemAudioName, source: SystemAudioSource { [weak self] displayID in
                 Task { @MainActor in self?.systemAudioCaptures(displayID: displayID, number: number) }
             })
         case .stop(let id):
-            guard let (_, capture) = audioCaptures.removeValue(forKey: id) else { return }
+            guard let (number, capture) = audioCaptures.removeValue(forKey: id) else { return }
+            unfollowInputVolume(id, captureNumber: number)
             stopInProgress { await capture.stop() }
         }
     }
@@ -540,10 +618,73 @@ public final class Recorder {
             fileEnded: { end in post(.fileEnded(end)) },
             event: { event in post(.event(event)) },
             clockDrift: { status in post(.clockDrift(id, number: number, status)) },
+            noAudio: { isNoAudio in post(.noAudio(id, number: number, isNoAudio)) },
             ended: { reason in post(.ended(id, number: number, name: name, reason)) })
-        let capture = AudioCapture(id: id, number: sourceNumber, name: name, source: source, context: context, guides: guides, reports: reports)
+        var control: (any InputVolumeControl)?
+        if case .input(let uid) = id {
+            control = devices.inputVolume(uid, name)
+            followInputVolume(uid, name: name, control: control, captureNumber: number)
+        }
+        let capture = AudioCapture(
+            id: id, number: sourceNumber, name: name, source: source, context: context, guides: guides, reports: reports,
+            inputVolume: { [control] in control?.read() })
         audioCaptures[id] = (number, capture)
         capture.start()
+    }
+
+    // MARK: Input volume
+
+    /// Follows an audio input's input volume while its capture runs; an
+    /// input without one has none to follow.
+    private func followInputVolume(_ uid: String, name: String, control: (any InputVolumeControl)?, captureNumber: Int) {
+        if let followed = inputVolumes[uid] { unfollowInputVolume(.input(uid), captureNumber: followed.captureNumber) }
+        guard let control else { return }
+        let volume = control.read()
+        inputVolumes[uid] = InputVolumeFollow(
+            control: control, name: name, captureNumber: captureNumber, changes: InputVolumeChanges(volume: volume),
+            latest: volume)
+        do throws(InputVolumeError) {
+            try control.watch { [weak self] in
+                Task { @MainActor in self?.readInputVolume(uid) }
+            }
+            problemsTold.cleared(.inputVolumeNotFollowed(name))
+        } catch {
+            tell("Changes of the input volume of \(name) cannot be followed", error: ErrorDetail(message: error.description),
+                 kind: .inputVolumeNotFollowed(name))
+        }
+    }
+
+    /// The capture ended: a change not told yet is told now.
+    private func unfollowInputVolume(_ id: AudioTracker.SourceID, captureNumber: Int) {
+        guard case .input(let uid) = id, let follow = inputVolumes[uid], follow.captureNumber == captureNumber else { return }
+        inputVolumes[uid] = nil
+        follow.control.cancel()
+        follow.dueTask?.cancel()
+        var changes = follow.changes
+        if let event = changes.flush(audioSource: follow.name) { audioEvent(event) }
+    }
+
+    private func readInputVolume(_ uid: String) {
+        guard var follow = inputVolumes[uid], let volume = follow.control.read() else { return }
+        follow.latest = volume
+        follow.changes.observe(volume, at: context.now())
+        follow.dueTask?.cancel()
+        follow.dueTask = follow.changes.nextDueTime().map { due in
+            let wait = max(0, due - context.now())
+            return Task { [weak self] in
+                try? await Task.sleep(for: .nanoseconds(wait))
+                guard !Task.isCancelled else { return }
+                self?.inputVolumeDue(uid)
+            }
+        }
+        inputVolumes[uid] = follow
+    }
+
+    private func inputVolumeDue(_ uid: String) {
+        guard var follow = inputVolumes[uid], let event = follow.changes.due(at: context.now(), audioSource: follow.name) else { return }
+        follow.dueTask = nil
+        inputVolumes[uid] = follow
+        audioEvent(event)
     }
 
     /// The audio captures' reports, in order, the one route by which they
@@ -556,6 +697,9 @@ public final class Recorder {
             case .fileEnded(let end): audioFileEnded(end)
             case .event(let event): audioEvent(event)
             case .clockDrift(let id, let number, let status): audioClockDrift[id] = (number, status)
+            case .noAudio(let id, let number, let isNoAudio):
+                // Only its running capture's: one that ended says nothing more.
+                if audioCaptures[id]?.0 == number { audioTracker.noAudio(id, isNoAudio) }
             case .ended(let id, let number, let name, let reason):
                 audioCaptureEnded(id, number: number, name: name, reason: reason)
             }
@@ -603,6 +747,7 @@ public final class Recorder {
     ) {
         guard !isStopped, let (current, _) = audioCaptures[id], current == number else { return }
         audioCaptures[id] = nil
+        unfollowInputVolume(id, captureNumber: number)
         // Told at the time of the failure's event, so the recording manifest lists it once (D47).
         let now = context.now()
         switch reason {

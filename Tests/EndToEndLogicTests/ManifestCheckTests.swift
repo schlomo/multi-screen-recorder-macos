@@ -27,7 +27,10 @@ struct SampleRecording {
                 "audioSource": source, "channels": channels,
                 "clockDriftCorrection": killed ? NSNull() : 0.0, "clockDriftPpm": NSNull(),
             ]) { first, _ in first }
-            if let uid { entry["audioSourceUID"] = uid }
+            if let uid {
+                entry["audioSourceUID"] = uid
+                entry["inputVolume"] = 1.0
+            }
             return entry
         }
         manifest = [

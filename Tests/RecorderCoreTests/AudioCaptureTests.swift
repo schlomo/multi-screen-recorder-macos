@@ -40,6 +40,12 @@ import Testing
             isReady: Bool, refusalsLeft: Int?, samples: Int64, silence: Int64, endPosition: Int64??, appends: Int, failsAtAppend: Int?,
             taken: [Int]
         )>((true, nil, 0, 0, nil, 0, nil, []))
+        private let sound = Mutex<Int64?>(nil)
+        /// The first tick of the first file made.
+        let firstTick = Mutex<Int64?>(nil)
+
+        /// The position of the first sample taken that is not zero, from the file's first tick.
+        var firstSound: Int64? { sound.withLock { $0 } }
 
         var isReady: Bool {
             get { state.withLock { $0.isReady } }
@@ -79,6 +85,9 @@ import Testing
                 guard state.isReady else { return false }
                 state.samples += Int64(channels[0].count)
                 state.taken.append(channels[0].count)
+                if let index = channels[0].firstIndex(where: { $0 != 0 }) {
+                    sound.withLock { $0 = $0 ?? position + Int64(index) }
+                }
                 return true
             }
         }
@@ -99,14 +108,15 @@ import Testing
     final class Reported: @unchecked Sendable {
         private let state = Mutex<(
             started: [String], ended: [AudioFileEnd], events: [RecordingEvent], clockDrift: [ClockDriftCorrection.Status],
-            end: AudioTracker.CaptureEnd?
-        )>(([], [], [], [], nil))
+            end: AudioTracker.CaptureEnd?, noAudio: [Bool]
+        )>(([], [], [], [], nil, []))
 
         var started: [String] { state.withLock { $0.started } }
         var ended: [AudioFileEnd] { state.withLock { $0.ended } }
         var events: [RecordingEvent] { state.withLock { $0.events } }
         var clockDrift: [ClockDriftCorrection.Status] { state.withLock { $0.clockDrift } }
         var captureEnd: AudioTracker.CaptureEnd? { state.withLock { $0.end } }
+        var noAudio: [Bool] { state.withLock { $0.noAudio } }
 
         var reports: AudioCaptureReports {
             AudioCaptureReports(
@@ -114,6 +124,7 @@ import Testing
                 fileEnded: { end in self.state.withLock { $0.ended.append(end) } },
                 event: { event in self.state.withLock { $0.events.append(event) } },
                 clockDrift: { status in self.state.withLock { $0.clockDrift.append(status) } },
+                noAudio: { isNoAudio in self.state.withLock { $0.noAudio.append(isNoAudio) } },
                 ended: { end in self.state.withLock { $0.end = end } })
         }
 
@@ -153,7 +164,10 @@ import Testing
     /// the next buffer or the capture's end.
     private let heldBack = RecorderValues.clockDriftResamplerTaps / 2
 
-    private func capture(_ id: AudioTracker.SourceID = .input("Razer"), drainTimeout: Duration = .seconds(2)) -> AudioCapture {
+    private func capture(
+        _ id: AudioTracker.SourceID = .input("Razer"), drainTimeout: Duration = .seconds(2),
+        inputVolume: (@Sendable () -> Double?)? = nil
+    ) -> AudioCapture {
         let context = RecordingContext(
             folder: FileManager.default.temporaryDirectory, started: Date(), timeZone: TimeZone(identifier: "Europe/Berlin")!,
             clock: SharedClock(reading: reading), app: "Multi Screen Recorder (tests)")
@@ -162,15 +176,18 @@ import Testing
         let capture = AudioCapture(
             id: id, number: id == .systemAudio ? 0 : 2, name: id == .systemAudio ? "System audio" : "Razer Seiren V3 Mini", source: source, context: context,
             guides: GuideTrackFeed(tracks: [], now: { 0 }), reports: reported.reports, drainTimeout: drainTimeout,
-            now: { arrival.time.withLock { $0 } ?? context.now() },
-            makeWriter: { _, _, _ in writer })
+            now: { arrival.time.withLock { $0 } ?? context.now() }, inputVolume: inputVolume,
+            makeWriter: { _, _, firstTick in
+                writer.firstTick.withLock { $0 = $0 ?? firstTick }
+                return writer
+            })
         capture.start()
         return capture
     }
 
     /// A buffer of `channels` channels whose first sample is `at` nanoseconds from t0.
-    private func buffer(at nanoseconds: Int64, channels: Int = 1, count: Int? = nil) throws -> CMSampleBuffer {
-        let samples = Array(repeating: [Float](repeating: 0.25, count: count ?? samplesPerBuffer), count: channels)
+    private func buffer(at nanoseconds: Int64, channels: Int = 1, count: Int? = nil, value: Float = 0.25) throws -> CMSampleBuffer {
+        let samples = Array(repeating: [Float](repeating: value, count: count ?? samplesPerBuffer), count: channels)
         let time = CMTime(value: CMTimeValue(reading.host) + nanoseconds, timescale: 1_000_000_000)
         return try pcmSample(samples[...], format: pcmFormat(channels: channels), at: time)
     }
@@ -561,5 +578,107 @@ import Testing
         #expect(writer.samples == Int64(buffers * perBuffer))
         #expect(writer.taken.dropLast().allSatisfy { $0 >= appendSamples })
         #expect(RecorderValues.audioFileAppendSamples == RecorderValues.audioSampleRate / 10)
+    }
+
+    // MARK: Level meter, input volume and no audio (D69)
+
+    /// Sends the buffers of a run without gaps, each `value` throughout, arriving 1 ms after their time.
+    private func send(_ value: Float, buffers: Range<Int>, channels: Int = 1) throws {
+        for index in buffers {
+            arrival.time.withLock { $0 = time(ofBuffer: index) + 1_000_000 }
+            source.send(try buffer(at: time(ofBuffer: index), channels: channels, value: value))
+        }
+    }
+
+    /// Buffers of exact zeros for the no audio time.
+    private var buffersOfNoAudio: Int {
+        Int(RecorderValues.noAudioTime.nanoseconds * Int64(RecorderValues.audioSampleRate) / 1_000_000_000) / samplesPerBuffer
+    }
+
+    private func kinds(_ events: [RecordingEvent]) -> [RecordingEvent.Kind] { events.map(\.event) }
+
+    @Test func eachIncomingBufferGoesToTheLevelMeter() throws {
+        let capture = capture()
+        source.send(try buffer(at: 0, value: -0.5))
+        source.send(try buffer(at: time(ofBuffer: 1), value: 0.25))
+        let level = capture.readLevel(at: time(ofBuffer: 2))
+        #expect(level.peak == 0.5)
+        #expect(level.hold == 0.5)
+        #expect(capture.readLevel(at: time(ofBuffer: 3)).peak == 0)
+    }
+
+    @Test func anAudioInputsFileHasItsInputVolumeAtItsStart() async throws {
+        let capture = capture(inputVolume: { 0.4567 })
+        try send(0.25, buffers: 0..<10)
+        await capture.stop()
+        #expect(reported.ended.map(\.file.inputVolume) == [0.457])
+    }
+
+    @Test func anInputWithNoAudioFromTheStartGetsNoFile() async throws {
+        let capture = capture()
+        try send(0, buffers: 0..<(buffersOfNoAudio + 30))
+        #expect(reported.started.isEmpty)
+        #expect(kinds(reported.events) == [.noAudioStarted])
+        #expect(reported.events.first?.audioSource == "Razer Seiren V3 Mini")
+        #expect(abs(reported.events[0].at - 10) < 0.01, "\(reported.events[0].at)")
+        #expect(reported.noAudio == [true])
+        await capture.stop()
+        #expect(reported.ended.isEmpty)
+        #expect(writer.appends == 0)
+    }
+
+    /// The new file starts at a tick before the sound, so nothing of it is cut.
+    @Test func soundAfterNoAudioStartsAFileWithNothingCut() async throws {
+        let capture = capture()
+        let quiet = buffersOfNoAudio + 30
+        try send(0, buffers: 0..<quiet)
+        try send(0.25, buffers: quiet..<(quiet + 20))
+        await capture.stop()
+        #expect(kinds(reported.events) == [.noAudioStarted, .noAudioStopped])
+        #expect(reported.noAudio == [true, false])
+        #expect(reported.started.count == 1)
+        let soundStarts = Double(time(ofBuffer: quiet)) / 1_000_000_000
+        let file = try #require(reported.ended.first?.file)
+        #expect(file.start <= soundStarts)
+        #expect(soundStarts - file.start < 0.07)
+        #expect(try #require(writer.firstSound) > 0)
+        #expect(abs(reported.events[1].at - soundStarts) < 0.002, "\(reported.events[1].at)")
+    }
+
+    @Test func zerosShorterThanTheNoAudioTimeStayInTheFile() async throws {
+        let capture = capture()
+        try send(0.25, buffers: 0..<10)
+        try send(0, buffers: 10..<(10 + buffersOfNoAudio - 10))
+        try send(0.25, buffers: (buffersOfNoAudio)..<(buffersOfNoAudio + 10))
+        await capture.stop()
+        #expect(reported.events.isEmpty)
+        #expect(reported.started.count == 1)
+        #expect(reported.ended.count == 1)
+    }
+
+    @Test func noAudioEndsTheFileAndTheSoundStartsTheNext() async throws {
+        let capture = capture()
+        try send(0.25, buffers: 0..<10)
+        try send(0, buffers: 10..<(10 + buffersOfNoAudio + 10))
+        try await reported.waitForFileEnds(1)
+        let first = try #require(reported.ended.first?.file)
+        #expect(first.state == .finalized)
+        let noAudioStarts = Double(time(ofBuffer: 10)) / 1_000_000_000 + 10
+        #expect(abs(try #require(first.end) - noAudioStarts) < 0.07, "\(String(describing: first.end))")
+        let restart = 10 + buffersOfNoAudio + 10
+        try send(0.25, buffers: restart..<(restart + 10))
+        await capture.stop()
+        #expect(kinds(reported.events) == [.noAudioStarted, .noAudioStopped])
+        #expect(reported.started.count == 2)
+        #expect(reported.ended.count == 2)
+    }
+
+    @Test func theSystemAudioIsExcluded() async throws {
+        let capture = capture(.systemAudio)
+        try send(0, buffers: 0..<(buffersOfNoAudio + 30), channels: 2)
+        await capture.stop()
+        #expect(reported.events.isEmpty)
+        #expect(reported.started.count == 1)
+        #expect(reported.ended.first?.file.inputVolume == nil)
     }
 }

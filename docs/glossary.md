@@ -14,7 +14,7 @@ recording manifest, problem, status window, screen file, screen
 identity, settle time, screen check, tick, timecode, audio track,
 audio file, guide track, clock drift; D45, D49), labels (D55), the
 banner, the recording log and the error detail (D64), the timeline file
-(D68), and the end-to-end
+(D68), the level meter, the input volume and no audio (D69), and the end-to-end
 tests' first named scenarios, with the restore file, virtual screens and
 the test tone (D63).
 
@@ -114,7 +114,8 @@ the whole is its `errorDetail` in the recording manifest (D64).
 
 The small window of a running recording, opened by a click on the Dock
 icon or by Quit, in the app and in `msr record`: what is recorded, the
-data written, the problems, and Stop and Continue (D46).
+data written, each audio source's level meter and an audio input's
+input volume (D69), the problems, and Stop and Continue (D46).
 
 ## Status line
 
@@ -252,7 +253,8 @@ The file for one audio source, beside the screen files: a recorded
 audio input's audio tracks, one per channel, or the system audio's one
 audio track, with its timecode. It starts when the source appears and
 ends when it disappears or its channel count changes, which starts a new
-one. Its samples sit on the tick grid by their count: a gap in the
+one; an audio input's starts only with sound and ends at no audio (D69).
+Its samples sit on the tick grid by their count: a gap in the
 audio up to 1 s is filled with silence, a longer one ends the file and
 starts a new one (D31, D46, D49).
 
@@ -267,6 +269,27 @@ silence in its guide track (D31). It ends with its screen file's video
 (D51), unless the file ended by a failure, or the samples for its last
 mix were no longer there or the writer did not take them in time,
 which is told as a problem.
+
+## Level meter
+
+An audio source's bar in the status window: the sample peak of its
+incoming buffers in dBFS on the scale from −60 to 0, with a peak hold
+of 1.5 s, red from −1 dBFS, drawn 10 times a second while the window is
+open (D69).
+
+## Input volume
+
+An audio input's own volume in macOS (macOS's word, in its Sound
+settings), the one its knob or another app changes, 0 to 1: the status
+window's slider sets it where it can be set, for every app on the Mac.
+Not "gain", which is the guide track mix's (D52, D69).
+
+## No audio
+
+An audio input that delivered only exact zeros for 10 s: its audio file
+ends and its State says `no audio` until its sound returns, which starts
+a new audio file. Not a problem. The system audio never has no audio
+(D69).
 
 ## Clock drift
 

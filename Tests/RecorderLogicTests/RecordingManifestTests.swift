@@ -249,6 +249,40 @@ import Testing
         #expect(unmeasured["clockDriftPpm"] is NSNull)
     }
 
+    /// An audio input's file has its input volume at its start, null when
+    /// it cannot be read; the system audio's file has none (D69).
+    @Test func anAudioInputsFileHasItsInputVolume() throws {
+        var input = RecordingManifest.AudioFile(
+            name: "a.mov", audioSource: "Razer Seiren V3 Mini", audioSourceUID: "R", channels: .mono(1), start: 0, timecode: "t")
+        let unread = try #require(try JSONSerialization.jsonObject(with: try JSONEncoder().encode(input)) as? [String: Any])
+        #expect(unread["inputVolume"] is NSNull)
+        input.inputVolume = 0.42
+        let read = try #require(try JSONSerialization.jsonObject(with: try JSONEncoder().encode(input)) as? [String: Any])
+        #expect(read["inputVolume"] as? Double == 0.42)
+        #expect(try JSONDecoder().decode(RecordingManifest.AudioFile.self, from: JSONEncoder().encode(input)) == input)
+        let system = RecordingManifest.AudioFile(
+            name: "s.mov", audioSource: "System audio", audioSourceUID: nil, channels: .stereo, start: 0, timecode: "t")
+        let systemObject = try #require(try JSONSerialization.jsonObject(with: try JSONEncoder().encode(system)) as? [String: Any])
+        #expect(systemObject.keys.contains("inputVolume") == false)
+    }
+
+    @Test func anInputVolumeChangeCarriesTheVolumesFrom0To1() throws {
+        var changed = RecordingEvent(at: 1_200_000_000, event: .audioInputVolumeChanged, audioSource: "Razer")
+        changed.from = .volume(0.5)
+        changed.to = .volume(1)
+        let text = String(decoding: try prettyJSON(changed), as: UTF8.self)
+        #expect(text.contains(#""from" : 0.5"#))
+        #expect(text.contains(#""to" : 1"#))
+        #expect(try JSONDecoder().decode(RecordingEvent.self, from: prettyJSON(changed)) == changed)
+        #expect(RecordingEvent.Value.volume(0.25).text == "0.25")
+    }
+
+    @Test func noAudioAndTheInputVolumeAreNoFailures() {
+        for kind in [RecordingEvent.Kind.noAudioStarted, .noAudioStopped, .audioInputVolumeChanged] {
+            #expect(!kind.isFailure)
+        }
+    }
+
     @Test func aFinalizedManifestTakesNoMoreEventsOrAudioFiles() {
         var manifest = manifest()
         let file = RecordingManifest.AudioFile(

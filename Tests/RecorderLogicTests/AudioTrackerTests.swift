@@ -304,4 +304,27 @@ import Testing
         #expect(woke.actions.isEmpty)
         #expect(tracker.due(at: 101 * second).actions.count == 2)
     }
+
+    /// An audio input with no audio keeps its capture: the window says so
+    /// until its sound returns or its capture ends (D69).
+    @Test func anInputWithNoAudioShowsItWhileItsCaptureRuns() {
+        var tracker = AudioTracker(settings: settings(.wired))
+        _ = tracker.begin(inputs: [usb], mainDisplayID: 1, screens: [1], at: 0)
+        let state = { tracker.sourcesShown.first { $0.id == .input("Razer") }?.state }
+        tracker.noAudio(.input("Razer"), true)
+        #expect(state() == .noAudio)
+        tracker.noAudio(.input("Razer"), false)
+        #expect(state() == .recording)
+        tracker.noAudio(.input("Razer"), true)
+        _ = tracker.captureEnded(.input("Razer"), .captureFailed("x"), at: 1 * second)
+        #expect(state() == .failedRetrying)
+        // The next capture starts with sound until it says otherwise.
+        let restarted = tracker.due(at: 2 * second)
+        #expect(restarted.actions == [.startInput(uid: "Razer", number: 1, name: "Razer Seiren V3 Mini")])
+        #expect(state() == .recording)
+        // A source not recording takes no report.
+        _ = tracker.stopAll()
+        tracker.noAudio(.input("Razer"), true)
+        #expect(state() != .noAudio)
+    }
 }

@@ -57,6 +57,11 @@ enum TableLayout {
     /// font, may make a column wider still, which does not move either.
     static let statusColumnWidths: [CGFloat] = statusSamples.map(measuredWidth)
 
+    /// An audio row's level meter and input volume slider, after the text columns (D69).
+    static let levelMeterWidth: CGFloat = 120
+    static let levelMeterHeight: CGFloat = 8
+    static let inputVolumeWidth: CGFloat = 120
+
     static let windowPadding: CGFloat = 20
 
     /// The width of the widest of `texts` in the table's font, rounded up.
