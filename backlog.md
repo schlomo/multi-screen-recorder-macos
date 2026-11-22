@@ -2,13 +2,10 @@
 
 ## Next session starts here
 
-Item 23, the Resolve timeline, is PR #25, ready for the owner's merge
-(2026-11-21): reviewed, end-to-end tests passed on c5a4bbc, pipeline
-green on 2dc00a4. Left: the owner's import of
-`2026-11-20 12-36-09.otio` from the example recording into Resolve,
-and the merge. Then, one PR each: item 21, the meters (design signed off);
-item 3's follow-up; item 4; item 7; item 12; item 22; the rest of item
-6; item 16.
+PR #25 (item 23, the Resolve timeline file, D68) is merged
+(2026-11-22). Next, one PR each: item 21, the meters (design signed
+off); item 3's follow-up; item 4; item 7; item 12; item 22; the rest of
+item 6; item 16. Start each in a fresh session.
 
 Agents may run `msr record` on the owner's Mac (D48), with `HOME` set
 to a scratch folder (`AGENTS.md`, "Facts that bite"), and BetterDisplay's command
@@ -25,7 +22,7 @@ Still open from D34: what AGC does and whether it is on in auto mode;
 
 ## In flight
 
-- Item 23, the Resolve timeline file: PR #25, ready for the owner's merge (2026-11-21).
+Nothing (2026-11-22).
 
 ## Queued
 
@@ -521,47 +518,6 @@ Still open from D34: what AGC does and whether it is on in auto mode;
    again. Needs item 12. Design first. Measured 2026-11-18 (30 minutes,
    a radio in the room): the Razer and the BRIO stay a constant 17 to
    18 ms apart, before and after a replug of the Razer, with no drift.
-23. **A Resolve timeline in every recording folder** (the owner,
-   2026-11-19: "a timeline where all clips are already loaded and
-   aligned by time code … longest clip starting at the beginning as
-   track v1, all clips from the same device on the same track, track
-   named like device … goal is to make editing in resolve super easy";
-   "otio sounds great, go ahead with that"). Signed off: an
-   OpenTimelineIO file (`.otio`, open JSON; Resolve 21.1 imports it,
-   manual ch. 22 p. 527), named after the recording folder, written at
-   Stop from `recording.json` and by `msr timeline <folder>` (also
-   for older or unfinished recordings, a file's length read from the
-   file when `end` is null); a derived file, rewritten, never edited.
-   30 fps, starting at the first file's timecode; V1 the screen whose
-   file starts at the beginning and runs longest, then the screens by
-   number; one audio track per audio source, `Audio 0 - System` first;
-   each track named by its label; each file at its timecode; the
-   screen files' guide tracks left off. A spike (made with the
-   reference library in a session scratchpad) put a 30 s recording of
-   2 screens and 5 audio sources on V1, V2 and A1 to A5 as designed;
-   the owner's import into Resolve (2026-11-20, a 2 h recording, the
-   relative variant): "the timeline itself was really good, all in
-   sync"; the Razer, unplugged and plugged back, came back in sync
-   with the BRIO after a few seconds. To fix: the Load OTIO dialog
-   cuts the timeline name at its first dot ("2026-11-20 12"), it must
-   be the folder's name; each microphone got an L and an R track with
-   the R empty, though the Razer's file is mono and the BRIO's stereo
-   with both sides alike; the timeline resolution should be the
-   largest frame size (the dialog proposed 2560x1080); the owner wants
-   the multi-channel tracks as linked groups and the recording's
-   events (screen and device changes) as markers. Resolve's own
-   "Import log messages as markers" is for its import errors, not
-   ours (manual ch. 22 p. 513), so ours would be OTIO markers; "Use
-   sizing/colour information" carry another editor's transforms and
-   grades, which a recording has none of. Done 2026-11-20 (D68):
-   a timeline hand-built in Resolve 21.2 and exported showed its
-   `Resolve_OTIO` keys (Audio Type Mono/Stereo, per-clip Channels,
-   Link Group ID, markers on the stack); Resolve names the timeline
-   from the file name up to its first dot, drops a clip's channel
-   mapping when the clip is a frame longer than its file, and its OTIO
-   reader takes no resolution (none in its key list, none from
-   `available_image_bounds`), so a first marker says what to set.
-   Built in Swift in PR #25.
 25. **A new screen showing a still picture gets no file until it
    changes** (found by PR #23's runs, 2026-11-19): ScreenCaptureKit
    delivers complete frames only on change, so a newly connected
@@ -624,6 +580,17 @@ Still open from D34: what AGC does and whether it is on in auto mode;
    attributed client) and fix it at its root; add the error text to
    `docs/troubleshooting.md`. Running `msr check` on the Mac does not
    help: the check runs in the VM.
+35. **Audio inputs started late once** (the owner's test of PR #25's
+   build, 2026-11-22 08.25.27, a 12 s recording): the audio inputs'
+   files start 1.40 to 1.63 s after the recording's start, the screens'
+   at 0.33 s and the system audio's at 0.50 s; in the four earlier
+   recordings (2026-11-18 to 2026-11-20) every audio input started
+   within 0.6 s. Every file sits at its own timecode, so sync holds,
+   but the first second of every microphone is missing. One sample,
+   cause unknown [CONJECTURE: devices still waking, it was the first
+   recording of the morning]. Measure the start of each audio input
+   over more recordings (the recording log has `startInput` and `file
+   started`); if it recurs, find what the session waits for.
 
 ## Deliberately deferred
 
@@ -786,6 +753,11 @@ Still open from D34: what AGC does and whether it is on in auto mode;
 
 ## Done (recent)
 
+- 2026-11-22: PR #25 merged by the owner: item 23, a DaVinci Resolve
+  timeline file in every recording folder, written at Stop and by
+  `msr timeline` (D68), in the form Resolve 21.2 exports; the
+  resolution set by hand, as its first marker says. Reviews: top-tier
+  full and delta reviews; end-to-end tests passed on c5a4bbc.
 - 2026-11-20: PR #23 merged by the owner: item 3's first part, the
   end-to-end tests (seven scenarios through `msr record` in a throwaway
   tart VM on the owner's Mac, D63, D67), with item 27 (a failure's
