@@ -13,7 +13,7 @@ Open with the owner: whether exact zeros on both sides of a gap add up
 to the 10 s of no audio (today they do not; the files are the same
 either way, only the event and the State differ). After the merge, one
 PR each: item 3's follow-up; item 4; item 7; item 12; item 22; the
-rest of item 6; item 16; item 36.
+rest of item 6; item 16; item 36; item 37 (screen names).
 
 Agents may run `msr record` on the owner's Mac (D48), with `HOME` set
 to a scratch folder (`AGENTS.md`, "Facts that bite"), and BetterDisplay's command
@@ -609,6 +609,22 @@ Still open from D34: what AGC does and whether it is on in auto mode;
    counts `seq 60` rounds of `sleep 5` plus one SSH call, so its
    "300 s" is longer in fact; PR #26 made `vm_wait_for_login` a real
    deadline with `SECONDS`. Do the same for `vm_start`.
+
+37. **Realistic names for the end-to-end virtual screens** (the owner
+   signed off the design as text on 2026-11-22: "yes to both"). The
+   homepage screenshots show the driver's screens as "MSR Test 201/202".
+   Design: each `VirtualScreenSpec` carries its own name, "Desk
+   Monitor" (1600x900) and "Portable Monitor" (1280x720); the driver
+   recognises its own screens by the vendor and product ID it already
+   sets (`0x4D53`/`0x5254`), no longer by the name prefix "MSR Test",
+   so the names are display text only; `ManifestCheck`'s label and the
+   driver's log lines follow; docs `docs/design/end-to-end-tests.md`
+   and a decisions entry with the PR. "Apple Virtual" (the VM's own
+   display) and the audio devices stay: Apple's framework names them,
+   and a renamed BlackHole would still read as virtual. Its own PR
+   after PR #26 (both touch the driver), with the architect's
+   end-to-end run, then `update-homepage-screenshots --release` after
+   its release.
 
 ## Deliberately deferred
 
