@@ -74,7 +74,7 @@ public struct CameraTracker: Sendable {
     /// counts as recorded: the recording resolution records video (None is
     /// audio only), the camera mode includes it, it lists a format and is not suspended.
     public static func records(_ camera: CameraInfo, settings: Settings) -> Bool {
-        settings.effectiveResolution.recordsScreens && settings.cameraModeIncludes(camera) && camera.chosenFormat != nil
+        settings.effectiveResolution.recordsScreens && settings.cameraModeIncludes(camera) && !camera.formats.isEmpty
             && !camera.isSuspended
     }
 
@@ -279,7 +279,7 @@ public struct CameraTracker: Sendable {
             nextNumber += 1
         }
         // `records` holds for a wanted camera, so it has a format, and the resolution records video.
-        let format = reading.chosenFormat!
+        let format = reading.chosenFormat(resolution: settings.effectiveResolution)!
         let frameSize = settings.effectiveResolution.frameSize(forLooksLike: format.size)
         tracked.phase = .recording(frameSize: frameSize)
         cameras[uniqueID] = tracked

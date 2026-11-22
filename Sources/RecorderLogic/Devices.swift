@@ -151,6 +151,25 @@ public struct CameraFormat: Equatable, Sendable, CustomStringConvertible {
 
     /// "1920×1080 at 30 fps".
     public var description: String { "\(size) at \(String(format: "%g", maxFramesPerSecond)) fps" }
+
+    /// Whether it delivers the tick grid's frame rate, a rate rounded to whole frames per second.
+    var deliversTheTickRate: Bool { maxFramesPerSecond.rounded() >= Double(TickGrid.recording.framesPerSecond) }
+
+    /// One format per frame size, smallest first, of a camera's formats as
+    /// listed: the variant with the lowest rate that still delivers the tick
+    /// grid's frame rate, or the fastest where none does (D74).
+    public static func preferred(_ listed: [CameraFormat]) -> [CameraFormat] {
+        Dictionary(grouping: listed, by: \.size).values.compactMap { variants in
+            variants.filter(\.deliversTheTickRate).min { $0.maxFramesPerSecond < $1.maxFramesPerSecond }
+                ?? variants.max { $0.maxFramesPerSecond < $1.maxFramesPerSecond }
+        }.sorted { $0.size.pixelCount < $1.size.pixelCount }
+    }
+
+    /// The frame rate to set: `wanted` where one of the format's ranges
+    /// allows it, otherwise the allowed rate closest to it; nil without a range.
+    public static func frameRate(closestTo wanted: Double, in ranges: [ClosedRange<Double>]) -> Double? {
+        ranges.map { min(max(wanted, $0.lowerBound), $0.upperBound) }.min { abs($0 - wanted) < abs($1 - wanted) }
+    }
 }
 
 /// A camera as AVFoundation lists it, known by its unique ID (D74).
@@ -177,22 +196,40 @@ public struct CameraInfo: Equatable, Sendable {
         self.isSuspended = isSuspended
     }
 
-    /// The format a recording opens the camera with: its largest that
-    /// delivers the tick grid's frame rate, a rate rounded to whole frames
-    /// per second; a camera with none such delivers its fastest, the largest
-    /// of those. Nil for a camera that lists no format.
-    public var chosenFormat: CameraFormat? {
-        let wanted = Double(TickGrid.recording.framesPerSecond)
-        return formats.max { lhs, rhs in
-            (min(lhs.maxFramesPerSecond.rounded(), wanted), lhs.size.pixelCount)
-                < (min(rhs.maxFramesPerSecond.rounded(), wanted), rhs.size.pixelCount)
+    /// The format a recording at `resolution` opens the camera with (D74):
+    /// of the formats that deliver the tick grid's frame rate the 16:9 ones,
+    /// if there are any, and of those the largest that fits into the
+    /// resolution's box (at Native, the largest), so it is recorded as it
+    /// is; when none fits, the smallest, which is scaled. A camera with no
+    /// format at that rate delivers its fastest, the largest of those. Nil
+    /// for a camera that lists no format.
+    public func chosenFormat(resolution: RecordingResolution) -> CameraFormat? {
+        let fastEnough = formats.filter(\.deliversTheTickRate)
+        guard !fastEnough.isEmpty else {
+            return formats.max { ($0.maxFramesPerSecond.rounded(), $0.size.pixelCount) < ($1.maxFramesPerSecond.rounded(), $1.size.pixelCount) }
         }
+        let wide = fastEnough.filter { Self.isSixteenByNine($0.size) }
+        let candidates = wide.isEmpty ? fastEnough : wide
+        let fitting = candidates.filter { Self.fits($0.size, into: resolution.box) }
+        return fitting.max { $0.size.pixelCount < $1.size.pixelCount } ?? candidates.min { $0.size.pixelCount < $1.size.pixelCount }
     }
 
-    /// The frame size of the camera's file: its chosen format's size fitted
-    /// into the recording resolution's box, as a screen's looks-like size is.
+    /// The frame size of the camera's file: its chosen format's size, fitted
+    /// into the recording resolution's box as a screen's looks-like size is.
     public func frameSize(resolution: RecordingResolution) -> FrameSize? {
-        chosenFormat.map { resolution.frameSize(forLooksLike: $0.size) }
+        chosenFormat(resolution: resolution).map { resolution.frameSize(forLooksLike: $0.size) }
+    }
+
+    /// An aspect ratio within 1 % of 16:9, either way up.
+    private static func isSixteenByNine(_ size: FrameSize) -> Bool {
+        let ratio = Double(max(size.width, size.height)) / Double(max(1, min(size.width, size.height)))
+        return abs(ratio / (16.0 / 9.0) - 1) <= 0.01
+    }
+
+    private static func fits(_ size: FrameSize, into box: FrameSize?) -> Bool {
+        guard let box else { return true }
+        let upright = size.isPortrait ? box.rotated : box
+        return size.width <= upright.width && size.height <= upright.height
     }
 
     /// "FaceTime HD Camera (default)" or just the name.

@@ -214,9 +214,15 @@ final class CameraSource: NSObject, CameraFrameSource, AVCaptureVideoDataOutputS
         }
         session.addInput(input)
         session.addOutput(output)
-        // After the input is added, so the session keeps the format; it runs at the format's default rate.
+        // After the input is added, so the session keeps the format and the frame rate.
+        let wanted = Double(TickGrid.recording.framesPerSecond)
+        let frameDuration = Self.frameDuration(closestTo: wanted, of: deviceFormat)
         try device.lockForConfiguration()
         device.activeFormat = deviceFormat
+        if let frameDuration {
+            device.activeVideoMinFrameDuration = frameDuration
+            device.activeVideoMaxFrameDuration = frameDuration
+        }
         device.unlockForConfiguration()
         session.commitConfiguration()
         let center = NotificationCenter.default
@@ -244,7 +250,32 @@ final class CameraSource: NSObject, CameraFrameSource, AVCaptureVideoDataOutputS
         session.startRunning()
         // A stop that came while it started has run already, on this queue after this.
         if withState({ $0.isStopped }) { session.stopRunning() }
+        let active = device.activeFormat
+        let rate = frameDuration.map { 1 / $0.seconds }
+        RecorderLog.detail(
+            "camera \(uniqueID): active format \(cameraFormat(of: active).size) "
+                + FrameFacts.fourCharacterCode(CMFormatDescriptionGetMediaSubType(active.formatDescription))
+                + ", frame duration \(Self.text(device.activeVideoMinFrameDuration)) to \(Self.text(device.activeVideoMaxFrameDuration))"
+                + (rate.map { abs($0 - wanted) < 0.001 ? "" : ", the format allows no \(Int(wanted)) fps, set to \(String(format: "%.3g", $0)) fps" }
+                    ?? ", the format lists no frame rate"),
+            category: VideoFileWriter.detailCategory)
     }
+
+    /// The frame duration for `wanted` frames per second where one of the
+    /// format's ranges allows it, otherwise the range's bound closest to it,
+    /// as the format gives it, so the device takes it.
+    private static func frameDuration(closestTo wanted: Double, of format: AVCaptureDevice.Format) -> CMTime? {
+        let ranges = format.videoSupportedFrameRateRanges
+        guard let rate = CameraFormat.frameRate(closestTo: wanted, in: ranges.map { $0.minFrameRate...$0.maxFrameRate }),
+              let range = ranges.first(where: { ($0.minFrameRate...$0.maxFrameRate).contains(rate) })
+        else { return nil }
+        if rate == range.maxFrameRate { return range.minFrameDuration }
+        if rate == range.minFrameRate { return range.maxFrameDuration }
+        return CMTime(value: 1, timescale: CMTimeScale(wanted))
+    }
+
+    /// "1/30 s".
+    private static func text(_ time: CMTime) -> String { "\(time.value)/\(time.timescale) s" }
 
     func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
         withState { $0.deliver }?(sampleBuffer)

@@ -15,14 +15,10 @@ private func cameraDevices() -> [AVCaptureDevice] {
 public func currentCameras() -> [CameraInfo] {
     let defaultID = AVCaptureDevice.default(for: .video)?.uniqueID
     return cameraDevices().map { device in
-        var largestRate: [FrameSize: CameraFormat] = [:]
-        for format in device.formats.map(cameraFormat) where format.maxFramesPerSecond > (largestRate[format.size]?.maxFramesPerSecond ?? 0) {
-            largestRate[format.size] = format
-        }
-        return CameraInfo(
+        CameraInfo(
             uniqueID: device.uniqueID, name: device.localizedName, isDefault: device.uniqueID == defaultID,
             isVirtual: cameraIsVirtual(deviceType: device.deviceType, transportType: device.transportType),
-            formats: largestRate.values.sorted { ($0.size.pixelCount, $0.maxFramesPerSecond) < ($1.size.pixelCount, $1.maxFramesPerSecond) },
+            formats: CameraFormat.preferred(device.formats.map(cameraFormat)),
             isSuspended: device.isSuspended)
     }
 }

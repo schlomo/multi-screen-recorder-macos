@@ -210,7 +210,7 @@ public struct WhatWillBeRecorded: Equatable, Sendable {
         guard let number, let frameSize = camera.frameSize(resolution: settings.effectiveResolution) else {
             let leavesOutVirtual = [.defaultCamera, .real].contains(settings.effectiveCameraMode)
                 && settings.effectiveResolution.recordsScreens
-            let reason: String? = if camera.chosenFormat == nil { "no format" } else if camera.isVirtual && leavesOutVirtual {
+            let reason: String? = if camera.formats.isEmpty { "no format" } else if camera.isVirtual && leavesOutVirtual {
                 "virtual"
             } else if camera.isSuspended && settings.cameraModeIncludes(camera) && settings.effectiveResolution.recordsScreens {
                 "suspended"

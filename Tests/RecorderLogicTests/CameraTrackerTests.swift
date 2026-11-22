@@ -77,17 +77,57 @@ import Testing
 
     @Test func theLargestFormatThatDeliversThirtyFramesPerSecondIsChosen() {
         let formats = [format(640, 480, 30), format(3840, 2160, 15), format(1920, 1080, 30), format(1280, 720, 60)]
-        #expect(camera(formats).chosenFormat == format(1920, 1080, 30))
+        #expect(camera(formats).chosenFormat(resolution: .native) == format(1920, 1080, 30))
     }
 
     @Test func aRateRoundingToThirtyCounts() {
-        #expect(camera([format(1280, 720, 30), format(1920, 1080, 29.97)]).chosenFormat == format(1920, 1080, 29.97))
+        #expect(camera([format(1280, 720, 30), format(1920, 1080, 29.97)]).chosenFormat(resolution: .native) == format(1920, 1080, 29.97))
     }
 
     @Test func withoutAThirtyFramesFormatTheFastestIsChosenTheLargestOfThose() {
         let formats = [format(3840, 2160, 5), format(640, 480, 25), format(1280, 720, 25), format(1920, 1080, 15)]
-        #expect(camera(formats).chosenFormat == format(1280, 720, 25))
-        #expect(camera([]).chosenFormat == nil)
+        #expect(camera(formats).chosenFormat(resolution: .native) == format(1280, 720, 25))
+        #expect(camera([]).chosenFormat(resolution: .native) == nil)
+    }
+
+    /// A DCI 4096×2160 or a square format is not chosen over a 16:9 one (D74).
+    @Test func sixteenByNineFormatsArePreferredWhenOneDeliversThirtyFramesPerSecond() {
+        let brio = camera([format(4096, 2160, 30), format(3840, 2160, 30), format(1552, 1552, 30), format(1920, 1080, 30)])
+        #expect(brio.chosenFormat(resolution: .native) == format(3840, 2160, 30))
+        #expect(camera([format(1366, 768, 30), format(1600, 1200, 30)]).chosenFormat(resolution: .native) == format(1366, 768, 30))
+        #expect(camera([format(1552, 1552, 30), format(640, 480, 30)]).chosenFormat(resolution: .native) == format(1552, 1552, 30))
+    }
+
+    /// The largest format that fits into the recording resolution's box is recorded as it is, not scaled.
+    @Test func theLargestFormatInsideTheBoxIsChosen() {
+        let brio = camera([format(4096, 2160, 30), format(3840, 2160, 30), format(1920, 1080, 30), format(1280, 720, 30)])
+        #expect(brio.chosenFormat(resolution: .p1440) == format(1920, 1080, 30))
+        #expect(brio.frameSize(resolution: .p1440) == FrameSize(width: 1920, height: 1080))
+        #expect(brio.chosenFormat(resolution: .p1080) == format(1920, 1080, 30))
+        #expect(camera([format(1552, 1552, 30), format(640, 480, 30)]).chosenFormat(resolution: .p1080) == format(640, 480, 30))
+    }
+
+    /// When no format fits into the box, the smallest is chosen and scaled.
+    @Test func withoutAFormatInsideTheBoxTheSmallestIsScaled() {
+        let large = camera([format(3840, 2160, 30), format(1920, 1080, 30)])
+        #expect(large.chosenFormat(resolution: .p720) == format(1920, 1080, 30))
+        #expect(large.frameSize(resolution: .p720) == FrameSize(width: 1280, height: 720))
+    }
+
+    /// Of a frame size's variants the slowest that still delivers 30 fps, else the fastest (D74).
+    @Test func eachSizeKeepsItsSlowestVariantThatDeliversThirtyFramesPerSecond() {
+        let listed = [format(1920, 1080, 60), format(1920, 1080, 30), format(1920, 1080, 29.97), format(1920, 1080, 15),
+                      format(3840, 2160, 15), format(3840, 2160, 24), format(1280, 720, 60)]
+        #expect(CameraFormat.preferred(listed) == [format(1280, 720, 60), format(1920, 1080, 29.97), format(3840, 2160, 24)])
+    }
+
+    @Test func theFrameRateIsThirtyWhereARangeAllowsItOtherwiseTheClosest() {
+        #expect(CameraFormat.frameRate(closestTo: 30, in: [5...60]) == 30)
+        #expect(CameraFormat.frameRate(closestTo: 30, in: [30...30, 60...60]) == 30)
+        #expect(CameraFormat.frameRate(closestTo: 30, in: [24...24, 60...60]) == 24)
+        #expect(CameraFormat.frameRate(closestTo: 30, in: [29.97...29.97]) == 29.97)
+        #expect(CameraFormat.frameRate(closestTo: 30, in: [50...60, 15...25]) == 25)
+        #expect(CameraFormat.frameRate(closestTo: 30, in: []) == nil)
     }
 
     @Test func theRecordingResolutionCapsTheFrameSizeAsForAScreen() {
@@ -121,9 +161,9 @@ import Testing
         var cameras = tracker()
         let step = cameras.begin([Self.obs, Self.usb, Self.builtIn], at: 0)
         #expect(step.actions == [
-            .start(uniqueID: "A", format: Self.builtIn.chosenFormat!, frameSize: FrameSize(width: 1920, height: 1080), number: 1,
+            .start(uniqueID: "A", format: Self.builtIn.chosenFormat(resolution: .native)!, frameSize: FrameSize(width: 1920, height: 1080), number: 1,
                    name: "FaceTime HD Camera"),
-            .start(uniqueID: "B", format: Self.usb.chosenFormat!, frameSize: FrameSize(width: 1920, height: 1080), number: 2,
+            .start(uniqueID: "B", format: Self.usb.chosenFormat(resolution: .native)!, frameSize: FrameSize(width: 1920, height: 1080), number: 2,
                    name: "Logitech BRIO"),
         ])
         #expect(step.events.isEmpty)
