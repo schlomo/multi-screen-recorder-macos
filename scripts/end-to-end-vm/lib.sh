@@ -49,9 +49,10 @@ vm_start() {
 # the console and the tccd of their GUI session runs. SSH answers before that,
 # and until then the user's own permissions (Microphone) read as denied.
 vm_wait_for_login() {
-    for _ in $(seq 120); do
+    for waited in $(seq 0 119); do
         if guest "[[ \$(stat -f %Su /dev/console) == $guest_user ]] &&
             launchctl print gui/\$(id -u)/com.apple.tccd 2>/dev/null | grep -q '^[[:space:]]*state = running'"; then
+            echo "$me: $guest_user is logged in, after $waited waits of 1 s"
             return 0
         fi
         sleep 1
