@@ -2,10 +2,25 @@
 
 ## Next session starts here
 
-PR #25 (item 23, the Resolve timeline file, D68) is merged
-(2026-11-22). Next, one PR each: item 21, the meters (design signed
-off); item 3's follow-up; item 4; item 7; item 12; item 22; the rest of
-item 6; item 16. Start each in a fresh session.
+PR #26 (draft, branch `audio-meters`) holds item 21 with items 31,
+35, 19, 33, 34 and 32 (D69 to D72; the owner's rulings of 2026-11-22
+are quoted there). State at 2026-11-22 16:40 Europe/Berlin, interrupted
+by a laptop restart: on the branch up to 1297380 (meters, Recorder
+tests, crash filter, VM login wait, free space plain reading D71,
+unreadable crash reports skipped); not yet built: the signed-off
+screenshot flow (D72 to write): `scripts/end-to-end-test --release` /
+`--snapshot <n>` runs the published zip in the VM (check first whether
+the VM's permissions accept the certificate-signed app),
+`scripts/update-homepage-screenshots --release|--snapshot <n>` commits
+the captures unmarked (a homepage-only PR off `main`, or onto PR n),
+no snapshot release for a homepage-only PR, the homepage PNGs restored
+to `main`'s in PR #26. Then: the top-tier review of the whole PR (a
+first one on 8aff7b5 was interrupted), the architect's end-to-end run,
+one unmarked commit for the pipeline, `update-homepage-screenshots
+--snapshot 26` for the owner's Cloudflare preview. The meters build
+4d89314 is installed in `/Applications` for the owner's try-out. After
+PR #26, one PR each: item 3's follow-up; item 4; item 7; item 12; item
+22; the rest of item 6; item 16.
 
 Agents may run `msr record` on the owner's Mac (D48), with `HOME` set
 to a scratch folder (`AGENTS.md`, "Facts that bite"), and BetterDisplay's command
