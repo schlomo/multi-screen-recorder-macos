@@ -38,11 +38,13 @@ vm_start() {
     tart run --no-graphics "$1" >"$work/tart-run-$1.log" 2>&1 &
     vm_pid=$!
     vm_ip=$(tart ip --wait 120 "$1") || vm_failed "$1 has no IP address within 120 s"
-    for _ in $(seq 60); do
+    local deadline=300
+    SECONDS=0
+    while ((SECONDS < deadline)); do
         if guest true 2>/dev/null; then return 0; fi
         sleep 5
     done
-    vm_failed "$1 did not answer over SSH within 300 s"
+    vm_failed "$1 did not answer over SSH within $deadline s"
 }
 
 # Waits until the automatic login of $guest_user has finished: the user owns
