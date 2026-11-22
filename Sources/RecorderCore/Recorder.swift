@@ -237,8 +237,7 @@ public final class Recorder {
         }
         let bytes = Dictionary(sizes.compactMap { name, size in size.map { (name, $0) } }, uniquingKeysWith: { $1 })
         let bytesWritten: Int64? = sizes.contains { $0.1 == nil } ? nil : bytes.values.reduce(0, +)
-        let free = (try? folder.resourceValues(forKeys: [.volumeAvailableCapacityForImportantUsageKey]))?
-            .volumeAvailableCapacityForImportantUsage
+        let free = (try? volumeFreeBytes(of: folder)) ?? nil
         return (
             RecordingStatusTable.rows(sources: tracker.sources, files: manifest.files, bytes: bytes)
                 + RecordingStatusTable.audioRows(
@@ -780,8 +779,7 @@ public final class Recorder {
         guard !isStopped else { return }
         let free: Int64
         do {
-            let values = try folder.resourceValues(forKeys: [.volumeAvailableCapacityForImportantUsageKey])
-            guard let bytes = values.volumeAvailableCapacityForImportantUsage else {
+            guard let bytes = try volumeFreeBytes(of: folder) else {
                 tell("The free space in \(folder.path(percentEncoded: false)) cannot be read",
                      error: "the volume does not report its free space", kind: .freeSpaceNotRead)
                 return

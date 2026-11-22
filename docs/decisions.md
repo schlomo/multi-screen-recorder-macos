@@ -2346,3 +2346,11 @@ architect's reading.
 - **Decision:** A crash report is offered only if its `procPath` lies inside a folder named `Multi Screen Recorder.app`; a report without one is an error, shown like an unreadable folder. The end-to-end run captures the windows active and shadowless (the review files too, one set of files), with two more virtual screens of which one comes back, and `scripts/update-homepage-screenshots <scratch folder>` copies `review/app/app-start-window-light.png`, `app-status-window-light.png` and `app-finder-window-light.png` over `homepage/assets/images/app-window.png`, `status-window.png` and `recording-folder.png`; this replaces the manual steps in `homepage/README.md`. Out: an animated status window, replacing the video's title bar, a dark collage, more audio devices than the VM has.
 - **Consequences:** An `msr` built into any bundle of that name, `build/` included, still counts as the app's. The homepage shows the VM's screens and devices and the dev version the run built; the PNG diff is the review.
 - **Evidence:** backlog items 19 and 32; [design/recorder.md](design/recorder.md), "Crash report offer"; [design/end-to-end-tests.md](design/end-to-end-tests.md), "Artifacts for review"; [homepage/README.md](../homepage/README.md).
+
+## D71: Free space is the volume's plain available capacity (2026-11-22)
+
+- **Status:** in force
+- **Context:** The volume's free space "for important usage" read 0 bytes on the hosted runner, and, measured on the owner's Mac, for every folder off the boot volume (a disk image, the system volume mounted a second time), while the plain available capacity gave the real figure. The owner, 2026-11-22: "Plain reading".
+- **Decision:** The ready check, the low disk warning and the status line read the volume's plain available capacity (`volumeAvailableCapacity`); the important-usage reading is no longer used. Why: it gives the real figure on every volume, where the other refuses to record on any volume but the boot volume.
+- **Consequences:** Space macOS could free by purging (caches, local snapshots) is not counted, so the figure can be lower than what macOS would make room for.
+- **Evidence:** PR #26; `Tests/RecorderCoreTests/OutputFolderProbeTests.swift`; backlog item 33.
