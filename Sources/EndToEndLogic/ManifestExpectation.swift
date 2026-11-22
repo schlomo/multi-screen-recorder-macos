@@ -188,8 +188,8 @@ public struct ManifestExpectation: Sendable {
     }
     /// The Mac's own screens when the run started: they take the first numbers.
     public var ownScreenCount: Int
-    /// The name every virtual screen's name starts with.
-    public var virtualScreenNamePrefix: String
+    /// The names of the virtual screens; macOS may append a counter, so a name matches by its start.
+    public var virtualScreenNames: [String]
     public var virtualScreenFiles: [VirtualScreenFile]
     public var virtualScreenEvents: [VirtualScreenEvent]
     public var playedAudioInputs: [PlayedAudioInput]
@@ -207,7 +207,7 @@ public struct ManifestExpectation: Sendable {
 
     public init(
         app: String, settings: Settings, ending: Ending, stoppedAt: Double, ownScreenCount: Int,
-        virtualScreenNamePrefix: String, virtualScreenFiles: [VirtualScreenFile] = [],
+        virtualScreenNames: [String], virtualScreenFiles: [VirtualScreenFile] = [],
         virtualScreenEvents: [VirtualScreenEvent] = [], playedAudioInputs: [PlayedAudioInput] = [],
         timeTolerance: Double, finalizeAllowance: Double, settleTime: Double, firstFrameLimit: Double
     ) {
@@ -217,12 +217,16 @@ public struct ManifestExpectation: Sendable {
         self.ending = ending
         self.stoppedAt = stoppedAt
         self.ownScreenCount = ownScreenCount
-        self.virtualScreenNamePrefix = virtualScreenNamePrefix
+        self.virtualScreenNames = virtualScreenNames
         self.virtualScreenFiles = virtualScreenFiles
         self.virtualScreenEvents = virtualScreenEvents
         self.playedAudioInputs = playedAudioInputs
         self.timeTolerance = timeTolerance
         self.finalizeAllowance = finalizeAllowance
         self.settleTime = settleTime
+    }
+
+    public func isVirtualScreenName(_ name: String) -> Bool {
+        virtualScreenNames.contains { name.hasPrefix($0) }
     }
 }

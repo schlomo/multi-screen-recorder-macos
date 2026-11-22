@@ -330,7 +330,9 @@ final class Driver {
         let expectation = ManifestExpectation(
             app: "Multi Screen Recorder \(version)", settings: scenario.settings,
             ending: scenario.stop == .kill ? .killed(at: stopped) : .finalized, stoppedAt: stopped,
-            ownScreenCount: ownScreenCount, virtualScreenNamePrefix: VirtualScreenSpec.namePrefix,
+            ownScreenCount: ownScreenCount, virtualScreenNames: scenario.events.compactMap {
+                if case .connectScreen(let spec) = $0.event { spec.name } else { nil }
+            },
             virtualScreenFiles: virtual.files, virtualScreenEvents: virtual.events,
             playedAudioInputs: scenario.playsTone
                 ? [.init(name: Machine.loopbackName, uid: Machine.loopbackUID, channels: 2)] : [],
@@ -418,9 +420,9 @@ final class Driver {
 
     static func describe(_ event: Scenario.Event) -> String {
         switch event {
-        case .connectScreen(let spec): "the connect of \(spec.name)"
-        case .switchScreenMode(let serialNumber, let size): "the mode switch of \(VirtualScreenSpec.namePrefix) \(serialNumber) to \(size)"
-        case .disconnectScreen(let serialNumber): "the disconnect of \(VirtualScreenSpec.namePrefix) \(serialNumber)"
+        case .connectScreen(let spec): "the connect of \(spec.name) (virtual screen \(spec.serialNumber))"
+        case .switchScreenMode(let serialNumber, let size): "the mode switch of virtual screen \(serialNumber) to \(size)"
+        case .disconnectScreen(let serialNumber): "the disconnect of virtual screen \(serialNumber)"
         }
     }
 

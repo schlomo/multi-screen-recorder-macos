@@ -34,12 +34,14 @@ public struct RecorderStartError: ErrorWithDetail, CustomStringConvertible {
 /// The audio devices a recording reads and opens: `system` in every
 /// recording; `RecorderTests` stands in for them.
 struct RecorderDevices: Sendable {
+    var screens: @MainActor @Sendable () throws(DeviceReadError) -> [ConnectedScreen]
     var audioInputs: @Sendable () throws -> [AudioInputInfo]
     var audioInputSource: @Sendable (_ uid: String) -> any AudioBufferSource
     /// An audio input's input volume, nil when it has none (D69).
     var inputVolume: @Sendable (_ uid: String, _ name: String) -> (any InputVolumeControl)?
 
     static let system = RecorderDevices(
+        screens: connectedScreens,
         audioInputs: { try currentAudioInputs() },
         audioInputSource: { MicrophoneSource(uid: $0) },
         inputVolume: { CoreAudioInputVolume(uid: $0, name: $1) })
@@ -133,7 +135,7 @@ public final class Recorder {
         let readsScreens = ReadyCheck.needsScreenRecording(settings)
         let screens: [ConnectedScreen]
         do {
-            screens = readsScreens ? try connectedScreens() : []
+            screens = readsScreens ? try devices.screens() : []
         } catch {
             throw RecorderStartError("The screens cannot be read", underlying: error)
         }
@@ -403,7 +405,7 @@ public final class Recorder {
 
     private func readScreens() -> [ConnectedScreen]? {
         do {
-            let screens = try connectedScreens()
+            let screens = try devices.screens()
             RecorderLog.detail("screens: \(DetailLine.screens(screens))", category: "recorder")
             problemsTold.cleared(.screensNotRead)
             return screens
@@ -413,14 +415,14 @@ public final class Recorder {
         }
     }
 
-    private func willSleep() {
+    func willSleep() {
         guard !isStopped else { return }
         apply(tracker.sleep(at: context.now()))
         for action in audioTracker.sleep() { performAudio(action) }
         audioDueTask?.cancel()
     }
 
-    private func didWake() {
+    func didWake() {
         guard !isStopped else { return }
         context.rereadClocks()
         guard readsScreens else {
@@ -428,7 +430,11 @@ public final class Recorder {
             applyAudio(audioTracker.wake(readAudioInputs() ?? [], at: context.now()))
             return
         }
-        guard let screens = readScreens() else { return }
+        guard let screens = readScreens() else {
+            // The audio's wake does not depend on the screens, only the system audio's main screen does.
+            applyAudio(audioTracker.wake(readAudioInputs() ?? [], at: context.now()))
+            return
+        }
         let step = tracker.wake(screens, at: context.now())
         context.update(screens, lastScreenChange: tracker.lastScreenChange)
         apply(step)

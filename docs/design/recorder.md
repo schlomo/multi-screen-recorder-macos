@@ -1373,6 +1373,9 @@ stream's first frame included (D63).
   screen changed`; the numbers stay.
 - **Sleep and wake:** at sleep every file ends (event `sleep`); at wake
   (event `wake`) new files start, the screens after the settle time.
+  The audio's wake runs whether or not the screens can be read: a wake
+  whose screens cannot be read tells "The screens cannot be read" and
+  still restarts the audio inputs.
 
 **Screen check (D45).** Every frame is checked before it is kept: the
 rectangle ScreenCaptureKit attaches to it (`SCStreamFrameInfo.screenRect`)
@@ -1646,7 +1649,8 @@ file, the system audio excluded), the input volume against a stand-in
 for Core Audio (its property's address, a set clamped to 0 to 1, a
 refusal, the listener; no test reads or sets a real device's volume), a
 recorder audio only with a stand-in audio input and input volume
-(`RecorderTests`: a failure told once by its event and its repeats
+and a stand-in for the screens (`RecorderDevices.screens`; a wake whose
+screens cannot be read still restarts the audio inputs) (`RecorderTests`: a failure told once by its event and its repeats
 counted at Stop, D65; `inputVolume`, a change told once it held still,
 also one Core Audio does not report, the slider's set, a refused set as
 a problem, no slider where it cannot be set; the level meters; no audio
