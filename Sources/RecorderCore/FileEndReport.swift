@@ -23,12 +23,8 @@ struct FileEndReport: Equatable {
     }
 
     /// `reason` is nil when the recorder stopped the capture; `now` is the
-    /// time on the shared clock, the time of the report when no file ended.
-    init(reason: VideoStreamEnd?, end: VideoFileEnd<RecordingManifest.ScreenFile>?, screen: String, at now: Int64) {
-        self.init(reason: reason, end: end, source: screen, at: now)
-    }
-
-    /// As for a screen file, for any video file; `source` is the screen's or the camera's name.
+    /// time on the shared clock, the time of the report when no file ended;
+    /// `source` is the screen's or the camera's name.
     init<File>(reason: VideoStreamEnd?, end: VideoFileEnd<File>?, source: String, at now: Int64) {
         let word = File.sourceWord
         let reasonError: ErrorDetail? = switch reason {
@@ -69,14 +65,6 @@ struct CaptureEndReports {
     /// end of capture `captureNumber` unless it was told; the report to
     /// tell, if any: its problem for the person, told by its event when it
     /// has one (D65).
-    mutating func record(
-        captureNumber: Int, reason: VideoStreamEnd?, end: VideoFileEnd<RecordingManifest.ScreenFile>?, screen: String, at now: Int64,
-        into manifest: inout RecordingManifest
-    ) -> FileEndReport? {
-        record(captureNumber: captureNumber, reason: reason, end: end, source: screen, at: now, into: &manifest)
-    }
-
-    /// As for a screen file, for any video file.
     mutating func record<File>(
         captureNumber: Int, reason: VideoStreamEnd?, end: VideoFileEnd<File>?, source: String, at now: Int64,
         into manifest: inout RecordingManifest

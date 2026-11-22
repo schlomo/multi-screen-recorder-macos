@@ -14,7 +14,8 @@ import Testing
         audioInputs: [AudioInputInfo] = builtInMicrophoneOnly,
         audioInputsError: DeviceReadError? = nil,
         outputFolder: OutputFolderProbe = .usable(.bytes(100_000_000_000)),
-        cameras: [CameraInfo] = []
+        cameras: [CameraInfo] = [],
+        cameraGranted: Bool = true
     ) -> ReadyCheckFacts {
         ReadyCheckFacts(
             screenRecording: screenRecording,
@@ -22,7 +23,7 @@ import Testing
             screens: screens ?? .success(fullHDScreens),
             audioInputs: audioInputsError.map { .failure($0) } ?? .success(audioInputs),
             outputFolder: outputFolder,
-            cameraGranted: cameras.isEmpty ? nil : true,
+            cameraGranted: cameras.isEmpty ? nil : cameraGranted,
             cameras: cameras
         )
     }
@@ -54,6 +55,21 @@ import Testing
 
     @Test func theDesignShowsTheExample() throws {
         #expect(try repositoryFile("docs/design/recorder.md").contains("```\n\(Self.designExample)```\n"))
+    }
+
+    /// A denied Camera permission fails the check, with the fix in System Settings or no camera (D74).
+    @Test func aMissingCameraPermissionFailsWithItsFix() throws {
+        let result = ReadyCheck.evaluate(facts(cameras: DesignExample.cameras, cameraGranted: false), settings: .manual)
+        #expect(!result.isReady)
+        let item = try #require(result.items.first { $0.title == "Camera permission" })
+        #expect(!item.passed)
+        #expect(item.fix == "allow it in System Settings › Privacy & Security › Camera, then " + ReadyCheck.restartNote
+            + ReadyCheck.terminalNote + " Or record no camera: turn off Auto and move the Camera mode slider to None"
+            + " (--camera-mode none).")
+        var noCamera = Settings.manual
+        noCamera.cameraMode = .none
+        #expect(!ReadyCheck.evaluate(facts(cameras: DesignExample.cameras, cameraGranted: false), settings: noCamera)
+            .items.contains { $0.title == "Camera permission" })
     }
 
     /// A long fix wraps at 80 columns and keeps its indent, under the text after "Fix: ".

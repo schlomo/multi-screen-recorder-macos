@@ -26,7 +26,7 @@
         "metadata": {
           "Resolve_OTIO": {
             "Keywords": [],
-            "Note": "Multi Screen Recorder, recording 2026-11-20 12:36:09 to 12:38:18 (2m09s).\nSet the timeline resolution to 3440 x 1440 (the largest screen): Timeline > Timeline Settings.\nTracks: one per screen, one per audio channel; the channels of one input are a linked group.\nMarkers: blue = screen change, green = audio and other changes.\nProblems: none."
+            "Note": "Multi Screen Recorder, recording 2026-11-20 12:36:09 to 12:38:18 (2m09s).\nSet the timeline resolution to 3440 x 1440 (the largest video file): Timeline > Timeline Settings.\nTracks: one per screen, one per audio channel; the channels of one input are a linked group.\nMarkers: blue = screen change, green = audio and other changes.\nProblems: none."
           }
         },
         "marked_range": {

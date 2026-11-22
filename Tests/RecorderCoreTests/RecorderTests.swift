@@ -308,6 +308,7 @@ extension GlobalRecordingLog {
             recorder.didWake()
             try await wait("the audio input's restart") { sources.count == 2 }
             #expect(observer.problems.map(\.problem.problem) == ["The screens cannot be read"])
+            #expect(try manifestOnDisk().events.map(\.event) == [.sleep, .wake])
             _ = await stop()
         }
 
@@ -368,6 +369,37 @@ extension GlobalRecordingLog {
             let summary = await stop()
             #expect(summary.manifest.result == .problems)
             #expect(summary.manifest.cameraFiles.map(\.state) == [.finalized])
+        }
+
+        @Test func stopFinalizesTheCameraFileItRecords() async throws {
+            cameras.connected.withLock { $0 = [Self.camera] }
+            try start(cameraMode: .real)
+            let camera = try #require(cameras.last)
+            try await sendFrames(camera, until: "the camera file") { (try? manifestOnDisk().cameraFiles.count) == 1 }
+            let summary = await stop()
+            #expect(camera.isStopped)
+            #expect(summary.manifest.cameraFiles.map(\.state) == [.finalized])
+            #expect(summary.manifest.cameraFiles.first?.end != nil)
+            #expect(summary.manifest.result == .ok)
+        }
+
+        @Test func atSleepTheCameraFileEndsAndAtWakeANewOneStarts() async throws {
+            cameras.connected.withLock { $0 = [Self.camera] }
+            try start(cameraMode: .real)
+            let first = try #require(cameras.last)
+            try await sendFrames(first, until: "the camera file") { (try? manifestOnDisk().cameraFiles.count) == 1 }
+            recorder.willSleep()
+            try await wait("the file's end at sleep") { (try? manifestOnDisk().cameraFiles.first?.state) == .finalized }
+            #expect(first.isStopped)
+            recorder.didWake()
+            try await wait("the camera's start after the settle time") { cameras.opened.withLock { $0.count } == 2 }
+            let second = try #require(cameras.last)
+            try await sendFrames(second, until: "the second camera file") { (try? manifestOnDisk().cameraFiles.count) == 2 }
+            let summary = await stop()
+            #expect(summary.manifest.events.map(\.event) == [.sleep, .wake])
+            #expect(summary.manifest.cameraFiles.map(\.state) == [.finalized, .finalized])
+            #expect(Set(summary.manifest.cameraFiles.map(\.name)).count == 2)
+            #expect(summary.manifest.result == .ok)
         }
 
         /// Limits short enough for a test.

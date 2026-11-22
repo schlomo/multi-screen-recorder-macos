@@ -466,6 +466,7 @@ public final class Recorder {
             return
         }
         guard let screens = readScreens() else {
+            apply(tracker.wakeUnread(at: context.now()))
             // The audio's wake does not depend on the screens, only the system audio's main screen does.
             applyAudio(audioTracker.wake(readAudioInputs() ?? [], at: context.now()))
             return

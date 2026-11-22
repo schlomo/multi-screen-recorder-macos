@@ -278,6 +278,21 @@ import Testing
         #expect(numbers(screens.due(at: 3601 * second)) == [1, 2])
     }
 
+    /// A wake whose screens cannot be read is told; the next reading starts the screens.
+    @Test func aWakeWithoutAReadingStartsTheScreensAtTheNextReading() {
+        var screens = tracker()
+        _ = screens.begin([Self.builtIn, Self.lg], at: 0)
+        _ = screens.sleep(at: 10 * second)
+        let awake = screens.wakeUnread(at: 3600 * second)
+        #expect(awake.events.map(\.event) == [.wake])
+        #expect(awake.actions.isEmpty)
+        #expect(screens.due(at: 3700 * second).actions.isEmpty)
+        #expect(screens.nextDueTime() == nil)
+        #expect(screens.observe([Self.builtIn, Self.lg], at: 3800 * second).events.isEmpty)
+        #expect(screens.due(at: 3800 * second).actions.isEmpty)
+        #expect(numbers(screens.due(at: 3801 * second)) == [1, 2])
+    }
+
     @Test func aStreamEndAfterItsFileWasStoppedChangesNothing() {
         var screens = tracker()
         _ = screens.begin([Self.builtIn], at: 0)

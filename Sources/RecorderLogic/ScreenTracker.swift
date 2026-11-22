@@ -74,6 +74,8 @@ public struct ScreenTracker: Sendable {
     private var nextNumber = 1
     private var mainUUID: String?
     private var isAsleep = false
+    /// Woken without a reading: nothing starts before the next one.
+    private var needsReading = false
     /// The newest change of any screen: the screen check does not count
     /// failing frames within the settle time after it.
     public private(set) var lastScreenChange: Int64?
@@ -164,13 +166,20 @@ public struct ScreenTracker: Sendable {
             if mainUUID != nil { step.events.append(event(.mainScreenChanged, newMain, at: now)) }
             mainUUID = newMain
         }
+        if needsReading {
+            needsReading = false
+            for uuid in screens.keys where screens[uuid]?.reading != nil {
+                screens[uuid]?.changedAt = now
+            }
+            lastScreenChange = now
+        }
         return step
     }
 
     /// What is due at `now`: screens unchanged for the settle time start,
     /// and one whose frame size changed ends its file and starts a new one.
     public mutating func due(at now: Int64) -> Step {
-        guard !isAsleep else { return Step() }
+        guard !isAsleep, !needsReading else { return Step() }
         var step = Step()
         let settled = screens.filter { _, tracked in
             guard let reading = tracked.reading, !reading.isMirroring else { return false }
@@ -207,7 +216,7 @@ public struct ScreenTracker: Sendable {
 
     /// The next time `due(at:)` may have something to do, if any.
     public func nextDueTime() -> Int64? {
-        guard !isAsleep else { return nil }
+        guard !isAsleep, !needsReading else { return nil }
         return screens.values.compactMap { tracked -> Int64? in
             guard let reading = tracked.reading, !reading.isMirroring else { return nil }
             let settled = tracked.changedAt + settleTime.nanoseconds
@@ -287,6 +296,14 @@ public struct ScreenTracker: Sendable {
         }
         lastScreenChange = now
         return step
+    }
+
+    /// At wake when the screens cannot be read: awake and told, and the
+    /// screens start after the settle time from the next reading (`observe`).
+    public mutating func wakeUnread(at now: Int64) -> Step {
+        isAsleep = false
+        needsReading = true
+        return Step(events: [RecordingEvent(at: now, event: .wake)])
     }
 
     /// At Stop every screen file ends.

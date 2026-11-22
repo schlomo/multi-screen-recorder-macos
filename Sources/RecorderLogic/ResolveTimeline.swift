@@ -264,10 +264,10 @@ public enum ResolveTimeline {
 
         var note = [recordingLine(started: started, ended: ended)]
         var title = "Recording \(name)"
-        if let largest = manifest.files.max(by: { area($0.frameSize) < area($1.frameSize) }) {
-            let size = "\(largest.frameSize[0]) x \(largest.frameSize[1])"
+        if let largest = (manifest.files.map(\.frameSize) + manifest.cameraFiles.map(\.frameSize)).max(by: { area($0) < area($1) }) {
+            let size = "\(largest[0]) x \(largest[1])"
             title += ": set resolution \(size)"
-            note.append("Set the timeline resolution to \(size) (the largest screen): Timeline > Timeline Settings.")
+            note.append("Set the timeline resolution to \(size) (the largest video file): Timeline > Timeline Settings.")
         }
         note.append(manifest.cameraFiles.isEmpty
             ? "Tracks: one per screen, one per audio channel; the channels of one input are a linked group."

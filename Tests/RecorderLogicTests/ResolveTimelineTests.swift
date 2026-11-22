@@ -142,7 +142,7 @@ private extension Dictionary where Key == String, Value == Any {
         #expect(info.frames == (0, 1))
         #expect(info.note == """
             Multi Screen Recorder, recording 2026-11-20 10:00:00 to 10:02:10 (2m10s).
-            Set the timeline resolution to 3440 x 1440 (the largest screen): Timeline > Timeline Settings.
+            Set the timeline resolution to 3440 x 1440 (the largest video file): Timeline > Timeline Settings.
             Tracks: one per screen, one per audio channel; the channels of one input are a linked group.
             Markers: blue = screen change, green = audio and other changes.
             Problems:
@@ -187,6 +187,18 @@ private extension Dictionary where Key == String, Value == Any {
         ]))
         #expect(result.trackNames == ["Screen 1 - A", "Camera 1 - FaceTime HD Camera", "Audio 1 - M"])
         #expect(result.tracks.map { $0["kind"] as! String } == ["Video", "Video", "Audio"])
+    }
+
+    /// The resolution to set is the largest video file's, a camera's too.
+    @Test func theResolutionToSetIsTheLargestVideoFiles() throws {
+        let camera = """
+            {"name": "2026-11-20 10.00.01 Camera 1 - BRIO.mov", "camera": "BRIO",
+             "cameraUniqueID": "c", "frameSize": [3840, 2160], "start": 1, "end": 9, "timecode": "10:00:01:00",
+             "state": "finalized", "guideTracks": [], "framesRepeatedForLateness": 0}
+            """
+        let result = try timeline(manifest(files: [screen("10.00.00", "Screen 1 - A", end: 8), camera]))
+        #expect(result.stack.markers[0].note.contains(
+            "Set the timeline resolution to 3840 x 2160 (the largest video file): Timeline > Timeline Settings."))
     }
 
     @Test func v1IsChosenAmongTheScreensThatStartFirstNotAmongAllFiles() throws {

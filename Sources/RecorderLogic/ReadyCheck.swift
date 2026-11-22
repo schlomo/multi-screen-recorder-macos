@@ -193,7 +193,7 @@ public enum ReadyCheck {
         ReadyCheckItem(
             title: cameraTitle, passed: granted,
             fix: granted ? nil : "allow it in System Settings › Privacy & Security › Camera, then " + restartNote + terminalNote
-                + " Or record no camera (--camera-mode none).")
+                + " Or record no camera: turn off Auto and move the Camera mode slider to None (--camera-mode none).")
     }
 
     private static func screensItem(_ screens: Result<[ScreenInfo], DeviceReadError>) -> ReadyCheckItem {

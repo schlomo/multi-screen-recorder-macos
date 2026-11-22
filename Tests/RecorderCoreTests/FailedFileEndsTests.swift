@@ -75,7 +75,7 @@ private func audioEnd(state: RecordingManifest.State) -> AudioFileEnd {
 
     @Test func theEventAndProblemStayAtTheFailureAndAProblemTellsWhatIsLost() async {
         let end = await screenEnd(state: .notFinalized).readingItsFile(in: folder, with: Reader(result: .success(4.667)))
-        let report = FileEndReport(reason: nil, end: end, screen: "LG", at: 9_000_000_000)
+        let report = FileEndReport(reason: nil, end: end, source: "LG", at: 9_000_000_000)
         #expect(report.event?.at == 6.933)
         #expect(report.problem?.at == 6.933)
         #expect(report.lostProblem?.problem == "Screen file s.mov")
@@ -83,7 +83,7 @@ private func audioEnd(state: RecordingManifest.State) -> AudioFileEnd {
         var manifest = RecordingManifest(
             app: "x", started: Date(), timeZone: .gmt, settings: .defaults)
         var reports = CaptureEndReports()
-        _ = reports.record(captureNumber: 1, reason: nil, end: end, screen: "LG", at: 9_000_000_000, into: &manifest)
+        _ = reports.record(captureNumber: 1, reason: nil, end: end, source: "LG", at: 9_000_000_000, into: &manifest)
         #expect(manifest.files.first?.end == 5.667)
         #expect(manifest.problems.count == 2)
     }
