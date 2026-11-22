@@ -25,8 +25,10 @@ Still open from D34: what AGC does and whether it is on in auto mode;
 ## In flight
 
 - Branch `cameras`, one PR (the owner, 2026-11-22):
-  - Item 12, cameras: design signed off as text on 2026-11-22, except
-    which audio tracks a camera's file carries (asked).
+  - Item 12, cameras: design signed off as text on 2026-11-22, with
+    the audio tracks, settled the same day: the same two guide tracks
+    as every screen file ("I agree with identical guide tracks on
+    every video"); a camera microphone track is not built.
   - Item 36: `vm_start` in `scripts/end-to-end-vm/lib.sh` waits on a
     real deadline (`SECONDS`), as `vm_wait_for_login` does since PR #26.
   - Item 37 (signed off 2026-11-22): the driver's virtual screens are
@@ -277,9 +279,13 @@ Still open from D34: what AGC does and whether it is on in auto mode;
    longer here: auto mode brings it (D34).
 9. **v1 gate:** 1.0 means "record everything reliably" (the owner,
    2026-11-22): every screen, camera and audio source, surviving
-   laptop sleep and screen changes. The 1.0 work, in the architect's
-   order: item 12 (cameras, in flight), item 7, item 25, item 29,
-   then these acceptance tests on the owner's Mac (M3 Pro, macOS 26):
+   laptop sleep and screen changes. The 1.0 work, in order (the
+   owner agreed 2026-11-22: "I agree with your v1.0 selection including
+   the addons"): item 12 (cameras, in flight), item 4 (simplification,
+   before item 7 touches the same code), item 7 with a sleep and wake
+   scenario in the end-to-end tests if the VM can sleep and wake
+   [CONJECTURE], item 25, item 29, then these acceptance tests on the
+   owner's Mac (M3 Pro, macOS 26):
    - Timing by content: record a full-screen clock showing
      milliseconds; across a still period of at least 60 s followed by a
      change, each sampled frame shows the time of its timestamp within
@@ -363,7 +369,8 @@ Still open from D34: what AGC does and whether it is on in auto mode;
    one row per camera in the status window; unit tests with a stand-in
    camera, the real check on the owner's Mac; a decisions entry
    superseding D1's "out of scope: camera capture". Taking the H.264
-   stream as-is is deferred. Open: the camera file's audio tracks.
+   stream as-is is deferred. Audio: the two guide tracks, as a screen
+   file (the owner, 2026-11-22).
 13. **Presentation: the window and the terminal output** (the owner,
    2026-11-16: "if running in a terminal (try) then show the running
    status as persistent last line, recording time, CPU, recording size
