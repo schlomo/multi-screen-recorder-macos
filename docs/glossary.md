@@ -128,7 +128,8 @@ line below its table.
 
 The `.ips` file macOS writes when `msr` quits unexpectedly, in
 `~/Library/Logs/DiagnosticReports`; the app offers to report it as a
-GitHub issue (D40).
+GitHub issue (D40) if it is the app's own, its `msr` inside a bundle
+named `Multi Screen Recorder.app` (D70).
 Its text copy is the `.txt` copy the app makes in `Crash Reports` beside
 the state file, because GitHub refuses `.ips` attachments.
 

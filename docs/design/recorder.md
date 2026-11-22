@@ -812,10 +812,14 @@ checked, reported or rewritten at the next start (D47).
   opens in the browser (D15, D26). The credit to the former upstream is
   in the README.
 - **Crash report offer:** when the app starts, after the window is
-  shown, it looks for the newest crash report of `msr`
+  shown, it looks for the newest crash report of the app
   (`~/Library/Logs/DiagnosticReports/msr-YYYY-MM-DD-HHMMSS.ips`, top
-  level only). If its name is greater than `lastOfferedCrashReport` in
-  the state file (nothing there: any crash report), a dialog "Multi
+  level only) whose name is greater than `lastOfferedCrashReport` in
+  the state file (nothing there: any crash report) and whose `procPath`,
+  the path of the program that crashed, is inside a bundle named
+  `Multi Screen Recorder.app` (D70); a report of any other `msr` (a test
+  run, a stray `msr`, `msr` run from `.build/`) is skipped silently, and
+  is read again at the next start. If there is one, a dialog "Multi
   Screen Recorder quit unexpectedly" offers [Report on GitHub] [Not
   Now], and the name is stored whatever the answer, so a crash is
   offered once; a crash whose name sorts before the last offered one is
@@ -837,7 +841,8 @@ checked, reported or rewritten at the next start (D47).
   for this offer and the problem report offer below; one that cannot be
   read or decoded shows one alert "Cannot offer to report a crash or a
   recording's problems" with the error, and nothing is offered that
-  start. A crash report folder that cannot be read, or a failed write,
+  start. A crash report folder or a crash report that cannot be read
+  (no `procPath` in it), or a failed write,
   shows an alert "Cannot offer the crash report" with the error; a failed text copy (the dialog was
   already answered) shows "Cannot copy the crash report" with the
   error; a browser that cannot be opened shows
