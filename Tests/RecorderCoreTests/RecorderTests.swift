@@ -95,8 +95,8 @@ extension GlobalRecordingLog {
             let format: CameraFormat?
             private let state = Mutex<(
                 queue: DispatchQueue?, deliver: (@Sendable (CMSampleBuffer) -> Void)?,
-                ended: (@Sendable (VideoStreamEnd) -> Void)?, stopped: Bool
-            )>((nil, nil, nil, false))
+                ended: (@Sendable (VideoStreamEnd) -> Void)?, formatTakenOver: (@Sendable () -> Void)?, stopped: Bool
+            )>((nil, nil, nil, nil, false))
 
             init(frameSize: FrameSize, format: CameraFormat?) {
                 self.frameSize = frameSize
@@ -107,9 +107,14 @@ extension GlobalRecordingLog {
 
             func start(
                 queue: DispatchQueue, deliver: @escaping @Sendable (CMSampleBuffer) -> Void,
-                ended: @escaping @Sendable (VideoStreamEnd) -> Void
+                ended: @escaping @Sendable (VideoStreamEnd) -> Void, formatTakenOver: @escaping @Sendable () -> Void
             ) {
-                state.withLock { $0 = (queue, deliver, ended, false) }
+                state.withLock { $0 = (queue, deliver, ended, formatTakenOver, false) }
+            }
+
+            /// Another app changes the open camera's format, as `CameraSource` sees it.
+            func formatChangedByAnotherApp() {
+                state.withLock { $0.formatTakenOver }?()
             }
 
             func stop() async {
@@ -456,20 +461,34 @@ extension GlobalRecordingLog {
             #expect(summary.manifest.result == .problems)
         }
 
-        /// A camera another app uses is opened without changing its format;
-        /// that app changing the frame size makes a new camera file (D74).
-        @Test func aCameraAnotherAppUsesKeepsItsFormatAndItsFrameSizeChangeStartsANewFile() async throws {
+        /// A camera running elsewhere at the start is opened without changing its format (D74).
+        @Test func aCameraRunningElsewhereKeepsItsFormat() async throws {
             var inUse = Self.camera
-            inUse.isInUseByAnotherApplication = true
+            inUse.isRunningElsewhere = true
             inUse.activeFormat = Self.camera.formats.first
             cameras.connected.withLock { $0 = [inUse] }
             try start(cameraMode: .real)
+            let camera = try #require(cameras.last)
+            #expect(camera.format == nil)
+            #expect(camera.frameSize == FrameSize(width: 320, height: 180))
+            _ = await stop()
+        }
+
+        /// Another app changing the open camera's format, as the source sees
+        /// it, makes one new camera file after the settle time at the format
+        /// the camera then runs in, never setting it back (D74).
+        @Test func aFormatChangeByAnotherAppStartsANewFileKeepingItsFormat() async throws {
+            cameras.connected.withLock { $0 = [Self.camera] }
+            try start(cameraMode: .real)
             let first = try #require(cameras.last)
-            #expect(first.format == nil)
+            #expect(first.format != nil)
             try await sendFrames(first, until: "the camera file") { (try? manifestOnDisk().cameraFiles.count) == 1 }
-            inUse.activeFormat = CameraFormat(size: FrameSize(width: 160, height: 90), maxFramesPerSecond: 30)
-            cameras.connected.withLock { $0 = [inUse] }
-            recorder.camerasChanged()
+            var takenOver = Self.camera
+            takenOver.isRunningElsewhere = true
+            takenOver.activeFormat = CameraFormat(size: FrameSize(width: 160, height: 90), maxFramesPerSecond: 30)
+            cameras.connected.withLock { $0 = [takenOver] }
+            first.formatChangedByAnotherApp()
+            first.formatChangedByAnotherApp()
             try await wait("the second camera") { cameras.opened.withLock { $0.count } == 2 }
             let second = try #require(cameras.last)
             #expect(second.format == nil)
@@ -477,6 +496,7 @@ extension GlobalRecordingLog {
             try await sendFrames(second, until: "the second camera file") { (try? manifestOnDisk().cameraFiles.count) == 2 }
             #expect(first.isStopped)
             let summary = await stop()
+            #expect(cameras.opened.withLock { $0.count } == 2)
             #expect(summary.manifest.events.map(\.event) == [.cameraFrameSizeChanged])
             #expect(summary.manifest.events.first?.to == [160, 90])
             #expect(summary.manifest.cameraFiles.map(\.frameSize) == [[320, 180], [160, 90]])

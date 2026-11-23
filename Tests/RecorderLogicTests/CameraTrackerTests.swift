@@ -461,10 +461,10 @@ import Testing
     }
 
     /// A camera another app uses keeps its active format, fitted into the camera's box (D74).
-    @Test func aCameraAnotherAppUsesIsRecordedInItsActiveFormatUnchanged() {
+    @Test func aCameraRunningElsewhereIsRecordedInItsActiveFormatUnchanged() {
         var cameras = tracker()
         var inUse = Self.usb
-        inUse.isInUseByAnotherApplication = true
+        inUse.isRunningElsewhere = true
         inUse.activeFormat = CameraFormat(size: FrameSize(width: 640, height: 480), maxFramesPerSecond: 30)
         let step = cameras.begin([inUse], at: 0)
         #expect(step.actions == [.start(
@@ -478,9 +478,10 @@ import Testing
         var cameras = tracker()
         _ = cameras.begin([Self.usb], at: 0)
         var takenOver = Self.usb
-        takenOver.isInUseByAnotherApplication = true
+        takenOver.isRunningElsewhere = true
         takenOver.activeFormat = CameraFormat(size: FrameSize(width: 1280, height: 720), maxFramesPerSecond: 30)
         #expect(cameras.observe([takenOver], at: 5 * second) == CameraTracker.Step())
+        cameras.formatTakenOver("B", at: 5 * second)
         #expect(cameras.nextDueTime() == 6 * second)
         let step = cameras.due(at: 6 * second)
         var changed = RecordingEvent(at: 6 * second, event: .cameraFrameSizeChanged, camera: "Logitech BRIO")
@@ -501,9 +502,10 @@ import Testing
         var cameras = tracker()
         _ = cameras.begin([Self.usb], at: 0)
         var takenOver = Self.usb
-        takenOver.isInUseByAnotherApplication = true
+        takenOver.isRunningElsewhere = true
         takenOver.activeFormat = CameraFormat(size: FrameSize(width: 640, height: 480), maxFramesPerSecond: 30)
         _ = cameras.observe([takenOver], at: 5 * second)
+        cameras.formatTakenOver("B", at: 5 * second)
         takenOver.activeFormat = CameraFormat(size: FrameSize(width: 1280, height: 720), maxFramesPerSecond: 30)
         _ = cameras.observe([takenOver], at: 5 * second + second / 2)
         #expect(cameras.due(at: 6 * second) == CameraTracker.Step())
@@ -513,17 +515,22 @@ import Testing
         #expect(cameras.due(at: 8 * second) == CameraTracker.Step())
     }
 
-    /// Our own format, not yet set when read, and a format of the same frame size change nothing.
-    @Test func anActiveFormatOfNoOtherAppOrOfTheSameFrameSizeChangesNothing() {
+    /// A format change the source did not report as another app's (our own open's, read
+    /// while it configures), running elsewhere during the recording (which counts the
+    /// recording itself), and a takeover at the same frame size change nothing.
+    @Test func onlyAReportedTakeoverAtAnotherFrameSizeMakesANewFile() {
         var cameras = tracker()
         _ = cameras.begin([Self.usb], at: 0)
-        var notYetOpened = Self.usb
-        notYetOpened.activeFormat = CameraFormat(size: FrameSize(width: 640, height: 480), maxFramesPerSecond: 30)
-        #expect(cameras.observe([notYetOpened], at: 5 * second) == CameraTracker.Step())
-        var sameSize = Self.usb
-        sameSize.isInUseByAnotherApplication = true
+        var running = Self.usb
+        running.isRunningElsewhere = true
+        running.activeFormat = CameraFormat(size: FrameSize(width: 640, height: 480), maxFramesPerSecond: 30)
+        #expect(cameras.observe([running], at: 5 * second) == CameraTracker.Step())
+        #expect(cameras.due(at: 10 * second) == CameraTracker.Step())
+        var sameSize = running
         sameSize.activeFormat = CameraFormat(size: FrameSize(width: 3840, height: 2160), maxFramesPerSecond: 30)
-        #expect(cameras.observe([sameSize], at: 6 * second) == CameraTracker.Step())
+        _ = cameras.observe([sameSize], at: 11 * second)
+        cameras.formatTakenOver("B", at: 11 * second)
+        #expect(cameras.due(at: 13 * second) == CameraTracker.Step())
     }
 
     @Test func noCameraNoActionNoEvent() {

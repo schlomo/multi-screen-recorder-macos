@@ -213,12 +213,14 @@ public struct CameraInfo: Equatable, Sendable {
     public var isSuspended: Bool
     /// The format the camera runs in now, nil where it cannot be read.
     public var activeFormat: CameraFormat?
-    /// Another app uses the camera: the recording keeps its active format.
-    public var isInUseByAnotherApplication: Bool
+    /// The camera runs, as CoreMediaIO says (`kCMIODevicePropertyDeviceIsRunningSomewhere`):
+    /// read before the recording opens it, another app uses it, and the recording keeps
+    /// its active format. AVFoundation's `isInUseByAnotherApplication` misses a browser's use (D74).
+    public var isRunningElsewhere: Bool
 
     public init(
         uniqueID: String, name: String, isDefault: Bool, isVirtual: Bool, isContinuity: Bool = false, formats: [CameraFormat],
-        isSuspended: Bool = false, activeFormat: CameraFormat? = nil, isInUseByAnotherApplication: Bool = false
+        isSuspended: Bool = false, activeFormat: CameraFormat? = nil, isRunningElsewhere: Bool = false
     ) {
         self.uniqueID = uniqueID
         self.name = name
@@ -228,7 +230,7 @@ public struct CameraInfo: Equatable, Sendable {
         self.formats = formats
         self.isSuspended = isSuspended
         self.activeFormat = activeFormat
-        self.isInUseByAnotherApplication = isInUseByAnotherApplication
+        self.isRunningElsewhere = isRunningElsewhere
     }
 
     /// The format a recording at `resolution` records the camera in (D74).
@@ -243,7 +245,7 @@ public struct CameraInfo: Equatable, Sendable {
     /// camera with no format at that rate delivers its fastest, the largest
     /// of those. Nil for a camera that lists no format.
     public func chosenFormat(resolution: RecordingResolution, limited: Bool = true) -> CameraFormat? {
-        if isInUseByAnotherApplication, let activeFormat { return activeFormat }
+        if isRunningElsewhere, let activeFormat { return activeFormat }
         let fastEnough = formats.filter(\.deliversTheTickRate)
         guard !fastEnough.isEmpty else {
             return formats.max { ($0.maxFramesPerSecond.rounded(), $0.size.pixelCount) < ($1.maxFramesPerSecond.rounded(), $1.size.pixelCount) }

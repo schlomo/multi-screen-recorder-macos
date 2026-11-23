@@ -6,10 +6,11 @@ import RecorderLogic
 /// Where a camera capture's frames come from: the camera's
 /// `AVCaptureSession` (`CameraSource`) in a recording, a stand-in in tests.
 protocol CameraFrameSource: AnyObject, Sendable {
-    /// Starts delivering frames to `deliver` on `queue`; `ended` when it ends by itself.
+    /// Starts delivering frames to `deliver` on `queue`; `ended` when it ends
+    /// by itself; `formatTakenOver` when another app changes the camera's format.
     func start(
         queue: DispatchQueue, deliver: @escaping @Sendable (CMSampleBuffer) -> Void,
-        ended: @escaping @Sendable (VideoStreamEnd) -> Void)
+        ended: @escaping @Sendable (VideoStreamEnd) -> Void, formatTakenOver: @escaping @Sendable () -> Void)
     func stop() async
 }
 
@@ -32,6 +33,7 @@ final class CameraCapture: @unchecked Sendable {
     private let frameWatch: CameraFrameWatch
     private let onStalled: @Sendable () -> Void
     private let onStallEnded: @Sendable (_ length: Int64) -> Void
+    private let onFormatTakenOver: @Sendable () -> Void
     // Confined to `queue`.
     private var startedAt: Int64 = 0
     /// When the last frame came, on the shared clock; nil before the first.
@@ -48,6 +50,7 @@ final class CameraCapture: @unchecked Sendable {
         onFileStarted: @escaping @Sendable (RecordingManifest.CameraFile) -> Void,
         onStalled: @escaping @Sendable () -> Void,
         onStallEnded: @escaping @Sendable (_ length: Int64) -> Void,
+        onFormatTakenOver: @escaping @Sendable () -> Void,
         onEnded: @escaping @Sendable (VideoStreamEnd, VideoFileEnd<RecordingManifest.CameraFile>?) -> Void
     ) {
         self.uniqueID = uniqueID
@@ -60,6 +63,7 @@ final class CameraCapture: @unchecked Sendable {
         self.frameWatch = frameWatch
         self.onStalled = onStalled
         self.onStallEnded = onStallEnded
+        self.onFormatTakenOver = onFormatTakenOver
         queue = DispatchQueue(label: "msr.camera.\(number)", qos: .userInteractive)
         let ticker = VideoFileTicker<RecordingManifest.CameraFile>(
             captureStart: context.now(), decisionDelay: RecorderValues.cameraDecisionDelay
@@ -101,7 +105,8 @@ final class CameraCapture: @unchecked Sendable {
             ended: { [weak self] end in
                 guard let self else { return }
                 queue.async { self.feed.end(end) }
-            })
+            },
+            formatTakenOver: onFormatTakenOver)
     }
 
     /// A frame of the camera, on the queue: captured at its presentation
@@ -182,6 +187,8 @@ final class CameraSource: NSObject, CameraFrameSource, AVCaptureVideoDataOutputS
         var session: AVCaptureSession?
         var deliver: (@Sendable (CMSampleBuffer) -> Void)?
         var ended: (@Sendable (VideoStreamEnd) -> Void)?
+        var formatTakenOver: (@Sendable () -> Void)?
+        var formatWatch = ForeignFormatWatch()
         var observers: [any NSObjectProtocol] = []
         var formatObservation: NSKeyValueObservation?
         var drops = DroppedFrames()
@@ -201,11 +208,12 @@ final class CameraSource: NSObject, CameraFrameSource, AVCaptureVideoDataOutputS
 
     func start(
         queue: DispatchQueue, deliver: @escaping @Sendable (CMSampleBuffer) -> Void,
-        ended: @escaping @Sendable (VideoStreamEnd) -> Void
+        ended: @escaping @Sendable (VideoStreamEnd) -> Void, formatTakenOver: @escaping @Sendable () -> Void
     ) {
         withState {
             $0.deliver = deliver
             $0.ended = ended
+            $0.formatTakenOver = formatTakenOver
         }
         sessionQueue.async { [self] in
             do {
@@ -282,8 +290,14 @@ final class CameraSource: NSObject, CameraFrameSource, AVCaptureVideoDataOutputS
                 self?.endOnce(.captureSourceGone)
             },
         ]
-        let formatObservation = device.observe(\.activeFormat) { [uniqueID] device, _ in
-            RecorderLog.detail("camera \(uniqueID): active format changed to \(Self.formatText(device))", category: VideoFileWriter.detailCategory)
+        let formatObservation = device.observe(\.activeFormat) { [weak self, uniqueID] device, _ in
+            let foreign: (@Sendable () -> Void)? = self?.withState { state in
+                state.formatWatch.isForeign(cameraFormat(of: device.activeFormat)) ? state.formatTakenOver : nil
+            }
+            RecorderLog.detail(
+                "camera \(uniqueID): active format changed to \(Self.formatText(device))" + (foreign == nil ? "" : ", by another app"),
+                category: VideoFileWriter.detailCategory)
+            foreign?()
         }
         let proceed = withState { state -> Bool in
             guard !state.isStopped else { return false }
@@ -297,14 +311,13 @@ final class CameraSource: NSObject, CameraFrameSource, AVCaptureVideoDataOutputS
             formatObservation.invalidate()
             return
         }
-        if device.isInUseByAnotherApplication || format == nil {
-            RecorderLog.detail(
-                "camera \(uniqueID): in use by another app at the start, "
-                    + (format == nil ? "its format kept" : "its format set as it was free when read"),
-                category: VideoFileWriter.detailCategory)
+        if format == nil {
+            RecorderLog.detail("camera \(uniqueID): in use by another app at the start, its format kept", category: VideoFileWriter.detailCategory)
         }
         // A stop that comes from here on stops the session on this queue, after this.
         session.startRunning()
+        // From here on a change of the format the recording did not make is another app's.
+        withState { $0.formatWatch.opened(in: cameraFormat(of: device.activeFormat)) }
         let rate = frameDuration.map { 1 / $0.seconds }
         RecorderLog.detail(
             "camera \(uniqueID): active format \(Self.formatText(device))"
@@ -368,6 +381,7 @@ final class CameraSource: NSObject, CameraFrameSource, AVCaptureVideoDataOutputS
             state.isStopped = true
             state.deliver = nil
             state.ended = nil
+            state.formatTakenOver = nil
             state.formatObservation?.invalidate()
             defer {
                 state.session = nil

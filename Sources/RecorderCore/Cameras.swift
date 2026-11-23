@@ -1,4 +1,5 @@
 import AVFoundation
+import CoreMediaIO
 import Foundation
 import RecorderLogic
 
@@ -14,6 +15,7 @@ private func cameraDevices() -> [AVCaptureDevice] {
 /// `AVCaptureDevice.default(for: .video)`.
 public func currentCameras() -> [CameraInfo] {
     let defaultID = AVCaptureDevice.default(for: .video)?.uniqueID
+    let running = camerasRunningSomewhere()
     return cameraDevices().map { device in
         CameraInfo(
             uniqueID: device.uniqueID, name: device.localizedName, isDefault: device.uniqueID == defaultID,
@@ -21,8 +23,40 @@ public func currentCameras() -> [CameraInfo] {
             isContinuity: cameraIsContinuity(deviceType: device.deviceType, transportType: device.transportType),
             formats: CameraFormat.preferred(device.formats.map(cameraFormat)),
             isSuspended: device.isSuspended, activeFormat: cameraFormat(of: device.activeFormat),
-            isInUseByAnotherApplication: device.isInUseByAnotherApplication)
+            isRunningElsewhere: running.contains(device.uniqueID))
     }
+}
+
+/// The unique IDs of the cameras CoreMediaIO says run in any process
+/// (`kCMIODevicePropertyDeviceIsRunningSomewhere`), matched by the CMIO
+/// device's UID, which is the AVFoundation device's unique ID. A device
+/// whose properties cannot be read counts as not running.
+func camerasRunningSomewhere() -> Set<String> {
+    var devices = address(kCMIOHardwarePropertyDevices)
+    var size: UInt32 = 0
+    guard CMIOObjectGetPropertyDataSize(CMIOObjectID(kCMIOObjectSystemObject), &devices, 0, nil, &size) == noErr else { return [] }
+    var ids = [CMIOObjectID](repeating: 0, count: Int(size) / MemoryLayout<CMIOObjectID>.size)
+    var used: UInt32 = 0
+    guard CMIOObjectGetPropertyData(CMIOObjectID(kCMIOObjectSystemObject), &devices, 0, nil, size, &used, &ids) == noErr else { return [] }
+    return Set(ids.compactMap { id -> String? in
+        var running = address(kCMIODevicePropertyDeviceIsRunningSomewhere)
+        var isRunning: UInt32 = 0
+        var runningSize = UInt32(MemoryLayout<UInt32>.size)
+        guard CMIOObjectGetPropertyData(id, &running, 0, nil, runningSize, &runningSize, &isRunning) == noErr, isRunning != 0 else {
+            return nil
+        }
+        var uidAddress = address(kCMIODevicePropertyDeviceUID)
+        var uid: Unmanaged<CFString>?
+        var uidSize = UInt32(MemoryLayout<Unmanaged<CFString>?>.size)
+        guard CMIOObjectGetPropertyData(id, &uidAddress, 0, nil, uidSize, &uidSize, &uid) == noErr else { return nil }
+        return uid?.takeRetainedValue() as String?
+    })
+}
+
+private func address(_ selector: Int) -> CMIOObjectPropertyAddress {
+    CMIOObjectPropertyAddress(
+        mSelector: CMIOObjectPropertySelector(selector), mScope: CMIOObjectPropertyScope(kCMIOObjectPropertyScopeGlobal),
+        mElement: CMIOObjectPropertyElement(kCMIOObjectPropertyElementMain))
 }
 
 /// A device format as the recording knows it: its size and its highest frame rate.

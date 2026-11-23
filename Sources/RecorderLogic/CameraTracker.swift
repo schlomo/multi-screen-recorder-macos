@@ -61,6 +61,9 @@ public struct CameraTracker: Sendable {
         var mayLoseCaptureSource = true
         /// While its recording stream delivers no frames, but has not failed.
         var isStalled = false
+        /// Another app changed its format during the recording: from then on
+        /// the recording keeps the camera's format, never setting it back.
+        var isTakenOver = false
     }
 
     public let settings: Settings
@@ -148,9 +151,8 @@ public struct CameraTracker: Sendable {
                     cameras[uniqueID]?.phase = .idle
                 }
             }
-            if let reading, let before = tracked.reading,
-               reading.activeFormat != before.activeFormat || reading.isInUseByAnotherApplication != before.isInUseByAnotherApplication {
-                // Another app changing the format settles as a screen's change does (`due`).
+            if tracked.isTakenOver, let reading, let before = tracked.reading, reading.activeFormat != before.activeFormat {
+                // Another app changing the format again settles as a screen's change does (`due`).
                 cameras[uniqueID]?.changedAt = now
             }
             cameras[uniqueID]?.reading = reading
@@ -213,10 +215,19 @@ public struct CameraTracker: Sendable {
     /// The frame size of a recording camera whose format another app
     /// changed to one of another recorded frame size, if so.
     private func frameSizeTakenOver(_ tracked: Tracked) -> FrameSize? {
-        guard case .recording(let current) = tracked.phase, let reading = tracked.reading, reading.isInUseByAnotherApplication,
-              let active = reading.activeFormat else { return nil }
+        guard case .recording(let current) = tracked.phase, tracked.isTakenOver, let active = tracked.reading?.activeFormat
+        else { return nil }
         let frameSize = settings.effectiveResolution.cameraFrameSize(for: active.size, limited: settings.limitCameras)
         return frameSize == current ? nil : frameSize
+    }
+
+    /// The recording stream of `uniqueID` saw another app change the
+    /// camera's format (`ForeignFormatWatch`): after the settle time, at a
+    /// changed frame size, a new file at the format the camera runs in (`due`).
+    public mutating func formatTakenOver(_ uniqueID: String, at now: Int64) {
+        guard case .recording = cameras[uniqueID]?.phase else { return }
+        cameras[uniqueID]?.isTakenOver = true
+        cameras[uniqueID]?.changedAt = now
     }
 
     /// A camera file of `uniqueID` started: its restart delay starts over.
@@ -334,13 +345,15 @@ public struct CameraTracker: Sendable {
             nextNumber += 1
         }
         // `records` holds for a wanted camera, so it has a format, and the resolution records video.
-        let format = reading.chosenFormat(resolution: settings.effectiveResolution, limited: settings.limitCameras)!
+        let keepsFormat = reading.isRunningElsewhere || tracked.isTakenOver
+        let format = (keepsFormat ? reading.activeFormat : nil)
+            ?? reading.chosenFormat(resolution: settings.effectiveResolution, limited: settings.limitCameras)!
         let frameSize = settings.effectiveResolution.cameraFrameSize(for: format.size, limited: settings.limitCameras)
         tracked.phase = .recording(frameSize: frameSize)
         tracked.isStalled = false
         cameras[uniqueID] = tracked
         return .start(
-            uniqueID: uniqueID, format: format, setsFormat: !reading.isInUseByAnotherApplication, frameSize: frameSize,
+            uniqueID: uniqueID, format: format, setsFormat: !keepsFormat, frameSize: frameSize,
             number: tracked.number!, name: tracked.name, isContinuity: reading.isContinuity)
     }
 

@@ -1562,20 +1562,28 @@ no audio of the camera's own.
   MJPEG). AVFoundation scales the frames to the camera file's frame
   size. A frame without a decoded picture ends the capture as a failing
   stream.
-- **Another app.** A camera another app uses
-  (`isInUseByAnotherApplication`) when the recorder reads the cameras
-  before its start is opened without changing its format or frame
-  duration: it records the format the camera runs in, fitted into the
-  camera's box like any format (the owner, 2026-11-23: "accept another
-  app taking control"). Otherwise the recorder sets its own format, as
-  above. When another app uses the camera and changes its format so that
-  the recorded frame size changes, the camera file ends and a new one
-  starts at the new size, with the event `camera frame size changed`
-  (from and to), after the settle time as a screen's frame size change
-  makes a new screen file (D30), so an app changing it several times in
-  a row gives one new file; the format is never set back. The recorder reads the
-  cameras again when a camera's active format or its use by another app
-  changes.
+- **Another app.** A camera another app uses when the recorder reads
+  the cameras before its start is opened without changing its format or
+  frame duration: it records the format the camera runs in, fitted into
+  the camera's box like any format (the owner, 2026-11-23: "accept
+  another app taking control"). "Another app uses it" is Core Media
+  I/O's `kCMIODevicePropertyDeviceIsRunningSomewhere`, read for the
+  device whose `kCMIODevicePropertyDeviceUID` is the camera's unique ID
+  (`CameraInfo.isRunningElsewhere`), not AVFoundation's
+  `isInUseByAnotherApplication`, which stays false for a camera a
+  browser uses (D74). Otherwise the recorder sets its own format, as
+  above. Once the recorder's own opening of a camera has finished
+  setting it up, any change of its active format the recorder did not
+  make is another app taking it over (`ForeignFormatWatch`); the
+  recorder's own format and frame duration settings never count. When
+  such a change gives another recorded frame size, the camera file ends
+  and a new one starts at the new size in the format the camera then
+  runs in, with the event `camera frame size changed` (from and to),
+  after the settle time as a screen's frame size change makes a new
+  screen file (D30), so an app changing it several times in a row gives
+  one new file; the format is never set back. The recorder reads the
+  cameras again when a camera's active format or AVFoundation's
+  `isInUseByAnotherApplication` changes.
 - **Placement.** A camera's frames arrive late more often than a
   screen's: USB cameras deliver them in bursts, seen 0.1 s to 1.5 s
   after their capture when the USB bus was overloaded (a BRIO and a DJI
@@ -1708,10 +1716,11 @@ fails on some Macs only (the hosted runner, about 2 of 7 runs, with
   as `1/30 s to 1/30 s`), with `the format allows no 30 fps, set to <n>
   fps` when it cannot run at 30 (left out when its format was kept), and
   before it `camera <unique ID>: in use by another app at the start, its
-  format kept` (or `its format set as it was free when read`) when
-  another app uses the camera;
+  format kept` when another app used the camera as the cameras were
+  read;
   `camera <unique ID>: active format changed to <w>×<h> <subtype>, frame
-  duration <min> to <max>` when the open camera's active format changes;
+  duration <min> to <max>` when the open camera's active format changes,
+  with `, by another app` when the recorder did not make the change;
   `camera <unique ID>: <n> frames dropped: <reason> <count>, …` for the
   frames AVFoundation dropped (`captureOutput(_:didDrop:from:)`, its
   reason such as `FrameWasLate`, `OutOfBuffers` or `Discontinuity`), at
@@ -1724,9 +1733,9 @@ fails on some Macs only (the hosted runner, about 2 of 7 runs, with
   `recorder`, at every reading of the cameras, `cameras: <name> [virtual]
   [Continuity Camera] [suspended] <format>, …`, the format the camera is
   opened with at the recording resolution (none at None), and when
-  another app starts or ends its use of a camera, `camera <name> (<unique
-  ID>): now in use by another app` or `no longer in use by another
-  app`.
+  AVFoundation's `isInUseByAnotherApplication` of a camera changes,
+  `camera <name> (<unique ID>): now in use by another app` or `no longer
+  in use by another app`.
 
 A screen's frame is never converted: its size and format go to the
 writer as they come, so a frame of a size other than the file's gets no

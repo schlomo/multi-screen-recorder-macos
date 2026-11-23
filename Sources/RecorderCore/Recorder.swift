@@ -681,6 +681,9 @@ public final class Recorder {
                 onStallEnded: { [weak self] length in
                     Task { @MainActor in self?.cameraStallEnded(uniqueID: uniqueID, captureNumber: captureNumber, length: length) }
                 },
+                onFormatTakenOver: { [weak self] in
+                    Task { @MainActor in self?.cameraFormatTakenOver(uniqueID: uniqueID, captureNumber: captureNumber) }
+                },
                 onEnded: { [weak self] reason, file in
                     Task { @MainActor in
                         self?.cameraCaptureEnded(uniqueID: uniqueID, captureNumber: captureNumber, camera: name, reason: reason, file: file)
@@ -720,6 +723,14 @@ public final class Recorder {
         guard !isStopped, cameraCaptures[uniqueID]?.0 == captureNumber else { return }
         problemsTold.cleared(.cameraStalled(uniqueID))
         applyCameras(cameraTracker.stallEnded(uniqueID, length: length, at: context.now()))
+    }
+
+    /// Another app changed the format of the running capture's camera: read
+    /// the cameras for its format, the new file following after the settle time.
+    private func cameraFormatTakenOver(uniqueID: String, captureNumber: Int) {
+        guard !isStopped, cameraCaptures[uniqueID]?.0 == captureNumber else { return }
+        cameraTracker.formatTakenOver(uniqueID, at: context.now())
+        camerasChanged()
     }
 
     /// As a screen capture's end by itself (`captureEnded`).
