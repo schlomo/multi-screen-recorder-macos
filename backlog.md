@@ -3,9 +3,9 @@
 ## Next session starts here
 
 PR #27 merged on 2026-11-23 (cameras, audio delay, guide-track
-membership, problem lines). Left from it: the homepage screenshots
-from the release (`scripts/update-homepage-screenshots --release`, a
-draft PR). Next: item 38 (each microphone placed by its measured delay
+membership, problem lines). Left from it: item 46 (the release fails
+the end-to-end tests at a screen's mode switch; it blocks the homepage
+screenshots), first. Next: item 38 (each microphone placed by its measured delay
 in the "Audio inputs" guide track, about 1 s of hindsight), then item
 22 (camera picture sync from claps, a Calibrate button); each needs
 its design signed off by the owner as text first (the owner,
@@ -542,6 +542,25 @@ Still open from D34: what AGC does and whether it is on in auto mode;
    - a way to run the recorder's tests under CPU load locally, as the
      PR #27 builder did by hand (36 `yes` processes).
    Moot for the compiler once item 2 lands.
+46. **The release fails the end-to-end tests at a screen's mode
+   switch** (found 2026-11-23 by `update-homepage-screenshots
+   --release` on v0.20261123.93; blocks the homepage screenshots of
+   PR #27). Runs in the VM on 2026-11-23:
+   - **The release (built by CI):** 3 runs, `virtual-screen` failed in
+     all 3. In 2 of them both screen file writers failed with
+     `-11800` from `-19092` at +6.6 to +7.3 s, the failure D67 saw only
+     on the hosted runner. The rest were file ends 0.1 to 1.1 s after
+     the settle window.
+   - **Local builds:** b35bce7 passed 2 of 2; f5e8e09 (same code as the
+     release) passed 1 of 2, the other failing by a 0.01 s timing miss.
+     Neither had the encoder error.
+   [CONJECTURE] Two things: the CI build (Xcode 26.6, signed) makes
+   the encoder error likelier, and the timing window is tighter than
+   the VM now keeps, perhaps from PR #27's added work while recording
+   (the audio delay measurement, the camera watch). Next: about 5 runs
+   each of the release and a local build of the same commit, compared,
+   and the previous release v0.20261122.89 as a baseline. Settled before
+   item 38 starts, as it touches what every recording ships.
 
 ## Deliberately deferred
 
