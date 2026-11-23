@@ -93,7 +93,10 @@ D28).
   one camera file per camera, made like a screen file, with the same
   two guide tracks; each camera at 30 fps in the format, of any aspect
   ratio, that records the largest size once fitted into the recording
-  resolution's box limited to 1920×1080, the smallest of equal ones,
+  resolution's box, limited to 1920×1080 while the setting
+  `limitCameras` is on (its default), the smallest of equal ones, then
+  the one turned as the camera's active format (D74); a camera whose
+  picture is boxed in the other orientation is turned to it (D76),
   and a camera another app uses in its own format, a change of its frame
   size starting a new file; a camera tick waits up to 0.5 s for a late frame; a camera
   that pauses for 2 s is stalled, its file going on, and one that sends
@@ -113,7 +116,13 @@ D28).
   file beyond; every source resampled to the shared clock, its clock drift
   measured from buffer arrivals and corrected (D57); the
   "Audio inputs" guide mixes each input as mono at unity gain through a
-  soft limiter (D52); guide tracks end with the video (D51).
+  soft limiter approaching −6 dBFS (D52, D75); guide tracks end with
+  the video (D51). Each input's delay is measured while recording by
+  cross-correlation, and the timeline file shifts its audio by it
+  (D77); an input more than 0.1 s out of sync with the largest group
+  leaves the "Audio inputs" guide track until it is back in sync, its
+  own audio file still recorded (D79). Placing each input by its delay
+  in the guide track is queued (backlog item 38).
 - Audio: none, the default microphone, wired (the default microphone
   plus every built-in and wired input) or all inputs, with system audio
   and AGC as separate switches (D12, D44); one audio file per source, every
@@ -143,7 +152,9 @@ D28).
   crash-safe fragmented files, keeping the Mac awake (D14). The window
   shows what will be recorded and what it costs in disk space (D26,
   D33), and follows screens, cameras and audio inputs as they change
-  (D36, D74).
+  (D36, D74). The status window's problem lines are red while
+  something is broken or a person must act, orange once it is over or
+  for a hiccup, one line per source and kind (D78).
 - No network connections; feedback goes to GitHub Issues (D15).
 
 ### Front ends
