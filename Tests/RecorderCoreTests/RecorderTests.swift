@@ -290,14 +290,23 @@ extension GlobalRecordingLog {
             }
         }
 
-        /// Waits on the main actor, so the recorder's tasks run, until `condition` holds, for at most 5 s.
-        private func wait(_ what: String, until condition: () -> Bool) async throws {
-            for _ in 0..<500 {
+        /// Waits on the main actor, so the recorder's tasks run, until `condition` holds, for at most `seconds`.
+        private func wait(_ what: String, seconds: Int = 5, until condition: () -> Bool) async throws {
+            for _ in 0..<(seconds * 100) {
                 if condition() { return }
                 try await Task.sleep(for: .milliseconds(10))
             }
             Issue.record("timed out waiting for \(what)")
             throw CancellationError()
+        }
+
+        /// Sends a buffer to each input's latest capture at each of `wait`'s checks until the recording
+        /// has `count` audio files, as a single buffer now and then starts none.
+        private func startAudioFiles(_ uids: [String], _ what: String = "the audio files", count: Int? = nil) async throws {
+            try await wait(what) {
+                for uid in uids { try? send(0.1, buffers: 1, to: sources.last(of: uid)) }
+                return (try? manifestOnDisk().audioFiles.count) == count ?? uids.count
+            }
         }
 
         private func manifestOnDisk() throws -> RecordingManifest {
@@ -424,8 +433,6 @@ extension GlobalRecordingLog {
             #expect(summary.manifest.result == .ok)
         }
 
-        /// A camera that offers its size in both orientations and delivers a portrait picture pillarboxed in
-        /// its landscape format turns to the portrait format before its file starts (D76).
         /// A camera that offers its size in both orientations, as the DJI Osmo Pocket.
         static let osmo = CameraInfo(
             uniqueID: "Osmo", name: "OsmoPocket4P", isDefault: true, isVirtual: false,
@@ -435,15 +442,10 @@ extension GlobalRecordingLog {
             ],
             activeFormat: CameraFormat(size: FrameSize(width: 320, height: 180), maxFramesPerSecond: 30))
 
+        /// A camera that offers its size in both orientations and delivers a portrait picture pillarboxed in
+        /// its landscape format turns to the portrait format before its file starts (D76).
         @Test func aCameraWhosePictureIsBoxedInTheOtherOrientationTurnsBeforeItsFile() async throws {
-            let osmo = CameraInfo(
-                uniqueID: "Osmo", name: "OsmoPocket4P", isDefault: true, isVirtual: false,
-                formats: [
-                    CameraFormat(size: FrameSize(width: 320, height: 180), maxFramesPerSecond: 30),
-                    CameraFormat(size: FrameSize(width: 180, height: 320), maxFramesPerSecond: 30),
-                ],
-                activeFormat: CameraFormat(size: FrameSize(width: 320, height: 180), maxFramesPerSecond: 30))
-            cameras.connected.withLock { $0 = [osmo] }
+            cameras.connected.withLock { $0 = [Self.osmo] }
             try start(cameraMode: .real)
             let landscape = try #require(cameras.last)
             #expect(landscape.frameSize == FrameSize(width: 320, height: 180))
@@ -496,8 +498,7 @@ extension GlobalRecordingLog {
             let inputs = ["R", "A", "B"].map { AudioInputInfo(name: "Mic \($0)", channelCount: 1, isDefault: $0 == "R", transport: .usb, uid: $0) }
             try start(inputs: inputs)
             try await wait("the audio inputs' captures") { sources.byUID.withLock { $0.count } == 3 }
-            for uid in ["R", "A", "B"] { try send(0.1, buffers: 1, to: sources.last(of: uid)) }
-            try await wait("the audio files") { (try? manifestOnDisk().audioFiles.count) == 3 }
+            try await startAudioFiles(["R", "A", "B"])
             feedDelayedNoise(["R": 0, "A": -0.5, "B": 0.2])
             for _ in 0..<3 { await recorder.measureAudioDelays() }
             func delays() throws -> [String: Double?] {
@@ -510,8 +511,7 @@ extension GlobalRecordingLog {
             // A's file ends, and A starts again in a new file without a measurement yet.
             try #require(sources.last(of: "A")).lose(.captureFailed("the stand-in failed"))
             try await wait("A's restart") { sources.byUID.withLock { $0["A"]?.count } == 2 }
-            try send(0.1, buffers: 1, to: sources.last(of: "A"))
-            try await wait("A's new file") { (try? manifestOnDisk().audioFiles.count) == 4 }
+            try await startAudioFiles(["A"], "A's new file", count: 4)
             feedDelayedNoise(["R": 0, "B": 0.2])
             await recorder.measureAudioDelays()
             #expect(abs(((try delays()["Mic B"] ?? nil) ?? 0) - 0.7) < 0.002)
@@ -526,12 +526,31 @@ extension GlobalRecordingLog {
             let camera = try #require(cameras.last)
             camera.stopTakes.withLock { $0 = .seconds(2) }
             try await wait("the audio inputs' captures") { sources.byUID.withLock { $0.count } == 2 }
-            for uid in ["R", "A"] { try send(0.1, buffers: 1, to: sources.last(of: uid)) }
-            try await wait("the audio files") { (try? manifestOnDisk().audioFiles.count) == 2 }
+            try await startAudioFiles(["R", "A"])
             feedDelayedNoise(["R": 0, "A": 0.2])
             let stopping = Task { await recorder.stop() }
             try await Task.sleep(for: .milliseconds(200))
             for _ in 0..<3 { await recorder.measureAudioDelays() }
+            let summary = await stopping.value
+            #expect(summary.manifest.audioFiles.allSatisfy { $0.measuredDelay == nil })
+        }
+
+        /// A measurement already running when Stop begins changes the recording no more (D77): the
+        /// measuring task reaches its wait for the windows before the stopping task starts, both queued
+        /// on the main actor in this order.
+        @Test func anAudioDelayMeasuredWhileStopBeginsIsNotRecorded() async throws {
+            cameras.connected.withLock { $0 = [Self.camera] }
+            let inputs = ["R", "A"].map { AudioInputInfo(name: "Mic \($0)", channelCount: 1, isDefault: $0 == "R", transport: .usb, uid: $0) }
+            try start(cameraMode: .real, inputs: inputs)
+            let camera = try #require(cameras.last)
+            camera.stopTakes.withLock { $0 = .seconds(1) }
+            try await wait("the audio inputs' captures") { sources.byUID.withLock { $0.count } == 2 }
+            try await startAudioFiles(["R", "A"])
+            feedDelayedNoise(["R": 0, "A": 0.2])
+            for _ in 0..<2 { await recorder.measureAudioDelays() }
+            let measuring = Task { await recorder.measureAudioDelays() }
+            let stopping = Task { await recorder.stop() }
+            await measuring.value
             let summary = await stopping.value
             #expect(summary.manifest.audioFiles.allSatisfy { $0.measuredDelay == nil })
         }
@@ -743,6 +762,173 @@ extension GlobalRecordingLog {
             #expect(line.text.hasPrefix("Camera Stand-in camera stalled "))
             #expect(line.text.hasSuffix(" s at 0:00, then disconnected"))
             #expect(!line.isRed)
+            _ = await stop()
+        }
+
+        /// The camera's file, recorded until the camera is suspended or unplugged.
+        private func recordThenStop(_ reading: CameraInfo?) async throws -> StandInCamera {
+            cameras.connected.withLock { $0 = [Self.camera] }
+            try start(cameraMode: .real)
+            let camera = try #require(cameras.last)
+            try await sendFrames(camera, until: "the camera file") { (try? manifestOnDisk().cameraFiles.count) == 1 }
+            cameras.connected.withLock { $0 = reading.map { [$0] } ?? [] }
+            recorder.camerasChanged()
+            return camera
+        }
+
+        private static var suspended: CameraInfo {
+            var camera = camera
+            camera.isSuspended = true
+            return camera
+        }
+
+        private static var runningElsewhere: CameraInfo {
+            var camera = camera
+            camera.isRunningElsewhere = true
+            camera.activeFormat = camera.formats.first
+            return camera
+        }
+
+        /// Once our capture's end is reported, a reading counts another app's use again: the camera, used
+        /// elsewhere after we stopped it, starts again keeping its format (D74, D76).
+        @Test func aCameraUsedElsewhereAfterOurCaptureEndedKeepsItsFormat() async throws {
+            _ = try await recordThenStop(Self.suspended)
+            try await wait("the file's end") { (try? manifestOnDisk().cameraFiles.first?.state) == .finalized }
+            cameras.connected.withLock { $0 = [Self.runningElsewhere] }
+            recorder.camerasChanged()
+            try await wait("the camera's start after the settle time") { cameras.opened.withLock { $0.count } == 2 }
+            #expect(cameras.last?.format == nil)
+            _ = await stop()
+        }
+
+        /// A reading while our capture still stops is not taken; its end report reads the cameras again (D74).
+        @Test func aCameraUsedElsewhereWhileOurCaptureStopsKeepsItsFormat() async throws {
+            cameras.connected.withLock { $0 = [Self.camera] }
+            try start(cameraMode: .real)
+            let first = try #require(cameras.last)
+            first.stopTakes.withLock { $0 = .milliseconds(300) }
+            try await sendFrames(first, until: "the camera file") { (try? manifestOnDisk().cameraFiles.count) == 1 }
+            cameras.connected.withLock { $0 = [Self.suspended] }
+            recorder.camerasChanged()
+            cameras.connected.withLock { $0 = [Self.runningElsewhere] }
+            recorder.camerasChanged()
+            #expect(!first.isStopped)
+            try await wait("the camera's start after the settle time") { cameras.opened.withLock { $0.count } == 2 }
+            #expect(cameras.last?.format == nil)
+            _ = await stop()
+        }
+
+        /// A failed end of a camera's file, `lost` part of it, as `CameraCapture` reports it late.
+        private func failedEnd(of file: RecordingManifest.CameraFile, lost: String? = nil) -> VideoFileEnd<RecordingManifest.CameraFile> {
+            var file = file
+            file.state = .notFinalized
+            return VideoFileEnd(file: file, error: VideoFileWriterError(description: "cannot write \(file.name)", isDiskFull: false), lost: lost)
+        }
+
+        /// A failure of a camera's file, reported after a newer file of the camera started, is over when
+        /// told: orange at once (D78).
+        @Test func aCameraFileFailureReportedAfterANewerFileIsOverAtOnce() async throws {
+            cameras.connected.withLock { $0 = [Self.camera] }
+            try start(cameraMode: .real)
+            let first = try #require(cameras.last)
+            try await sendFrames(first, until: "the camera file") { (try? manifestOnDisk().cameraFiles.count) == 1 }
+            first.lose(.streamFailed("the stand-in failed"))
+            try await wait("the restart") { cameras.opened.withLock { $0.count } == 2 }
+            let second = try #require(cameras.last)
+            try await sendFrames(second, until: "the second camera file") { (try? manifestOnDisk().cameraFiles.count) == 2 }
+            let file = try #require(try manifestOnDisk().cameraFiles.first)
+            recorder.cameraCaptureEnded(
+                uniqueID: "StandInCamera", captureNumber: 1, camera: "Stand-in camera", reason: .writerFailed("cannot write"),
+                file: failedEnd(of: file))
+            let line = try #require(recorder.problemLines().first { $0.text.hasPrefix("Camera Stand-in camera not captured") })
+            #expect(line.text.contains(", recovered: "))
+            #expect(!line.isRed)
+            _ = await stop()
+        }
+
+        /// A failure of a camera's file reported after the camera was unplugged ends at once, then disconnected;
+        /// the part of the file lost is a red line of its own (D78).
+        @Test func aCameraFileFailureReportedAfterItsCameraWentIsOverAndItsLostPartRed() async throws {
+            _ = try await recordThenStop(nil)
+            try await wait("the file's end") { (try? manifestOnDisk().cameraFiles.first?.state) == .finalized }
+            let file = try #require(try manifestOnDisk().cameraFiles.first)
+            recorder.cameraCaptureEnded(
+                uniqueID: "StandInCamera", captureNumber: 1, camera: "Stand-in camera", reason: .writerFailed("cannot write"),
+                file: failedEnd(of: file, lost: "its last 2 s"))
+            let lines = recorder.problemLines()
+            let lost = try #require(lines.first { $0.text.hasPrefix("File \(file.name) incomplete since ") })
+            #expect(lost.isRed)
+            let failure = try #require(lines.first { $0.text.hasPrefix("Camera Stand-in camera not captured") })
+            #expect(failure.text.contains(", then disconnected: "))
+            #expect(!failure.isRed)
+            _ = await stop()
+        }
+
+        /// A full disk is red until the free space check finds room (D78).
+        @Test func aFullDiskEndsOnceThereIsRoom() async throws {
+            cameras.connected.withLock { $0 = [Self.camera] }
+            try start(cameraMode: .real)
+            let camera = try #require(cameras.last)
+            try await sendFrames(camera, until: "the camera file") { (try? manifestOnDisk().cameraFiles.count) == 1 }
+            camera.lose(.diskFull)
+            try await wait("the line") { recorder.problemLines().first?.text.hasPrefix("Disk full since ") == true }
+            #expect(recorder.problemLines().first?.isRed == true)
+            // The next free space check, at most 5 s on.
+            try await wait("the room", seconds: 7) { recorder.problemLines().first { $0.text.hasPrefix("Disk full ") }?.isRed == false }
+            _ = await stop()
+        }
+
+        /// Two audio inputs of the same name: a new file of one ends only its own failed files' lines (D78).
+        @Test func aNewAudioFileEndsOnlyItsOwnInputsFailedFiles() async throws {
+            let inputs = ["X", "Y"].map { AudioInputInfo(name: "Mic", channelCount: 1, isDefault: $0 == "X", transport: .usb, uid: $0) }
+            try start(inputs: inputs)
+            try await wait("the audio inputs' captures") { sources.byUID.withLock { $0.count } == 2 }
+            try await startAudioFiles(["X", "Y"])
+            let x = try #require(try manifestOnDisk().audioFiles.first { $0.audioSourceUID == "X" })
+            recorder.audioFileEnded(failedEnd(of: x))
+            try #require(sources.last(of: "Y")).lose(.captureFailed("the stand-in failed"))
+            try await wait("Y's restart") { sources.byUID.withLock { $0["Y"]?.count } == 2 }
+            try await startAudioFiles(["Y"], "Y's new file", count: 3)
+            let line = try #require(recorder.problemLines().first { $0.text.hasPrefix("File \(x.name) failed") })
+            #expect(line.isRed)
+            _ = await stop()
+        }
+
+        /// A failure of an audio file reported after a newer file of its input started is over when told (D78).
+        @Test func anAudioFileFailureReportedAfterANewerFileIsOverAtOnce() async throws {
+            try start()
+            try await startAudioFiles([uid])
+            source.lose(.captureFailed("the stand-in failed"))
+            try await wait("the restart") { sources.count == 2 }
+            try await startAudioFiles([uid], "the new file", count: 2)
+            let first = try #require(try manifestOnDisk().audioFiles.first)
+            recorder.audioFileEnded(failedEnd(of: first))
+            let line = try #require(recorder.problemLines().first { $0.text.hasPrefix("File \(first.name) failed") })
+            #expect(!line.isRed)
+            _ = await stop()
+        }
+
+        /// A failed end of an audio file, as `AudioCapture` reports it.
+        private func failedEnd(of file: RecordingManifest.AudioFile) -> AudioFileEnd {
+            var file = file
+            file.end = file.end ?? file.start + 0.5
+            file.state = .notFinalized
+            return AudioFileEnd(file: file, error: AudioFileWriterError(nil, while: "cannot write \(file.name)"))
+        }
+
+        /// A stalled camera the recorder stops, here as it is suspended: its stall ends with its capture,
+        /// neither recovered nor disconnected (D78).
+        @Test func aStalledCameraStoppedEndsItsStallLine() async throws {
+            cameras.connected.withLock { $0 = [Self.camera] }
+            try start(cameraMode: .real, cameraFrameWatch: Self.quickFrameWatch)
+            let camera = try #require(cameras.last)
+            try await sendFrames(camera, until: "the camera file") { (try? manifestOnDisk().cameraFiles.count) == 1 }
+            try await wait("the stall") { (try? manifestOnDisk().events.map(\.event)) == [.cameraStalled] }
+            cameras.connected.withLock { $0 = [Self.suspended] }
+            recorder.camerasChanged()
+            let line = try #require(recorder.problemLines().first)
+            #expect(line.text.hasPrefix("Camera Stand-in camera stalled "))
+            #expect(line.text.hasSuffix(" s at 0:00, ended"))
             _ = await stop()
         }
 

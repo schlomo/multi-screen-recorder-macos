@@ -135,6 +135,33 @@ import Testing
         ])
     }
 
+    /// A line only shown, as a video file's end, keeps no tell of its kind from the manifest; and only a
+    /// failure that ends with a new file can be over when told: a full disk or cut guide tracks never are.
+    @Test func aShownLineNeitherSwallowsATellNorEndsWhatANewFileDoesNotEnd() {
+        var told = ProblemsTold()
+        var manifest = manifest()
+        told.show(problem(5 * second, "Camera file c.mov"), kind: .cameraNotCaptured("C"), source: "BRIO")
+        #expect(told.add(problem(5 * second, "Camera BRIO stream failed"), kind: .cameraNotCaptured("C"), source: "BRIO", to: &manifest)
+            == .tell(writeManifest: true))
+        #expect(manifest.problems.count == 1)
+        #expect(told.add(problem(6 * second, "Camera BRIO"), kind: .cameraNotCaptured("C"), source: "BRIO", to: &manifest) == .alreadyTold)
+        told.show(problem(5 * second, "g"), kind: .guideTracksCut("Screen 1 - DELL.mov"), endedAt: 6 * second)
+        told.show(problem(5 * second, "d"), kind: .diskFull, endedAt: 6 * second)
+        #expect(told.lines(now: 7 * second).map(\.text) == [
+            "Disk full since 0:05: denied", "Camera BRIO not captured since 0:05: denied",
+            "Guide tracks of Screen 1 - DELL.mov cut since 0:05: denied",
+        ])
+    }
+
+    /// A stall whose capture ended neither by its frames coming again nor by an unplug: ended.
+    @Test func aStallEndedWithItsCaptureSaysEnded() {
+        var told = ProblemsTold()
+        var manifest = manifest()
+        stall(&told, &manifest, at: 30)
+        told.cleared(.cameraStalled("brio"), at: nanoseconds(31), ending: .ended)
+        #expect(told.lines(now: nanoseconds(32)).map(\.text) == ["Camera BRIO stalled 3.0 s at 0:28, ended"])
+    }
+
     /// A failure of a file whose source already has a newer file is over when told: orange at once.
     @Test func aFailureToldAfterANewerFileIsOverAtOnce() {
         var told = ProblemsTold()

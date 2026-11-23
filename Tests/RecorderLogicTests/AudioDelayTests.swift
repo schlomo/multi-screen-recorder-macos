@@ -56,7 +56,6 @@ import Testing
         #expect(AudioDelay.normalized([:], reference: "r") == [:])
     }
 
-    /// A file's lags count against one reference: a new reference starts it again (D77).
     /// A file's lags count against one reference file: another (a new reference, or the same one's new
     /// file) starts it again; every file measured against the reference counts in the normalization (D77).
     @Test func aNewReferenceFileStartsAFilesLagsAgain() {

@@ -611,7 +611,7 @@ public final class Recorder {
                     Task { @MainActor in self?.fileStarted(file, uuid: uuid) }
                 },
                 onEnded: { [weak self] reason, file in
-                    Task { @MainActor in self?.captureEnded(uuid: uuid, captureNumber: captureNumber, screen: name, reason: reason, file: file) }
+                    Task { @MainActor in self?.captureEnded(uuid: uuid, captureNumber: captureNumber, screen: name, number: number, reason: reason, file: file) }
                 })
             captures[uuid] = (captureNumber, capture)
             capture.start()
@@ -620,7 +620,7 @@ public final class Recorder {
             guard let (captureNumber, capture) = captures.removeValue(forKey: uuid) else { return }
             stopInProgress { [weak self] in
                 let file = await capture.stop()
-                self?.fileEnded(file, captureNumber: captureNumber, screen: capture.name, uuid: uuid, reason: nil)
+                self?.fileEnded(file, captureNumber: captureNumber, screen: capture.name, number: capture.number, uuid: uuid, reason: nil)
             }
         }
     }
@@ -641,10 +641,13 @@ public final class Recorder {
     /// yet. Its event and problem are recorded once per capture, also when
     /// the capture ended by itself while the recorder stopped it.
     private func fileEnded(
-        _ end: VideoFileEnd<RecordingManifest.ScreenFile>?, captureNumber: Int, screen: String, uuid: String, reason: VideoStreamEnd?
+        _ end: VideoFileEnd<RecordingManifest.ScreenFile>?, captureNumber: Int, screen: String, number: Int, uuid: String,
+        reason: VideoStreamEnd?
     ) {
         let newer = end.flatMap { end in manifest.files.filter { $0.screenUUID == uuid && $0.start > end.file.start }.map(\.start).min() }
-        videoFileEnded(end, captureNumber: captureNumber, source: screen, reason: reason, notCaptured: .screenNotCaptured(uuid), newerFileStart: newer)
+        videoFileEnded(
+            end, captureNumber: captureNumber, source: screen, label: "\(number) \(screen)", reason: reason,
+            notCaptured: .screenNotCaptured(uuid), newerFileStart: newer)
     }
 
     private func videoFileEnded(
@@ -653,14 +656,16 @@ public final class Recorder {
         let newer = end.flatMap { end in
             manifest.cameraFiles.filter { $0.cameraUniqueID == uniqueID && $0.start > end.file.start }.map(\.start).min()
         }
-        videoFileEnded(end, captureNumber: captureNumber, source: source, reason: reason, notCaptured: .cameraNotCaptured(uniqueID), newerFileStart: newer)
+        videoFileEnded(
+            end, captureNumber: captureNumber, source: source, label: source, reason: reason, notCaptured: .cameraNotCaptured(uniqueID),
+            newerFileStart: newer)
     }
 
     /// A screen file or a camera file ended, as `fileEnded` says; `source` is the screen's or the camera's name,
     /// `notCaptured` its kind of a failure; `newerFileStart`, a newer file of the source that started already:
     /// a failure of this one is over when told (D78).
     private func videoFileEnded<File>(
-        _ end: VideoFileEnd<File>?, captureNumber: Int, source: String, reason: VideoStreamEnd?, notCaptured: ProblemKind,
+        _ end: VideoFileEnd<File>?, captureNumber: Int, source: String, label: String, reason: VideoStreamEnd?, notCaptured: ProblemKind,
         newerFileStart: Double?
     ) {
         let before = manifest
@@ -669,9 +674,9 @@ public final class Recorder {
         if manifest != before { try? writeManifest() }
         told(Array(manifest.events.dropFirst(before.events.count)))
         if let report, let problem = report.problem {
-            problemsTold.show(
-                problem, kind: report.problemKind(notCaptured: notCaptured), source: source,
-                endedAt: newerFileStart.map { Int64(($0 * 1_000_000_000).rounded()) })
+            let kind = report.problemKind(notCaptured: notCaptured)
+            let over = gone(kind) ?? newerFileStart.map { (Int64(($0 * 1_000_000_000).rounded()), .recovered) }
+            problemsTold.show(problem, kind: kind, source: label, endedAt: over?.at, ending: over?.ending ?? .recovered)
             told(problem, ofAnEvent: report.event != nil)
         }
         if let report, let lost = report.lostProblem {
@@ -685,9 +690,10 @@ public final class Recorder {
     }
 
     private func captureEnded(
-        uuid: String, captureNumber: Int, screen: String, reason: VideoStreamEnd, file: VideoFileEnd<RecordingManifest.ScreenFile>?
+        uuid: String, captureNumber: Int, screen: String, number: Int, reason: VideoStreamEnd,
+        file: VideoFileEnd<RecordingManifest.ScreenFile>?
     ) {
-        fileEnded(file, captureNumber: captureNumber, screen: screen, uuid: uuid, reason: reason)
+        fileEnded(file, captureNumber: captureNumber, screen: screen, number: number, uuid: uuid, reason: reason)
         // One the recorder already stopped, or replaced, changes nothing more.
         guard !isStopped, let (current, capture) = captures[uuid], current == captureNumber else { return }
         captures[uuid] = nil
@@ -706,7 +712,9 @@ public final class Recorder {
                 problem = RecordingProblem(
                     atSeconds: failure.at, problem: "Screen \(screen) cannot be captured", error: ScreenTracker.captureSourceGoneAgain)
             }
-            tell(problem, kind: .screenNotCaptured(uuid), source: screen, ofAnEvent: true)
+            let over = gone(.screenNotCaptured(uuid))
+            tell(problem, kind: .screenNotCaptured(uuid), source: "\(number) \(screen)", endedAt: over?.at,
+                 ending: over?.ending ?? .recovered, ofAnEvent: true)
         }
     }
 
@@ -816,7 +824,7 @@ public final class Recorder {
             capture.start()
         case .stop(let uniqueID):
             guard let (captureNumber, capture) = cameraCaptures.removeValue(forKey: uniqueID) else { return }
-            problemsTold.cleared(.cameraStalled(uniqueID), at: context.now())
+            problemsTold.cleared(.cameraStalled(uniqueID), at: context.now(), ending: .ended)
             stopInProgress { [weak self] in
                 let file = await capture.stop()
                 self?.cameraCaptureGone(uniqueID, captureNumber: captureNumber)
@@ -864,15 +872,27 @@ public final class Recorder {
         applyCameras(cameraTracker.pictureInOtherOrientation(uniqueID, beforeItsFile: beforeItsFile, at: context.now()))
     }
 
+    /// Now and `.disconnected` when the source of a failure `kind` is gone: its line ends at once (D78).
+    private func gone(_ kind: ProblemKind) -> (at: Int64, ending: ProblemsTold.Ending)? {
+        let isGone = switch kind {
+        case .screenNotCaptured(let uuid): tracker.sources.first { $0.uuid == uuid }?.state == .disconnected
+        case .cameraNotCaptured(let uniqueID): cameraTracker.sources.first { $0.uniqueID == uniqueID }?.state == .disconnected
+        default: false
+        }
+        return isGone ? (context.now(), .disconnected) : nil
+    }
+
     /// A camera capture's stream has stopped, reported once though both end paths may report it: its
     /// camera's readings count another app's use again (D74, D76).
     private func cameraCaptureGone(_ uniqueID: String, captureNumber: Int) {
-        guard cameraCapturesGone.insert(captureNumber).inserted else { return }
-        cameraTracker.captureEnded(uniqueID)
+        guard cameraCapturesGone.insert(captureNumber).inserted, cameraTracker.captureEnded(uniqueID) else { return }
+        // A reading while our capture still counted was not taken: read again.
+        camerasChanged()
     }
 
-    /// As a screen capture's end by itself (`captureEnded`).
-    private func cameraCaptureEnded(
+    /// As a screen capture's end by itself (`captureEnded`). Internal, so a test can deliver a late end
+    /// report of a capture, as the stand-in cameras cannot fail a file's writer.
+    func cameraCaptureEnded(
         uniqueID: String, captureNumber: Int, camera: String, reason: VideoStreamEnd, file: VideoFileEnd<RecordingManifest.CameraFile>?
     ) {
         cameraCaptureGone(uniqueID, captureNumber: captureNumber)
@@ -881,14 +901,16 @@ public final class Recorder {
         cameraCaptures[uniqueID] = nil
         let step = cameraTracker.streamEnded(uniqueID, reason, connected: readCameras(), at: context.now())
         applyCameras(step)
-        problemsTold.cleared(.cameraStalled(uniqueID), at: context.now())
+        problemsTold.cleared(.cameraStalled(uniqueID), at: context.now(), ending: .ended)
         for failure in step.events where failure.event.isFailure {
             var problem = failure.problem
             if reason == .captureSourceGone, failure.event == .cameraStreamFailed {
                 problem = RecordingProblem(
                     atSeconds: failure.at, problem: "Camera \(camera) cannot be captured", error: CameraTracker.captureSourceGoneAgain)
             }
-            tell(problem, kind: .cameraNotCaptured(uniqueID), source: camera, ofAnEvent: true)
+            let over = gone(.cameraNotCaptured(uniqueID))
+            tell(problem, kind: .cameraNotCaptured(uniqueID), source: camera, endedAt: over?.at, ending: over?.ending ?? .recovered,
+                 ofAnEvent: true)
         }
     }
 
@@ -1130,7 +1152,8 @@ public final class Recorder {
         told(started)
     }
 
-    private func audioFileEnded(_ end: AudioFileEnd) {
+    /// Internal, so a test can deliver a failed file's end, as the stand-in audio sources cannot fail a writer.
+    func audioFileEnded(_ end: AudioFileEnd) {
         guard manifest.audioFileEnded(end.file) else { return }
         RecorderLog.detail("file ended: \(end.file.name), \(end.file.state.rawValue)", category: "recorder")
         _ = manifest.record(end.events)
@@ -1323,9 +1346,10 @@ public final class Recorder {
     }
 
     private func tell(
-        _ problem: RecordingProblem, kind: ProblemKind, source: String? = nil, endedAt: Int64? = nil, ofAnEvent: Bool = false
+        _ problem: RecordingProblem, kind: ProblemKind, source: String? = nil, endedAt: Int64? = nil,
+        ending: ProblemsTold.Ending = .recovered, ofAnEvent: Bool = false
     ) {
-        switch problemsTold.add(problem, kind: kind, source: source, endedAt: endedAt, to: &manifest) {
+        switch problemsTold.add(problem, kind: kind, source: source, endedAt: endedAt, ending: ending, to: &manifest) {
         case .tell(let writesManifest):
             if writesManifest { try? writeManifest() }
             told(problem, ofAnEvent: ofAnEvent)

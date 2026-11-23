@@ -106,14 +106,19 @@ is broken, orange for a hiccup, D78), a line on standard
 error in `msr record`, a line in the recording log, and an entry in the
 recording manifest's `problems` with its time and full error (D46, D64).
 
+## Ended
+
+A problem that is over while the recording goes on: its line in the
+status window says how long it lasted, when it began and how it ended:
+`recovered`, `then disconnected` when its source went away, or `ended`
+when the recorder ended its capture (Stop, out of the camera mode); it
+is orange unless the problem damaged the recording (D78).
+
 ## Recovered
 
-A problem that ended while the recording went on, such as a camera
+A problem that ended because its source works again, such as a camera
 stall whose frames came again or a failed screen whose next file
-started: its line in the status window says how long it lasted, when it
-began and how it ended (`recovered`, or `then disconnected` when its
-source went away), and is orange unless the problem damaged the
-recording (D78).
+started; one of the endings of an ended problem (D78).
 
 ## Error detail
 

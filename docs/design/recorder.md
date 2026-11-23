@@ -975,16 +975,21 @@ checked, reported or rewritten at the next start (D47).
   input volume not set or not followed, a video file's guide tracks cut
   before its video (the video is intact) and the timeline file not
   written (the media are intact). A failure of a file whose source has
-  started a newer file is over when told, so it is orange at once. A
+  started a newer file is over when told, so it is orange at once; a
+  full disk, guide tracks cut or a file lost in part never is. A line
+  only shown, as a video file's end the manifest lists already, never
+  keeps a problem of its kind told after it from the manifest. A
   problem still lasting at the end keeps its colour by this rule. Each
-  kind has its own words and names its source, such as `Screen DELL not
+  kind has its own words and names its source, such as `Screen 1 DELL not
   captured`, `Camera BRIO stalled`, `Free space not read`, `Disk full`,
   `File <name> incomplete`, `Guide tracks of <name> cut`, and one line:
   `<words> since 0:12` while it lasts, `<words> for 4.0 s at 0:12,
-  recovered` once over (`, then disconnected` when its source went
-  away: unplugged, or a screen gone), and when it came more than once
+  recovered` once over because its source works again (`, then
+  disconnected` when its source went away: unplugged, or a screen gone,
+  also at once for a failure told after it went; `, ended` for a stall
+  whose capture the recorder ended), and when it came more than once
   `<words> 3 times, 12 s in total` (the ongoing one counted to now),
-  with `, recovered` or `, then disconnected` once none lasts; then the
+  with its ending once none lasts; then the
   latest error after a colon, `latest: ` before it when the errors
   differ. A stall reads `Camera <name> stalled since 0:53` and `Camera
   <name> stalled 7.4 s at 0:53, recovered`, without its error, always
@@ -992,7 +997,8 @@ checked, reported or rewritten at the next start (D47).
   lasts, 2 s (the stall limit) before it was told; another problem
   began when it was told. A stall ends when frames come again, when a
   new file of the camera starts, or at its capture's end (unplugged,
-  out of the camera mode, Stop), its length then up to that end. Times
+  out of the camera mode, Stop), its length then up to that end,
+  `, ended` unless unplugged. Times
   are `m:ss` since the start, `h:mm:ss` from an hour on; lengths have
   one decimal below 10 s as rounded, whole seconds from there (rounded
   once, so 10.45 s is `10 s`), `m:ss` from a minute on. The red lines
@@ -1745,10 +1751,11 @@ no audio of the camera's own.
   device whose `kCMIODevicePropertyDeviceUID` is the camera's unique ID
   (`CameraInfo.isRunningElsewhere`), taken only from a reading while no
   capture of the recorder's own is the camera's, from that capture's
-  start until its capture-ended report, which comes once its
-  `stopRunning` has returned (a reading counts the recorder's own
-  session too; [ASSUMED] Core Media I/O is current once `stopRunning`
-  has returned), not AVFoundation's
+  start until its capture-ended report, which comes once its file is
+  finalized, after its `stopRunning` returned (a reading counts the
+  recorder's own session too; [ASSUMED] Core Media I/O is current by
+  then); at that report the recorder reads the cameras again, as a
+  reading while its capture still counted was not taken, not AVFoundation's
   `isInUseByAnotherApplication`, which stays false for a camera a
   browser uses (D74). Otherwise the recorder sets its own format, as
   above. Once the recorder's own opening of a camera has finished

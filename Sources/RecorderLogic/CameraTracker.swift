@@ -275,11 +275,14 @@ public struct CameraTracker: Sendable {
         return Step()
     }
 
-    /// A capture of `uniqueID` reported its end, after its stream stopped: from then on, with no other
-    /// capture of it running, a reading tells whether another app uses it. Once per capture.
-    public mutating func captureEnded(_ uniqueID: String) {
-        guard let count = cameras[uniqueID]?.ownCaptures, count > 0 else { return }
+    /// A capture of `uniqueID` reported its end, after its file was finalized: from then on, with no other
+    /// capture of it running, a reading tells whether another app uses it. Once per capture; true when
+    /// none of ours is left, so the cameras are read again for a reading dropped meanwhile.
+    @discardableResult
+    public mutating func captureEnded(_ uniqueID: String) -> Bool {
+        guard let count = cameras[uniqueID]?.ownCaptures, count > 0 else { return false }
         cameras[uniqueID]?.ownCaptures = count - 1
+        return count == 1
     }
 
     /// A camera file of `uniqueID` started: its restart delay starts over.
