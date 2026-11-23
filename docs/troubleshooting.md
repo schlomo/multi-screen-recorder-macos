@@ -294,8 +294,8 @@ One row per entry, the error text exactly as in the entry.
 - **Verify:** the two tests pass 20 of 20 runs under the same load, and
   with the 1.5 s and 3.5 s sleeps; CI's `scripts/test` passes on the
   pushed head.
-- **Observed:** 2026-11-23, PR #27, runner Xcode 26.6; open until CI
-  passes.
+- **Observed:** 2026-11-23, PR #27, runner Xcode 26.6; resolved
+  (the pipeline on abc1953 passed).
 
 ## Swift 6.3 rejects self in a later argument after callbacks capture it
 
@@ -313,4 +313,5 @@ One row per entry, the error text exactly as in the entry.
   local (`checksOrientation` in `Recorder.performCamera`, 4115a17).
 - **Verify:** CI's `scripts/test` compiles the package (run
   45242373454 on 4115a17 got past the build to the tests).
-- **Observed:** 2026-11-23, PR #27, runner Xcode 26.6; open.
+- **Observed:** 2026-11-23, PR #27, runner Xcode 26.6; resolved
+  (the pipeline on abc1953 passed).
