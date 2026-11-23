@@ -38,14 +38,6 @@ verifying agent output are in the principles (linked from
   lenient check (following redirects, an agent's summary, a render
   that may be cropped) is redone or named as such; a 200 reached
   through a redirect is not a 200.
-- **An MR/PR's description is kept true at every round**, not rewritten
-  at the end: PR #27's claimed for about 50 commits that a denied
-  Camera permission blocks Start.
-- **After the green pipeline run, no commit with the skip-ci marker
-  goes onto the branch.** A late fix waits for the next MR/PR or comes
-  with an unmarked commit, and the pipeline is waited for again. A commit with the
-  skip-ci marker on the head made closing PR #27 skip removing its
-  snapshot release (`AGENTS.md`, "Pipeline").
 
 ## Deciding and asking
 
@@ -61,17 +53,23 @@ verifying agent output are in the principles (linked from
   collect (the owner, 2026-11-16: a screenshot of the start window
   instead of two Terminal commands).
 - **An MR/PR keeps its scope.** When a human's test asks for
-  something new rather than a fix, propose it as the next MR/PR and
-  say what the current one lacks without it. Keep it in only when the
-  current one would ship broken without it. In PR #27 the late
-  microphone leaving the guide track had to go in ("Seems like a
-  faulty release", the owner, 2026-11-23). The audio delay, the
-  problem lines' colours and the guide limiter could each have been
-  their own PR. PR #27 grew from two items to six decisions and about
-  60 commits.
+  something new rather than a fix, propose it as the next MR/PR, say
+  what the current one lacks without it, and let the human decide;
+  recommend keeping it in only when the current one would ship broken
+  without it. In PR #27 the late microphone leaving the guide track had
+  to go in ("Seems like a faulty release", the owner, 2026-11-23); the
+  audio delay, the problem lines' colours and the guide limiter could
+  each have been their own PR. PR #27 grew from two items to six
+  decisions and 67 commits.
 - **When deferring, say what the human sees meanwhile.** "Queued as
   item 38" hid that the guide track would keep a late microphone's
   echo until then; the owner had to ask.
+- **A Markdown-only commit on an MR/PR after its green run is unmarked
+  too**, as the trunk's Markdown exemption does not apply to a work
+  branch: a docs fix that this change needs runs the pipeline again,
+  and one it does not need lands after the merge. PR #27 was merged
+  with a marked Markdown commit on its head, so its snapshot release
+  was not removed (`AGENTS.md`, "Pipeline").
 
 ## Supervising long-running work
 
