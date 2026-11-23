@@ -2,18 +2,18 @@
 
 ## Next session starts here
 
-PR #27 (branch `cameras`) is finishing: cameras, A/V sync of the
-microphones in the timeline file, the guide track fixes and the
-problem lines. Left before ready: the review fixes of D79 (in
-progress), the owner's listening test (the Osmo leaves the guide
-track, no echo), the end-to-end run on the head, the PR description
-rewritten (stale since b908b4f), one pipeline run. Then the A/V sync
-work, items 38 and 22, in that order (the owner, 2026-11-23:
-"Noticeable lip sync is my goal"; "Iterative improvement, every
-shipment is better"). Test recordings of 2026-11-23 (rec7 to rec11)
-sit in `$TMPDIR/camcheck` on the owner's Mac for the sync design;
-the owner's kept one is `keep/2026-11-23 10.56.18`; delete the rest
-once item 38 is built.
+PR #27 merged on 2026-11-23 (cameras, audio delay, guide-track
+membership, problem lines). Left from it: the homepage screenshots
+from the release (`scripts/update-homepage-screenshots --release`, a
+draft PR). Next: item 38 (each microphone placed by its measured delay
+in the "Audio inputs" guide track, about 1 s of hindsight), then item
+22 (camera picture sync from claps, a Calibrate button); each needs
+its design signed off by the owner as text first (the owner,
+2026-11-23: "Noticeable lip sync is my goal"; "Iterative improvement,
+every shipment is better"). Test recordings of 2026-11-23 (rec7 to
+rec12) sit in `$TMPDIR/camcheck` on the owner's Mac for the sync
+design; the owner's kept one is `keep/2026-11-23 10.56.18`; delete
+the rest once item 38 is built.
 
 Agents may run `msr record` on the owner's Mac (D48), with `HOME` set
 to a scratch folder (`AGENTS.md`, "Facts that bite"), and BetterDisplay's command
@@ -30,16 +30,7 @@ Still open from D34: what AGC does and whether it is on in auto mode;
 
 ## In flight
 
-- PR #27, branch `cameras` (draft): item 12 (cameras, D74, D76),
-  items 36 and 37 (D73), the wake bug, the homepage's claim, story and
-  workflow, plus what the owner's tests of 2026-11-23 asked for: the
-  1080p camera limit with its toggle, cameras another app uses (Core
-  Media I/O), the mouse-over details, the audio delay measured while
-  recording and applied in the timeline file (D77), problem lines red
-  or orange by the owner's rule with a capped, scrolling area (D78),
-  the guide limiter at −6 dBFS (D75), and a clearly late microphone
-  leaving the guide track (D79, the owner: "Yes, it should"). Reviewed
-  in seven rounds; the D79 fix round is in progress.
+- Nothing.
 
 ## Queued
 
@@ -273,7 +264,7 @@ Still open from D34: what AGC does and whether it is on in auto mode;
    2026-11-22): every screen, camera and audio source, surviving
    laptop sleep and screen changes. The 1.0 work, in order (the
    owner agreed 2026-11-22: "I agree with your v1.0 selection including
-   the addons"): item 12 (cameras, in flight), item 38 and item 22 (A/V sync, the
+   the addons"): item 38 and item 22 (A/V sync, the
    owner, 2026-11-23), item 4 (simplification,
    before item 7 touches the same code), item 7 with a sleep and wake
    scenario in the end-to-end tests if the VM can sleep and wake
@@ -329,41 +320,6 @@ Still open from D34: what AGC does and whether it is on in auto mode;
    by throwaway scripts in a session scratchpad, so remake them if
    gone. Candidates: a WAV copy derived at Stop, or the CSV; the
    recording itself stays a fragmented `.mov`. Design first.
-12. **Cameras** (the owner, 2026-11-16: "we'll have to add a feature to
-   record cameras, same slider: none, default, all, all + virtual. Auto
-   defaults to default camera if available"; 2026-11-18: keep "all +
-   virtual"). A camera's file carries
-   audio too ("Later for webcam we'll have more combined files as we of
-   course want have audio there as well", 2026-11-16). Design first.
-   Each camera records its largest format that still delivers the
-   wanted frame rate (the owner, 2026-11-18); the architect proposes
-   that the recording resolution caps cameras as it caps screens (a
-   4K camera often delivers MJPEG, a decode on top of the encode).
-   The owner (2026-11-18): a camera's file carries the camera's own
-   microphone when it has one ("sync problem might be there"), and
-   where a camera offers an H.264 stream, the recorder takes it as-is
-   rather than decoding and encoding again. Open for the design: the
-   audio of a camera without a microphone; whether AVFoundation hands
-   out a camera's H.264 stream undecoded at all [ASSUMED: it usually
-   delivers decoded frames]; and how a stream taken as-is fits D11's
-   constant 30 fps on the host clock (no frame repeated or dropped
-   without encoding again) and the resolution cap. Camera capture is
-   out of scope in D1, so this needs a decisions entry that supersedes
-   that line. A test device: a tester's Logitech BCC950 ConferenceCam
-   (a camera with a stereo microphone, recorded as an audio input on
-   2026-11-18); whether it offers H.264 is unchecked.
-   Signed off as text on 2026-11-22: all real cameras by default, auto
-   mode included ("I'd record all real cameras by default"; no users
-   yet, so "record everything"); the setting none, default, all, all +
-   virtual; each camera's file made like a screen file (HEVC, 30 fps on
-   the host clock, its largest format at 30 fps, capped by the
-   recording resolution); a camera that comes or goes starts or ends a
-   file with an event; the ready check asks for the Camera permission;
-   one row per camera in the status window; unit tests with a stand-in
-   camera, the real check on the owner's Mac; a decisions entry
-   superseding D1's "out of scope: camera capture". Taking the H.264
-   stream as-is is deferred. Audio: the two guide tracks, as a screen
-   file (the owner, 2026-11-22).
 13. **Presentation: the window and the terminal output** (the owner,
    2026-11-16: "if running in a terminal (try) then show the running
    status as persistent last line, recording time, CPU, recording size
@@ -714,6 +670,19 @@ Still open from D34: what AGC does and whether it is on in auto mode;
   the README (D46). Revisit when people struggle with it.
 
 ## Done (recent)
+
+- 2026-11-23: PR #27 merged by the owner: item 12 (cameras, D74, D76),
+  items 36 and 37 (D73), the wake bug, the homepage's claim, story and
+  workflow, the 1080p camera limit with its toggle, cameras another
+  app uses (Core Media I/O), mouse-over details, the audio delay
+  measured while recording and applied in the timeline file (D77),
+  problem lines red or orange with a capped, scrolling area (D78), the
+  guide limiter at −6 dBFS (D75) and a clearly late microphone leaving
+  the guide track (D79). Reviews: adversarial and delta reviews of
+  every round; real cameras on the owner's Mac (orientation turn, the
+  Osmo leaving the guide track, listened to in Resolve); end-to-end
+  tests passed on b35bce7; two CI-only failures fixed (Swift 6.3, test
+  timing; `docs/troubleshooting.md`).
 
 - 2026-11-22: PR #26 merged by the owner: item 21 (meters, input
   volume, no audio; absorbs item 11, D69), item 19 (D70), item 31,
