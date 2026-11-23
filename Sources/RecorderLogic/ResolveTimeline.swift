@@ -62,13 +62,16 @@ public enum ResolveTimeline {
                 name: file.name, source: file.camera, timecode: file.timecode, start: file.start, end: file.end,
                 mediaSeconds: mediaSeconds[file.name], channels: nil, recordingStart: recordingStart)
         }.filter { $0.frames > 0 }
-        let audios = try manifest.audioFiles.map { file in
+        let audiosAsRecorded = try manifest.audioFiles.map { file in
             try Placed(
                 name: file.name, source: file.audioSource, timecode: file.timecode, start: file.start, end: file.end,
                 mediaSeconds: mediaSeconds[file.name], channels: file.channels, recordingStart: recordingStart)
         }.filter { $0.frames > 0 }
-        let earliest = (screens + cameras + audios).min { $0.startFrame < $1.startFrame }
+        let earliest = (screens + cameras + audiosAsRecorded).min { $0.startFrame < $1.startFrame }
         let timelineStart = earliest?.startFrame ?? 0
+        let delays = Dictionary(manifest.audioFiles.compactMap { file in file.measuredDelay.map { (file.name, $0) } }) { $1 }
+        let audios = audiosAsRecorded.map { file in delays[file.name].map { file.placed(earlierBy: $0, notBefore: timelineStart) } ?? file }
+            .filter { $0.frames > 0 }
         let videoTracks = Self.videoTracks(screens, timelineStart: timelineStart)
             + Self.videoTracks(cameras, timelineStart: timelineStart)
         let audioTracks = Self.audioTracks(audios, timelineStart: timelineStart)
@@ -96,11 +99,15 @@ public enum ResolveTimeline {
 
     private struct Placed {
         let name: String
-        /// Where the file goes on the timeline: its timecode in frames, a day later for a file after midnight.
-        let startFrame: Int
+        /// Where the file goes on the timeline: its timecode in frames, a day
+        /// later for a file after midnight, earlier by its measured delay (D77).
+        var startFrame: Int
         /// The file's own timecode in frames, which its clip's source range keeps.
         let timecodeFrame: Int
-        let frames: Int
+        /// The frames the clip plays, from `trimmed` on.
+        var frames: Int
+        /// The file's first frames the clip leaves out: a delayed clip that would start before the timeline.
+        var trimmed = 0
         let channels: RecordingManifest.AudioFile.Channels?
         let label: String
         let number: Int
@@ -124,6 +131,19 @@ public enum ResolveTimeline {
             self.channels = channels
             label = Self.label(ofFileName: name, source: source)
             number = SourceLabel.listPosition(ofFileName: name).number
+        }
+
+        /// The file placed `delay` seconds earlier, to the nearest frame (negative: later); what would
+        /// start before `timelineStart` is trimmed off, so the clip starts there.
+        func placed(earlierBy delay: Double, notBefore timelineStart: Int) -> Placed {
+            var placed = self
+            placed.startFrame -= Int((delay * ResolveTimeline.rate).rounded())
+            if placed.startFrame < timelineStart {
+                placed.trimmed = timelineStart - placed.startFrame
+                placed.frames -= placed.trimmed
+                placed.startFrame = timelineStart
+            }
+            return placed
         }
 
         /// An audio input's number of mono tracks; the system audio's stereo track is one.
@@ -229,13 +249,13 @@ public enum ResolveTimeline {
     }
 
     private static func clip(_ file: Placed, metadata: Node) -> Node {
-        let available = range(start: file.timecodeFrame, frames: file.frames)
+        let available = range(start: file.timecodeFrame, frames: file.trimmed + file.frames)
         return .object([
             ("OTIO_SCHEMA", "Clip.2"),
             ("name", .string(file.name)),
             ("enabled", true),
             ("metadata", metadata),
-            ("source_range", available),
+            ("source_range", range(start: file.timecodeFrame + file.trimmed, frames: file.frames)),
             ("effects", .array([])),
             ("markers", .array([])),
             ("active_media_reference_key", "DEFAULT_MEDIA"),

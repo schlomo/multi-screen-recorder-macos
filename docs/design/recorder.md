@@ -420,6 +420,13 @@ Media are linked by file name only, relative to the timeline file.
   with n channels n mono tracks, `<label>` for one and `<label>, channel
   <k>` for more. The channels of one file are a linked group in Resolve.
   A gap fills each space before a clip, none follows the last clip.
+- **Audio delay (D77):** an audio file with a `measuredDelay` is placed
+  that much earlier (later for a negative one), rounded to the nearest
+  frame, as the timeline places every clip at a whole frame, so up to
+  17 ms remain; a clip that would then start before the timeline's start
+  begins there instead, its first frames left out of its source range
+  (its available range stays the whole file). The audio files and the
+  guide tracks keep their sound as recorded.
 - **Markers,** all on the timeline: the first, red, at frame 0, says in its
   name the resolution to set (the largest video file's frame size, which
   Resolve's reader has no key for) and in its note when it was recorded, how
@@ -502,7 +509,8 @@ every change:
       "state": "recording",
       "clockDriftCorrection": null,
       "clockDriftPpm": null,
-      "inputVolume": 0.757
+      "inputVolume": 0.757,
+      "measuredDelay": null
     },
     {
       "name": "2026-11-12 14.03.05 Audio 0 - System.mov",
@@ -513,7 +521,8 @@ every change:
       "timecode": "14:03:05:04",
       "state": "recording",
       "clockDriftCorrection": null,
-      "clockDriftPpm": null
+      "clockDriftPpm": null,
+      "measuredDelay": null
     },
     {
       "name": "2026-11-12 14.27.41 Screen 2 - LG HDR 4K.mov",
@@ -657,7 +666,11 @@ null until the file ends; `clockDriftPpm` its audio source's clock drift
 as shown at the file's end (see "Audio"), to 0.1 ppm, null until the
 file ends and if it was not measured by then; `inputVolume` an audio
 input's input volume at the file's start, 0 to 1 to the thousandth,
-null when it cannot be read, absent for the system audio (D69). `files` lists the screen
+null when it cannot be read, absent for the system audio (D69);
+`measuredDelay` the seconds its sound is later than the reference
+microphone's (negative: earlier), measured while recording, to 0.0001
+s, null when not measured: for the system audio, the reference, and a
+file with fewer than 3 clear windows (see "Audio delay", D77). `files` lists the screen
 files, the camera files and the audio files in the order of their start.
 
 **Names in a file name (D49, D55).** In a file name, `/` and `:` in a
@@ -898,7 +911,8 @@ checked, reported or rewritten at the next start (D47).
   drift while it records, with the sound the correction added so far,
   `-116 ppm (+34.9 ms)`; `measuring (+0.3 ms)` until the clock drift is
   known, `measuring` before any correction; zero is `0`, never `+0` or
-  `-0`; empty for a screen), then, drawn for an audio source only,
+  `-0`; empty for a screen; once its file's delay is measured, followed
+  by `· 550 ms late` or `· 30 ms early`, see "Audio delay", D77), then, drawn for an audio source only,
   "Level" (its level meter) and "Input volume" (an audio input's
   slider, where its input volume can be set; see "Audio", D69). Each
   row's mouse-over shows the source's details as the start window's
@@ -1389,6 +1403,31 @@ the metadata items (see "Output on disk").
   neither file), to 0.0001 s, and `clockDriftPpm`, the clock drift shown
   at the file's end, positive when the source's clock runs fast, to a
   tenth of a ppm, null if not measured by then.
+- **Audio delay (D77).** Some audio inputs deliver their sound later
+  than others by more than their clock says: on the owner's Mac on
+  2026-11-23 a DJI Osmo Pocket's microphone was 450 ms to 590 ms later
+  than a Razer Seiren's, while Core Audio's latency properties reported
+  0 to 1.5 ms for every microphone. So the recorder measures it while
+  recording: each audio input's corrected sound also goes, mono at 8
+  kHz (each 6 samples averaged), into a ring of its latest 12 s
+  (`AudioDelayFeed`); every 10 s, off the capture queues and the main
+  thread, each audio input file being written is cross-correlated
+  (`AudioDelay`, Accelerate's FFT) with the reference microphone over
+  their latest common 10 s, searching ±1 s. The reference is the default
+  microphone when it is recorded, else the recorded audio input with the
+  lowest number; its own delay is taken as 0 and not written; the
+  system audio is neither measured nor the reference. A window counts
+  only when its match is clear, the peak of |correlation| at least 12
+  times its median over the searched lags (the measured windows gave 13
+  to 68 when clear, 5 to 9 when not), and not when either side is
+  silent or the window starts before the file. A file's delay is the
+  median of its counted windows' lags once it has 3; with fewer, none.
+  It goes into `recording.json` as the file's `measuredDelay` (a file
+  that ends before Stop keeps what was measured until then), the status
+  window's Clock drift column (`· 550 ms late`, `· 30 ms early`) and the
+  timeline file, which places the file's clip earlier by it; each
+  counted window is a detail line (`<file>: lag 550 ms late, clarity
+  31`). The audio files and the guide tracks are not changed.
 - **Failures.** A failing audio capture or writer and a full disk are
   handled for an audio file as for a screen file (below): the file
   ends, the event (`audio input failed`, `system audio failed`, `audio

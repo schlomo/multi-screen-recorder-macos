@@ -38,13 +38,14 @@ private func screen(
 
 private func audio(
     _ stamp: String = "10.00.00", _ label: String, channels: String, timecode: String = "10:00:00:00", start: Double = 0,
-    end: Double? = 10, suffix: String = ""
+    end: Double? = 10, suffix: String = "", delay: Double? = nil
 ) -> String {
     let source = label.components(separatedBy: " - ").dropFirst().joined(separator: " - ")
     let endText = end.map { String($0) } ?? "null"
+    let delayText = delay.map { String($0) } ?? "null"
     return """
         {"name": "2026-11-20 \(stamp) \(label)\(suffix).mov", "audioSource": "\(source)", "channels": \(channels), "start": \(start),
-         "end": \(endText), "timecode": "\(timecode)", "state": "finalized"}
+         "end": \(endText), "timecode": "\(timecode)", "state": "finalized", "measuredDelay": \(delayText)}
         """
 }
 
@@ -248,6 +249,27 @@ private extension Dictionary where Key == String, Value == Any {
             events: [event("screen connected", at: 12, extra: #", "screen": "LG""#)]))
         #expect(result["global_start_time"] != nil)
         #expect(result.stack.markers[1].frames == (300, 1))
+    }
+
+    /// A measured delay places the audio clip that much earlier, to the nearest frame; one that would start
+    /// before the timeline is trimmed at its start instead (D77).
+    @Test func aMeasuredDelayPlacesTheAudioClipEarlier() throws {
+        let result = try timeline(manifest(files: [
+            screen("10.00.00", "Screen 1 - A", timecode: "10:00:00:00", end: 20),
+            audio("10.00.01", "Audio 1 - Razer", channels: "1", timecode: "10:00:01:00", start: 1, end: 11),
+            audio("10.00.01", "Audio 2 - Osmo", channels: "1", timecode: "10:00:01:00", start: 1, end: 11, delay: 0.55),
+            audio("10.00.00", "Audio 3 - BRIO", channels: "1", timecode: "10:00:00:00", start: 0, end: 10, delay: 0.55),
+        ]))
+        #expect(result.trackNames == ["Screen 1 - A", "Audio 1 - Razer", "Audio 2 - Osmo", "Audio 3 - BRIO"])
+        #expect(result.tracks[1].children[0].frames == (0, 30))
+        #expect(result.tracks[2].children[0].frames == (0, 13))
+        #expect(result.tracks[2].clips[0].frames == (1_080_030, 300))
+        let trimmed = result.tracks[3].clips[0]
+        #expect(result.tracks[3].children.count == 1)
+        #expect(trimmed.frames == (1_080_017, 283))
+        let available = ((trimmed["media_references"] as! JSON)["DEFAULT_MEDIA"] as! JSON)["available_range"] as! JSON
+        #expect(((available["start_time"] as! JSON)["value"] as! Double, (available["duration"] as! JSON)["value"] as! Double)
+            == (1_080_000, 300))
     }
 
     @Test func aSourceWithTwoFilesIsOneTrackWithAGapBetweenAndNoGapAfter() throws {

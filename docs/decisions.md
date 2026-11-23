@@ -2396,3 +2396,42 @@ architect's reading.
   unchanged.
 - **Evidence:** [design/recorder.md](design/recorder.md), "Guide
   tracks"; `Sources/RecorderLogic/GuideTrackMix.swift`.
+
+## D77: Each audio input's delay is measured while recording and the timeline file shifts its audio (2026-11-23)
+
+- **Status:** in force.
+- **Context:** In a test recording on the owner's Mac on 2026-11-23, a
+  DJI Osmo Pocket's microphone was later than a Razer Seiren's by
+  447 ms to 589 ms (cross-correlation, 8 kHz mono, 10 s windows, ±1 s
+  search), drifting between two files of the same recording; Core
+  Audio's device latency properties reported about 0 to 1.5 ms for
+  every microphone. The clock drift correction (D49, D57) follows a
+  device's clock, not the delay in its sound path. The owner: "fix the
+  audio shift for all audio tracks now".
+- **Decision:** The architect's design, signed off by the owner: every
+  10 s while recording, each audio input file being written is
+  cross-correlated with a reference microphone over the latest 10 s,
+  ±1 s, at 8 kHz mono (Accelerate's FFT), off the capture threads, from
+  a ring of 12 s per input. The reference is the default microphone if
+  recorded, else the first recorded audio input; its delay is taken as
+  0; the system audio is neither measured nor the reference. A window
+  counts when the peak of |correlation| is at least 12 times its median
+  (clear windows measured 13 to 68, unclear ones 5 to 9) and neither
+  side is silent; a file's delay is the median of its counted windows,
+  none with fewer than 3. It is written as the audio file's
+  `measuredDelay` in `recording.json` (null when not measured), shown in
+  the status window's Clock drift column ("· 550 ms late"), and the
+  timeline file places the file's clip earlier by it, trimming its start
+  where it would begin before the timeline. The audio files and the
+  guide tracks on the video files stay as recorded. Decided while
+  building: the timeline shift is rounded to the nearest frame, as the
+  timeline places clips at whole frames at 30 fps.
+- **Consequences:** An edit opened from the timeline file has every
+  measured microphone in sync with the reference to within a frame; a
+  file's own sound and its guide tracks still carry the delay. A
+  microphone without 3 clear windows (a quiet room, a short file) is
+  left as recorded. Measuring costs one FFT cross-correlation of 2^18
+  points per audio input every 10 s.
+- **Evidence:** [design/recorder.md](design/recorder.md), "Audio
+  delay"; `Sources/RecorderLogic/AudioDelay.swift`,
+  `Sources/RecorderCore/AudioDelayFeed.swift`.

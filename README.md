@@ -111,6 +111,12 @@ confirmed yet.
   microphones' files kept the same lag to each other within 1 ms by
   room sound, where uncorrected they would have moved about 0.4 s
   apart.
+- **Audio delay:** some microphones deliver their sound later than
+  others, such as a camera's built-in microphone over USB, about 0.5 s
+  behind on the owner's Mac. The recorder measures each microphone's
+  delay against the default microphone while recording and the
+  timeline file places its audio that much earlier; the audio files
+  stay as recorded.
 - **USB docks:** plugging a USB device into a dock while recording can
   cause a few seconds of silence or repeated audio in the USB audio
   inputs.

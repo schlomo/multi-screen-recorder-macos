@@ -193,6 +193,10 @@ public struct RecordingManifest: Codable, Equatable, Sendable {
         /// An audio input's input volume at the file's start, 0 to 1; nil
         /// when it cannot be read, and for the system audio, which has none (D69).
         public var inputVolume: Double?
+        /// Seconds the file's sound is later than the reference microphone's,
+        /// measured while recording (D77; negative: earlier); nil when not
+        /// measured, as for the system audio and the reference itself.
+        public var measuredDelay: Double?
 
         public init(
             name: String, audioSource: String, audioSourceUID: String?, channels: Channels, start: Double, timecode: String
@@ -208,6 +212,7 @@ public struct RecordingManifest: Codable, Equatable, Sendable {
             clockDriftPpm = nil
             clockDriftCorrection = nil
             inputVolume = nil
+            measuredDelay = nil
         }
 
         /// The file ended with `correction` seconds of sound added and the
@@ -222,10 +227,10 @@ public struct RecordingManifest: Codable, Equatable, Sendable {
 
         private enum CodingKeys: String, CodingKey {
             case name, audioSource, audioSourceUID, channels, start, end, timecode, state, clockDriftPpm, clockDriftCorrection,
-                 inputVolume
+                 inputVolume, measuredDelay
         }
 
-        /// `end`, `clockDriftPpm` and `clockDriftCorrection` are written as null until known;
+        /// `end`, `clockDriftPpm`, `clockDriftCorrection` and `measuredDelay` are written as null until known;
         /// `audioSourceUID` and `inputVolume`, null when it cannot be read, only for an audio input.
         public func encode(to encoder: any Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
@@ -240,6 +245,7 @@ public struct RecordingManifest: Codable, Equatable, Sendable {
             try container.encode(clockDriftPpm, forKey: .clockDriftPpm)
             try container.encode(clockDriftCorrection, forKey: .clockDriftCorrection)
             if audioSourceUID != nil { try container.encode(inputVolume, forKey: .inputVolume) }
+            try container.encode(measuredDelay, forKey: .measuredDelay)
         }
     }
 
@@ -395,14 +401,24 @@ public struct RecordingManifest: Codable, Equatable, Sendable {
         return true
     }
 
-    /// An audio file ended: its entry as it ended; false once finalized.
+    /// An audio file ended: its entry as it ended, keeping the delay measured
+    /// while it was written; false once finalized.
     public mutating func audioFileEnded(_ file: AudioFile) -> Bool {
         guard state != .finalized else { return false }
         if let index = audioFiles.firstIndex(where: { $0.name == file.name }) {
+            var file = file
+            file.measuredDelay = audioFiles[index].measuredDelay
             audioFiles[index] = file
         } else {
             audioFiles.append(file)
         }
+        return true
+    }
+
+    /// The delay measured for an audio file so far (D77), to 0.1 ms; false once finalized or for a file not listed.
+    public mutating func audioDelayMeasured(_ delay: Double?, file name: String) -> Bool {
+        guard state != .finalized, let index = audioFiles.firstIndex(where: { $0.name == name }) else { return false }
+        audioFiles[index].measuredDelay = delay.map { ($0 * 10_000).rounded() / 10_000 }
         return true
     }
 

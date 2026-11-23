@@ -266,6 +266,24 @@ import Testing
         #expect(systemObject.keys.contains("inputVolume") == false)
     }
 
+    /// An audio file's measured delay is null until measured, and its end keeps it (D77).
+    @Test func anAudioFileKeepsItsMeasuredDelayAtItsEnd() throws {
+        var manifest = RecordingManifest(app: "a", started: Date(), timeZone: .gmt, settings: .manual)
+        let file = RecordingManifest.AudioFile(
+            name: "a.mov", audioSource: "OsmoPocket4P", audioSourceUID: "O", channels: .mono(1), start: 0, timecode: "t")
+        let unmeasured = try #require(try JSONSerialization.jsonObject(with: try JSONEncoder().encode(file)) as? [String: Any])
+        #expect(unmeasured["measuredDelay"] is NSNull)
+        _ = manifest.audioFileStarted(file)
+        let measured = manifest.audioDelayMeasured(0.553_24, file: "a.mov")
+        let unlisted = manifest.audioDelayMeasured(0.5, file: "other.mov")
+        #expect(measured && !unlisted)
+        var ended = file
+        ended.end = 12
+        _ = manifest.audioFileEnded(ended)
+        #expect(manifest.audioFiles.first?.measuredDelay == 0.5532)
+        #expect(manifest.audioFiles.first?.end == 12)
+    }
+
     @Test func anInputVolumeChangeCarriesTheVolumesFrom0To1() throws {
         var changed = RecordingEvent(at: 1_200_000_000, event: .audioInputVolumeChanged, audioSource: "Razer")
         changed.from = .volume(0.5)

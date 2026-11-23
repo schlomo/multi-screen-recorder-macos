@@ -152,6 +152,31 @@ import Testing
         #expect(text(.init(clockDriftPpm: -0.3, applied: -0.000_04, remaining: 0)) == "0 ppm (0 ms)")
     }
 
+    /// Once measured, the delay of the file being written follows the clock drift (D77).
+    @Test func anAudioInputShowsItsMeasuredDelay() {
+        var settings = Settings.defaults
+        settings.auto = false
+        settings.audioMode = .allInputs
+        settings.systemAudio = false
+        var tracker = AudioTracker(settings: settings)
+        let osmo = AudioInputInfo(name: "OsmoPocket4P", channelCount: 1, isDefault: false, transport: .usb, uid: "O")
+        let razer = AudioInputInfo(name: "Razer Seiren V3 Mini", channelCount: 1, isDefault: true, transport: .usb, uid: "R")
+        _ = tracker.begin(inputs: [osmo, razer], mainDisplayID: 1, screens: [1], at: 0)
+        _ = tracker.fileStarted(.input("O"), at: 0)
+        _ = tracker.fileStarted(.input("R"), at: 0)
+        var measured = RecordingManifest.AudioFile(
+            name: "o.mov", audioSource: "OsmoPocket4P", audioSourceUID: "O", channels: .mono(1), start: 0, timecode: "t")
+        measured.measuredDelay = 0.5504
+        var ended = RecordingManifest.AudioFile(
+            name: "r.mov", audioSource: "Razer Seiren V3 Mini", audioSourceUID: "R", channels: .mono(1), start: 0, timecode: "t")
+        ended.measuredDelay = -0.2
+        ended.end = 5
+        let rows = RecordingStatusTable.audioRows(sources: tracker.sourcesShown, files: [measured, ended], bytes: [:], clockDrift: [
+            .input("O"): ClockDriftCorrection.Status(clockDriftPpm: -116.12, applied: 0.03494, remaining: 0.00004),
+        ])
+        #expect(rows.map(\.clockDrift) == ["-116 ppm (+34.9 ms) · 550 ms late", "measuring"])
+    }
+
     /// An audio row knows its source, for its level meter and its input
     /// volume; an input with no audio says so, and shows its clock drift, as the correction keeps running (D69).
     @Test func anAudioInputWithNoAudioSaysSo() {

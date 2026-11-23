@@ -125,6 +125,8 @@ final class AudioCapture: @unchecked Sendable {
     }
     private let context: RecordingContext
     private let guides: GuideTrackFeed
+    /// Where an audio input's sound goes for measuring its delay (D77); nil for the system audio.
+    private let delays: AudioDelayFeed?
     private let guide: GuideTrack
     private let source: any AudioBufferSource
     private let reports: AudioCaptureReports
@@ -237,8 +239,10 @@ final class AudioCapture: @unchecked Sendable {
         drainTimeout: Duration = .seconds(RecorderValues.audioWaitBoundSeconds),
         now: (@Sendable () -> Int64)? = nil,
         inputVolume: (@Sendable () -> Double?)? = nil,
+        delays: AudioDelayFeed? = nil,
         makeWriter: MakeWriter? = nil
     ) {
+        self.delays = id == .systemAudio ? nil : delays
         self.id = id
         self.number = number
         self.name = name
@@ -351,6 +355,7 @@ final class AudioCapture: @unchecked Sendable {
         let channels = corrected.channels
         joinGuide(channelCount: channels.count)
         guides.receive(channels, from: label, to: guide, at: corrected.time)
+        if case .input(let uid) = id { delays?.receive(channels, from: uid, at: corrected.time) }
         guard var detector = noAudio else {
             _ = place(channels, at: corrected.time, appliedBefore: corrected.appliedAtStart, applied: corrected.applied)
             return

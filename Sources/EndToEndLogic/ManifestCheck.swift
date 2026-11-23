@@ -37,7 +37,7 @@ public struct ManifestCheck {
     ]
     static let audioInputFileKeys: Set = [
         "name", "audioSource", "audioSourceUID", "channels", "start", "end", "timecode", "state", "clockDriftPpm",
-        "clockDriftCorrection", "inputVolume",
+        "clockDriftCorrection", "inputVolume", "measuredDelay",
     ]
     static let systemAudioFileKeys = audioInputFileKeys.subtracting(["audioSourceUID", "inputVolume"])
     static let systemAudioSource = "System audio"

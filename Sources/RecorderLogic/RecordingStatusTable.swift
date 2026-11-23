@@ -97,7 +97,8 @@ public enum RecordingStatusTable {
 
     /// The audio sources' rows, below the cameras': Records at is the
     /// channels of the source's newest audio file; `clockDrift` the latest
-    /// clock drift correction status of each source's running capture.
+    /// clock drift correction status of each source's running capture; Clock
+    /// drift adds the delay measured for its file being written (D77): "-116 ppm (+34.9 ms) · 550 ms late".
     public static func audioRows(
         sources: [AudioTracker.Source], files: [RecordingManifest.AudioFile], bytes: [String: Int64],
         clockDrift: [AudioTracker.SourceID: ClockDriftCorrection.Status]
@@ -118,9 +119,11 @@ public enum RecordingStatusTable {
             }
             let cell: SourceCell = source.id == .systemAudio
                 ? .systemAudio(isRecorded: true) : .audioInput(source.number, name: source.name)
+            let drift = source.state == .recording || source.state == .noAudio ? clockDriftText(clockDrift[source.id]) : ""
+            let delay = own.last { $0.end == nil }?.measuredDelay.map(AudioDelay.text)
             return Row(
                 source: cell, recordsAt: channels, files: own.count, written: written, state: text(source.state),
-                clockDrift: source.state == .recording || source.state == .noAudio ? clockDriftText(clockDrift[source.id]) : "", audioSource: source.id)
+                clockDrift: [drift, delay ?? ""].filter { !$0.isEmpty }.joined(separator: " · "), audioSource: source.id)
         }
     }
 

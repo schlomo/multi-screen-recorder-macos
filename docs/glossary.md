@@ -360,6 +360,15 @@ file's end as `clockDriftPpm` (D57; under D49 it was measured over the
 whole file) and the sound the correction added as
 `clockDriftCorrection`.
 
+## Audio delay
+
+How much later an audio input's sound arrives than the reference
+microphone's (the default microphone when recorded, else the recorded
+audio input with the lowest number), beyond what its clock drift
+explains; measured while recording by cross-correlation and written as
+an audio file's `measuredDelay` (D77). The timeline file places the
+file's clip earlier by it; the audio file itself is unchanged.
+
 ## Recording resolution
 
 The maximum box a screen's looks-like size is shrunk to fit: 4K,
