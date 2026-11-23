@@ -2380,25 +2380,33 @@ architect's reading.
 - **Amended in review (2026-11-23):** "another app uses it" is read only while no capture of the recorder's own is the camera's, from its start until its capture-ended report, which comes once its file is finalized, after `stopRunning` returned, as Core Media I/O's running-somewhere counts the recorder's own session; then the cameras are read again, as a reading meanwhile was not taken: for a capture the recorder stopped, after its file ended; for one that ended by itself, in its stream's end (`streamEnded`); [ASSUMED] Core Media I/O is current by then (see D76).
 - **Evidence:** [design/recorder.md](design/recorder.md), "Cameras"; `Sources/RecorderLogic/CameraTracker.swift`, `Sources/RecorderCore/CameraCapture.swift`; backlog item 12.
 
-## D75: The guide mix's soft limiter approaches −2 dBFS, not full scale (2026-11-23)
+## D75: The guide mix's soft limiter approaches −6 dBFS, not full scale (2026-11-23)
 
-- **Status:** in force. Amends D52's limiter, whose curve approached ±1.
+- **Status:** in force. Amends D52's limiter, whose curve went from a
+  knee at 0.5 towards ±1.
 - **Context:** In a camera test recording on the owner's Mac on
   2026-11-23, a loud thump decoded from a guide track's AAC at 1.14 to
   1.19 although the mix before the encoder stayed within ±1: AAC
   overshoots a signal near full scale.
-- **Decision:** The architect's decision: the limiter keeps its knee at
-  0.5 (−6 dBFS) and approaches ±10^(−2/20) ≈ 0.794 (−2 dBFS,
-  `GuideTrackMix.limiterCeiling`) instead of ±1:
-  `0.5 + 0.294 · tanh((|x| − 0.5) / 0.294)` with its sign. (First
-  −1 dBFS, 0.891; lowered in review, as the cited overshoot of 1.14 to
-  1.19 at a ceiling of 1.0 means about 1.02 to 1.06 at 0.891.)
+- **Decision:** The architect's decision: the limiter keeps D52's 6 dB
+  between knee and ceiling, with its knee at 10^(−12/20) ≈ 0.251
+  (−12 dBFS, `GuideTrackMix.limiterKnee`), approaching ±10^(−6/20) ≈
+  0.501 (−6 dBFS, `GuideTrackMix.limiterCeiling`) instead of ±1:
+  `0.251 + 0.250 · tanh((|x| − 0.251) / 0.250)` with its sign. (First
+  a ceiling of −1 dBFS, then −2 dBFS with the knee at 0.5, both lowered
+  in review.) An analyst found that the AAC encoder (64 kbit/s, a
+  cutoff near 16.5 kHz) overshoots the limiter by up to 1.6×, depending
+  on the material, and that lowering the ceiling from 0 to −2 dBFS cut
+  the decoded peak by only about 0.7 dB. In a simulation on the
+  2026-11-23 recording, −6/−12 dBFS decoded to at most about 0.78,
+  roughly 2 dB below full scale.
 - **Consequences:** Loud passages on the "Audio inputs" guide track are
-  up to 2 dB quieter; a thump is expected to decode at about 0.91 to
-  0.95, below full scale. [ASSUMED] The overshoot scales with the level,
-  so the 14 to 19 % seen at 1.0 holds at 0.794; to be measured at the
-  next real test. The audio files and the "System audio" guide, still
-  clamped at ±1, are unchanged.
+  about 1.6 dB quieter than with −2 dBFS. The decoded peak is not
+  bounded: it depends on the material, and the margin seen is a
+  simulation's, to be checked at the next real test. A true-peak
+  limiter (a low-pass and lookahead before the limiter) is deferred.
+  The audio files and the "System audio" guide, still clamped at ±1,
+  are unchanged.
 - **Evidence:** [design/recorder.md](design/recorder.md), "Guide
   tracks"; `Sources/RecorderLogic/GuideTrackMix.swift`.
 

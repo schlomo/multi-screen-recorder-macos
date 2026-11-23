@@ -1522,12 +1522,17 @@ the metadata items (see "Output on disk").
   audio", stereo, unless system audio is off. The two are never mixed
   together. For "Audio inputs" each audio input is averaged to mono, the
   inputs are summed at unity gain, so a silent input never lowers a
-  live one, and a soft limiter keeps the sum within ±0.794, −2 dBFS
-  (`limiterCeiling`): unchanged up to 0.5 (−6 dBFS), above it
-  `0.5 + 0.294 · tanh((|x| − 0.5) / 0.294)` with its sign (D52, D75; the
-  ceiling was 1.0 until an audit of a recording on the owner's Mac,
-  2026-11-23, found AAC decoding a loud thump limited to 1.0 to 1.14
-  to 1.19). "System audio" is clamped to ±1. Each source is placed by
+  live one, and a soft limiter keeps the sum within ±0.501, −6 dBFS
+  (`limiterCeiling`): unchanged up to 0.251, −12 dBFS (`limiterKnee`),
+  above it `0.251 + 0.250 · tanh((|x| − 0.251) / 0.250)` with its sign
+  (D52, D75; the ceiling was 1.0 until an audit of a recording on the
+  owner's Mac, 2026-11-23, found AAC decoding a loud thump limited to
+  1.0 to 1.14 to 1.19). The AAC encoder (64 kbit/s, a cutoff near
+  16.5 kHz) overshoots the limiter by up to 1.6×, depending on the
+  material; in a simulation on that recording the mix decoded to at
+  most about 0.78, roughly 2 dB below full scale, but the decoded peak
+  is not bounded. A true-peak limiter (a low-pass and lookahead) is
+  deferred. "System audio" is clamped to ±1. Each source is placed by
   its own timestamps, the mix runs 200 ms (*data*) behind real time so
   every source's buffers have arrived, and a source that is missing is
   silence in its guide track. The mix is handed to every open screen

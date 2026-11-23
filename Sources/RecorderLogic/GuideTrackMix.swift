@@ -35,13 +35,12 @@ public struct GuideTrackMix: Sendable {
         self.delay = delay.nanoseconds
     }
 
-    /// Up to this level, the "Audio inputs" mix passes unchanged: −6 dBFS.
-    public static let limiterKnee: Float = 0.5
+    /// Up to this level, the "Audio inputs" mix passes unchanged: −12 dBFS, 6 dB below the ceiling (D52, D75).
+    public static let limiterKnee = Float(pow(10, -12.0 / 20))
 
-    /// The level the "Audio inputs" mix never exceeds: −2 dBFS, as AAC
-    /// decoded a mix limited to 1.0 to 1.14–1.19 at a loud thump (the owner's
-    /// Mac, 2026-11-23), so −1 dBFS would still decode above full scale (D75).
-    public static let limiterCeiling = Float(pow(10, -2.0 / 20))
+    /// The level the "Audio inputs" mix never exceeds: −6 dBFS, as its AAC overshoots the limiter by up to
+    /// 1.6×, depending on the material (D75).
+    public static let limiterCeiling = Float(pow(10, -6.0 / 20))
 
     /// The soft limiter of "Audio inputs": unchanged up to the knee, above it
     /// `knee + (ceiling − knee) · tanh((|x| − knee) / (ceiling − knee))`,
