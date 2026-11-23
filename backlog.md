@@ -2,12 +2,18 @@
 
 ## Next session starts here
 
-PR #26 merged on 2026-11-22. Next PR, branch `cameras` (the owner,
-2026-11-22): item 12 (cameras) with item 36, item 37 and the wake bug
-below, plus the homepage's new claim, story and workflow. 1.0 means
-"record everything reliably" (item 9). Kept as it is from PR #26:
-exact zeros on both sides of a gap do not add up to the 10 s of no
-audio (the owner, 2026-11-22: "leave it as is").
+PR #27 (branch `cameras`) is finishing: cameras, A/V sync of the
+microphones in the timeline file, the guide track fixes and the
+problem lines. Left before ready: the review fixes of D79 (in
+progress), the owner's listening test (the Osmo leaves the guide
+track, no echo), the end-to-end run on the head, the PR description
+rewritten (stale since b908b4f), one pipeline run. Then the A/V sync
+work, items 38 and 22, in that order (the owner, 2026-11-23:
+"Noticeable lip sync is my goal"; "Iterative improvement, every
+shipment is better"). Test recordings of 2026-11-23 (rec7 to rec11)
+sit in `$TMPDIR/camcheck` on the owner's Mac for the sync design;
+the owner's kept one is `keep/2026-11-23 10.56.18`; delete the rest
+once item 38 is built.
 
 Agents may run `msr record` on the owner's Mac (D48), with `HOME` set
 to a scratch folder (`AGENTS.md`, "Facts that bite"), and BetterDisplay's command
@@ -24,30 +30,16 @@ Still open from D34: what AGC does and whether it is on in auto mode;
 
 ## In flight
 
-- Branch `cameras`, one PR (the owner, 2026-11-22):
-  - Item 12, cameras: design signed off as text on 2026-11-22, with
-    the audio tracks, settled the same day: the same two guide tracks
-    as every screen file ("I agree with identical guide tracks on
-    every video"); a camera microphone track is not built.
-  - Item 36: `vm_start` in `scripts/end-to-end-vm/lib.sh` waits on a
-    real deadline (`SECONDS`), as `vm_wait_for_login` does since PR #26.
-  - Item 37 (signed off 2026-11-22): the driver's virtual screens are
-    "Desk Monitor" (1600x900) and "Portable Monitor" (1280x720),
-    recognised by vendor and product ID (`0x4D53`/`0x5254`), no
-    longer by the name prefix "MSR Test"; `ManifestCheck`'s label and
-    log lines follow; `docs/design/end-to-end-tests.md` and a decisions
-    entry. Then `update-homepage-screenshots --release` after its
-    release.
-  - The wake bug (from item 7, found in PR #21's review): after a wake
-    with screens that cannot be read, the recorder returns before the
-    audio's wake, so the system audio does not come back
-    (`Recorder.swift`, `didWake`). The owner: "one promise is that we
-    survive laptop sleep and screen changes".
-  - Homepage and claim: cameras in the claim (homepage, `README.md`,
-    `AGENTS.md`); a short story credited to Nadia Schapiro; the strong
-    hint at testing goes; a recommended workflow: record everything,
-    open the timeline file (`.otio`) in the editor, remove the tracks
-    not needed, trim start and end, done.
+- PR #27, branch `cameras` (draft): item 12 (cameras, D74, D76),
+  items 36 and 37 (D73), the wake bug, the homepage's claim, story and
+  workflow, plus what the owner's tests of 2026-11-23 asked for: the
+  1080p camera limit with its toggle, cameras another app uses (Core
+  Media I/O), the mouse-over details, the audio delay measured while
+  recording and applied in the timeline file (D77), problem lines red
+  or orange by the owner's rule with a capped, scrolling area (D78),
+  the guide limiter at −6 dBFS (D75), and a clearly late microphone
+  leaving the guide track (D79, the owner: "Yes, it should"). Reviewed
+  in seven rounds; the D79 fix round is in progress.
 
 ## Queued
 
@@ -281,7 +273,8 @@ Still open from D34: what AGC does and whether it is on in auto mode;
    2026-11-22): every screen, camera and audio source, surviving
    laptop sleep and screen changes. The 1.0 work, in order (the
    owner agreed 2026-11-22: "I agree with your v1.0 selection including
-   the addons"): item 12 (cameras, in flight), item 4 (simplification,
+   the addons"): item 12 (cameras, in flight), item 38 and item 22 (A/V sync, the
+   owner, 2026-11-23), item 4 (simplification,
    before item 7 touches the same code), item 7 with a sleep and wake
    scenario in the end-to-end tests if the VM can sleep and wake
    [CONJECTURE], item 25, item 29, then these acceptance tests on the
@@ -467,24 +460,31 @@ Still open from D34: what AGC does and whether it is on in auto mode;
    branch `troubleshooting-ci-runner` holds two troubleshooting entries
    (no macOS runner; a crash dialog for crash reports the tests wrote):
    they ship with this item.
-22. **Lip sync calibration** (the owner, 2026-11-18: measured AV
-   offsets between cameras and microphones; fixing them by hand in
-   Resolve is "super tedious", so worth automating): a support tool
-   shows a signal on the laptop's built-in screen and plays a sound on
-   its built-in speakers; the person points each camera at the screen;
-   the tool measures every camera's and microphone's offset and the
-   recorder corrects for it, for lip sync across all cameras and
-   microphones. The built-in screen and speakers are the source (the
-   owner), because their own delays are small and known; Bluetooth or
-   external ones would add their delay to the measurement. Known for
-   the design: lip sync is noticed beyond about +45 ms audio early and
-   −125 ms audio late (ITU-R BT.1359); audio shifts by the sample,
-   video at 30 fps only by 33 ms frames (D11), so the correction moves
-   audio; a webcam's delay may change with its exposure in low light
-   [CONJECTURE], so the design says when a stored offset is measured
-   again. Needs item 12. Design first. Measured 2026-11-18 (30 minutes,
-   a radio in the room): the Razer and the BRIO stay a constant 17 to
-   18 ms apart, before and after a replug of the Razer, with no drift.
+22. **A/V sync, cameras** (the owner, 2026-11-23: "Noticeable lip
+   sync is my goal"; claps "something we encourage without requiring
+   them"; a Calibrate button "highlight[ed] if recommended and ...
+   muted if we think it's not needed"). The architect's design, agreed
+   in general by the owner, to be signed off as text before building:
+   a camera's picture delay is measured from claps (the sound's onset
+   in the reference microphone, then the frame where each camera's
+   motion burst stops), watched all the time at about 0.03 % of a core
+   per camera; a value is stored per camera and format with its date
+   only once 3 claps agree within a frame; it is applied as a fixed
+   shift per camera file at its start (never inside a running file),
+   a value measured mid-file applies to the next file and to this
+   file's clip in the timeline file; a camera without a value is "not
+   measured" and not shifted. A Calibrate button guides "clap 3 times
+   where all cameras see you", highlighted when a recorded camera has
+   no value or an uncertain one (format, orientation, frame rate
+   changed, or old). Later in it: a flash on the screen plus a sound
+   (measured 2026-11-23, 10 of 10 events seen by every camera in an
+   empty room; a button, never automatic: calls, audiences).
+   Evidence 2026-11-23: picture later than the Razer's sound by about
+   +25 ms (BRIO) and +125 ms (Osmo) by a clap, +31 and +164 ms by the
+   flash; content without claps (motion against sound) fails, chance
+   level; lip analysis with Vision promising but fragile and 14 % of a
+   core, deferred. Tolerance: ITU-R BT.1359, sound at most 45 ms early
+   or 125 ms late. With item 39 if both touch the source rows.
 25. **A new screen showing a still picture gets no file until it
    changes** (found by PR #23's runs, 2026-11-19): ScreenCaptureKit
    delivers complete frames only on change, so a newly connected
@@ -530,7 +530,64 @@ Still open from D34: what AGC does and whether it is on in auto mode;
    PR #26's runs (2026-11-22): once more 1.37 to 1.50 s in the first
    recording of the session, within 0.8 s in the later ones.
 
+38. **A/V sync, microphones in the guide track** (next after PR #27;
+   the owner, 2026-11-23: late microphones "should stay if we can
+   compensate for them"; the guide track is "primary artifact for easy
+   users ... the quality there matters"; "1s crash lost is totally
+   fine, 2-3s would be also totally fine"). The architect's design,
+   reviewed by a top-tier analyst, to be signed off as text: zero stays
+   the earliest microphone (D77); the guide mix runs about 1 s behind
+   live with each microphone placed by its audio delay, a change
+   crossfaded; D79's limit rises to about 0.8 s; fragments go from 2 s
+   to 1 s so a crash still costs about 2 to 3 s (to be measured with
+   the project's writer); a microphone that leaves keeps its last
+   second in the mix. An audio delay changes only when at least 5
+   counted windows over at least 60 s agree on a change of more than a
+   frame; `recording.json` lists each change and the timeline file
+   splits an audio clip at it. Evidence: rec9 (90 min, 2026-11-23) the
+   Osmo's delay moved from 558 ms (minutes 0 to 30) to 450 to 485 ms
+   (minutes 40 to 90), so one value per file was about 90 ms off for
+   an hour; the BRIO held 14 ms. Not doing: the Mac's own sound as the
+   zero (fails with headphones, Bluetooth, echo cancellation).
+39. **Compact source rows** (the owner, 2026-11-23: "with the cameras
+   on my system and the lots of devices vertical space starts to be a
+   problem"): sources not recorded (virtual, suspended, no audio)
+   collapse into one row "+n not recorded"; the source table scrolls
+   inside the window, in the status window and in "What will be
+   recorded". Design first.
+40. **A seam for screens in the recorder's tests**: `ScreenCapture`
+   is concrete, so a screen's problem lines ("Screen 1 DELL ... then
+   disconnected") are covered by reading only (PR #27's reviews).
+41. **Audio tests sometimes start no file after one buffer** (found
+   in PR #27, worked around with `startAudioFiles`); cause unknown.
+42. **The MacBook microphone's audio file far above full scale**:
+   rec9's decoded at +14.4 dBFS (2279 samples above 1.0 in a second);
+   fine in a float editor, clipped in any 16- or 24-bit export. Find
+   where the level comes from.
+43. **Orange problems and the Dock** (owner's call): every problem
+   bounces the Dock, sets the "!" badge and counts in the status line,
+   orange ones included; by the owner's rule orange needs no human.
+   D79's kind is exempt; ask whether all orange ones should be.
+44. **Smaller follow-ups from PR #27**: a stopRunning time-out for a
+   camera; `framesRepeatedForLateness` names frames placed late (a
+   manifest key, the owner's to rename); the Razer's padded zeros are
+   not in the manifest; the System audio guide track is still clamped
+   at ±1; a virtual camera in the end-to-end VM so camera capture gets
+   an automatic test; a warning when a camera shares a USB 2 bus.
+
 ## Deliberately deferred
+
+- **A true-peak guide limiter** (low-pass plus lookahead; the
+  analysis of 2026-11-23): the AAC encoder overshoots the soft limiter
+  by up to 1.6×; D75's −6 dBFS ceiling keeps about 2 dB margin in a
+  simulation. Revive with item 38, whose 1 s hindsight gives the
+  lookahead for free, or if a guide track clips audibly.
+- **Timeline markers at the device events, not the track starts**
+  (the owner, 2026-11-23: "I'd tend to leave for now as it nicely
+  illustrates the facts").
+- **A camera's picture delay from content without claps** (motion
+  against sound fails, 2026-11-23; lip analysis fragile and heavy).
+  Revive if lip analysis after Stop proves robust on other speakers.
 
 - **No snapshot release for a homepage-only PR** (D72): a homepage-only
   PR builds a throwaway `pr-<n>`, removed at close, and a screenshot
