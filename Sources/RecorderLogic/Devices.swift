@@ -65,7 +65,7 @@ public struct AudioInputInfo: Equatable, Sendable {
     /// The number of channels, or why it cannot be read; each input is read by itself.
     public var channelCount: Result<Int, DeviceReadError>
     public var isDefault: Bool
-    public var transport: AudioTransport
+    public var transport: DeviceTransport
     /// The Core Audio UID, by which a recording knows the input and opens it;
     /// nil when it cannot be read.
     public var uid: String?
@@ -75,7 +75,7 @@ public struct AudioInputInfo: Equatable, Sendable {
     public var inputVolume: InputVolumeReading?
 
     public init(
-        name: String, channelCount: Result<Int, DeviceReadError>, isDefault: Bool, transport: AudioTransport = .builtIn,
+        name: String, channelCount: Result<Int, DeviceReadError>, isDefault: Bool, transport: DeviceTransport = .builtIn,
         uid: String? = nil, sampleRate: Double? = nil, inputVolume: InputVolumeReading? = nil
     ) {
         self.name = name
@@ -87,7 +87,7 @@ public struct AudioInputInfo: Equatable, Sendable {
         self.inputVolume = inputVolume
     }
 
-    public init(name: String, channelCount: Int, isDefault: Bool, transport: AudioTransport = .builtIn, uid: String? = nil) {
+    public init(name: String, channelCount: Int, isDefault: Bool, transport: DeviceTransport = .builtIn, uid: String? = nil) {
         self.init(name: name, channelCount: .success(channelCount), isDefault: isDefault, transport: transport, uid: uid)
     }
 
@@ -255,7 +255,7 @@ public struct CameraInfo: Equatable, Sendable {
     /// its active format. AVFoundation's `isInUseByAnotherApplication` misses a browser's use (D74).
     public var isRunningElsewhere: Bool
     /// How AVFoundation says the camera is connected (`transportType`, as Core Audio's).
-    public var transport: AudioTransport
+    public var transport: DeviceTransport
     /// Each frame size the camera offers once, with all its rates (`CameraFormat.offered`).
     public var offeredFormats: [CameraFormat]
     /// The frame rates the camera runs at now, nil where they cannot be read.
@@ -266,7 +266,7 @@ public struct CameraInfo: Equatable, Sendable {
     public init(
         uniqueID: String, name: String, isDefault: Bool, isVirtual: Bool, isContinuity: Bool = false, formats: [CameraFormat],
         isSuspended: Bool = false, activeFormat: CameraFormat? = nil, isRunningElsewhere: Bool = false,
-        transport: AudioTransport = .unknown, offeredFormats: [CameraFormat] = [], activeFrameRates: ClosedRange<Double>? = nil,
+        transport: DeviceTransport = .unknown, offeredFormats: [CameraFormat] = [], activeFrameRates: ClosedRange<Double>? = nil,
         usbSpeed: USBSpeed? = nil
     ) {
         self.uniqueID = uniqueID

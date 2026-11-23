@@ -1,6 +1,6 @@
-/// How an audio input is connected to the Mac, as Core Audio reports its
-/// transport type.
-public enum AudioTransport: Equatable, Sendable, CaseIterable {
+/// How an audio input or a camera is connected to the Mac, as Core Audio
+/// (for a camera, AVFoundation) reports its transport type.
+public enum DeviceTransport: Equatable, Sendable, CaseIterable {
     case builtIn
     case usb
     case fireWire

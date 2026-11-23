@@ -123,7 +123,7 @@ import Testing
             .replacing(/\s+/) { _ in " " }.contains(note))
     }
 
-    private func input(_ transport: AudioTransport, isDefault: Bool = false) -> AudioInputInfo {
+    private func input(_ transport: DeviceTransport, isDefault: Bool = false) -> AudioInputInfo {
         AudioInputInfo(name: "X", channelCount: 1, isDefault: isDefault, transport: transport)
     }
 
@@ -135,29 +135,29 @@ import Testing
     }
 
     @Test(arguments: [
-        (AudioTransport.builtIn, true), (.usb, true), (.fireWire, true), (.pci, true), (.thunderbolt, true),
+        (DeviceTransport.builtIn, true), (.usb, true), (.fireWire, true), (.pci, true), (.thunderbolt, true),
         (.hdmi, true), (.displayPort, true),
         (.bluetooth, false), (.bluetoothLE, false), (.virtual, false), (.aggregate, false), (.airPlay, false),
         (.continuityCapture, false), (.unknown, false), (.unreadable, false),
     ])
-    func onlyBuiltInAndWiredTransportsAreWired(transport: AudioTransport, isWired: Bool) {
+    func onlyBuiltInAndWiredTransportsAreWired(transport: DeviceTransport, isWired: Bool) {
         #expect(transport.isWired == isWired)
     }
 
     @Test func everyTransportIsClassified() {
-        #expect(AudioTransport.allCases.count == 15)
+        #expect(DeviceTransport.allCases.count == 15)
     }
 
-    @Test(arguments: AudioTransport.allCases)
-    func theDefaultMicrophoneIsRecordedInEveryModeButNone(transport: AudioTransport) {
+    @Test(arguments: DeviceTransport.allCases)
+    func theDefaultMicrophoneIsRecordedInEveryModeButNone(transport: DeviceTransport) {
         for mode in AudioMode.allCases where mode != .none {
             #expect(records(mode, input(transport, isDefault: true)))
         }
         #expect(!records(.none, input(transport, isDefault: true)))
     }
 
-    @Test(arguments: AudioTransport.allCases)
-    func otherInputsFollowTheMode(transport: AudioTransport) {
+    @Test(arguments: DeviceTransport.allCases)
+    func otherInputsFollowTheMode(transport: DeviceTransport) {
         let other = input(transport)
         #expect(!records(.none, other))
         #expect(!records(.defaultMicrophone, other))

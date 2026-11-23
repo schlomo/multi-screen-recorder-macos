@@ -238,23 +238,23 @@ import Testing
 
     // Why an input is not recorded, after its name in parentheses: the reason comes from the rule that does not record it.
 
-    private func reason(_ transport: AudioTransport, isDefault: Bool = false, uid: String? = "U", mode: AudioMode) -> String? {
+    private func reason(_ transport: DeviceTransport, isDefault: Bool = false, uid: String? = "U", mode: AudioMode) -> String? {
         var settings = Settings.manual
         settings.audioMode = mode
         return settings.reasonNotRecorded(AudioInputInfo(name: "X", channelCount: 1, isDefault: isDefault, transport: transport, uid: uid))
     }
 
-    @Test(arguments: [(AudioTransport.virtual, "virtual"), (.bluetooth, "Bluetooth"), (.bluetoothLE, "Bluetooth"),
+    @Test(arguments: [(DeviceTransport.virtual, "virtual"), (.bluetooth, "Bluetooth"), (.bluetoothLE, "Bluetooth"),
                       (.aggregate, "aggregate"), (.airPlay, "AirPlay"), (.continuityCapture, "Continuity Capture"),
                       (.unknown, "unknown connection"), (.unreadable, "unknown connection")])
-    func underWiredAnInputThatIsNotWiredSaysItsConnection(transport: AudioTransport, expected: String) {
+    func underWiredAnInputThatIsNotWiredSaysItsConnection(transport: DeviceTransport, expected: String) {
         #expect(reason(transport, mode: .wired) == expected)
         #expect(reason(transport, isDefault: true, mode: .wired) == nil)
         #expect(reason(transport, mode: .allInputs) == nil)
     }
 
-    @Test(arguments: AudioTransport.allCases.filter(\.isWired))
-    func underWiredAWiredInputIsRecordedAndNeedsNoReason(transport: AudioTransport) {
+    @Test(arguments: DeviceTransport.allCases.filter(\.isWired))
+    func underWiredAWiredInputIsRecordedAndNeedsNoReason(transport: DeviceTransport) {
         #expect(reason(transport, mode: .wired) == nil)
     }
 
@@ -267,8 +267,8 @@ import Testing
         #expect(reason(.virtual, uid: nil, mode: .wired) == "virtual")
     }
 
-    @Test(arguments: AudioTransport.allCases)
-    func underNoneAndDefaultMicrophoneTheSettingsLineGivesTheReasonNotTheName(transport: AudioTransport) {
+    @Test(arguments: DeviceTransport.allCases)
+    func underNoneAndDefaultMicrophoneTheSettingsLineGivesTheReasonNotTheName(transport: DeviceTransport) {
         #expect(reason(transport, mode: .none) == nil)
         #expect(reason(transport, mode: .defaultMicrophone) == nil)
     }
@@ -278,7 +278,7 @@ import Testing
         var settings = Settings.defaults
         settings.auto = true
         settings.audioMode = .allInputs
-        func input(_ transport: AudioTransport) -> AudioInputInfo {
+        func input(_ transport: DeviceTransport) -> AudioInputInfo {
             AudioInputInfo(name: "X", channelCount: 1, isDefault: false, transport: transport, uid: "U")
         }
         #expect(settings.reasonNotRecorded(input(.virtual)) == "virtual")

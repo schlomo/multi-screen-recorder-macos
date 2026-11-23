@@ -20,7 +20,7 @@ public func currentCameras() -> [CameraInfo] {
     let devices = cameraDevices()
     let speeds = devices.contains { $0.transportType == Int32(bitPattern: kAudioDeviceTransportTypeUSB) } ? usbSpeeds() : [:]
     return devices.map { device in
-        let transport = audioTransport(coreAudioValue: UInt32(bitPattern: device.transportType))
+        let transport = deviceTransport(coreAudioValue: UInt32(bitPattern: device.transportType))
         return CameraInfo(
             uniqueID: device.uniqueID, name: device.localizedName, isDefault: device.uniqueID == defaultID,
             isVirtual: cameraIsVirtual(deviceType: device.deviceType, transportType: device.transportType),
@@ -112,7 +112,7 @@ func cameraFormat(of format: AVCaptureDevice.Format) -> CameraFormat {
 /// other transport, virtual and unknown ones included, is virtual (D74).
 func cameraIsVirtual(deviceType: AVCaptureDevice.DeviceType, transportType: Int32) -> Bool {
     if [.builtInWideAngleCamera, .continuityCamera, .deskViewCamera].contains(deviceType) { return false }
-    return switch audioTransport(coreAudioValue: UInt32(bitPattern: transportType)) {
+    return switch deviceTransport(coreAudioValue: UInt32(bitPattern: transportType)) {
     case .builtIn, .usb, .fireWire, .pci, .thunderbolt, .continuityCapture: false
     case .hdmi, .displayPort, .bluetooth, .bluetoothLE, .virtual, .aggregate, .airPlay, .unknown, .unreadable: true
     }
@@ -123,7 +123,7 @@ func cameraIsVirtual(deviceType: AVCaptureDevice.DeviceType, transportType: Int3
 /// one (D74).
 func cameraIsContinuity(deviceType: AVCaptureDevice.DeviceType, transportType: Int32) -> Bool {
     [.continuityCamera, .deskViewCamera].contains(deviceType)
-        || audioTransport(coreAudioValue: UInt32(bitPattern: transportType)) == .continuityCapture
+        || deviceTransport(coreAudioValue: UInt32(bitPattern: transportType)) == .continuityCapture
 }
 
 /// Follows the cameras: one connected or disconnected (video devices only)

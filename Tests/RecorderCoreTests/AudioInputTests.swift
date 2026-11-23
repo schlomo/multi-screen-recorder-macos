@@ -10,7 +10,7 @@ import Testing
     private func inputs(
         _ channels: [InputChannels],
         name: (AudioObjectID) throws(DeviceReadError) -> String? = { "Device \($0)" },
-        transport: (AudioObjectID) -> AudioTransport = { _ in .builtIn },
+        transport: (AudioObjectID) -> DeviceTransport = { _ in .builtIn },
         defaultInput: () throws(DeviceReadError) -> AudioObjectID = { AudioObjectID(kAudioObjectUnknown) }
     ) throws -> [AudioInputInfo] {
         try audioInputs(
@@ -98,7 +98,7 @@ import Testing
     }
 
     @Test(arguments: [
-        (kAudioDeviceTransportTypeBuiltIn, AudioTransport.builtIn),
+        (kAudioDeviceTransportTypeBuiltIn, DeviceTransport.builtIn),
         (kAudioDeviceTransportTypeUSB, .usb),
         (kAudioDeviceTransportTypeFireWire, .fireWire),
         (kAudioDeviceTransportTypePCI, .pci),
@@ -117,13 +117,13 @@ import Testing
         (kAudioDeviceTransportTypeUnknown, .unknown),
         (0x1234_5678, .unknown),
     ])
-    func coreAudioTransportTypesAreClassified(value: UInt32, transport: AudioTransport) {
-        #expect(audioTransport(coreAudioValue: value) == transport)
+    func coreAudioTransportTypesAreClassified(value: UInt32, transport: DeviceTransport) {
+        #expect(deviceTransport(coreAudioValue: value) == transport)
     }
 
     @Test func aTransportThatCannotBeReadIsUnreadableAndNotWired() {
-        #expect(audioTransport(coreAudioValue: nil) == .unreadable)
-        #expect(!audioTransport(coreAudioValue: nil).isWired)
+        #expect(deviceTransport(coreAudioValue: nil) == .unreadable)
+        #expect(!deviceTransport(coreAudioValue: nil).isWired)
     }
 
     @Test(arguments: [
@@ -137,7 +137,7 @@ import Testing
         (kAudioDeviceTransportTypeContinuityCaptureWireless, false), (kAudioDeviceTransportTypeUnknown, false),
     ])
     func wiredIsClassifiedPerCoreAudioTransportType(value: UInt32, isWired: Bool) {
-        #expect(audioTransport(coreAudioValue: value).isWired == isWired)
+        #expect(deviceTransport(coreAudioValue: value).isWired == isWired)
     }
 
     /// Reads this Mac's audio devices, which needs no permission and shows

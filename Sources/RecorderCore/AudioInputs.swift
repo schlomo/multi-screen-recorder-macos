@@ -15,7 +15,7 @@ enum InputChannels: Equatable {
 public func currentAudioInputs() throws(DeviceReadError) -> [AudioInputInfo] {
     try audioInputs(
         devices: try audioDeviceIDs(), inputChannels: inputChannels, name: audioDeviceName,
-        transport: { audioTransport(coreAudioValue: audioDeviceTransportType($0)) },
+        transport: { deviceTransport(coreAudioValue: audioDeviceTransportType($0)) },
         uid: audioDeviceUID, defaultInput: defaultInputDeviceID, sampleRate: audioDeviceSampleRate,
         inputVolume: { id in
             CoreAudioInputVolume(device: id, name: "").map { InputVolumeReading(value: $0.read(), isSettable: $0.isSettable) }
@@ -32,7 +32,7 @@ func audioInputs(
     devices: [AudioObjectID],
     inputChannels: (AudioObjectID) -> InputChannels,
     name: (AudioObjectID) throws(DeviceReadError) -> String?,
-    transport: (AudioObjectID) -> AudioTransport,
+    transport: (AudioObjectID) -> DeviceTransport,
     uid: (AudioObjectID) -> String?,
     defaultInput: () throws(DeviceReadError) -> AudioObjectID,
     sampleRate: (AudioObjectID) -> Double? = { _ in nil },
@@ -184,7 +184,7 @@ private func audioDeviceName(_ id: AudioObjectID) throws(DeviceReadError) -> Str
 
 /// The transport of a Core Audio transport type; nil, a type that could not
 /// be read, is unreadable and any type not named here unknown.
-func audioTransport(coreAudioValue value: UInt32?) -> AudioTransport {
+func deviceTransport(coreAudioValue value: UInt32?) -> DeviceTransport {
     guard let value else { return .unreadable }
     return switch value {
     case kAudioDeviceTransportTypeBuiltIn: .builtIn
