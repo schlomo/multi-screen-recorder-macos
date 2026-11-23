@@ -1530,10 +1530,13 @@ no audio of the camera's own.
   format with the largest recorded size is chosen, and of formats with
   that same recorded size the smallest, the least to decode. Of formats
   that record as much and are as large (such as 1920×1080 and
-  1080×1920), the narrower is opened, whatever the camera lists first:
-  the Osmo in its 9:16 mode lists 1080×1920 and a 1920×1080 with the
-  upright picture pillarboxed in it, and the narrower is the real
-  picture. So at 720p a camera with 640×480 and 1920×1080 records
+  1080×1920), the one turned as the camera's active format (portrait,
+  landscape or square) is opened, as the camera's own orientation tells
+  which picture it means: the Osmo in its 9:16 mode runs in 1080×1920
+  and also lists a 1920×1080 with that picture pillarboxed in it, while
+  the FaceTime HD Camera, offering 1920×1080, 1080×1920 and 1552×1552,
+  runs in 1920×1080. Without an active format, or still tied, landscape
+  goes first, then the narrower, whatever the camera lists first. So at 720p a camera with 640×480 and 1920×1080 records
   1920×1080 scaled to 1280×720, and a BRIO with 4096×2160, 3840×2160
   and 1920×1080 records 1920×1080 as it is at 1080p and at Native. A
   camera with no format reaching 30 fps records its fastest, the

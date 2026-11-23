@@ -237,7 +237,9 @@ public struct CameraInfo: Equatable, Sendable {
     /// of any aspect ratio, records its size fitted into the camera's box
     /// (`cameraFrameSize(for:)`, never enlarged, a portrait one against the
     /// box turned upright); the format with the largest recorded size, and of
-    /// those the smallest, the least to decode, then the narrower. A
+    /// those the smallest, the least to decode, then the one turned as the
+    /// camera's active format (portrait, landscape or square), then
+    /// landscape before the rest, then the narrower. A
     /// camera with no format at that rate delivers its fastest, the largest
     /// of those. Nil for a camera that lists no format. Not at None, which records no camera.
     public func chosenFormat(resolution: RecordingResolution) -> CameraFormat? {
@@ -247,16 +249,23 @@ public struct CameraInfo: Equatable, Sendable {
             return formats.max { ($0.maxFramesPerSecond.rounded(), $0.size.pixelCount) < ($1.maxFramesPerSecond.rounded(), $1.size.pixelCount) }
         }
         let recorded = { (format: CameraFormat) in resolution.cameraFrameSize(for: format.size).pixelCount }
-        // Of equal ones the narrower: the Osmo's upright 1080×1920, not its pillarboxed 1920×1080.
-        return fastEnough.max {
-            (recorded($0), -$0.size.pixelCount, -$0.size.width) < (recorded($1), -$1.size.pixelCount, -$1.size.width)
+        // The active format's orientation is the picture the camera means: the Osmo's 9:16 mode is
+        // 1080×1920, also listed pillarboxed as 1920×1080, while the FaceTime camera means 1920×1080.
+        let turnedAsActive = { (format: CameraFormat) in activeFormat.map { Self.turn(of: $0.size) == Self.turn(of: format.size) } ?? false }
+        let key = { (format: CameraFormat) in
+            (recorded(format), -format.size.pixelCount, turnedAsActive(format) ? 1 : 0,
+             format.size.width > format.size.height ? 1 : 0, -format.size.width)
         }
+        return fastEnough.max { key($0) < key($1) }
     }
 
     /// The frame size of the camera's file: its chosen format's size, fitted into the camera's box.
     public func frameSize(resolution: RecordingResolution) -> FrameSize? {
         chosenFormat(resolution: resolution).map { resolution.cameraFrameSize(for: $0.size) }
     }
+
+    /// Portrait (-1), square (0) or landscape (1).
+    private static func turn(of size: FrameSize) -> Int { (size.width - size.height).signum() }
 
     /// "FaceTime HD Camera (default)" or just the name.
     public var shownName: String { isDefault ? "\(name) (default)" : name }

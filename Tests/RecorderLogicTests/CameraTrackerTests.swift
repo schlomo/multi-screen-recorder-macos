@@ -106,8 +106,9 @@ import Testing
         let brio = camera([format(4096, 2160, 30), format(3840, 2160, 30), format(1920, 1080, 30), format(1280, 720, 30)])
         #expect(brio.chosenFormat(resolution: .native) == format(1920, 1080, 30))
         #expect(brio.frameSize(resolution: .native) == FrameSize(width: 1920, height: 1080))
-        // In its 9:16 mode the Osmo lists the upright picture and a pillarboxed landscape one.
-        let osmo = camera([format(1920, 1080, 30), format(1080, 1920, 30), format(3840, 2160, 30)])
+        // In its 9:16 mode the Osmo runs in 1080×1920 and also lists a pillarboxed 1920×1080.
+        var osmo = camera([format(1920, 1080, 30), format(1080, 1920, 30), format(3840, 2160, 30)])
+        osmo.activeFormat = format(1080, 1920, 30)
         #expect(osmo.chosenFormat(resolution: .native) == format(1080, 1920, 30))
         #expect(osmo.frameSize(resolution: .native) == FrameSize(width: 1080, height: 1920))
         #expect(osmo.chosenFormat(resolution: .p1080) == format(1080, 1920, 30))
@@ -182,6 +183,18 @@ import Testing
         #expect(CameraFormat.frameRate(closestTo: 30, in: [29.97...29.97]) == 29.97)
         #expect(CameraFormat.frameRate(closestTo: 30, in: [50...60, 15...25]) == 25)
         #expect(CameraFormat.frameRate(closestTo: 30, in: []) == nil)
+    }
+
+    /// Of formats recording as much, the one turned as the camera's active format (D74).
+    @Test func aTieGoesToTheActiveFormatsOrientationElseLandscape() {
+        var faceTime = camera([format(1920, 1080, 30), format(1080, 1920, 30), format(1552, 1552, 30)])
+        faceTime.activeFormat = format(1920, 1080, 30)
+        #expect(faceTime.chosenFormat(resolution: .native) == format(1920, 1080, 30))
+        faceTime.activeFormat = format(1080, 1920, 30)
+        #expect(faceTime.chosenFormat(resolution: .native) == format(1080, 1920, 30))
+        let unknown = camera([format(1080, 1920, 30), format(1920, 1080, 30)])
+        #expect(unknown.chosenFormat(resolution: .native) == format(1920, 1080, 30))
+        #expect(camera([format(1080, 1920, 30), format(1920, 1080, 30)]).chosenFormat(resolution: .p720) == format(1920, 1080, 30))
     }
 
     @Test func theCamerasBoxIsTheRecordingResolutionsLimitedToFullHD() {
