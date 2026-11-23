@@ -278,16 +278,31 @@ extension GlobalRecordingLog {
 
         private var source: AudioCaptureTests.StandInSource { sources.last }
 
-        /// Buffers of `value` throughout, the first `start` buffers after now.
-        private func send(_ value: Float, buffers: Int, after start: Int = 0, to source: AudioCaptureTests.StandInSource? = nil) throws {
+        /// Each stand-in source's end of the latest buffer sent, in host nanoseconds.
+        private var sentUntil: [ObjectIdentifier: Int64] = [:]
+
+        /// Buffers of `value` throughout, the first `start` buffers after `origin`, now unless given.
+        private func send(
+            _ value: Float, buffers: Int, after start: Int = 0, to source: AudioCaptureTests.StandInSource? = nil, from origin: Int64? = nil
+        ) throws {
             let source = source ?? self.source
-            let now = readClocks().host
+            let origin = origin ?? Int64(readClocks().host)
+            func nanoseconds(_ buffers: Int) -> Int64 {
+                Int64(buffers) * Int64(samplesPerBuffer) * 1_000_000_000 / Int64(RecorderValues.audioSampleRate)
+            }
             for index in 0..<buffers {
-                let nanoseconds = Int64(start + index) * Int64(samplesPerBuffer) * 1_000_000_000 / Int64(RecorderValues.audioSampleRate)
                 let samples = [[Float](repeating: value, count: samplesPerBuffer)]
-                let time = CMTime(value: CMTimeValue(now) + nanoseconds, timescale: 1_000_000_000)
+                let time = CMTime(value: origin + nanoseconds(start + index), timescale: 1_000_000_000)
                 source.send(try pcmSample(samples[...], format: pcmFormat(channels: 1), at: time))
             }
+            sentUntil[ObjectIdentifier(source)] = origin + nanoseconds(start + buffers)
+        }
+
+        /// Buffers of `value` right after the latest one sent to `source`, however long ago that was: on the
+        /// test's own clock, as a pause of a slow runner longer than the longest filled gap would end the file.
+        private func sendNext(_ value: Float, buffers: Int, to source: AudioCaptureTests.StandInSource?) throws {
+            let source = source ?? self.source
+            try send(value, buffers: buffers, to: source, from: sentUntil[ObjectIdentifier(source)])
         }
 
         /// Waits on the main actor, so the recorder's tasks run, until `condition` holds, for at most `seconds`.
@@ -556,10 +571,10 @@ extension GlobalRecordingLog {
             await recorder.measureAudioDelays()
             // More of its sound changes nothing: it stays out.
             try await wait("A out of the guide track") {
-                try? send(0.1, buffers: 1, to: sources.last(of: "A"))
+                try? sendNext(0.1, buffers: 1, to: sources.last(of: "A"))
                 return !isInTheGuideTrack(a)
             }
-            try send(0.1, buffers: 3, to: sources.last(of: "A"))
+            try sendNext(0.1, buffers: 3, to: sources.last(of: "A"))
             try await Task.sleep(for: .milliseconds(50))
             #expect(!isInTheGuideTrack(a))
             #expect(isInTheGuideTrack(r))
@@ -580,7 +595,7 @@ extension GlobalRecordingLog {
             try await wait("A's restart") { sources.byUID.withLock { $0["A"]?.count } == 2 }
             try await startAudioFiles(["A"], "A's new file", count: 3)
             try await wait("A back in the guide track") {
-                try? send(0.1, buffers: 1, to: sources.last(of: "A"))
+                try? sendNext(0.1, buffers: 1, to: sources.last(of: "A"))
                 return isInTheGuideTrack(a)
             }
             _ = await stop()
@@ -596,7 +611,7 @@ extension GlobalRecordingLog {
             feedDelayedNoise(["R": 0, "A": 0])
             for _ in 0..<3 { await recorder.measureAudioDelays() }
             try await wait("A back in the guide track") {
-                try? send(0.1, buffers: 1, to: sources.last(of: "A"))
+                try? sendNext(0.1, buffers: 1, to: sources.last(of: "A"))
                 return isInTheGuideTrack(a)
             }
             let line = try #require(recorder.problemLines().first)

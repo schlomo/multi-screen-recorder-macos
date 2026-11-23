@@ -31,6 +31,8 @@ One row per entry, the error text exactly as in the entry.
 | `the virtual screen 24 is not active at 1280x720 within 5 s, but 1600x900` | [A virtual screen comes back at its last mode](#a-virtual-screen-comes-back-at-its-last-mode) |
 | `the virtual screen 122787BA-50AA-4A5A-B00C-3F98867665AF has no mode 1600x900: []` | [A long-running process sees no modes of a new screen](#a-long-running-process-sees-no-modes-of-a-new-screen) |
 | `the program running this (a terminal app) lacks the Microphone permission; run msr check once from this terminal to get the prompt` | [The VM's Microphone permission reads as denied before its login](#the-vms-microphone-permission-reads-as-denied-before-its-login) |
+| `timed out waiting for A out of the guide track again` | [A stand-in audio input's file ends after a pause of a slow runner](#a-stand-in-audio-inputs-file-ends-after-a-pause-of-a-slow-runner) |
+| `sending 'self' risks causing data races [#SendingRisksDataRace]` | [Swift 6.3 rejects self in a later argument after callbacks capture it](#swift-63-rejects-self-in-a-later-argument-after-callbacks-capture-it) |
 
 ## Format
 
@@ -257,3 +259,58 @@ One row per entry, the error text exactly as in the entry.
   above, not by a run.
 - **Observed:** 2026-11-21 (PR #25's runs) and 2026-11-22, the
   end-to-end VM (Cirrus Labs' `macos-tahoe-vanilla`); open.
+
+## A stand-in audio input's file ends after a pause of a slow runner
+
+- **Error:** `timed out waiting for A out of the guide track again`
+- **Symptom:** in CI's `scripts/test` (run 45242373454 on 4115a17 of
+  PR #27), `RecorderTests.anAudioInputOutOnAFalseFirstWindowRejoinsOnItsMedianAndLeavesAgainOnIt`
+  times out and throws `CancellationError`, and
+  `anAudioInputOutOfSyncLeavesTheGuideTrackUntilItsFileEnds` fails on
+  `!isInTheGuideTrack(a)`, on the problem line (`Audio 2 Mic A was not
+  in the guide track from 0:03 to 0:03 (500 ms late); …` instead of the
+  present one) and on `audioFiles.allSatisfy { $0.end == nil }`; both
+  pass locally.
+- **Why:** [KNOWN: the test code] the tests sent their stand-in
+  buffers timestamped at the host clock's now, so a pause between two
+  sends became a gap in the input's audio; after the audio files
+  started, the next buffer to A came only after the delay measurements
+  (`feedDelayedNoise`, `measureAudioDelays`). [KNOWN:
+  `AudioFileTimeline`, `RecorderValues.longestFilledAudioGap`] a gap
+  longer than 1 s ends the file, and the input's next sound starts a
+  new file, in the guide track and not yet measured. [KNOWN: reproduced
+  locally, 2026-11-23] with 36 `yes` processes on 12 cores, the second
+  test failed 5 of 5 runs, A's first file ending at 0.09 s and the next
+  starting at 1.1 s; a 1.5 s sleep after the measurement gave the first
+  test exactly CI's three failures, and a 3.5 s sleep gave the second
+  CI's timeout: a file starting after 3 s of the recording holds none
+  of the measured windows (the fed noise ends at 13 s, a window is
+  10 s), so A never leaves again.
+- **Fix:** the buffers sent to A after the measurements continue from
+  the end of the latest buffer sent to it (`sendNext` in
+  `Tests/RecorderCoreTests/RecorderTests.swift`), on the test's own
+  clock instead of now, so no runner's pause makes a gap. The recorder
+  is right to end the file at such a gap; nothing changed there.
+- **Verify:** the two tests pass 20 of 20 runs under the same load, and
+  with the 1.5 s and 3.5 s sleeps; CI's `scripts/test` passes on the
+  pushed head.
+- **Observed:** 2026-11-23, PR #27, runner Xcode 26.6; open until CI
+  passes.
+
+## Swift 6.3 rejects self in a later argument after callbacks capture it
+
+- **Error:** `sending 'self' risks causing data races [#SendingRisksDataRace]`
+- **Symptom:** CI's `scripts/test` fails to compile
+  `Recorder.performCamera`, with the note "task-isolated 'self' is
+  captured by a main actor-isolated closure. main actor-isolated uses in
+  closure may race against later nonisolated uses"; the same code builds
+  with Swift 6.4 on a Mac with Xcode 27.
+- **Why:** Swift 6.3, not 6.4, rejects a use of `self` in a later
+  argument of the same call after callbacks in earlier arguments
+  captured it [KNOWN: the CI log of PR #27; the local build with
+  Swift 6.4 passed].
+- **Fix:** read the value into a local before the call and pass the
+  local (`checksOrientation` in `Recorder.performCamera`, 4115a17).
+- **Verify:** CI's `scripts/test` compiles the package (run
+  45242373454 on 4115a17 got past the build to the tests).
+- **Observed:** 2026-11-23, PR #27, runner Xcode 26.6; open.
