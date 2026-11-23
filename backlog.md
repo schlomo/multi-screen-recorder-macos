@@ -641,7 +641,11 @@ Still open from D34: what AGC does and whether it is on in auto mode;
 - **A snapshot release left behind** by a PR closed with a merge
   conflict (GitHub may not run the removal then; inferred from its
   documentation, never seen). Deferred because the leftover is deleted
-  by hand in a minute. Revisit when one appears.
+  by hand in a minute. Revisit when one appears. Seen once from
+  another cause: PR #27 was merged on 2026-11-23 with a marked head
+  commit, so `pr-27` stayed (deleting it waits for the owner's
+  go-ahead); the architect's operating rules now keep such a commit off
+  a PR's head (PR #28).
 - **Interface languages other than English** (D13). Revisit when users
   ask for one.
 - **A `dynamicRange` setting** to record an HDR display as HDR (D24).
