@@ -1039,7 +1039,7 @@ public final class Recorder {
             guideTrackMembership.add(window.lag, file: file, reference: referenceFile)
         }
         let membership = guideTrackMembership.update(writing: Set(writing.map(\.name)), reference: referenceFile)
-        for (file, lag) in membership.leaving.sorted(by: { $0.key < $1.key }) { leaveTheGuideTrack(file: file, lag: lag) }
+        for (file, offset) in membership.leaving.sorted(by: { $0.key < $1.key }) { leaveTheGuideTrack(file: file, offset: offset) }
         for file in membership.rejoining.sorted() { rejoinTheGuideTrack(file: file) }
         var delays = delayLags.delays(reference: referenceFile)
         // The reference's file once shifted keeps a value: 0 when it is the earliest again.
@@ -1053,20 +1053,20 @@ public final class Recorder {
     /// An audio input's file out of sync with the staying group leaves the "Audio inputs" guide track, its own
     /// file unchanged; its event and problem once its capture took it out (D79). By design: no Dock bounce,
     /// badge or count. Internal, so a test can ask for a leave its capture does not carry out.
-    func leaveTheGuideTrack(file name: String, lag: Double) {
+    func leaveTheGuideTrack(file name: String, offset: Double) {
         guard let file = manifest.audioFiles.first(where: { $0.name == name }), let uid = file.audioSourceUID,
               audioCaptures[.input(uid)]?.1.leaveTheGuideTrack(file: name) == true else { return }
         var event = RecordingEvent(at: context.now(), event: .audioInputLeftTheGuideTrack, audioSource: file.audioSource)
-        event.lag = (lag * 10_000).rounded() / 10_000
+        event.offset = (offset * 10_000).rounded() / 10_000
         guard manifest.record([event]) else { return }
         try? writeManifest()
         told([event])
         let number = audioTracker.sourcesShown.first { $0.id == .input(uid) }?.number
         let problem = RecordingProblem(
             atSeconds: event.at, problem: event.problem.problem,
-            error: ErrorDetail(message: event.event.rawValue, underlying: [ErrorDetail(message: AudioDelay.text(lag))]))
+            error: ErrorDetail(message: event.event.rawValue, underlying: [ErrorDetail(message: AudioDelay.text(offset))]))
         tell(problem, kind: .audioInputOutOfTheGuideTrack(uid), source: number.map { "Audio \($0) \(file.audioSource)" } ?? file.audioSource,
-             note: AudioDelay.text(lag), ofAnEvent: true, notifies: false)
+             note: AudioDelay.text(offset), ofAnEvent: true, notifies: false)
     }
 
     /// A file that left the guide track rejoins it; its line turns to the past (D79).

@@ -605,9 +605,9 @@ public struct RecordingEvent: Codable, Equatable, Sendable {
     public var length: Double?
     /// For `screen mirroring started`: the screen it mirrors.
     public var mirrors: String?
-    /// For `audio input left the guide track`: its lag in seconds after the staying group's earliest input,
-    /// to 0.0001 s (D79).
-    public var lag: Double?
+    /// For `audio input left the guide track`: its file's offset in seconds from the staying group's earliest
+    /// input, to 0.0001 s, negative when earlier (D79).
+    public var offset: Double?
     /// For a failure (`screen stream failed`, `audio input failed` and the
     /// like) and a failing writer: why, with its full chain.
     public var errorDetail: ErrorDetail?
@@ -639,7 +639,7 @@ public struct RecordingEvent: Codable, Equatable, Sendable {
     }
 
     private enum CodingKeys: String, CodingKey {
-        case at, event, screen, camera, audioSource, from, to, length, mirrors, lag, error, errorDetail
+        case at, event, screen, camera, audioSource, from, to, length, mirrors, offset, error, errorDetail
     }
 
     public init(from decoder: any Decoder) throws {
@@ -653,7 +653,7 @@ public struct RecordingEvent: Codable, Equatable, Sendable {
         to = try container.decodeIfPresent(Value.self, forKey: .to)
         length = try container.decodeIfPresent(Double.self, forKey: .length)
         mirrors = try container.decodeIfPresent(String.self, forKey: .mirrors)
-        lag = try container.decodeIfPresent(Double.self, forKey: .lag)
+        offset = try container.decodeIfPresent(Double.self, forKey: .offset)
         // A manifest written before D64 has only the `error` text: kept as the recorder's own.
         errorDetail = try container.decodeIfPresent(ErrorDetail.self, forKey: .errorDetail)
             ?? container.decodeIfPresent(String.self, forKey: .error).map { ErrorDetail(message: $0) }
@@ -671,7 +671,7 @@ public struct RecordingEvent: Codable, Equatable, Sendable {
         try container.encodeIfPresent(to, forKey: .to)
         try container.encodeIfPresent(length, forKey: .length)
         try container.encodeIfPresent(mirrors, forKey: .mirrors)
-        try container.encodeIfPresent(lag, forKey: .lag)
+        try container.encodeIfPresent(offset, forKey: .offset)
         try container.encodeIfPresent(error, forKey: .error)
         try container.encodeIfPresent(errorDetail, forKey: .errorDetail)
     }

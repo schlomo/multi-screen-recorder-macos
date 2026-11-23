@@ -19,10 +19,10 @@ import Testing
         #expect(EventLine.text(failed, started: start, timeZone: berlin) == "22:15:32 +61.3s screen stream failed: LG (-3811)")
     }
 
-    /// An input that left the guide track says its lag; written and read back as `lag` (D79).
-    @Test func anInputThatLeftTheGuideTrackSaysItsLag() throws {
+    /// An input that left the guide track says its offset; written and read back as `offset` (D79).
+    @Test func anInputThatLeftTheGuideTrackSaysItsOffset() throws {
         var left = RecordingEvent(at: 0, event: .audioInputLeftTheGuideTrack, audioSource: "Razer")
-        left.lag = 0.5
+        left.offset = 0.5
         #expect(EventLine.text(left, started: start, timeZone: berlin).hasSuffix("audio input left the guide track: Razer 500 ms late"))
         #expect(try JSONDecoder().decode(RecordingEvent.self, from: JSONEncoder().encode(left)) == left)
         #expect(!RecordingEvent.Kind.audioInputLeftTheGuideTrack.isFailure)

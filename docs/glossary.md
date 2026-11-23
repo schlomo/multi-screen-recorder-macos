@@ -353,8 +353,12 @@ silence in its guide track (D31). It ends with its screen file's video
 (D51), unless the file ended by a failure, or the samples for its last
 mix were no longer there or the writer did not take them in time,
 which is told as a problem. An audio input out of sync with the
-others leaves "Audio inputs" (D79): the largest group of inputs whose lags
-lie within 0.1 s of each other stays.
+others leaves "Audio inputs" (D79): the largest group of inputs whose
+values lie within 0.1 s of each other stays.
+
+## Offset (guide track)
+
+An audio input file's distance from the earliest input of the group the "Audio inputs" guide track keeps, in seconds, negative when earlier (D79).
 
 ## Level meter
 

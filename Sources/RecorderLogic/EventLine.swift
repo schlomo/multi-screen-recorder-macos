@@ -12,7 +12,7 @@ public enum EventLine {
         }
         if let length = event.length { line += String(format: " %.3fs", length) }
         if let mirrors = event.mirrors { line += " mirrors \(mirrors)" }
-        if let lag = event.lag { line += " " + AudioDelay.text(lag) }
+        if let offset = event.offset { line += " " + AudioDelay.text(offset) }
         if let error = event.error { line += " (\(error))" }
         return line
     }

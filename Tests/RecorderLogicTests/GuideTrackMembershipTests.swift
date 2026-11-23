@@ -16,7 +16,7 @@ import Testing
     }
 
     @Test func theLimitIsOneDataValue() {
-        #expect(RecorderValues.guideTrackLateLimit == 0.1)
+        #expect(RecorderValues.guideTrackSyncLimit == 0.1)
     }
 
     /// A late reference, as an Osmo as the default microphone, leaves; the two microphones in sync stay.
@@ -44,8 +44,37 @@ import Testing
 
     @Test func atTheLimitAnInputStays() {
         var membership = GuideTrackMembership()
-        measure(&membership, ["a.mov": [RecorderValues.guideTrackLateLimit]])
+        measure(&membership, ["a.mov": [RecorderValues.guideTrackSyncLimit]])
         #expect(update(&membership, writing: ["a.mov"]) == Change())
+    }
+
+    /// On a tie the group holding the inputs that stayed wins: a newcomer never evicts them.
+    @Test func onATieTheGroupThatStayedWins() {
+        var membership = GuideTrackMembership()
+        measure(&membership, ["a.mov": [0.09]])
+        #expect(update(&membership, writing: ["a.mov"]) == Change())
+        measure(&membership, ["b.mov": [-0.05]])
+        #expect(update(&membership, writing: ["a.mov", "b.mov"]) == Change(leaving: ["b.mov": -0.05]))
+    }
+
+    /// Once a file has 3 counted windows its median is its value, a staying file's too: a false first window
+    /// at about 0 on a late microphone is corrected.
+    @Test func aStayingFilesMedianCorrectsAFalseFirstWindow() {
+        var membership = GuideTrackMembership()
+        measure(&membership, ["a.mov": [0.01]])
+        #expect(update(&membership, writing: ["a.mov"]) == Change())
+        measure(&membership, ["a.mov": [0.5]])
+        #expect(update(&membership, writing: ["a.mov"]) == Change())
+        measure(&membership, ["a.mov": [0.5]])
+        #expect(update(&membership, writing: ["a.mov"]) == Change(leaving: ["a.mov": 0.5]))
+    }
+
+    /// Values a counted window apart at the limit stay together wherever they lie: 0.4 − 0.3 is a little more
+    /// than 0.1 in binary.
+    @Test func aPairAtTheLimitStaysTogetherAwayFromZero() {
+        var membership = GuideTrackMembership()
+        measure(&membership, ["a.mov": [0.3], "b.mov": [0.4]])
+        #expect(update(&membership, writing: ["a.mov", "b.mov"]) == Change(leaving: ["r.mov": -0.3]))
     }
 
     /// On a tie the group with the earliest input stays.
@@ -56,22 +85,20 @@ import Testing
     }
 
     /// The first counted window decides; a file that left rejoins once the median of its counted windows lies
-    /// within the limit of the group, and then only the median makes it leave again.
+    /// within the limit of the group, and leaves again only on its median.
     @Test func aFalseFirstWindowRejoinsOnItsMedianAndOnlyTheMedianMakesItLeaveAgain() {
         var membership = GuideTrackMembership()
         measure(&membership, ["a.mov": [0.5]])
         #expect(update(&membership, writing: ["a.mov"]).leaving == ["a.mov": 0.5])
         measure(&membership, ["a.mov": [0.01]])
         #expect(update(&membership, writing: ["a.mov"]) == Change())
-        measure(&membership, ["a.mov": [0.01, 0.02]])
+        measure(&membership, ["a.mov": [0.02]])
         #expect(update(&membership, writing: ["a.mov"]) == Change(rejoining: ["a.mov"]))
         #expect(!membership.isOut("a.mov"))
-        // One late window moves the median of 5 [0.01, 0.01, 0.02, 0.5, 0.6] no further than 0.02: it stays.
+        // One late window moves the median of 4 [0.01, 0.02, 0.5, 0.6] to 0.26: out again on the median.
         measure(&membership, ["a.mov": [0.6]])
-        #expect(update(&membership, writing: ["a.mov"]) == Change())
-        measure(&membership, ["a.mov": [0.6, 0.6, 0.6]])
         let left = update(&membership, writing: ["a.mov"]).leaving
-        #expect(abs((left["a.mov"] ?? 0) - 0.55) < 1e-9)
+        #expect(abs((left["a.mov"] ?? 0) - 0.26) < 1e-9)
     }
 
     /// A file out on its first counted window stays out, without a median, even when the group moves to it.

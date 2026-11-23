@@ -38,7 +38,7 @@ public enum ProblemKind: Hashable, Sendable {
     /// An audio input whose input volume changes cannot be followed, by its name; clears when following it works (D69).
     case inputVolumeNotFollowed(String)
     /// An audio input, by its UID, whose file is out of the "Audio inputs" guide track, `source` naming the
-    /// input and the note its lag; ends when it rejoins, its file ends or it disconnects (D79).
+    /// input and the note its offset; ends when it rejoins, its file ends or it disconnects (D79).
     case audioInputOutOfTheGuideTrack(String)
     /// A video file a full disk ended; clears when there is room again.
     case diskFull

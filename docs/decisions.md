@@ -2401,7 +2401,7 @@ architect's reading.
   2026-11-23 recording, −6/−12 dBFS decoded to at most about 0.78,
   roughly 2 dB below full scale.
 - **Consequences:** The curve takes nothing off below −12 dBFS, about
-  1.1 dB at −6 dBFS and up to about 4 dB towards the ceiling, so speech
+  1.1 dB at −6 dBFS, about 4 dB at −2 dBFS input and 6 dB at full scale, so speech
   peaks on the "Audio inputs" guide track are now shaped by the curve
   (corrected in review: an earlier "about 1.6 dB quieter" did not hold
   for the curve). The decoded peak is not
@@ -2619,7 +2619,8 @@ architect's reading.
   and what went wrong and passed or never touched the recording
   (orange), and keeps its size with many problems. The Dock
   badge, the status line's count and the lines on standard error stay
-  as they were.
+  as they were; D79 exempts one kind, an audio input out of the guide
+  track, from the Dock bounce, the badge and the count.
 - **Evidence:** [design/recorder.md](design/recorder.md), "Status
   window"; `Sources/RecorderLogic/ProblemsTold.swift`.
 
@@ -2636,7 +2637,7 @@ architect's reading.
 - **Decision:** The architect's design, approved by the owner: an audio
   input whose file's first counted window (clarity at least 12, as
   D77), normalized as D77's delays, is later than
-  `RecorderValues.guideTrackLateLimit`, 0.1 s (*data*), leaves the
+  `RecorderValues.guideTrackSyncLimit`, 0.1 s (*data*), leaves the
   "Audio inputs" mix (`GuideTrackMix.remove(source:)`) for every video
   file alike; its own audio file is unchanged, and `measuredDelay` and
   the timeline file keep D77's median. The first counted window
@@ -2655,9 +2656,8 @@ architect's reading.
   group, and after a rejoin only its median makes it leave again, so
   it does not flap; an input's next file starts in the guide track. A
   leave is written and told only once the capture took the file out.
-  The event's field is `lag`, the file's lag after the staying group's
-  earliest input (one counted window's, or the median's), not its audio
-  delay. The line reads `Audio <n> <name> 553 ms late, not in the guide
+  The event's field (named `offset` after the second review) is the
+  file's distance from the staying group's earliest input. The line reads `Audio <n> <name> 553 ms late, not in the guide
   track; its own audio track is recorded` while the file is out, and
   `Audio <n> <name> was not in the guide track from 0:50 to 1:40 (553
   ms late); its own audio track is recorded` once it rejoins, its file
@@ -2665,14 +2665,30 @@ architect's reading.
   not a problem a person must act on, it neither bounces the Dock icon
   nor sets the "!" badge nor counts in the status line's problem count;
   it is still in `recording.json`'s `problems` and the window's lines.
-  The limit is `guideTrackLateLimit`. A leaving source is cut, not
+  The limit is `guideTrackSyncLimit` (named so after the second review,
+  as it holds for early inputs too). A leaving source is cut, not
   faded: `GuideTrackMix.remove` drops its samples not mixed yet, and a
   fade would keep a leaving source in the mix for its last 10 ms, which
   the mix does not support cheaply. Decided while building: the line
   names the input as `Audio <n> <name>`, as screens' and cameras' lines
   do; the problem in `recording.json` has the event's name as its error
-  with the lag under it (`audio input left the guide track: 500 ms
+  with the offset under it (`audio input left the guide track: 500 ms
   late`); the event's word is "guide track", the glossary's.
+- **Amended after a second review (the architect's reading):** a file's
+  value is the median of its counted windows once it has 3, a staying
+  file's too, and its first counted window's lag before, so a false
+  first window near 0 on a late microphone is corrected by its median.
+  On a tie the group holding the files that stayed before wins, so a
+  newcomer never evicts them (R at 0 and A at 0.09 staying, B at −0.05
+  arriving: B leaves); only when no group holds them does the group
+  with the earliest input win. Values are compared with the limit with
+  a tolerance of half a sample at 8 kHz, so a pair at the limit stays
+  together wherever it lies. The event's field is `offset`, the file's
+  distance from the staying group's earliest input, negative when
+  earlier; the limit is `RecorderValues.guideTrackSyncLimit`. The line
+  says `<n> ms late` or `<n> ms early`: `Audio 2 Mic A 400 ms early,
+  not in the guide track; its own audio track is recorded`, and in the
+  past `… from 0:50 to 1:40 (400 ms early); …`.
 - **Consequences:** A microphone out of sync no longer echoes in the
   guide; until its first counted window it still does, and inputs
   within 0.1 s of each other stay in. Planned, not decided: a next
