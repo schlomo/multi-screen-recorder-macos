@@ -892,7 +892,7 @@ checked, reported or rewritten at the next start (D47).
   recording manifest or the recording log cannot be written, the screens or the free space
   cannot be read, a screen file's or an audio file's writer fails, an
   audio source's capture fails) shows the same way,
-  and the status window lists it (red, orange once recovered, D78); `msr record` also names each
+  and the status window lists it (red when broken, orange for a hiccup, D78); `msr record` also names each
   on standard error.
 - **Status window (D46):** clicking the Dock icon while recording opens
   a small window, and Quit opens it too: a table with a row per screen,
@@ -953,31 +953,40 @@ checked, reported or rewritten at the next start (D47).
   the problem); one that repeats, such as the free space that cannot be
   read on every check, is told once (one manifest entry, one line in
   the window, one line on standard error, one bounce) until it clears,
-  and again if it comes back. **Problem lines (D78):** a problem that
-  can end while the recording goes on (a camera stall, the recording
-  log or the recording manifest not written, the screens, the audio
-  inputs or the free space not read, the Camera permission missing, an
-  input volume not set or not followed) is red while it lasts, with
-  the time it began, `<problem> since 0:12: <error>`, and orange once
-  it recovered, `<problem> for 4.0 s at 0:12, recovered: <error>`; one
-  that lasts until the end stays red. A stall reads `Camera <name>
-  stalled since 0:53` while it lasts and `Camera <name> stalled 7.4 s at
-  0:53, recovered` after; a camera's stalls share one line, `Camera
-  <name> stalled 3 times, 12 s in total` (the ongoing one counted to
-  now), with `, recovered` and orange once none lasts. A stall began
-  at its end minus its length, or, while it lasts, 2 s (the stall
-  limit) before it was told; another problem began when it was told.
-  A stall recovers when frames come again, when a new file of the
-  camera starts, or at its capture's end (unplugged, out of the camera
-  mode, Stop), its length then up to that end. Times are `m:ss` since
-  the start, `h:mm:ss` from an hour on; lengths have one decimal below
-  10 s as rounded, whole seconds from there, `m:ss` from a minute on. A failure (a
-  file ended by a failure, a stream or an audio source that failed, an
-  audio file lost, the Dock icon, the timeline file, or the audio
-  inputs' changes that cannot be followed) stays red as
-  told, even when a new file starts: it cost a file split and a gap.
-  The recording manifest's `problems`, the result, the exit code, the
-  status line's count and the lines on standard error are unchanged.
+  and again if it comes back. **Problem lines (D78):** red marks something
+  broken that a person must fix, or a recording not usable as it is;
+  orange a hiccup in a recording that worked. Red while it lasts: the
+  Camera permission missing, a screen, camera or audio source whose
+  file a failure ended or an audio file whose writer failed until a new
+  file of it starts, the recording log or the recording manifest not
+  written, the free space, the screens or the audio inputs not read;
+  red always: an audio file lost (it lacks content), an audio input that
+  cannot be recorded, the audio inputs' changes that cannot be
+  followed. Orange: everything else once it is over, a failure followed
+  by a new file included, and always a camera stall (its file goes on),
+  the Dock icon not shown, an input volume not set or not followed, and
+  the timeline file not written (the media are intact). A problem still
+  lasting at the end keeps its colour by this rule. A kind names its
+  source, and each has one line: `<problem> since 0:12: <error>` while
+  it lasts, `<problem> for 4.0 s at 0:12, recovered: <error>` once over,
+  and when it came more than once `<problem> 3 times, 12 s in total`
+  (the ongoing one counted to now), with `, recovered` once none lasts,
+  the latest error after a colon. A stall reads `Camera <name> stalled
+  since 0:53`, `Camera <name> stalled 7.4 s at 0:53, recovered` and
+  `Camera <name> stalled 3 times, 12 s in total`, without its error,
+  always the same. A stall began at its end minus its length, or, while
+  it lasts, 2 s (the stall limit) before it was told; another problem
+  began when it was told. A stall recovers when frames come again, when
+  a new file of the camera starts, or at its capture's end (unplugged,
+  out of the camera mode, Stop), its length then up to that end. Times
+  are `m:ss` since the start, `h:mm:ss` from an hour on; lengths have
+  one decimal below 10 s as rounded, whole seconds from there, `m:ss`
+  from a minute on. The red lines come first, then the orange ones,
+  each newest first; the area shows at most 5 lines, more scroll inside
+  it, so the window never grows past that for problems; the line naming
+  the files for a report stays below it. The recording manifest's
+  `problems`, the result, the exit code, the status line's count and
+  the lines on standard error are unchanged.
 - **Stop:** Stop in the status window finalizes, opens the recording folder itself
   in Finder (D46) and quits the app: a recording is typically one shot (D45).
   Logout, restart and shutdown finalize without asking, told apart from

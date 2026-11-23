@@ -597,18 +597,17 @@ extension GlobalRecordingLog {
             #expect(summary.manifest.result == .problems)
         }
 
-        /// A stalled camera unplugged: its stall's line has recovered at the capture's end (D78).
+        /// A stalled camera unplugged: its stall has recovered at the capture's end (D78).
         @Test func aStalledCameraUnpluggedEndsItsStallLine() async throws {
             cameras.connected.withLock { $0 = [Self.camera] }
             try start(cameraMode: .real, cameraFrameWatch: Self.quickFrameWatch)
             let camera = try #require(cameras.last)
             try await sendFrames(camera, until: "the camera file") { (try? manifestOnDisk().cameraFiles.count) == 1 }
             try await wait("the stall") { (try? manifestOnDisk().events.map(\.event)) == [.cameraStalled] }
-            #expect(recorder.problemLines().map(\.isRecovered) == [false])
+            #expect(recorder.problemLines().map(\.text) == ["Camera Stand-in camera stalled since 0:00"])
             cameras.connected.withLock { $0 = [] }
             recorder.camerasChanged()
             let line = try #require(recorder.problemLines().first)
-            #expect(line.isRecovered)
             #expect(line.text.hasPrefix("Camera Stand-in camera stalled "))
             #expect(line.text.hasSuffix(" s at 0:00, recovered"))
             _ = await stop()

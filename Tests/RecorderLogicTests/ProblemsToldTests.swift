@@ -53,7 +53,7 @@ import Testing
         #expect(manifest.problems.count == 3)
     }
 
-    // The status window's lines (D78): a problem with an end turns orange once it recovered.
+    // The status window's lines (D78): red when broken, orange for a hiccup in a recording that worked.
 
     private let second: Int64 = 1_000_000_000
 
@@ -64,60 +64,78 @@ import Testing
 
     private func nanoseconds(_ seconds: Double) -> Int64 { Int64((seconds * 1_000_000_000).rounded()) }
 
-    @Test func aStallThatRecoveredTellsItsLengthAndItsStart() {
+    /// A stall's file goes on: orange while it lasts and after.
+    @Test func aStallIsOrangeAndTellsItsLengthAndItsStart() {
         var told = ProblemsTold()
         var manifest = manifest()
         stall(&told, &manifest, at: 55)
-        #expect(told.lines(now: nanoseconds(56)) == [ProblemLine(text: "Camera BRIO stalled since 0:53", isRecovered: false)])
+        #expect(told.lines(now: nanoseconds(56)) == [ProblemLine(text: "Camera BRIO stalled since 0:53", isRed: false)])
         told.cleared(.cameraStalled("brio"), at: nanoseconds(60.4), length: nanoseconds(7.4))
         #expect(told.lines(now: nanoseconds(61))
-            == [ProblemLine(text: "Camera BRIO stalled 7.4 s at 0:53, recovered", isRecovered: true)])
+            == [ProblemLine(text: "Camera BRIO stalled 7.4 s at 0:53, recovered", isRed: false)])
     }
 
-    @Test func repeatedStallsOfACameraShareOneLine() {
+    @Test func repeatsOfAKindShareOneLine() {
         var told = ProblemsTold()
         var manifest = manifest()
         stall(&told, &manifest, at: 10)
         told.cleared(.cameraStalled("brio"), at: nanoseconds(12), length: nanoseconds(4))
-        _ = told.add(problem(nanoseconds(20), "The screens cannot be read"), kind: .screensNotRead, to: &manifest)
         stall(&told, &manifest, at: 30)
         told.cleared(.cameraStalled("brio"), at: nanoseconds(33), length: nanoseconds(5))
         stall(&told, &manifest, at: 40)
         // The third is ongoing: 3 s since its start, 2 s before it was told.
-        #expect(told.lines(now: nanoseconds(41)) == [
-            ProblemLine(text: "Camera BRIO stalled 3 times, 12 s in total", isRecovered: false),
-            ProblemLine(text: "The screens cannot be read since 0:20: denied", isRecovered: false),
-        ])
+        #expect(told.lines(now: nanoseconds(41)) == [ProblemLine(text: "Camera BRIO stalled 3 times, 12 s in total", isRed: false)])
         // A file of the camera starting ends the stall too, without its length.
         told.cleared(.cameraStalled("brio"), at: nanoseconds(41))
-        #expect(told.lines(now: nanoseconds(50)).first
-            == ProblemLine(text: "Camera BRIO stalled 3 times, 12 s in total, recovered", isRecovered: true))
-        #expect(manifest.problems.count == 4)
+        #expect(told.lines(now: nanoseconds(50)) == [ProblemLine(text: "Camera BRIO stalled 3 times, 12 s in total, recovered", isRed: false)])
+        #expect(manifest.problems.count == 3)
     }
 
-    @Test func aProblemWithAnEndTellsHowLongItLasted() {
+    @Test func aProblemThatEndsTellsHowLongItLasted() {
         var told = ProblemsTold()
         var manifest = manifest()
         _ = told.add(problem(12 * second), kind: .freeSpaceNotRead, to: &manifest)
-        #expect(told.lines(now: 13 * second)
-            == [ProblemLine(text: "The free space cannot be read since 0:12: denied", isRecovered: false)])
+        #expect(told.lines(now: 13 * second) == [ProblemLine(text: "The free space cannot be read since 0:12: denied", isRed: true)])
         told.cleared(.freeSpaceNotRead, at: 16 * second)
         #expect(told.lines(now: 20 * second)
-            == [ProblemLine(text: "The free space cannot be read for 4.0 s at 0:12, recovered: denied", isRecovered: true)])
-        // Back again: a line of its own.
+            == [ProblemLine(text: "The free space cannot be read for 4.0 s at 0:12, recovered: denied", isRed: false)])
         _ = told.add(problem(3723 * second), kind: .freeSpaceNotRead, to: &manifest)
-        #expect(told.lines(now: 3724 * second).last
-            == ProblemLine(text: "The free space cannot be read since 1:02:03: denied", isRecovered: false))
+        #expect(told.lines(now: 3724 * second)
+            == [ProblemLine(text: "The free space cannot be read 2 times, 5.0 s in total: denied", isRed: true)])
     }
 
-    /// A failure cost a file split and a gap: its line stays red as told, even when a new file starts.
-    @Test func aFailureStaysAsTold() {
+    /// The owner's rule, per kind: red while it lasts when a source is not recorded or saved or a person
+    /// must act, always for a damaged file; orange once over, and always for what never touches the recording.
+    @Test(arguments: [
+        (ProblemKind.cameraPermissionMissing, true, false), (.screenNotCaptured("S"), true, false),
+        (.cameraNotCaptured("C"), true, false), (.audioSourceFailed("A"), true, false), (.audioFileFailed("f"), true, false),
+        (.recordingLogNotWritten, true, false), (.manifestNotWritten, true, false), (.freeSpaceNotRead, true, false),
+        (.screensNotRead, true, false), (.audioInputsNotRead, true, false),
+        (.audioFileLost("f"), true, true), (.audioInputChangesNotFollowed, true, true), (.audioInputNotRecordable("A"), true, true),
+        (.cameraStalled("C"), false, false), (.dockIconNotShown, false, false), (.inputVolumeNotSet("A"), false, false),
+        (.inputVolumeNotFollowed("A"), false, false), (.timelineFileNotWritten, false, false),
+    ])
+    func theColourFollowsTheKindAndWhetherItLasts(kind: ProblemKind, redWhileItLasts: Bool, redOnceOver: Bool) {
         var told = ProblemsTold()
         var manifest = manifest()
-        let failed = RecordingProblem(atSeconds: 5, problem: "Audio source BlackHole", error: "audio source failed")
-        _ = told.add(failed, kind: .audioSourceFailed("BlackHole"), to: &manifest)
-        told.cleared(.audioSourceFailed("BlackHole"), at: 9 * second)
-        #expect(told.lines(now: 10 * second) == [ProblemLine(text: failed.text, isRecovered: false)])
+        _ = told.add(problem(second), kind: kind, to: &manifest)
+        #expect(told.lines(now: 2 * second).first?.isRed == redWhileItLasts)
+        told.cleared(kind, at: 3 * second)
+        #expect(told.lines(now: 4 * second).first?.isRed == redOnceOver)
+    }
+
+    /// Red first, then orange, each newest first.
+    @Test func redLinesComeFirstEachGroupNewestFirst() {
+        var told = ProblemsTold()
+        var manifest = manifest()
+        _ = told.add(problem(1 * second, "Screen A"), kind: .screenNotCaptured("A"), to: &manifest)
+        _ = told.add(problem(2 * second, "The Dock icon cannot be shown"), kind: .dockIconNotShown, to: &manifest)
+        _ = told.add(problem(3 * second, "Screen B"), kind: .screenNotCaptured("B"), to: &manifest)
+        _ = told.add(problem(4 * second, "Volume"), kind: .inputVolumeNotSet("M"), to: &manifest)
+        #expect(told.lines(now: 5 * second).map(\.text) == [
+            "Screen B since 0:03: denied", "Screen A since 0:01: denied",
+            "Volume since 0:04: denied", "The Dock icon cannot be shown since 0:02: denied",
+        ])
     }
 
     /// One decimal below 10 s (as rounded), whole seconds from there, m:ss from a minute on.
@@ -140,6 +158,7 @@ import Testing
         told.cleared(.audioInputsNotRead, at: 5 * second)
         #expect(told.add(problem(6 * second, "The audio inputs cannot be read"), kind: .audioInputsNotRead, to: &manifest)
             == .tell(writeManifest: true))
-        #expect(told.lines(now: 7 * second).first == ProblemLine(text: notFollowed.text, isRecovered: false))
+        #expect(told.lines(now: 7 * second).last
+            == ProblemLine(text: "Changes of the audio inputs cannot be followed since 0:00: denied", isRed: true))
     }
 }

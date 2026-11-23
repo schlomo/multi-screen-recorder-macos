@@ -1067,6 +1067,10 @@ public final class Recorder {
         RecorderLog.detail("file started: \(file.name)", category: "recorder")
         let started = audioTracker.fileStarted(id, at: Int64((file.start * 1_000_000_000).rounded()))
         problemsTold.cleared(.audioSourceFailed(name), at: context.now())
+        // A failed file of the source is over once a new one starts (D78).
+        for earlier in manifest.audioFiles where earlier.audioSource == file.audioSource {
+            problemsTold.cleared(.audioFileFailed(earlier.name), at: context.now())
+        }
         let listed = manifest.audioFileStarted(file)
         if !started.isEmpty { _ = manifest.record(started) }
         if listed || !started.isEmpty { try? writeManifest() }

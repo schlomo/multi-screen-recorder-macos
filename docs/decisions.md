@@ -2530,8 +2530,35 @@ architect's reading.
   from a minute on. Fixed in review: a stall also recovers at its
   capture's end (unplugged, out of the camera mode, Stop), its length
   up to that end.
-- **Consequences:** The window tells at a glance what still needs the
-  person (red) and what went wrong and passed (orange). The Dock
+- **Amended the same day, by the owner's rule, which replaces the
+  colours above:** "for me a red line indicates something broken, and
+  something that requires a human to go and fix it or to warn that the
+  recording is not usable / everything else feels like transient
+  problems and should therefore be orange like a warning that there
+  were hiccups but in total there is a recording that worked." And:
+  "how large can the window grow? Is there scrolling? we need to keep
+  UX in mind". The architect's reading: red only while a problem lasts
+  and a source is not recorded or saved right now, or a person must
+  act (the Camera permission missing; an audio input that cannot be
+  recorded; a screen, camera, audio source or audio file failure until
+  a new file of that source starts; the recording log or manifest not
+  written and the free space not read while ongoing; an audio file
+  lost always; the audio inputs' changes not followed). Orange:
+  everything once it is over, failures included, stalls, the screens
+  or audio inputs read again, and always the Dock icon, an input volume
+  not set or not followed and the timeline file not written. A problem
+  ongoing at the end keeps its colour by that rule. Every kind merges
+  as stalls do, one line per source and kind. The problems area shows
+  at most 5 lines, more scroll inside it, red first, then orange, each
+  newest first; the line for a report stays below it. Decided while
+  building: the screens and the audio inputs not read are red while
+  ongoing (the rule names them orange "once read again"); a failed
+  audio file's line is per file, as its kind names the file, and ends
+  when a new file of its source starts; a merged line carries the
+  latest error.
+- **Consequences:** The window tells at a glance what is broken (red)
+  and what went wrong and passed or never touched the recording
+  (orange), and keeps its size with many problems. The Dock
   badge, the status line's count and the lines on standard error stay
   as they were.
 - **Evidence:** [design/recorder.md](design/recorder.md), "Status

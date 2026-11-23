@@ -101,16 +101,17 @@ printed already (D64).
 ## Problem
 
 Something that went wrong in a recording and that the person is told:
-the Dock badge's "!", a line in the status window (red, orange once
-recovered, D78), a line on standard
+the Dock badge's "!", a line in the status window (red when something
+is broken, orange for a hiccup, D78), a line on standard
 error in `msr record`, a line in the recording log, and an entry in the
 recording manifest's `problems` with its time and full error (D46, D64).
 
 ## Recovered
 
 A problem that ended while the recording went on, such as a camera
-stall whose frames came again: its line in the status window turns
-orange and says how long it lasted and when it began (D78).
+stall whose frames came again: its line in the status window says how
+long it lasted and when it began, and is orange unless the problem
+damaged the recording (D78).
 
 ## Error detail
 

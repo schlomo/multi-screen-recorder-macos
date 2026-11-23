@@ -38,28 +38,32 @@ public enum ProblemKind: Hashable, Sendable {
 }
 
 extension ProblemKind {
-    /// Whether the problem can end while the recording goes on, so its line
-    /// turns orange once it recovered (D78). A failure cost a file split and a gap: it stays red.
-    var canRecover: Bool {
+    /// Whether its line is red (D78, the owner's rule): something broken that a person must fix,
+    /// or a recording not usable as it is. Red while it lasts and its source is not recorded or
+    /// saved, or a person must act; a damaged file and changes of the audio inputs not followed
+    /// always. Orange, a hiccup in a recording that worked: everything once it is over, and always
+    /// what never touches what is recorded, and a stall, whose file goes on.
+    func isRed(ongoing: Bool) -> Bool {
         switch self {
-        case .cameraStalled, .recordingLogNotWritten, .manifestNotWritten, .screensNotRead, .audioInputsNotRead,
-             .freeSpaceNotRead, .cameraPermissionMissing, .inputVolumeNotSet, .inputVolumeNotFollowed:
+        case .audioFileLost, .audioInputChangesNotFollowed, .audioInputNotRecordable:
             true
-        case .timelineFileNotWritten, .screenNotCaptured, .cameraNotCaptured, .dockIconNotShown, .audioInputChangesNotFollowed, .audioInputNotRecordable,
-             .audioSourceFailed, .audioFileFailed, .audioFileLost:
+        case .dockIconNotShown, .inputVolumeNotSet, .inputVolumeNotFollowed, .timelineFileNotWritten, .cameraStalled:
             false
+        case .cameraPermissionMissing, .screenNotCaptured, .cameraNotCaptured, .audioSourceFailed, .audioFileFailed,
+             .recordingLogNotWritten, .manifestNotWritten, .freeSpaceNotRead, .screensNotRead, .audioInputsNotRead:
+            ongoing
         }
     }
 }
 
-/// A line of the status window's problems: red while ongoing, orange once recovered (D78).
+/// A line of the status window's problems: red when broken, orange for a hiccup (D78).
 public struct ProblemLine: Equatable, Sendable {
     public var text: String
-    public var isRecovered: Bool
+    public var isRed: Bool
 
-    public init(text: String, isRecovered: Bool) {
+    public init(text: String, isRed: Bool) {
         self.text = text
-        self.isRecovered = isRecovered
+        self.isRed = isRed
     }
 }
 
@@ -107,47 +111,32 @@ public struct ProblemsTold: Sendable {
         if let length { told[index].began = max(0, now - length) }
     }
 
-    /// The status window's lines, in the order told; the stalls of a camera share the line of its first.
+    /// The status window's lines, one per kind (a kind names its source): red first, then
+    /// orange, each newest first (D78).
     public func lines(now: Int64) -> [ProblemLine] {
-        var lines: [ProblemLine] = []
-        var stallLines: [String: Int] = [:]
-        for (index, entry) in told.enumerated() {
-            if case .cameraStalled(let uniqueID) = entry.kind {
-                guard stallLines[uniqueID] == nil else { continue }
-                stallLines[uniqueID] = lines.count
-                lines.append(Self.stallLine(told[index...].filter { $0.kind == entry.kind }, now: now))
-            } else if !entry.kind.canRecover {
-                lines.append(ProblemLine(text: entry.problem.text, isRecovered: false))
-            } else {
-                let what = entry.problem.problem
-                let why = entry.problem.error.map { ": \($0)" } ?? ""
-                let line = if let ended = entry.ended {
-                    ProblemLine(
-                        text: "\(what) for \(Self.seconds(ended - entry.began)) at \(Self.time(entry.began)), recovered\(why)",
-                        isRecovered: true)
-                } else {
-                    ProblemLine(text: "\(what) since \(Self.time(entry.began))\(why)", isRecovered: false)
-                }
-                lines.append(line)
-            }
-        }
-        return lines
+        var kinds: [ProblemKind] = []
+        for entry in told.reversed() where !kinds.contains(entry.kind) { kinds.append(entry.kind) }
+        let lines = kinds.map { kind in Self.line(told.filter { $0.kind == kind }, now: now) }
+        return lines.filter(\.isRed) + lines.filter { !$0.isRed }
     }
 
-    private static func stallLine(_ stalls: [Told], now: Int64) -> ProblemLine {
-        let source = stalls[0].problem.problem
-        let isRecovered = stalls.allSatisfy { $0.ended != nil }
-        if stalls.count == 1, let stall = stalls.first {
-            return if let ended = stall.ended {
-                ProblemLine(text: "\(source) stalled \(seconds(ended - stall.began)) at \(time(stall.began)), recovered", isRecovered: true)
-            } else {
-                ProblemLine(text: "\(source) stalled since \(time(stall.began))", isRecovered: false)
-            }
+    /// `<what> since 0:53`, `<what> for 7.4 s at 0:53, recovered`, `<what> 3 times, 12 s in total[, recovered]`,
+    /// the latest error after a colon; a stall's `<what>` is `<source> stalled`, without its error, always the same.
+    private static func line(_ repeats: [Told], now: Int64) -> ProblemLine {
+        let latest = repeats[repeats.count - 1]
+        let isStall = if case .cameraStalled = latest.kind { true } else { false }
+        let what = isStall ? "\(latest.problem.problem) stalled" : latest.problem.problem
+        let why = isStall ? "" : latest.problem.error.map { ": \($0)" } ?? ""
+        let ongoing = latest.ended == nil
+        let text = if repeats.count > 1 {
+            "\(what) \(repeats.count) times, \(seconds(repeats.reduce(Int64(0)) { $0 + ($1.ended ?? now) - $1.began })) in total"
+                + (ongoing ? "" : ", recovered")
+        } else if let ended = latest.ended {
+            "\(what) \(isStall ? "" : "for ")\(seconds(ended - latest.began)) at \(time(latest.began)), recovered"
+        } else {
+            "\(what) since \(time(latest.began))"
         }
-        let total = stalls.reduce(Int64(0)) { $0 + ($1.ended ?? now) - $1.began }
-        return ProblemLine(
-            text: "\(source) stalled \(stalls.count) times, \(seconds(total)) in total" + (isRecovered ? ", recovered" : ""),
-            isRecovered: isRecovered)
+        return ProblemLine(text: text + why, isRed: latest.kind.isRed(ongoing: ongoing))
     }
 
     /// "0:53" since the start, "1:02:03" from an hour on.

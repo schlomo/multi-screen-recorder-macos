@@ -69,6 +69,16 @@ struct StatusView: View {
     let stop: () -> Void
     let continueRecording: () -> Void
     let setInputVolume: (AudioTracker.SourceID, Double) -> Void
+    /// The problem lines' height as laid out; the area shows at most `problemLinesShown` lines of it.
+    @State var problemsHeight: CGFloat = 0
+
+    /// The problems area grows to 5 lines at most; more scroll inside it (D78).
+    static let problemLinesShown = 5
+    private static let problemSpacing: CGFloat = 4
+    private static var problemsMaxHeight: CGFloat {
+        let lineHeight = NSLayoutManager().defaultLineHeight(for: NSFont.preferredFont(forTextStyle: .body))
+        return CGFloat(problemLinesShown) * lineHeight + CGFloat(problemLinesShown - 1) * problemSpacing
+    }
 
     var body: some View {
         WidthSettingStack(spacing: 12) {
@@ -120,9 +130,16 @@ struct StatusView: View {
             }
             if !model.problems.isEmpty {
                 VStack(alignment: .leading, spacing: 4) {
-                    ForEach(Array(model.problems.enumerated()), id: \.offset) { _, problem in
-                        Text(problem.text).foregroundStyle(problem.isRecovered ? .orange : .red).fixedSize(horizontal: false, vertical: true)
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: Self.problemSpacing) {
+                            ForEach(Array(model.problems.enumerated()), id: \.offset) { _, problem in
+                                Text(problem.text).foregroundStyle(problem.isRed ? .red : .orange).fixedSize(horizontal: false, vertical: true)
+                            }
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { problemsHeight = $0 }
                     }
+                    .frame(height: min(problemsHeight, Self.problemsMaxHeight))
                     Text(Self.forAReport)
                         .font(.callout)
                         .foregroundStyle(.secondary)
