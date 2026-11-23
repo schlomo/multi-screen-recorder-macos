@@ -887,7 +887,7 @@ public final class Recorder {
 
     /// A camera capture's stream has stopped, reported once though both end paths may report it: its
     /// camera's readings count another app's use again (D74, D76). True when no capture of ours is left:
-    /// the caller reads the cameras again once it handled the end, as a reading meanwhile was not taken.
+    /// the stop path reads the cameras again once it handled the end, as a reading meanwhile was not taken.
     private func cameraCaptureGone(_ uniqueID: String, captureNumber: Int) -> Bool {
         cameraCapturesGone.insert(captureNumber).inserted && cameraTracker.captureEnded(uniqueID)
     }
@@ -902,11 +902,11 @@ public final class Recorder {
     func cameraCaptureEnded(
         uniqueID: String, captureNumber: Int, camera: String, reason: VideoStreamEnd, file: VideoFileEnd<RecordingManifest.CameraFile>?
     ) {
-        let readAgain = cameraCaptureGone(uniqueID, captureNumber: captureNumber)
-        defer { if readAgain { camerasChanged() } }
+        _ = cameraCaptureGone(uniqueID, captureNumber: captureNumber)
         videoFileEnded(file, captureNumber: captureNumber, source: camera, reason: reason, uniqueID: uniqueID)
         guard !isStopped, let (current, _) = cameraCaptures[uniqueID], current == captureNumber else { return }
         cameraCaptures[uniqueID] = nil
+        // No second read: `streamEnded` observes this fresh reading, taken once our capture no longer counts.
         let step = cameraTracker.streamEnded(uniqueID, reason, connected: readCameras(), at: context.now())
         applyCameras(step)
         problemsTold.cleared(.cameraStalled(uniqueID), at: context.now(), ending: .stopped)
