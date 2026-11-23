@@ -64,10 +64,14 @@ verifying agent output are in the principles (linked from
 - **When deferring, say what the human sees meanwhile.** "Queued as
   item 38" hid that the guide track would keep a late microphone's
   echo until then; the owner had to ask.
-- **A Markdown-only commit on an MR/PR after its green run is unmarked
-  too**, as the trunk's Markdown exemption does not apply to a work
-  branch: a docs fix that this change needs runs the pipeline again,
-  and one it does not need lands after the merge. PR #27 was merged
+- **A Markdown-only commit on an MR/PR after its green run is
+  unmarked, like any other commit after the green run** ("Iterate
+  locally" in the principles), as the trunk's Markdown exemption does
+  not apply to a work branch: a docs fix that this change needs (a
+  troubleshooting or decision entry about it included) runs the
+  pipeline again, and one it does not need lands after the merge in
+  its own MR/PR (an architect-maintained file goes straight onto the
+  trunk). PR #27 was merged
   with a marked Markdown commit on its head, so its snapshot release
   was not removed (`AGENTS.md`, "Pipeline").
 
