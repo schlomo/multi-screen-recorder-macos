@@ -36,7 +36,7 @@ struct SourceCellView: View {
     static func symbol(_ kind: SourceCell.Kind) -> String {
         switch kind {
         case .screen: "display"
-        case .camera: "web.camera"
+        case .camera: "video"
         case .audioInput: "mic"
         case .systemAudio: "speaker.wave.2"
         }
