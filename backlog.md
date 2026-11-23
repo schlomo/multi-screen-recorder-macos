@@ -530,6 +530,18 @@ Still open from D34: what AGC does and whether it is on in auto mode;
    not in the manifest; the System audio guide track is still clamped
    at ±1; a virtual camera in the end-to-end VM so camera capture gets
    an automatic test; a warning when a camera shares a USB 2 bus.
+45. **CI-only failures found before the one pipeline run** (retro of
+   PR #27): its first two pipeline runs failed on what only CI shows:
+   - Swift 6.3 rejected code Swift 6.4 accepts;
+   - two tests timed out under the runner's load, the third time
+     (PR #14, PR #19, PR #27; `docs/troubleshooting.md`).
+   Proposal, the owner's call (about 10 GB of disk):
+   - Xcode 26.6 beside Xcode 27 on the owner's Mac, and
+     `scripts/test` also run with `DEVELOPER_DIR` pointing at it in the
+     local gate;
+   - a way to run the recorder's tests under CPU load locally, as the
+     PR #27 builder did by hand (36 `yes` processes).
+   Moot for the compiler once item 2 lands.
 
 ## Deliberately deferred
 
