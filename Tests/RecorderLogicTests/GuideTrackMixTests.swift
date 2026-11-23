@@ -76,7 +76,7 @@ import Testing
         guide.receive([[1, -1, 0.9, 0.2], [1, -1, 0.9, 0.2]], from: "B", at: 0)
         let mixed = guide.mix(until: 4 * millisecond)[0]
         #expect(mixed.allSatisfy { abs($0) <= GuideTrackMix.limiterCeiling })
-        #expect(mixed[0] > 0.85 && mixed[1] < -0.85)
+        #expect(mixed[0] > 0.79 && mixed[1] < -0.79)
         for (sample, sum) in zip(mixed, [2, -2, 1.8, 1.2] as [Float]) { #expect(abs(sample - limited(sum)) < 1e-6) }
     }
 
@@ -90,10 +90,10 @@ import Testing
         #expect(guide.mix(until: 3 * millisecond)[0] == [0.5, -0.5, 0])
         // Just above it, the curve starts with the same slope: no step.
         #expect(abs(GuideTrackMix.limit(0.5001) - 0.5001) < 1e-6)
-        #expect(abs(GuideTrackMix.limiterCeiling - 0.891_25) < 1e-5)
+        #expect(abs(GuideTrackMix.limiterCeiling - 0.794_33) < 1e-5)
         #expect(GuideTrackMix.limit(100) <= GuideTrackMix.limiterCeiling)
         #expect(GuideTrackMix.limit(-100) >= -GuideTrackMix.limiterCeiling)
-        #expect(GuideTrackMix.limit(2) > 0.85)
+        #expect(GuideTrackMix.limit(2) > 0.79)
     }
 
     @Test func eachInputIsPlacedByItsOwnTimestampsAndAMissingInputIsSilence() {

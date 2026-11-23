@@ -2379,7 +2379,7 @@ architect's reading.
 - **Consequences:** A camera costs about as much disk and encoder as a screen of its frame size, a format that needs decoding (MJPEG) costs a decode on top, and every camera of a Mac is recorded by default, so every recorded camera's light turns on at every recording. H.264 pass-through of a camera's own stream is deferred: every format is decoded and encoded again. Capture from a real camera is not covered by any test: the end-to-end VM has no camera. No camera is recorded above 1920×1080, also when the camera and the bus could carry more. A crash loses up to 0.5 s more of a camera file than of a screen file, the ticks waiting for late frames.
 - **Evidence:** [design/recorder.md](design/recorder.md), "Cameras"; `Sources/RecorderLogic/CameraTracker.swift`, `Sources/RecorderCore/CameraCapture.swift`; backlog item 12.
 
-## D75: The guide mix's soft limiter approaches −1 dBFS, not full scale (2026-11-23)
+## D75: The guide mix's soft limiter approaches −2 dBFS, not full scale (2026-11-23)
 
 - **Status:** in force. Amends D52's limiter, whose curve approached ±1.
 - **Context:** In a camera test recording on the owner's Mac on
@@ -2387,13 +2387,17 @@ architect's reading.
   1.19 although the mix before the encoder stayed within ±1: AAC
   overshoots a signal near full scale.
 - **Decision:** The architect's decision: the limiter keeps its knee at
-  0.5 (−6 dBFS) and approaches ±10^(−1/20) ≈ 0.891 (−1 dBFS,
+  0.5 (−6 dBFS) and approaches ±10^(−2/20) ≈ 0.794 (−2 dBFS,
   `GuideTrackMix.limiterCeiling`) instead of ±1:
-  `0.5 + 0.391 · tanh((|x| − 0.5) / 0.391)` with its sign.
+  `0.5 + 0.294 · tanh((|x| − 0.5) / 0.294)` with its sign. (First
+  −1 dBFS, 0.891; lowered in review, as the cited overshoot of 1.14 to
+  1.19 at a ceiling of 1.0 means about 1.02 to 1.06 at 0.891.)
 - **Consequences:** Loud passages on the "Audio inputs" guide track are
-  up to 1 dB quieter; the decoded guide no longer clips at a thump. The
-  audio files and the "System audio" guide, still clamped at ±1, are
-  unchanged.
+  up to 2 dB quieter; a thump is expected to decode at about 0.91 to
+  0.95, below full scale. [ASSUMED] The overshoot scales with the level,
+  so the 14 to 19 % seen at 1.0 holds at 0.794; to be measured at the
+  next real test. The audio files and the "System audio" guide, still
+  clamped at ±1, are unchanged.
 - **Evidence:** [design/recorder.md](design/recorder.md), "Guide
   tracks"; `Sources/RecorderLogic/GuideTrackMix.swift`.
 

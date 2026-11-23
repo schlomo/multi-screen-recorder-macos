@@ -5,7 +5,7 @@ import Foundation
 /// timestamps, and a source with no samples for a stretch is silence there.
 /// "Audio inputs" is one mono mix: each recorded audio input averaged to
 /// mono, the inputs summed at unity gain, through a soft limiter
-/// (`limit`) with its ceiling at −1 dBFS. "System audio" carries the system audio's two channels as
+/// (`limit`) with its ceiling at −2 dBFS. "System audio" carries the system audio's two channels as
 /// they are, clamped to ±1. Times are nanoseconds from t0 on the shared
 /// clock; positions are samples from t0. A sample that is not finite is
 /// silence.
@@ -38,10 +38,10 @@ public struct GuideTrackMix: Sendable {
     /// Up to this level, the "Audio inputs" mix passes unchanged: −6 dBFS.
     public static let limiterKnee: Float = 0.5
 
-    /// The level the "Audio inputs" mix never exceeds: −1 dBFS, as AAC
+    /// The level the "Audio inputs" mix never exceeds: −2 dBFS, as AAC
     /// decoded a mix limited to 1.0 to 1.14–1.19 at a loud thump (the owner's
-    /// Mac, 2026-11-23).
-    public static let limiterCeiling = Float(pow(10, -1.0 / 20))
+    /// Mac, 2026-11-23), so −1 dBFS would still decode above full scale (D75).
+    public static let limiterCeiling = Float(pow(10, -2.0 / 20))
 
     /// The soft limiter of "Audio inputs": unchanged up to the knee, above it
     /// `knee + (ceiling − knee) · tanh((|x| − knee) / (ceiling − knee))`,
