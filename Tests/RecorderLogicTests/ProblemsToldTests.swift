@@ -130,4 +130,16 @@ import Testing
             #expect(told.lines(now: nanoseconds(length)).first?.text == "The free space cannot be read for \(shown) at 0:00, recovered: denied")
         }
     }
+
+    /// Following the audio inputs' changes failing is its own problem: a working read of them does not end it.
+    @Test func changesOfTheAudioInputsNotFollowedIsNotEndedByAReadOfThem() {
+        var told = ProblemsTold()
+        var manifest = manifest()
+        let notFollowed = RecordingProblem(atSeconds: 0, problem: "Changes of the audio inputs cannot be followed", error: "denied")
+        _ = told.add(notFollowed, kind: .audioInputChangesNotFollowed, to: &manifest)
+        told.cleared(.audioInputsNotRead, at: 5 * second)
+        #expect(told.add(problem(6 * second, "The audio inputs cannot be read"), kind: .audioInputsNotRead, to: &manifest)
+            == .tell(writeManifest: true))
+        #expect(told.lines(now: 7 * second).first == ProblemLine(text: notFollowed.text, isRecovered: false))
+    }
 }

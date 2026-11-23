@@ -461,7 +461,7 @@ public final class Recorder {
         do {
             audioWatch = try AudioInputWatch { [weak self] in self?.audioInputsChanged() }
         } catch {
-            tell("Changes of the audio inputs cannot be followed", error: ErrorDetail(error), kind: .audioInputsNotRead)
+            tell("Changes of the audio inputs cannot be followed", error: ErrorDetail(error), kind: .audioInputChangesNotFollowed)
         }
     }
 

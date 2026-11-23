@@ -973,7 +973,8 @@ checked, reported or rewritten at the next start (D47).
   the start, `h:mm:ss` from an hour on; lengths have one decimal below
   10 s as rounded, whole seconds from there, `m:ss` from a minute on. A failure (a
   file ended by a failure, a stream or an audio source that failed, an
-  audio file lost, the Dock icon or the timeline file) stays red as
+  audio file lost, the Dock icon, the timeline file, or the audio
+  inputs' changes that cannot be followed) stays red as
   told, even when a new file starts: it cost a file split and a gap.
   The recording manifest's `problems`, the result, the exit code, the
   status line's count and the lines on standard error are unchanged.

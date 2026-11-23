@@ -21,6 +21,8 @@ public enum ProblemKind: Hashable, Sendable {
     /// `msr record` could not show its Dock icon.
     case dockIconNotShown
     case audioInputsNotRead
+    /// The audio inputs' changes cannot be followed (the device list's listener failed): it never ends.
+    case audioInputChangesNotFollowed
     /// An audio input that is to be recorded and cannot be, by its name.
     case audioInputNotRecordable(String)
     /// An audio source whose capture failed, by its name; clears when a file of it starts.
@@ -43,7 +45,7 @@ extension ProblemKind {
         case .cameraStalled, .recordingLogNotWritten, .manifestNotWritten, .screensNotRead, .audioInputsNotRead,
              .freeSpaceNotRead, .cameraPermissionMissing, .inputVolumeNotSet, .inputVolumeNotFollowed:
             true
-        case .timelineFileNotWritten, .screenNotCaptured, .cameraNotCaptured, .dockIconNotShown, .audioInputNotRecordable,
+        case .timelineFileNotWritten, .screenNotCaptured, .cameraNotCaptured, .dockIconNotShown, .audioInputChangesNotFollowed, .audioInputNotRecordable,
              .audioSourceFailed, .audioFileFailed, .audioFileLost:
             false
         }
