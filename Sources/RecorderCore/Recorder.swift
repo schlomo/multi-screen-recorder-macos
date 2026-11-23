@@ -795,6 +795,8 @@ public final class Recorder {
         case .start(let uniqueID, let format, let setsFormat, let frameSize, let number, let name, let isContinuity):
             captureCount += 1
             let captureNumber = captureCount
+            // Read before the callbacks capture self: Swift 6.3 rejects a use of self after them as a data race.
+            let checksOrientation = setsFormat && cameraTracker.recordedReading(of: uniqueID)?.otherOrientation(of: format) != nil
             let capture = CameraCapture(
                 uniqueID: uniqueID, number: number, name: name, frameSize: frameSize, isContinuity: isContinuity,
                 source: devices.cameraSource(uniqueID, setsFormat ? format : nil, frameSize), context: context, guides: guides,
@@ -811,7 +813,7 @@ public final class Recorder {
                 onFormatTakenOver: { [weak self] in
                     Task { @MainActor in self?.cameraFormatTakenOver(uniqueID: uniqueID, captureNumber: captureNumber) }
                 },
-                checksOrientation: setsFormat && cameraTracker.recordedReading(of: uniqueID)?.otherOrientation(of: format) != nil,
+                checksOrientation: checksOrientation,
                 onPictureInOtherOrientation: { [weak self] beforeItsFile in
                     Task { @MainActor in
                         self?.cameraPictureInOtherOrientation(uniqueID: uniqueID, captureNumber: captureNumber, beforeItsFile: beforeItsFile)
