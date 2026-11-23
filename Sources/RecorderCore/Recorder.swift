@@ -885,9 +885,9 @@ public final class Recorder {
         return isGone ? (context.now(), .disconnected) : nil
     }
 
-    /// A camera capture's stream has stopped, reported once though both end paths may report it: its
-    /// camera's readings count another app's use again (D74, D76). True when no capture of ours is left:
-    /// the stop path reads the cameras again once it handled the end, as a reading meanwhile was not taken.
+    /// A camera capture is over, reported once though both end paths may report it: its camera's
+    /// readings count another app's use again (D74, D76). True when no capture of ours is left: the
+    /// caller that got it reads the cameras again, as a reading meanwhile was not taken.
     private func cameraCaptureGone(_ uniqueID: String, captureNumber: Int) -> Bool {
         cameraCapturesGone.insert(captureNumber).inserted && cameraTracker.captureEnded(uniqueID)
     }
@@ -902,9 +902,13 @@ public final class Recorder {
     func cameraCaptureEnded(
         uniqueID: String, captureNumber: Int, camera: String, reason: VideoStreamEnd, file: VideoFileEnd<RecordingManifest.CameraFile>?
     ) {
-        _ = cameraCaptureGone(uniqueID, captureNumber: captureNumber)
+        let readAgain = cameraCaptureGone(uniqueID, captureNumber: captureNumber)
         videoFileEnded(file, captureNumber: captureNumber, source: camera, reason: reason, uniqueID: uniqueID)
-        guard !isStopped, let (current, _) = cameraCaptures[uniqueID], current == captureNumber else { return }
+        guard !isStopped, let (current, _) = cameraCaptures[uniqueID], current == captureNumber else {
+            // A capture the recorder stops: reported here first, the stop path no longer reads the cameras.
+            if readAgain { camerasChanged() }
+            return
+        }
         cameraCaptures[uniqueID] = nil
         // No second read: `streamEnded` observes this fresh reading, taken once our capture no longer counts.
         let step = cameraTracker.streamEnded(uniqueID, reason, connected: readCameras(), at: context.now())

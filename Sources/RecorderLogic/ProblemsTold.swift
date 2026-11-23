@@ -134,7 +134,8 @@ public struct ProblemsTold: Sendable {
         case recovered
         /// Its source went away.
         case disconnected
-        /// The recorder stopped its capture, as at Stop or when the camera mode leaves the camera.
+        /// Its capture ended without recovering and without a disconnect: Stop, out of the camera mode,
+        /// the camera suspended, or the capture ended by a failure.
         case stopped
     }
 

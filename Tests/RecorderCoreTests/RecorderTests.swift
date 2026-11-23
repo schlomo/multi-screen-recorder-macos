@@ -832,6 +832,26 @@ extension GlobalRecordingLog {
             #expect(summary.manifest.events.map(\.event).contains(.cameraStreamFailed))
         }
 
+        /// A capture the recorder stops that ends by itself at the same moment, its own end reported
+        /// first: that report reads the cameras again, as the stop path's comes too late to (D74).
+        @Test func aCaptureEndingByItselfAsItIsStoppedReadsTheCamerasAgain() async throws {
+            cameras.connected.withLock { $0 = [Self.camera] }
+            try start(cameraMode: .real)
+            let first = try #require(cameras.last)
+            first.stopTakes.withLock { $0 = .milliseconds(300) }
+            try await sendFrames(first, until: "the camera file") { (try? manifestOnDisk().cameraFiles.count) == 1 }
+            cameras.connected.withLock { $0 = [Self.suspended] }
+            recorder.camerasChanged()
+            cameras.connected.withLock { $0 = [Self.runningElsewhere] }
+            recorder.camerasChanged()
+            recorder.cameraCaptureEnded(
+                uniqueID: "StandInCamera", captureNumber: 1, camera: "Stand-in camera", reason: .streamFailed("the stand-in failed"),
+                file: nil)
+            try await wait("the camera's start after the settle time") { cameras.opened.withLock { $0.count } == 2 }
+            #expect(cameras.last?.format == nil)
+            _ = await stop()
+        }
+
         /// A failed end of a camera's file, `lost` part of it, as `CameraCapture` reports it late.
         private func failedEnd(of file: RecordingManifest.CameraFile, lost: String? = nil) -> VideoFileEnd<RecordingManifest.CameraFile> {
             var file = file

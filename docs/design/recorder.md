@@ -988,7 +988,8 @@ checked, reported or rewritten at the next start (D47).
   recovered` once over because its source works again (`, then
   disconnected` when its source went away: unplugged, or a screen gone,
   also at once for a screen's or a camera's failure told after it
-  went; `, stopped` for a stall whose capture the recorder stopped), and when it came more than once
+  went; `, stopped` for a stall whose capture ended without recovering
+  and without a disconnect), and when it came more than once
   `<words> 3 times, 12 s in total` (the ongoing one counted to now),
   with its ending once none lasts; then the
   latest error after a colon, `latest: ` before it when the errors
@@ -1755,8 +1756,10 @@ no audio of the camera's own.
   start until its capture-ended report, which comes once its file is
   finalized, after its `stopRunning` returned (a reading counts the
   recorder's own session too; [ASSUMED] Core Media I/O is current by
-  then); at that report the recorder reads the cameras again, as a
-  reading while its capture still counted was not taken, not AVFoundation's
+  then); then the cameras are read again, as a reading while its
+  capture still counted was not taken: for a capture the recorder
+  stopped, after its file ended; for one that ended by itself, in its
+  stream's end, not AVFoundation's
   `isInUseByAnotherApplication`, which stays false for a camera a
   browser uses (D74). Otherwise the recorder sets its own format, as
   above. Once the recorder's own opening of a camera has finished
