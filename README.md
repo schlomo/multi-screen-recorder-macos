@@ -198,7 +198,8 @@ they are enabled and show the recording resolution (None, which records
 audio only, then 720p up to Native) and the audio mode: None, Default
 microphone, Wired or All, with a note under it on Bluetooth and virtual
 microphones, and the camera mode: None, Default camera, All real or All,
-with a note under it on virtual and iPhone cameras), system audio, the output folder and the ready check:
+with a note under it on virtual and iPhone cameras), the checkbox "Cameras
+at most 1080p" (on by default; not set by Auto), system audio, the output folder and the ready check:
 "Ready to record" when every item passes, otherwise each item with a
 fix for each failing one; a recording that would record neither a
 screen nor any audio does not pass. Every change is saved at once; the ready check runs again after each change,
@@ -258,7 +259,8 @@ settings say), `--resolution` (`native`, `4k`, `1440p`, `1200p`, `1080p`,
 `720p`, `none` for audio only), `--audio-mode` (`none`, `default-microphone`, `wired`,
 `all-inputs`), `--camera-mode` (`none`, `default-camera`, `real` for all
 real cameras, `all-cameras` for virtual and iPhone cameras too), `--system-audio`
-(`on`, `off`), `--output-folder`, `--required-recording-hours`,
+(`on`, `off`), `--limit-cameras` (`on`, the default: cameras at most
+1080p; `off`: as the recording resolution allows), `--output-folder`, `--required-recording-hours`,
 `--low-disk-warning-minutes`. `--resolution`, `--audio-mode` and
 `--camera-mode` turn auto mode off for the run; `--auto` together with
 any of them is a usage error. A usage error exits 64; an unset

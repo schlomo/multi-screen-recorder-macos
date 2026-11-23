@@ -215,7 +215,7 @@ public struct CameraTracker: Sendable {
     private func frameSizeTakenOver(_ tracked: Tracked) -> FrameSize? {
         guard case .recording(let current) = tracked.phase, let reading = tracked.reading, reading.isInUseByAnotherApplication,
               let active = reading.activeFormat else { return nil }
-        let frameSize = settings.effectiveResolution.cameraFrameSize(for: active.size)
+        let frameSize = settings.effectiveResolution.cameraFrameSize(for: active.size, limited: settings.limitCameras)
         return frameSize == current ? nil : frameSize
     }
 
@@ -334,8 +334,8 @@ public struct CameraTracker: Sendable {
             nextNumber += 1
         }
         // `records` holds for a wanted camera, so it has a format, and the resolution records video.
-        let format = reading.chosenFormat(resolution: settings.effectiveResolution)!
-        let frameSize = settings.effectiveResolution.cameraFrameSize(for: format.size)
+        let format = reading.chosenFormat(resolution: settings.effectiveResolution, limited: settings.limitCameras)!
+        let frameSize = settings.effectiveResolution.cameraFrameSize(for: format.size, limited: settings.limitCameras)
         tracked.phase = .recording(frameSize: frameSize)
         tracked.isStalled = false
         cameras[uniqueID] = tracked

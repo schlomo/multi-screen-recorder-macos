@@ -105,17 +105,19 @@ public struct ManifestExpectation: Sendable {
         public var systemAudio: Bool
         /// The VM has no camera, so a scenario keeps the default camera mode and no camera file is expected.
         public var cameraMode: String
+        public var limitCameras: Bool
 
-        public init(resolution: String, audioMode: String, systemAudio: Bool, cameraMode: String = "real") {
+        public init(resolution: String, audioMode: String, systemAudio: Bool, cameraMode: String = "real", limitCameras: Bool = true) {
             self.resolution = resolution
             self.audioMode = audioMode
             self.systemAudio = systemAudio
             self.cameraMode = cameraMode
+            self.limitCameras = limitCameras
         }
 
         var json: JSONValue {
             .object(["resolution": .string(resolution), "audioMode": .string(audioMode), "systemAudio": .bool(systemAudio),
-                     "cameraMode": .string(cameraMode)])
+                     "cameraMode": .string(cameraMode), "limitCameras": .bool(limitCameras)])
         }
 
         /// The guide tracks of every screen file (recorder.md, "Guide tracks").

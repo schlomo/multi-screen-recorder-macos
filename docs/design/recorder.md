@@ -73,7 +73,7 @@ System Audio Recording permission`. For the devices below:
 
 ```
 What will be recorded
-  Settings: Auto (resolution Native, audio mode Wired, camera mode All real), system audio on
+  Settings: Auto (resolution Native, audio mode Wired, camera mode All real), system audio on, limit cameras on
   Source                                      Looks like  Drawn at   Records at  GB/h max
   ───────────────────────────────────────────────────────────────────────────────────────
   Screen 1 - Built-in Retina Display          1728×1117   3456×2234  1728×1116        1.0
@@ -161,7 +161,7 @@ line's text), and `Ready.` or `Not ready.` last. For the devices of the
 
 ```
 What will be recorded
-  Settings: Auto (resolution Native, audio mode Wired, camera mode All real), system audio on
+  Settings: Auto (resolution Native, audio mode Wired, camera mode All real), system audio on, limit cameras on
   Source                                      Looks like  Drawn at   Records at  GB/h max
   ───────────────────────────────────────────────────────────────────────────────────────
   Screen 1 - Built-in Retina Display          1728×1117   3456×2234  1728×1116        1.0
@@ -214,6 +214,7 @@ saves, so a fresh Mac has none and the defaults apply:
   "audioMode" : "wired",
   "auto" : true,
   "cameraMode" : "real",
+  "limitCameras" : true,
   "lowDiskWarningMinutes" : 20,
   "outputFolder" : "~/Movies/Multi Screen Recorder",
   "requiredRecordingHours" : 2,
@@ -224,14 +225,17 @@ saves, so a fresh Mac has none and the defaults apply:
 
 - **Auto mode.** `auto` is on by default. With it on, a recording uses
   Native, the audio mode Wired and the camera mode All real whatever
-  `resolution`, `audioMode` and `cameraMode` say, and system audio as
-  its own switch says. The defaults of `resolution` (`native`),
+  `resolution`, `audioMode` and `cameraMode` say, and the system audio
+  and the cameras' limit as their own switches say. The defaults of `resolution` (`native`),
   `audioMode` (`wired`) and `cameraMode` (`real`) are auto mode's
   choices, so turning auto off changes nothing until a slider is moved.
 - **Camera mode (D74).** `cameraMode` chooses the cameras recorded:
   `none`, `default-camera` (the default camera only, if it is real),
   `real` (every real camera) or `all-cameras` (every camera, the
-  virtual ones too).
+  virtual ones too). `limitCameras` (`--limit-cameras on|off`, the
+  window's checkbox "Cameras at most 1080p", on by default): on, a
+  camera's box is the recording resolution's limited to 1920×1080; off,
+  the recording resolution's alone (see "Cameras").
 - **Read what is valid, never refuse.** A missing key takes its default;
   an unknown key and an invalid value are ignored (the key takes its
   default); a file that cannot be read, is no JSON or no JSON object
@@ -449,7 +453,7 @@ every change:
   "ended": null,
   "result": null,
   "cpu": null,
-  "settings": { "resolution": "1080p", "audioMode": "default-microphone", "systemAudio": true, "cameraMode": "real" },
+  "settings": { "resolution": "1080p", "audioMode": "default-microphone", "systemAudio": true, "cameraMode": "real", "limitCameras": true },
   "files": [
     {
       "name": "2026-11-12 14.03.05 Screen 1 - Built-in Retina Display.mov",
@@ -808,7 +812,10 @@ checked, reported or rewritten at the next start (D47).
   name beside it, and under it: "Virtual cameras and iPhone cameras
   (Continuity Camera, Desk View) are recorded only under All: a virtual
   camera often carries a copy of a screen or of another
-  camera." Then system audio and output
+  camera." Under that the checkbox "Cameras at most 1080p" (the setting
+  `limitCameras`), enabled whenever cameras are recorded (not under the
+  camera mode None or at the recording resolution None) and, as the
+  system audio, its own switch, not set by Auto. Then system audio and output
   folder, which stay as they are; the ready check, with "Check again";
   and, in the lower right corner, Cancel and Start, Start on the right
   in blue as the call to action. Cancel quits the app without
@@ -1511,10 +1518,13 @@ no audio of the camera's own.
   after the settle time when it is resumed; the recorder and the app
   observe the suspension and read the cameras again when it changes.
 - **Format.** A camera's box is the recording resolution's box limited
-  to 1920×1080 (*data*, `RecorderValues.cameraLargestSize`), so at
+  to 1920×1080 (*data*, `RecorderValues.cameraLargestSize`) while the
+  setting `limitCameras` is on, the default; off, the recording
+  resolution's box alone (the owner, 2026-11-23: "for the webcam
+  resolution clamp I'd like a toggle"). With the limit, at
   Native, 4K and 1440p a camera records at most 1920×1080, or 1080×1920
   upright, and at 720p 1280×720 (the owner, 2026-11-23: "quality and
-  reliability trumps all"). The reason: at Native a BRIO (USB 3) opened
+  reliability trumps all"). The reason for the default: at Native a BRIO (USB 3) opened
   4096×2160 and a DJI Osmo Pocket (USB 2, on the same dock controller as
   a USB microphone and the keyboard) 3840×2160; the system log showed
   about 1100 USB errors, the BRIO stalled and the microphone's file was

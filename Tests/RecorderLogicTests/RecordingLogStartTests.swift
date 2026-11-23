@@ -40,7 +40,7 @@ import Testing
             + Array(repeating: "ready check", count: readyCheck.count + 1)
         #expect(rest.map { $0.category } == categories)
         #expect(rest[..<table.count].map { $0.message } == table)
-        #expect(rest[table.count].message == DetailLine.facts(facts, resolution: Settings.defaults.effectiveResolution))
+        #expect(rest[table.count].message == DetailLine.facts(facts, resolution: Settings.defaults.effectiveResolution, limitCameras: true))
         #expect(rest[(1 + table.count)...].map { $0.message } == readyCheck)
         #expect(readyCheck.contains { $0.hasPrefix("ok ") })
     }

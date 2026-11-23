@@ -32,7 +32,7 @@ public enum DiskEstimate {
             audioInputFiles.append(audioInputFileBytesPerHour(channelCount: channelCount))
         }
         let cameraFiles = cameras.filter { CameraTracker.records($0, settings: settings) }.compactMap { camera in
-            camera.frameSize(resolution: settings.effectiveResolution).map { videoFileBytesPerHour(frameSize: $0, settings: settings) }
+            camera.frameSize(resolution: settings.effectiveResolution, limited: settings.limitCameras).map { videoFileBytesPerHour(frameSize: $0, settings: settings) }
         }
         let systemAudioFile = settings.systemAudio ? systemAudioFileBytesPerHour : 0
         return (screenFiles + cameraFiles + audioInputFiles).reduce(systemAudioFile, +)

@@ -33,7 +33,7 @@ import Testing
 
     @Test func theDefaultsWithTheDesignsDevices() {
         #expect(defaultSection == WhatWillBeRecorded(
-            settingsLine: "Settings: Auto (resolution Native, audio mode Wired, camera mode All real), system audio on",
+            settingsLine: "Settings: Auto (resolution Native, audio mode Wired, camera mode All real), system audio on, limit cameras on",
             screensError: nil,
             screens: [
                 .init(number: 1, name: "Built-in Retina Display", looksLike: "1728×1117", drawnAt: "3456×2234",
@@ -213,7 +213,7 @@ import Testing
     @Test func theTextForMSRCheckIsOneTableAndTheTotal() {
         #expect(defaultSection.text == """
             What will be recorded
-              Settings: Auto (resolution Native, audio mode Wired, camera mode All real), system audio on
+              Settings: Auto (resolution Native, audio mode Wired, camera mode All real), system audio on, limit cameras on
               Source                                      Looks like  Drawn at   Records at  GB/h max
               ───────────────────────────────────────────────────────────────────────────────────────
               Screen 1 - Built-in Retina Display          1728×1117   3456×2234  1728×1116        1.0
@@ -333,18 +333,18 @@ import Testing
     }
 
     @Test func theSettingsLineNamesTheEffectiveSettings() {
-        #expect(defaultSection.settingsLine == "Settings: Auto (resolution Native, audio mode Wired, camera mode All real), system audio on")
+        #expect(defaultSection.settingsLine == "Settings: Auto (resolution Native, audio mode Wired, camera mode All real), system audio on, limit cameras on")
         #expect(section { $0.systemAudio = false; $0.audioMode = .allInputs }.settingsLine
-            == "Settings: resolution 1080p, audio mode All, camera mode All real, system audio off")
+            == "Settings: resolution 1080p, audio mode All, camera mode All real, system audio off, limit cameras on")
         #expect(section { $0.auto = true; $0.resolution = .p720; $0.audioMode = .none }.settingsLine
-            == "Settings: Auto (resolution Native, audio mode Wired, camera mode All real), system audio on")
+            == "Settings: Auto (resolution Native, audio mode Wired, camera mode All real), system audio on, limit cameras on")
     }
 
     @Test func underNoneOrDefaultMicrophoneTheSettingsLineGivesTheReason() {
         #expect(section { $0.audioMode = .none }.settingsLine
-            == "Settings: resolution 1080p, audio mode None (no audio input is recorded), camera mode All real, system audio on")
+            == "Settings: resolution 1080p, audio mode None (no audio input is recorded), camera mode All real, system audio on, limit cameras on")
         #expect(section { $0.audioMode = .defaultMicrophone }.settingsLine
-            == "Settings: resolution 1080p, audio mode Default microphone (only the default microphone is recorded), camera mode All real, system audio on")
+            == "Settings: resolution 1080p, audio mode Default microphone (only the default microphone is recorded), camera mode All real, system audio on, limit cameras on")
     }
 
     @Test func underNoneOrDefaultCameraTheSettingsLineGivesTheReason() {
@@ -557,9 +557,9 @@ import Testing
 
     @Test func atTheResolutionNoneTheSettingsLineSaysThatNoScreenIsRecorded() {
         #expect(audioOnly.settingsLine
-            == "Settings: resolution None (no screen and no camera is recorded), audio mode Default microphone (only the default microphone is recorded), camera mode All real, system audio on")
+            == "Settings: resolution None (no screen and no camera is recorded), audio mode Default microphone (only the default microphone is recorded), camera mode All real, system audio on, limit cameras on")
         #expect(section { $0.resolution = .none; $0.audioMode = .wired }.settingsLine
-            == "Settings: resolution None (no screen and no camera is recorded), audio mode Wired, camera mode All real, system audio on")
+            == "Settings: resolution None (no screen and no camera is recorded), audio mode Wired, camera mode All real, system audio on, limit cameras on")
     }
 
     /// The screens are rows not recorded, without a number, Records at and GB/h max; the total is the audio files'.
@@ -582,7 +582,7 @@ import Testing
     @Test func atTheResolutionNoneTheTextKeepsTheScreensNamesColumn() {
         #expect(section({ $0.resolution = .none }, audioInputs: []).text == """
             What will be recorded
-              Settings: resolution None (no screen and no camera is recorded), audio mode Default microphone (only the default microphone is recorded), camera mode All real, system audio on
+              Settings: resolution None (no screen and no camera is recorded), audio mode Default microphone (only the default microphone is recorded), camera mode All real, system audio on, limit cameras on
               Source                              Looks like  Drawn at   Records at  GB/h max
               ───────────────────────────────────────────────────────────────────────────────
                          Built-in Retina Display  1728×1117   3456×2234  -                  -

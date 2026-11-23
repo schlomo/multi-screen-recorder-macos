@@ -456,7 +456,7 @@ import Testing
         #expect(object["ended"] is NSNull)
         #expect(object["result"] is NSNull)
         let settings = try #require(object["settings"] as? [String: Any])
-        #expect(Set(settings.keys) == ["resolution", "audioMode", "systemAudio", "cameraMode"])
+        #expect(Set(settings.keys) == ["resolution", "audioMode", "systemAudio", "cameraMode", "limitCameras"])
         #expect(object["started"] as? String == manifest().started)
     }
 

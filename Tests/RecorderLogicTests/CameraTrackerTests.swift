@@ -197,6 +197,17 @@ import Testing
         #expect(camera([format(1080, 1920, 30), format(1920, 1080, 30)]).chosenFormat(resolution: .p720) == format(1920, 1080, 30))
     }
 
+    /// With the setting `limitCameras` off, the camera's box is the recording resolution's alone.
+    @Test func withoutTheLimitACameraRecordsAsTheResolutionAllows() {
+        let brio = camera([format(4096, 2160, 30), format(3840, 2160, 30), format(1920, 1080, 30)])
+        #expect(brio.chosenFormat(resolution: .native, limited: false) == format(4096, 2160, 30))
+        #expect(brio.frameSize(resolution: .native, limited: false) == FrameSize(width: 4096, height: 2160))
+        #expect(brio.chosenFormat(resolution: .uhd4k, limited: false) == format(3840, 2160, 30))
+        #expect(brio.frameSize(resolution: .uhd4k, limited: false) == FrameSize(width: 3840, height: 2160))
+        #expect(brio.frameSize(resolution: .native, limited: true) == FrameSize(width: 1920, height: 1080))
+        #expect(brio.frameSize(resolution: .uhd4k, limited: true) == FrameSize(width: 1920, height: 1080))
+    }
+
     @Test func atNoneACameraHasAFormatButNoFrameSize() {
         let brio = camera([format(3840, 2160, 30), format(1920, 1080, 30)])
         #expect(brio.chosenFormat(resolution: .none) == format(1920, 1080, 30))
@@ -227,6 +238,19 @@ import Testing
         settings.resolution = resolution
         settings.cameraMode = mode
         return CameraTracker(settings: settings)
+    }
+
+    @Test func theTrackerFollowsTheSettingLimitCameras() {
+        var settings = Settings.defaults
+        settings.limitCameras = false
+        var cameras = CameraTracker(settings: settings)
+        let fourK = CameraInfo(uniqueID: "K", name: "4K", isDefault: true, isVirtual: false,
+                               formats: [CameraFormat(size: FrameSize(width: 3840, height: 2160), maxFramesPerSecond: 30)])
+        guard case .start(_, _, _, let frameSize, _, _, _) = cameras.begin([fourK], at: 0).actions.first else {
+            Issue.record("the camera did not start")
+            return
+        }
+        #expect(frameSize == FrameSize(width: 3840, height: 2160))
     }
 
     private func starts(_ step: CameraTracker.Step) -> [String] {

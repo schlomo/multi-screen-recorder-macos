@@ -162,6 +162,9 @@ private struct SettingsForm: View {
                     }
                 }
                 .disabled(model.settings.auto)
+                // Its own switch, as the system audio: auto mode does not set it.
+                Toggle("Cameras at most 1080p", isOn: binding(\.limitCameras))
+                    .disabled(model.settings.effectiveCameraMode == .none || !model.settings.effectiveResolution.recordsScreens)
                 Toggle("System audio", isOn: binding(\.systemAudio))
                 LabeledContent("Output folder") {
                     HStack {

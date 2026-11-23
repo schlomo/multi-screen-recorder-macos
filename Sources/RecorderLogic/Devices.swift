@@ -242,13 +242,13 @@ public struct CameraInfo: Equatable, Sendable {
     /// landscape before the rest, then the narrower. A
     /// camera with no format at that rate delivers its fastest, the largest
     /// of those. Nil for a camera that lists no format.
-    public func chosenFormat(resolution: RecordingResolution) -> CameraFormat? {
+    public func chosenFormat(resolution: RecordingResolution, limited: Bool = true) -> CameraFormat? {
         if isInUseByAnotherApplication, let activeFormat { return activeFormat }
         let fastEnough = formats.filter(\.deliversTheTickRate)
         guard !fastEnough.isEmpty else {
             return formats.max { ($0.maxFramesPerSecond.rounded(), $0.size.pixelCount) < ($1.maxFramesPerSecond.rounded(), $1.size.pixelCount) }
         }
-        let recorded = { (format: CameraFormat) in resolution.cameraFrameSize(for: format.size).pixelCount }
+        let recorded = { (format: CameraFormat) in resolution.cameraFrameSize(for: format.size, limited: limited).pixelCount }
         // The active format's orientation is the picture the camera means: the Osmo's 9:16 mode is
         // 1080×1920, also listed pillarboxed as 1920×1080, while the FaceTime camera means 1920×1080.
         let turnedAsActive = { (format: CameraFormat) in activeFormat.map { Self.turn(of: $0.size) == Self.turn(of: format.size) } ?? false }
@@ -261,9 +261,9 @@ public struct CameraInfo: Equatable, Sendable {
 
     /// The frame size of the camera's file: its chosen format's size, fitted
     /// into the camera's box; nil at None, which records no camera.
-    public func frameSize(resolution: RecordingResolution) -> FrameSize? {
+    public func frameSize(resolution: RecordingResolution, limited: Bool = true) -> FrameSize? {
         guard resolution.recordsScreens else { return nil }
-        return chosenFormat(resolution: resolution).map { resolution.cameraFrameSize(for: $0.size) }
+        return chosenFormat(resolution: resolution, limited: limited).map { resolution.cameraFrameSize(for: $0.size, limited: limited) }
     }
 
     /// Portrait (-1), square (0) or landscape (1).

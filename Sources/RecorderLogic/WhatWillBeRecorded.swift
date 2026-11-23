@@ -179,7 +179,7 @@ public struct WhatWillBeRecorded: Equatable, Sendable {
         let explained = "resolution \(resolution.shownName)\(resolutionReason), audio mode \(mode.shownName)\(modeReason)"
             + ", camera mode \(cameraMode.shownName)\(cameraModeReason)"
         return "Settings: " + (settings.auto ? "Auto (\(choices))" : explained)
-            + ", system audio \(settings.systemAudio ? "on" : "off")"
+            + ", system audio \(settings.systemAudio ? "on" : "off"), limit cameras \(settings.limitCameras ? "on" : "off")"
     }
 
     /// What the ready check's probes found, as the window and `msr check` show it.
@@ -211,7 +211,7 @@ public struct WhatWillBeRecorded: Equatable, Sendable {
     /// why, where its own rule leaves it out: "OBS Virtual Camera (virtual)", "(Continuity Camera)", "(no format)", "(suspended)", and one the
     /// camera mode records "(no Camera permission)".
     private static func camera(_ camera: CameraInfo, number: Int?, settings: Settings) -> Camera {
-        guard let number, let frameSize = camera.frameSize(resolution: settings.effectiveResolution) else {
+        guard let number, let frameSize = camera.frameSize(resolution: settings.effectiveResolution, limited: settings.limitCameras) else {
             let leavesOutVirtual = [.defaultCamera, .real].contains(settings.effectiveCameraMode)
                 && settings.effectiveResolution.recordsScreens
             let reason: String? = if CameraTracker.records(camera, settings: settings) {

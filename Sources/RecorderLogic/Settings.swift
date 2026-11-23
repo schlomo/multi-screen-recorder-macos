@@ -71,6 +71,7 @@ public enum SettingKey: String, CaseIterable, Sendable {
     case audioMode
     case cameraMode
     case systemAudio
+    case limitCameras
     case outputFolder
     case requiredRecordingHours
     case lowDiskWarningMinutes
@@ -88,6 +89,9 @@ public struct Settings: Equatable, Sendable, Encodable {
     public var audioMode: AudioMode
     public var cameraMode: CameraMode
     public var systemAudio: Bool
+    /// Cameras at most 1080p: a camera's box is the recording resolution's
+    /// limited to `RecorderValues.cameraLargestSize` (D74). Not set by auto mode.
+    public var limitCameras: Bool
     /// As written in the settings file, possibly starting with `~`.
     public var outputFolder: String
     public var requiredRecordingHours: Double
@@ -99,6 +103,7 @@ public struct Settings: Equatable, Sendable, Encodable {
         audioMode: AudioMode,
         cameraMode: CameraMode,
         systemAudio: Bool,
+        limitCameras: Bool = true,
         outputFolder: String,
         requiredRecordingHours: Double,
         lowDiskWarningMinutes: Double
@@ -108,6 +113,7 @@ public struct Settings: Equatable, Sendable, Encodable {
         self.audioMode = audioMode
         self.cameraMode = cameraMode
         self.systemAudio = systemAudio
+        self.limitCameras = limitCameras
         self.outputFolder = outputFolder
         self.requiredRecordingHours = requiredRecordingHours
         self.lowDiskWarningMinutes = lowDiskWarningMinutes
@@ -128,6 +134,7 @@ public struct Settings: Equatable, Sendable, Encodable {
         audioMode: autoAudioMode,
         cameraMode: autoCameraMode,
         systemAudio: true,
+        limitCameras: true,
         outputFolder: "~/Movies/Multi Screen Recorder",
         requiredRecordingHours: 2,
         lowDiskWarningMinutes: 20
@@ -346,6 +353,8 @@ extension Settings {
         case (.cameraMode, _): return Expected.cameraMode
         case (.systemAudio, .bool(let flag)): systemAudio = flag
         case (.systemAudio, _): return Expected.jsonSwitch
+        case (.limitCameras, .bool(let flag)): limitCameras = flag
+        case (.limitCameras, _): return Expected.jsonSwitch
         case (.outputFolder, .string(let text)):
             guard let parsed = validFolder(text) else { return Expected.folder }
             outputFolder = parsed
@@ -398,6 +407,12 @@ extension Settings {
                 switch text {
                 case "on": settings.systemAudio = true
                 case "off": settings.systemAudio = false
+                default: throw invalid(Expected.flagSwitch)
+                }
+            case .limitCameras:
+                switch text {
+                case "on": settings.limitCameras = true
+                case "off": settings.limitCameras = false
                 default: throw invalid(Expected.flagSwitch)
                 }
             case .outputFolder:

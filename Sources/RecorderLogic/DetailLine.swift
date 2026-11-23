@@ -31,7 +31,7 @@ public enum DetailLine {
     }
 
     /// "screen recording granted; microphone granted; screens: DELL P3421W 3440×1440 at (0,0) main, …"
-    public static func facts(_ facts: ReadyCheckFacts, resolution: RecordingResolution) -> String {
+    public static func facts(_ facts: ReadyCheckFacts, resolution: RecordingResolution, limitCameras: Bool) -> String {
         let screen = switch facts.screenRecording {
         case .granted: "granted"
         case .notGranted: "not granted"
@@ -55,7 +55,7 @@ public enum DetailLine {
         case .usable(.unreadable(let error)): "output folder usable, free space cannot be read (\(error))"
         case .unusable(let error): "output folder unusable (\(error))"
         }
-        let cameras = "cameras: " + Self.cameras(facts.cameras, resolution: resolution)
+        let cameras = "cameras: " + Self.cameras(facts.cameras, resolution: resolution, limitCameras: limitCameras)
         return ["screen recording \(screen)", "microphone \(microphone)", "camera \(camera)", screens, audioInputs, cameras, folder]
             .joined(separator: "; ")
     }
@@ -85,10 +85,10 @@ public enum DetailLine {
 
     /// "FaceTime HD Camera (default) 1920×1080 at 30 fps, OBS Virtual Camera virtual 1280×720 at 30 fps":
     /// each camera with the format it is opened with at `resolution`; none at None, which records no camera.
-    public static func cameras(_ cameras: [CameraInfo], resolution: RecordingResolution) -> String {
+    public static func cameras(_ cameras: [CameraInfo], resolution: RecordingResolution, limitCameras: Bool) -> String {
         list(cameras.map { camera in
             let format = !resolution.recordsScreens ? ""
-                : camera.chosenFormat(resolution: resolution).map { " \($0)" } ?? " no format"
+                : camera.chosenFormat(resolution: resolution, limited: limitCameras).map { " \($0)" } ?? " no format"
             return camera.shownName + (camera.isVirtual ? " virtual" : "") + (camera.isContinuity ? " Continuity Camera" : "")
                 + (camera.isSuspended ? " suspended" : "") + format
         })

@@ -10,6 +10,7 @@ import Testing
         #expect(defaults.audioMode == .wired)
         #expect(defaults.cameraMode == .real)
         #expect(defaults.systemAudio == true)
+        #expect(defaults.limitCameras == true)
         #expect(defaults.outputFolder == "~/Movies/Multi Screen Recorder")
         #expect(defaults.requiredRecordingHours == 2)
         #expect(defaults.lowDiskWarningMinutes == 20)
@@ -20,6 +21,7 @@ import Testing
           "audioMode" : "wired",
           "auto" : true,
           "cameraMode" : "real",
+          "limitCameras" : true,
           "lowDiskWarningMinutes" : 20,
           "outputFolder" : "~/Movies/Multi Screen Recorder",
           "requiredRecordingHours" : 2,
@@ -39,7 +41,7 @@ import Testing
 
     @Test func flagNamesAreTheKeysInKebabCase() {
         #expect(SettingKey.allCases.map(\.flagName) == [
-            "--resolution", "--audio-mode", "--camera-mode", "--system-audio", "--output-folder",
+            "--resolution", "--audio-mode", "--camera-mode", "--system-audio", "--limit-cameras", "--output-folder",
             "--required-recording-hours", "--low-disk-warning-minutes",
         ])
     }
@@ -232,6 +234,7 @@ import Testing
         (#"{"audioMode": true}"#, "audioMode"),
         (#"{"systemAudio": "on"}"#, "systemAudio"),
         (#"{"systemAudio": 1}"#, "systemAudio"),
+        (#"{"limitCameras": "off"}"#, "limitCameras"),
         (#"{"outputFolder": ""}"#, "outputFolder"),
         (#"{"outputFolder": "relative/folder"}"#, "outputFolder"),
         (#"{"outputFolder": 3}"#, "outputFolder"),
@@ -373,10 +376,27 @@ import Testing
         #expect(try Settings.defaults.applying(flags: [.systemAudio: "off"]).systemAudio == false)
     }
 
+    /// As `--system-audio`: on or off, not set by auto mode (D74).
+    @Test func limitCamerasFlagTakesOnAndOffAndKeepsAutoMode() throws {
+        let off = try Settings.defaults.applying(flags: [.limitCameras: "off"])
+        #expect(off.limitCameras == false)
+        #expect(off.auto == true)
+        #expect(try off.applying(flags: [.limitCameras: "on"]).limitCameras == true)
+        let error = try #require(throws: SettingsError.self) { try Settings.defaults.applying(flags: [.limitCameras: "true"]) }
+        let systemAudioError = try #require(throws: SettingsError.self) { try Settings.defaults.applying(flags: [.systemAudio: "true"]) }
+        #expect(error.description == systemAudioError.description.replacing("--system-audio", with: "--limit-cameras"))
+    }
+
+    @Test func theSettingsFileTurnsTheCamerasLimitOff() {
+        #expect(Settings.read(json: Data(#"{"limitCameras": false}"#.utf8)).settings.limitCameras == false)
+        #expect(Settings.read(json: Data(#"{"systemAudio": false}"#.utf8)).settings.limitCameras == true)
+    }
+
     @Test(arguments: [
         (SettingKey.resolution, "999p"),
         (.audioMode, "loud"),
         (.systemAudio, "true"),
+        (.limitCameras, "true"),
         (.outputFolder, ""),
         (.requiredRecordingHours, "two"),
         (.requiredRecordingHours, "0"),

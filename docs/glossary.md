@@ -188,7 +188,7 @@ screen or of another camera (D74).
 The video file for one camera, made exactly as a screen file: the same
 tick grid, timecode and guide tracks, no audio of the camera's own, its
 frame size its chosen format's size fitted, as a screen's, into the
-recording resolution's box limited to 1920×1080: of the formats at 30
+recording resolution's box, limited to 1920×1080 unless `limitCameras` is off: of the formats at 30
 fps, of any aspect ratio, the one that records the largest size, and of
 those the smallest; for a camera another app uses, the format it runs
 in. Another app changing that to another frame size starts a new one. Its tick waits up to 0.5 s for a frame captured before it. A camera

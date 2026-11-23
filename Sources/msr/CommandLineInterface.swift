@@ -32,6 +32,9 @@ struct SettingsFlags: ParsableArguments {
     @Option(help: "System audio: on or off.")
     var systemAudio: String?
 
+    @Option(help: "Cameras at most 1080p: on or off.")
+    var limitCameras: String?
+
     @Option(help: "Output folder: a path starting with / or ~.")
     var outputFolder: String?
 
@@ -50,6 +53,7 @@ struct SettingsFlags: ParsableArguments {
             (.audioMode, audioMode),
             (.cameraMode, cameraMode),
             (.systemAudio, systemAudio),
+            (.limitCameras, limitCameras),
             (.outputFolder, outputFolder),
             (.requiredRecordingHours, requiredRecordingHours),
             (.lowDiskWarningMinutes, lowDiskWarningMinutes),

@@ -85,10 +85,11 @@ public enum RecordingResolution: String, CaseIterable, Sendable, Encodable {
     }
 
     /// The frame size of a camera file: the camera format's size fitted as
-    /// a screen's looks-like size, into the box limited to
-    /// `RecorderValues.cameraLargestSize` (D74); at None, which records no
-    /// camera, as at Native.
-    public func cameraFrameSize(for size: FrameSize) -> FrameSize {
+    /// a screen's looks-like size, into the box, with `limited` (the setting
+    /// `limitCameras`) limited to `RecorderValues.cameraLargestSize` (D74);
+    /// at None, which records no camera, as at Native.
+    public func cameraFrameSize(for size: FrameSize, limited: Bool) -> FrameSize {
+        guard limited else { return fitted(size, into: box) }
         let largest = RecorderValues.cameraLargestSize
         return fitted(size, into: FrameSize(
             width: min(box?.width ?? .max, largest.width), height: min(box?.height ?? .max, largest.height)))

@@ -42,7 +42,7 @@ import Testing
 
     static let designExample = """
         What will be recorded
-          Settings: Auto (resolution Native, audio mode Wired, camera mode All real), system audio on
+          Settings: Auto (resolution Native, audio mode Wired, camera mode All real), system audio on, limit cameras on
           Source                                      Looks like  Drawn at   Records at  GB/h max
           ───────────────────────────────────────────────────────────────────────────────────────
           Screen 1 - Built-in Retina Display          1728×1117   3456×2234  1728×1116        1.0

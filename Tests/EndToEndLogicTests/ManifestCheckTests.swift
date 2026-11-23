@@ -40,7 +40,7 @@ struct SampleRecording {
             "ended": killed ? NSNull() : "2026-11-19T08:27:39.000+01:00",
             "result": killed ? NSNull() : "ok",
             "cpu": killed ? NSNull() : ["averagePercent": 32.0, "peakPercent": 129.0] as [String: Any],
-            "settings": ["resolution": "1080p", "audioMode": "all-inputs", "systemAudio": true, "cameraMode": "real"] as [String: Any],
+            "settings": ["resolution": "1080p", "audioMode": "all-inputs", "systemAudio": true, "cameraMode": "real", "limitCameras": true] as [String: Any],
             "files": [
                 screen("2026-11-19 08.27.21 Screen 1 - DELL P3421W.mov", screen: "DELL P3421W",
                        uuid: "A95C2BA6-2796-4EDF-919B-66A6C21CE71F", size: [1920, 802], start: 0.1333333, end: 17.0333333,
@@ -153,7 +153,7 @@ struct SampleRecording {
 
     @Test func otherSettingsOrAnotherAppFail() {
         var sample = SampleRecording()
-        sample.manifest["settings"] = ["resolution": "native", "audioMode": "all-inputs", "systemAudio": true, "cameraMode": "real"]
+        sample.manifest["settings"] = ["resolution": "native", "audioMode": "all-inputs", "systemAudio": true, "cameraMode": "real", "limitCameras": true]
         sample.manifest["app"] = "Multi Screen Recorder 0.1 (abc)"
         let failures = sample.check().failures
         #expect(failures.count == 2)

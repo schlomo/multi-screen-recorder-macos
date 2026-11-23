@@ -13,7 +13,7 @@ import Testing
             screenRecording: .granted, microphoneGranted: true, screens: .success([dell, retina]),
             audioInputs: .success([AudioInputInfo(name: "MacBook Pro Microphone", channelCount: 1, isDefault: true)]),
             outputFolder: .usable(.bytes(120_400_000_000)))
-        #expect(DetailLine.facts(facts, resolution: .native) == "screen recording granted; microphone granted; camera not asked; "
+        #expect(DetailLine.facts(facts, resolution: .native, limitCameras: true) == "screen recording granted; microphone granted; camera not asked; "
             + "screens: DELL P3421W 3440×1440 at (0,0) main, Built-in Retina Display looks like 1728×1117, drawn at 3456×2234 at (3440,0); "
             + "audio inputs: MacBook Pro Microphone (default) 1 channel; cameras: none; output folder usable, 120.4 GB free")
     }
@@ -27,7 +27,7 @@ import Testing
                            formats: [CameraFormat(size: FrameSize(width: 1920, height: 1080), maxFramesPerSecond: 30)]),
                 CameraInfo(uniqueID: "C", name: "OBS Virtual Camera", isDefault: false, isVirtual: true, formats: []),
             ])
-        #expect(DetailLine.facts(facts, resolution: .native) == "screen recording granted; microphone not asked; camera not granted; screens: none; "
+        #expect(DetailLine.facts(facts, resolution: .native, limitCameras: true) == "screen recording granted; microphone not asked; camera not granted; screens: none; "
             + "audio inputs: none; cameras: FaceTime HD Camera (default) 1920×1080 at 30 fps, OBS Virtual Camera virtual no format; "
             + "output folder unusable (read-only)")
     }
@@ -39,11 +39,11 @@ import Testing
             CameraInfo(uniqueID: "A", name: "FaceTime HD Camera", isDefault: true, isVirtual: false, formats: formats, isSuspended: true),
             CameraInfo(uniqueID: "B", name: "iPhone Camera", isDefault: false, isVirtual: false, isContinuity: true, formats: formats),
         ]
-        #expect(DetailLine.cameras(cameras, resolution: .native)
+        #expect(DetailLine.cameras(cameras, resolution: .native, limitCameras: true)
             == "FaceTime HD Camera (default) suspended 1920×1080 at 30 fps, iPhone Camera Continuity Camera 1920×1080 at 30 fps")
-        #expect(DetailLine.cameras(cameras, resolution: .p720)
+        #expect(DetailLine.cameras(cameras, resolution: .p720, limitCameras: true)
             == "FaceTime HD Camera (default) suspended 1280×720 at 30 fps, iPhone Camera Continuity Camera 1280×720 at 30 fps")
-        #expect(DetailLine.cameras(cameras, resolution: .none) == "FaceTime HD Camera (default) suspended, iPhone Camera Continuity Camera")
+        #expect(DetailLine.cameras(cameras, resolution: .none, limitCameras: true) == "FaceTime HD Camera (default) suspended, iPhone Camera Continuity Camera")
     }
 
     @Test func theFramesPlacedLateAreCountedWithTheLatestArrival() {
@@ -57,7 +57,7 @@ import Testing
         let facts = ReadyCheckFacts(
             screenRecording: .failed("-3801"), microphoneGranted: nil, screens: .failure(DeviceReadError("no list")),
             audioInputs: .success([]), outputFolder: .unusable("read-only"))
-        #expect(DetailLine.facts(facts, resolution: .native) == "screen recording failed (-3801); microphone not asked; camera not asked; "
+        #expect(DetailLine.facts(facts, resolution: .native, limitCameras: true) == "screen recording failed (-3801); microphone not asked; camera not asked; "
             + "screens cannot be read (no list); audio inputs: none; cameras: none; output folder unusable (read-only)")
     }
 
@@ -66,7 +66,7 @@ import Testing
         let facts = ReadyCheckFacts(
             screenRecording: nil, microphoneGranted: true, screens: .success([]),
             audioInputs: .success([]), outputFolder: .unusable("read-only"))
-        #expect(DetailLine.facts(facts, resolution: .native).hasPrefix("screen recording not asked; microphone granted; "))
+        #expect(DetailLine.facts(facts, resolution: .native, limitCameras: true).hasPrefix("screen recording not asked; microphone granted; "))
     }
 
     /// The clock drift lines of all audio sources come together, in number order: the system audio (0) first.

@@ -16,23 +16,27 @@ public struct RecordingManifest: Codable, Equatable, Sendable {
         public var audioMode: String
         public var cameraMode: String
         public var systemAudio: Bool
+        public var limitCameras: Bool
 
         public init(_ settings: Settings) {
             resolution = settings.effectiveResolution.rawValue
             audioMode = settings.effectiveAudioMode.rawValue
             cameraMode = settings.effectiveCameraMode.rawValue
             systemAudio = settings.systemAudio
+            limitCameras = settings.limitCameras
         }
 
-        private enum CodingKeys: String, CodingKey { case resolution, audioMode, cameraMode, systemAudio }
+        private enum CodingKeys: String, CodingKey { case resolution, audioMode, cameraMode, systemAudio, limitCameras }
 
-        /// A manifest from before cameras were recorded (D74) has no `cameraMode`: it recorded none.
+        /// A manifest from before cameras were recorded (D74) has no `cameraMode`: it recorded none;
+        /// one from before the cameras' limit has no `limitCameras`: none was applied.
         public init(from decoder: any Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             resolution = try container.decode(String.self, forKey: .resolution)
             audioMode = try container.decode(String.self, forKey: .audioMode)
             cameraMode = try container.decodeIfPresent(String.self, forKey: .cameraMode) ?? CameraMode.none.rawValue
             systemAudio = try container.decode(Bool.self, forKey: .systemAudio)
+            limitCameras = try container.decodeIfPresent(Bool.self, forKey: .limitCameras) ?? false
         }
     }
 
