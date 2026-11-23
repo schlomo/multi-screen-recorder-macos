@@ -272,6 +272,20 @@ private extension Dictionary where Key == String, Value == Any {
             == (1_080_000, 300))
     }
 
+    /// A delayed file that would overlap its source's previous one leaves out its head, so what
+    /// it plays stays at its own time, never pushed later.
+    @Test func aDelayedClipOverlappingThePreviousOneLeavesOutItsHead() throws {
+        let result = try timeline(manifest(files: [
+            audio("10.00.00", "Audio 2 - Osmo", channels: "1", timecode: "10:00:00:00", start: 0, end: 10),
+            audio("10.00.10", "Audio 2 - Osmo", channels: "1", timecode: "10:00:10:06", start: 10.2, end: 20, delay: 0.55),
+        ]))
+        let children = result.tracks[0].children
+        #expect(children.map { $0["OTIO_SCHEMA"] as! String } == ["Clip.2", "Clip.2"])
+        #expect(children[0].frames == (1_080_000, 300))
+        // 0.55 s is 17 frames earlier: from frame 289, 11 frames into the first file, which ends at frame 300.
+        #expect(children[1].frames == (1_080_317, 283))
+    }
+
     @Test func aSourceWithTwoFilesIsOneTrackWithAGapBetweenAndNoGapAfter() throws {
         let result = try timeline(manifest(files: [
             audio("10.00.00", "Audio 2 - R", channels: "1", timecode: "10:00:00:10", start: 0.3, end: 3),

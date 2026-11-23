@@ -51,6 +51,39 @@ public enum AudioDelay {
         lags.count >= windowsNeeded ? median(lags) : nil
     }
 
+    /// The files' delays as written and shown: the medians against the reference
+    /// (whose own file, `reference`, counts as 0), less the smallest of them where it is
+    /// below 0, so the earliest measured input is 0 and a delayed reference never moves
+    /// the others later; the reference's file is listed when that shifts it.
+    public static func normalized(_ delays: [String: Double], reference: String?) -> [String: Double] {
+        let shift = min(0, delays.values.min() ?? 0)
+        var normalized = delays.mapValues { $0 - shift }
+        if let reference, shift < 0 { normalized[reference] = -shift }
+        return normalized
+    }
+
+    /// Each audio file's counted lags, against the reference they were measured with.
+    public struct Lags: Sendable {
+        private var byFile: [String: (reference: String, lags: [Double])] = [:]
+
+        public init() {}
+
+        /// A counted window's lag; against another reference than before, the file starts again.
+        public mutating func add(_ lag: Double, file: String, reference: String) {
+            if byFile[file]?.reference != reference { byFile[file] = (reference, []) }
+            byFile[file]?.lags.append(lag)
+        }
+
+        /// The delays of `files` against `reference`, `normalized`; a file without one is not listed.
+        public func delays(of files: [String], reference: String, referenceFile: String?) -> [String: Double] {
+            let medians = files.reduce(into: [String: Double]()) { medians, file in
+                guard let measured = byFile[file], measured.reference == reference else { return }
+                medians[file] = AudioDelay.delay(ofCountedLags: measured.lags)
+            }
+            return normalized(medians, reference: referenceFile)
+        }
+    }
+
     /// "550 ms late", "30 ms early", "0 ms".
     public static func text(_ delay: Double) -> String {
         let milliseconds = Int((delay * 1000).rounded())

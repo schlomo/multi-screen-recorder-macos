@@ -106,7 +106,7 @@ public enum ResolveTimeline {
         let timecodeFrame: Int
         /// The frames the clip plays, from `trimmed` on.
         var frames: Int
-        /// The file's first frames the clip leaves out: a delayed clip that would start before the timeline.
+        /// The file's first frames the clip leaves out: where it would start before the timeline or overlap its source's previous clip.
         var trimmed = 0
         let channels: RecordingManifest.AudioFile.Channels?
         let label: String
@@ -226,11 +226,19 @@ public enum ResolveTimeline {
     }
 
     /// The clips of a track in time order, a gap before each where the track is empty. A clip that
-    /// starts before the previous one ends, by a frame at most, follows it at once.
+    /// starts before the previous one ends (a delayed audio file's, D77, or by a frame's rounding)
+    /// leaves out its overlapping head, so what it plays stays at its own time.
     private static func trackChildren(_ files: [Placed], timelineStart: Int, metadata: (Placed) -> Node) -> [Node] {
         var children: [Node] = []
         var cursor = timelineStart
-        for file in files {
+        for var file in files {
+            if file.startFrame < cursor {
+                let overlap = cursor - file.startFrame
+                file.trimmed += overlap
+                file.frames -= overlap
+                file.startFrame = cursor
+                guard file.frames > 0 else { continue }
+            }
             if file.startFrame > cursor {
                 children.append(.object([
                     ("OTIO_SCHEMA", "Gap.1"),
@@ -243,7 +251,7 @@ public enum ResolveTimeline {
                 ]))
             }
             children.append(clip(file, metadata: metadata(file)))
-            cursor = max(cursor, file.startFrame) + file.frames
+            cursor = file.startFrame + file.frames
         }
         return children
     }

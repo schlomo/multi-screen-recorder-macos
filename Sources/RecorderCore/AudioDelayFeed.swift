@@ -4,7 +4,7 @@ import Synchronization
 /// Each recorded audio input's latest sound at `AudioDelay.sampleRate`
 /// mono, placed on the recording's timeline, for measuring its delay
 /// (D77): the audio captures hand their corrected audio in on their own
-/// queues, the measurement takes windows out; at most `keptSeconds` per input.
+/// queues, the measurement takes windows out; `keptSeconds` to twice that per input.
 final class AudioDelayFeed: Sendable {
     static let keptSeconds = 12
     private static let kept = keptSeconds * AudioDelay.sampleRate
@@ -28,35 +28,37 @@ final class AudioDelayFeed: Sendable {
         guard let frames = channels.first?.count, frames > 0 else { return }
         let rate = Int64(RecorderValues.audioSampleRate)
         let position = time * rate / 1_000_000_000
-        rings.withLock { rings in
-            var ring = rings[uid] ?? Ring()
-            var channels = channels
-            // Not where it was expected, by more than a millisecond: start the group grid over at a whole group.
-            if ring.samples.isEmpty || abs(position - ring.next) > rate / 1000 {
-                let decimation = Int64(AudioDelay.decimation)
-                let index = (position + decimation - 1) / decimation
-                let skip = Int(index * decimation - position)
-                guard skip < frames else { return }
-                channels = channels.map { Array($0[skip...]) }
-                ring.carry = []
-                if ring.samples.isEmpty || index < ring.firstIndex || index - ring.endIndex > Int64(Self.kept) {
-                    ring.samples = []
-                    ring.firstIndex = index
-                } else if index < ring.endIndex {
-                    ring.samples.removeLast(Int(ring.endIndex - index))
-                } else {
-                    ring.samples += [Float](repeating: 0, count: Int(index - ring.endIndex))
-                }
+        rings.withLock { rings in Self.append(channels, at: position, frames: frames, to: &rings[uid, default: Ring()]) }
+    }
+
+    /// In place, so a buffer appends to the ring without copying it.
+    private static func append(_ channels: [[Float]], at position: Int64, frames: Int, to ring: inout Ring) {
+        let rate = Int64(RecorderValues.audioSampleRate)
+        var channels = channels
+        // Not where it was expected, by more than a millisecond: start the group grid over at a whole group.
+        if ring.samples.isEmpty || abs(position - ring.next) > rate / 1000 {
+            let decimation = Int64(AudioDelay.decimation)
+            let index = (position + decimation - 1) / decimation
+            let skip = Int(index * decimation - position)
+            guard skip < frames else { return }
+            channels = channels.map { Array($0[skip...]) }
+            ring.carry = []
+            if ring.samples.isEmpty || index < ring.firstIndex || index - ring.endIndex > Int64(Self.kept) {
+                ring.samples = []
+                ring.firstIndex = index
+            } else if index < ring.endIndex {
+                ring.samples.removeLast(Int(ring.endIndex - index))
+            } else {
+                ring.samples += [Float](repeating: 0, count: Int(index - ring.endIndex))
             }
-            ring.samples += AudioDelay.downsampled(channels, carry: &ring.carry)
-            ring.next = position + Int64(frames)
-            // Trims rarely, so most buffers only append.
-            if ring.samples.count > 2 * Self.kept {
-                let drop = ring.samples.count - Self.kept
-                ring.samples.removeFirst(drop)
-                ring.firstIndex += Int64(drop)
-            }
-            rings[uid] = ring
+        }
+        ring.samples += AudioDelay.downsampled(channels, carry: &ring.carry)
+        ring.next = position + Int64(frames)
+        // Trims rarely, so most buffers only append.
+        if ring.samples.count > 2 * Self.kept {
+            let drop = ring.samples.count - Self.kept
+            ring.samples.removeFirst(drop)
+            ring.firstIndex += Int64(drop)
         }
     }
 
@@ -72,9 +74,5 @@ final class AudioDelayFeed: Sendable {
             let from = Int(end - Int64(count) - ring.firstIndex)
             return Array(ring.samples[from..<(from + count)])
         }
-    }
-
-    func remove(_ uid: String) {
-        _ = rings.withLock { $0.removeValue(forKey: uid) }
     }
 }

@@ -2473,7 +2473,17 @@ architect's reading.
   where it would begin before the timeline. The audio files and the
   guide tracks on the video files stay as recorded. Decided while
   building: the timeline shift is rounded to the nearest frame, as the
-  timeline places clips at whole frames at 30 fps.
+  timeline places clips at whole frames at 30 fps. The architect's
+  reading after review: a file's lags are kept per reference, and when
+  the reference changes its lags against the old one are discarded (it
+  starts again); after the medians the delays are normalized so the
+  earliest measured input is 0, every delay less min(0, the smallest),
+  the reference counting as 0, so a delayed default microphone (an
+  Osmo, a Bluetooth microphone) never moves the others later, and the
+  reference's own file then gets a `measuredDelay` too. Fixed in
+  review: a delayed clip that would overlap its source's previous clip
+  leaves out its head instead of being pushed later; measuring ends at
+  Stop.
 - **Consequences:** An edit opened from the timeline file has every
   measured microphone in sync with the reference to within a frame; a
   file's own sound and its guide tracks still carry the delay. A

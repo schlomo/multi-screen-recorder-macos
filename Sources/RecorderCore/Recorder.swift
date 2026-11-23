@@ -97,7 +97,7 @@ public final class Recorder {
     private var screensRead: [ConnectedScreen] = []
     /// The audio inputs' latest sound and the lags counted so far per audio file, for their delays (D77).
     private let audioDelays = AudioDelayFeed()
-    private var delayLags: [String: [Double]] = [:]
+    private var delayLags = AudioDelay.Lags()
     private var delayTask: Task<Void, Never>?
     private var audioInputsRead: [AudioInputInfo] = []
     private var endReports = CaptureEndReports()
@@ -226,6 +226,7 @@ public final class Recorder {
         delayTask = Task { [weak self] in
             while !Task.isCancelled {
                 try? await Task.sleep(for: AudioDelay.interval)
+                guard !Task.isCancelled else { return }
                 await self?.measureAudioDelays()
             }
         }
@@ -926,8 +927,9 @@ public final class Recorder {
 
     /// Measures each audio input file being written against the reference
     /// microphone over their latest common window, off the main thread, and
-    /// keeps the clear windows' lags; a file's delay is their median (D77).
+    /// keeps the clear windows' lags; a file's delay is their median, normalized (D77). Nothing after Stop.
     private func measureAudioDelays() async {
+        guard !isStopped else { return }
         let writing = manifest.audioFiles.filter { $0.end == nil && $0.audioSourceUID != nil }
         guard let reference = delayReference(among: Set(writing.compactMap(\.audioSourceUID))),
               let referenceEnd = audioDelays.endIndex(of: reference) else { return }
@@ -943,14 +945,16 @@ public final class Recorder {
         let windows = await Task.detached(priority: .utility) {
             jobs.map { ($0.file, AudioDelay.window(reference: $0.reference, other: $0.other)) }
         }.value
-        var changed = false
+        guard !isStopped else { return }
         for case let (file, window?) in windows where window.counts {
             RecorderLog.detail("\(file): lag \(AudioDelay.text(window.lag)), clarity \(Int(window.clarity.rounded()))", category: "recorder")
-            delayLags[file, default: []].append(window.lag)
-            let delay = AudioDelay.delay(ofCountedLags: delayLags[file]!)
-            changed = manifest.audioDelayMeasured(delay, file: file) && delay != nil || changed
+            delayLags.add(window.lag, file: file, reference: reference)
         }
-        if changed { try? writeManifest() }
+        let delays = delayLags.delays(
+            of: writing.map(\.name), reference: reference, referenceFile: writing.first { $0.audioSourceUID == reference }?.name)
+        let before = manifest.audioFiles.map(\.measuredDelay)
+        for file in writing { _ = manifest.audioDelayMeasured(delays[file.name], file: file.name) }
+        if manifest.audioFiles.map(\.measuredDelay) != before { try? writeManifest() }
     }
 
     /// The default microphone when it is recorded, else the recorded audio input with the lowest number (D77).

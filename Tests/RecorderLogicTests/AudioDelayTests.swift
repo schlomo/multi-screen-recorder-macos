@@ -47,6 +47,27 @@ import Testing
         #expect(AudioDelay.delay(ofCountedLags: [0.5, 0.52, 0.6, 0.4]) == 0.51)
     }
 
+    /// The earliest measured input is 0: a delayed reference (an Osmo, a Bluetooth microphone)
+    /// moves itself later, never the others (D77).
+    @Test func theDelaysAreNormalizedSoTheEarliestInputIsZero() {
+        #expect(AudioDelay.normalized(["a": 0.5, "b": -0.25], reference: "r") == ["a": 0.75, "b": 0, "r": 0.25])
+        #expect(AudioDelay.normalized(["a": 0.55], reference: "r") == ["a": 0.55])
+        #expect(AudioDelay.normalized(["a": -0.1], reference: nil) == ["a": 0])
+        #expect(AudioDelay.normalized([:], reference: "r") == [:])
+    }
+
+    /// A file's lags count against one reference: a new reference starts it again (D77).
+    @Test func aNewReferenceStartsAFilesLagsAgain() {
+        var lags = AudioDelay.Lags()
+        for lag in [0.5, 0.5, 0.5] { lags.add(lag, file: "a", reference: "r1") }
+        for lag in [-0.25, -0.25, -0.25] { lags.add(lag, file: "b", reference: "r1") }
+        #expect(lags.delays(of: ["a", "b"], reference: "r1", referenceFile: "r1 file") == ["a": 0.75, "b": 0, "r1 file": 0.25])
+        lags.add(0.5, file: "a", reference: "r2")
+        #expect(lags.delays(of: ["a", "b"], reference: "r2", referenceFile: nil) == [:])
+        for lag in [0.25, 0.25] { lags.add(lag, file: "a", reference: "r2") }
+        #expect(lags.delays(of: ["a"], reference: "r2", referenceFile: nil) == ["a": 0.25])
+    }
+
     @Test func theDelayReadsLateOrEarly() {
         #expect(AudioDelay.text(0.5504) == "550 ms late")
         #expect(AudioDelay.text(-0.03) == "30 ms early")

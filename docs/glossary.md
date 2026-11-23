@@ -16,7 +16,7 @@ audio file, guide track, clock drift; D45, D49), labels (D55), the
 banner, the recording log and the error detail (D64), the timeline file
 (D68), the level meter, the input volume and no audio (D69), cameras,
 camera files and the camera mode (D74), the orientation (D76), the audio
-delay (D77), recovered (D78), and the end-to-end
+delay and the lag (D77), recovered (D78), and the end-to-end
 tests' first named scenarios, with the restore file, virtual screens and
 the test tone (D63).
 
@@ -383,8 +383,15 @@ How much later an audio input's sound arrives than the reference
 microphone's (the default microphone when recorded, else the recorded
 audio input with the lowest number), beyond what its clock drift
 explains; measured while recording by cross-correlation and written as
-an audio file's `measuredDelay` (D77). The timeline file places the
-file's clip earlier by it; the audio file itself is unchanged.
+an audio file's `measuredDelay` (D77), normalized so the earliest
+measured input's is 0. The timeline file places the file's clip earlier
+by it; the audio file itself is unchanged.
+
+## Lag
+
+One window's measurement of an audio delay: how many seconds a file's
+sound is later than the reference microphone's in the latest 10 s
+(D77). A file's audio delay is the median of its counted lags.
 
 ## Recording resolution
 

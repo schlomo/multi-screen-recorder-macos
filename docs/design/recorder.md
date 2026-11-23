@@ -421,11 +421,12 @@ Media are linked by file name only, relative to the timeline file.
   <k>` for more. The channels of one file are a linked group in Resolve.
   A gap fills each space before a clip, none follows the last clip.
 - **Audio delay (D77):** an audio file with a `measuredDelay` is placed
-  that much earlier (later for a negative one), rounded to the nearest
-  frame, as the timeline places every clip at a whole frame, so up to
-  17 ms remain; a clip that would then start before the timeline's start
-  begins there instead, its first frames left out of its source range
-  (its available range stays the whole file). The audio files and the
+  that much earlier, rounded to the nearest frame, as the timeline
+  places every clip at a whole frame, so up to 17 ms remain; a clip that
+  would then start before the timeline's start, or before its source's
+  previous clip ends, begins there instead, its first frames left out
+  of its source range (its available range stays the whole file), so
+  what it plays stays at its own time. The audio files and the
   guide tracks keep their sound as recorded.
 - **Markers,** all on the timeline: the first, red, at frame 0, says in its
   name the resolution to set (the largest video file's frame size, which
@@ -668,10 +669,11 @@ as shown at the file's end (see "Audio"), to 0.1 ppm, null until the
 file ends and if it was not measured by then; `inputVolume` an audio
 input's input volume at the file's start, 0 to 1 to the thousandth,
 null when it cannot be read, absent for the system audio (D69);
-`measuredDelay` the seconds its sound is later than the reference
-microphone's (negative: earlier), measured while recording, to 0.0001
-s, null when not measured: for the system audio, the reference, and a
-file with fewer than 3 clear windows (see "Audio delay", D77). `files` lists the screen
+`measuredDelay` the seconds its sound is later than the earliest
+measured audio input's, measured while recording, to 0.0001 s, never
+negative, null when not measured: for the system audio, the reference
+when it is the earliest, and a file with fewer than 3 clear windows
+against the current reference (see "Audio delay", D77). `files` lists the screen
 files, the camera files and the audio files in the order of their start.
 
 **Names in a file name (D49, D55).** In a file name, `/` and `:` in a
@@ -913,7 +915,7 @@ checked, reported or rewritten at the next start (D47).
   `-116 ppm (+34.9 ms)`; `measuring (+0.3 ms)` until the clock drift is
   known, `measuring` before any correction; zero is `0`, never `+0` or
   `-0`; empty for a screen; once its file's delay is measured, followed
-  by `· 550 ms late` or `· 30 ms early`, see "Audio delay", D77), then, drawn for an audio source only,
+  by `· 550 ms late`, see "Audio delay", D77), then, drawn for an audio source only,
   "Level" (its level meter) and "Input volume" (an audio input's
   slider, where its input volume can be set; see "Audio", D69). Each
   row's mouse-over shows the source's details as the start window's
@@ -1439,16 +1441,24 @@ the metadata items (see "Output on disk").
   (`AudioDelay`, Accelerate's FFT) with the reference microphone over
   their latest common 10 s, searching ±1 s. The reference is the default
   microphone when it is recorded, else the recorded audio input with the
-  lowest number; its own delay is taken as 0 and not written; the
-  system audio is neither measured nor the reference. A window counts
+  lowest number; its own delay is taken as 0; the system audio is
+  neither measured nor the reference. A window counts
   only when its match is clear, the peak of |correlation| at least 12
   times its median over the searched lags (the measured windows gave 13
   to 68 when clear, 5 to 9 when not), and not when either side is
   silent or the window starts before the file. A file's delay is the
-  median of its counted windows' lags once it has 3; with fewer, none.
-  It goes into `recording.json` as the file's `measuredDelay` (a file
+  median of its counted windows' lags (each a lag, the seconds by which
+  the file's sound is later than the reference's) once it has 3; with
+  fewer, none. A file's lags count against the reference they were
+  measured with: when the reference changes (the default microphone
+  changed or its file ended), the file starts again. The delays are then
+  normalized so the earliest measured input is 0: each less the
+  smallest where that is below 0, the reference counting as 0, so a
+  delayed reference (an Osmo or a Bluetooth microphone as the default)
+  moves itself later, never the others, and its own file gets a
+  `measuredDelay` too. Measuring ends at Stop. It goes into `recording.json` as the file's `measuredDelay` (a file
   that ends before Stop keeps what was measured until then), the status
-  window's Clock drift column (`· 550 ms late`, `· 30 ms early`) and the
+  window's Clock drift column (`· 550 ms late`) and the
   timeline file, which places the file's clip earlier by it; each
   counted window is a detail line (`<file>: lag 550 ms late, clarity
   31`). The audio files and the guide tracks are not changed.
