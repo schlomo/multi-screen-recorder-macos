@@ -64,6 +64,8 @@ public struct CameraTracker: Sendable {
         /// Another app changed its format during the recording: from then on
         /// the recording keeps the camera's format, never setting it back.
         var isTakenOver = false
+        /// Its latest file started in the format the camera ran in, as another app used it.
+        var keptFormat = false
     }
 
     public let settings: Settings
@@ -351,6 +353,7 @@ public struct CameraTracker: Sendable {
         let frameSize = settings.effectiveResolution.cameraFrameSize(for: format.size, limited: settings.limitCameras)
         tracked.phase = .recording(frameSize: frameSize)
         tracked.isStalled = false
+        tracked.keptFormat = keepsFormat
         cameras[uniqueID] = tracked
         return .start(
             uniqueID: uniqueID, format: format, setsFormat: !keepsFormat, frameSize: frameSize,
@@ -376,6 +379,16 @@ public struct CameraTracker: Sendable {
 
     private func event(_ kind: RecordingEvent.Kind, _ uniqueID: String, at now: Int64) -> RecordingEvent {
         RecordingEvent(at: now, event: kind, camera: cameras[uniqueID]?.name)
+    }
+
+    /// The camera as last read, for the status window's details; its
+    /// `isRunningElsewhere` says whether its latest file kept the format
+    /// another app set, as a reading during the recording counts the
+    /// recording's own use too. Nil while it is gone.
+    public func recordedReading(of uniqueID: String) -> CameraInfo? {
+        guard let tracked = cameras[uniqueID], var reading = tracked.reading else { return nil }
+        reading.isRunningElsewhere = tracked.keptFormat
+        return reading
     }
 
     /// Every camera the recording has seen, as the status window shows it.

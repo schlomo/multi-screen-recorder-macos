@@ -25,6 +25,8 @@ public struct WhatWillBeRecorded: Equatable, Sendable {
         public var drawnAt: String
         public var recordsAt: String
         public var gigabytesPerHour: String
+        /// The row's mouse-over (`SourceDetails`).
+        public var details = ""
     }
 
     /// One row of the table. A source not recorded is shown dimmed.
@@ -34,6 +36,8 @@ public struct WhatWillBeRecorded: Equatable, Sendable {
         /// The cells after Source.
         public var values: [String]
         public var isRecorded: Bool
+        /// The mouse-over, the source's technical details (`SourceDetails`); empty for the total row.
+        public var details = ""
 
         /// A cell per column, Source as text.
         public var cells: [String] { [source?.text ?? "Total"] + values }
@@ -45,6 +49,7 @@ public struct WhatWillBeRecorded: Equatable, Sendable {
         public var source: SourceCell
         public var recordsAt: String
         public var gigabytesPerHour: String
+        public var details = ""
         public var isRecorded: Bool { source.number != nil }
     }
 
@@ -61,6 +66,7 @@ public struct WhatWillBeRecorded: Equatable, Sendable {
         public var gigabytesPerHour: String
         /// Why the channels cannot be read; `text` shows it after "cannot be read".
         public var readError: String? = nil
+        public var details = ""
     }
 
     /// The total GB/h max, and what the required recording hours need.
@@ -134,7 +140,8 @@ public struct WhatWillBeRecorded: Equatable, Sendable {
         let systemAudio = Audio(
             source: .systemAudio(isRecorded: settings.systemAudio), channels: "stereo", isRecorded: settings.systemAudio,
             gigabytesPerHour: settings.systemAudio
-                ? DiskEstimate.gigabytesPerHour(DiskEstimate.systemAudioFileBytesPerHour) : Self.notRecorded)
+                ? DiskEstimate.gigabytesPerHour(DiskEstimate.systemAudioFileBytesPerHour) : Self.notRecorded,
+            details: SourceDetails.systemAudio(label: SourceCell.systemAudio(isRecorded: settings.systemAudio).text))
         audio = []
         switch readAudioInputs {
         case .success(let audioInputs):
@@ -195,7 +202,7 @@ public struct WhatWillBeRecorded: Equatable, Sendable {
         let isRecorded = number != nil
         let reason = settings.reasonNotRecorded(input)
         let source = SourceCell.audioInput(number, name: input.shownName + (reason.map { " (\($0))" } ?? ""))
-        return switch input.channelCount {
+        var audio: Audio = switch input.channelCount {
         case .success(let count):
             Audio(source: source, channels: count == 1 ? "1 channel" : "\(count) channels", isRecorded: isRecorded,
                   gigabytesPerHour: isRecorded
@@ -205,6 +212,8 @@ public struct WhatWillBeRecorded: Equatable, Sendable {
             Audio(source: source, channels: cannotBeRead, isRecorded: isRecorded,
                   gigabytesPerHour: isRecorded ? unknown : notRecorded, readError: ErrorDetail(error).text)
         }
+        audio.details = SourceDetails.audioInput(label: source.text, input)
+        return audio
     }
 
     /// A camera not recorded has no number and `-` for Records at and GB/h max; after its name it says
@@ -223,20 +232,28 @@ public struct WhatWillBeRecorded: Equatable, Sendable {
             } else if camera.isSuspended && settings.cameraModeIncludes(camera) && settings.effectiveResolution.recordsScreens {
                 "suspended"
             } else { nil }
-            return Camera(source: .camera(nil, name: camera.shownName + (reason.map { " (\($0))" } ?? "")),
-                          recordsAt: notRecorded, gigabytesPerHour: notRecorded)
+            let source = SourceCell.camera(nil, name: camera.shownName + (reason.map { " (\($0))" } ?? ""))
+            return Camera(source: source, recordsAt: notRecorded, gigabytesPerHour: notRecorded,
+                          details: SourceDetails.camera(label: source.text, camera, settings: settings))
         }
+        let source = SourceCell.camera(number, name: camera.shownName)
         return Camera(
-            source: .camera(number, name: camera.shownName), recordsAt: "\(frameSize)",
-            gigabytesPerHour: DiskEstimate.gigabytesPerHour(DiskEstimate.videoFileBytesPerHour(frameSize: frameSize, settings: settings)))
+            source: source, recordsAt: "\(frameSize)",
+            gigabytesPerHour: DiskEstimate.gigabytesPerHour(DiskEstimate.videoFileBytesPerHour(frameSize: frameSize, settings: settings)),
+            details: SourceDetails.camera(label: source.text, camera, settings: settings))
     }
 
     /// At the recording resolution None a screen not recorded: no number, `-` for Records at and GB/h max.
     private static func screen(_ numbered: NumberedScreen, settings: Settings) -> Screen {
         let screen = numbered.screen
+        let details = { (number: Int?, recordsAt: FrameSize?) in
+            SourceDetails.screen(
+                label: SourceCell.screen(number, name: screen.name).text, looksLike: screen.pointSize, drawnAt: screen.pixelSize,
+                recordsAt: recordsAt, refreshRate: screen.refreshRate, displayID: screen.displayID, isMain: screen.isMain)
+        }
         guard settings.effectiveResolution.recordsScreens else {
             return Screen(number: nil, name: screen.name, looksLike: "\(screen.pointSize)", drawnAt: "\(screen.pixelSize)",
-                          recordsAt: notRecorded, gigabytesPerHour: notRecorded)
+                          recordsAt: notRecorded, gigabytesPerHour: notRecorded, details: details(nil, nil))
         }
         let frameSize = settings.effectiveResolution.frameSize(forLooksLike: screen.pointSize)
         return Screen(
@@ -244,7 +261,8 @@ public struct WhatWillBeRecorded: Equatable, Sendable {
             looksLike: "\(screen.pointSize)", drawnAt: "\(screen.pixelSize)",
             recordsAt: "\(frameSize)",
             gigabytesPerHour: DiskEstimate.gigabytesPerHour(
-                DiskEstimate.videoFileBytesPerHour(frameSize: frameSize, settings: settings)))
+                DiskEstimate.videoFileBytesPerHour(frameSize: frameSize, settings: settings)),
+            details: details(numbered.number, frameSize))
     }
 
     /// "2.2" and "2 hours need 4.3 GB, 3.1 GB free."
@@ -260,19 +278,21 @@ public struct WhatWillBeRecorded: Equatable, Sendable {
     public var screenRows: [Row] {
         screens.map {
             Row(source: .screen($0.number, name: $0.name), values: [$0.looksLike, $0.drawnAt, $0.recordsAt, $0.gigabytesPerHour],
-                isRecorded: $0.number != nil)
+                isRecorded: $0.number != nil, details: $0.details)
         }
     }
 
     /// The camera rows of the table: no Looks like and Drawn at, which are a screen's.
     public var cameraRows: [Row] {
-        cameras.map { Row(source: $0.source, values: ["", "", $0.recordsAt, $0.gigabytesPerHour], isRecorded: $0.isRecorded) }
+        cameras.map {
+            Row(source: $0.source, values: ["", "", $0.recordsAt, $0.gigabytesPerHour], isRecorded: $0.isRecorded, details: $0.details)
+        }
     }
 
     /// The audio rows of the table, the system audio first: no Looks like and Drawn at.
     public var audioRows: [Row] {
         audio.map {
-            Row(source: $0.source, values: ["", "", $0.channels, $0.gigabytesPerHour], isRecorded: $0.isRecorded)
+            Row(source: $0.source, values: ["", "", $0.channels, $0.gigabytesPerHour], isRecorded: $0.isRecorded, details: $0.details)
         }
     }
 

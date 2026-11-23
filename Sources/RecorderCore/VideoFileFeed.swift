@@ -88,6 +88,11 @@ final class VideoFileFeed<File: VideoFileEntry>: @unchecked Sendable {
         if let reason = ticker.tick(now: context.now()) { end(reason) }
     }
 
+    /// The running file's frames repeated for lateness and placed late so far; nil without one.
+    func lateness() -> (repeated: Int, placedLate: Int)? {
+        queue.sync { ticker?.lateness }
+    }
+
     /// Ends the capture by itself, then reports why; unless the recorder stopped it first. On the queue.
     func end(_ reason: VideoStreamEnd) {
         guard !isEnding else { return }

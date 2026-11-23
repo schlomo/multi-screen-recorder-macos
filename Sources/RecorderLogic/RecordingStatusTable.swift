@@ -27,11 +27,14 @@ public enum RecordingStatusTable {
         public var clockDrift: String
         /// The audio source of an audio row, for its level meter and its input volume (D69); nil for a screen.
         public var audioSource: AudioTracker.SourceID?
+        /// The mouse-over: the source's details and its live facts (`SourceDetails`), its label first.
+        public var details: String
 
         public init(
             source: SourceCell, recordsAt: String, files: Int, written: String, state: String, clockDrift: String = "",
-            audioSource: AudioTracker.SourceID? = nil
+            audioSource: AudioTracker.SourceID? = nil, details: String = ""
         ) {
+            self.details = details
             self.source = source
             self.recordsAt = recordsAt
             self.files = files

@@ -1,6 +1,10 @@
 /// A screen as the system reports it, before it gets its number.
 public struct ScreenInfo: Equatable, Sendable {
     public var name: String
+    /// Core Graphics' display ID, 0 where not read.
+    public var displayID: UInt32
+    /// The screen mode's refresh rate in Hz, nil where macOS reports none.
+    public var refreshRate: Double?
     public var pixelSize: FrameSize
     /// What macOS calls "looks like": the size in points.
     public var pointSize: FrameSize
@@ -9,8 +13,13 @@ public struct ScreenInfo: Equatable, Sendable {
     public var originX: Double
     public var originY: Double
 
-    public init(name: String, pixelSize: FrameSize, pointSize: FrameSize, isMain: Bool, originX: Double, originY: Double) {
+    public init(
+        name: String, pixelSize: FrameSize, pointSize: FrameSize, isMain: Bool, originX: Double, originY: Double,
+        displayID: UInt32 = 0, refreshRate: Double? = nil
+    ) {
         self.name = name
+        self.displayID = displayID
+        self.refreshRate = refreshRate
         self.pixelSize = pixelSize
         self.pointSize = pointSize
         self.isMain = isMain
@@ -60,16 +69,22 @@ public struct AudioInputInfo: Equatable, Sendable {
     /// The Core Audio UID, by which a recording knows the input and opens it;
     /// nil when it cannot be read.
     public var uid: String?
+    /// Core Audio's nominal sample rate, nil where it cannot be read.
+    public var sampleRate: Double?
+    /// Its own input volume, nil for an input that has none.
+    public var inputVolume: InputVolumeReading?
 
     public init(
         name: String, channelCount: Result<Int, DeviceReadError>, isDefault: Bool, transport: AudioTransport = .builtIn,
-        uid: String? = nil
+        uid: String? = nil, sampleRate: Double? = nil, inputVolume: InputVolumeReading? = nil
     ) {
         self.name = name
         self.channelCount = channelCount
         self.isDefault = isDefault
         self.transport = transport
         self.uid = uid
+        self.sampleRate = sampleRate
+        self.inputVolume = inputVolume
     }
 
     public init(name: String, channelCount: Int, isDefault: Bool, transport: AudioTransport = .builtIn, uid: String? = nil) {
@@ -141,18 +156,40 @@ func padded(_ text: String, _ width: Int) -> String {
 }
 
 /// One way a camera can deliver its picture: its size in pixels and the
-/// highest frame rate it delivers at that size.
+/// frame rates it delivers at that size.
 public struct CameraFormat: Equatable, Sendable, CustomStringConvertible {
     public var size: FrameSize
     public var maxFramesPerSecond: Double
+    public var minFramesPerSecond: Double
 
-    public init(size: FrameSize, maxFramesPerSecond: Double) {
+    /// `minFramesPerSecond` defaults to `maxFramesPerSecond`: a single rate.
+    public init(size: FrameSize, maxFramesPerSecond: Double, minFramesPerSecond: Double? = nil) {
         self.size = size
         self.maxFramesPerSecond = maxFramesPerSecond
+        self.minFramesPerSecond = minFramesPerSecond ?? maxFramesPerSecond
     }
 
     /// "1920×1080 at 30 fps".
     public var description: String { "\(size) at \(String(format: "%g", maxFramesPerSecond)) fps" }
+
+    /// "1920×1080 5–60 fps", or "1920×1080 30 fps" for a single rate.
+    public var rangeText: String { "\(size) \(Self.ratesText(minFramesPerSecond...maxFramesPerSecond))" }
+
+    /// "5–60 fps", or "30 fps" for a single rate.
+    public static func ratesText(_ rates: ClosedRange<Double>) -> String {
+        let bound = { (rate: Double) in String(format: "%g", (rate * 100).rounded() / 100) }
+        return rates.lowerBound == rates.upperBound ? "\(bound(rates.upperBound)) fps" : "\(bound(rates.lowerBound))–\(bound(rates.upperBound)) fps"
+    }
+
+    /// One format per frame size, as `preferred` orders them, its rates
+    /// from the lowest to the highest of any variant at that size: what a
+    /// camera offers, for reading.
+    public static func offered(_ listed: [CameraFormat]) -> [CameraFormat] {
+        Dictionary(grouping: listed, by: \.size).map { size, variants in
+            CameraFormat(size: size, maxFramesPerSecond: variants.map(\.maxFramesPerSecond).max()!,
+                         minFramesPerSecond: variants.map(\.minFramesPerSecond).min()!)
+        }.sorted { ($0.size.pixelCount, $0.size.width, $0.size.height) < ($1.size.pixelCount, $1.size.width, $1.size.height) }
+    }
 
     /// Whether it delivers the tick grid's frame rate, a rate rounded to whole frames per second.
     var deliversTheTickRate: Bool { maxFramesPerSecond.rounded() >= Double(TickGrid.recording.framesPerSecond) }
@@ -217,10 +254,20 @@ public struct CameraInfo: Equatable, Sendable {
     /// read before the recording opens it, another app uses it, and the recording keeps
     /// its active format. AVFoundation's `isInUseByAnotherApplication` misses a browser's use (D74).
     public var isRunningElsewhere: Bool
+    /// How AVFoundation says the camera is connected (`transportType`, as Core Audio's).
+    public var transport: AudioTransport
+    /// Each frame size the camera offers once, with all its rates (`CameraFormat.offered`).
+    public var offeredFormats: [CameraFormat]
+    /// The frame rates the camera runs at now, nil where they cannot be read.
+    public var activeFrameRates: ClosedRange<Double>?
+    /// The speed of a USB camera's link, nil for another camera or where it cannot be read.
+    public var usbSpeed: USBSpeed?
 
     public init(
         uniqueID: String, name: String, isDefault: Bool, isVirtual: Bool, isContinuity: Bool = false, formats: [CameraFormat],
-        isSuspended: Bool = false, activeFormat: CameraFormat? = nil, isRunningElsewhere: Bool = false
+        isSuspended: Bool = false, activeFormat: CameraFormat? = nil, isRunningElsewhere: Bool = false,
+        transport: AudioTransport = .unknown, offeredFormats: [CameraFormat] = [], activeFrameRates: ClosedRange<Double>? = nil,
+        usbSpeed: USBSpeed? = nil
     ) {
         self.uniqueID = uniqueID
         self.name = name
@@ -231,6 +278,10 @@ public struct CameraInfo: Equatable, Sendable {
         self.isSuspended = isSuspended
         self.activeFormat = activeFormat
         self.isRunningElsewhere = isRunningElsewhere
+        self.transport = transport
+        self.offeredFormats = offeredFormats
+        self.activeFrameRates = activeFrameRates
+        self.usbSpeed = usbSpeed
     }
 
     /// The format a recording at `resolution` records the camera in (D74).
@@ -269,8 +320,47 @@ public struct CameraInfo: Equatable, Sendable {
     }
 
     /// Portrait (-1), square (0) or landscape (1).
-    private static func turn(of size: FrameSize) -> Int { (size.width - size.height).signum() }
+    static func turn(of size: FrameSize) -> Int { (size.width - size.height).signum() }
 
     /// "FaceTime HD Camera (default)" or just the name.
     public var shownName: String { isDefault ? "\(name) (default)" : name }
+}
+
+/// An audio input's own input volume: its value, 0 to 1 (nil where it
+/// cannot be read), and whether Core Audio lets it be set (D69).
+public struct InputVolumeReading: Equatable, Sendable {
+    public var value: Double?
+    public var isSettable: Bool
+
+    public init(value: Double?, isSettable: Bool) {
+        self.value = value
+        self.isSettable = isSettable
+    }
+}
+
+/// A USB device's link speed, as IOKit's `USBSpeed` registry property
+/// numbers it (`tIOUSBHostConnectionSpeed`).
+public enum USBSpeed: Int, Equatable, Sendable {
+    case full = 1, low, high, superSpeed, superSpeedPlus, superSpeedPlusBy2
+
+    /// "480 Mb/s (USB 2)".
+    public var text: String {
+        switch self {
+        case .low: "1.5 Mb/s (USB 1)"
+        case .full: "12 Mb/s (USB 1)"
+        case .high: "480 Mb/s (USB 2)"
+        case .superSpeed: "5 Gb/s (USB 3)"
+        case .superSpeedPlus: "10 Gb/s (USB 3)"
+        case .superSpeedPlusBy2: "20 Gb/s (USB 3)"
+        }
+    }
+
+    /// USB 2 or slower.
+    public var isAtMostUSB2: Bool { self == .low || self == .full || self == .high }
+
+    /// The USB location ID a USB camera's unique ID starts with: "0x20522000" in "0x20522000046d085e".
+    public static func locationID(ofUniqueID uniqueID: String) -> UInt32? {
+        guard uniqueID.hasPrefix("0x"), uniqueID.count >= 10 else { return nil }
+        return UInt32(uniqueID.dropFirst(2).prefix(8), radix: 16)
+    }
 }

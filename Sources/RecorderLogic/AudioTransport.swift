@@ -33,6 +33,27 @@ public enum AudioTransport: Equatable, Sendable, CaseIterable {
         }
     }
 
+    /// "USB", "built in", "Bluetooth" and so on.
+    public var shownName: String {
+        switch self {
+        case .builtIn: "built in"
+        case .usb: "USB"
+        case .fireWire: "FireWire"
+        case .pci: "PCI"
+        case .thunderbolt: "Thunderbolt"
+        case .hdmi: "HDMI"
+        case .displayPort: "DisplayPort"
+        case .bluetooth: "Bluetooth"
+        case .bluetoothLE: "Bluetooth LE"
+        case .virtual: "virtual"
+        case .aggregate: "aggregate"
+        case .airPlay: "AirPlay"
+        case .continuityCapture: "Continuity Capture"
+        case .unknown: "unknown"
+        case .unreadable: "cannot be read"
+        }
+    }
+
     /// Whether the audio mode Wired records an input of this transport: the
     /// built-in and the wired ones. Every other transport, an unknown one and
     /// one that cannot be read included, is not wired.

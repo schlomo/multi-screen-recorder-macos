@@ -32,7 +32,7 @@ import Testing
     }
 
     @Test func theDefaultsWithTheDesignsDevices() {
-        #expect(defaultSection == WhatWillBeRecorded(
+        #expect(defaultSection.withoutDetails == WhatWillBeRecorded(
             settingsLine: "Settings: Auto (resolution Native, audio mode Wired, camera mode All real), system audio on, limit cameras on",
             screensError: nil,
             screens: [
@@ -101,7 +101,7 @@ import Testing
     @Test func aSourceNotRecordedIsARowWithNotRecordedAndIsDimmed() {
         let rows = section({ $0.audioMode = .wired }, audioInputs: DesignExample.audioInputs + [AudioInputInfo(
             name: "AirPods", channelCount: 1, isDefault: false, transport: .bluetooth, uid: "A")]).audioRows
-        #expect(rows.last { $0.cells[0] == "AirPods (Bluetooth)" }
+        #expect(rows.last { $0.cells[0] == "AirPods (Bluetooth)" }?.withoutDetails
             == .init(source: .audioInput(nil, name: "AirPods (Bluetooth)"), values: ["", "", "1 channel", "-"], isRecorded: false))
     }
 
@@ -138,7 +138,7 @@ import Testing
     @Test func anInputWithoutAUIDIsNotRecordedAndGetsNoNumber() {
         let noUID = AudioInputInfo(name: "Mystery", channelCount: 1, isDefault: false, transport: .usb)
         let withNoUID = section({ $0.audioMode = .wired }, audioInputs: [noUID] + DesignExample.audioInputs)
-        #expect(withNoUID.audio[3] == .init(source: .audioInput(nil, name: "Mystery (no device ID)"), channels: "1 channel",
+        #expect(withNoUID.audio[3].withoutDetails == .init(source: .audioInput(nil, name: "Mystery (no device ID)"), channels: "1 channel",
                                             isRecorded: false, gigabytesPerHour: "-"))
         #expect(withNoUID.audio.map(\.source.number) == [0, 1, 2, nil])
         #expect(withNoUID.total == section { $0.audioMode = .wired }.total)
@@ -474,7 +474,7 @@ import Testing
     }
 
     @Test func systemAudioOffIsNotRecorded() {
-        #expect(section { $0.systemAudio = false }.audio.last
+        #expect(section { $0.systemAudio = false }.audio.last?.withoutDetails
             == .init(source: .systemAudio(isRecorded: false), channels: "stereo", isRecorded: false, gigabytesPerHour: "-"))
         #expect(section { $0.systemAudio = false }.audioRows.last?.cells[0] == "System audio")
     }
@@ -521,7 +521,7 @@ import Testing
 
     @Test func anUnreadableInputThatIsNotRecordedIsARowAndKeepsTheTotal() {
         let withUnreadable = section(audioInputs: DesignExample.audioInputs + [Self.unreadable(isDefault: false)])
-        #expect(withUnreadable.audio[3]
+        #expect(withUnreadable.audio[3].withoutDetails
             == .init(source: .audioInput(nil, name: "X"), channels: "cannot be read", isRecorded: false, gigabytesPerHour: "-",
                    readError: "no format"))
         #expect(withUnreadable.screens == section().screens)
@@ -530,7 +530,7 @@ import Testing
 
     @Test func anUnreadableRecordedInputLeavesTheTotalOut() {
         let broken = section(audioInputs: [Self.unreadable(isDefault: true)])
-        #expect(broken.audio[1]
+        #expect(broken.audio[1].withoutDetails
             == .init(source: .audioInput(1, name: "X (default)"), channels: "cannot be read", isRecorded: true, gigabytesPerHour: "?",
                    readError: "no format"))
         #expect(broken.screens == section().screens)
@@ -564,7 +564,7 @@ import Testing
 
     /// The screens are rows not recorded, without a number, Records at and GB/h max; the total is the audio files'.
     @Test func atTheResolutionNoneTheScreensAreRowsNotRecordedAndTheTotalIsTheAudios() {
-        #expect(audioOnly.screenRows == [
+        #expect(audioOnly.screenRows.map(\.withoutDetails) == [
             .init(source: .screen(nil, name: "Built-in Retina Display"), values: ["1728×1117", "3456×2234", "-", "-"], isRecorded: false),
             .init(source: .screen(nil, name: "LG HDR 4K"), values: ["3840×2160", "3840×2160", "-", "-"], isRecorded: false),
         ])
@@ -596,4 +596,23 @@ import Testing
 
             """)
     }
+}
+
+/// The table's data without the mouse-over texts, which `SourceDetailsTests` checks.
+extension WhatWillBeRecorded {
+    var withoutDetails: Self {
+        var shown = self
+        shown.screens = screens.map { var screen = $0; screen.details = ""; return screen }
+        shown.cameras = cameras.map { var camera = $0; camera.details = ""; return camera }
+        shown.audio = audio.map(\.withoutDetails)
+        return shown
+    }
+}
+
+extension WhatWillBeRecorded.Audio {
+    var withoutDetails: Self { var audio = self; audio.details = ""; return audio }
+}
+
+extension WhatWillBeRecorded.Row {
+    var withoutDetails: Self { var row = self; row.details = ""; return row }
 }

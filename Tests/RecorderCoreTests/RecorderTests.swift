@@ -512,6 +512,11 @@ extension GlobalRecordingLog {
             try await sendFrames(camera, until: "the camera file") { (try? manifestOnDisk().cameraFiles.count) == 1 }
             try await wait("the stall") { (try? manifestOnDisk().events.map(\.event)) == [.cameraStalled] }
             #expect(recorder.status().rows.contains { $0.source == .camera(1, name: "Stand-in camera") && $0.state == "stalled" })
+            let stalledRow = try #require(recorder.status().rows.first { $0.source == .camera(1, name: "Stand-in camera") })
+            #expect(stalledRow.details.hasPrefix("Camera 1 - Stand-in camera\n"))
+            #expect(stalledRow.details.contains("\nStalled: yes"))
+            #expect(stalledRow.details.contains("\nThis file so far: "))
+            #expect(recorder.status().rows.allSatisfy { $0.details.hasPrefix($0.source.text) })
             #expect(observer.problems.map(\.problem.text) == ["Camera Stand-in camera: camera stalled: \(CameraTracker.stalledError.text)"])
             try await sendFrames(camera, until: "the stall's end") { (try? manifestOnDisk().events.count) == 2 }
             let ended = try #require(try manifestOnDisk().events.last)

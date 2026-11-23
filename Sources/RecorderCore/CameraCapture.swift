@@ -156,6 +156,9 @@ final class CameraCapture: @unchecked Sendable {
         watchTimer = nil
     }
 
+    /// The running file's frames repeated for lateness and placed late so far, for the status window.
+    func lateness() -> (repeated: Int, placedLate: Int)? { feed.lateness() }
+
     /// Stops the capture at the recorder's request and finalizes its file;
     /// if the capture is already ending by itself, waits for that.
     func stop() async -> VideoFileEnd<RecordingManifest.CameraFile>? {

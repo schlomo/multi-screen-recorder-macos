@@ -33,6 +33,15 @@ import Testing
         #expect(listed.map(\.uid) == ["AppleUSBAudioEngine:1", nil])
     }
 
+    @Test func eachInputCarriesItsSampleRateAndInputVolume() throws {
+        let listed = try audioInputs(
+            devices: [1, 2], inputChannels: { _ in .count(1) }, name: { "Device \($0)" }, transport: { _ in .usb },
+            uid: { _ in nil }, defaultInput: { 1 }, sampleRate: { $0 == 1 ? 48_000 : nil },
+            inputVolume: { $0 == 2 ? InputVolumeReading(value: 0.5, isSettable: true) : nil })
+        #expect(listed.map(\.sampleRate) == [48_000, nil])
+        #expect(listed.map(\.inputVolume) == [nil, InputVolumeReading(value: 0.5, isSettable: true)])
+    }
+
     @Test func eachInputKeepsItsTransport() throws {
         let listed = try inputs([.count(1), .count(0), .count(2)], transport: { $0 == 1 ? .usb : .bluetooth })
         #expect(listed.map(\.transport) == [.usb, .bluetooth])

@@ -16,21 +16,27 @@ public func currentAudioInputs() throws(DeviceReadError) -> [AudioInputInfo] {
     try audioInputs(
         devices: try audioDeviceIDs(), inputChannels: inputChannels, name: audioDeviceName,
         transport: { audioTransport(coreAudioValue: audioDeviceTransportType($0)) },
-        uid: audioDeviceUID, defaultInput: defaultInputDeviceID)
+        uid: audioDeviceUID, defaultInput: defaultInputDeviceID, sampleRate: audioDeviceSampleRate,
+        inputVolume: { id in
+            CoreAudioInputVolume(device: id, name: "").map { InputVolumeReading(value: $0.read(), isSettable: $0.isSettable) }
+        })
 }
 
 /// A device without input channels is asked nothing more, so it cannot fail
 /// the listing; one whose channels cannot be read is listed with the reason,
 /// as it may be an audio input. `name` gives nil for a device that
 /// disappeared; `transport` says how an input is connected. Without an audio input the default is not asked for: what
-/// Core Audio answers then has not been observed.
+/// Core Audio answers then has not been observed. `sampleRate` and
+/// `inputVolume` are what the window's mouse-over shows.
 func audioInputs(
     devices: [AudioObjectID],
     inputChannels: (AudioObjectID) -> InputChannels,
     name: (AudioObjectID) throws(DeviceReadError) -> String?,
     transport: (AudioObjectID) -> AudioTransport,
     uid: (AudioObjectID) -> String?,
-    defaultInput: () throws(DeviceReadError) -> AudioObjectID
+    defaultInput: () throws(DeviceReadError) -> AudioObjectID,
+    sampleRate: (AudioObjectID) -> Double? = { _ in nil },
+    inputVolume: (AudioObjectID) -> InputVolumeReading? = { _ in nil }
 ) throws(DeviceReadError) -> [AudioInputInfo] {
     var inputs: [(id: AudioObjectID, name: String, channelCount: Result<Int, DeviceReadError>)] = []
     for id in devices {
@@ -52,7 +58,7 @@ func audioInputs(
     return inputs.map {
         AudioInputInfo(
             name: $0.name, channelCount: $0.channelCount, isDefault: $0.id == defaultID, transport: transport($0.id),
-            uid: uid($0.id))
+            uid: uid($0.id), sampleRate: sampleRate($0.id), inputVolume: inputVolume($0.id))
     }
 }
 
@@ -64,6 +70,14 @@ private func audioDeviceTransportType(_ id: AudioObjectID) -> UInt32? {
     var size = UInt32(MemoryLayout<UInt32>.size)
     let status = AudioObjectGetPropertyData(id, &address, 0, nil, &size, &value)
     return status == noErr ? value : nil
+}
+
+/// Core Audio's nominal sample rate of a device; nil when it cannot be read.
+private func audioDeviceSampleRate(_ id: AudioObjectID) -> Double? {
+    var address = address(kAudioDevicePropertyNominalSampleRate)
+    var value: Float64 = 0
+    var size = UInt32(MemoryLayout<Float64>.size)
+    return AudioObjectGetPropertyData(id, &address, 0, nil, &size, &value) == noErr ? value : nil
 }
 
 /// Watches the audio devices and the default audio input: `changed` is

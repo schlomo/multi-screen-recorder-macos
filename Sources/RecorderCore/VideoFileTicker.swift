@@ -109,6 +109,9 @@ public final class VideoFileTicker<File: VideoFileEntry> {
     private let guideWaitBound = Int(RecorderValues.audioWaitBoundSeconds * 1000 / Int(RecorderValues.guideTrackInterval.nanoseconds / 1_000_000))
 
     /// How long the end waits for the writer: as long as ticks may wait (D53).
+    /// The current file's frames repeated for lateness and placed late so far.
+    public var lateness: (repeated: Int, placedLate: Int) { (ticks.framesRepeatedForLateness, ticks.framesPlacedLate) }
+
     public static var defaultDrainTimeout: Duration { .seconds(RecorderValues.videoFileLateTickSeconds) }
 
     /// `captureStart` in nanoseconds from t0: the file's first tick is

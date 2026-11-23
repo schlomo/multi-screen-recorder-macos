@@ -296,7 +296,7 @@ struct WhatWillBeRecordedView: View {
     }
 
     private func row(_ row: WhatWillBeRecorded.Row, boldSource: Bool = false) -> some View {
-        self.row(row.source, row.cells, boldSource: boldSource)
+        self.row(row.source, row.cells, boldSource: boldSource).help(row.details)
     }
 
     /// Digits of one width, so the GB/h max figures line up on the decimal

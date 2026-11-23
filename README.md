@@ -190,7 +190,9 @@ and the size it records at (dimmed and not numbered at the recording
 resolution None, which records no screen), then the cameras, each with the size it
 records at, then the audio sources, the system audio
 first and the inputs by number, then the ones not recorded, dimmed and
-with their reason (such as "(virtual)"); each row with the most disk space it can write
+with their reason (such as "(virtual)"); hold the mouse over a row for
+the technical details of how it is recorded, such as a camera's formats,
+the one chosen and why, its USB link and potential problems; each row with the most disk space it can write
 per hour, "GB/h max", usually more than it writes; the total as the
 last row; below it the space the required hours need and the free
 space; the output folder, a link that opens it in Finder), then the switch "Auto" (on, the three sliders are grayed out and show Native, Wired and All real; off,
@@ -212,7 +214,8 @@ Click Start: the window closes; the Dock icon shows a "!" badge when
 the disk runs low, a screen shows another screen's picture or
 something went wrong. Click the Dock icon or quit to open the status
 window: each screen, camera and audio source with its files, the data written
-and its state, each audio source's level meter (red from −1 dBFS) and,
+and its state (hold the mouse over a row for its details and, while it
+records, its late frames, stall or clock drift), each audio source's level meter (red from −1 dBFS) and,
 where macOS lets it be set, a slider for an audio input's input volume
 (it changes that input's volume for every app on the Mac, and stays as
 set after Stop), the time recorded (`h:mm:ss`, every second), data and

@@ -88,12 +88,13 @@ struct StatusView: View {
                 Divider()
                 ForEach(Array(model.rows.enumerated()), id: \.offset) { _, row in
                     GridRow {
-                        SourceCellView(cell: row.source).monospacedDigit()
+                        SourceCellView(cell: row.source).monospacedDigit().help(row.details)
                         ForEach(Array(row.values.enumerated()), id: \.offset) { offset, cell in
                             Text(cell)
                                 .lineLimit(1)
                                 .monospacedDigit()
                                 .gridColumnAlignment(Self.alignment(offset + 1))
+                                .help(row.details)
                         }
                         if let id = row.audioSource {
                             LevelMeterView(level: model.levels[id] ?? .silent)

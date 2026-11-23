@@ -3,7 +3,8 @@ import SwiftUI
 
 /// A source in the Source column (D55): an icon for its kind, then its
 /// number, if it is recorded (a source not recorded keeps the number's
-/// width blank), and its name.
+/// width blank), and its name. Its row's mouse-over shows the source's
+/// details, its full name first (`SourceDetails`).
 struct SourceCellView: View {
     let cell: SourceCell
     /// The digits of the highest number in the table, the width a source not recorded keeps blank.
@@ -17,7 +18,6 @@ struct SourceCellView: View {
             nameText
                 .lineLimit(1)
                 .truncationMode(.middle)
-                .help(cell.text)
         }
     }
 

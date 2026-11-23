@@ -93,6 +93,9 @@ public final class Recorder {
     private var cameraPermissionRequested = false
     /// The cameras the camera mode would record while the Camera permission is denied, for the status window.
     private var camerasWithoutPermission: [CameraInfo] = []
+    /// The screens and audio inputs as last read, for the status window's details.
+    private var screensRead: [ConnectedScreen] = []
+    private var audioInputsRead: [AudioInputInfo] = []
     private var endReports = CaptureEndReports()
     private var problemsTold = ProblemsTold()
     private var repeats = RepeatedFailures()
@@ -180,6 +183,7 @@ public final class Recorder {
         }
         context = RecordingContext(folder: folder, started: started, timeZone: timeZone, clock: SharedClock(reading: reading), app: app)
         self.settings = settings
+        screensRead = screens
         self.readsScreens = readsScreens
         readsCameras = settings.effectiveCameraMode != .none && settings.effectiveResolution.recordsScreens
         cameraTracker = CameraTracker(settings: settings)
@@ -264,15 +268,73 @@ public final class Recorder {
         let bytesWritten: Int64? = sizes.contains { $0.1 == nil } ? nil : bytes.values.reduce(0, +)
         let free = (try? volumeFreeBytes(of: folder)) ?? nil
         return (
-            RecordingStatusTable.rows(sources: tracker.sources, files: manifest.files, bytes: bytes)
-                + RecordingStatusTable.cameraRows(sources: cameraTracker.sources, files: manifest.cameraFiles, bytes: bytes)
-                + RecordingStatusTable.cameraRowsWithoutPermission(camerasWithoutPermission)
-                + RecordingStatusTable.audioRows(
+            statusDetails(screenRows: RecordingStatusTable.rows(sources: tracker.sources, files: manifest.files, bytes: bytes))
+                + statusDetails(cameraRows: RecordingStatusTable.cameraRows(
+                    sources: cameraTracker.sources, files: manifest.cameraFiles, bytes: bytes))
+                + zip(RecordingStatusTable.cameraRowsWithoutPermission(camerasWithoutPermission), camerasWithoutPermission).map { row, camera in
+                    var row = row
+                    row.details = SourceDetails.camera(label: row.source.text, camera, settings: settings)
+                    return row
+                }
+                + statusDetails(audioRows: RecordingStatusTable.audioRows(
                     sources: audioTracker.sourcesShown, files: manifest.audioFiles, bytes: bytes, clockDrift: clockDrift),
+                    clockDrift: clockDrift),
             RecordingStatusTable.line(
                 elapsedSeconds: elapsedSeconds, bytesWritten: bytesWritten, files: names.count,
                 freeBytes: free),
             cpu.text)
+    }
+
+    /// The screen rows with their details: the screen as last read, the running file's lateness.
+    private func statusDetails(screenRows rows: [RecordingStatusTable.Row]) -> [RecordingStatusTable.Row] {
+        zip(rows, tracker.sources).map { row, source in
+            var row = row
+            let recordsAt: FrameSize? = if case .recording(let size) = source.state { size } else { nil }
+            let details = screensRead.first { $0.uuid == source.uuid }.map { screen in
+                SourceDetails.screen(
+                    label: row.source.text, looksLike: screen.pointSize, drawnAt: nil, recordsAt: recordsAt, refreshRate: nil,
+                    displayID: screen.displayID, isMain: screen.isMain)
+            } ?? row.source.text
+            row.details = ([details] + SourceDetails.live(lateness: captures[source.uuid]?.1.lateness())).joined(separator: "\n")
+            return row
+        }
+    }
+
+    /// The camera rows with their details: the camera as last read, the running file's lateness and its stall.
+    private func statusDetails(cameraRows rows: [RecordingStatusTable.Row]) -> [RecordingStatusTable.Row] {
+        zip(rows, cameraTracker.sources).map { row, source in
+            var row = row
+            let details = cameraTracker.recordedReading(of: source.uniqueID).map {
+                SourceDetails.camera(label: row.source.text, $0, settings: settings)
+            } ?? row.source.text
+            let isStalled: Bool = if case .stalled = source.state { true } else { false }
+            let live = SourceDetails.live(lateness: cameraCaptures[source.uniqueID]?.1.lateness(), isStalled: isStalled)
+            row.details = ([details] + live).joined(separator: "\n")
+            return row
+        }
+    }
+
+    /// The audio rows with their details: the input as last read, its input volume as followed, the clock drift.
+    private func statusDetails(
+        audioRows rows: [RecordingStatusTable.Row], clockDrift: [AudioTracker.SourceID: ClockDriftCorrection.Status]
+    ) -> [RecordingStatusTable.Row] {
+        rows.map { row in
+            var row = row
+            guard let id = row.audioSource else { return row }
+            let details: String = switch id {
+            case .systemAudio: SourceDetails.systemAudio(label: row.source.text)
+            case .input(let uid):
+                audioInputsRead.first { $0.uid == uid }.map { input in
+                    var input = input
+                    if let follow = inputVolumes[uid] {
+                        input.inputVolume = InputVolumeReading(value: follow.latest, isSettable: follow.control.isSettable)
+                    }
+                    return SourceDetails.audioInput(label: row.source.text, input)
+                } ?? row.source.text
+            }
+            row.details = ([details] + SourceDetails.live(clockDrift: clockDrift[id])).joined(separator: "\n")
+            return row
+        }
     }
 
     /// The level meter of each audio source with a running capture, read
@@ -426,6 +488,7 @@ public final class Recorder {
     private func readAudioInputs() -> [AudioInputInfo]? {
         do {
             let inputs = try devices.audioInputs()
+            audioInputsRead = inputs
             problemsTold.cleared(.audioInputsNotRead)
             return inputs
         } catch {
@@ -442,6 +505,7 @@ public final class Recorder {
     private func readScreens() -> [ConnectedScreen]? {
         do {
             let screens = try devices.screens()
+            screensRead = screens
             RecorderLog.detail("screens: \(DetailLine.screens(screens))", category: "recorder")
             problemsTold.cleared(.screensNotRead)
             return screens

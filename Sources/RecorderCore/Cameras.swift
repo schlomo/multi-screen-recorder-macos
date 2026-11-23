@@ -1,6 +1,7 @@
 import AVFoundation
 import CoreMediaIO
 import Foundation
+import IOKit
 import RecorderLogic
 
 /// The kinds of camera device AVFoundation lists on a Mac.
@@ -16,15 +17,49 @@ private func cameraDevices() -> [AVCaptureDevice] {
 public func currentCameras() -> [CameraInfo] {
     let defaultID = AVCaptureDevice.default(for: .video)?.uniqueID
     let running = camerasRunningSomewhere()
-    return cameraDevices().map { device in
-        CameraInfo(
+    let devices = cameraDevices()
+    let speeds = devices.contains { $0.transportType == Int32(bitPattern: kAudioDeviceTransportTypeUSB) } ? usbSpeeds() : [:]
+    return devices.map { device in
+        let transport = audioTransport(coreAudioValue: UInt32(bitPattern: device.transportType))
+        return CameraInfo(
             uniqueID: device.uniqueID, name: device.localizedName, isDefault: device.uniqueID == defaultID,
             isVirtual: cameraIsVirtual(deviceType: device.deviceType, transportType: device.transportType),
             isContinuity: cameraIsContinuity(deviceType: device.deviceType, transportType: device.transportType),
             formats: CameraFormat.preferred(device.formats.map(cameraFormat)),
             isSuspended: device.isSuspended, activeFormat: cameraFormat(of: device.activeFormat),
-            isRunningElsewhere: running.contains(device.uniqueID))
+            isRunningElsewhere: running.contains(device.uniqueID), transport: transport,
+            offeredFormats: CameraFormat.offered(device.formats.map(cameraFormat)), activeFrameRates: activeFrameRates(of: device),
+            usbSpeed: transport == .usb ? USBSpeed.locationID(ofUniqueID: device.uniqueID).flatMap { speeds[$0] } : nil)
     }
+}
+
+/// The frame rates a camera runs at now, from its active frame durations; nil where they cannot be read.
+private func activeFrameRates(of device: AVCaptureDevice) -> ClosedRange<Double>? {
+    let slowest = device.activeVideoMaxFrameDuration.seconds, fastest = device.activeVideoMinFrameDuration.seconds
+    guard slowest.isFinite, fastest.isFinite, slowest > 0, fastest > 0, fastest <= slowest else { return nil }
+    return (1 / slowest)...(1 / fastest)
+}
+
+/// The link speed of every USB device by its location ID, as IOKit's
+/// registry says it (`USBSpeed`, which Apple marks as subject to change);
+/// empty where the registry cannot be read.
+func usbSpeeds() -> [UInt32: USBSpeed] {
+    var iterator: io_iterator_t = 0
+    guard IOServiceGetMatchingServices(kIOMainPortDefault, IOServiceMatching("IOUSBHostDevice"), &iterator) == KERN_SUCCESS else {
+        return [:]
+    }
+    defer { IOObjectRelease(iterator) }
+    var speeds: [UInt32: USBSpeed] = [:]
+    while case let service = IOIteratorNext(iterator), service != 0 {
+        defer { IOObjectRelease(service) }
+        let number = { (key: String) in
+            IORegistryEntryCreateCFProperty(service, key as CFString, kCFAllocatorDefault, 0)?.takeRetainedValue() as? NSNumber
+        }
+        if let location = number("locationID"), let speed = number("USBSpeed").flatMap({ USBSpeed(rawValue: $0.intValue) }) {
+            speeds[location.uint32Value] = speed
+        }
+    }
+    return speeds
 }
 
 /// The unique IDs of the cameras CoreMediaIO says run in any process
@@ -59,12 +94,13 @@ private func address(_ selector: Int) -> CMIOObjectPropertyAddress {
         mElement: CMIOObjectPropertyElement(kCMIOObjectPropertyElementMain))
 }
 
-/// A device format as the recording knows it: its size and its highest frame rate.
+/// A device format as the recording knows it: its size and its lowest and highest frame rate.
 func cameraFormat(of format: AVCaptureDevice.Format) -> CameraFormat {
     let dimensions = CMVideoFormatDescriptionGetDimensions(format.formatDescription)
+    let ranges = format.videoSupportedFrameRateRanges
     return CameraFormat(
         size: FrameSize(width: Int(dimensions.width), height: Int(dimensions.height)),
-        maxFramesPerSecond: format.videoSupportedFrameRateRanges.map(\.maxFrameRate).max() ?? 0)
+        maxFramesPerSecond: ranges.map(\.maxFrameRate).max() ?? 0, minFramesPerSecond: ranges.map(\.minFrameRate).min())
 }
 
 /// Whether a camera is virtual, made by software such as OBS Virtual Camera

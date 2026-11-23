@@ -723,9 +723,9 @@ checked, reported or rewritten at the next start (D47).
   connected, so no column moves when auto mode or a slider change.
   Source is as wide as the kind's icon and the longest name connected
   now, each measured with the number "88", so that a setting that
-  numbers a source or not moves nothing; no cell wraps or is cut (its
-  tooltip is the label, with "(default)" after it for the default
-  input). The window is as wide as the table, or as the tagline header
+  numbers a source or not moves nothing; no cell wraps or is cut (the
+  row's mouse-over starts with the label, with "(default)" after it
+  for the default input). The window is as wide as the table, or as the tagline header
   when that is wider, and Source then takes the rest; it is never
   narrower than the controls below need, and the text below the table,
   such as the audio mode's explanation, wraps to that width instead of
@@ -747,6 +747,31 @@ checked, reported or rewritten at the next start (D47).
     One 13T"; D55). `msr check` prints the label as text instead
     (`Screen 1 - Built-in Retina Display`), the default input marked
     "(default)" after it (`Audio 1 - MacBook Pro Microphone (default)`).
+  - Every source row's mouse-over (SwiftUI's `.help`, on the whole
+    row) shows the technical details of how it is recorded, built by
+    `SourceDetails` as plain "Label: value" lines under the row's full
+    label, a potential problem as a "Note:" line. A screen: looks like,
+    drawn at, records at, refresh rate, the colour it is recorded in
+    (BT.709, SDR, HEVC 8-bit), display ID, main screen or not. A camera:
+    its kind (USB, built in, iPhone or virtual) and unique ID, a USB
+    camera's link speed (IOKit's `USBSpeed` of the `IOUSBHostDevice`
+    whose `locationID` the unique ID starts with, such as `0x20522000`
+    in `0x20522000046d085e`; a property Apple marks as subject to
+    change, "cannot be read" without it), each size it offers once with
+    its frame rates, the format chosen and why (the largest recorded
+    size, `limited to 1080p` or `1080p limit off`, `turned as the
+    camera's active format` where the orientation broke a tie, `kept:
+    another app uses it`), the frame rate the recorder sets or the
+    range another app left, whether another app uses it and whether it
+    is suspended; notes for a frame rate below 30 fps (how many of
+    every 30 frames repeat the one before), more than 1080p over a USB
+    2 link (480 Mb/s) and another app's use. An audio input: channels,
+    its sample rate (recorded at 48 kHz), connection, input volume and
+    whether it can be set, default microphone or not, the Core Audio
+    UID and how it is recorded. The system audio: what it captures and
+    its format. Not shown: whether a USB 2 camera shares its USB bus
+    with an audio input, as Core Audio gives no USB location for an
+    audio input.
   - Screen rows first: the number and name, "Looks like" (the size in
     points), "Drawn at" (the pixel size, shown also where both are
     equal), "Records at" (the frame size) and GB/h max (the screen file,
@@ -875,7 +900,15 @@ checked, reported or rewritten at the next start (D47).
   known, `measuring` before any correction; zero is `0`, never `+0` or
   `-0`; empty for a screen), then, drawn for an audio source only,
   "Level" (its level meter) and "Input volume" (an audio input's
-  slider, where its input volume can be set; see "Audio", D69); under
+  slider, where its input volume can be set; see "Audio", D69). Each
+  row's mouse-over shows the source's details as the start window's
+  does (a screen's without drawn at and refresh rate, which the
+  recording does not read; a camera's as read last, "in use by another
+  app" meaning that its file kept the format another app set, as a
+  reading during the recording counts the recording's own use), then
+  what is known while it records: a video file's frames repeated for
+  lateness and placed late so far (`This file so far: …`), a camera's
+  `Stalled: yes` or `no`, an audio source's clock drift; under
   it the line "Recording 1:07:00 ·
   1.3 GB in 3 files · 120.4 GB free", the elapsed time as `h:mm:ss`
   (D47) and the sizes as in Written; then "CPU 23 %", our process's CPU
@@ -1809,7 +1842,7 @@ report.
 ```
 Package.swift             Swift 6 language mode, macOS 26, arm64
 Sources/RecorderLogic/    pure logic, Foundation and Accelerate only, fully unit-tested
-Sources/RecorderCore/     ScreenCaptureKit, AVFoundation and Core Audio adapters
+Sources/RecorderCore/     ScreenCaptureKit, AVFoundation, Core Audio, Core Media I/O and IOKit adapters
 Sources/msr/              entry point: the command line and the app
 Sources/EndToEndLogic/    the end-to-end tests' logic: scenarios and assertions (never in the app)
 Sources/VirtualScreen/    Objective-C: the private CGVirtualDisplay, looked up when it runs (test equipment)
