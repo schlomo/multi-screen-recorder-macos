@@ -5,7 +5,7 @@ import Foundation
 /// timestamps, and a source with no samples for a stretch is silence there.
 /// "Audio inputs" is one mono mix: each recorded audio input averaged to
 /// mono, the inputs summed at unity gain, through a soft limiter
-/// (`limit`). "System audio" carries the system audio's two channels as
+/// (`limit`) with its ceiling at −1 dBFS. "System audio" carries the system audio's two channels as
 /// they are, clamped to ±1. Times are nanoseconds from t0 on the shared
 /// clock; positions are samples from t0. A sample that is not finite is
 /// silence.
@@ -38,16 +38,21 @@ public struct GuideTrackMix: Sendable {
     /// Up to this level, the "Audio inputs" mix passes unchanged: −6 dBFS.
     public static let limiterKnee: Float = 0.5
 
+    /// The level the "Audio inputs" mix never exceeds: −1 dBFS, as AAC
+    /// decoded a mix limited to 1.0 to 1.14–1.19 at a loud thump (the owner's
+    /// Mac, 2026-11-23).
+    public static let limiterCeiling = Float(pow(10, -1.0 / 20))
+
     /// The soft limiter of "Audio inputs": unchanged up to the knee, above it
-    /// `knee + (1 − knee) · tanh((|x| − knee) / (1 − knee))`, which starts
-    /// with slope 1 and approaches ±1 without reaching beyond it. A sample
-    /// that is not finite (NaN, ±infinity) becomes 0.
+    /// `knee + (ceiling − knee) · tanh((|x| − knee) / (ceiling − knee))`,
+    /// which starts with slope 1 and approaches ±ceiling without reaching
+    /// beyond it. A sample that is not finite (NaN, ±infinity) becomes 0.
     public static func limit(_ sample: Float) -> Float {
         guard sample.isFinite else { return 0 }
         let level = abs(sample)
         guard level > limiterKnee else { return sample }
-        let headroom = 1 - limiterKnee
-        let limited = min(1, limiterKnee + headroom * tanh((level - limiterKnee) / headroom))
+        let headroom = limiterCeiling - limiterKnee
+        let limited = min(limiterCeiling, limiterKnee + headroom * tanh((level - limiterKnee) / headroom))
         return sample < 0 ? -limited : limited
     }
 

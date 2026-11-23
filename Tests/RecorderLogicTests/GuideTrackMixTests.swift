@@ -12,9 +12,9 @@ import Testing
 
     /// The soft limiter's output for `x`, as the design states it.
     private func limited(_ x: Float) -> Float {
-        let knee = GuideTrackMix.limiterKnee
+        let knee = GuideTrackMix.limiterKnee, ceiling = GuideTrackMix.limiterCeiling
         guard abs(x) > knee else { return x }
-        return (x < 0 ? -1 : 1) * (knee + (1 - knee) * tanh((abs(x) - knee) / (1 - knee)))
+        return (x < 0 ? -1 : 1) * (knee + (ceiling - knee) * tanh((abs(x) - knee) / (ceiling - knee)))
     }
 
     /// At Stop the last mix waits until every source has delivered up to the video's end.
@@ -75,8 +75,8 @@ import Testing
         guide.receive([[1, -1, 0.9, 1]], from: "A", at: 0)
         guide.receive([[1, -1, 0.9, 0.2], [1, -1, 0.9, 0.2]], from: "B", at: 0)
         let mixed = guide.mix(until: 4 * millisecond)[0]
-        #expect(mixed.allSatisfy { abs($0) <= 1 })
-        #expect(mixed[0] > 0.9 && mixed[1] < -0.9)
+        #expect(mixed.allSatisfy { abs($0) <= GuideTrackMix.limiterCeiling })
+        #expect(mixed[0] > 0.85 && mixed[1] < -0.85)
         for (sample, sum) in zip(mixed, [2, -2, 1.8, 1.2] as [Float]) { #expect(abs(sample - limited(sum)) < 1e-6) }
     }
 
@@ -90,8 +90,10 @@ import Testing
         #expect(guide.mix(until: 3 * millisecond)[0] == [0.5, -0.5, 0])
         // Just above it, the curve starts with the same slope: no step.
         #expect(abs(GuideTrackMix.limit(0.5001) - 0.5001) < 1e-6)
-        #expect(GuideTrackMix.limit(100) <= 1)
-        #expect(GuideTrackMix.limit(-100) >= -1)
+        #expect(abs(GuideTrackMix.limiterCeiling - 0.891_25) < 1e-5)
+        #expect(GuideTrackMix.limit(100) <= GuideTrackMix.limiterCeiling)
+        #expect(GuideTrackMix.limit(-100) >= -GuideTrackMix.limiterCeiling)
+        #expect(GuideTrackMix.limit(2) > 0.85)
     }
 
     @Test func eachInputIsPlacedByItsOwnTimestampsAndAMissingInputIsSilence() {
