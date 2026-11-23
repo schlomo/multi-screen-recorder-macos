@@ -96,7 +96,7 @@ public final class Recorder {
     /// The screens and audio inputs as last read, for the status window's details.
     private var screensRead: [ConnectedScreen] = []
     /// The audio inputs' latest sound and the lags counted so far per audio file, for their delays (D77).
-    private let audioDelays = AudioDelayFeed()
+    let audioDelays = AudioDelayFeed()
     private var delayLags = AudioDelay.Lags()
     private var delayTask: Task<Void, Never>?
     private var audioInputsRead: [AudioInputInfo] = []
@@ -960,7 +960,7 @@ public final class Recorder {
     /// Measures each audio input file being written against the reference
     /// microphone over their latest common window, off the main thread, and
     /// keeps the clear windows' lags; a file's delay is their median, normalized (D77). Nothing after Stop.
-    private func measureAudioDelays() async {
+    func measureAudioDelays() async {
         guard !isStopped else { return }
         let writing = manifest.audioFiles.filter { $0.end == nil && $0.audioSourceUID != nil }
         guard let reference = delayReference(among: Set(writing.compactMap(\.audioSourceUID))),
@@ -977,15 +977,22 @@ public final class Recorder {
         let windows = await Task.detached(priority: .utility) {
             jobs.map { ($0.file, AudioDelay.window(reference: $0.reference, other: $0.other)) }
         }.value
-        guard !isStopped else { return }
+        guard !isStopped, let referenceFile = writing.first(where: { $0.audioSourceUID == reference })?.name else { return }
+        let before = manifest.audioFiles.map(\.measuredDelay)
         for case let (file, window?) in windows where window.counts {
             RecorderLog.detail("\(file): lag \(AudioDelay.text(window.lag)), clarity \(Int(window.clarity.rounded()))", category: "recorder")
-            delayLags.add(window.lag, file: file, reference: reference)
+            // Against another reference's file its delay no longer holds: the one time a measured value goes back to null.
+            if let measuredAgainst = delayLags.reference(of: file), measuredAgainst != referenceFile {
+                _ = manifest.audioDelayMeasured(nil, file: file)
+            }
+            delayLags.add(window.lag, file: file, reference: referenceFile)
         }
-        let delays = delayLags.delays(
-            of: writing.map(\.name), reference: reference, referenceFile: writing.first { $0.audioSourceUID == reference }?.name)
-        let before = manifest.audioFiles.map(\.measuredDelay)
-        for file in writing { _ = manifest.audioDelayMeasured(delays[file.name], file: file.name) }
+        var delays = delayLags.delays(reference: referenceFile)
+        // The reference's file once shifted keeps a value: 0 when it is the earliest again.
+        if delays[referenceFile] == nil, manifest.audioFiles.first(where: { $0.name == referenceFile })?.measuredDelay != nil {
+            delays[referenceFile] = 0
+        }
+        for (file, delay) in delays { _ = manifest.audioDelayMeasured(delay, file: file) }
         if manifest.audioFiles.map(\.measuredDelay) != before { try? writeManifest() }
     }
 

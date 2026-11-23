@@ -62,25 +62,27 @@ public enum AudioDelay {
         return normalized
     }
 
-    /// Each audio file's counted lags, against the reference they were measured with.
+    /// Each audio file's counted lags, against the reference's file they were measured with.
     public struct Lags: Sendable {
         private var byFile: [String: (reference: String, lags: [Double])] = [:]
 
         public init() {}
 
-        /// A counted window's lag; against another reference than before, the file starts again.
+        /// A counted window's lag against the reference's file `reference`; against another than before, the
+        /// file starts again: a new reference, or the same one's new file, as after a reconnect at another latency.
         public mutating func add(_ lag: Double, file: String, reference: String) {
             if byFile[file]?.reference != reference { byFile[file] = (reference, []) }
             byFile[file]?.lags.append(lag)
         }
 
-        /// The delays of `files` against `reference`, `normalized`; a file without one is not listed.
-        public func delays(of files: [String], reference: String, referenceFile: String?) -> [String: Double] {
-            let medians = files.reduce(into: [String: Double]()) { medians, file in
-                guard let measured = byFile[file], measured.reference == reference else { return }
-                medians[file] = AudioDelay.delay(ofCountedLags: measured.lags)
-            }
-            return normalized(medians, reference: referenceFile)
+        /// The reference's file `file` was last measured against.
+        public func reference(of file: String) -> String? { byFile[file]?.reference }
+
+        /// The delays of every file measured against the reference's file `reference`, ended ones included,
+        /// `normalized`; a file without one is not listed.
+        public func delays(reference: String) -> [String: Double] {
+            normalized(byFile.compactMapValues { $0.reference == reference ? AudioDelay.delay(ofCountedLags: $0.lags) : nil },
+                       reference: reference)
         }
     }
 

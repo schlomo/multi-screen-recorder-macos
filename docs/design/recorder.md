@@ -673,7 +673,8 @@ null when it cannot be read, absent for the system audio (D69);
 measured audio input's, measured while recording, to 0.0001 s, never
 negative, null when not measured: for the system audio, the reference
 when it is the earliest, and a file with fewer than 3 clear windows
-against the current reference (see "Audio delay", D77). `files` lists the screen
+against the current reference's file; once measured it stays, unless
+the reference's file changes (see "Audio delay", D77). `files` lists the screen
 files, the camera files and the audio files in the order of their start.
 
 **Names in a file name (D49, D55).** In a file name, `/` and `:` in a
@@ -1470,14 +1471,17 @@ the metadata items (see "Output on disk").
   silent or the window starts before the file. A file's delay is the
   median of its counted windows' lags (each a lag, the seconds by which
   the file's sound is later than the reference's) once it has 3; with
-  fewer, none. A file's lags count against the reference they were
-  measured with: when the reference changes (the default microphone
-  changed or its file ended), the file starts again. The delays are then
-  normalized so the earliest measured input is 0: each less the
-  smallest where that is below 0, the reference counting as 0, so a
+  fewer, none. A file's lags count against the reference's file they
+  were measured with: when it changes (another reference, or the same
+  microphone's new file after it ended, as a reconnect may come back at
+  another latency), the file starts again, and its value goes back to
+  null, the one time a measured value does. The delays are then
+  normalized over every file measured against the reference's file,
+  ended ones included, so the earliest measured input is 0: each less
+  the smallest where that is below 0, the reference counting as 0, so a
   delayed reference (an Osmo or a Bluetooth microphone as the default)
   moves itself later, never the others, and its own file gets a
-  `measuredDelay` too. Measuring ends at Stop. It goes into `recording.json` as the file's `measuredDelay` (a file
+  `measuredDelay` too (0 once it is the earliest again). Measuring ends at Stop. It goes into `recording.json` as the file's `measuredDelay` (a file
   that ends before Stop keeps what was measured until then), the status
   window's Clock drift column (`· 550 ms late`) and the
   timeline file, which places the file's clip earlier by it; each

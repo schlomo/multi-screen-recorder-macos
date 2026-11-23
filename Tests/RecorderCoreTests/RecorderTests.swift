@@ -76,6 +76,9 @@ extension GlobalRecordingLog {
         /// Every source the recorder opened, in order: a restart opens a new one.
         final class OpenedSources: Sendable {
             let list = Mutex<[AudioCaptureTests.StandInSource]>([])
+            /// The sources opened per audio input, by its UID.
+            let byUID = Mutex<[String: [AudioCaptureTests.StandInSource]]>([:])
+            func last(of uid: String) -> AudioCaptureTests.StandInSource? { byUID.withLock { $0[uid]?.last } }
             var count: Int { list.withLock { $0.count } }
             var last: AudioCaptureTests.StandInSource { list.withLock { $0.last! } }
         }
@@ -216,16 +219,18 @@ extension GlobalRecordingLog {
         }
 
         private func start(
-            readsScreens: Bool = false, cameraMode: CameraMode = .none, cameraFrameWatch: CameraFrameWatch = CameraFrameWatch()
+            readsScreens: Bool = false, cameraMode: CameraMode = .none, cameraFrameWatch: CameraFrameWatch = CameraFrameWatch(),
+            inputs: [AudioInputInfo]? = nil
         ) throws {
             var settings = Settings.defaults
             settings.auto = false
             settings.resolution = readsScreens || cameraMode != .none ? .p1080 : RecordingResolution.none
             settings.cameraMode = cameraMode
-            settings.audioMode = .defaultMicrophone
+            settings.audioMode = inputs == nil ? .defaultMicrophone : .allInputs
             settings.systemAudio = false
             settings.outputFolder = home.path(percentEncoded: false)
             let input = AudioInputInfo(name: name, channelCount: 1, isDefault: true, transport: .usb, uid: uid)
+            let inputs = inputs ?? [input]
             let sources = sources
             let volume = volume
             let screensReadable = screensReadable
@@ -235,10 +240,11 @@ extension GlobalRecordingLog {
                     if screensReadable.isOn.withLock({ $0 }) { return [] }
                     throw DeviceReadError("the stand-in's screens cannot be read")
                 },
-                audioInputs: { [input] },
-                audioInputSource: { _ in
+                audioInputs: { inputs },
+                audioInputSource: { uid in
                     let source = AudioCaptureTests.StandInSource()
                     sources.list.withLock { $0.append(source) }
+                    sources.byUID.withLock { $0[uid, default: []].append(source) }
                     return source
                 },
                 inputVolume: { _, _ in volume },
@@ -259,7 +265,7 @@ extension GlobalRecordingLog {
                     return answer == .granted
                 })
             let facts = ReadyCheckFacts(
-                screenRecording: nil, microphoneGranted: true, screens: .success([]), audioInputs: .success([input]),
+                screenRecording: nil, microphoneGranted: true, screens: .success([]), audioInputs: .success(inputs),
                 outputFolder: .unusable("not probed by the tests"))
             recorder = try Recorder(
                 settings: settings, homeFolder: home, app: "Multi Screen Recorder (tests)", readyCheckFacts: facts, observer: observer,
@@ -269,7 +275,8 @@ extension GlobalRecordingLog {
         private var source: AudioCaptureTests.StandInSource { sources.last }
 
         /// Buffers of `value` throughout, the first `start` buffers after now.
-        private func send(_ value: Float, buffers: Int, after start: Int = 0) throws {
+        private func send(_ value: Float, buffers: Int, after start: Int = 0, to source: AudioCaptureTests.StandInSource? = nil) throws {
+            let source = source ?? self.source
             let now = readClocks().host
             for index in 0..<buffers {
                 let nanoseconds = Int64(start + index) * Int64(samplesPerBuffer) * 1_000_000_000 / Int64(RecorderValues.audioSampleRate)
@@ -448,6 +455,53 @@ extension GlobalRecordingLog {
             #expect(landscape.isStopped)
             #expect(summary.manifest.cameraFiles.map(\.frameSize) == [[180, 320]])
             #expect(summary.manifest.events.isEmpty)
+        }
+
+        /// Three microphones' sound, the reference R and A 0.5 s earlier, B 0.2 s later, placed straight into the
+        /// delay measurement's rings from 1 s to 13 s of the recording, so every window is there at once.
+        private func feedDelayedNoise(_ uids: [String: Double]) {
+            let rate = RecorderValues.audioSampleRate
+            var seed: UInt64 = 7
+            let noise = (0..<(15 * rate)).map { _ -> Float in
+                seed = seed &* 6_364_136_223_846_793_005 &+ 1_442_695_040_888_963_407
+                return Float(Int64(bitPattern: seed >> 11) % 2001 - 1000) / 2000
+            }
+            for (uid, lag) in uids {
+                for chunk in stride(from: rate, to: 13 * rate, by: rate / 10) {
+                    let shift = Int((lag * Double(rate)).rounded())
+                    let samples = Array(noise[(chunk - shift + rate)..<(chunk - shift + rate + rate / 10)])
+                    recorder.audioDelays.receive([samples], from: uid, at: Int64(chunk) * 1_000_000_000 / Int64(rate))
+                }
+            }
+        }
+
+        /// The delays are normalized over every file measured against the reference's file, ended ones
+        /// included, and written into the manifest: an input that was the earliest ending and starting
+        /// again leaves the others' delays as they were (D77).
+        @Test func theDelaysStayNormalizedWhenTheEarliestInputsFileEnds() async throws {
+            let inputs = ["R", "A", "B"].map { AudioInputInfo(name: "Mic \($0)", channelCount: 1, isDefault: $0 == "R", transport: .usb, uid: $0) }
+            try start(inputs: inputs)
+            try await wait("the audio inputs' captures") { sources.byUID.withLock { $0.count } == 3 }
+            for uid in ["R", "A", "B"] { try send(0.1, buffers: 1, to: sources.last(of: uid)) }
+            try await wait("the audio files") { (try? manifestOnDisk().audioFiles.count) == 3 }
+            feedDelayedNoise(["R": 0, "A": -0.5, "B": 0.2])
+            for _ in 0..<3 { await recorder.measureAudioDelays() }
+            func delays() throws -> [String: Double?] {
+                Dictionary(try manifestOnDisk().audioFiles.map { ($0.audioSource, $0.measuredDelay) }, uniquingKeysWith: { _, last in last })
+            }
+            let measured = try delays()
+            #expect(abs((measured["Mic A"] ?? nil) ?? 1) < 0.002)
+            #expect(abs(((measured["Mic B"] ?? nil) ?? 0) - 0.7) < 0.002)
+            #expect(abs(((measured["Mic R"] ?? nil) ?? 0) - 0.5) < 0.002)
+            // A's file ends, and A starts again in a new file without a measurement yet.
+            try #require(sources.last(of: "A")).lose(.captureFailed("the stand-in failed"))
+            try await wait("A's restart") { sources.byUID.withLock { $0["A"]?.count } == 2 }
+            try send(0.1, buffers: 1, to: sources.last(of: "A"))
+            try await wait("A's new file") { (try? manifestOnDisk().audioFiles.count) == 4 }
+            feedDelayedNoise(["R": 0, "B": 0.2])
+            await recorder.measureAudioDelays()
+            #expect(abs(((try delays()["Mic B"] ?? nil) ?? 0) - 0.7) < 0.002)
+            _ = await stop()
         }
 
         /// A video file's writer failure and a full disk reach the window's lines, red until a new file of the

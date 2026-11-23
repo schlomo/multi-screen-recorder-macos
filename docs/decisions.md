@@ -2486,7 +2486,13 @@ architect's reading.
   earliest measured input is 0, every delay less min(0, the smallest),
   the reference counting as 0, so a delayed default microphone (an
   Osmo, a Bluetooth microphone) never moves the others later, and the
-  reference's own file then gets a `measuredDelay` too. Fixed in
+  reference's own file then gets a `measuredDelay` too. After a second
+  review, the architect's decisions: the normalization runs over all of
+  the recording's files measured against the current reference, ended
+  ones included; a measured value is never overwritten with null,
+  except when the reference changes; lags are keyed by the reference's
+  file, not its UID, so a reference whose file ends and starts again (a
+  reconnect at another latency) discards the old lags. Fixed in
   review: a delayed clip that would overlap its source's previous clip
   leaves out its head instead of being pushed later; measuring ends at
   Stop.

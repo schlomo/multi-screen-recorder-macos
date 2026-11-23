@@ -57,15 +57,19 @@ import Testing
     }
 
     /// A file's lags count against one reference: a new reference starts it again (D77).
-    @Test func aNewReferenceStartsAFilesLagsAgain() {
+    /// A file's lags count against one reference file: another (a new reference, or the same one's new
+    /// file) starts it again; every file measured against the reference counts in the normalization (D77).
+    @Test func aNewReferenceFileStartsAFilesLagsAgain() {
         var lags = AudioDelay.Lags()
         for lag in [0.5, 0.5, 0.5] { lags.add(lag, file: "a", reference: "r1") }
         for lag in [-0.25, -0.25, -0.25] { lags.add(lag, file: "b", reference: "r1") }
-        #expect(lags.delays(of: ["a", "b"], reference: "r1", referenceFile: "r1 file") == ["a": 0.75, "b": 0, "r1 file": 0.25])
+        #expect(lags.delays(reference: "r1") == ["a": 0.75, "b": 0, "r1": 0.25])
+        #expect(lags.reference(of: "a") == "r1")
         lags.add(0.5, file: "a", reference: "r2")
-        #expect(lags.delays(of: ["a", "b"], reference: "r2", referenceFile: nil) == [:])
+        #expect(lags.reference(of: "a") == "r2")
+        #expect(lags.delays(reference: "r2") == [:])
         for lag in [0.25, 0.25] { lags.add(lag, file: "a", reference: "r2") }
-        #expect(lags.delays(of: ["a"], reference: "r2", referenceFile: nil) == ["a": 0.25])
+        #expect(lags.delays(reference: "r2") == ["a": 0.25])
     }
 
     @Test func theDelayReadsLateOrEarly() {
