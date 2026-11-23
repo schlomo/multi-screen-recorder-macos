@@ -37,6 +37,9 @@ public enum ProblemKind: Hashable, Sendable {
     case inputVolumeNotSet(String)
     /// An audio input whose input volume changes cannot be followed, by its name; clears when following it works (D69).
     case inputVolumeNotFollowed(String)
+    /// An audio input, by its UID, whose file left the "Audio inputs" guide track as too late; ends when a
+    /// new file of it starts (D79).
+    case audioInputOutOfTheGuideTrack(String)
     /// A video file a full disk ended; clears when there is room again.
     case diskFull
     /// A screen file or a camera file whose writer failed and that lacks what its writer was given, by its name (D66).
@@ -56,7 +59,7 @@ extension ProblemKind {
         case .audioFileLost, .videoFileLost, .audioInputChangesNotFollowed, .audioInputNotRecordable:
             true
         case .dockIconNotShown, .inputVolumeNotSet, .inputVolumeNotFollowed, .timelineFileNotWritten, .cameraStalled,
-             .guideTracksCut:
+             .guideTracksCut, .audioInputOutOfTheGuideTrack:
             false
         case .diskFull, .cameraPermissionMissing, .screenNotCaptured, .cameraNotCaptured, .audioSourceFailed, .audioFileFailed,
              .recordingLogNotWritten, .manifestNotWritten, .freeSpaceNotRead, .screensNotRead, .audioInputsNotRead:
@@ -98,6 +101,8 @@ extension ProblemKind {
         case .inputVolumeNotFollowed(let name): "Input volume of \(name) not followed"
         case .diskFull: "Disk full"
         case .guideTracksCut(let name): "Guide tracks of \(name) cut"
+        case .audioInputOutOfTheGuideTrack(let uid):
+            "\(source ?? uid) too far out of sync, not in the guide track; own audio track recorded"
         }
     }
 }

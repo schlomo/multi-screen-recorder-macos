@@ -593,7 +593,8 @@ and for audio `audio input connected`, `audio input disconnected`,
 `system audio started`, `system audio stopped`, `default microphone
 changed`, `audio input gap`, `audio input failed`, `system audio
 failed`, `audio file writer failed`, `audio file writer fell behind`,
-`audio input volume changed`, `no audio started`, `no audio stopped`;
+`audio input volume changed`, `no audio started`, `no audio stopped`,
+`audio input left the guide track`;
 each names its screen (`screen`), its camera (`camera`) or its audio
 source (`audioSource`) where it is about one; `screen` always means a
 screen. `audio file
@@ -610,7 +611,9 @@ the new input volume, 0 to 1, for `audio input volume changed` (D69);
 `mirrors` (the
 screen mirrored) for `screen mirroring started`; `length` (seconds, to
 the millisecond) for `audio input gap` and `camera stall ended` (from
-the camera's last frame before the stall to its next); `error` (why, as one line) and
+the camera's last frame before the stall to its next); `delay` (its
+audio delay in seconds, to 0.0001 s) for `audio input left the guide
+track` (D79); `error` (why, as one line) and
 `errorDetail` (the same error as its full chain, below) for `screen stream
 failed`, `screen file writer failed`, `camera stream failed`, `camera
 stalled`, `camera file writer failed`, `audio input failed`, `system
@@ -1497,7 +1500,8 @@ the metadata items (see "Output on disk").
   window's Clock drift column (`· 550 ms late`) and the
   timeline file, which places the file's clip earlier by it; each
   counted window is a detail line (`<file>: lag 550 ms late, clarity
-  31`). The audio files and the guide tracks are not changed.
+  31`). The audio files are not changed; an input clearly late leaves
+  the "Audio inputs" guide track (see "Guide tracks", D79).
 - **Failures.** A failing audio capture or writer and a full disk are
   handled for an audio file as for a screen file (below): the file
   ends, the event (`audio input failed`, `system audio failed`, `audio
@@ -1532,7 +1536,22 @@ the metadata items (see "Output on disk").
   material; in a simulation on that recording the mix decoded to at
   most about 0.78, roughly 2 dB below full scale, but the decoded peak
   is not bounded. A true-peak limiter (a low-pass and lookahead) is
-  deferred. "System audio" is clamped to ±1. Each source is placed by
+  deferred. "System audio" is clamped to ±1. **An audio input clearly
+  late leaves "Audio inputs" (D79):** when the first counted window of
+  one of its files, normalized as the audio delays are (see "Audio
+  delay"), says it is more than 0.1 s (`guideDelayLimit`, *data*) later
+  than the earliest input, that file's sound leaves the mix of every
+  video file alike, for the rest of the file; its next file (after a
+  replug or a restart) joins again until it is measured. The first
+  counted window decides, not the median of 3, so the echo lasts about
+  10 s instead of 30 s; `measuredDelay` and the timeline file keep the
+  median. The reference microphone and the earliest input never leave.
+  It writes the event `audio input left the guide track` with its
+  `delay` and tells the problem `Audio <n> <name> too far out of sync,
+  not in the guide track; own audio track recorded`, always orange
+  (the recording works), recovered when the input's next file starts.
+  Its own audio file is unchanged and the timeline file still places it
+  by its measured delay. Each source is placed by
   its own timestamps, the mix runs 200 ms (*data*) behind real time so
   every source's buffers have arrived, and a source that is missing is
   silence in its guide track. The mix is handed to every open screen

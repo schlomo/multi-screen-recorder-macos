@@ -2619,3 +2619,44 @@ architect's reading.
   as they were.
 - **Evidence:** [design/recorder.md](design/recorder.md), "Status
   window"; `Sources/RecorderLogic/ProblemsTold.swift`.
+
+## D79: An audio input clearly late leaves the "Audio inputs" guide track (2026-11-23)
+
+- **Status:** in force. Amends D52's guide mix and D77, which left the
+  guide tracks unchanged.
+- **Context:** With D77 the timeline file places a late microphone
+  right, but the "Audio inputs" guide track still sums it as it
+  arrives, so a microphone 0.5 s late echoes in every video file's
+  guide. The owner, on a test recording: "So no mic sync now? Seems
+  like a faulty release" … and, asked whether a late microphone should
+  leave the guide: "Yes, it should".
+- **Decision:** The architect's design, approved by the owner: an audio
+  input whose file's first counted window (clarity at least 12, as
+  D77), normalized as D77's delays, is later than
+  `RecorderValues.guideDelayLimit`, 0.1 s (*data*), leaves the "Audio
+  inputs" mix (`GuideTrackMix.remove(source:)`) for every video file
+  alike, for the rest of that audio file; its next file (a replug, a
+  restart) starts in the guide again until it is measured, so there is
+  no flapping within a file. The first counted window decides, not the
+  median of 3, so the echo lasts about 10 s instead of 30 s;
+  `measuredDelay` and the timeline file keep D77's median. The
+  reference microphone and the earliest input never leave. Its own
+  audio file is unchanged. It is the event `audio input left the guide
+  track` with the input as `audioSource` and its `delay`, in
+  `recording.json` and the timeline file's markers, and a problem of
+  its own kind, always orange (the recording works): `Audio <n> <name>
+  too far out of sync, not in the guide track; own audio track
+  recorded`, one line per input, merged as every kind, recovered when
+  the input's next file starts. Decided while building: the line names
+  the input as `Audio <n> <name>`, as screens' and cameras' lines do;
+  the problem's error is the event's name with the delay under it
+  (`audio input left the guide track: 500 ms late`); the event's word is
+  "guide track", the glossary's.
+- **Consequences:** A clearly late microphone no longer echoes in the
+  guide; until its first clear window it still does, and an input
+  between 0 and 0.1 s late stays in. The next change raises the limit
+  to about 0.8 s and aligns late microphones in the guide instead of
+  removing them: one data value and its decision.
+- **Evidence:** [design/recorder.md](design/recorder.md), "Guide
+  tracks"; `Sources/RecorderLogic/GuideTrackLeaving.swift`,
+  `Sources/RecorderCore/Recorder.swift` (`leaveTheGuideTrack`).

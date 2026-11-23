@@ -98,6 +98,10 @@ public final class GuideTrackFeed: Sendable {
         }
     }
 
+    func contains(source name: String, in guide: GuideTrack) -> Bool {
+        state.withLock { $0.mixes[guide]?.contains(source: name) == true }
+    }
+
     func receive(_ channels: [[Float]], from name: String, to guide: GuideTrack, at time: Int64) {
         state.withLock { state in
             guard state.mixes[guide]?.contains(source: name) == true else { return }

@@ -104,6 +104,7 @@ public final class Recorder {
     /// The camera captures whose end was reported to the camera tracker.
     private var cameraCapturesGone: Set<Int> = []
     private var delayTask: Task<Void, Never>?
+    private var guideTrackLeaving = GuideTrackLeaving()
     private var audioInputsRead: [AudioInputInfo] = []
     private var endReports = CaptureEndReports()
     private var problemsTold = ProblemsTold()
@@ -129,7 +130,8 @@ public final class Recorder {
     private let audioReports = AudioReportInbox()
     /// The latest clock drift correction status of each audio capture, by its number among all audio captures.
     private var audioClockDrift: [AudioTracker.SourceID: (number: Int, status: ClockDriftCorrection.Status)] = [:]
-    private let guides: GuideTrackFeed
+    /// Internal, so a test can see which sources a guide track mixes.
+    let guides: GuideTrackFeed
     private var clockDriftDetailSchedule = ClockDriftDetailSchedule()
     /// Nil when it could not be created: that is a problem, and the recording goes on.
     private var recordingLog: RecordingLog?
@@ -1034,7 +1036,9 @@ public final class Recorder {
                 _ = manifest.audioDelayMeasured(nil, file: file)
             }
             delayLags.add(window.lag, file: file, reference: referenceFile)
+            guideTrackLeaving.add(window.lag, file: file, reference: referenceFile)
         }
+        for (file, delay) in guideTrackLeaving.leaving(reference: referenceFile) { leaveTheGuideTrack(file: file, delay: delay) }
         var delays = delayLags.delays(reference: referenceFile)
         // The reference's file once shifted keeps a value: 0 when it is the earliest again.
         if delays[referenceFile] == nil, manifest.audioFiles.first(where: { $0.name == referenceFile })?.measuredDelay != nil {
@@ -1042,6 +1046,23 @@ public final class Recorder {
         }
         for (file, delay) in delays { _ = manifest.audioDelayMeasured(delay, file: file) }
         if manifest.audioFiles.map(\.measuredDelay) != before { try? writeManifest() }
+    }
+
+    /// An audio input's file clearly late leaves the "Audio inputs" guide track, its own file unchanged (D79).
+    private func leaveTheGuideTrack(file name: String, delay: Double) {
+        guard let file = manifest.audioFiles.first(where: { $0.name == name }), let uid = file.audioSourceUID else { return }
+        audioCaptures[.input(uid)]?.1.leaveTheGuideTrack(file: name)
+        var event = RecordingEvent(at: context.now(), event: .audioInputLeftTheGuideTrack, audioSource: file.audioSource)
+        event.delay = (delay * 10_000).rounded() / 10_000
+        guard manifest.record([event]) else { return }
+        try? writeManifest()
+        told([event])
+        let number = audioTracker.sourcesShown.first { $0.id == .input(uid) }?.number
+        let problem = RecordingProblem(
+            atSeconds: event.at, problem: event.problem.problem,
+            error: ErrorDetail(message: event.event.rawValue, underlying: [ErrorDetail(message: AudioDelay.text(delay))]))
+        tell(problem, kind: .audioInputOutOfTheGuideTrack(uid), source: number.map { "Audio \($0) \(file.audioSource)" } ?? file.audioSource,
+             ofAnEvent: true)
     }
 
     /// The default microphone when it is recorded, else the recorded audio input with the lowest number (D77).
@@ -1154,6 +1175,7 @@ public final class Recorder {
         RecorderLog.detail("file started: \(file.name)", category: "recorder")
         let started = audioTracker.fileStarted(id, at: Int64((file.start * 1_000_000_000).rounded()))
         problemsTold.cleared(.audioSourceFailed(name), at: context.now())
+        if let uid = file.audioSourceUID { problemsTold.cleared(.audioInputOutOfTheGuideTrack(uid), at: context.now()) }
         // A failed file of the source is over once a new one starts (D78).
         for earlier in manifest.audioFiles where earlier.audioSourceUID == file.audioSourceUID {
             problemsTold.cleared(.audioFileFailed(earlier.name), at: context.now())

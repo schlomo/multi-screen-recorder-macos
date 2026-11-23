@@ -352,7 +352,8 @@ screen file has follows from the settings alone; a missing source is
 silence in its guide track (D31). It ends with its screen file's video
 (D51), unless the file ended by a failure, or the samples for its last
 mix were no longer there or the writer did not take them in time,
-which is told as a problem.
+which is told as a problem. An audio input whose audio delay is clearly
+late leaves "Audio inputs" for the rest of its audio file (D79).
 
 ## Level meter
 

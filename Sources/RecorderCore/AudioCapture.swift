@@ -149,6 +149,8 @@ final class AudioCapture: @unchecked Sendable {
     private var finishing: [Task<Void, Never>] = []
     private var isEnding = false
     private var guideChannels: Int?
+    /// The current file left its guide track (D79): its sound joins again with the next file.
+    private var isOutOfTheGuideTrack = false
     private var correction = ClockDriftCorrection()
     /// The correction applied up to the current file's start and up to the
     /// end of what was placed in it, in seconds.
@@ -314,6 +316,15 @@ final class AudioCapture: @unchecked Sendable {
     }
 
     /// The level meter's reading: the sample peak since the last reading, and the peak hold.
+    /// The file `name`, if still the current one, leaves its guide track for the rest of it (D79).
+    func leaveTheGuideTrack(file name: String) {
+        queue.async { [self] in
+            guard open?.entry.name == name else { return }
+            isOutOfTheGuideTrack = true
+            leaveGuide()
+        }
+    }
+
     func readLevel(at now: Int64) -> AudioLevel {
         level.withLock { $0.read(at: now) }
     }
@@ -508,6 +519,7 @@ final class AudioCapture: @unchecked Sendable {
         let fileCorrection = fileApplied.end - fileApplied.start
         let clockDriftPpm = correction.status.clockDriftPpm
         timeline = nil
+        isOutOfTheGuideTrack = false
         guard let file = open else { return }
         open = nil
         let reports = reports
@@ -567,7 +579,7 @@ final class AudioCapture: @unchecked Sendable {
     // MARK: Guide track
 
     private func joinGuide(channelCount: Int) {
-        guard guideChannels != channelCount else { return }
+        guard !isOutOfTheGuideTrack, guideChannels != channelCount else { return }
         if guideChannels != nil { guides.remove(source: label, from: guide) }
         guides.add(source: label, channelCount: channelCount, to: guide)
         guideChannels = channelCount
