@@ -15,7 +15,8 @@ identity, settle time, screen check, tick, timecode, audio track,
 audio file, guide track, clock drift; D45, D49), labels (D55), the
 banner, the recording log and the error detail (D64), the timeline file
 (D68), the level meter, the input volume and no audio (D69), cameras,
-camera files and the camera mode (D74), and the end-to-end
+camera files and the camera mode (D74), the orientation (D76), the audio
+delay (D77), recovered (D78), and the end-to-end
 tests' first named scenarios, with the restore file, virtual screens and
 the test tone (D63).
 
@@ -100,9 +101,16 @@ printed already (D64).
 ## Problem
 
 Something that went wrong in a recording and that the person is told:
-the Dock badge's "!", red in the status window, a line on standard
+the Dock badge's "!", a line in the status window (red, orange once
+recovered, D78), a line on standard
 error in `msr record`, a line in the recording log, and an entry in the
 recording manifest's `problems` with its time and full error (D46, D64).
+
+## Recovered
+
+A problem that ended while the recording went on, such as a camera
+stall whose frames came again: its line in the status window turns
+orange and says how long it lasted and when it began (D78).
 
 ## Error detail
 

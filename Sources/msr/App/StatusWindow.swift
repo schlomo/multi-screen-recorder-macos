@@ -11,7 +11,8 @@ final class StatusModel {
     var line = ""
     /// "CPU 23 %", our process only.
     var cpu = ""
-    var problems: [String] = []
+    /// Red while ongoing, orange once recovered (D78).
+    var problems: [ProblemLine] = []
     /// Each audio source's level meter, drawn 10 times a second while the window is open (D69).
     var levels: [AudioTracker.SourceID: AudioLevel] = [:]
     /// The input volume of each audio input whose volume can be set: only those have a slider.
@@ -120,7 +121,7 @@ struct StatusView: View {
             if !model.problems.isEmpty {
                 VStack(alignment: .leading, spacing: 4) {
                     ForEach(Array(model.problems.enumerated()), id: \.offset) { _, problem in
-                        Text(problem).foregroundStyle(.red).fixedSize(horizontal: false, vertical: true)
+                        Text(problem.text).foregroundStyle(problem.isRecovered ? .orange : .red).fixedSize(horizontal: false, vertical: true)
                     }
                     Text(Self.forAReport)
                         .font(.callout)

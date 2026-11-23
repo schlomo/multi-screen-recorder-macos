@@ -260,6 +260,9 @@ public final class Recorder {
     /// Seconds since the recording started, on the shared clock.
     public var elapsedSeconds: Double { Double(context.now()) / 1_000_000_000 }
 
+    /// The status window's problem lines, read now (D78).
+    public func problemLines() -> [ProblemLine] { problemsTold.lines(now: context.now()) }
+
     /// `msr record` could not show its Dock icon: a problem; the recording goes on.
     public func dockIconNotShown() {
         tell("The Dock icon cannot be shown", error: "macOS refused the regular activation policy; stop with Ctrl-C",
@@ -365,7 +368,7 @@ public final class Recorder {
         guard case .input(let uid) = id, let follow = inputVolumes[uid], follow.control.isSettable else { return }
         do throws(InputVolumeError) {
             try follow.control.set(volume)
-            problemsTold.cleared(.inputVolumeNotSet(follow.name))
+            problemsTold.cleared(.inputVolumeNotSet(follow.name), at: context.now())
         } catch {
             tell("The input volume of \(follow.name) cannot be set", error: ErrorDetail(message: error.description),
                  kind: .inputVolumeNotSet(follow.name))
@@ -500,7 +503,7 @@ public final class Recorder {
         do {
             let inputs = try devices.audioInputs()
             audioInputsRead = inputs
-            problemsTold.cleared(.audioInputsNotRead)
+            problemsTold.cleared(.audioInputsNotRead, at: context.now())
             return inputs
         } catch {
             tell("The audio inputs cannot be read", error: ErrorDetail(error), kind: .audioInputsNotRead)
@@ -518,7 +521,7 @@ public final class Recorder {
             let screens = try devices.screens()
             screensRead = screens
             RecorderLog.detail("screens: \(DetailLine.screens(screens))", category: "recorder")
-            problemsTold.cleared(.screensNotRead)
+            problemsTold.cleared(.screensNotRead, at: context.now())
             return screens
         } catch {
             tell("The screens cannot be read", error: ErrorDetail(error), kind: .screensNotRead)
@@ -618,7 +621,7 @@ public final class Recorder {
     private func fileStarted(_ file: RecordingManifest.ScreenFile, uuid: String) {
         RecorderLog.detail("file started: \(file.name)", category: "recorder")
         tracker.fileStarted(uuid)
-        problemsTold.cleared(.screenNotCaptured(uuid))
+        problemsTold.cleared(.screenNotCaptured(uuid), at: context.now())
         guard !manifest.files.contains(where: { $0.name == file.name }) else { return }
         manifest.files.append(file)
         try? writeManifest()
@@ -687,7 +690,7 @@ public final class Recorder {
         guard cameras.contains(where: { CameraTracker.records($0, settings: settings) }) else { return cameras }
         switch devices.cameraPermission() {
         case .granted:
-            problemsTold.cleared(.cameraPermissionMissing)
+            problemsTold.cleared(.cameraPermissionMissing, at: context.now())
             return cameras
         case .notAsked:
             if !cameraPermissionRequested {
@@ -786,8 +789,8 @@ public final class Recorder {
     private func cameraFileStarted(_ file: RecordingManifest.CameraFile, uniqueID: String) {
         RecorderLog.detail("file started: \(file.name)", category: "recorder")
         cameraTracker.fileStarted(uniqueID)
-        problemsTold.cleared(.cameraNotCaptured(uniqueID))
-        problemsTold.cleared(.cameraStalled(uniqueID))
+        problemsTold.cleared(.cameraNotCaptured(uniqueID), at: context.now())
+        problemsTold.cleared(.cameraStalled(uniqueID), at: context.now())
         guard !manifest.cameraFiles.contains(where: { $0.name == file.name }) else { return }
         manifest.cameraFiles.append(file)
         try? writeManifest()
@@ -803,7 +806,7 @@ public final class Recorder {
 
     private func cameraStallEnded(uniqueID: String, captureNumber: Int, length: Int64) {
         guard !isStopped, cameraCaptures[uniqueID]?.0 == captureNumber else { return }
-        problemsTold.cleared(.cameraStalled(uniqueID))
+        problemsTold.cleared(.cameraStalled(uniqueID), at: context.now(), length: length)
         applyCameras(cameraTracker.stallEnded(uniqueID, length: length, at: context.now()))
     }
 
@@ -975,7 +978,7 @@ public final class Recorder {
             try control.watch { [weak self] in
                 Task { @MainActor in self?.readInputVolume(uid) }
             }
-            problemsTold.cleared(.inputVolumeNotFollowed(name))
+            problemsTold.cleared(.inputVolumeNotFollowed(name), at: context.now())
         } catch {
             tell("Changes of the input volume of \(name) cannot be followed", error: ErrorDetail(message: error.description),
                  kind: .inputVolumeNotFollowed(name))
@@ -1057,7 +1060,7 @@ public final class Recorder {
         guard manifest.state != .finalized else { return }
         RecorderLog.detail("file started: \(file.name)", category: "recorder")
         let started = audioTracker.fileStarted(id, at: Int64((file.start * 1_000_000_000).rounded()))
-        problemsTold.cleared(.audioSourceFailed(name))
+        problemsTold.cleared(.audioSourceFailed(name), at: context.now())
         let listed = manifest.audioFileStarted(file)
         if !started.isEmpty { _ = manifest.record(started) }
         if listed || !started.isEmpty { try? writeManifest() }
@@ -1138,7 +1141,7 @@ public final class Recorder {
                  kind: .freeSpaceNotRead)
             return
         }
-        problemsTold.cleared(.freeSpaceNotRead)
+        problemsTold.cleared(.freeSpaceNotRead, at: context.now())
         let threshold = lowDiskWarningBytes()
         let isLow = Double(free) < threshold
         if isLow != isLowOnDisk {
@@ -1219,7 +1222,7 @@ public final class Recorder {
 
     private func recordingLogWriting(_ failure: ErrorDetail?) {
         guard let failure else {
-            problemsTold.cleared(.recordingLogNotWritten)
+            problemsTold.cleared(.recordingLogNotWritten, at: context.now())
             return
         }
         tell("Cannot write the recording log \(RecordingNames.recordingLog)", error: failure, kind: .recordingLogNotWritten)
@@ -1228,7 +1231,7 @@ public final class Recorder {
     private func writeManifest() throws {
         do {
             try manifest.jsonData().write(to: folder.appending(path: RecordingNames.manifest), options: .atomic)
-            problemsTold.cleared(.manifestNotWritten)
+            problemsTold.cleared(.manifestNotWritten, at: context.now())
         } catch {
             tell("Cannot write the recording manifest", error: ErrorDetail(error), kind: .manifestNotWritten)
             throw error

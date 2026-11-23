@@ -890,7 +890,7 @@ checked, reported or rewritten at the next start (D47).
   recording manifest or the recording log cannot be written, the screens or the free space
   cannot be read, a screen file's or an audio file's writer fails, an
   audio source's capture fails) shows the same way,
-  and the status window lists it in red; `msr record` also names each
+  and the status window lists it (red, orange once recovered, D78); `msr record` also names each
   on standard error.
 - **Status window (D46):** clicking the Dock icon while recording opens
   a small window, and Quit opens it too: a table with a row per screen,
@@ -930,7 +930,7 @@ checked, reported or rewritten at the next start (D47).
   use in percent of one core as Activity Monitor shows it, sampled every
   second, with the line "Encoding and capture also run in macOS's own
   processes (VTEncoderXPCService, replayd, WindowServer), which this
-  number does not include."; the problems in red, with a line naming
+  number does not include."; the problems (below), with a line naming
   the recording's `recording.json` and `recording.log` for a report
   (see "Logging"); and, in the lower right corner, Continue and
   Stop, Stop on the right in blue as the call to action. The window is
@@ -949,9 +949,29 @@ checked, reported or rewritten at the next start (D47).
   does not report is a problem as a failing read is. A problem goes into
   the recording manifest, which is written at once (unless writing it is
   the problem); one that repeats, such as the free space that cannot be
-  read on every check, is told once (one manifest entry, one red line,
-  one line on standard error, one bounce) until it clears, and again if
-  it comes back.
+  read on every check, is told once (one manifest entry, one line in
+  the window, one line on standard error, one bounce) until it clears,
+  and again if it comes back. **Problem lines (D78):** a problem that
+  can end while the recording goes on (a camera stall, the recording
+  log or the recording manifest not written, the screens, the audio
+  inputs or the free space not read, the Camera permission missing, an
+  input volume not set or not followed) is red while it lasts, with
+  the time it began, `<problem> since 0:12: <error>`, and orange once
+  it recovered, `<problem> for 4.0 s at 0:12, recovered: <error>`; one
+  that lasts until the end stays red. A stall reads `Camera <name>
+  stalled since 0:53` while it lasts and `Camera <name> stalled 7.4 s at
+  0:53, recovered` after; a camera's stalls share one line, `Camera
+  <name> stalled 3 times, 12 s in total` (the ongoing one counted to
+  now), with `, recovered` and orange once none lasts. A stall began
+  at its end minus its length, or, while it lasts, 2 s (the stall
+  limit) before it was told; another problem began when it was told.
+  Times are `m:ss` since the start, `h:mm:ss` from an hour on; lengths
+  have one decimal below 10 s, whole seconds from there. A failure (a
+  file ended by a failure, a stream or an audio source that failed, an
+  audio file lost, the Dock icon or the timeline file) stays red as
+  told, even when a new file starts: it cost a file split and a gap.
+  The recording manifest's `problems`, the result, the exit code, the
+  status line's count and the lines on standard error are unchanged.
 - **Stop:** Stop in the status window finalizes, opens the recording folder itself
   in Finder (D46) and quits the app: a recording is typically one shot (D45).
   Logout, restart and shutdown finalize without asking, told apart from

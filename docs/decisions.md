@@ -2476,3 +2476,39 @@ architect's reading.
 - **Evidence:** [design/recorder.md](design/recorder.md), "Audio
   delay"; `Sources/RecorderLogic/AudioDelay.swift`,
   `Sources/RecorderCore/AudioDelayFeed.swift`.
+
+## D78: A problem that recovered turns orange in the status window (2026-11-23)
+
+- **Status:** in force.
+- **Context:** The status window listed every problem in red for the
+  rest of the recording, a camera stall the camera recovered from as
+  much as a file that a failure ended. The owner: "red lines should
+  turn orange together with the past tense".
+- **Decision:** The architect's reading of the owner's words: orange
+  only for problems with a real end (a camera stall, the recording log
+  or the recording manifest not written, the screens, the audio inputs
+  or the free space not read, the Camera permission missing, an input
+  volume not set or not followed). The failure kinds (a file ended by
+  a failure, a stream that failed, an audio source that failed) stay
+  red even when a new file starts: they cost a file split and a gap.
+  One word for all, "recovered": a stall reads "<source> stalled 7.4 s
+  at 0:53, recovered", a camera's repeats "<source> stalled 3 times,
+  12 s in total" (with ", recovered" when none is ongoing), the others
+  "<problem> for <n> s at <m:ss>, recovered"; while ongoing, "<source>
+  stalled since 0:53" or "<problem> since <m:ss>". The time is when
+  the problem began: for a stall, its end minus its length (while
+  ongoing, the told time minus the 2 s stall limit); for the others,
+  the elapsed time when told. A problem that lasts until the end stays
+  red; the recording manifest's `problems`, the result and the exit
+  code are unchanged. Decided while building: `<source>` is the
+  problem's own name, `Camera <name>`; a problem's error follows its
+  line after a colon (`… since 0:12: <error>`), a stall's (always the
+  same) is left out; the total of a camera's stalls counts an ongoing
+  one up to now; times are `h:mm:ss` from an hour on; lengths have one
+  decimal below 10 s and whole seconds from there.
+- **Consequences:** The window tells at a glance what still needs the
+  person (red) and what went wrong and passed (orange). The Dock
+  badge, the status line's count and the lines on standard error stay
+  as they were.
+- **Evidence:** [design/recorder.md](design/recorder.md), "Status
+  window"; `Sources/RecorderLogic/ProblemsTold.swift`.
