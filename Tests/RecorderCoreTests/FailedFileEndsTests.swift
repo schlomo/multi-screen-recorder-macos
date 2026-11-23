@@ -20,12 +20,12 @@ private struct Reader: FileDurationReader {
 
 private let folder = URL(filePath: "/recording")
 
-private func screenEnd(state: RecordingManifest.State) -> ScreenFileEnd {
+private func screenEnd(state: RecordingManifest.State) -> VideoFileEnd<RecordingManifest.ScreenFile> {
     var file = RecordingManifest.ScreenFile(
         name: "s.mov", screen: "LG", screenUUID: "U", frameSize: FrameSize(width: 2, height: 2), start: 1, timecode: "00:00:01:00")
     file.end = 6.933
     file.state = state
-    return ScreenFileEnd(file: file, error: ScreenFileWriterError(description: "cannot write s.mov", isDiskFull: false))
+    return VideoFileEnd<RecordingManifest.ScreenFile>(file: file, error: VideoFileWriterError(description: "cannot write s.mov", isDiskFull: false))
 }
 
 private func audioEnd(state: RecordingManifest.State) -> AudioFileEnd {
@@ -75,15 +75,16 @@ private func audioEnd(state: RecordingManifest.State) -> AudioFileEnd {
 
     @Test func theEventAndProblemStayAtTheFailureAndAProblemTellsWhatIsLost() async {
         let end = await screenEnd(state: .notFinalized).readingItsFile(in: folder, with: Reader(result: .success(4.667)))
-        let report = FileEndReport(reason: nil, end: end, screen: "LG", at: 9_000_000_000)
+        let report = FileEndReport(reason: nil, end: end, source: "LG", at: 9_000_000_000)
         #expect(report.event?.at == 6.933)
         #expect(report.problem?.at == 6.933)
         #expect(report.lostProblem?.problem == "Screen file s.mov")
         #expect(report.lostProblem?.error?.contains("1.266 s of the recording are lost") == true)
+        #expect(report.lostKind == .videoFileLost("s.mov"))
         var manifest = RecordingManifest(
             app: "x", started: Date(), timeZone: .gmt, settings: .defaults)
         var reports = CaptureEndReports()
-        _ = reports.record(captureNumber: 1, reason: nil, end: end, screen: "LG", at: 9_000_000_000, into: &manifest)
+        _ = reports.record(captureNumber: 1, reason: nil, end: end, source: "LG", at: 9_000_000_000, into: &manifest)
         #expect(manifest.files.first?.end == 5.667)
         #expect(manifest.problems.count == 2)
     }

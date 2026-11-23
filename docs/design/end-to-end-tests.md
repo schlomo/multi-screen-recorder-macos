@@ -204,7 +204,8 @@ The executable is `msr-end-to-end`; `scripts/end-to-end-test` builds it
 and passes its arguments on. Its subcommands: `run` (the default: the
 named scenarios, or those given with `--scenario`), `restore`, `state`
 (prints what the restore file saves), and the device helper's
-`virtual-screen` (one virtual screen, held until SIGTERM or until its
+`virtual-screen` (one virtual screen, given its `--serial-number`, its
+`--name` and its `--size`s, held until SIGTERM or until its
 standard input closes, which happens when the driver ends in any way;
 a line `size <width>x<height>` switches its mode) and `switch-mode`.
 Its logic is the library `EndToEndLogic`, under unit tests in
@@ -864,8 +865,9 @@ tried:
   time itself. It restores them after the run, after a failure and
   after Ctrl-C. If the driver itself is killed, `restore` as its only
   argument does the same from the restore file, and removes every
-  virtual screen and aggregate device carrying the tests' name prefix
-  (an aggregate device may outlive the helper that made it).
+  virtual screen carrying the tests' vendor and product ID and every
+  aggregate device carrying the tests' UID prefix (an aggregate device
+  may outlive the helper that made it).
 - The time is restored first, as the saved time plus the time elapsed
   since, read from a clock that counts sleep and that setting the time
   does not move; then the time zone and whether the time is set
@@ -889,7 +891,15 @@ tried:
 - Virtual screens use a small fixed set of identities: macOS keeps an
   arrangement and a colour profile (owned by root, never removed) per
   identity; the scenarios use one, serial number 101 of the tests'
-  vendor and product.
+  vendor and product (`0x4D53`, `0x5254`), and the status window's
+  capture two more, 201 and 202. The driver recognises its screens by
+  that vendor and product ID. Each screen's name is display text only,
+  realistic so the recorder's own screens' names look like a Mac's
+  (D73): "Desk Monitor" (1600 × 900, serial number 201),
+  "Portable Monitor" (1280 × 720, serial number 202, and the one
+  the scenarios use, which starts at that size). `ManifestCheck`
+  matches the recorder's names against the names of the screens a
+  scenario connects, by their start, as macOS may append a counter.
 - Nothing switches off the built-in screen: a helper killed while
   holding it off is reported to leave it off until logout.
 - Nothing sends keystrokes or asks for the person's password.

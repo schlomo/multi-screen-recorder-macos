@@ -34,6 +34,36 @@ import Testing
         #expect(rows.allSatisfy { $0.values.count == RecordingStatusTable.columns.count - 1 && $0.clockDrift.isEmpty })
     }
 
+    /// D74: a camera's row is a screen's, below the screens.
+    @Test func eachCameraIsARowWithItsFilesBytesAndState() {
+        var tracker = CameraTracker(settings: .defaults)
+        let builtIn = CameraInfo(
+            uniqueID: "A", name: "FaceTime HD Camera", isDefault: true, isVirtual: false,
+            formats: [CameraFormat(size: FrameSize(width: 1920, height: 1080), maxFramesPerSecond: 30)])
+        let brio = CameraInfo(uniqueID: "B", name: "BRIO", isDefault: false, isVirtual: false, formats: builtIn.formats)
+        _ = tracker.begin([builtIn, brio], at: 0)
+        _ = tracker.observe([builtIn], at: 1)
+        let files = [RecordingManifest.CameraFile(
+            name: "c1.mov", camera: "FaceTime HD Camera", cameraUniqueID: "A", frameSize: FrameSize(width: 1920, height: 1080),
+            start: 0, timecode: "00:00:00:00")]
+        let rows = RecordingStatusTable.cameraRows(sources: tracker.sources, files: files, bytes: ["c1.mov": 40_000_000])
+        #expect(rows == [
+            .init(source: .camera(1, name: "FaceTime HD Camera"), recordsAt: "1920×1080", files: 1, written: "40 MB", state: "recording"),
+            .init(source: .camera(2, name: "BRIO"), recordsAt: "", files: 0, written: "0 MB", state: "disconnected"),
+        ])
+    }
+
+    /// Without the Camera permission each camera the mode would record is a row saying so (D74).
+    @Test func aCameraWithoutTheCameraPermissionIsARowSayingSo() {
+        let builtIn = CameraInfo(
+            uniqueID: "A", name: "FaceTime HD Camera", isDefault: true, isVirtual: false,
+            formats: [CameraFormat(size: FrameSize(width: 1920, height: 1080), maxFramesPerSecond: 30)])
+        #expect(RecordingStatusTable.cameraRowsWithoutPermission([builtIn]) == [
+            .init(source: .camera(nil, name: "FaceTime HD Camera"), recordsAt: "", files: 0, written: "", state: "no Camera permission"),
+        ])
+        #expect(RecordingStatusTable.StateText.allCases.map(\.rawValue).contains("no Camera permission"))
+    }
+
     @Test func aScreenWaitingGoneOrFailingSaysSo() {
         var tracker = ScreenTracker(resolution: .native)
         let built = screen("A", "Built-in", main: true)
@@ -56,9 +86,14 @@ import Testing
         let audioStates: [AudioTracker.Source.State] = [
             .recording, .noAudio, .waiting, .failedRetrying, .diskFull, .disconnected, .notRecorded, .asleep,
         ]
+        let cameraStates: [CameraTracker.Source.State] = [
+            .recording(FrameSize(width: 1, height: 1)), .stalled(FrameSize(width: 1, height: 1)), .waiting, .failedRetrying,
+            .diskFull, .disconnected, .notRecorded, .asleep,
+        ]
         let texts = Set(RecordingStatusTable.StateText.allCases.map(\.rawValue))
         #expect(Set(screenStates.map { RecordingStatusTable.text($0) }).union(audioStates.map { RecordingStatusTable.text($0) })
-            == texts)
+            .union(cameraStates.map { RecordingStatusTable.text($0) })
+            .union(RecordingStatusTable.cameraRowsWithoutPermission([camera("A", "A")]).map(\.state)) == texts)
         #expect(texts.contains("shows another screen"))
     }
 
@@ -115,6 +150,31 @@ import Testing
         #expect(text(.init(clockDriftPpm: 49.1, applied: -0.0123, remaining: 0)) == "+49 ppm (-12.3 ms)")
         // Zero is 0, never +0 or -0.0.
         #expect(text(.init(clockDriftPpm: -0.3, applied: -0.000_04, remaining: 0)) == "0 ppm (0 ms)")
+    }
+
+    /// Once measured, the delay of the file being written follows the clock drift (D77).
+    @Test func anAudioInputShowsItsMeasuredDelay() {
+        var settings = Settings.defaults
+        settings.auto = false
+        settings.audioMode = .allInputs
+        settings.systemAudio = false
+        var tracker = AudioTracker(settings: settings)
+        let osmo = AudioInputInfo(name: "OsmoPocket4P", channelCount: 1, isDefault: false, transport: .usb, uid: "O")
+        let razer = AudioInputInfo(name: "Razer Seiren V3 Mini", channelCount: 1, isDefault: true, transport: .usb, uid: "R")
+        _ = tracker.begin(inputs: [osmo, razer], mainDisplayID: 1, screens: [1], at: 0)
+        _ = tracker.fileStarted(.input("O"), at: 0)
+        _ = tracker.fileStarted(.input("R"), at: 0)
+        var measured = RecordingManifest.AudioFile(
+            name: "o.mov", audioSource: "OsmoPocket4P", audioSourceUID: "O", channels: .mono(1), start: 0, timecode: "t")
+        measured.measuredDelay = 0.5504
+        var ended = RecordingManifest.AudioFile(
+            name: "r.mov", audioSource: "Razer Seiren V3 Mini", audioSourceUID: "R", channels: .mono(1), start: 0, timecode: "t")
+        ended.measuredDelay = -0.2
+        ended.end = 5
+        let rows = RecordingStatusTable.audioRows(sources: tracker.sourcesShown, files: [measured, ended], bytes: [:], clockDrift: [
+            .input("O"): ClockDriftCorrection.Status(clockDriftPpm: -116.12, applied: 0.03494, remaining: 0.00004),
+        ])
+        #expect(rows.map(\.clockDrift) == ["-116 ppm (+34.9 ms) · 550 ms late", "measuring"])
     }
 
     /// An audio row knows its source, for its level meter and its input

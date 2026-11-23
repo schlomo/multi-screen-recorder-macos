@@ -12,7 +12,7 @@ import Testing
     private let berlin = TimeZone(identifier: "Europe/Berlin")!
     private let start = Date(timeIntervalSince1970: 1_794_488_585.12) // 2026-11-12 14:03:05.120 in Berlin
     private let rate = RecorderValues.audioSampleRate
-    private let prefix = ScreenFileMetadata.keyPrefix
+    private let prefix = VideoFileMetadata.keyPrefix
     private let started = "2026-11-12T14:03:05.120+01:00"
     private let app = "Multi Screen Recorder 0.20261115.3 (a1b2c3d)"
 

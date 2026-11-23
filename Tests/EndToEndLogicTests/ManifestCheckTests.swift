@@ -25,7 +25,7 @@ struct SampleRecording {
         func audio(_ name: String, source: String, uid: String?, channels: Any, start: Double, end: Double, timecode: String) -> [String: Any] {
             var entry = file(name, start: start, end: end, timecode: timecode).merging([
                 "audioSource": source, "channels": channels,
-                "clockDriftCorrection": killed ? NSNull() : 0.0, "clockDriftPpm": NSNull(),
+                "clockDriftCorrection": killed ? NSNull() : 0.0, "clockDriftPpm": NSNull(), "measuredDelay": NSNull(),
             ]) { first, _ in first }
             if let uid {
                 entry["audioSourceUID"] = uid
@@ -40,7 +40,7 @@ struct SampleRecording {
             "ended": killed ? NSNull() : "2026-11-19T08:27:39.000+01:00",
             "result": killed ? NSNull() : "ok",
             "cpu": killed ? NSNull() : ["averagePercent": 32.0, "peakPercent": 129.0] as [String: Any],
-            "settings": ["resolution": "1080p", "audioMode": "all-inputs", "systemAudio": true] as [String: Any],
+            "settings": ["resolution": "1080p", "audioMode": "all-inputs", "systemAudio": true, "cameraMode": "real", "limitCameras": true] as [String: Any],
             "files": [
                 screen("2026-11-19 08.27.21 Screen 1 - DELL P3421W.mov", screen: "DELL P3421W",
                        uuid: "A95C2BA6-2796-4EDF-919B-66A6C21CE71F", size: [1920, 802], start: 0.1333333, end: 17.0333333,
@@ -49,15 +49,15 @@ struct SampleRecording {
                       start: 0.4, end: 17.08, timecode: "08:27:22:03"),
                 audio("2026-11-19 08.27.22 Audio 1 - BlackHole 2ch.mov", source: "BlackHole 2ch", uid: "BlackHole2ch_UID",
                       channels: 2, start: 0.4, end: 17.08, timecode: "08:27:22:03"),
-                screen("2026-11-19 08.27.25 Screen 2 - MSR Test 101.mov", screen: "MSR Test 101", uuid: Self.virtualUUID,
+                screen("2026-11-19 08.27.25 Screen 2 - Portable Monitor.mov", screen: "Portable Monitor", uuid: Self.virtualUUID,
                        size: [1280, 720], start: 3.4, end: 7.3, timecode: "08:27:25:03"),
-                screen("2026-11-19 08.27.29 Screen 2 - MSR Test 101.mov", screen: "MSR Test 101", uuid: Self.virtualUUID,
+                screen("2026-11-19 08.27.29 Screen 2 - Portable Monitor.mov", screen: "Portable Monitor", uuid: Self.virtualUUID,
                        size: [1600, 900], start: 7.3666667, end: 11.2666667, timecode: "08:27:29:02"),
             ],
             "events": [
-                ["at": 2.226, "event": "screen connected", "screen": "MSR Test 101"],
-                ["at": 7.204, "event": "screen frame size changed", "screen": "MSR Test 101", "from": [1280, 720], "to": [1600, 900]],
-                ["at": 11.242, "event": "screen disconnected", "screen": "MSR Test 101"],
+                ["at": 2.226, "event": "screen connected", "screen": "Portable Monitor"],
+                ["at": 7.204, "event": "screen frame size changed", "screen": "Portable Monitor", "from": [1280, 720], "to": [1600, 900]],
+                ["at": 11.242, "event": "screen disconnected", "screen": "Portable Monitor"],
             ],
             "problems": [] as [Any],
         ]
@@ -81,7 +81,7 @@ struct SampleRecording {
             app: "Multi Screen Recorder 0.20261119.65 (6ffc65f)",
             settings: .init(resolution: "1080p", audioMode: "all-inputs", systemAudio: true),
             ending: killedAt.map { .killed(at: $0) } ?? .finalized, stoppedAt: killedAt ?? 17, ownScreenCount: 1,
-            virtualScreenNamePrefix: "MSR Test",
+            virtualScreenNames: ["Portable Monitor"],
             virtualScreenFiles: [
                 .init(screenUUID: virtualUUID, frameSize: [1280, 720], startedBy: connect, noticedBy: 0,
                       endedBy: .init(change: modeSwitch, kind: .settled)),
@@ -107,7 +107,7 @@ struct SampleRecording {
         let check = SampleRecording().check()
         #expect(check.failures == [])
         #expect(check.files.count == 5)
-        #expect(check.files[3].label == "Screen 2 - MSR Test 101")
+        #expect(check.files[3].label == "Screen 2 - Portable Monitor")
         #expect(check.files[1].source == .systemAudio)
     }
 
@@ -153,7 +153,7 @@ struct SampleRecording {
 
     @Test func otherSettingsOrAnotherAppFail() {
         var sample = SampleRecording()
-        sample.manifest["settings"] = ["resolution": "native", "audioMode": "all-inputs", "systemAudio": true]
+        sample.manifest["settings"] = ["resolution": "native", "audioMode": "all-inputs", "systemAudio": true, "cameraMode": "real", "limitCameras": true]
         sample.manifest["app"] = "Multi Screen Recorder 0.1 (abc)"
         let failures = sample.check().failures
         #expect(failures.count == 2)
@@ -176,24 +176,24 @@ struct SampleRecording {
         var sample = SampleRecording()
         sample.files[3]["timecode"] = "08:27:25:04"
         #expect(sample.check().failures == [
-            "2026-11-19 08.27.25 Screen 2 - MSR Test 101.mov: timecode is 08:27:25:04, expected 08:27:25:03 from started and start",
+            "2026-11-19 08.27.25 Screen 2 - Portable Monitor.mov: timecode is 08:27:25:04, expected 08:27:25:03 from started and start",
         ])
     }
 
     @Test func aNameWhoseTimeIsNotTheFilesStartFails() {
         var sample = SampleRecording()
-        let renamed = "2026-11-19 08.27.27 Screen 2 - MSR Test 101.mov"
+        let renamed = "2026-11-19 08.27.27 Screen 2 - Portable Monitor.mov"
         sample.files[3]["name"] = renamed
         #expect(sample.check().failures == ["\(renamed): the name's time is not the file's start, 3.4 s after the recording's start"])
     }
 
     @Test func aScreenThatChangesItsNumberOrSharesOneFails() {
         var sample = SampleRecording()
-        sample.files[4]["name"] = "2026-11-19 08.27.29 Screen 3 - MSR Test 101.mov"
+        sample.files[4]["name"] = "2026-11-19 08.27.29 Screen 3 - Portable Monitor.mov"
         #expect(sample.check().failures.contains { $0.hasSuffix("changed its number") })
         var shared = SampleRecording()
-        shared.files[3]["name"] = "2026-11-19 08.27.25 Screen 1 - MSR Test 101.mov"
-        shared.files[4]["name"] = "2026-11-19 08.27.29 Screen 1 - MSR Test 101.mov"
+        shared.files[3]["name"] = "2026-11-19 08.27.25 Screen 1 - Portable Monitor.mov"
+        shared.files[4]["name"] = "2026-11-19 08.27.29 Screen 1 - Portable Monitor.mov"
         let failures = shared.check().failures
         #expect(failures.contains { $0.hasPrefix("two screens share a number") })
         #expect(failures.contains("the first virtual screen is screen 1, expected 2, after the Mac's own"))
@@ -221,12 +221,12 @@ struct SampleRecording {
         // The recorder noticed the connect at 2.226 s: its file starts the
         // settle time later, within the tolerance; at 2.4 s it ignored it.
         sample.files[3]["start"] = 2.4
-        sample.files[3]["name"] = "2026-11-19 08.27.24 Screen 2 - MSR Test 101.mov"
+        sample.files[3]["name"] = "2026-11-19 08.27.24 Screen 2 - Portable Monitor.mov"
         sample.files[3]["timecode"] = "08:27:24:03"
         let failures = sample.check().failures
-        #expect(failures.contains("2026-11-19 08.27.29 Screen 2 - MSR Test 101.mov: frameSize [1280, 720], expected [1600, 900]"))
+        #expect(failures.contains("2026-11-19 08.27.29 Screen 2 - Portable Monitor.mov: frameSize [1280, 720], expected [1600, 900]"))
         #expect(failures.contains(
-            "2026-11-19 08.27.24 Screen 2 - MSR Test 101.mov: starts at 2.40 s, expected 2.73 s to 4.23 s, the settle time after the recorder's notice at 2.23 s"))
+            "2026-11-19 08.27.24 Screen 2 - Portable Monitor.mov: starts at 2.40 s, expected 2.73 s to 4.23 s, the settle time after the recorder's notice at 2.23 s"))
     }
 
     @Test func aFileStartBeforeItsScreenSettledFails() {
@@ -235,7 +235,7 @@ struct SampleRecording {
         var expectation = SampleRecording.expectation()
         expectation.virtualScreenFiles[0].startedBy.lastChange = 3.0
         #expect(SampleRecording().check(expectation).failures == [
-            "2026-11-19 08.27.25 Screen 2 - MSR Test 101.mov: starts at 3.40 s, expected 3.50 s to 5.00 s, the settle time after the screen's last change at 3.00 s",
+            "2026-11-19 08.27.25 Screen 2 - Portable Monitor.mov: starts at 3.40 s, expected 3.50 s to 5.00 s, the settle time after the screen's last change at 3.00 s",
         ])
     }
 
@@ -266,7 +266,7 @@ struct SampleRecording {
 
     @Test func aFirstFrameLaterThanTheLimitFails() {
         #expect(connect(noticedAt: 2.5, startingAt: 4.6) == [
-            "2026-11-19 08.27.25 Screen 2 - MSR Test 101.mov: starts at 4.60 s, expected 3.00 s to 4.50 s, the settle time after the recorder's notice at 2.50 s",
+            "2026-11-19 08.27.25 Screen 2 - Portable Monitor.mov: starts at 4.60 s, expected 3.00 s to 4.50 s, the settle time after the recorder's notice at 2.50 s",
         ])
     }
 
@@ -280,14 +280,14 @@ struct SampleRecording {
 
     @Test func aStartBeforeTheNoticePlusTheSettleTimeFails() {
         #expect(connect(noticedAt: 2.5, startingAt: 2.9) == [
-            "2026-11-19 08.27.25 Screen 2 - MSR Test 101.mov: starts at 2.90 s, expected 3.00 s to 4.50 s, the settle time after the recorder's notice at 2.50 s",
+            "2026-11-19 08.27.25 Screen 2 - Portable Monitor.mov: starts at 2.90 s, expected 3.00 s to 4.50 s, the settle time after the recorder's notice at 2.50 s",
         ])
     }
 
     @Test func aNoticeOutsideItsWindowFailsTheStartToo() {
         // The connect was asked at 2.0 s and done at 2.2 s: its notice is due by 2.7 s.
         #expect(connect(noticedAt: 2.9, startingAt: 3.9) == [
-            "2026-11-19 08.27.25 Screen 2 - MSR Test 101.mov: its start is not checked: the recorder's notice, screen connected at 2.90 s, is outside its window",
+            "2026-11-19 08.27.25 Screen 2 - Portable Monitor.mov: its start is not checked: the recorder's notice, screen connected at 2.90 s, is outside its window",
             "screen connected at 2.90 s, expected 1.50 s to 2.70 s, with the change",
         ])
     }
@@ -298,8 +298,8 @@ struct SampleRecording {
         events[0]["at"] = nil
         sample.manifest["events"] = events
         #expect(sample.check().failures == [
-            "2026-11-19 08.27.25 Screen 2 - MSR Test 101.mov: its start is not checked: the recorder's notice, screen connected, is missing",
-            "event {\"event\": \"screen connected\", \"screen\": \"MSR Test 101\"} has no time",
+            "2026-11-19 08.27.25 Screen 2 - Portable Monitor.mov: its start is not checked: the recorder's notice, screen connected, is missing",
+            "event {\"event\": \"screen connected\", \"screen\": \"Portable Monitor\"} has no time",
         ])
     }
 
@@ -317,21 +317,21 @@ struct SampleRecording {
         events.swapAt(0, 1)
         sample.manifest["events"] = events
         #expect(sample.check().failures == [
-            "2026-11-19 08.27.25 Screen 2 - MSR Test 101.mov: its start is not checked: the recorder's notice, screen connected, is missing",
+            "2026-11-19 08.27.25 Screen 2 - Portable Monitor.mov: its start is not checked: the recorder's notice, screen connected, is missing",
             "the virtual screens' events are [\"screen frame size changed\", \"screen connected\", \"screen disconnected\"], expected [\"screen connected\", \"screen frame size changed\", \"screen disconnected\"]",
         ])
         var late = SampleRecording()
         late.manifest["events"] = [
-            ["at": 2.226, "event": "screen connected", "screen": "MSR Test 101"],
-            ["at": 8.0, "event": "screen frame size changed", "screen": "MSR Test 101", "from": [1280, 720], "to": [1600, 900]],
-            ["at": 11.242, "event": "screen disconnected", "screen": "MSR Test 101"],
+            ["at": 2.226, "event": "screen connected", "screen": "Portable Monitor"],
+            ["at": 8.0, "event": "screen frame size changed", "screen": "Portable Monitor", "from": [1280, 720], "to": [1600, 900]],
+            ["at": 11.242, "event": "screen disconnected", "screen": "Portable Monitor"],
         ]
         #expect(late.check().failures == ["screen frame size changed at 8.00 s, expected 6.50 s to 7.70 s, the settle time after the change"])
         var lateDisconnect = SampleRecording()
         lateDisconnect.manifest["events"] = [
-            ["at": 2.226, "event": "screen connected", "screen": "MSR Test 101"],
-            ["at": 7.204, "event": "screen frame size changed", "screen": "MSR Test 101", "from": [1280, 720], "to": [1600, 900]],
-            ["at": 11.8, "event": "screen disconnected", "screen": "MSR Test 101"],
+            ["at": 2.226, "event": "screen connected", "screen": "Portable Monitor"],
+            ["at": 7.204, "event": "screen frame size changed", "screen": "Portable Monitor", "from": [1280, 720], "to": [1600, 900]],
+            ["at": 11.8, "event": "screen disconnected", "screen": "Portable Monitor"],
         ]
         // The disconnect was done at 11.24 s: its event is due by 11.74 s, without the settle time.
         #expect(lateDisconnect.check().failures == ["screen disconnected at 11.80 s, expected 10.50 s to 11.74 s, with the change"])

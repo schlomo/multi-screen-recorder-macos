@@ -35,35 +35,47 @@ import Testing
 @Suite struct ListRenderingTests {
     private func rendered(
         screens: [ScreenInfo] = DesignExample.screens, audioInputs: [AudioInputInfo] = DesignExample.audioInputs,
-        settings: Settings = .defaults, systemAudioAvailable: Bool = true
+        cameras: [CameraInfo] = [], settings: Settings = .defaults, systemAudioAvailable: Bool = true
     ) -> String {
-        renderList(settings: settings, screens: screens, audioInputs: audioInputs, systemAudioAvailable: systemAudioAvailable)
+        renderList(settings: settings, screens: screens, audioInputs: audioInputs, cameras: cameras, systemAudioAvailable: systemAudioAvailable)
     }
 
     static let designExample = """
         What will be recorded
-          Settings: Auto (resolution Native, audio mode Wired), system audio on
+          Settings: Auto (resolution Native, audio mode Wired, camera mode All real), system audio on, limit cameras on
           Source                                      Looks like  Drawn at   Records at  GB/h max
           ───────────────────────────────────────────────────────────────────────────────────────
           Screen 1 - Built-in Retina Display          1728×1117   3456×2234  1728×1116        1.0
           Screen 2 - LG HDR 4K                        3840×2160   3840×2160  3840×2160        4.1
           ───────────────────────────────────────────────────────────────────────────────────────
+          Camera 1 - FaceTime HD Camera (default)                            1920×1080        1.1
+          ───────────────────────────────────────────────────────────────────────────────────────
           Audio 0 - System                                                   stereo           0.1
           Audio 1 - MacBook Pro Microphone (default)                         1 channel        0.1
           Audio 2 - RØDE Wireless GO II RX                                   2 channels       0.1
           ───────────────────────────────────────────────────────────────────────────────────────
-          Total                                                                               5.3
-          2 hours need 10.7 GB.
+          Total                                                                               6.4
+          2 hours need 12.8 GB.
           Files go to ~/Movies/Multi Screen Recorder
         System audio: available
 
         """
 
     @Test func rendersTheSameTableAsMSRCheckAndTheSystemAudioLine() {
-        #expect(rendered() == Self.designExample)
+        #expect(rendered(cameras: DesignExample.cameras) == Self.designExample)
         let check = WhatWillBeRecorded(settings: .defaults, screens: .success(DesignExample.screens),
-                                       audioInputs: .success(DesignExample.audioInputs), outputFolder: nil).text
-        #expect(rendered().hasPrefix(check))
+                                       audioInputs: .success(DesignExample.audioInputs), cameras: DesignExample.cameras,
+                                       outputFolder: nil).text
+        #expect(rendered(cameras: DesignExample.cameras).hasPrefix(check))
+    }
+
+    /// `msr list` shows a camera without the Camera permission as not recorded, saying why (D74).
+    @Test func aCameraWithoutTheCameraPermissionIsListedWithTheReason() {
+        let listed = renderList(
+            settings: .defaults, screens: [], audioInputs: [], cameras: DesignExample.cameras, cameraPermissionDenied: true,
+            systemAudioAvailable: true)
+        #expect(listed.contains("FaceTime HD Camera (default) (no Camera permission)"))
+        #expect(!listed.contains("Camera 1 - "))
     }
 
     @Test func theDesignShowsTheExample() throws {

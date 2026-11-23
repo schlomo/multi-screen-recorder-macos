@@ -6,10 +6,10 @@ public enum RecorderValues {
     /// many frames per second (D11, D21).
     public static let framesPerSecond = 30
     /// How long ticks may wait for a writer that is not ready before its
-    /// screen file ends with `screen file writer fell behind`, and how
-    /// long the waiting ticks and the last guide track samples are written
-    /// at a screen file's end (D53).
-    public static let screenFileLateTickSeconds = 6
+    /// video file ends with `screen file writer fell behind` or `camera file
+    /// writer fell behind`, and how long the waiting ticks and the last guide
+    /// track samples are written at a video file's end (D53).
+    public static let videoFileLateTickSeconds = 6
     /// How long audio waits: guide track samples for a screen file's
     /// writer, a screen file's last mix for its sources' sound up to the
     /// video's end, and an audio file's samples for its writer, also at its end.
@@ -25,6 +25,22 @@ public enum RecorderValues {
     /// The wait before a failed stream is started again, doubling up to the longest.
     public static let firstRestartDelay = Duration.seconds(1)
     public static let longestRestartDelay = Duration.seconds(10)
+    /// How long a camera's capture may wait for its first frame, an iPhone's
+    /// (Continuity Camera) longer, and then between frames, before its
+    /// stream counts as failing; no frame for `cameraStallLimit` is a stall,
+    /// the file going on (D74).
+    public static let cameraFirstFrameLimit = Duration.seconds(5)
+    public static let continuityCameraFirstFrameLimit = Duration.seconds(10)
+    public static let cameraFrameGapLimit = Duration.seconds(10)
+    public static let cameraStallLimit = Duration.seconds(2)
+    /// The seconds within which the values of the audio inputs the "Audio inputs" guide track mixes lie of
+    /// each other, early or late; an input outside the largest such group leaves it (D79).
+    public static let guideTrackSyncLimit = 0.1
+    /// The largest a camera file is: a camera's box is the recording
+    /// resolution's limited to this, turned upright for a portrait format (D74).
+    public static let cameraLargestSize = FrameSize(width: 1920, height: 1080)
+    /// How long a camera file's tick waits for a frame captured after it (D74).
+    public static let cameraDecisionDelay = Duration.milliseconds(500)
     /// How often the free space in the recording folder is checked.
     public static let freeSpaceCheckInterval = Duration.seconds(5)
     /// The longest detail lines wait in memory before the recording log gets them (D64).
@@ -34,6 +50,6 @@ public enum RecorderValues {
     /// whole points, so this only absorbs rounding.
     public static let screenCheckTolerancePoints = 0.5
 
-    public static let lateTickBound = screenFileLateTickSeconds * framesPerSecond
+    public static let lateTickBound = videoFileLateTickSeconds * framesPerSecond
     public static let screenCheckFailuresInARow = screenCheckFailureSeconds * framesPerSecond
 }

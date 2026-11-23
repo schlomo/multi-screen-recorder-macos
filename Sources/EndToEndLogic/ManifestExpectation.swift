@@ -103,15 +103,21 @@ public struct ManifestExpectation: Sendable {
         public var resolution: String
         public var audioMode: String
         public var systemAudio: Bool
+        /// The VM has no camera, so a scenario keeps the default camera mode and no camera file is expected.
+        public var cameraMode: String
+        public var limitCameras: Bool
 
-        public init(resolution: String, audioMode: String, systemAudio: Bool) {
+        public init(resolution: String, audioMode: String, systemAudio: Bool, cameraMode: String = "real", limitCameras: Bool = true) {
             self.resolution = resolution
             self.audioMode = audioMode
             self.systemAudio = systemAudio
+            self.cameraMode = cameraMode
+            self.limitCameras = limitCameras
         }
 
         var json: JSONValue {
-            .object(["resolution": .string(resolution), "audioMode": .string(audioMode), "systemAudio": .bool(systemAudio)])
+            .object(["resolution": .string(resolution), "audioMode": .string(audioMode), "systemAudio": .bool(systemAudio),
+                     "cameraMode": .string(cameraMode), "limitCameras": .bool(limitCameras)])
         }
 
         /// The guide tracks of every screen file (recorder.md, "Guide tracks").
@@ -188,8 +194,8 @@ public struct ManifestExpectation: Sendable {
     }
     /// The Mac's own screens when the run started: they take the first numbers.
     public var ownScreenCount: Int
-    /// The name every virtual screen's name starts with.
-    public var virtualScreenNamePrefix: String
+    /// The names of the virtual screens; macOS may append a counter, so a name matches by its start.
+    public var virtualScreenNames: [String]
     public var virtualScreenFiles: [VirtualScreenFile]
     public var virtualScreenEvents: [VirtualScreenEvent]
     public var playedAudioInputs: [PlayedAudioInput]
@@ -207,7 +213,7 @@ public struct ManifestExpectation: Sendable {
 
     public init(
         app: String, settings: Settings, ending: Ending, stoppedAt: Double, ownScreenCount: Int,
-        virtualScreenNamePrefix: String, virtualScreenFiles: [VirtualScreenFile] = [],
+        virtualScreenNames: [String], virtualScreenFiles: [VirtualScreenFile] = [],
         virtualScreenEvents: [VirtualScreenEvent] = [], playedAudioInputs: [PlayedAudioInput] = [],
         timeTolerance: Double, finalizeAllowance: Double, settleTime: Double, firstFrameLimit: Double
     ) {
@@ -217,12 +223,16 @@ public struct ManifestExpectation: Sendable {
         self.ending = ending
         self.stoppedAt = stoppedAt
         self.ownScreenCount = ownScreenCount
-        self.virtualScreenNamePrefix = virtualScreenNamePrefix
+        self.virtualScreenNames = virtualScreenNames
         self.virtualScreenFiles = virtualScreenFiles
         self.virtualScreenEvents = virtualScreenEvents
         self.playedAudioInputs = playedAudioInputs
         self.timeTolerance = timeTolerance
         self.finalizeAllowance = finalizeAllowance
         self.settleTime = settleTime
+    }
+
+    public func isVirtualScreenName(_ name: String) -> Bool {
+        virtualScreenNames.contains { name.hasPrefix($0) }
     }
 }

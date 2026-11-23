@@ -38,7 +38,7 @@ architect's reading.
 
 ## D1: An independent product, written from scratch (2026-11-12)
 
-- **Status:** in force
+- **Status:** in force; "camera capture" out of scope superseded by D74
 - **Context:** The owner started from a fork of
   `UBA-PSI/psi-screencapture-macos` (MIT, Dominik Herrmann, PSI chair,
   University of Bamberg) and decided to "disconnect from upstream and
@@ -2362,3 +2362,344 @@ architect's reading.
 - **Decision:** `scripts/end-to-end-test --release` or `--snapshot <n>` runs the published app (downloaded by `scripts/install-app`) in the VM, the driver still built on the Mac. `scripts/update-homepage-screenshots --release` runs it in a temporary worktree of `origin/main`, commits the three light captures without the skip-ci marker onto a new branch `homepage-screenshots-v<version>`, pushes it and opens a draft PR; `--snapshot <n>` pushes them onto PR n's head branch, once PR n's snapshot release is of that head. Feature PRs no longer commit the homepage's PNGs. Replaces D70's copy into the feature PR. A homepage-only PR still makes a snapshot release, removed when it closes, and a screenshot commit on a feature PR rebuilds its snapshot, so its pictures show the build one commit before: the owner deferred the rule against it, "Defer it" (2026-11-22), as on `main` it is the workflow's `paths-ignore`, which compares a whole PR, and a robust one is a script comparing against the snapshot's commit (backlog, "Deliberately deferred"). The certificate-signed app needed no new VM permissions (a passing `--release` run, 2026-11-22).
 - **Consequences:** The homepage's screenshots trail a release by one homepage-only PR, merged by a human; the driver must be of the app's commit, which the worktree at the target commit gives. `--release` takes the latest release and does not check that it is `origin/main`'s build: if a release job failed or is still running, the screenshots show the previous app, and the PNG diff on the screenshots PR is where that shows.
 - **Evidence:** PR #26; [design/end-to-end-tests.md](design/end-to-end-tests.md), "Running them"; [design/delivery.md](design/delivery.md); [homepage/README.md](../homepage/README.md).
+
+## D73: The end-to-end driver's virtual screens carry realistic names and are recognised by vendor and product ID (2026-11-22)
+
+- **Status:** in force
+- **Context:** The virtual screens were named "MSR Test <serial number>", which shows on the homepage's screenshots, and the driver and `ManifestCheck` took the name prefix for the screens' identity. Signed off by the owner as text, 2026-11-22; asked whether each screen carries its own name and whether the driver recognises its screens by vendor and product ID, the owner: "yes to both".
+- **Decision:** Each `VirtualScreenSpec` carries its name, display text only: "Desk Monitor" (1600x900) and "Portable Monitor" (1280x720). The driver recognises its screens by the vendor and product ID it sets (`0x4D53`, `0x5254`), never by name; `ManifestCheck` matches the recorder's screen names against the names of the screens the scenario connects. Replaces the name prefix "MSR Test".
+- **Consequences:** A screen's name is not unique (the scenarios' screen and one of the status window's share "Portable Monitor"); screens are told apart by UUID and serial number. "Apple Virtual" (the VM's own display) and the audio devices' names stay.
+- **Evidence:** [design/end-to-end-tests.md](design/end-to-end-tests.md), "Virtual screens use a small fixed set of identities"; `Tests/EndToEndLogicTests`; backlog item 37.
+
+## D74: Cameras are recorded, each in its own camera file made as a screen file (2026-11-22)
+
+- **Status:** in force
+- **Context:** D1 left camera capture out of scope. The owner, 2026-11-16: "we'll have to add a feature to record cameras, same slider: none, default, all, all + virtual"; 2026-11-18, each camera in "its largest format that still delivers the wanted frame rate"; 2026-11-22: "I'd record all real cameras by default", on the permission "I don't think we have users so we go for the 'record everything'", and on audio "I agree with identical guide tracks on every video". Later on 2026-11-22, on the format: "I'd not take 16:9 for granted but rather see what the camera offers, maybe there is a 9:16 camera, or 3:2? And yes, we do match the camera to the recording resolution, same like screens"; on no camera at the recording resolution None: "I'm OK with that approach"; on Continuity Camera and Desk View counting as virtual: "iphone etc. camera: yes"; on a denied Camera permission: "if a single camera can be denied and others work, then yes record and show in status". On 2026-11-23, after two runs on the owner's Mac: at Native a BRIO (USB 3) opened 4096×2160 and a DJI Osmo Pocket (USB 2, on the same dock controller as the USB microphone and the keyboard) 3840×2160, the system log showed about 1100 USB errors, the BRIO stalled and the microphone's file was padded with zeros; at 1080p (1920×1080 and 1080×1920) no USB error, result ok, no stall, no late frame. The owner: "quality and reliability trumps all"; on a camera another app uses: "can we see if we have the camera for ourselves? So that we can try optimized settings and accept another app taking control?" Also on 2026-11-23, on the owner's Mac with Google Meet in Chrome holding the BRIO: [KNOWN] AVFoundation's `isInUseByAnotherApplication` was false for it on macOS 26, while Core Media I/O's `kCMIODevicePropertyDeviceIsRunningSomewhere`, read for the device whose `kCMIODevicePropertyDeviceUID` is the camera's unique ID, was 1; our recording changed Meet's frame duration range from 1/30 s to 1/24 s to 1/30 s to 1/30 s. [ASSUMED] The Core Media I/O property reflects any process using the camera, as it is the device's own state rather than one app's view; not verified with an app other than Chrome.
+- **Decision:** (Rulings of 2026-11-22 and 2026-11-23.) A setting `cameraMode` (`--camera-mode`, a slider): None, Default camera, All real (`real`, auto mode's and the default), All (`all-cameras`, virtual cameras too). Each recorded camera gets a camera file made exactly as a screen file: the same writer and 30 fps tick grid on the shared clock, HEVC, timecode, the same two guide tracks, no camera microphone track. Its format, the architect's reading of "same like screens": each format reaching 30 fps, of any aspect ratio, records its size fitted into the camera's box as a screen's (never enlarged, a portrait one against the box turned upright); the format with the largest recorded size, and of equal ones the smallest, the least to decode, then the one turned as the camera's active format (portrait, landscape or square), as the camera's own orientation tells which picture it means (the Osmo in its 9:16 mode runs in 1080×1920 and also lists a pillarboxed 1920×1080; the FaceTime HD Camera runs in 1920×1080 and also lists 1080×1920, which "narrower first" recorded on 2026-11-23), then landscape, then the narrower: the architect's decision of 2026-11-23. The camera's box is the recording resolution's limited to 1920×1080 (`RecorderValues.cameraLargestSize`) while the setting `limitCameras` is on, its default (`--limit-cameras on|off`, the window's checkbox "Cameras at most 1080p" under the Camera mode slider, its own switch as the system audio, not set by Auto); off, the recording resolution's box alone. With it, at Native, 4K and 1440p a camera records at most 1920×1080 or 1080×1920; the USB evidence above is why it is on by default. The owner, 2026-11-23: "for the webcam resolution clamp I'd like a toggle". A camera another app uses when the cameras are read before its start keeps the format it runs in, no format or frame duration set, fitted into the camera's box; "another app uses it" is Core Media I/O's running-somewhere property, as AVFoundation's `isInUseByAnotherApplication` misses a browser (the architect's decision of 2026-11-23 on the evidence above). Once the recorder's own opening of a camera has finished setting it up, any change of its active format the recorder did not make is another app taking it over, the recorder's own settings never counting (the architect's decision of 2026-11-23); when such a change gives another recorded frame size, the camera file ends and a new one starts at it in the format the camera then runs in, with the event `camera frame size changed` after the settle time, as a screen's (D30), and the format is never set back. A camera's stall makes the result `problems`: it loses picture (D47). A camera file's tick waits for late frames; a camera that pauses is stalled, its file going on, and one that delivers no frames is a failing stream, restarted with the back-off (limits below); a suspended camera is not recorded. Labels `Camera <n> - <device name>`; cameras come and go as screens, with their own events, in `recording.json`, the timeline file and the status window. The Camera permission is asked only when the camera mode records a connected camera, at the ready check or when one appears; denied, the recording records no camera and goes on: the ready check's item passes and says so, "What will be recorded" and the status window show each camera the mode would record as "no Camera permission", and the problem is told once. The architect's reading of the owner's words: macOS grants the Camera permission per app, so it is all cameras or none, and the rest records. Replaces D1's "camera capture" out of scope. The recording resolution None records no camera either. An iPhone camera (a Continuity Camera or Desk View, or a camera on Continuity Capture) is recorded only under All, as a virtual one. The architect's reading, decided while building, for the owner to confirm: a camera is virtual unless AVFoundation lists it as built in, Continuity Camera or Desk View or by a built-in, USB, FireWire, PCI, Thunderbolt or Continuity Capture transport; a camera with no format reaching 30 fps records its fastest; the default camera is `AVCaptureDevice.default(for: .video)`, and a virtual default camera is not recorded under Default camera; the event `default camera changed` only under Default camera; per frame size the variant with the lowest rate still reaching 30 fps (`CameraFormat.preferred`), of sizes with the same pixel count the narrower first in the list, and of a camera's formats of that size and rate the first that macOS does not deliver as MJPEG, else the first: a deterministic pick among the pixel formats macOS delivers (420v, yuvs, 2vuy and the like), not a choice of the encoding on the cable, which is the driver's and not visible (the Osmo cannot send 1080×1920 2vuy at 30 fps over USB 2; its driver decodes MJPEG); the frame duration 1/30 s where a range of the format allows it, otherwise the range's bound closest to 30 fps as the format lists it. Also the architect's reading, on the evidence of a two-camera run on the owner's Mac on 2026-11-22 (a Logitech BRIO and a DJI Osmo Pocket, a camera viewer app also holding the BRIO): a camera file's tick is decided once a frame captured after it has arrived, or 0.5 s after its time, whichever is first (a screen's at its time), as 222 BRIO frames arrived 101 ms to 1492 ms after their capture on the overloaded USB bus and were placed by their arrival; a frame later than that is placed late and counted in a detail line. No frame for 2 s is a stall (`camera stalled`, `camera stall ended` with its length), told once per stall, the capture going on, as the BRIO's 2.95 s USB stall recovered by itself, while ending and restarting the capture split the file and left a 1.17 s hole; the capture ends only on AVFoundation's runtime error, a disconnect, no first frame within 5 s (10 s for an iPhone camera) or no frame for 10 s. The 1920×1080 limit is the architect's reading of "quality and reliability trumps all": preventive, set before the start, not adaptive; stepping a camera down while recording when the bus is overloaded is deferred.
+- **Consequences:** A camera costs about as much disk and encoder as a screen of its frame size, a format that needs decoding (MJPEG) costs a decode on top, and every camera of a Mac is recorded by default, so every recorded camera's light turns on at every recording. H.264 pass-through of a camera's own stream is deferred: every format is decoded and encoded again. Capture from a real camera is not covered by any test: the end-to-end VM has no camera. No camera is recorded above 1920×1080, also when the camera and the bus could carry more. A crash loses up to 0.5 s more of a camera file than of a screen file, the ticks waiting for late frames.
+- **Amended in review (2026-11-23):** "another app uses it" is read only while no capture of the recorder's own is the camera's, from its start until its capture-ended report, which comes once its file is finalized, after `stopRunning` returned, as Core Media I/O's running-somewhere counts the recorder's own session; then the cameras are read again, as a reading meanwhile was not taken: for a capture the recorder stopped, after its file ended; for one that ended by itself, in its stream's end (`streamEnded`); [ASSUMED] Core Media I/O is current by then (see D76).
+- **Evidence:** [design/recorder.md](design/recorder.md), "Cameras"; `Sources/RecorderLogic/CameraTracker.swift`, `Sources/RecorderCore/CameraCapture.swift`; backlog item 12.
+
+## D75: The guide mix's soft limiter approaches −6 dBFS, not full scale (2026-11-23)
+
+- **Status:** in force. Amends D52's limiter, whose curve went from a
+  knee at 0.5 towards ±1.
+- **Context:** In a camera test recording on the owner's Mac on
+  2026-11-23, a loud thump decoded from a guide track's AAC at 1.14 to
+  1.19 although the mix before the encoder stayed within ±1: AAC
+  overshoots a signal near full scale.
+- **Decision:** The architect's decision: the limiter keeps D52's 6 dB
+  between knee and ceiling, with its knee at 10^(−12/20) ≈ 0.251
+  (−12 dBFS, `GuideTrackMix.limiterKnee`), approaching ±10^(−6/20) ≈
+  0.501 (−6 dBFS, `GuideTrackMix.limiterCeiling`) instead of ±1:
+  `0.251 + 0.250 · tanh((|x| − 0.251) / 0.250)` with its sign. (First
+  a ceiling of −1 dBFS, then −2 dBFS with the knee at 0.5, both lowered
+  in review.) An analyst found that the AAC encoder (64 kbit/s, a
+  cutoff near 16.5 kHz) overshoots the limiter by up to 1.6×, depending
+  on the material, and that lowering the ceiling from 0 to −2 dBFS cut
+  the decoded peak by only about 0.7 dB. In a simulation on the
+  2026-11-23 recording, −6/−12 dBFS decoded to at most about 0.78,
+  roughly 2 dB below full scale.
+- **Consequences:** The curve takes nothing off below −12 dBFS, about
+  1.1 dB at −6 dBFS, about 4 dB at −2 dBFS input and 6 dB at full scale, so speech
+  peaks on the "Audio inputs" guide track are now shaped by the curve
+  (corrected in review: an earlier "about 1.6 dB quieter" did not hold
+  for the curve). The decoded peak is not
+  bounded: it depends on the material, and the margin seen is a
+  simulation's, to be checked at the next real test. A true-peak
+  limiter (a low-pass and lookahead before the limiter) is deferred.
+  The audio files and the "System audio" guide, still clamped at ±1,
+  are unchanged.
+- **Evidence:** [design/recorder.md](design/recorder.md), "Guide
+  tracks"; `Sources/RecorderLogic/GuideTrackMix.swift`.
+
+## D76: A camera whose picture is boxed in the other orientation is turned to it (2026-11-23)
+
+- **Status:** in force. Amends D74's choice of a camera's format.
+- **Context:** On the owner's Mac on 2026-11-23 a DJI Osmo Pocket, which
+  offers 1920×1080 and 1080×1920, delivered in the orientation it was
+  not set to its picture between pure black bars, and opened in the
+  format a host last set (it persisted across a replug), not in its own
+  mode: the recording held a portrait picture pillarboxed in 1920×1080,
+  and after the owner switched it to landscape while unplugged, a
+  landscape picture letterboxed in 1080×1920. The owner: "I guess there
+  are only few cameras like the osmo, it would be nice if we could
+  smartly handle that".
+- **Decision:** The architect's design, signed off by the owner: only
+  for a camera that offers a format of the same size in both
+  orientations, both at 30 fps, and whose format the recorder sets (a
+  camera another app uses keeps its format, D74). At a capture's start
+  its first frames are checked before its file starts; a picture
+  between pure black bars whose aspect ratio is the other orientation's
+  turns the camera to the format of that orientation before any file
+  (the start takes up to about 1 s longer). While recording one frame is
+  checked every 5 s; boxed in the other orientation continuously for
+  2 s, the file ends and a new one starts in the other orientation after
+  the settle time, as a frame size change (D30), with the event `camera
+  orientation changed`. Bars must be pure black, the picture box steady
+  and its aspect ratio the other orientation's, so a dark room does not
+  turn a camera. Decided while building: the luma is sampled at 192
+  points along the long side; a bar is within 4 of black; the aspect
+  ratio within 5%; at the start 3 frames in a row decide, and 1 s from
+  the first frame without that starts the file; while confirming, a
+  frame every 0.5 s; a turn at the start has no event; the turned
+  orientation holds until the picture shows it boxed again. Fixed in
+  review: whether another app uses the camera is taken only from a
+  reading while no capture of the recorder's own is the camera's, from
+  its start until its capture-ended report, which comes once its file
+  is finalized, after `stopRunning` returned, and the cameras are read
+  again then (a reading while the tracker's phase was already idle but our
+  session still stopping had counted that session; [ASSUMED] Core Media
+  I/O is current by then), as Core Media I/O's
+  running-somewhere counts the recorder's own capture, which had kept a
+  turned camera in its format; a takeover while a turn waits is the
+  takeover's change, not a turn, and a boxed picture after a takeover
+  is no turn at all (it had left a turn due that never came, so the
+  recorder waited for it again and again); the two bars must be equal within a
+  sample, and a dark first or last row of the picture does not stop a
+  box.
+- **Consequences:** Such a camera is recorded in the orientation of its
+  picture, without black bars, whichever format a host left it in.
+  Checking costs one sampled frame every 5 s per such camera. The camera
+  files of that test recording, decoded through the same checks: both Osmo files
+  boxed in every sampled frame and turned after 3 frames; the BRIO and
+  the FaceTime HD Camera never.
+- **Evidence:** [design/recorder.md](design/recorder.md), "Cameras",
+  "Orientation"; `Sources/RecorderLogic/CameraOrientation.swift`,
+  `Sources/RecorderCore/CameraLuma.swift`.
+
+## D77: Each audio input's delay is measured while recording and the timeline file shifts its audio (2026-11-23)
+
+- **Status:** in force.
+- **Context:** In a test recording on the owner's Mac on 2026-11-23, a
+  DJI Osmo Pocket's microphone was later than a Razer Seiren's by
+  447 ms to 589 ms (cross-correlation, 8 kHz mono, 10 s windows, ±1 s
+  search), drifting between two files of the same recording; Core
+  Audio's device latency properties reported about 0 to 1.5 ms for
+  every microphone. The clock drift correction (D49, D57) follows a
+  device's clock, not the delay in its sound path. The owner: "fix the
+  audio shift for all audio tracks now".
+- **Decision:** The architect's design, signed off by the owner: every
+  10 s while recording, each audio input file being written is
+  cross-correlated with a reference microphone over the latest 10 s,
+  ±1 s, at 8 kHz mono (Accelerate's FFT), off the capture threads, from
+  a ring of 12 s per input. The reference is the default microphone if
+  recorded, else the first recorded audio input; its delay is taken as
+  0; the system audio is neither measured nor the reference. A window
+  counts when the peak of |correlation| is at least 12 times its median
+  (clear windows measured 13 to 68, unclear ones 5 to 9) and neither
+  side is silent; a file's delay is the median of its counted windows,
+  none with fewer than 3. It is written as the audio file's
+  `measuredDelay` in `recording.json` (null when not measured), shown in
+  the status window's Clock drift column ("· 550 ms late"), and the
+  timeline file places the file's clip earlier by it, trimming its start
+  where it would begin before the timeline. The audio files and the
+  guide tracks on the video files stay as recorded. Decided while
+  building: the timeline shift is rounded to the nearest frame, as the
+  timeline places clips at whole frames at 30 fps. The architect's
+  reading after review: a file's lags are kept per reference, and when
+  the reference changes its lags against the old one are discarded (it
+  starts again); after the medians the delays are normalized so the
+  earliest measured input is 0, every delay less min(0, the smallest),
+  the reference counting as 0, so a delayed default microphone (an
+  Osmo, a Bluetooth microphone) never moves the others later, and the
+  reference's own file then gets a `measuredDelay` too. After a second
+  review, the architect's decisions: the normalization runs over all of
+  the recording's files measured against the current reference, ended
+  ones included; a measured value is never overwritten with null,
+  except when the reference changes; lags are keyed by the reference's
+  file, not its UID, so a reference whose file ends and starts again (a
+  reconnect at another latency) discards the old lags. Fixed in
+  review: a delayed clip that would overlap its source's previous clip
+  leaves out its head instead of being pushed later; measuring ends at
+  Stop.
+- **Consequences:** An edit opened from the timeline file has every
+  measured microphone in sync with the reference to within a frame; a
+  file's own sound and its guide tracks still carry the delay. A
+  microphone without 3 clear windows (a quiet room, a short file) is
+  left as recorded. Measuring costs one FFT cross-correlation of 2^18
+  points per audio input every 10 s.
+- **Evidence:** [design/recorder.md](design/recorder.md), "Audio
+  delay"; `Sources/RecorderLogic/AudioDelay.swift`,
+  `Sources/RecorderCore/AudioDelayFeed.swift`.
+
+## D78: Problem lines: red when broken, orange for a hiccup, one line per kind (2026-11-23)
+
+- **Status:** in force.
+- **Context:** The status window listed every problem in red for the
+  rest of the recording, a camera stall the camera recovered from as
+  much as a file that a failure ended. The owner: "red lines should
+  turn orange together with the past tense".
+- **Decision:** The architect's reading of the owner's words: orange
+  only for problems with a real end (a camera stall, the recording log
+  or the recording manifest not written, the screens, the audio inputs
+  or the free space not read, the Camera permission missing, an input
+  volume not set or not followed). The failure kinds (a file ended by
+  a failure, a stream that failed, an audio source that failed) stay
+  red even when a new file starts: they cost a file split and a gap.
+  One word for all, "recovered": a stall reads "<source> stalled 7.4 s
+  at 0:53, recovered", a camera's repeats "<source> stalled 3 times,
+  12 s in total" (with ", recovered" when none is ongoing), the others
+  "<problem> for <n> s at <m:ss>, recovered"; while ongoing, "<source>
+  stalled since 0:53" or "<problem> since <m:ss>". The time is when
+  the problem began: for a stall, its end minus its length (while
+  ongoing, the told time minus the 2 s stall limit); for the others,
+  the elapsed time when told. A problem that lasts until the end stays
+  red; the recording manifest's `problems`, the result and the exit
+  code are unchanged. Decided while building: `<source>` is the
+  problem's own name, `Camera <name>`; a problem's error follows its
+  line after a colon (`… since 0:12: <error>`), a stall's (always the
+  same) is left out; the total of a camera's stalls counts an ongoing
+  one up to now; times are `h:mm:ss` from an hour on; lengths have one
+  decimal below 10 s as rounded, whole seconds from there and `m:ss`
+  from a minute on. Fixed in review: a stall also recovers at its
+  capture's end (unplugged, out of the camera mode, Stop), its length
+  up to that end.
+- **Amended the same day, by the owner's rule, which replaces the
+  colours above:** "for me a red line indicates something broken, and
+  something that requires a human to go and fix it or to warn that the
+  recording is not usable / everything else feels like transient
+  problems and should therefore be orange like a warning that there
+  were hiccups but in total there is a recording that worked." And:
+  "how large can the window grow? Is there scrolling? we need to keep
+  UX in mind". The architect's reading: red only while a problem lasts
+  and a source is not recorded or saved right now, or a person must
+  act (the Camera permission missing; an audio input that cannot be
+  recorded; a screen, camera, audio source or audio file failure until
+  a new file of that source starts; the recording log or manifest not
+  written and the free space not read while ongoing; an audio file
+  lost always; the audio inputs' changes not followed). Orange:
+  everything once it is over, failures included, stalls, the screens
+  or audio inputs read again, and always the Dock icon, an input volume
+  not set or not followed and the timeline file not written. A problem
+  ongoing at the end keeps its colour by that rule. Every kind merges
+  as stalls do, one line per source and kind. The problems area shows
+  at most 5 lines, more scroll inside it, red first, then orange, each
+  newest first; the line for a report stays below it. Decided while
+  building: the screens and the audio inputs not read are red while
+  ongoing (the rule names them orange "once read again"); a failed
+  audio file's line is per file, as its kind names the file, and ends
+  when a new file of its source starts; a merged line carries the
+  latest error.
+- **Amended after a second review (the architect's reading):** the
+  free space not read and the recording log not written are red while
+  they last, as a person should look at the disk; the screens or the
+  audio inputs not read stay red until the next read works, as a new
+  source might go unrecorded. A video file's end reaches the window as
+  every other problem: its writer failure as its source's not
+  captured, red until a new file of that source starts; a full disk,
+  red until there is room; a video file lost in part, always red; its
+  guide tracks cut, always orange (the video is intact). A failure of a
+  file whose source has a newer file already is over when told, so
+  orange at once; failed audio files are matched to their source by
+  its UID, not its name. Each kind has its own fixed words, then the
+  latest error after a colon, `latest: ` before it when the errors
+  differ; a stall or failure whose source went away ends `, then
+  disconnected`, orange; lengths are rounded once. Decided while
+  building: a stall's line leaves out its error, always the same; a
+  lost or cut file names the file (`File <name> incomplete`, `Guide
+  tracks of <name> cut`).
+- **Amended after a third review (the architect's reading):** "ended"
+  is the general word for a problem line that is over, "recovered"
+  means only that its source works again, and "then disconnected" is
+  the other ending; a stall whose capture ended without recovering and
+  without a disconnect (Stop, out of the camera mode, the camera
+  suspended, or the capture ended by a failure) ends `, stopped` (the
+  word ruled after the fourth review, as "ended" is the general term). Only a source's failure (a
+  screen's, a camera's, an audio file's) is over when told because a
+  newer file of its source started; a full disk, guide tracks cut and
+  a video file lost in part never are. A line only shown (a video
+  file's end, which the manifest lists already) never swallows the
+  same kind told after it: every tell reaches the recording manifest.
+  A screen's or a camera's failure told after its source went away
+  ends `, then disconnected` at once. A screen's or a camera's line
+  names it with its number, as its files do: `Screen 1 DELL not
+  captured`, `Camera 2 BRIO stalled`.
+- **Consequences:** The window tells at a glance what is broken (red)
+  and what went wrong and passed or never touched the recording
+  (orange), and keeps its size with many problems. The Dock
+  badge, the status line's count and the lines on standard error stay
+  as they were; D79 exempts one kind, an audio input out of the guide
+  track, from the Dock bounce, the badge and the count.
+- **Evidence:** [design/recorder.md](design/recorder.md), "Status
+  window"; `Sources/RecorderLogic/ProblemsTold.swift`.
+
+## D79: Audio inputs out of sync with the others leave the "Audio inputs" guide track (2026-11-23)
+
+- **Status:** in force. Amends D52's guide mix and D77, which left the
+  guide tracks unchanged.
+- **Context:** With D77 the timeline file places a late microphone
+  right, but the "Audio inputs" guide track still sums it as it
+  arrives, so a microphone 0.5 s late echoes in every video file's
+  guide. The owner, on a test recording: "So no mic sync now? Seems
+  like a faulty release" … and, asked whether a late microphone should
+  leave the guide: "Yes, it should".
+- **Decision:** The architect's design, approved by the owner: an audio
+  input whose file's first counted window (clarity at least 12, as
+  D77), normalized as D77's delays, is later than
+  `RecorderValues.guideTrackSyncLimit`, 0.1 s (*data*), leaves the
+  "Audio inputs" mix (`GuideTrackMix.remove(source:)`) for every video
+  file alike; its own audio file is unchanged, and `measuredDelay` and
+  the timeline file keep D77's median. The first counted window
+  decides, so the echo lasts about 10 s instead of 30 s. It is the
+  event `audio input left the guide track` in `recording.json` and the
+  timeline file's markers, and an orange problem of its own kind.
+- **Amended in review (the architect's reading):** which inputs stay is
+  the largest group of the files being written whose values lie within
+  the limit of each other, on a tie the group with the earliest input;
+  a file's value is its first counted window's lag against the
+  reference's file, or, once it left or rejoined, the median of its
+  counted windows, the reference's own file 0; ended files are
+  forgotten. The reference has no exemption: an Osmo as the default
+  microphone late after two microphones in sync leaves. A file that
+  left rejoins when its median lies within the limit of the staying
+  group, and after a rejoin only its median makes it leave again, so
+  it does not flap; an input's next file starts in the guide track. A
+  leave is written and told only once the capture took the file out.
+  The event's field (named `offset` after the second review) is the
+  file's distance from the staying group's earliest input. The line reads `Audio <n> <name> 553 ms late, not in the guide
+  track; its own audio track is recorded` while the file is out, and
+  `Audio <n> <name> was not in the guide track from 0:50 to 1:40 (553
+  ms late); its own audio track is recorded` once it rejoins, its file
+  ends or it disconnects; always orange, and as by-design handling,
+  not a problem a person must act on, it neither bounces the Dock icon
+  nor sets the "!" badge nor counts in the status line's problem count;
+  it is still in `recording.json`'s `problems` and the window's lines.
+  The limit is `guideTrackSyncLimit` (named so after the second review,
+  as it holds for early inputs too). A leaving source is cut, not
+  faded: `GuideTrackMix.remove` drops its samples not mixed yet, and a
+  fade would keep a leaving source in the mix for its last 10 ms, which
+  the mix does not support cheaply. Decided while building: the line
+  names the input as `Audio <n> <name>`, as screens' and cameras' lines
+  do; the problem in `recording.json` has the event's name as its error
+  with the offset under it (`audio input left the guide track: 500 ms
+  late`); the event's word is "guide track", the glossary's.
+- **Amended after a second review (the architect's reading):** a file's
+  value is the median of its counted windows once it has 3, a staying
+  file's too, and its first counted window's lag before, so a false
+  first window near 0 on a late microphone is corrected by its median.
+  On a tie the group holding the files that stayed before wins, so a
+  newcomer never evicts them (R at 0 and A at 0.09 staying, B at −0.05
+  arriving: B leaves); only when no group holds them does the group
+  with the earliest input win. Values are compared with the limit with
+  a tolerance of half a sample at 8 kHz, so a pair at the limit stays
+  together wherever it lies. The event's field is `offset`, the file's
+  distance from the staying group's earliest input, negative when
+  earlier; the limit is `RecorderValues.guideTrackSyncLimit`. The line
+  says `<n> ms late` or `<n> ms early`: `Audio 2 Mic A 400 ms early,
+  not in the guide track; its own audio track is recorded`, and in the
+  past `… from 0:50 to 1:40 (400 ms early); …`.
+- **Amended after a third review (the architect's reading):** the
+  tolerance is a quarter of a sample at 8 kHz, not half, as the median
+  of an even count moves in half-sample steps: a pair half a sample
+  beyond the limit is apart. A file that is out no longer counts among
+  the files that stayed when a tie is decided.
+- **Consequences:** A microphone out of sync no longer echoes in the
+  guide; until its first counted window it still does, and inputs
+  within 0.1 s of each other stay in. Planned, not decided: a next
+  change raising the limit to about 0.8 s and aligning late
+  microphones in the guide instead of removing them, one data value and
+  its decision.
+- **Evidence:** [design/recorder.md](design/recorder.md), "Guide
+  tracks"; `Sources/RecorderLogic/GuideTrackMembership.swift`,
+  `Sources/RecorderCore/Recorder.swift` (`leaveTheGuideTrack`).

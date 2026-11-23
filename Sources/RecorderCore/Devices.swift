@@ -21,6 +21,8 @@ public func currentScreens() throws(DeviceReadError) -> [ScreenInfo] {
             pointSize: FrameSize(width: mode.width, height: mode.height),
             isMain: id == mainID,
             originX: bounds.origin.x,
-            originY: bounds.origin.y)
+            originY: bounds.origin.y,
+            displayID: id,
+            refreshRate: mode.refreshRate > 0 ? mode.refreshRate : nil)
     }
 }

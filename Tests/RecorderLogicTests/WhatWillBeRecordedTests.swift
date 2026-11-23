@@ -24,9 +24,16 @@ import Testing
             audioInputs: .success(DesignExample.audioInputs), outputFolder: Self.designFolder)
     }
 
+    /// The design's examples, which add the camera.
+    private var designSection: WhatWillBeRecorded {
+        WhatWillBeRecorded(
+            settings: .defaults, screens: .success(DesignExample.screens),
+            audioInputs: .success(DesignExample.audioInputs), cameras: DesignExample.cameras, outputFolder: Self.designFolder)
+    }
+
     @Test func theDefaultsWithTheDesignsDevices() {
-        #expect(defaultSection == WhatWillBeRecorded(
-            settingsLine: "Settings: Auto (resolution Native, audio mode Wired), system audio on",
+        #expect(defaultSection.withoutDetails == WhatWillBeRecorded(
+            settingsLine: "Settings: Auto (resolution Native, audio mode Wired, camera mode All real), system audio on, limit cameras on",
             screensError: nil,
             screens: [
                 .init(number: 1, name: "Built-in Retina Display", looksLike: "1728×1117", drawnAt: "3456×2234",
@@ -44,7 +51,7 @@ import Testing
             ],
             total: .init(gigabytesPerHour: "5.3", need: "2 hours need 10.7 GB, 3.1 GB free."),
             outputFolder: "Files go to ~/Movies/Multi Screen Recorder",
-            continuity: "Recording continues when screens or audio sources change."))
+            continuity: "Recording continues when screens, cameras or audio sources change."))
     }
 
     @Test func the1080pSettingsOfBeforeAutoModeRecordSmallerFiles() {
@@ -59,10 +66,10 @@ import Testing
     /// The table with its total row, and the line of what the required
     /// recording hours need, in docs/design/recorder.md, as Markdown.
     @Test func theDesignShowsTheExample() throws {
-        let example = defaultSection
+        let example = designSection
         var lines = ["| " + WhatWillBeRecorded.columns.joined(separator: " | ") + " |",
                      "|" + String(repeating: "---|", count: WhatWillBeRecorded.columns.count)]
-        let rows = example.screenRows + example.audioRows + [try #require(example.totalRow)]
+        let rows = example.screenRows + example.cameraRows + example.audioRows + [try #require(example.totalRow)]
         lines += rows.map { "| " + $0.cells.joined(separator: " | ") + " |" }
         lines += ["", try #require(example.total?.need)]
         #expect(try repositoryFile("docs/design/recorder.md").contains(lines.joined(separator: "\n") + "\n"))
@@ -94,7 +101,7 @@ import Testing
     @Test func aSourceNotRecordedIsARowWithNotRecordedAndIsDimmed() {
         let rows = section({ $0.audioMode = .wired }, audioInputs: DesignExample.audioInputs + [AudioInputInfo(
             name: "AirPods", channelCount: 1, isDefault: false, transport: .bluetooth, uid: "A")]).audioRows
-        #expect(rows.last { $0.cells[0] == "AirPods (Bluetooth)" }
+        #expect(rows.last { $0.cells[0] == "AirPods (Bluetooth)" }?.withoutDetails
             == .init(source: .audioInput(nil, name: "AirPods (Bluetooth)"), values: ["", "", "1 channel", "-"], isRecorded: false))
     }
 
@@ -131,7 +138,7 @@ import Testing
     @Test func anInputWithoutAUIDIsNotRecordedAndGetsNoNumber() {
         let noUID = AudioInputInfo(name: "Mystery", channelCount: 1, isDefault: false, transport: .usb)
         let withNoUID = section({ $0.audioMode = .wired }, audioInputs: [noUID] + DesignExample.audioInputs)
-        #expect(withNoUID.audio[3] == .init(source: .audioInput(nil, name: "Mystery (no device ID)"), channels: "1 channel",
+        #expect(withNoUID.audio[3].withoutDetails == .init(source: .audioInput(nil, name: "Mystery (no device ID)"), channels: "1 channel",
                                             isRecorded: false, gigabytesPerHour: "-"))
         #expect(withNoUID.audio.map(\.source.number) == [0, 1, 2, nil])
         #expect(withNoUID.total == section { $0.audioMode = .wired }.total)
@@ -206,7 +213,7 @@ import Testing
     @Test func theTextForMSRCheckIsOneTableAndTheTotal() {
         #expect(defaultSection.text == """
             What will be recorded
-              Settings: Auto (resolution Native, audio mode Wired), system audio on
+              Settings: Auto (resolution Native, audio mode Wired, camera mode All real), system audio on, limit cameras on
               Source                                      Looks like  Drawn at   Records at  GB/h max
               ───────────────────────────────────────────────────────────────────────────────────────
               Screen 1 - Built-in Retina Display          1728×1117   3456×2234  1728×1116        1.0
@@ -224,30 +231,30 @@ import Testing
     }
 
     @Test func theDesignShowsTheTextOfMSRCheck() throws {
-        #expect(try repositoryFile("docs/design/recorder.md").contains("```\n\(defaultSection.text)```\n"))
+        #expect(try repositoryFile("docs/design/recorder.md").contains("```\n\(designSection.text)```\n"))
     }
 
     // The settings line, and why an input is not recorded.
 
     // Why an input is not recorded, after its name in parentheses: the reason comes from the rule that does not record it.
 
-    private func reason(_ transport: AudioTransport, isDefault: Bool = false, uid: String? = "U", mode: AudioMode) -> String? {
+    private func reason(_ transport: DeviceTransport, isDefault: Bool = false, uid: String? = "U", mode: AudioMode) -> String? {
         var settings = Settings.manual
         settings.audioMode = mode
         return settings.reasonNotRecorded(AudioInputInfo(name: "X", channelCount: 1, isDefault: isDefault, transport: transport, uid: uid))
     }
 
-    @Test(arguments: [(AudioTransport.virtual, "virtual"), (.bluetooth, "Bluetooth"), (.bluetoothLE, "Bluetooth"),
+    @Test(arguments: [(DeviceTransport.virtual, "virtual"), (.bluetooth, "Bluetooth"), (.bluetoothLE, "Bluetooth"),
                       (.aggregate, "aggregate"), (.airPlay, "AirPlay"), (.continuityCapture, "Continuity Capture"),
                       (.unknown, "unknown connection"), (.unreadable, "unknown connection")])
-    func underWiredAnInputThatIsNotWiredSaysItsConnection(transport: AudioTransport, expected: String) {
+    func underWiredAnInputThatIsNotWiredSaysItsConnection(transport: DeviceTransport, expected: String) {
         #expect(reason(transport, mode: .wired) == expected)
         #expect(reason(transport, isDefault: true, mode: .wired) == nil)
         #expect(reason(transport, mode: .allInputs) == nil)
     }
 
-    @Test(arguments: AudioTransport.allCases.filter(\.isWired))
-    func underWiredAWiredInputIsRecordedAndNeedsNoReason(transport: AudioTransport) {
+    @Test(arguments: DeviceTransport.allCases.filter(\.isWired))
+    func underWiredAWiredInputIsRecordedAndNeedsNoReason(transport: DeviceTransport) {
         #expect(reason(transport, mode: .wired) == nil)
     }
 
@@ -260,8 +267,8 @@ import Testing
         #expect(reason(.virtual, uid: nil, mode: .wired) == "virtual")
     }
 
-    @Test(arguments: AudioTransport.allCases)
-    func underNoneAndDefaultMicrophoneTheSettingsLineGivesTheReasonNotTheName(transport: AudioTransport) {
+    @Test(arguments: DeviceTransport.allCases)
+    func underNoneAndDefaultMicrophoneTheSettingsLineGivesTheReasonNotTheName(transport: DeviceTransport) {
         #expect(reason(transport, mode: .none) == nil)
         #expect(reason(transport, mode: .defaultMicrophone) == nil)
     }
@@ -271,7 +278,7 @@ import Testing
         var settings = Settings.defaults
         settings.auto = true
         settings.audioMode = .allInputs
-        func input(_ transport: AudioTransport) -> AudioInputInfo {
+        func input(_ transport: DeviceTransport) -> AudioInputInfo {
             AudioInputInfo(name: "X", channelCount: 1, isDefault: false, transport: transport, uid: "U")
         }
         #expect(settings.reasonNotRecorded(input(.virtual)) == "virtual")
@@ -326,18 +333,114 @@ import Testing
     }
 
     @Test func theSettingsLineNamesTheEffectiveSettings() {
-        #expect(defaultSection.settingsLine == "Settings: Auto (resolution Native, audio mode Wired), system audio on")
+        #expect(defaultSection.settingsLine == "Settings: Auto (resolution Native, audio mode Wired, camera mode All real), system audio on, limit cameras on")
         #expect(section { $0.systemAudio = false; $0.audioMode = .allInputs }.settingsLine
-            == "Settings: resolution 1080p, audio mode All, system audio off")
+            == "Settings: resolution 1080p, audio mode All, camera mode All real, system audio off, limit cameras on")
         #expect(section { $0.auto = true; $0.resolution = .p720; $0.audioMode = .none }.settingsLine
-            == "Settings: Auto (resolution Native, audio mode Wired), system audio on")
+            == "Settings: Auto (resolution Native, audio mode Wired, camera mode All real), system audio on, limit cameras on")
     }
 
     @Test func underNoneOrDefaultMicrophoneTheSettingsLineGivesTheReason() {
         #expect(section { $0.audioMode = .none }.settingsLine
-            == "Settings: resolution 1080p, audio mode None (no audio input is recorded), system audio on")
+            == "Settings: resolution 1080p, audio mode None (no audio input is recorded), camera mode All real, system audio on, limit cameras on")
         #expect(section { $0.audioMode = .defaultMicrophone }.settingsLine
-            == "Settings: resolution 1080p, audio mode Default microphone (only the default microphone is recorded), system audio on")
+            == "Settings: resolution 1080p, audio mode Default microphone (only the default microphone is recorded), camera mode All real, system audio on, limit cameras on")
+    }
+
+    @Test func underNoneOrDefaultCameraTheSettingsLineGivesTheReason() {
+        #expect(section { $0.cameraMode = .none }.settingsLine.contains("camera mode None (no camera is recorded), "))
+        #expect(section { $0.cameraMode = .defaultCamera }.settingsLine
+            .contains("camera mode Default camera (only the default camera is recorded), "))
+    }
+
+    // Cameras (D74).
+
+    private static let builtInCamera = CameraInfo(
+        uniqueID: "A", name: "FaceTime HD Camera", isDefault: true, isVirtual: false,
+        formats: [CameraFormat(size: FrameSize(width: 1920, height: 1080), maxFramesPerSecond: 30)])
+    private static let brio = CameraInfo(
+        uniqueID: "B", name: "Logitech BRIO", isDefault: false, isVirtual: false,
+        formats: [CameraFormat(size: FrameSize(width: 3840, height: 2160), maxFramesPerSecond: 30)])
+    private static let obs = CameraInfo(
+        uniqueID: "C", name: "OBS Virtual Camera", isDefault: false, isVirtual: true,
+        formats: [CameraFormat(size: FrameSize(width: 1280, height: 720), maxFramesPerSecond: 30)])
+
+    @Test func theCamerasFollowTheScreensTheRecordedOnesNumberedTheDefaultFirst() throws {
+        let shown = WhatWillBeRecorded(
+            settings: .defaults, screens: .success(DesignExample.screens), audioInputs: .success(DesignExample.audioInputs),
+            cameras: [Self.obs, Self.brio, Self.builtInCamera], outputFolder: nil)
+        let videoFileRate = { (size: FrameSize) in
+            DiskEstimate.gigabytesPerHour(DiskEstimate.videoFileBytesPerHour(frameSize: size, settings: .defaults))
+        }
+        #expect(shown.cameraRows.map(\.cells) == [
+            ["Camera 1 - FaceTime HD Camera (default)", "", "", "1920×1080", videoFileRate(FrameSize(width: 1920, height: 1080))],
+            // At most 1920×1080 (D74).
+            ["Camera 2 - Logitech BRIO", "", "", "1920×1080", videoFileRate(FrameSize(width: 1920, height: 1080))],
+            ["OBS Virtual Camera (virtual)", "", "", "-", "-"],
+        ])
+        #expect(shown.cameraRows.map(\.isRecorded) == [true, true, false])
+        let withoutCameras = WhatWillBeRecorded(
+            settings: .defaults, screens: .success(DesignExample.screens), audioInputs: .success(DesignExample.audioInputs),
+            outputFolder: nil)
+        #expect(shown.total != nil && withoutCameras.total != nil)
+        #expect(shown.total?.gigabytesPerHour != withoutCameras.total?.gigabytesPerHour)
+        let lines = shown.text.split(separator: "\n").map(String.init)
+        let cameraLine = try #require(lines.firstIndex { $0.contains("Camera 1 - FaceTime HD Camera") })
+        let audioLine = try #require(lines.firstIndex { $0.contains("Audio 0 - System") })
+        #expect(cameraLine < audioLine)
+        #expect(lines.contains { $0.hasPrefix("  " + String(repeating: " ", count: "Camera 1 - ".count) + "OBS Virtual Camera (virtual)") })
+    }
+
+    @Test func underAllTheVirtualCameraIsRecordedAndAtTheResolutionNoneNoCamera() {
+        var all = Settings.defaults
+        all.auto = false
+        all.cameraMode = .allCameras
+        let allShown = WhatWillBeRecorded(settings: all, screens: .success([]), audioInputs: .success([]), cameras: [Self.obs], outputFolder: nil)
+        #expect(allShown.cameraRows.map(\.isRecorded) == [true])
+        all.resolution = .none
+        let audioOnly = WhatWillBeRecorded(settings: all, screens: .success([]), audioInputs: .success([]), cameras: [Self.obs], outputFolder: nil)
+        #expect(audioOnly.cameraRows.map(\.cells) == [["OBS Virtual Camera", "", "", "-", "-"]])
+    }
+
+    @Test func anIPhoneCameraIsRecordedOnlyUnderAllAndSaysWhy() {
+        let iPhone = CameraInfo(
+            uniqueID: "I", name: "Anna's iPhone Camera", isDefault: false, isVirtual: false, isContinuity: true,
+            formats: [CameraFormat(size: FrameSize(width: 1920, height: 1080), maxFramesPerSecond: 30)])
+        let real = WhatWillBeRecorded(settings: .defaults, screens: .success([]), audioInputs: .success([]), cameras: [iPhone], outputFolder: nil)
+        #expect(real.cameraRows.map(\.cells) == [["Anna's iPhone Camera (Continuity Camera)", "", "", "-", "-"]])
+        var all = Settings.defaults
+        all.auto = false
+        all.cameraMode = .allCameras
+        let allShown = WhatWillBeRecorded(settings: all, screens: .success([]), audioInputs: .success([]), cameras: [iPhone], outputFolder: nil)
+        #expect(allShown.cameraRows.map(\.isRecorded) == [true])
+    }
+
+    /// macOS grants the Camera permission per app: denied, no camera is recorded, and each the mode would record says why (D74).
+    @Test func underADeniedCameraPermissionEachCameraTheModeWouldRecordSaysSo() {
+        var facts = ReadyCheckFacts(
+            screenRecording: .granted, microphoneGranted: true, screens: .success(DesignExample.screens),
+            audioInputs: .success(DesignExample.audioInputs), outputFolder: .usable(.bytes(100_000_000_000)),
+            cameraGranted: false, cameras: [Self.builtInCamera, Self.obs])
+        let denied = WhatWillBeRecorded(settings: .defaults, facts: facts)
+        #expect(denied.cameraRows.map(\.cells) == [
+            ["FaceTime HD Camera (default) (no Camera permission)", "", "", "-", "-"],
+            ["OBS Virtual Camera (virtual)", "", "", "-", "-"],
+        ])
+        #expect(denied.cameraRows.map(\.isRecorded) == [false, false])
+        facts.cameras = []
+        #expect(denied.total == WhatWillBeRecorded(settings: .defaults, facts: facts).total)
+        let listed = WhatWillBeRecorded(
+            settings: .defaults, screens: .success([]), audioInputs: .success([]), cameras: [Self.builtInCamera],
+            cameraPermissionDenied: true, outputFolder: nil)
+        #expect(listed.cameraRows.map(\.cells) == [["FaceTime HD Camera (default) (no Camera permission)", "", "", "-", "-"]])
+    }
+
+    @Test func aSuspendedCameraIsNotRecordedAndSaysSo() {
+        var suspended = Self.builtInCamera
+        suspended.isSuspended = true
+        let section = WhatWillBeRecorded(
+            settings: .defaults, screens: .success([]), audioInputs: .success([]), cameras: [suspended], outputFolder: nil)
+        #expect(section.cameraRows.map(\.cells) == [["FaceTime HD Camera (default) (suspended)", "", "", "-", "-"]])
     }
 
     @Test func anInputNotRecordedKeepsItsNamesColumnAndSaysWhy() {
@@ -371,7 +474,7 @@ import Testing
     }
 
     @Test func systemAudioOffIsNotRecorded() {
-        #expect(section { $0.systemAudio = false }.audio.last
+        #expect(section { $0.systemAudio = false }.audio.last?.withoutDetails
             == .init(source: .systemAudio(isRecorded: false), channels: "stereo", isRecorded: false, gigabytesPerHour: "-"))
         #expect(section { $0.systemAudio = false }.audioRows.last?.cells[0] == "System audio")
     }
@@ -418,7 +521,7 @@ import Testing
 
     @Test func anUnreadableInputThatIsNotRecordedIsARowAndKeepsTheTotal() {
         let withUnreadable = section(audioInputs: DesignExample.audioInputs + [Self.unreadable(isDefault: false)])
-        #expect(withUnreadable.audio[3]
+        #expect(withUnreadable.audio[3].withoutDetails
             == .init(source: .audioInput(nil, name: "X"), channels: "cannot be read", isRecorded: false, gigabytesPerHour: "-",
                    readError: "no format"))
         #expect(withUnreadable.screens == section().screens)
@@ -427,7 +530,7 @@ import Testing
 
     @Test func anUnreadableRecordedInputLeavesTheTotalOut() {
         let broken = section(audioInputs: [Self.unreadable(isDefault: true)])
-        #expect(broken.audio[1]
+        #expect(broken.audio[1].withoutDetails
             == .init(source: .audioInput(1, name: "X (default)"), channels: "cannot be read", isRecorded: true, gigabytesPerHour: "?",
                    readError: "no format"))
         #expect(broken.screens == section().screens)
@@ -454,14 +557,14 @@ import Testing
 
     @Test func atTheResolutionNoneTheSettingsLineSaysThatNoScreenIsRecorded() {
         #expect(audioOnly.settingsLine
-            == "Settings: resolution None (no screen is recorded), audio mode Default microphone (only the default microphone is recorded), system audio on")
+            == "Settings: resolution None (no screen and no camera is recorded), audio mode Default microphone (only the default microphone is recorded), camera mode All real, system audio on, limit cameras on")
         #expect(section { $0.resolution = .none; $0.audioMode = .wired }.settingsLine
-            == "Settings: resolution None (no screen is recorded), audio mode Wired, system audio on")
+            == "Settings: resolution None (no screen and no camera is recorded), audio mode Wired, camera mode All real, system audio on, limit cameras on")
     }
 
     /// The screens are rows not recorded, without a number, Records at and GB/h max; the total is the audio files'.
     @Test func atTheResolutionNoneTheScreensAreRowsNotRecordedAndTheTotalIsTheAudios() {
-        #expect(audioOnly.screenRows == [
+        #expect(audioOnly.screenRows.map(\.withoutDetails) == [
             .init(source: .screen(nil, name: "Built-in Retina Display"), values: ["1728×1117", "3456×2234", "-", "-"], isRecorded: false),
             .init(source: .screen(nil, name: "LG HDR 4K"), values: ["3840×2160", "3840×2160", "-", "-"], isRecorded: false),
         ])
@@ -479,7 +582,7 @@ import Testing
     @Test func atTheResolutionNoneTheTextKeepsTheScreensNamesColumn() {
         #expect(section({ $0.resolution = .none }, audioInputs: []).text == """
             What will be recorded
-              Settings: resolution None (no screen is recorded), audio mode Default microphone (only the default microphone is recorded), system audio on
+              Settings: resolution None (no screen and no camera is recorded), audio mode Default microphone (only the default microphone is recorded), camera mode All real, system audio on, limit cameras on
               Source                              Looks like  Drawn at   Records at  GB/h max
               ───────────────────────────────────────────────────────────────────────────────
                          Built-in Retina Display  1728×1117   3456×2234  -                  -
@@ -493,4 +596,23 @@ import Testing
 
             """)
     }
+}
+
+/// The table's data without the mouse-over texts, which `SourceDetailsTests` checks.
+extension WhatWillBeRecorded {
+    var withoutDetails: Self {
+        var shown = self
+        shown.screens = screens.map { var screen = $0; screen.details = ""; return screen }
+        shown.cameras = cameras.map { var camera = $0; camera.details = ""; return camera }
+        shown.audio = audio.map(\.withoutDetails)
+        return shown
+    }
+}
+
+extension WhatWillBeRecorded.Audio {
+    var withoutDetails: Self { var audio = self; audio.details = ""; return audio }
+}
+
+extension WhatWillBeRecorded.Row {
+    var withoutDetails: Self { var row = self; row.details = ""; return row }
 }

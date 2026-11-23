@@ -38,13 +38,14 @@ private func screen(
 
 private func audio(
     _ stamp: String = "10.00.00", _ label: String, channels: String, timecode: String = "10:00:00:00", start: Double = 0,
-    end: Double? = 10, suffix: String = ""
+    end: Double? = 10, suffix: String = "", delay: Double? = nil
 ) -> String {
     let source = label.components(separatedBy: " - ").dropFirst().joined(separator: " - ")
     let endText = end.map { String($0) } ?? "null"
+    let delayText = delay.map { String($0) } ?? "null"
     return """
         {"name": "2026-11-20 \(stamp) \(label)\(suffix).mov", "audioSource": "\(source)", "channels": \(channels), "start": \(start),
-         "end": \(endText), "timecode": "\(timecode)", "state": "finalized"}
+         "end": \(endText), "timecode": "\(timecode)", "state": "finalized", "measuredDelay": \(delayText)}
         """
 }
 
@@ -142,7 +143,7 @@ private extension Dictionary where Key == String, Value == Any {
         #expect(info.frames == (0, 1))
         #expect(info.note == """
             Multi Screen Recorder, recording 2026-11-20 10:00:00 to 10:02:10 (2m10s).
-            Set the timeline resolution to 3440 x 1440 (the largest screen): Timeline > Timeline Settings.
+            Set the timeline resolution to 3440 x 1440 (the largest video file): Timeline > Timeline Settings.
             Tracks: one per screen, one per audio channel; the channels of one input are a linked group.
             Markers: blue = screen change, green = audio and other changes.
             Problems:
@@ -171,6 +172,34 @@ private extension Dictionary where Key == String, Value == Any {
         #expect(result.trackNames == ["Screen 2 - B", "Screen 1 - A", "Screen 3 - C", "Screen 4 - D", "Audio 1 - M"])
         #expect(result.tracks.map { $0["kind"] as! String } == ["Video", "Video", "Video", "Video", "Audio"])
         #expect(result.tracks[0].resolve["Locked"] as? Bool == false)
+    }
+
+    /// D74: a camera file is a video track like a screen file, the cameras' tracks after the screens'.
+    @Test func theCamerasAreVideoTracksAfterTheScreens() throws {
+        let camera = """
+            {"name": "2026-11-20 10.00.01 Camera 1 - FaceTime HD Camera.mov", "camera": "FaceTime HD Camera",
+             "cameraUniqueID": "c", "frameSize": [1920, 1080], "start": 1, "end": 9, "timecode": "10:00:01:00",
+             "state": "finalized", "guideTracks": [], "framesRepeatedForLateness": 0}
+            """
+        let result = try timeline(manifest(files: [
+            screen("10.00.00", "Screen 1 - A", end: 8),
+            camera,
+            audio("10.00.00", "Audio 1 - M", channels: "1", end: 70),
+        ]))
+        #expect(result.trackNames == ["Screen 1 - A", "Camera 1 - FaceTime HD Camera", "Audio 1 - M"])
+        #expect(result.tracks.map { $0["kind"] as! String } == ["Video", "Video", "Audio"])
+    }
+
+    /// The resolution to set is the largest video file's, a camera's too.
+    @Test func theResolutionToSetIsTheLargestVideoFiles() throws {
+        let camera = """
+            {"name": "2026-11-20 10.00.01 Camera 1 - BRIO.mov", "camera": "BRIO",
+             "cameraUniqueID": "c", "frameSize": [3840, 2160], "start": 1, "end": 9, "timecode": "10:00:01:00",
+             "state": "finalized", "guideTracks": [], "framesRepeatedForLateness": 0}
+            """
+        let result = try timeline(manifest(files: [screen("10.00.00", "Screen 1 - A", end: 8), camera]))
+        #expect(result.stack.markers[0].note.contains(
+            "Set the timeline resolution to 3840 x 2160 (the largest video file): Timeline > Timeline Settings."))
     }
 
     @Test func v1IsChosenAmongTheScreensThatStartFirstNotAmongAllFiles() throws {
@@ -220,6 +249,54 @@ private extension Dictionary where Key == String, Value == Any {
             events: [event("screen connected", at: 12, extra: #", "screen": "LG""#)]))
         #expect(result["global_start_time"] != nil)
         #expect(result.stack.markers[1].frames == (300, 1))
+    }
+
+    /// A measured delay places the audio clip that much earlier, to the nearest frame; one that would start
+    /// before the timeline is trimmed at its start instead (D77).
+    @Test func aMeasuredDelayPlacesTheAudioClipEarlier() throws {
+        let result = try timeline(manifest(files: [
+            screen("10.00.00", "Screen 1 - A", timecode: "10:00:00:00", end: 20),
+            audio("10.00.01", "Audio 1 - Razer", channels: "1", timecode: "10:00:01:00", start: 1, end: 11),
+            audio("10.00.01", "Audio 2 - Osmo", channels: "1", timecode: "10:00:01:00", start: 1, end: 11, delay: 0.55),
+            audio("10.00.00", "Audio 3 - BRIO", channels: "1", timecode: "10:00:00:00", start: 0, end: 10, delay: 0.55),
+        ]))
+        #expect(result.trackNames == ["Screen 1 - A", "Audio 1 - Razer", "Audio 2 - Osmo", "Audio 3 - BRIO"])
+        #expect(result.tracks[1].children[0].frames == (0, 30))
+        #expect(result.tracks[2].children[0].frames == (0, 13))
+        #expect(result.tracks[2].clips[0].frames == (1_080_030, 300))
+        let trimmed = result.tracks[3].clips[0]
+        #expect(result.tracks[3].children.count == 1)
+        #expect(trimmed.frames == (1_080_017, 283))
+        let available = ((trimmed["media_references"] as! JSON)["DEFAULT_MEDIA"] as! JSON)["available_range"] as! JSON
+        #expect(((available["start_time"] as! JSON)["value"] as! Double, (available["duration"] as! JSON)["value"] as! Double)
+            == (1_080_000, 300))
+    }
+
+    /// A delayed file that would overlap its source's previous one leaves out its head, so what
+    /// it plays stays at its own time, never pushed later.
+    @Test func aDelayedClipOverlappingThePreviousOneLeavesOutItsHead() throws {
+        let result = try timeline(manifest(files: [
+            audio("10.00.00", "Audio 2 - Osmo", channels: "1", timecode: "10:00:00:00", start: 0, end: 10),
+            audio("10.00.10", "Audio 2 - Osmo", channels: "1", timecode: "10:00:10:06", start: 10.2, end: 20, delay: 0.55),
+        ]))
+        let children = result.tracks[0].children
+        #expect(children.map { $0["OTIO_SCHEMA"] as! String } == ["Clip.2", "Clip.2"])
+        #expect(children[0].frames == (1_080_000, 300))
+        // 0.55 s is 17 frames earlier: from frame 289, 11 frames into the first file, which ends at frame 300.
+        #expect(children[1].frames == (1_080_317, 283))
+    }
+
+    /// A screen file that starts a frame before its source's previous one ends, by rounding, leaves out
+    /// that frame, so the rest plays at its own time.
+    @Test func aVideoClipOverlappingThePreviousOneByAFrameLeavesOutThatFrame() throws {
+        let result = try timeline(manifest(files: [
+            screen("10.00.00", "Screen 1 - A", timecode: "10:00:00:00", start: 0, end: 10.04),
+            screen("10.00.10", "Screen 1 - A", timecode: "10:00:10:00", start: 10, end: 20),
+        ]))
+        let children = result.tracks[0].children
+        #expect(children.map { $0["OTIO_SCHEMA"] as! String } == ["Clip.2", "Clip.2"])
+        #expect(children[0].frames == (1_080_000, 301))
+        #expect(children[1].frames == (1_080_301, 299))
     }
 
     @Test func aSourceWithTwoFilesIsOneTrackWithAGapBetweenAndNoGapAfter() throws {

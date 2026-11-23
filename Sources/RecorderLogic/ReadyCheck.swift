@@ -31,32 +31,51 @@ public struct ReadyCheckFacts: Sendable {
     public var screens: Result<[ScreenInfo], DeviceReadError>
     public var audioInputs: Result<[AudioInputInfo], DeviceReadError>
     public var outputFolder: OutputFolderProbe
+    /// Whether the Camera permission is granted; nil when the recording
+    /// records no connected camera, so it was not asked (D74).
+    public var cameraGranted: Bool?
+    public var cameras: [CameraInfo]
 
     public init(
         screenRecording: PermissionProbe?,
         microphoneGranted: Bool?,
         screens: Result<[ScreenInfo], DeviceReadError>,
         audioInputs: Result<[AudioInputInfo], DeviceReadError>,
-        outputFolder: OutputFolderProbe
+        outputFolder: OutputFolderProbe,
+        cameraGranted: Bool? = nil,
+        cameras: [CameraInfo] = []
     ) {
         self.screenRecording = screenRecording
         self.microphoneGranted = microphoneGranted
         self.screens = screens
         self.audioInputs = audioInputs
         self.outputFolder = outputFolder
+        self.cameraGranted = cameraGranted
+        self.cameras = cameras
     }
+}
+
+extension ReadyCheckFacts {
+    /// The cameras a recording may record: none when the Camera permission is denied, as macOS grants it per app.
+    var camerasRecordable: [CameraInfo] { cameraGranted == false ? [] : cameras }
 }
 
 public struct ReadyCheckItem: Equatable, Sendable {
     public var title: String
     public var passed: Bool
     public var fix: String?
+    /// The fix is shown though the item passed: a denied Camera permission, which records no camera (D74).
+    public var showsFixWhenPassed: Bool
 
-    public init(title: String, passed: Bool, fix: String?) {
+    public init(title: String, passed: Bool, fix: String?, showsFixWhenPassed: Bool = false) {
         self.title = title
         self.passed = passed
         self.fix = fix
+        self.showsFixWhenPassed = showsFixWhenPassed
     }
+
+    /// The fix to show under the item: a failing item's, or one shown though it passed.
+    public var shownFix: String? { !passed || showsFixWhenPassed ? fix : nil }
 }
 
 public struct ReadyCheckResult: Equatable, Sendable {
@@ -72,7 +91,7 @@ public struct ReadyCheckResult: Equatable, Sendable {
         var lines: [String] = []
         for item in items {
             lines.append((item.passed ? "ok    " : "FAIL  ") + item.title)
-            if !item.passed, let fix = item.fix {
+            if let fix = item.shownFix {
                 let wrapped = wrappedLines(fix, width: Self.lineWidth - Self.fixLabel.count)
                 lines.append(Self.fixLabel + (wrapped.first ?? ""))
                 lines += wrapped.dropFirst().map { String(repeating: " ", count: Self.fixLabel.count) + $0 }
@@ -86,6 +105,7 @@ public struct ReadyCheckResult: Equatable, Sendable {
 public enum ReadyCheck {
     static let screenRecordingTitle = "Screen & System Audio Recording permission"
     static let microphoneTitle = "Microphone permission"
+    static let cameraTitle = "Camera permission"
     static let restartNote = "quit Multi Screen Recorder and start it again. "
     static let terminalNote = "If it was started from a terminal, then the terminal app needs the permission."
 
@@ -97,6 +117,13 @@ public enum ReadyCheck {
     ) -> Bool {
         guard case .success(let inputs) = audioInputs else { return false }
         return inputs.contains { AudioTracker.records($0, settings: settings) }
+    }
+
+    /// Whether a recording with these settings records at least one of the
+    /// cameras connected: only then the Camera permission is asked for and
+    /// part of the check (D74).
+    public static func recordsCamera(_ cameras: [CameraInfo], settings: Settings) -> Bool {
+        cameras.contains { CameraTracker.records($0, settings: settings) }
     }
 
     /// Whether a recording with these settings needs the Screen & System
@@ -128,6 +155,9 @@ public enum ReadyCheck {
         if recordsAudioInput(facts.audioInputs, settings: settings) {
             items.append(microphoneItem(granted: facts.microphoneGranted ?? false))
         }
+        if recordsCamera(facts.cameras, settings: settings) {
+            items.append(cameraItem(granted: facts.cameraGranted ?? false))
+        }
         let recordsScreens = settings.effectiveResolution.recordsScreens
         if recordsScreens {
             items.append(screensItem(facts.screens))
@@ -144,7 +174,8 @@ public enum ReadyCheck {
         if case .success(let screens) = screensToJudge(facts.screens, settings: settings),
            case .usable(let freeSpace) = facts.outputFolder,
            case .success(let audioInputs) = audioInputsToJudge(facts.audioInputs, settings: settings),
-           let bytesPerHour = DiskEstimate.bytesPerHour(settings: settings, screens: screens, audioInputs: audioInputs) {
+           let bytesPerHour = DiskEstimate.bytesPerHour(
+               settings: settings, screens: screens, audioInputs: audioInputs, cameras: facts.camerasRecordable) {
             items.append(diskItem(freeSpace, bytesPerHour: bytesPerHour, settings: settings))
         }
         return ReadyCheckResult(items: items)
@@ -167,6 +198,15 @@ public enum ReadyCheck {
             title: microphoneTitle, passed: granted,
             fix: granted ? nil : "allow it in System Settings › Privacy & Security › Microphone, then "
                 + restartNote + terminalNote)
+    }
+
+    /// Denied, it passes: the recording records no camera, and the fix says how to change that (D74).
+    private static func cameraItem(granted: Bool) -> ReadyCheckItem {
+        ReadyCheckItem(
+            title: granted ? cameraTitle : "\(cameraTitle) denied: no camera is recorded", passed: true,
+            fix: granted ? nil : "allow it in System Settings › Privacy & Security › Camera, then " + restartNote + terminalNote
+                + " Or record no camera: turn off Auto and move the Camera mode slider to None (--camera-mode none).",
+            showsFixWhenPassed: !granted)
     }
 
     private static func screensItem(_ screens: Result<[ScreenInfo], DeviceReadError>) -> ReadyCheckItem {

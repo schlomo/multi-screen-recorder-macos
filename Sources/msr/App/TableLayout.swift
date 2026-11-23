@@ -50,7 +50,7 @@ enum TableLayout {
         ["888"],
         ["888.8 GB", "999 MB", "?"],
         RecordingStatusTable.StateText.allCases.map(\.rawValue),
-        ["-1000 ppm (-9999.9 ms)", "\(RecordingStatusTable.measuring) (-9999.9 ms)"],
+        ["-1000 ppm (-9999.9 ms) · 9999 ms early", "\(RecordingStatusTable.measuring) (-9999.9 ms) · 9999 ms early"],
     ]
 
     /// The status window's columns after Source; its headers, in a bolder

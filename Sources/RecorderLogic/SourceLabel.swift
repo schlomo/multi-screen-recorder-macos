@@ -10,12 +10,20 @@ public enum SourceLabel {
         "Screen \(number) - \(name)"
     }
 
-    /// Where a source's file goes in a list of files: the screens by number, then the audio
-    /// sources by number (the system audio, 0, first), read from the label in the file's name
-    /// ("2026-11-12 14.03.05 Screen 2 - LG HDR 4K.mov"); a name without a label goes last.
+    /// "Camera 1 - FaceTime HD Camera" (D74).
+    public static func camera(_ number: Int, name: String) -> String {
+        "Camera \(number) - \(name)"
+    }
+
+    /// Where a source's file goes in a list of files: the screens by number, then the cameras
+    /// by number, then the audio sources by number (the system audio, 0, first), read from the
+    /// label in the file's name ("2026-11-12 14.03.05 Screen 2 - LG HDR 4K.mov"); a name
+    /// without a label goes last.
     public static func listPosition(ofFileName name: String) -> (group: Int, number: Int) {
-        guard let match = name.firstMatch(of: /\ (Screen|Audio)\ (\d+)\ -\ /), let number = Int(match.2) else { return (2, 0) }
-        return (match.1 == "Screen" ? 0 : 1, number)
+        guard let match = name.firstMatch(of: /\ (Screen|Camera|Audio)\ (\d+)\ -\ /), let number = Int(match.2) else {
+            return (3, 0)
+        }
+        return (["Screen", "Camera", "Audio"].firstIndex(of: String(match.1))!, number)
     }
 
     /// "Audio 3 - Razer Seiren V3 Mini".
@@ -30,6 +38,7 @@ public enum SourceLabel {
 public struct SourceCell: Equatable, Sendable {
     public enum Kind: Equatable, Sendable {
         case screen
+        case camera
         case audioInput
         case systemAudio
     }
@@ -49,6 +58,10 @@ public struct SourceCell: Equatable, Sendable {
         SourceCell(kind: .screen, number: number, name: name)
     }
 
+    public static func camera(_ number: Int?, name: String) -> SourceCell {
+        SourceCell(kind: .camera, number: number, name: name)
+    }
+
     public static func audioInput(_ number: Int?, name: String) -> SourceCell {
         SourceCell(kind: .audioInput, number: number, name: name)
     }
@@ -64,6 +77,7 @@ public struct SourceCell: Equatable, Sendable {
         guard let number else { return name }
         return switch kind {
         case .screen: SourceLabel.screen(number, name: name)
+        case .camera: SourceLabel.camera(number, name: name)
         case .audioInput: SourceLabel.audioInput(number, name: name)
         case .systemAudio: SourceLabel.systemAudio
         }

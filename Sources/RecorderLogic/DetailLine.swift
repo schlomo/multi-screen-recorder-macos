@@ -31,7 +31,7 @@ public enum DetailLine {
     }
 
     /// "screen recording granted; microphone granted; screens: DELL P3421W 3440×1440 at (0,0) main, …"
-    public static func facts(_ facts: ReadyCheckFacts) -> String {
+    public static func facts(_ facts: ReadyCheckFacts, resolution: RecordingResolution, limitCameras: Bool) -> String {
         let screen = switch facts.screenRecording {
         case .granted: "granted"
         case .notGranted: "not granted"
@@ -39,6 +39,7 @@ public enum DetailLine {
         case nil: "not asked"
         }
         let microphone = facts.microphoneGranted.map { $0 ? "granted" : "not granted" } ?? "not asked"
+        let camera = facts.cameraGranted.map { $0 ? "granted" : "not granted" } ?? "not asked"
         let screens = switch facts.screens {
         case .success(let screens): "screens: " + list(screens.map { screen in
             "\(screen.name) \(screen.sizeText) at (\(point(screen.originX)),\(point(screen.originY)))" + (screen.isMain ? " main" : "")
@@ -54,7 +55,9 @@ public enum DetailLine {
         case .usable(.unreadable(let error)): "output folder usable, free space cannot be read (\(error))"
         case .unusable(let error): "output folder unusable (\(error))"
         }
-        return ["screen recording \(screen)", "microphone \(microphone)", screens, audioInputs, folder].joined(separator: "; ")
+        let cameras = "cameras: " + Self.cameras(facts.cameras, resolution: resolution, limitCameras: limitCameras)
+        return ["screen recording \(screen)", "microphone \(microphone)", "camera \(camera)", screens, audioInputs, cameras, folder]
+            .joined(separator: "; ")
     }
 
     /// "start Screen 2 Wacom One 13T (UUID 037036FB…, display ID 2) at 1920×1080";
@@ -66,6 +69,35 @@ public enum DetailLine {
         case .stop(let uuid, let ending):
             "stop \(names[uuid] ?? "screen \(uuid.prefix(8))…") (\(text(ending)))"
         }
+    }
+
+    /// "start Camera 1 FaceTime HD Camera (unique ID 0x14100…) in 1920×1080 at 30 fps at 1920×1080";
+    /// `names` gives a stopped camera's "Camera <n> <name>".
+    public static func cameraAction(_ action: CameraTracker.Action, names: [String: String]) -> String {
+        switch action {
+        case .start(let uniqueID, let format, let setsFormat, let frameSize, let number, let name, _):
+            "start Camera \(number) \(name) (unique ID \(uniqueID.prefix(8))…) in \(format)"
+                + (setsFormat ? "" : " as another app uses it") + " at \(frameSize)"
+        case .stop(let uniqueID):
+            "stop \(names[uniqueID] ?? "camera \(uniqueID.prefix(8))…")"
+        }
+    }
+
+    /// "FaceTime HD Camera (default) 1920×1080 at 30 fps, OBS Virtual Camera virtual 1280×720 at 30 fps":
+    /// each camera with the format it is opened with at `resolution`; none at None, which records no camera.
+    public static func cameras(_ cameras: [CameraInfo], resolution: RecordingResolution, limitCameras: Bool) -> String {
+        list(cameras.map { camera in
+            let format = !resolution.recordsScreens ? ""
+                : camera.chosenFormat(resolution: resolution, limited: limitCameras).map { " \($0)" } ?? " no format"
+            return camera.shownName + (camera.isVirtual ? " virtual" : "") + (camera.isContinuity ? " Continuity Camera" : "")
+                + (camera.isSuspended ? " suspended" : "") + format
+        })
+    }
+
+    /// "2026-11-12 14.03.05 Camera 1 - BRIO.mov: 222 frames arrived after their tick was decided and were placed late, the latest 1492 ms after its capture"
+    public static func framesPlacedLate(file: String, count: Int, largestLateArrival: Int64) -> String {
+        "\(file): \(count) frame\(count == 1 ? "" : "s") arrived after \(count == 1 ? "its" : "their") tick was decided and "
+            + "\(count == 1 ? "was" : "were") placed late, the latest \(largestLateArrival / 1_000_000) ms after its capture"
     }
 
     /// "DELL P3421W 3440×1440 at (0,0) main (display ID 1), …"
@@ -110,6 +142,11 @@ public enum DetailLine {
         case .sleep: "sleep"
         case .stop: "stop"
         }
+    }
+
+    /// "2612 ms": how long a blocking call took, in whole milliseconds, so a freeze can be traced.
+    public static func milliseconds(_ duration: Duration) -> String {
+        "\(Int((Double(duration.components.seconds) * 1000 + Double(duration.components.attoseconds) / 1e15).rounded())) ms"
     }
 
     private static func list(_ items: [String]) -> String { items.isEmpty ? "none" : items.joined(separator: ", ") }

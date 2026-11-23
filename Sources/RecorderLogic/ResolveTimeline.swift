@@ -42,7 +42,8 @@ public enum ResolveTimeline {
 
     /// The files whose length the media file must tell: those without an end.
     public static func filesWithoutEnd(in manifest: RecordingManifest) -> [String] {
-        manifest.files.filter { $0.end == nil }.map(\.name) + manifest.audioFiles.filter { $0.end == nil }.map(\.name)
+        manifest.files.filter { $0.end == nil }.map(\.name) + manifest.cameraFiles.filter { $0.end == nil }.map(\.name)
+            + manifest.audioFiles.filter { $0.end == nil }.map(\.name)
     }
 
     /// The timeline file's content; `mediaSeconds` holds the media file's duration of each file in `filesWithoutEnd`.
@@ -56,14 +57,23 @@ public enum ResolveTimeline {
                 name: file.name, source: file.screen, timecode: file.timecode, start: file.start, end: file.end,
                 mediaSeconds: mediaSeconds[file.name], channels: nil, recordingStart: recordingStart)
         }.filter { $0.frames > 0 }
-        let audios = try manifest.audioFiles.map { file in
+        let cameras = try manifest.cameraFiles.map { file in
+            try Placed(
+                name: file.name, source: file.camera, timecode: file.timecode, start: file.start, end: file.end,
+                mediaSeconds: mediaSeconds[file.name], channels: nil, recordingStart: recordingStart)
+        }.filter { $0.frames > 0 }
+        let audiosAsRecorded = try manifest.audioFiles.map { file in
             try Placed(
                 name: file.name, source: file.audioSource, timecode: file.timecode, start: file.start, end: file.end,
                 mediaSeconds: mediaSeconds[file.name], channels: file.channels, recordingStart: recordingStart)
         }.filter { $0.frames > 0 }
-        let earliest = (screens + audios).min { $0.startFrame < $1.startFrame }
+        let earliest = (screens + cameras + audiosAsRecorded).min { $0.startFrame < $1.startFrame }
         let timelineStart = earliest?.startFrame ?? 0
+        let delays = Dictionary(manifest.audioFiles.compactMap { file in file.measuredDelay.map { (file.name, $0) } }) { $1 }
+        let audios = audiosAsRecorded.map { file in delays[file.name].map { file.placed(earlierBy: $0, notBefore: timelineStart) } ?? file }
+            .filter { $0.frames > 0 }
         let videoTracks = Self.videoTracks(screens, timelineStart: timelineStart)
+            + Self.videoTracks(cameras, timelineStart: timelineStart)
         let audioTracks = Self.audioTracks(audios, timelineStart: timelineStart)
         let markers = try Self.markers(manifest: manifest, name: name, timelineStart: timelineStart)
         let timeline = Node.object([
@@ -89,11 +99,15 @@ public enum ResolveTimeline {
 
     private struct Placed {
         let name: String
-        /// Where the file goes on the timeline: its timecode in frames, a day later for a file after midnight.
-        let startFrame: Int
+        /// Where the file goes on the timeline: its timecode in frames, a day
+        /// later for a file after midnight, earlier by its measured delay (D77).
+        var startFrame: Int
         /// The file's own timecode in frames, which its clip's source range keeps.
         let timecodeFrame: Int
-        let frames: Int
+        /// The frames the clip plays, from `trimmed` on.
+        var frames: Int
+        /// The file's first frames the clip leaves out: where it would start before the timeline or overlap its source's previous clip.
+        var trimmed = 0
         let channels: RecordingManifest.AudioFile.Channels?
         let label: String
         let number: Int
@@ -117,6 +131,19 @@ public enum ResolveTimeline {
             self.channels = channels
             label = Self.label(ofFileName: name, source: source)
             number = SourceLabel.listPosition(ofFileName: name).number
+        }
+
+        /// The file placed `delay` seconds earlier, to the nearest frame (negative: later); what would
+        /// start before `timelineStart` is trimmed off, so the clip starts there.
+        func placed(earlierBy delay: Double, notBefore timelineStart: Int) -> Placed {
+            var placed = self
+            placed.startFrame -= Int((delay * ResolveTimeline.rate).rounded())
+            if placed.startFrame < timelineStart {
+                placed.trimmed = timelineStart - placed.startFrame
+                placed.frames -= placed.trimmed
+                placed.startFrame = timelineStart
+            }
+            return placed
         }
 
         /// An audio input's number of mono tracks; the system audio's stereo track is one.
@@ -199,11 +226,19 @@ public enum ResolveTimeline {
     }
 
     /// The clips of a track in time order, a gap before each where the track is empty. A clip that
-    /// starts before the previous one ends, by a frame at most, follows it at once.
+    /// starts before the previous one ends (a delayed audio file's, D77, or by a frame's rounding)
+    /// leaves out its overlapping head, so what it plays stays at its own time.
     private static func trackChildren(_ files: [Placed], timelineStart: Int, metadata: (Placed) -> Node) -> [Node] {
         var children: [Node] = []
         var cursor = timelineStart
-        for file in files {
+        for var file in files {
+            if file.startFrame < cursor {
+                let overlap = cursor - file.startFrame
+                file.trimmed += overlap
+                file.frames -= overlap
+                file.startFrame = cursor
+                guard file.frames > 0 else { continue }
+            }
             if file.startFrame > cursor {
                 children.append(.object([
                     ("OTIO_SCHEMA", "Gap.1"),
@@ -216,19 +251,19 @@ public enum ResolveTimeline {
                 ]))
             }
             children.append(clip(file, metadata: metadata(file)))
-            cursor = max(cursor, file.startFrame) + file.frames
+            cursor = file.startFrame + file.frames
         }
         return children
     }
 
     private static func clip(_ file: Placed, metadata: Node) -> Node {
-        let available = range(start: file.timecodeFrame, frames: file.frames)
+        let available = range(start: file.timecodeFrame, frames: file.trimmed + file.frames)
         return .object([
             ("OTIO_SCHEMA", "Clip.2"),
             ("name", .string(file.name)),
             ("enabled", true),
             ("metadata", metadata),
-            ("source_range", available),
+            ("source_range", range(start: file.timecodeFrame + file.trimmed, frames: file.frames)),
             ("effects", .array([])),
             ("markers", .array([])),
             ("active_media_reference_key", "DEFAULT_MEDIA"),
@@ -257,12 +292,14 @@ public enum ResolveTimeline {
 
         var note = [recordingLine(started: started, ended: ended)]
         var title = "Recording \(name)"
-        if let largest = manifest.files.max(by: { area($0.frameSize) < area($1.frameSize) }) {
-            let size = "\(largest.frameSize[0]) x \(largest.frameSize[1])"
+        if let largest = (manifest.files.map(\.frameSize) + manifest.cameraFiles.map(\.frameSize)).max(by: { area($0) < area($1) }) {
+            let size = "\(largest[0]) x \(largest[1])"
             title += ": set resolution \(size)"
-            note.append("Set the timeline resolution to \(size) (the largest screen): Timeline > Timeline Settings.")
+            note.append("Set the timeline resolution to \(size) (the largest video file): Timeline > Timeline Settings.")
         }
-        note.append("Tracks: one per screen, one per audio channel; the channels of one input are a linked group.")
+        note.append(manifest.cameraFiles.isEmpty
+            ? "Tracks: one per screen, one per audio channel; the channels of one input are a linked group."
+            : "Tracks: one per screen, then one per camera, one per audio channel; the channels of one input are a linked group.")
         note.append("Markers: blue = screen change, green = audio and other changes.")
         note.append(manifest.problems.isEmpty ? "Problems: none." : "Problems:")
         note += manifest.problems.map { EventLine.problemText($0, started: started.date, timeZone: started.timeZone) }

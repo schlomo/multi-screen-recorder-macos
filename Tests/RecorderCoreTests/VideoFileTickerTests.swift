@@ -6,8 +6,8 @@ import Testing
 
 /// A screen file's ticks with a stand-in writer: what reaches the
 /// recording manifest when a writer fails, falls behind or is slow at the end.
-@Suite struct ScreenFileTickerTests {
-    final class StandInWriter: ScreenFileWriting, @unchecked Sendable {
+@Suite struct VideoFileTickerTests {
+    final class StandInWriter: VideoFileWriting, @unchecked Sendable {
         let firstTick: Int64
         var isReady = true
         var isGuideReady = true
@@ -51,8 +51,8 @@ import Testing
             return false
         }
 
-        var appendError: ScreenFileWriterError?
-        var finishError: ScreenFileWriterError?
+        var appendError: VideoFileWriterError?
+        var finishError: VideoFileWriterError?
         private(set) var written: [Int64] = []
         private(set) var finishedAt: Int64??
 
@@ -62,7 +62,7 @@ import Testing
 
         init(firstTick: Int64) { self.firstTick = firstTick }
 
-        func appendGuide(_ guide: GuideTrack, _ channels: [[Float]], at position: Int64) throws(ScreenFileWriterError) -> Bool {
+        func appendGuide(_ guide: GuideTrack, _ channels: [[Float]], at position: Int64) throws(VideoFileWriterError) -> Bool {
             if let appendError { throw appendError }
             guard takesGuide else { return false }
             guides.append((guide, position, channels[0].count))
@@ -70,14 +70,14 @@ import Testing
             return true
         }
 
-        func append(_ frame: CVPixelBuffer, tick: Int64) throws(ScreenFileWriterError) -> Bool {
+        func append(_ frame: CVPixelBuffer, tick: Int64) throws(VideoFileWriterError) -> Bool {
             if let appendError { throw appendError }
             guard takesVideo else { return false }
             written.append(tick)
             return true
         }
 
-        func finish(lastTick: Int64?) async throws(ScreenFileWriterError) {
+        func finish(lastTick: Int64?) async throws(VideoFileWriterError) {
             finishedAt = .some(lastTick)
             if let finishError { throw finishError }
         }
@@ -92,9 +92,9 @@ import Testing
 
     /// A ticker whose writer is kept for inspection.
     private func ticker(captureStart: Int64 = 0, drainTimeout: Duration = .milliseconds(50))
-        -> (ScreenFileTicker, () -> StandInWriter?) {
+        -> (VideoFileTicker<RecordingManifest.ScreenFile>, () -> StandInWriter?) {
         nonisolated(unsafe) var made: StandInWriter?
-        let ticker = ScreenFileTicker(captureStart: captureStart, drainTimeout: drainTimeout) { firstTick throws(ScreenFileWriterError) in
+        let ticker = VideoFileTicker<RecordingManifest.ScreenFile>(captureStart: captureStart, drainTimeout: drainTimeout) { firstTick throws(VideoFileWriterError) in
             let writer = StandInWriter(firstTick: firstTick)
             made = writer
             return (writer, RecordingManifest.ScreenFile(
@@ -106,7 +106,7 @@ import Testing
 
     @Test func theFileEndCarriesItsStartEntryAndItsFinalState() async throws {
         let (ticker, writer) = ticker()
-        guard case .fileStarted(let entry) = ticker.receive(frame, capturedAt: 0) else { Issue.record("no file"); return }
+        guard case .fileStarted(let entry) = ticker.receive(frame, capturedAt: 0, arrivedAt: 0) else { Issue.record("no file"); return }
         #expect(entry.name == "f.mov")
         #expect(ticker.tick(now: grid.time(ofTick: 2)) == nil)
         let end = try #require(await ticker.finish(now: grid.time(ofTick: 2), writeWaitingTicks: true))
@@ -123,7 +123,7 @@ import Testing
         let (ticker, writer) = ticker()
         // Before a file: nothing.
         #expect(ticker.receiveGuide(.audioInputs, [[0, 0]], positionFromStart: 0) == nil)
-        _ = ticker.receive(frame, capturedAt: grid.time(ofTick: 2) - 1)
+        _ = ticker.receive(frame, capturedAt: grid.time(ofTick: 2) - 1, arrivedAt: grid.time(ofTick: 2))
         let made = try #require(writer())
         #expect(made.firstTick == 2)
         let samplesPerTick = RecorderValues.audioSampleRate / RecorderValues.framesPerSecond
@@ -142,9 +142,9 @@ import Testing
     /// 0.25 from t0 on, handed over up to `handedOver` samples.
     private func guidedFile(
         handedOver: Int, guideReady: Bool = true, drainTimeout: Duration = .milliseconds(50)
-    ) throws -> (ScreenFileTicker, StandInWriter, GuideTrackMix) {
+    ) throws -> (VideoFileTicker<RecordingManifest.ScreenFile>, StandInWriter, GuideTrackMix) {
         let (ticker, writer) = ticker(drainTimeout: drainTimeout)
-        _ = ticker.receive(frame, capturedAt: 0)
+        _ = ticker.receive(frame, capturedAt: 0, arrivedAt: 0)
         let made = try #require(writer())
         made.isGuideReady = guideReady
         var mix = GuideTrackMix(.audioInputs)
@@ -269,26 +269,26 @@ import Testing
 
     @Test func aWriterErrorReachesTheFileEnd() async throws {
         let (ticker, writer) = ticker()
-        _ = ticker.receive(frame, capturedAt: 0)
-        writer()?.appendError = ScreenFileWriterError(description: "cannot write f.mov: no luck", isDiskFull: false)
+        _ = ticker.receive(frame, capturedAt: 0, arrivedAt: 0)
+        writer()?.appendError = VideoFileWriterError(description: "cannot write f.mov: no luck", isDiskFull: false)
         #expect(ticker.tick(now: grid.time(ofTick: 1)) == .writerFailed("cannot write f.mov: no luck"))
-        writer()?.finishError = ScreenFileWriterError(description: "cannot finalize f.mov: no luck", isDiskFull: false)
+        writer()?.finishError = VideoFileWriterError(description: "cannot finalize f.mov: no luck", isDiskFull: false)
         let end = try #require(await ticker.finish(now: grid.time(ofTick: 1), writeWaitingTicks: false))
         #expect(end.file.state == .notFinalized)
-        #expect(end.error == ScreenFileWriterError(description: "cannot write f.mov: no luck", isDiskFull: false))
+        #expect(end.error == VideoFileWriterError(description: "cannot write f.mov: no luck", isDiskFull: false))
     }
 
     @Test func aFullDiskEndsAsDiskFull() {
         let (ticker, writer) = ticker()
-        _ = ticker.receive(frame, capturedAt: 0)
-        writer()?.appendError = ScreenFileWriterError(description: "full", isDiskFull: true)
+        _ = ticker.receive(frame, capturedAt: 0, arrivedAt: 0)
+        writer()?.appendError = VideoFileWriterError(description: "full", isDiskFull: true)
         #expect(ticker.tick(now: grid.time(ofTick: 1)) == .diskFull)
     }
 
     @Test func aFullDiskReachesTheFileEndAsAFullDisk() async throws {
         let (ticker, writer) = ticker()
-        _ = ticker.receive(frame, capturedAt: 0)
-        writer()?.appendError = ScreenFileWriterError(description: "full", isDiskFull: true)
+        _ = ticker.receive(frame, capturedAt: 0, arrivedAt: 0)
+        writer()?.appendError = VideoFileWriterError(description: "full", isDiskFull: true)
         _ = ticker.tick(now: grid.time(ofTick: 1))
         let end = try #require(await ticker.finish(now: grid.time(ofTick: 1), writeWaitingTicks: false))
         #expect(end.error?.isDiskFull == true)
@@ -296,7 +296,7 @@ import Testing
 
     @Test func aWriterThatFellBehindIsStillFinalized() async throws {
         let (ticker, writer) = ticker()
-        _ = ticker.receive(frame, capturedAt: 0)
+        _ = ticker.receive(frame, capturedAt: 0, arrivedAt: 0)
         writer()?.isReady = false
         let behind = Int64(RecorderValues.lateTickBound) + 1
         #expect(ticker.tick(now: grid.time(ofTick: behind)) == .writerFellBehind)
@@ -307,7 +307,7 @@ import Testing
 
     @Test func aDrainThatTimesOutStillFinalizesAndSaysSo() async throws {
         let (ticker, writer) = ticker()
-        _ = ticker.receive(frame, capturedAt: 0)
+        _ = ticker.receive(frame, capturedAt: 0, arrivedAt: 0)
         writer()?.isReady = false
         _ = ticker.tick(now: grid.time(ofTick: 3))
         let end = try #require(await ticker.finish(now: grid.time(ofTick: 3), writeWaitingTicks: true))
@@ -318,7 +318,7 @@ import Testing
 
     @Test func theTicksDueAtTheEndAreWrittenBeforeTheFileIsFinalized() async throws {
         let (ticker, writer) = ticker()
-        _ = ticker.receive(frame, capturedAt: 0)
+        _ = ticker.receive(frame, capturedAt: 0, arrivedAt: 0)
         _ = ticker.tick(now: grid.time(ofTick: 1))
         let end = try #require(await ticker.finish(now: grid.time(ofTick: 4), writeWaitingTicks: true))
         #expect(writer()?.written == [0, 1, 2, 3, 4])
@@ -326,10 +326,10 @@ import Testing
     }
 
     @Test func aWriterThatCannotBeCreatedEndsTheCapture() {
-        let ticker = ScreenFileTicker(captureStart: 0) { _ throws(ScreenFileWriterError) in
-            throw ScreenFileWriterError(description: "cannot create f.mov", isDiskFull: false)
+        let ticker = VideoFileTicker<RecordingManifest.ScreenFile>(captureStart: 0) { _ throws(VideoFileWriterError) in
+            throw VideoFileWriterError(description: "cannot create f.mov", isDiskFull: false)
         }
-        #expect(ticker.receive(frame, capturedAt: 0) == .ended(.writerFailed("cannot create f.mov")))
+        #expect(ticker.receive(frame, capturedAt: 0, arrivedAt: 0) == .ended(.writerFailed("cannot create f.mov")))
     }
 
     @Test func noFileNoEnd() async {

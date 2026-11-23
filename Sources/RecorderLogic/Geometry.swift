@@ -81,7 +81,22 @@ public enum RecordingResolution: String, CaseIterable, Sendable, Encodable {
     /// no frame size: asking for it is a bug.
     public func frameSize(forLooksLike looksLike: FrameSize) -> FrameSize {
         precondition(recordsScreens, "the recording resolution None records no screen, so it has no frame size")
-        let fitted = box.map { fit(looksLike, into: looksLike.isPortrait ? $0.rotated : $0) } ?? looksLike
+        return fitted(looksLike, into: box)
+    }
+
+    /// The frame size of a camera file: the camera format's size fitted as
+    /// a screen's looks-like size, into the box, with `limited` (the setting
+    /// `limitCameras`) limited to `RecorderValues.cameraLargestSize` (D74);
+    /// at None, which records no camera, as at Native.
+    public func cameraFrameSize(for size: FrameSize, limited: Bool) -> FrameSize {
+        guard limited else { return fitted(size, into: box) }
+        let largest = RecorderValues.cameraLargestSize
+        return fitted(size, into: FrameSize(
+            width: min(box?.width ?? .max, largest.width), height: min(box?.height ?? .max, largest.height)))
+    }
+
+    private func fitted(_ size: FrameSize, into box: FrameSize?) -> FrameSize {
+        let fitted = box.map { fit(size, into: size.isPortrait ? $0.rotated : $0) } ?? size
         return FrameSize(width: roundedDownToEven(fitted.width), height: roundedDownToEven(fitted.height))
     }
 

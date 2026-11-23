@@ -1,10 +1,10 @@
 import Foundation
 
-/// How much disk space a recording needs per hour, file by file: a screen
-/// file is its video plus its guide tracks, an audio file its tracks, all at
-/// the rates in `Encoding`.
+/// How much disk space a recording needs per hour, file by file: a video
+/// file (a screen file or a camera file) is its video plus its guide tracks,
+/// an audio file its tracks, all at the rates in `Encoding`.
 public enum DiskEstimate {
-    public static func screenFileBytesPerHour(frameSize: FrameSize, settings: Settings) -> Double {
+    public static func videoFileBytesPerHour(frameSize: FrameSize, settings: Settings) -> Double {
         let video = Encoding.videoBytesPerHour(frameSize: frameSize)
         return video + bytesPerHour(bitRate: GuideTrack.tracks(for: settings).map(\.bitRate).reduce(0, +))
     }
@@ -16,12 +16,14 @@ public enum DiskEstimate {
     public static let systemAudioFileBytesPerHour = bytesPerHour(bitRate: Encoding.systemAudioTrackBitRate)
 
     /// Every file a recording with these settings and devices writes, no
-    /// screen file at the recording resolution None; nil when the channels of an
-    /// audio input it records cannot be read.
-    public static func bytesPerHour(settings: Settings, screens: [ScreenInfo], audioInputs: [AudioInputInfo]) -> Double? {
+    /// screen file and no camera file at the recording resolution None; nil when the channels of an
+    /// audio input it records cannot be read. A camera file is estimated as a screen file of its frame size.
+    public static func bytesPerHour(
+        settings: Settings, screens: [ScreenInfo], audioInputs: [AudioInputInfo], cameras: [CameraInfo] = []
+    ) -> Double? {
         let recordedScreens = settings.effectiveResolution.recordsScreens ? screens : []
         let screenFiles = recordedScreens.map {
-            screenFileBytesPerHour(
+            videoFileBytesPerHour(
                 frameSize: settings.effectiveResolution.frameSize(forLooksLike: $0.pointSize), settings: settings)
         }
         var audioInputFiles: [Double] = []
@@ -29,8 +31,11 @@ public enum DiskEstimate {
             guard case .success(let channelCount) = input.channelCount else { return nil }
             audioInputFiles.append(audioInputFileBytesPerHour(channelCount: channelCount))
         }
+        let cameraFiles = cameras.filter { CameraTracker.records($0, settings: settings) }.compactMap { camera in
+            camera.frameSize(resolution: settings.effectiveResolution, limited: settings.limitCameras).map { videoFileBytesPerHour(frameSize: $0, settings: settings) }
+        }
         let systemAudioFile = settings.systemAudio ? systemAudioFileBytesPerHour : 0
-        return (screenFiles + audioInputFiles).reduce(systemAudioFile, +)
+        return (screenFiles + cameraFiles + audioInputFiles).reduce(systemAudioFile, +)
     }
 
     private static func bytesPerHour(bitRate: Int) -> Double {

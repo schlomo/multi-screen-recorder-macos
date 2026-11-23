@@ -1,6 +1,6 @@
-/// How an audio input is connected to the Mac, as Core Audio reports its
-/// transport type.
-public enum AudioTransport: Equatable, Sendable, CaseIterable {
+/// How an audio input or a camera is connected to the Mac, as Core Audio
+/// (for a camera, AVFoundation) reports its transport type.
+public enum DeviceTransport: Equatable, Sendable, CaseIterable {
     case builtIn
     case usb
     case fireWire
@@ -30,6 +30,27 @@ public enum AudioTransport: Equatable, Sendable, CaseIterable {
         case .continuityCapture: "Continuity Capture"
         case .unknown, .unreadable: "unknown connection"
         case .builtIn, .usb, .fireWire, .pci, .thunderbolt, .hdmi, .displayPort: nil
+        }
+    }
+
+    /// "USB", "built in", "Bluetooth" and so on.
+    public var shownName: String {
+        switch self {
+        case .builtIn: "built in"
+        case .usb: "USB"
+        case .fireWire: "FireWire"
+        case .pci: "PCI"
+        case .thunderbolt: "Thunderbolt"
+        case .hdmi: "HDMI"
+        case .displayPort: "DisplayPort"
+        case .bluetooth: "Bluetooth"
+        case .bluetoothLE: "Bluetooth LE"
+        case .virtual: "virtual"
+        case .aggregate: "aggregate"
+        case .airPlay: "AirPlay"
+        case .continuityCapture: "Continuity Capture"
+        case .unknown: "unknown"
+        case .unreadable: "cannot be read"
         }
     }
 

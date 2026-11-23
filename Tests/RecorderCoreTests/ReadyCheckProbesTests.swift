@@ -27,7 +27,7 @@ import Testing
         _ calls: Calls, screenRecording: PermissionProbe = .granted,
         screens: Result<[ScreenInfo], DeviceReadError> = .success([]),
         audioInputs: [AudioInputInfo] = [AudioInputInfo(name: "Microphone", channelCount: 1, isDefault: true, uid: "Microphone")],
-        outputFolder: OutputFolderProbe = .usable(.bytes(5))
+        outputFolder: OutputFolderProbe = .usable(.bytes(5)), cameras: [CameraInfo] = []
     ) -> ReadyCheckProbes {
         ReadyCheckProbes(
             screenRecording: { proof in calls.record("screenRecording \(proof)"); return screenRecording },
@@ -37,7 +37,9 @@ import Testing
             outputFolder: { folder in
                 calls.record("outputFolder \(folder.path(percentEncoded: false))")
                 return outputFolder
-            })
+            },
+            cameras: { calls.record("cameras"); return cameras },
+            cameraPermission: { calls.record("cameraPermission"); return true })
     }
 
     private let home = URL(filePath: "/Users/someone", directoryHint: .isDirectory)
@@ -114,6 +116,45 @@ import Testing
         let facts = await probeReadyCheckFacts(proof: .listScreens, settings: .defaults, homeFolder: home, probes: probes(calls))
         #expect(facts.microphoneGranted == true)
         #expect(calls.names.contains("microphonePermission"))
+    }
+
+    // MARK: The Camera permission (D74)
+
+    private static let builtInCamera = CameraInfo(
+        uniqueID: "A", name: "FaceTime HD Camera", isDefault: true, isVirtual: false,
+        formats: [CameraFormat(size: FrameSize(width: 1920, height: 1080), maxFramesPerSecond: 30)])
+    private static let virtualCamera = CameraInfo(
+        uniqueID: "V", name: "OBS Virtual Camera", isDefault: false, isVirtual: true,
+        formats: [CameraFormat(size: FrameSize(width: 1280, height: 720), maxFramesPerSecond: 30)])
+
+    @Test func aRecordedCameraAsksForTheCameraPermission() async {
+        let calls = Calls()
+        let facts = await probeReadyCheckFacts(
+            proof: .listScreens, settings: .defaults, homeFolder: home, probes: probes(calls, cameras: [Self.builtInCamera]))
+        #expect(facts.cameraGranted == true)
+        #expect(facts.cameras == [Self.builtInCamera])
+        #expect(calls.names.contains("cameraPermission"))
+    }
+
+    /// The test VM has no camera: no request, no prompt.
+    @Test func withoutACameraTheCameraPermissionIsNeitherAskedNorRead() async {
+        let calls = Calls()
+        let facts = await probeReadyCheckFacts(proof: .listScreens, settings: .defaults, homeFolder: home, probes: probes(calls))
+        #expect(facts.cameraGranted == nil)
+        #expect(!calls.names.contains("cameraPermission"))
+    }
+
+    @Test func aCameraTheCameraModeLeavesOutAsksNothing() async {
+        var none = Settings.defaults
+        none.auto = false
+        none.cameraMode = .none
+        let calls = Calls()
+        let withNone = await probeReadyCheckFacts(
+            proof: .listScreens, settings: none, homeFolder: home, probes: probes(calls, cameras: [Self.builtInCamera]))
+        let virtualOnly = await probeReadyCheckFacts(
+            proof: .listScreens, settings: .defaults, homeFolder: home, probes: probes(calls, cameras: [Self.virtualCamera]))
+        #expect(withNone.cameraGranted == nil && virtualOnly.cameraGranted == nil)
+        #expect(!calls.names.contains("cameraPermission"))
     }
 
     @Test func fileAccessIsOffTheMainThreadAndTheScreensAreOnIt() async {

@@ -10,6 +10,13 @@
 
 {{- $alt := "Three windows. The start window: every screen and audio source that will be recorded, the settings and the ready check; an arrow from its Start button leads to the status window while recording: every source with its files, what it has written, its state and clock drift; an arrow from its Stop button leads to the recording folder in Finder: one file per screen and audio source, and recording.json." }}
 {{- $standalone := partial "collage.html" (dict "alt" $alt "standalone" true) | resources.FromString "images/collage.svg" }}
+<figure class="story">
+  <blockquote>
+    <p>When I give a talk from my laptop, recording myself properly was always a struggle. Now I just start Multi Screen Recorder, it records literally everything, and I stop worrying about it.</p>
+  </blockquote>
+  <figcaption>Nadia Schapiro</figcaption>
+</figure>
+
 <figure class="collage">
   <a href="{{ $standalone.RelPermalink }}" target="_blank" title="Open the picture full size in a new tab">{{ partial "collage.html" (dict "alt" $alt) | safeHTML }}</a>
   <figcaption>
@@ -31,12 +38,22 @@
 {{ $features | markdownify }}
 </section>
 
+<section class="workflow">
+<h2>Recommended workflow</h2>
+<ol>
+  <li>Record everything.</li>
+  <li>Open the recording's timeline file (<code>.otio</code>) in your video editor, for example DaVinci Resolve.</li>
+  <li>Remove the video and audio tracks you don't need.</li>
+  <li>Trim the start and the end.</li>
+  <li>Done.</li>
+</ol>
+</section>
+
 <div class="facts">
 <section>
 <h2>Getting started</h2>
-<p>Multi Screen Recorder is in testing. The <a href="{{ site.Params.testerGuideURL }}">tester guide</a>
-says how to install it, how to open it the first time, which permissions it needs, and what it
-cannot do yet.</p>
+<p>The <a href="{{ site.Params.testerGuideURL }}">tester guide</a> says how to install the app,
+how to open it the first time and which permissions it needs, and how to report a problem.</p>
 </section>
 
 <section>

@@ -1,7 +1,8 @@
 /// The window's section "What will be recorded", from the settings, the
 /// devices connected now and the free space in the output folder, as data
 /// the view renders: one table, the screen rows (not recorded at the
-/// recording resolution None) then the audio rows (the system audio (0) first when
+/// recording resolution None), the camera rows (the recorded cameras by
+/// number, then those not recorded) then the audio rows (the system audio (0) first when
 /// it is on, the recorded inputs by number, then the sources not
 /// recorded, the system audio among them when it is off) and the total
 /// row, and a line of what the required recording hours need, under a
@@ -24,6 +25,8 @@ public struct WhatWillBeRecorded: Equatable, Sendable {
         public var drawnAt: String
         public var recordsAt: String
         public var gigabytesPerHour: String
+        /// The row's mouse-over (`SourceDetails`).
+        public var details = ""
     }
 
     /// One row of the table. A source not recorded is shown dimmed.
@@ -33,9 +36,21 @@ public struct WhatWillBeRecorded: Equatable, Sendable {
         /// The cells after Source.
         public var values: [String]
         public var isRecorded: Bool
+        /// The mouse-over, the source's technical details (`SourceDetails`); empty for the total row.
+        public var details = ""
 
         /// A cell per column, Source as text.
         public var cells: [String] { [source?.text ?? "Total"] + values }
+    }
+
+    /// A camera: a recorded one has its number, the default camera first,
+    /// then in the order listed, as the recording numbers them at its start (D74).
+    public struct Camera: Equatable, Sendable {
+        public var source: SourceCell
+        public var recordsAt: String
+        public var gigabytesPerHour: String
+        public var details = ""
+        public var isRecorded: Bool { source.number != nil }
     }
 
     /// An audio input, or the system audio.
@@ -51,6 +66,7 @@ public struct WhatWillBeRecorded: Equatable, Sendable {
         public var gigabytesPerHour: String
         /// Why the channels cannot be read; `text` shows it after "cannot be read".
         public var readError: String? = nil
+        public var details = ""
     }
 
     /// The total GB/h max, and what the required recording hours need.
@@ -60,11 +76,12 @@ public struct WhatWillBeRecorded: Equatable, Sendable {
         public var need: String
     }
 
-    /// "Settings: Auto (resolution Native, audio mode Wired), system audio on": the effective settings.
+    /// "Settings: Auto (resolution Native, audio mode Wired, camera mode All real), system audio on": the effective settings.
     public var settingsLine: String
     /// Set when the screens cannot be read; it stands in place of the Screens table.
     public var screensError: String?
     public var screens: [Screen]
+    public var cameras: [Camera] = []
     /// Set when the audio inputs cannot be read; the Audio table then has no row for them.
     public var audioError: String?
     public var audio: [Audio]
@@ -93,13 +110,15 @@ public struct WhatWillBeRecorded: Equatable, Sendable {
         settings: Settings,
         screens readScreens: Result<[ScreenInfo], DeviceReadError>,
         audioInputs readAudioInputs: Result<[AudioInputInfo], DeviceReadError>,
+        cameras cameraInfos: [CameraInfo] = [],
+        cameraPermissionDenied: Bool = false,
         outputFolder: OutputFolderProbe?
     ) {
         self.init(
             settingsLine: Self.settingsLine(settings),
             screensError: nil, screens: [], audioError: nil, audio: [], total: nil,
             outputFolder: "Files go to \(settings.outputFolder)",
-            continuity: "Recording continues when screens or audio sources change.")
+            continuity: "Recording continues when screens, cameras or audio sources change.")
         switch readScreens {
         case .success(let screenInfos):
             screens = numberScreens(screenInfos).map { Self.screen($0, settings: settings) }
@@ -108,13 +127,21 @@ public struct WhatWillBeRecorded: Equatable, Sendable {
         }
         if case .success(let screenInfos) = screensToJudge(readScreens, settings: settings),
            case .success(let audioInputs) = audioInputsToJudge(readAudioInputs, settings: settings),
-           let bytesPerHour = DiskEstimate.bytesPerHour(settings: settings, screens: screenInfos, audioInputs: audioInputs) {
+           let bytesPerHour = DiskEstimate.bytesPerHour(
+               settings: settings, screens: screenInfos, audioInputs: audioInputs,
+               cameras: cameraPermissionDenied ? [] : cameraInfos) {
             total = Self.total(bytesPerHour, settings: settings, outputFolder: outputFolder)
         }
+        let ordered = cameraInfos.filter(\.isDefault) + cameraInfos.filter { !$0.isDefault }
+        let recorded = cameraPermissionDenied ? [] : ordered.filter { CameraTracker.records($0, settings: settings) }
+        let leftOut = ordered.filter { camera in !recorded.contains { $0.uniqueID == camera.uniqueID } }
+        cameras = recorded.enumerated().map { Self.camera($0.element, number: $0.offset + 1, settings: settings) }
+            + leftOut.map { Self.camera($0, number: nil, settings: settings) }
         let systemAudio = Audio(
             source: .systemAudio(isRecorded: settings.systemAudio), channels: "stereo", isRecorded: settings.systemAudio,
             gigabytesPerHour: settings.systemAudio
-                ? DiskEstimate.gigabytesPerHour(DiskEstimate.systemAudioFileBytesPerHour) : Self.notRecorded)
+                ? DiskEstimate.gigabytesPerHour(DiskEstimate.systemAudioFileBytesPerHour) : Self.notRecorded,
+            details: SourceDetails.systemAudio(label: SourceCell.systemAudio(isRecorded: settings.systemAudio).text))
         audio = []
         switch readAudioInputs {
         case .success(let audioInputs):
@@ -135,30 +162,38 @@ public struct WhatWillBeRecorded: Equatable, Sendable {
             + (settings.systemAudio ? [] : [systemAudio])
     }
 
-    /// "Settings: Auto (resolution Native, audio mode Wired), system audio on"; with auto mode off
-    /// "Settings: resolution 1080p, audio mode Default microphone (only the default microphone is recorded), system audio off".
-    /// At the recording resolution None it says that no screen is recorded, under the audio modes None and Default
-    /// microphone why the inputs are not recorded.
+    /// "Settings: Auto (resolution Native, audio mode Wired, camera mode All real), system audio on"; with auto mode off
+    /// "Settings: resolution 1080p, audio mode Default microphone (only the default microphone is recorded), camera mode
+    /// None (no camera is recorded), system audio off". At the recording resolution None it says that no screen and no
+    /// camera is recorded, under the audio modes None and Default microphone and the camera modes None and Default
+    /// camera why the inputs and cameras are not recorded.
     static func settingsLine(_ settings: Settings) -> String {
         let resolution = settings.effectiveResolution
         let mode = settings.effectiveAudioMode
-        let resolutionReason = resolution.recordsScreens ? "" : " (no screen is recorded)"
+        let cameraMode = settings.effectiveCameraMode
+        let resolutionReason = resolution.recordsScreens ? "" : " (no screen and no camera is recorded)"
         let modeReason = switch mode {
         case .none: " (no audio input is recorded)"
         case .defaultMicrophone: " (only the default microphone is recorded)"
         case .wired, .allInputs: ""
         }
-        let choices = "resolution \(resolution.shownName), audio mode \(mode.shownName)"
+        let cameraModeReason = switch cameraMode {
+        case .none: " (no camera is recorded)"
+        case .defaultCamera: " (only the default camera is recorded)"
+        case .real, .allCameras: ""
+        }
+        let choices = "resolution \(resolution.shownName), audio mode \(mode.shownName), camera mode \(cameraMode.shownName)"
         let explained = "resolution \(resolution.shownName)\(resolutionReason), audio mode \(mode.shownName)\(modeReason)"
+            + ", camera mode \(cameraMode.shownName)\(cameraModeReason)"
         return "Settings: " + (settings.auto ? "Auto (\(choices))" : explained)
-            + ", system audio \(settings.systemAudio ? "on" : "off")"
+            + ", system audio \(settings.systemAudio ? "on" : "off"), limit cameras \(settings.limitCameras ? "on" : "off")"
     }
 
     /// What the ready check's probes found, as the window and `msr check` show it.
     public init(settings: Settings, facts: ReadyCheckFacts) {
         self.init(
-            settings: settings, screens: facts.screens, audioInputs: facts.audioInputs,
-            outputFolder: facts.outputFolder)
+            settings: settings, screens: facts.screens, audioInputs: facts.audioInputs, cameras: facts.cameras,
+            cameraPermissionDenied: facts.cameraGranted == false, outputFolder: facts.outputFolder)
     }
 
     /// An input whose channels cannot be read says so; its GB/h max is "?" if it is recorded.
@@ -167,7 +202,7 @@ public struct WhatWillBeRecorded: Equatable, Sendable {
         let isRecorded = number != nil
         let reason = settings.reasonNotRecorded(input)
         let source = SourceCell.audioInput(number, name: input.shownName + (reason.map { " (\($0))" } ?? ""))
-        return switch input.channelCount {
+        var audio: Audio = switch input.channelCount {
         case .success(let count):
             Audio(source: source, channels: count == 1 ? "1 channel" : "\(count) channels", isRecorded: isRecorded,
                   gigabytesPerHour: isRecorded
@@ -177,14 +212,48 @@ public struct WhatWillBeRecorded: Equatable, Sendable {
             Audio(source: source, channels: cannotBeRead, isRecorded: isRecorded,
                   gigabytesPerHour: isRecorded ? unknown : notRecorded, readError: ErrorDetail(error).text)
         }
+        audio.details = SourceDetails.audioInput(label: source.text, input)
+        return audio
+    }
+
+    /// A camera not recorded has no number and `-` for Records at and GB/h max; after its name it says
+    /// why, where its own rule leaves it out: "OBS Virtual Camera (virtual)", "(Continuity Camera)", "(no format)", "(suspended)", and one the
+    /// camera mode records "(no Camera permission)".
+    private static func camera(_ camera: CameraInfo, number: Int?, settings: Settings) -> Camera {
+        guard let number, let frameSize = camera.frameSize(resolution: settings.effectiveResolution, limited: settings.limitCameras) else {
+            let leavesOutVirtual = [.defaultCamera, .real].contains(settings.effectiveCameraMode)
+                && settings.effectiveResolution.recordsScreens
+            let reason: String? = if CameraTracker.records(camera, settings: settings) {
+                "no Camera permission"
+            } else if camera.formats.isEmpty { "no format" } else if camera.isVirtual && leavesOutVirtual {
+                "virtual"
+            } else if camera.isContinuity && leavesOutVirtual {
+                "Continuity Camera"
+            } else if camera.isSuspended && settings.cameraModeIncludes(camera) && settings.effectiveResolution.recordsScreens {
+                "suspended"
+            } else { nil }
+            let source = SourceCell.camera(nil, name: camera.shownName + (reason.map { " (\($0))" } ?? ""))
+            return Camera(source: source, recordsAt: notRecorded, gigabytesPerHour: notRecorded,
+                          details: SourceDetails.camera(label: source.text, camera, settings: settings))
+        }
+        let source = SourceCell.camera(number, name: camera.shownName)
+        return Camera(
+            source: source, recordsAt: "\(frameSize)",
+            gigabytesPerHour: DiskEstimate.gigabytesPerHour(DiskEstimate.videoFileBytesPerHour(frameSize: frameSize, settings: settings)),
+            details: SourceDetails.camera(label: source.text, camera, settings: settings))
     }
 
     /// At the recording resolution None a screen not recorded: no number, `-` for Records at and GB/h max.
     private static func screen(_ numbered: NumberedScreen, settings: Settings) -> Screen {
         let screen = numbered.screen
+        let details = { (number: Int?, recordsAt: FrameSize?) in
+            SourceDetails.screen(
+                label: SourceCell.screen(number, name: screen.name).text, looksLike: screen.pointSize, drawnAt: screen.pixelSize,
+                recordsAt: recordsAt, refreshRate: screen.refreshRate, displayID: screen.displayID, isMain: screen.isMain)
+        }
         guard settings.effectiveResolution.recordsScreens else {
             return Screen(number: nil, name: screen.name, looksLike: "\(screen.pointSize)", drawnAt: "\(screen.pixelSize)",
-                          recordsAt: notRecorded, gigabytesPerHour: notRecorded)
+                          recordsAt: notRecorded, gigabytesPerHour: notRecorded, details: details(nil, nil))
         }
         let frameSize = settings.effectiveResolution.frameSize(forLooksLike: screen.pointSize)
         return Screen(
@@ -192,7 +261,8 @@ public struct WhatWillBeRecorded: Equatable, Sendable {
             looksLike: "\(screen.pointSize)", drawnAt: "\(screen.pixelSize)",
             recordsAt: "\(frameSize)",
             gigabytesPerHour: DiskEstimate.gigabytesPerHour(
-                DiskEstimate.screenFileBytesPerHour(frameSize: frameSize, settings: settings)))
+                DiskEstimate.videoFileBytesPerHour(frameSize: frameSize, settings: settings)),
+            details: details(numbered.number, frameSize))
     }
 
     /// "2.2" and "2 hours need 4.3 GB, 3.1 GB free."
@@ -208,14 +278,21 @@ public struct WhatWillBeRecorded: Equatable, Sendable {
     public var screenRows: [Row] {
         screens.map {
             Row(source: .screen($0.number, name: $0.name), values: [$0.looksLike, $0.drawnAt, $0.recordsAt, $0.gigabytesPerHour],
-                isRecorded: $0.number != nil)
+                isRecorded: $0.number != nil, details: $0.details)
+        }
+    }
+
+    /// The camera rows of the table: no Looks like and Drawn at, which are a screen's.
+    public var cameraRows: [Row] {
+        cameras.map {
+            Row(source: $0.source, values: ["", "", $0.recordsAt, $0.gigabytesPerHour], isRecorded: $0.isRecorded, details: $0.details)
         }
     }
 
     /// The audio rows of the table, the system audio first: no Looks like and Drawn at.
     public var audioRows: [Row] {
         audio.map {
-            Row(source: $0.source, values: ["", "", $0.channels, $0.gigabytesPerHour], isRecorded: $0.isRecorded)
+            Row(source: $0.source, values: ["", "", $0.channels, $0.gigabytesPerHour], isRecorded: $0.isRecorded, details: $0.details)
         }
     }
 
@@ -233,7 +310,7 @@ public struct WhatWillBeRecorded: Equatable, Sendable {
     /// The text `msr check`, `msr record` and `msr list` print: the settings line, then the window's
     /// one table with its total row and the line of what the hours need, its columns aligned and the
     /// GB/h max column on the right. An error that stands for rows is a line above the table. A source
-    /// not recorded has the `Audio <n> - ` or `Screen <n> - ` part of its name blank.
+    /// not recorded has the `Audio <n> - `, `Camera <n> - ` or `Screen <n> - ` part of its name blank.
     public var text: String {
         var lines = ["What will be recorded", "  \(settingsLine)"]
         if let screensError { lines.append("  \(screensError)") }
@@ -241,16 +318,23 @@ public struct WhatWillBeRecorded: Equatable, Sendable {
         let audioBlank = String(repeating: " ", count: SourceLabel.audioInput(0, name: "").count - 1 + numberDigits)
         let screenDigits = String(screens.compactMap(\.number).max() ?? 1).count
         let screenBlank = String(repeating: " ", count: SourceLabel.screen(0, name: "").count - 1 + screenDigits)
+        let cameraDigits = String(cameras.compactMap(\.source.number).max() ?? 1).count
+        let cameraBlank = String(repeating: " ", count: SourceLabel.camera(0, name: "").count - 1 + cameraDigits)
         func cells(_ row: Row) -> [String] {
             guard let source = row.source, source.number == nil else { return row.cells }
-            return [(source.kind == .screen ? screenBlank : audioBlank) + source.name] + row.values
+            let blank = switch source.kind {
+            case .screen: screenBlank
+            case .camera: cameraBlank
+            case .audioInput, .systemAudio: audioBlank
+            }
+            return [blank + source.name] + row.values
         }
         let audioCells = zip(audio, audioRows).map { audio, row in
             var shown = cells(row)
             if let readError = audio.readError { shown[3] = "\(Self.cannotBeRead) (\(readError))" }
             return shown
         }
-        let rows = screenRows.map(cells) + audioCells + [totalRow].compactMap(\.self).map(cells)
+        let rows = screenRows.map(cells) + cameraRows.map(cells) + audioCells + [totalRow].compactMap(\.self).map(cells)
         let widths = Self.columns.indices.map { column in ([Self.columns] + rows).map { $0[column].count }.max() ?? 0 }
         func line(_ cells: [String]) -> String {
             let last = cells.count - 1
@@ -265,6 +349,8 @@ public struct WhatWillBeRecorded: Equatable, Sendable {
         lines += [line(Self.columns), rule]
         lines += screenRows.map { line(cells($0)) }
         if !screenRows.isEmpty { lines.append(rule) }
+        lines += cameraRows.map { line(cells($0)) }
+        if !cameraRows.isEmpty { lines.append(rule) }
         lines += audioCells.map(line)
         if let total, let totalRow {
             lines += [rule, line(totalRow.cells), "  \(total.need)"]

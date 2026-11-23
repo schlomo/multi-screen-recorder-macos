@@ -14,7 +14,9 @@ recording manifest, problem, status window, screen file, screen
 identity, settle time, screen check, tick, timecode, audio track,
 audio file, guide track, clock drift; D45, D49), labels (D55), the
 banner, the recording log and the error detail (D64), the timeline file
-(D68), the level meter, the input volume and no audio (D69), and the end-to-end
+(D68), the level meter, the input volume and no audio (D69), cameras,
+camera files and the camera mode (D74), the orientation (D76), the audio
+delay and the lag (D77), recovered (D78), and the end-to-end
 tests' first named scenarios, with the restore file, virtual screens and
 the test tone (D63).
 
@@ -99,9 +101,26 @@ printed already (D64).
 ## Problem
 
 Something that went wrong in a recording and that the person is told:
-the Dock badge's "!", red in the status window, a line on standard
+the Dock badge's "!", a line in the status window (red when something
+is broken, orange for a hiccup, D78), a line on standard
 error in `msr record`, a line in the recording log, and an entry in the
 recording manifest's `problems` with its time and full error (D46, D64).
+
+## Ended
+
+A problem that is over while the recording goes on: its line in the
+status window says how long it lasted, when it began and how it ended:
+`recovered`, `then disconnected` when its source went away, or `stopped`
+when its capture ended without recovering and without a disconnect
+(Stop, out of the camera mode, the camera suspended, or the capture
+ended by a failure); it
+is orange unless the problem damaged the recording (D78).
+
+## Recovered
+
+A problem that ended because its source works again, such as a camera
+stall whose frames came again or a failed screen whose next file
+started; one of the endings of an ended problem (D78).
 
 ## Error detail
 
@@ -159,8 +178,8 @@ says screen everywhere else (D55).
 What a recorded source is called in its file names, its reel name, its
 track names and the terminal's tables (the window shows an icon for
 the kind instead of the word):
-`Screen <n> - <name>`, `Audio <n> - <name>`, or `Audio 0 - System` for
-the system audio. The numbers count per kind from 1 in order of
+`Screen <n> - <name>`, `Camera <n> - <name>`, `Audio <n> - <name>`,
+or `Audio 0 - System` for the system audio. The numbers count per kind from 1 in order of
 appearance in the recording, and a source keeps its number when it
 comes back (D55).
 
@@ -173,6 +192,56 @@ a new one begins when it is back. A screen whose frame size changes
 also ends its file, and a new one begins after the settle time (D30,
 D45). Sleep, mirroring, a writer too far behind and the screen check
 end it too.
+
+## Camera
+
+A video device AVFoundation lists on the Mac. A real camera is built in
+or connected by cable. An iPhone camera is a Continuity Camera or Desk
+View, or connected by Continuity Capture. A virtual camera is made by
+software, such as OBS Virtual Camera, and often carries a copy of a
+screen or of another camera (D74).
+
+## Camera file
+
+The video file for one camera, made exactly as a screen file: the same
+tick grid, timecode and guide tracks, no audio of the camera's own, its
+frame size its chosen format's size fitted, as a screen's, into the
+recording resolution's box, limited to 1920×1080 unless `limitCameras` is off: of the formats at 30
+fps, of any aspect ratio, the one that records the largest size, and of
+those the smallest; for a camera another app uses, the format it runs
+in; for a camera that offers its size in both orientations and delivers its
+picture boxed in the other one, that other orientation (D76). Another app changing that to another frame size starts a new one. Its tick waits up to 0.5 s for a frame captured before it. A camera
+that disappears, is suspended, delivers no frames for 10 s, or whose
+stream or writer fails ends its camera file; a new one begins when it is back;
+a stall does not end it (D74).
+
+## Orientation
+
+Whether a frame or a picture is portrait, landscape or square. A camera
+that offers its size in both orientations (W×H and H×W) and delivers its
+picture boxed between black bars in the other one is turned to that
+orientation, with the event `camera orientation changed` while recording
+(D76).
+
+## Stall
+
+A camera that delivers no frame for 2 s while recording: its camera file
+goes on, repeating its last frame, until frames come again (events
+`camera stalled` and `camera stall ended`) or, after 10 s, the stream
+counts as failing. It makes the result `problems` (D47, D74).
+
+## Camera mode
+
+Which cameras are recorded, a slider of four steps: None (`none`),
+Default camera (`default-camera`, the default camera if it is real), All
+real (`real`, every real camera) and All (`all-cameras`, virtual and
+iPhone cameras too). All real is auto mode's camera mode and the default
+(D74).
+
+## Video file
+
+A screen file or a camera file: what the two share in the code (the
+writer, the ticks, the end of a file).
 
 ## Screen identity
 
@@ -200,11 +269,25 @@ even number (D11, D25, D30, D44).
 ## Tick
 
 One of the instants, 1/30 s apart from the recording's start, at which
-every screen file gets a frame (D11, D21).
+every screen file and every camera file gets a frame (D11, D21, D74).
+
+## Decision delay
+
+How long after its time a camera file's tick waits for a frame captured
+after it before its frame is chosen: 0.5 s; a screen file's tick has
+none (D74).
+
+## Placed late
+
+A frame that arrived after its tick was decided and was shown on a later
+tick, counted in a detail line at the camera file's end (D74). Not the
+same as a frame repeated for lateness (`framesRepeatedForLateness`): a
+tick written late because the writer was not ready, with the frame of
+its own time (D11).
 
 ## Timecode
 
-The time-of-day track in every screen file and every audio file, by
+The time-of-day track in every screen file, camera file and audio file, by
 which an editor places files on a timeline (D21, D31).
 
 ## Audio track
@@ -240,12 +323,12 @@ audio mode, and the default (D44).
 
 ## Auto mode
 
-The setting `auto`, on by default: every screen is recorded at Native
-and the audio mode is Wired, whatever the two sliders (`resolution`,
-`audioMode`) say; system audio, the output folder and the rest stay as
+The setting `auto`, on by default: every screen is recorded at Native,
+the audio mode is Wired and the camera mode All real, whatever the
+three sliders (`resolution`, `audioMode`, `cameraMode`) say; system audio, the output folder and the rest stay as
 set. The sliders' defaults are auto mode's choices, so turning auto mode
 off changes nothing until one is moved. In the window the switch "Auto"
-grays out the sliders, which then show Native and Wired; on the command line `--auto` forces it for one run
+grays out the sliders, which then show Native, Wired and All real; on the command line `--auto` forces it for one run
 (D34, D44).
 
 ## Audio file
@@ -261,7 +344,7 @@ starts a new one (D31, D46, D49).
 
 ## Guide track
 
-A track in a screen file for playback and waveform sync only:
+A track in a screen file or a camera file for playback and waveform sync only:
 "Audio inputs", one mono mix of the recorded audio inputs (each averaged
 to mono, summed at unity gain, through a soft limiter; D52), or
 "System audio", stereo; the two are never mixed together. Which ones a
@@ -269,7 +352,21 @@ screen file has follows from the settings alone; a missing source is
 silence in its guide track (D31). It ends with its screen file's video
 (D51), unless the file ended by a failure, or the samples for its last
 mix were no longer there or the writer did not take them in time,
-which is told as a problem.
+which is told as a problem. An audio input out of sync with the
+others leaves "Audio inputs" (D79): the largest group of inputs whose
+values lie within 0.1 s of each other stays.
+
+## Value (audio delay)
+
+The figure of an audio input file compared against the reference's
+file: its first counted window's lag until it has 3 counted windows,
+then their median; the reference's own file is 0. The "Audio inputs"
+guide track keeps the largest group whose values lie within 0.1 s of
+each other (D79).
+
+## Offset (guide track)
+
+An audio input file's distance from the earliest input of the group the "Audio inputs" guide track keeps, in seconds, negative when earlier (D79).
 
 ## Level meter
 
@@ -304,20 +401,44 @@ file's end as `clockDriftPpm` (D57; under D49 it was measured over the
 whole file) and the sound the correction added as
 `clockDriftCorrection`.
 
+## Audio delay
+
+How much later an audio input's sound arrives than the reference
+microphone's (the default microphone when recorded, else the recorded
+audio input with the lowest number), beyond what its clock drift
+explains; measured while recording by cross-correlation and written as
+an audio file's `measuredDelay` (D77), normalized so the earliest
+measured input's is 0. The timeline file places the file's clip earlier
+by it; the audio file itself is unchanged.
+
+## Lag
+
+One window's measurement of an audio delay: how many seconds a file's
+sound is later than the reference microphone's in the latest 10 s
+(D77). A file's audio delay is the median of its counted lags.
+
+## Counted window
+
+A window of an audio delay measurement whose match is clear enough to
+count, its peak of |correlation| at least 12 times its median (D77):
+only counted windows give a lag. Whether its input stays in the "Audio
+inputs" guide track, the first counted window of a file decides until
+the file has 3 counted windows, then their median does (D79).
+
 ## Recording resolution
 
 The maximum box a screen's looks-like size is shrunk to fit: 4K,
 1440p, 1200p, 1080p or 720p, turned upright for a portrait screen, or
 Native, which has no box. It never enlarges the picture (D11, D25, D44).
-Or None (`none`), first on the slider, which records no screen: audio
-only (D62). Said in full, "the recording resolution None", as the audio
+Or None (`none`), first on the slider, which records no screen and no
+camera: audio only (D62, D74). Said in full, "the recording resolution None", as the audio
 mode has a None of its own.
 
 ## Audio only
 
 A recording at the recording resolution None: its audio files and
-`recording.json`, no screen file and so no guide track. The screens are
-not recorded; a recording that would record neither a screen nor any
+`recording.json`, no screen file, no camera file and so no guide track.
+The screens and the cameras are not recorded; a recording that would record neither a screen nor any
 audio source does not pass the ready check (D62).
 
 ## Native
@@ -339,9 +460,10 @@ looks-like size; a column of the table. Never recorded (D44).
 
 A source the settings or its own state leave out of a recording: shown
 dimmed in the window, without a number, with `-` for GB/h max (and for
-Records at, for a screen at the recording resolution None), and, for an
-audio input whose own rule leaves it out, the reason in parentheses
-after its name (`(virtual)`, `(no device ID)`; D59, D62).
+Records at, for a screen at the recording resolution None and for a
+camera), and, for an audio input or a camera whose own rule leaves it
+out, the reason in parentheses after its name (`(virtual)`, `(Continuity Camera)`, `(no Camera permission)`, `(no device
+ID)`, `(no format)`, `(suspended)`; D59, D62, D74).
 
 ## Ready check
 

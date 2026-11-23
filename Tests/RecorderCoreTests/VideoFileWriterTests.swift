@@ -17,14 +17,14 @@ private final class CollectingFile: RecordingLogFile {
 extension GlobalRecordingLog {
     /// Writes screen files from synthetic frames and reads them back with
     /// AVFoundation: no screen, no permission.
-    @Suite struct ScreenFileWriterTests {
+    @Suite struct VideoFileWriterTests {
         private let scratch: URL
         private let frameSize = FrameSize(width: 320, height: 180)
         private let berlin = TimeZone(identifier: "Europe/Berlin")!
 
         init() throws {
             scratch = FileManager.default.temporaryDirectory
-                .appending(path: "ScreenFileWriterTests-\(UUID().uuidString)", directoryHint: .isDirectory)
+                .appending(path: "VideoFileWriterTests-\(UUID().uuidString)", directoryHint: .isDirectory)
             try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
         }
 
@@ -53,9 +53,9 @@ extension GlobalRecordingLog {
         }
 
         /// Writes `seconds` of ticks from `firstTick` on, waiting for the writer as a late tick would.
-        private func write(rate: Int, firstTick: Int64, seconds: Int, timecode: Timecode, finish: Bool = true) async throws -> (URL, ScreenFileWriter) {
+        private func write(rate: Int, firstTick: Int64, seconds: Int, timecode: Timecode, finish: Bool = true) async throws -> (URL, VideoFileWriter) {
             let url = scratch.appending(path: "Screen 1 - Test \(rate).mov")
-            let writer = try ScreenFileWriter(
+            let writer = try VideoFileWriter(
                 url: url, frameSize: frameSize, firstTick: firstTick, timecode: timecode, metadata: metadata,
                 grid: TickGrid(framesPerSecond: rate))
             let frames = try (0..<4).map { try frame(brightness: UInt8(40 + 50 * $0)) }
@@ -69,7 +69,7 @@ extension GlobalRecordingLog {
             return (url, writer)
         }
 
-        private let metadata = ScreenFileMetadata(
+        private let metadata = VideoFileMetadata(
             screenUUID: "1E6E43E3-6E7B-4C2A-9F6B-2B0F4C1A9D11", screenNumber: 2, screenName: "LG HDR 4K",
             frameSize: FrameSize(width: 320, height: 180), recordingStarted: "2026-11-12T14:03:05.120+01:00",
             app: "Multi Screen Recorder 0.20261115.4 (a1b2c3d)")
@@ -172,7 +172,7 @@ extension GlobalRecordingLog {
             defer { removeScratch() }
             let rate = RecorderValues.framesPerSecond
             let url = scratch.appending(path: "guide.mov")
-            let writer = try ScreenFileWriter(
+            let writer = try VideoFileWriter(
                 url: url, frameSize: frameSize, firstTick: 0, timecode: Timecode(start: try startDate(), timeZone: berlin),
                 metadata: metadata, guideTracks: [.audioInputs, .systemAudio])
             let image = try frame(brightness: 90)
@@ -208,7 +208,7 @@ extension GlobalRecordingLog {
             RecorderLog.recording(since: { 0 }, log: log)
             defer { RecorderLog.recording(since: nil, log: nil) }
             let timecode = Timecode(start: try startDate(), timeZone: berlin)
-            let writer = try ScreenFileWriter(
+            let writer = try VideoFileWriter(
                 url: scratch.appending(path: "failing.mov"), frameSize: frameSize, firstTick: 0, timecode: timecode,
                 metadata: metadata)
             let picture = try frame(brightness: 90)
@@ -216,7 +216,7 @@ extension GlobalRecordingLog {
                 while try !writer.append(picture, tick: Int64(tick)) { try await Task.sleep(for: .milliseconds(1)) }
             }
             // A frame before the last one makes the writer fail, after the append returned.
-            var failure: ScreenFileWriterError?
+            var failure: VideoFileWriterError?
             for attempt in 0..<200 where failure == nil {
                 do { _ = try writer.append(picture, tick: Int64(5 + attempt)) } catch { failure = error }
                 try await Task.sleep(for: .milliseconds(10))

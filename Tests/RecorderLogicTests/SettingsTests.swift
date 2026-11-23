@@ -8,7 +8,9 @@ import Testing
         #expect(defaults.auto == true)
         #expect(defaults.resolution == .native)
         #expect(defaults.audioMode == .wired)
+        #expect(defaults.cameraMode == .real)
         #expect(defaults.systemAudio == true)
+        #expect(defaults.limitCameras == true)
         #expect(defaults.outputFolder == "~/Movies/Multi Screen Recorder")
         #expect(defaults.requiredRecordingHours == 2)
         #expect(defaults.lowDiskWarningMinutes == 20)
@@ -18,6 +20,8 @@ import Testing
         {
           "audioMode" : "wired",
           "auto" : true,
+          "cameraMode" : "real",
+          "limitCameras" : true,
           "lowDiskWarningMinutes" : 20,
           "outputFolder" : "~/Movies/Multi Screen Recorder",
           "requiredRecordingHours" : 2,
@@ -37,7 +41,7 @@ import Testing
 
     @Test func flagNamesAreTheKeysInKebabCase() {
         #expect(SettingKey.allCases.map(\.flagName) == [
-            "--resolution", "--audio-mode", "--system-audio", "--output-folder",
+            "--resolution", "--audio-mode", "--camera-mode", "--system-audio", "--limit-cameras", "--output-folder",
             "--required-recording-hours", "--low-disk-warning-minutes",
         ])
     }
@@ -50,6 +54,7 @@ import Testing
     @Test func autoModesChoicesAreTheDefaultsOfTheTwoSliders() {
         #expect(Settings.defaults.resolution == Settings.autoResolution)
         #expect(Settings.defaults.audioMode == Settings.autoAudioMode)
+        #expect(Settings.defaults.cameraMode == Settings.autoCameraMode)
     }
 }
 
@@ -118,7 +123,7 @@ import Testing
             .replacing(/\s+/) { _ in " " }.contains(note))
     }
 
-    private func input(_ transport: AudioTransport, isDefault: Bool = false) -> AudioInputInfo {
+    private func input(_ transport: DeviceTransport, isDefault: Bool = false) -> AudioInputInfo {
         AudioInputInfo(name: "X", channelCount: 1, isDefault: isDefault, transport: transport)
     }
 
@@ -130,29 +135,29 @@ import Testing
     }
 
     @Test(arguments: [
-        (AudioTransport.builtIn, true), (.usb, true), (.fireWire, true), (.pci, true), (.thunderbolt, true),
+        (DeviceTransport.builtIn, true), (.usb, true), (.fireWire, true), (.pci, true), (.thunderbolt, true),
         (.hdmi, true), (.displayPort, true),
         (.bluetooth, false), (.bluetoothLE, false), (.virtual, false), (.aggregate, false), (.airPlay, false),
         (.continuityCapture, false), (.unknown, false), (.unreadable, false),
     ])
-    func onlyBuiltInAndWiredTransportsAreWired(transport: AudioTransport, isWired: Bool) {
+    func onlyBuiltInAndWiredTransportsAreWired(transport: DeviceTransport, isWired: Bool) {
         #expect(transport.isWired == isWired)
     }
 
     @Test func everyTransportIsClassified() {
-        #expect(AudioTransport.allCases.count == 15)
+        #expect(DeviceTransport.allCases.count == 15)
     }
 
-    @Test(arguments: AudioTransport.allCases)
-    func theDefaultMicrophoneIsRecordedInEveryModeButNone(transport: AudioTransport) {
+    @Test(arguments: DeviceTransport.allCases)
+    func theDefaultMicrophoneIsRecordedInEveryModeButNone(transport: DeviceTransport) {
         for mode in AudioMode.allCases where mode != .none {
             #expect(records(mode, input(transport, isDefault: true)))
         }
         #expect(!records(.none, input(transport, isDefault: true)))
     }
 
-    @Test(arguments: AudioTransport.allCases)
-    func otherInputsFollowTheMode(transport: AudioTransport) {
+    @Test(arguments: DeviceTransport.allCases)
+    func otherInputsFollowTheMode(transport: DeviceTransport) {
         let other = input(transport)
         #expect(!records(.none, other))
         #expect(!records(.defaultMicrophone, other))
@@ -229,6 +234,7 @@ import Testing
         (#"{"audioMode": true}"#, "audioMode"),
         (#"{"systemAudio": "on"}"#, "systemAudio"),
         (#"{"systemAudio": 1}"#, "systemAudio"),
+        (#"{"limitCameras": "off"}"#, "limitCameras"),
         (#"{"outputFolder": ""}"#, "outputFolder"),
         (#"{"outputFolder": "relative/folder"}"#, "outputFolder"),
         (#"{"outputFolder": 3}"#, "outputFolder"),
@@ -290,6 +296,7 @@ import Testing
             auto: false,
             resolution: .p720,
             audioMode: .none,
+            cameraMode: .real,
             systemAudio: false,
             outputFolder: "~/Desktop/Recordings",
             requiredRecordingHours: 0.5,
@@ -301,11 +308,29 @@ import Testing
         #expect(try Settings.defaults.applying(flags: [:]) == .defaults)
     }
 
-    @Test(arguments: [(SettingKey.resolution, "1080p"), (.audioMode, "all-inputs")])
+    @Test(arguments: [(SettingKey.resolution, "1080p"), (.audioMode, "all-inputs"), (.cameraMode, "all-cameras")])
     func aChoiceFlagTurnsAutoOffForTheRunAndSetsTheChoice(key: SettingKey, value: String) throws {
         let settings = try Settings.defaults.applying(flags: [key: value])
         #expect(settings.auto == false)
-        #expect(key == .resolution ? settings.resolution == .p1080 : settings.audioMode == .allInputs)
+        switch key {
+        case .resolution: #expect(settings.resolution == .p1080)
+        case .audioMode: #expect(settings.audioMode == .allInputs)
+        default: #expect(settings.cameraMode == .allCameras)
+        }
+    }
+
+    @Test func theCameraModeIsAFlagAndASettingAndAnInvalidOneIsRefusedOrIgnored() throws {
+        #expect(Settings.read(json: Data(#"{"auto": false, "cameraMode": "default-camera"}"#.utf8)).settings.effectiveCameraMode
+            == .defaultCamera)
+        #expect(Settings.read(json: Data(#"{"cameraMode": "webcams"}"#.utf8)).ignored == [IgnoredSetting(
+            key: "cameraMode", reason: "invalid value, expected one of none, default-camera, real, all-cameras")])
+        #expect(throws: SettingsError.invalidFlagValue(
+            flag: "--camera-mode", value: "webcams", expected: "one of none, default-camera, real, all-cameras")) {
+            try Settings.defaults.applying(flags: [.cameraMode: "webcams"])
+        }
+        #expect(throws: SettingsError.conflictingFlags(flag: "--camera-mode")) {
+            try Settings.defaults.applying(flags: [.cameraMode: "none"], auto: true)
+        }
     }
 
     /// Audio only: `--resolution none` and `"resolution": "none"`; auto mode stays Native.
@@ -351,10 +376,27 @@ import Testing
         #expect(try Settings.defaults.applying(flags: [.systemAudio: "off"]).systemAudio == false)
     }
 
+    /// As `--system-audio`: on or off, not set by auto mode (D74).
+    @Test func limitCamerasFlagTakesOnAndOffAndKeepsAutoMode() throws {
+        let off = try Settings.defaults.applying(flags: [.limitCameras: "off"])
+        #expect(off.limitCameras == false)
+        #expect(off.auto == true)
+        #expect(try off.applying(flags: [.limitCameras: "on"]).limitCameras == true)
+        let error = try #require(throws: SettingsError.self) { try Settings.defaults.applying(flags: [.limitCameras: "true"]) }
+        let systemAudioError = try #require(throws: SettingsError.self) { try Settings.defaults.applying(flags: [.systemAudio: "true"]) }
+        #expect(error.description == systemAudioError.description.replacing("--system-audio", with: "--limit-cameras"))
+    }
+
+    @Test func theSettingsFileTurnsTheCamerasLimitOff() {
+        #expect(Settings.read(json: Data(#"{"limitCameras": false}"#.utf8)).settings.limitCameras == false)
+        #expect(Settings.read(json: Data(#"{"systemAudio": false}"#.utf8)).settings.limitCameras == true)
+    }
+
     @Test(arguments: [
         (SettingKey.resolution, "999p"),
         (.audioMode, "loud"),
         (.systemAudio, "true"),
+        (.limitCameras, "true"),
         (.outputFolder, ""),
         (.requiredRecordingHours, "two"),
         (.requiredRecordingHours, "0"),

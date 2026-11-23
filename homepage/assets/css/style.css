@@ -31,7 +31,7 @@ a {
 
 /* Text reads best at most 44rem wide; the home page's header, collage and
    sections use the page's full width of up to 76rem. */
-.prose, footer, .features, .facts { max-inline-size: 44rem; margin-inline: auto; }
+.prose, footer, .features, .workflow, .facts { max-inline-size: 44rem; margin-inline: auto; }
 
 /* On a wide screen (64rem, wider than a phone held sideways), the home
    page's header: the icon and the name on the left, the tagline, description
@@ -145,10 +145,19 @@ footer {
   & figcaption { max-inline-size: 44rem; margin: 1rem auto 0; color: var(--text-light); }
 }
 
+/* The story: a quote, its speaker under it. */
+.story {
+  max-inline-size: 44rem; margin: 2rem auto;
+
+  & blockquote { margin: 0; padding-inline-start: 1rem; border-inline-start: 4px solid var(--accent); font-style: italic; }
+  & figcaption { margin-block-start: 0.5rem; padding-inline-start: 1rem; color: var(--text-light); &::before { content: "\2014\00a0"; } }
+}
+
 /* On a wide screen, the features in two columns and the three short sections
    side by side, Requirements last. */
 @media (min-width: 64rem) {
   .features, .facts { max-inline-size: none; }
+  .workflow { max-inline-size: 44rem; }
 
   .features > ul {
     columns: 2;

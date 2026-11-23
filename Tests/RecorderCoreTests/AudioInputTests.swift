@@ -10,7 +10,7 @@ import Testing
     private func inputs(
         _ channels: [InputChannels],
         name: (AudioObjectID) throws(DeviceReadError) -> String? = { "Device \($0)" },
-        transport: (AudioObjectID) -> AudioTransport = { _ in .builtIn },
+        transport: (AudioObjectID) -> DeviceTransport = { _ in .builtIn },
         defaultInput: () throws(DeviceReadError) -> AudioObjectID = { AudioObjectID(kAudioObjectUnknown) }
     ) throws -> [AudioInputInfo] {
         try audioInputs(
@@ -31,6 +31,15 @@ import Testing
             devices: [1, 2], inputChannels: { _ in .count(1) }, name: { "Device \($0)" }, transport: { _ in .usb },
             uid: { $0 == 1 ? "AppleUSBAudioEngine:1" : nil }, defaultInput: { 1 })
         #expect(listed.map(\.uid) == ["AppleUSBAudioEngine:1", nil])
+    }
+
+    @Test func eachInputCarriesItsSampleRateAndInputVolume() throws {
+        let listed = try audioInputs(
+            devices: [1, 2], inputChannels: { _ in .count(1) }, name: { "Device \($0)" }, transport: { _ in .usb },
+            uid: { _ in nil }, defaultInput: { 1 }, sampleRate: { $0 == 1 ? 48_000 : nil },
+            inputVolume: { $0 == 2 ? InputVolumeReading(value: 0.5, isSettable: true) : nil })
+        #expect(listed.map(\.sampleRate) == [48_000, nil])
+        #expect(listed.map(\.inputVolume) == [nil, InputVolumeReading(value: 0.5, isSettable: true)])
     }
 
     @Test func eachInputKeepsItsTransport() throws {
@@ -89,7 +98,7 @@ import Testing
     }
 
     @Test(arguments: [
-        (kAudioDeviceTransportTypeBuiltIn, AudioTransport.builtIn),
+        (kAudioDeviceTransportTypeBuiltIn, DeviceTransport.builtIn),
         (kAudioDeviceTransportTypeUSB, .usb),
         (kAudioDeviceTransportTypeFireWire, .fireWire),
         (kAudioDeviceTransportTypePCI, .pci),
@@ -108,13 +117,13 @@ import Testing
         (kAudioDeviceTransportTypeUnknown, .unknown),
         (0x1234_5678, .unknown),
     ])
-    func coreAudioTransportTypesAreClassified(value: UInt32, transport: AudioTransport) {
-        #expect(audioTransport(coreAudioValue: value) == transport)
+    func coreAudioTransportTypesAreClassified(value: UInt32, transport: DeviceTransport) {
+        #expect(deviceTransport(coreAudioValue: value) == transport)
     }
 
     @Test func aTransportThatCannotBeReadIsUnreadableAndNotWired() {
-        #expect(audioTransport(coreAudioValue: nil) == .unreadable)
-        #expect(!audioTransport(coreAudioValue: nil).isWired)
+        #expect(deviceTransport(coreAudioValue: nil) == .unreadable)
+        #expect(!deviceTransport(coreAudioValue: nil).isWired)
     }
 
     @Test(arguments: [
@@ -128,7 +137,7 @@ import Testing
         (kAudioDeviceTransportTypeContinuityCaptureWireless, false), (kAudioDeviceTransportTypeUnknown, false),
     ])
     func wiredIsClassifiedPerCoreAudioTransportType(value: UInt32, isWired: Bool) {
-        #expect(audioTransport(coreAudioValue: value).isWired == isWired)
+        #expect(deviceTransport(coreAudioValue: value).isWired == isWired)
     }
 
     /// Reads this Mac's audio devices, which needs no permission and shows

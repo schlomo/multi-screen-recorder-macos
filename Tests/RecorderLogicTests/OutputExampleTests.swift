@@ -38,7 +38,7 @@ import Testing
         let names = files.compactMap { $0["name"] as? String }
         #expect(names.count == files.count)
         #expect(try listedFiles().sorted() == names.sorted())
-        #expect(try listedFiles().count == 6)
+        #expect(try listedFiles().count == 7)
     }
 
     @Test func aFrameSizeChangeEndsOneFileAndStartsTheNext() throws {

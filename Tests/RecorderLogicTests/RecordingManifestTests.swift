@@ -46,7 +46,7 @@ import Testing
     }
 
     /// D47: the result is ok when every file is finalized and no screen
-    /// file was ended by a failure; a problem told alone does not change it.
+    /// file was ended by a failure or a camera stalled; a problem told alone does not change it.
     @Test(arguments: [
         RecordingEvent.Kind.screenStreamFailed, .screenFileWriterFailed, .diskFull, .screenFileWriterFellBehind,
         .screenShowsAnotherScreensPicture,
@@ -79,8 +79,8 @@ import Testing
 
     @Test func theFailuresAreTheWaysAFileEndsBadly() {
         #expect(RecordingEvent.Kind.allCases.filter(\.isFailure) == [
-            .screenStreamFailed, .screenShowsAnotherScreensPicture, .screenFileWriterFellBehind, .screenFileWriterFailed, .diskFull,
-            .audioInputFailed, .systemAudioFailed, .audioFileWriterFailed, .audioFileWriterFellBehind,
+            .screenStreamFailed, .screenShowsAnotherScreensPicture, .screenFileWriterFellBehind, .screenFileWriterFailed,
+            .cameraStreamFailed, .cameraStalled, .cameraFileWriterFellBehind, .cameraFileWriterFailed, .diskFull, .audioInputFailed, .systemAudioFailed, .audioFileWriterFailed, .audioFileWriterFellBehind,
         ])
     }
 
@@ -266,6 +266,24 @@ import Testing
         #expect(systemObject.keys.contains("inputVolume") == false)
     }
 
+    /// An audio file's measured delay is null until measured, and its end keeps it (D77).
+    @Test func anAudioFileKeepsItsMeasuredDelayAtItsEnd() throws {
+        var manifest = RecordingManifest(app: "a", started: Date(), timeZone: .gmt, settings: .manual)
+        let file = RecordingManifest.AudioFile(
+            name: "a.mov", audioSource: "OsmoPocket4P", audioSourceUID: "O", channels: .mono(1), start: 0, timecode: "t")
+        let unmeasured = try #require(try JSONSerialization.jsonObject(with: try JSONEncoder().encode(file)) as? [String: Any])
+        #expect(unmeasured["measuredDelay"] is NSNull)
+        _ = manifest.audioFileStarted(file)
+        let measured = manifest.audioDelayMeasured(0.553_24, file: "a.mov")
+        let unlisted = manifest.audioDelayMeasured(0.5, file: "other.mov")
+        #expect(measured && !unlisted)
+        var ended = file
+        ended.end = 12
+        _ = manifest.audioFileEnded(ended)
+        #expect(manifest.audioFiles.first?.measuredDelay == 0.5532)
+        #expect(manifest.audioFiles.first?.end == 12)
+    }
+
     @Test func anInputVolumeChangeCarriesTheVolumesFrom0To1() throws {
         var changed = RecordingEvent(at: 1_200_000_000, event: .audioInputVolumeChanged, audioSource: "Razer")
         changed.from = .volume(0.5)
@@ -433,6 +451,13 @@ import Testing
             #expect(Set(encoded.keys) == Set(file.keys))
             #expect(decoded.name == file["name"] as? String)
         }
+        let cameraFiles = files.filter { $0["camera"] != nil }
+        #expect(cameraFiles.count == 1)
+        for file in cameraFiles {
+            let decoded = try JSONDecoder().decode(RecordingManifest.CameraFile.self, from: JSONSerialization.data(withJSONObject: file))
+            let encoded = try #require(try JSONSerialization.jsonObject(with: prettyJSON(decoded)) as? [String: Any])
+            #expect(Set(encoded.keys) == Set(file.keys))
+        }
         let events = try #require(object["events"] as? [[String: Any]])
         for event in events {
             _ = try JSONDecoder().decode(RecordingEvent.self, from: JSONSerialization.data(withJSONObject: event))
@@ -449,7 +474,7 @@ import Testing
         #expect(object["ended"] is NSNull)
         #expect(object["result"] is NSNull)
         let settings = try #require(object["settings"] as? [String: Any])
-        #expect(Set(settings.keys) == ["resolution", "audioMode", "systemAudio"])
+        #expect(Set(settings.keys) == ["resolution", "audioMode", "systemAudio", "cameraMode", "limitCameras"])
         #expect(object["started"] as? String == manifest().started)
     }
 
@@ -622,5 +647,82 @@ import Testing
         let summary = RecordingSummary(manifest: manifest([.finalized], events: [failed]), recordingFolder: "/r", seconds: 1, manifestWritten: true)
         #expect(summary.endedWithError)
         #expect(summary.text.contains("screen file writer failed, LG (cannot write)"))
+    }
+}
+
+/// Camera files and camera events in the recording manifest (D74).
+@Suite struct CameraFileManifestTests {
+    private let berlin = TimeZone(identifier: "Europe/Berlin")!
+    private let start = Date(timeIntervalSince1970: 1_794_488_585.120)  // 2026-11-12 14:03:05.120 in Berlin
+
+    private func manifest() -> RecordingManifest {
+        RecordingManifest(app: "Multi Screen Recorder (tests)", started: start, timeZone: berlin, settings: .defaults)
+    }
+
+    private func cameraFile(at seconds: Double = 1.5) -> RecordingManifest.CameraFile {
+        RecordingManifest.CameraFile(
+            name: "2026-11-12 14.03.06 Camera 1 - FaceTime HD Camera.mov", camera: "FaceTime HD Camera",
+            cameraUniqueID: "0x1410000005ac8600", frameSize: FrameSize(width: 1920, height: 1080), start: seconds,
+            timecode: "14:03:06:20", guideTracks: ["Audio inputs", "System audio"])
+    }
+
+    @Test func aCameraFileIsListedInFilesInTheOrderOfItsStartAndReadBack() throws {
+        var manifest = manifest()
+        manifest.files.append(.init(
+            name: "2026-11-12 14.03.05 Screen 1 - Built-in Retina Display.mov", screen: "Built-in Retina Display",
+            screenUUID: "37D8832A", frameSize: FrameSize(width: 1670, height: 1080), start: 0, timecode: "14:03:05:04"))
+        manifest.cameraFiles.append(cameraFile())
+        manifest.events.append(RecordingEvent(at: 1_000_000_000, event: .cameraConnected, camera: "FaceTime HD Camera"))
+        let text = String(decoding: try manifest.jsonData(), as: UTF8.self)
+        #expect(text.contains(#""camera" : "FaceTime HD Camera""#))
+        #expect(text.contains(#""cameraUniqueID" : "0x1410000005ac8600""#))
+        #expect(text.contains(#""cameraMode" : "real""#))
+        let screen = try #require(text.range(of: "Screen 1 - Built-in Retina Display.mov"))
+        let camera = try #require(text.range(of: "Camera 1 - FaceTime HD Camera.mov"))
+        #expect(screen.lowerBound < camera.lowerBound)
+        let read = try RecordingManifest(json: manifest.jsonData())
+        #expect(read == manifest)
+        #expect(read.cameraFiles.map(\.camera) == ["FaceTime HD Camera"])
+        #expect(read.events.first?.camera == "FaceTime HD Camera")
+    }
+
+    @Test func aManifestOfBeforeCamerasRecordedNone() throws {
+        let json = """
+            {"app": "test", "state": "finalized", "started": "2026-11-20T10:00:00.000+01:00", "ended": null,
+             "settings": {"audioMode": "wired", "resolution": "native", "systemAudio": true},
+             "files": [], "events": [], "problems": []}
+            """
+        #expect(try RecordingManifest(json: Data(json.utf8)).settings.cameraMode == "none")
+    }
+
+    @Test func aCameraFileNotFinalizedMakesTheResultProblemsAndIsNamedWhenNothingWasTold() {
+        var manifest = manifest()
+        var file = cameraFile()
+        file.state = .notFinalized
+        manifest.cameraFiles = [file]
+        manifest.finalize(ended: start + 60, timeZone: berlin)
+        #expect(manifest.result == .problems)
+        #expect(manifest.problems.first?.error == file.name)
+    }
+
+    @Test func aCameraEventIsAProblemOfTheCamera() {
+        var failed = RecordingEvent(at: 2_000_000_000, event: .cameraStreamFailed, camera: "FaceTime HD Camera")
+        failed.errorDetail = "the stand-in failed"
+        #expect(failed.subject == "FaceTime HD Camera")
+        #expect(failed.problem.problem == "Camera FaceTime HD Camera")
+    }
+
+    @Test func theCameraFilesAreListedAfterTheScreensAndBeforeTheAudio() {
+        var recorded = manifest()
+        recorded.cameraFiles = [cameraFile(at: 0)]
+        recorded.files = [.init(
+            name: "2026-11-12 14.03.06 Screen 1 - A.mov", screen: "A", screenUUID: "A", frameSize: FrameSize(width: 2, height: 2),
+            start: 1, timecode: "t")]
+        recorded.audioFiles = [RecordingManifest.AudioFile(
+            name: "2026-11-12 14.03.05 Audio 0 - System.mov", audioSource: "System audio", audioSourceUID: nil, channels: .stereo,
+            start: 0, timecode: "t")]
+        let names = RecordingSummary(manifest: recorded, recordingFolder: "/r", seconds: 5, manifestWritten: true)
+            .text.split(separator: "\n").dropFirst().prefix(3).map { $0.dropFirst(22).prefix { $0 != "." } }
+        #expect(names == ["Screen 1 - A", "Camera 1 - FaceTime HD Camera", "Audio 0 - System"])
     }
 }

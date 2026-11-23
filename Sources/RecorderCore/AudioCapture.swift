@@ -125,6 +125,8 @@ final class AudioCapture: @unchecked Sendable {
     }
     private let context: RecordingContext
     private let guides: GuideTrackFeed
+    /// Where an audio input's sound goes for measuring its delay (D77); nil for the system audio.
+    private let delays: AudioDelayFeed?
     private let guide: GuideTrack
     private let source: any AudioBufferSource
     private let reports: AudioCaptureReports
@@ -147,6 +149,8 @@ final class AudioCapture: @unchecked Sendable {
     private var finishing: [Task<Void, Never>] = []
     private var isEnding = false
     private var guideChannels: Int?
+    /// The current file is out of its guide track (D79): its sound joins again when it rejoins or with the next file.
+    private var isOutOfTheGuideTrack = false
     private var correction = ClockDriftCorrection()
     /// The correction applied up to the current file's start and up to the
     /// end of what was placed in it, in seconds.
@@ -237,8 +241,10 @@ final class AudioCapture: @unchecked Sendable {
         drainTimeout: Duration = .seconds(RecorderValues.audioWaitBoundSeconds),
         now: (@Sendable () -> Int64)? = nil,
         inputVolume: (@Sendable () -> Double?)? = nil,
+        delays: AudioDelayFeed? = nil,
         makeWriter: MakeWriter? = nil
     ) {
+        self.delays = id == .systemAudio ? nil : delays
         self.id = id
         self.number = number
         self.name = name
@@ -309,6 +315,27 @@ final class AudioCapture: @unchecked Sendable {
         }
     }
 
+    /// The file `name`, if still the current one, leaves its guide track until it rejoins or ends; whether
+    /// it did (D79).
+    func leaveTheGuideTrack(file name: String) -> Bool {
+        queue.sync {
+            guard open?.entry.name == name else { return false }
+            isOutOfTheGuideTrack = true
+            leaveGuide()
+            return true
+        }
+    }
+
+    /// The file `name`, if still the current one and out of its guide track, joins it again with its next
+    /// buffer; whether it did (D79).
+    func rejoinTheGuideTrack(file name: String) -> Bool {
+        queue.sync {
+            guard open?.entry.name == name, isOutOfTheGuideTrack else { return false }
+            isOutOfTheGuideTrack = false
+            return true
+        }
+    }
+
     /// The level meter's reading: the sample peak since the last reading, and the peak hold.
     func readLevel(at now: Int64) -> AudioLevel {
         level.withLock { $0.read(at: now) }
@@ -351,6 +378,7 @@ final class AudioCapture: @unchecked Sendable {
         let channels = corrected.channels
         joinGuide(channelCount: channels.count)
         guides.receive(channels, from: label, to: guide, at: corrected.time)
+        if case .input(let uid) = id { delays?.receive(channels, from: uid, at: corrected.time) }
         guard var detector = noAudio else {
             _ = place(channels, at: corrected.time, appliedBefore: corrected.appliedAtStart, applied: corrected.applied)
             return
@@ -503,6 +531,7 @@ final class AudioCapture: @unchecked Sendable {
         let fileCorrection = fileApplied.end - fileApplied.start
         let clockDriftPpm = correction.status.clockDriftPpm
         timeline = nil
+        isOutOfTheGuideTrack = false
         guard let file = open else { return }
         open = nil
         let reports = reports
@@ -562,7 +591,7 @@ final class AudioCapture: @unchecked Sendable {
     // MARK: Guide track
 
     private func joinGuide(channelCount: Int) {
-        guard guideChannels != channelCount else { return }
+        guard !isOutOfTheGuideTrack, guideChannels != channelCount else { return }
         if guideChannels != nil { guides.remove(source: label, from: guide) }
         guides.add(source: label, channelCount: channelCount, to: guide)
         guideChannels = channelCount

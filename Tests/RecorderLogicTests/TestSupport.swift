@@ -11,6 +11,12 @@ enum DesignExample {
         AudioInputInfo(name: "MacBook Pro Microphone", channelCount: 1, isDefault: true, uid: "BuiltInMicrophoneDevice"),
         AudioInputInfo(name: "RØDE Wireless GO II RX", channelCount: 2, isDefault: false, transport: .usb, uid: "RODE"),
     ]
+    static let cameras = [
+        CameraInfo(uniqueID: "FaceTimeHD", name: "FaceTime HD Camera", isDefault: true, isVirtual: false, formats: [
+            CameraFormat(size: FrameSize(width: 1280, height: 720), maxFramesPerSecond: 30),
+            CameraFormat(size: FrameSize(width: 1920, height: 1080), maxFramesPerSecond: 30),
+        ]),
+    ]
 }
 
 /// A file of this repository, so a test can hold a document to the code.

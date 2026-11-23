@@ -1,5 +1,5 @@
 /// What `msr record` prints at its end: how long it recorded and where,
-/// each file and its state (the screens by number, then the audio sources by number, the system audio first), our process's CPU use, and the events that are
+/// each file and its state (the screens by number, then the cameras by number, then the audio sources by number, the system audio first), our process's CPU use, and the events that are
 /// errors.
 public struct RecordingSummary: Equatable, Sendable {
     public let manifest: RecordingManifest
@@ -21,7 +21,8 @@ public struct RecordingSummary: Equatable, Sendable {
 
     public var text: String {
         var lines = ["Recorded \(Self.elapsed(seconds: seconds)) into \(recordingFolder)"]
-        let files = (manifest.files.map { ($0.start, $0.name, $0.state) } + manifest.audioFiles.map { ($0.start, $0.name, $0.state) })
+        let files = (manifest.files.map { ($0.start, $0.name, $0.state) } + manifest.cameraFiles.map { ($0.start, $0.name, $0.state) }
+            + manifest.audioFiles.map { ($0.start, $0.name, $0.state) })
             .enumerated().sorted { lhs, rhs in
                 let (left, right) = (SourceLabel.listPosition(ofFileName: lhs.element.1), SourceLabel.listPosition(ofFileName: rhs.element.1))
                 return (left.group, left.number, lhs.element.0, lhs.offset) < (right.group, right.number, rhs.element.0, rhs.offset)

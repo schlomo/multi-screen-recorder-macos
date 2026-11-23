@@ -97,7 +97,7 @@ import Testing
     }
 
     @Test func aConnectAModeSwitchAndADisconnectGiveTheirFilesAndEvents() {
-        let spec = VirtualScreenSpec(serialNumber: 101, sizes: [.init(width: 1280, height: 720), .init(width: 1600, height: 900)])
+        let spec = VirtualScreenSpec(serialNumber: 101, name: "Portable Monitor", sizes: [.init(width: 1280, height: 720), .init(width: 1600, height: 900)])
         let expectation = Scenario.virtualScreenExpectation([
             HappenedEvent(times: .init(asked: 2.0, done: 2.2), event: .connectScreen(spec), screenUUID: "U"),
             HappenedEvent(times: .init(asked: 6.0, done: 6.2), event: .switchScreenMode(serialNumber: 101, to: spec.sizes[1]),
@@ -119,13 +119,13 @@ import Testing
     }
 
     @Test func aScreenStillConnectedAtTheStopHasNoDisconnect() {
-        let spec = VirtualScreenSpec(serialNumber: 102, sizes: [.init(width: 1280, height: 720)])
+        let spec = VirtualScreenSpec(serialNumber: 102, name: "Desk Monitor", sizes: [.init(width: 1280, height: 720)])
         let expectation = Scenario.virtualScreenExpectation([
             HappenedEvent(times: .init(asked: 1, done: 1.1), event: .connectScreen(spec), screenUUID: "V"),
         ])
         #expect(expectation.files.map(\.endedBy) == [nil])
         #expect(expectation.events.map(\.event) == ["screen connected"])
-        #expect(spec.name == "MSR Test 102")
+        #expect(spec.name == "Desk Monitor")
     }
 
     @Test func theStatusWindowsScreensComeBackSoAFileCountIsAboveOne() {

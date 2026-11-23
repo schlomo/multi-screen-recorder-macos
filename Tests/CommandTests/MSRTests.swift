@@ -73,7 +73,7 @@ import Testing
         let help = try await msr("record", "--help")
         // ArgumentParser wraps the help at 80 columns.
         let words = help.output.split(whereSeparator: \.isWhitespace).joined(separator: " ")
-        #expect(words.contains("1080p, 720p or none (audio only: no screen is recorded)"))
+        #expect(words.contains("1080p, 720p or none (audio only: no screen and no camera is recorded)"))
     }
 
     @Test func anAudioModeFlagSavesAndTurnsAutoOff() async throws {

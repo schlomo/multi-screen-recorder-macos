@@ -5,7 +5,7 @@ import Foundation
 /// timestamps, and a source with no samples for a stretch is silence there.
 /// "Audio inputs" is one mono mix: each recorded audio input averaged to
 /// mono, the inputs summed at unity gain, through a soft limiter
-/// (`limit`). "System audio" carries the system audio's two channels as
+/// (`limit`) with its knee at −12 dBFS and its ceiling at −6 dBFS (D75). "System audio" carries the system audio's two channels as
 /// they are, clamped to ±1. Times are nanoseconds from t0 on the shared
 /// clock; positions are samples from t0. A sample that is not finite is
 /// silence.
@@ -35,19 +35,23 @@ public struct GuideTrackMix: Sendable {
         self.delay = delay.nanoseconds
     }
 
-    /// Up to this level, the "Audio inputs" mix passes unchanged: −6 dBFS.
-    public static let limiterKnee: Float = 0.5
+    /// Up to this level, the "Audio inputs" mix passes unchanged: −12 dBFS, 6 dB below the ceiling (D52, D75).
+    public static let limiterKnee = Float(pow(10, -12.0 / 20))
+
+    /// The level the "Audio inputs" mix never exceeds: −6 dBFS, as its AAC overshoots the limiter by up to
+    /// 1.6×, depending on the material (D75).
+    public static let limiterCeiling = Float(pow(10, -6.0 / 20))
 
     /// The soft limiter of "Audio inputs": unchanged up to the knee, above it
-    /// `knee + (1 − knee) · tanh((|x| − knee) / (1 − knee))`, which starts
-    /// with slope 1 and approaches ±1 without reaching beyond it. A sample
-    /// that is not finite (NaN, ±infinity) becomes 0.
+    /// `knee + (ceiling − knee) · tanh((|x| − knee) / (ceiling − knee))`,
+    /// which starts with slope 1 and approaches ±ceiling without reaching
+    /// beyond it. A sample that is not finite (NaN, ±infinity) becomes 0.
     public static func limit(_ sample: Float) -> Float {
         guard sample.isFinite else { return 0 }
         let level = abs(sample)
         guard level > limiterKnee else { return sample }
-        let headroom = 1 - limiterKnee
-        let limited = min(1, limiterKnee + headroom * tanh((level - limiterKnee) / headroom))
+        let headroom = limiterCeiling - limiterKnee
+        let limited = min(limiterCeiling, limiterKnee + headroom * tanh((level - limiterKnee) / headroom))
         return sample < 0 ? -limited : limited
     }
 

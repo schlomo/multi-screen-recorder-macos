@@ -5,8 +5,8 @@ disableKinds = ["taxonomy", "term", "section", "rss", "404"]
 
 [params]
   # The tagline's two lines, as Tagline.lines in Sources/RecorderLogic/ProductLinks.swift (a test ties them).
-  tagline = ["Every screen, all audio.", "Keeps going when things change."]
-  description = "A reliable multi-source screen and audio recorder for macOS. It captures every screen and audio source, never loses a recording, and keeps going when screens, resolutions or audio sources change."
+  tagline = ["Every screen, every camera, all audio.", "Keeps going when things change."]
+  description = "A reliable multi-source screen and audio recorder for macOS. It captures every screen, camera and audio source, never loses a recording, and keeps going when screens, resolutions or audio sources change."
   repositoryURL = "https://github.com/schlomo/multi-screen-recorder-macos"
   # The release asset's name contains the version, so the page links to the
   # latest release, never to a file.

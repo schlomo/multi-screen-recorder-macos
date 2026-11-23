@@ -80,10 +80,10 @@ import Testing
         #expect(ticks.framesRepeatedForLateness == 2)
     }
 
-    /// A screen file's writer may fall 6 s behind, also at the file's end;
+    /// A video file's writer may fall 6 s behind, also at the file's end;
     /// the guide track wait and the audio drain keep 2 s.
-    @Test func theScreenFileMayFallSixSecondsBehind() {
-        #expect(RecorderValues.screenFileLateTickSeconds == 6)
+    @Test func aVideoFileMayFallSixSecondsBehind() {
+        #expect(RecorderValues.videoFileLateTickSeconds == 6)
         #expect(RecorderValues.lateTickBound == 6 * RecorderValues.framesPerSecond)
         #expect(TickLoop<String>().lateTickBound == 6 * RecorderValues.framesPerSecond)
         #expect(RecorderValues.audioWaitBoundSeconds == 2)
@@ -91,9 +91,9 @@ import Testing
 
     @Test(arguments: [RecorderValues.framesPerSecond, 60])
     func moreThanTheBoundOfWaitingTicksMeansTheWriterFellBehind(rate: Int) {
-        var ticks = loop(rate: rate, bound: RecorderValues.screenFileLateTickSeconds * rate)
+        var ticks = loop(rate: rate, bound: RecorderValues.videoFileLateTickSeconds * rate)
         ticks.receive("a", capturedAt: 0)
-        let bound = Int64(RecorderValues.screenFileLateTickSeconds * rate)
+        let bound = Int64(RecorderValues.videoFileLateTickSeconds * rate)
         // Ticks 0 to bound - 1 wait: exactly the bound.
         #expect(ticks.advance(to: ticks.grid.time(ofTick: bound - 1)) { _, _ in false } == .running)
         #expect(ticks.advance(to: ticks.grid.time(ofTick: bound)) { _, _ in false } == .writerFellBehind)
@@ -125,6 +125,86 @@ import Testing
         ticks.receive("old", capturedAt: 50)
         _ = ticks.advance(to: ticks.grid.time(ofTick: 1)) { written.append($1); return true }
         #expect(written == ["new"])
+    }
+
+    @Test func withoutADecisionDelayEachTickIsDecidedAtItsTime() {
+        var ticks = loop()
+        let grid = ticks.grid
+        var written: [(Int64, String)] = []
+        ticks.receive("a", capturedAt: 0)
+        _ = ticks.advance(to: grid.time(ofTick: 1)) { written.append(($0, $1)); return true }
+        // Captured before tick 1, arrived after it was decided.
+        ticks.receive("b", capturedAt: grid.time(ofTick: 1) - 1, arrivedAt: grid.time(ofTick: 1) + 5)
+        _ = ticks.advance(to: grid.time(ofTick: 2)) { written.append(($0, $1)); return true }
+        #expect(written.map(\.1) == ["a", "a", "b"])
+        #expect(ticks.framesPlacedLate == 1)
+    }
+
+    private let delay = RecorderValues.cameraDecisionDelay.nanoseconds
+
+    @Test func aCameraFrameArrivingWithinTheDecisionDelayIsPlacedOnItsTick() {
+        var ticks = TickLoop<String>(decisionDelay: delay)
+        let grid = ticks.grid
+        var written: [(Int64, String)] = []
+        ticks.receive("a", capturedAt: 0)
+        // Tick 1 waits: no frame captured after it has arrived and the delay has not passed.
+        _ = ticks.advance(to: grid.time(ofTick: 1) + delay - 1) { written.append(($0, $1)); return true }
+        #expect(written.map(\.0) == [0])
+        ticks.receive("b", capturedAt: grid.time(ofTick: 1) - 1, arrivedAt: grid.time(ofTick: 1) + delay - 1)
+        ticks.receive("c", capturedAt: grid.time(ofTick: 2) + 1, arrivedAt: grid.time(ofTick: 1) + delay - 1)
+        // "c" was captured after tick 1 and tick 2: both are decided, tick 3 still waits.
+        _ = ticks.advance(to: grid.time(ofTick: 3)) { written.append(($0, $1)); return true }
+        #expect(written.map(\.0) == [0, 1, 2])
+        #expect(written.map(\.1) == ["a", "b", "b"])
+        #expect(ticks.framesPlacedLate == 0)
+    }
+
+    @Test func aCameraTickIsDecidedOnceTheDecisionDelayHasPassed() {
+        var ticks = TickLoop<String>(decisionDelay: delay)
+        let grid = ticks.grid
+        var written: [Int64] = []
+        ticks.receive("a", capturedAt: 0)
+        _ = ticks.advance(to: grid.time(ofTick: 2) + delay) { tick, _ in written.append(tick); return true }
+        // Ticks 0 to 2 are 0.5 s old and more; the later ones wait.
+        #expect(written == [0, 1, 2])
+    }
+
+    @Test func aCameraFrameArrivingAfterTheDecisionDelayIsPlacedLateAndCounted() {
+        var ticks = TickLoop<String>(decisionDelay: delay)
+        let grid = ticks.grid
+        var written: [(Int64, String)] = []
+        ticks.receive("a", capturedAt: 0)
+        _ = ticks.advance(to: grid.time(ofTick: 1) + delay) { written.append(($0, $1)); return true }
+        let late = grid.time(ofTick: 1) - 1
+        ticks.receive("b", capturedAt: late, arrivedAt: late + delay + 300_000_000)
+        _ = ticks.advance(to: grid.time(ofTick: 2) + delay) { written.append(($0, $1)); return true }
+        #expect(written.map(\.1) == ["a", "a", "b"])
+        #expect(ticks.framesPlacedLate == 1)
+        #expect(ticks.largestLateArrival == delay + 300_000_000)
+    }
+
+    /// Of a burst of late frames only the one a tick shows is counted, once, however often it repeats.
+    @Test func onlyALateFrameATickShowsIsCountedOnce() {
+        var ticks = TickLoop<String>(decisionDelay: delay)
+        let grid = ticks.grid
+        var written: [String] = []
+        ticks.receive("a", capturedAt: 0)
+        _ = ticks.advance(to: grid.time(ofTick: 3) + delay) { written.append($1); return true }
+        ticks.receive("b", capturedAt: grid.time(ofTick: 1), arrivedAt: grid.time(ofTick: 3) + delay)
+        ticks.receive("c", capturedAt: grid.time(ofTick: 2), arrivedAt: grid.time(ofTick: 3) + delay + 1)
+        _ = ticks.advance(to: grid.time(ofTick: 6) + delay) { written.append($1); return true }
+        #expect(!written.contains("b"))
+        #expect(written.filter { $0 == "c" }.count == 3)
+        #expect(ticks.framesPlacedLate == 1)
+        #expect(ticks.largestLateArrival == grid.time(ofTick: 3) + delay + 1 - grid.time(ofTick: 2))
+    }
+
+    @Test func atTheFilesEndEveryDueTickIsDecided() {
+        var ticks = TickLoop<String>(decisionDelay: delay)
+        var written: [Int64] = []
+        ticks.receive("a", capturedAt: 0)
+        _ = ticks.advance(to: ticks.grid.time(ofTick: 3), waitingForLateFrames: false) { tick, _ in written.append(tick); return true }
+        #expect(written == [0, 1, 2, 3])
     }
 
     @Test func drainingWritesTheWaitingTicksInOrder() {

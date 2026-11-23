@@ -1,7 +1,7 @@
 # AGENTS.md
 
 Multi Screen Recorder: a reliable multi-source screen and audio
-recorder for macOS. It captures every screen and audio source, never
+recorder for macOS. It captures every screen, camera and audio source, never
 loses a recording, and keeps going when screens, resolutions or audio
 sources change.
 
@@ -296,13 +296,15 @@ opens as a draft PR (D72).
   resolution None without the system audio), so macOS shows a
   prompt on the person's screen, and
   creates the output folder if it is missing; `msr record` and Start
-  in the app record the screens; `msr list` reads the devices. An agent
+  in the app record the screens and, by default, every real camera,
+  asking for the Camera permission if never asked (D74); `msr list`
+  reads the devices. An agent
   runs these on the owner's Mac only to test the roadmap's work, into its
   own scratch folder (`--output-folder`) with `HOME` set to a scratch
   folder too, so the owner's settings and last-recording notice are
   never overwritten or faked (the permissions do not depend on `HOME`;
   the settings fall back to their defaults), deleting the recordings once
-  checked and never changing settings or permissions (D48); before an agent starts a recording or plays a sound on the owner's Mac, the session running or briefing that test tells the owner, once before the test's first run (D56); on anyone else's Mac, never unasked. On start the app also reads
+  checked and never changing settings or permissions (D48); before an agent starts a recording, opens a camera or plays a sound on the owner's Mac, the session running or briefing that test tells the owner, once before the test's first run (D56); on anyone else's Mac, never unasked. On start the app also reads
   `~/Library/Logs/DiagnosticReports`, may show the crash report dialog
   or the notice of the last recording's problems and open the browser
   and Finder, and may write `state.json` and a text copy under
@@ -312,19 +314,19 @@ opens as a draft PR (D72).
   `msr version`, `msr timeline` (it writes only the folder's timeline
   file), `msr settings` (it writes the settings file only with
   a settings flag; `HOME` decides where) and the tests are
-  safe; the tests read the Mac's audio device list, which shows no
-  prompt.
+  safe; the tests read the Mac's audio device and camera lists, which
+  show no prompt, and open no camera.
 - `scripts/install-app` replaces the installed app in `/Applications`,
   so an agent runs it against `/Applications` only with the owner's
   go-ahead for that install (to hand over a try-out build), and never
   while the owner records.
-- Real capture needs the Screen & System Audio Recording and
-  Microphone permissions, granted by a person on the Mac (in the
+- Real capture needs the Screen & System Audio Recording, Microphone
+  and, for a camera, Camera permissions, granted by a person on the Mac (in the
   end-to-end VM, by `scripts/end-to-end-setup`, which writes them into
   its TCC database). Capture behaviour is verified on the owner's Mac
   (the v1 gate in `backlog.md`) and by the end-to-end tests in that VM
   (D67). They run nowhere else: GitHub's hosted runner stalls its own
   video encoder at a virtual screen's mode switch
   ([end-to-end-tests.md](docs/design/end-to-end-tests.md), "Why the
-  VM"). A run records and plays sound inside the VM only, never on
-  the Mac; the VM takes about 30 GB of its disk.
+  VM"). The VM has no camera. A run records and plays sound inside the
+  VM only, never on the Mac; the VM takes about 30 GB of its disk.

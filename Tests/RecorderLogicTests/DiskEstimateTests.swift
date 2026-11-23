@@ -19,13 +19,13 @@ import Testing
     }
 
     @Test func aScreenFileWithoutGuideTracksIsOneGigabytePerHourAt1080p() {
-        #expect(DiskEstimate.screenFileBytesPerHour(frameSize: fullHD, settings: silent) == 1_000_000_000)
+        #expect(DiskEstimate.videoFileBytesPerHour(frameSize: fullHD, settings: silent) == 1_000_000_000)
     }
 
     @Test func theVideoScalesByThePixelCount() {
-        #expect(DiskEstimate.screenFileBytesPerHour(frameSize: FrameSize(width: 3840, height: 2160), settings: silent)
+        #expect(DiskEstimate.videoFileBytesPerHour(frameSize: FrameSize(width: 3840, height: 2160), settings: silent)
             == 4_000_000_000)
-        #expect(DiskEstimate.screenFileBytesPerHour(frameSize: FrameSize(width: 960, height: 540), settings: silent)
+        #expect(DiskEstimate.videoFileBytesPerHour(frameSize: FrameSize(width: 960, height: 540), settings: silent)
             == 250_000_000)
     }
 
@@ -41,9 +41,9 @@ import Testing
     }
 
     @Test func theGuideTracksAdd64And96KilobitsPerSecond() {
-        #expect(DiskEstimate.screenFileBytesPerHour(frameSize: fullHD, settings: settings())
+        #expect(DiskEstimate.videoFileBytesPerHour(frameSize: fullHD, settings: settings())
             == 1_000_000_000 + 28_800_000 + 43_200_000)
-        #expect(DiskEstimate.screenFileBytesPerHour(frameSize: fullHD, settings: settings { $0.audioMode = .none })
+        #expect(DiskEstimate.videoFileBytesPerHour(frameSize: fullHD, settings: settings { $0.audioMode = .none })
             == 1_000_000_000 + 43_200_000)
     }
 

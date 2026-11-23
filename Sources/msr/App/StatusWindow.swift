@@ -11,7 +11,8 @@ final class StatusModel {
     var line = ""
     /// "CPU 23 %", our process only.
     var cpu = ""
-    var problems: [String] = []
+    /// One line per kind of problem: red when broken, orange for a hiccup, red ones first (D78).
+    var problems: [ProblemLine] = []
     /// Each audio source's level meter, drawn 10 times a second while the window is open (D69).
     var levels: [AudioTracker.SourceID: AudioLevel] = [:]
     /// The input volume of each audio input whose volume can be set: only those have a slider.
@@ -68,6 +69,16 @@ struct StatusView: View {
     let stop: () -> Void
     let continueRecording: () -> Void
     let setInputVolume: (AudioTracker.SourceID, Double) -> Void
+    /// The problem lines' height as laid out; the area shows at most `problemLinesShown` lines of it.
+    @State var problemsHeight: CGFloat = 0
+
+    /// The problems area grows to 5 lines at most; more scroll inside it (D78).
+    static let problemLinesShown = 5
+    private static let problemSpacing: CGFloat = 4
+    private static var problemsMaxHeight: CGFloat {
+        let lineHeight = NSLayoutManager().defaultLineHeight(for: NSFont.preferredFont(forTextStyle: .body))
+        return CGFloat(problemLinesShown) * lineHeight + CGFloat(problemLinesShown - 1) * problemSpacing
+    }
 
     var body: some View {
         WidthSettingStack(spacing: 12) {
@@ -88,12 +99,13 @@ struct StatusView: View {
                 Divider()
                 ForEach(Array(model.rows.enumerated()), id: \.offset) { _, row in
                     GridRow {
-                        SourceCellView(cell: row.source).monospacedDigit()
+                        SourceCellView(cell: row.source).monospacedDigit().help(row.details)
                         ForEach(Array(row.values.enumerated()), id: \.offset) { offset, cell in
                             Text(cell)
                                 .lineLimit(1)
                                 .monospacedDigit()
                                 .gridColumnAlignment(Self.alignment(offset + 1))
+                                .help(row.details)
                         }
                         if let id = row.audioSource {
                             LevelMeterView(level: model.levels[id] ?? .silent)
@@ -118,9 +130,16 @@ struct StatusView: View {
             }
             if !model.problems.isEmpty {
                 VStack(alignment: .leading, spacing: 4) {
-                    ForEach(Array(model.problems.enumerated()), id: \.offset) { _, problem in
-                        Text(problem).foregroundStyle(.red).fixedSize(horizontal: false, vertical: true)
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: Self.problemSpacing) {
+                            ForEach(Array(model.problems.enumerated()), id: \.offset) { _, problem in
+                                Text(problem.text).foregroundStyle(problem.isRed ? .red : .orange).fixedSize(horizontal: false, vertical: true)
+                            }
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { problemsHeight = $0 }
                     }
+                    .frame(height: min(problemsHeight, Self.problemsMaxHeight))
                     Text(Self.forAReport)
                         .font(.callout)
                         .foregroundStyle(.secondary)

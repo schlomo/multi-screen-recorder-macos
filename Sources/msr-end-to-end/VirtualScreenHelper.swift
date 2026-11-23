@@ -96,7 +96,7 @@ enum VirtualScreenHelper {
     static func connect(_ spec: VirtualScreenSpec, executable: String, folder: URL) throws -> (ChildProcess, String) {
         let process = try ChildProcess(
             executable: executable,
-            arguments: ["virtual-screen", "--serial-number", "\(spec.serialNumber)"]
+            arguments: ["virtual-screen", "--serial-number", "\(spec.serialNumber)", "--name", spec.name]
                 + spec.sizes.flatMap { ["--size", "\($0)"] },
             environment: ProcessInfo.processInfo.environment,
             standardOutput: folder.appending(path: "virtual-screen-\(spec.serialNumber).out"),

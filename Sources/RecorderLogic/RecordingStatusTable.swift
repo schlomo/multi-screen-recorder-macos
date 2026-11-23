@@ -1,7 +1,7 @@
 import Foundation
 
-/// The status window of a running recording (D46): a row per screen and
-/// per audio source with its files, the data written, its state and its
+/// The status window of a running recording (D46): a row per screen, per
+/// camera (D74) and per audio source with its files, the data written, its state and its
 /// clock drift (an audio row also has its level meter and input volume,
 /// which the window draws, D69), and a line with the elapsed time, the data, the files and the free space.
 public enum RecordingStatusTable {
@@ -27,11 +27,14 @@ public enum RecordingStatusTable {
         public var clockDrift: String
         /// The audio source of an audio row, for its level meter and its input volume (D69); nil for a screen.
         public var audioSource: AudioTracker.SourceID?
+        /// The mouse-over: the source's details and its live facts (`SourceDetails`), its label first.
+        public var details: String
 
         public init(
             source: SourceCell, recordsAt: String, files: Int, written: String, state: String, clockDrift: String = "",
-            audioSource: AudioTracker.SourceID? = nil
+            audioSource: AudioTracker.SourceID? = nil, details: String = ""
         ) {
+            self.details = details
             self.source = source
             self.recordsAt = recordsAt
             self.files = files
@@ -64,9 +67,38 @@ public enum RecordingStatusTable {
         }
     }
 
-    /// The audio sources' rows, below the screens': Records at is the
+    /// The cameras' rows, below the screens', as a screen's: `bytes` by the camera file's name.
+    public static func cameraRows(
+        sources: [CameraTracker.Source], files: [RecordingManifest.CameraFile], bytes: [String: Int64]
+    ) -> [Row] {
+        sources.map { source in
+            let own = files.filter { $0.cameraUniqueID == source.uniqueID }
+            let frameSize: FrameSize? = switch source.state {
+            case .recording(let size), .stalled(let size): size
+            default: own.last.map { FrameSize(width: $0.frameSize[0], height: $0.frameSize[1]) }
+            }
+            return Row(
+                source: .camera(source.number, name: source.name),
+                recordsAt: frameSize.map { "\($0.width)×\($0.height)" } ?? "",
+                files: own.count,
+                written: writtenText(own.map { bytes[$0.name] }),
+                state: text(source.state))
+        }
+    }
+
+    /// Without the Camera permission, a row for each camera the camera mode
+    /// would record, not numbered: macOS grants it per app, so no camera is recorded (D74).
+    public static func cameraRowsWithoutPermission(_ cameras: [CameraInfo]) -> [Row] {
+        cameras.map { camera in
+            Row(source: .camera(nil, name: camera.name), recordsAt: "", files: 0, written: "",
+                state: StateText.noCameraPermission.rawValue)
+        }
+    }
+
+    /// The audio sources' rows, below the cameras': Records at is the
     /// channels of the source's newest audio file; `clockDrift` the latest
-    /// clock drift correction status of each source's running capture.
+    /// clock drift correction status of each source's running capture; Clock
+    /// drift adds the delay measured for its file being written (D77): "-116 ppm (+34.9 ms) · 550 ms late".
     public static func audioRows(
         sources: [AudioTracker.Source], files: [RecordingManifest.AudioFile], bytes: [String: Int64],
         clockDrift: [AudioTracker.SourceID: ClockDriftCorrection.Status]
@@ -87,9 +119,11 @@ public enum RecordingStatusTable {
             }
             let cell: SourceCell = source.id == .systemAudio
                 ? .systemAudio(isRecorded: true) : .audioInput(source.number, name: source.name)
+            let drift = source.state == .recording || source.state == .noAudio ? clockDriftText(clockDrift[source.id]) : ""
+            let delay = own.last { $0.end == nil }?.measuredDelay.map(AudioDelay.text)
             return Row(
                 source: cell, recordsAt: channels, files: own.count, written: written, state: text(source.state),
-                clockDrift: source.state == .recording || source.state == .noAudio ? clockDriftText(clockDrift[source.id]) : "", audioSource: source.id)
+                clockDrift: [drift, delay ?? ""].filter { !$0.isEmpty }.joined(separator: " · "), audioSource: source.id)
         }
     }
 
@@ -124,12 +158,28 @@ public enum RecordingStatusTable {
         case disconnected
         case notRecorded = "not recorded"
         case asleep
+        case noCameraPermission = "no Camera permission"
+        case stalled
     }
 
     static func text(_ state: AudioTracker.Source.State) -> String {
         let text: StateText = switch state {
         case .recording: .recording
         case .noAudio: .noAudio
+        case .waiting: .waiting
+        case .failedRetrying: .failedRetrying
+        case .diskFull: .diskFull
+        case .disconnected: .disconnected
+        case .notRecorded: .notRecorded
+        case .asleep: .asleep
+        }
+        return text.rawValue
+    }
+
+    static func text(_ state: CameraTracker.Source.State) -> String {
+        let text: StateText = switch state {
+        case .recording: .recording
+        case .stalled: .stalled
         case .waiting: .waiting
         case .failedRetrying: .failedRetrying
         case .diskFull: .diskFull

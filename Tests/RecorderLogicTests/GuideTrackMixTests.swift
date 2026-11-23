@@ -12,9 +12,9 @@ import Testing
 
     /// The soft limiter's output for `x`, as the design states it.
     private func limited(_ x: Float) -> Float {
-        let knee = GuideTrackMix.limiterKnee
+        let knee = GuideTrackMix.limiterKnee, ceiling = GuideTrackMix.limiterCeiling
         guard abs(x) > knee else { return x }
-        return (x < 0 ? -1 : 1) * (knee + (1 - knee) * tanh((abs(x) - knee) / (1 - knee)))
+        return (x < 0 ? -1 : 1) * (knee + (ceiling - knee) * tanh((abs(x) - knee) / (ceiling - knee)))
     }
 
     /// At Stop the last mix waits until every source has delivered up to the video's end.
@@ -52,10 +52,10 @@ import Testing
         for name in ["Razer", "CalDigit", "BRIO", "MacBook Pro Microphone"] {
             guide.add(source: name, channelCount: name == "BRIO" ? 2 : 1)
         }
-        guide.receive([[0.3, -0.2]], from: "Razer", at: 0)
+        guide.receive([[0.2, -0.15]], from: "Razer", at: 0)
         guide.receive([[0, 0]], from: "CalDigit", at: 0)
         guide.receive([[0, 0], [0, 0]], from: "BRIO", at: 0)
-        #expect(guide.mix(until: 2 * millisecond)[0] == [0.3, -0.2])
+        #expect(guide.mix(until: 2 * millisecond)[0] == [0.2, -0.15])
     }
 
     @Test func aStereoSourceWithIdenticalChannelsHasItsMonoLevel() {
@@ -75,33 +75,38 @@ import Testing
         guide.receive([[1, -1, 0.9, 1]], from: "A", at: 0)
         guide.receive([[1, -1, 0.9, 0.2], [1, -1, 0.9, 0.2]], from: "B", at: 0)
         let mixed = guide.mix(until: 4 * millisecond)[0]
-        #expect(mixed.allSatisfy { abs($0) <= 1 })
-        #expect(mixed[0] > 0.9 && mixed[1] < -0.9)
+        #expect(mixed.allSatisfy { abs($0) <= GuideTrackMix.limiterCeiling })
+        #expect(mixed[0] > 0.5 && mixed[1] < -0.5)
         for (sample, sum) in zip(mixed, [2, -2, 1.8, 1.2] as [Float]) { #expect(abs(sample - limited(sum)) < 1e-6) }
     }
 
     @Test func belowTheKneeTheLevelIsUnchanged() {
-        #expect(GuideTrackMix.limiterKnee == 0.5)
+        // The knee at −12 dBFS, the ceiling at −6 dBFS: D52's 6 dB between them (D75).
+        #expect(abs(GuideTrackMix.limiterKnee - 0.251_19) < 1e-5)
+        #expect(abs(GuideTrackMix.limiterCeiling - 0.501_19) < 1e-5)
         var guide = mix()
         guide.add(source: "A", channelCount: 1)
         guide.add(source: "B", channelCount: 1)
-        guide.receive([[0.25, -0.3, 0.1]], from: "A", at: 0)
-        guide.receive([[0.25, -0.2, -0.1]], from: "B", at: 0)
-        #expect(guide.mix(until: 3 * millisecond)[0] == [0.5, -0.5, 0])
+        guide.receive([[0.125, -0.125, 0.1]], from: "A", at: 0)
+        guide.receive([[0.125, -0.125, -0.1]], from: "B", at: 0)
+        #expect(guide.mix(until: 3 * millisecond)[0] == [0.25, -0.25, 0])
         // Just above it, the curve starts with the same slope: no step.
-        #expect(abs(GuideTrackMix.limit(0.5001) - 0.5001) < 1e-6)
-        #expect(GuideTrackMix.limit(100) <= 1)
-        #expect(GuideTrackMix.limit(-100) >= -1)
+        #expect(GuideTrackMix.limit(GuideTrackMix.limiterKnee) == GuideTrackMix.limiterKnee)
+        let above = GuideTrackMix.limiterKnee + 0.0001
+        #expect(abs(GuideTrackMix.limit(above) - above) < 1e-6)
+        #expect(GuideTrackMix.limit(100) <= GuideTrackMix.limiterCeiling)
+        #expect(GuideTrackMix.limit(-100) >= -GuideTrackMix.limiterCeiling)
+        #expect(GuideTrackMix.limit(2) > 0.5)
     }
 
     @Test func eachInputIsPlacedByItsOwnTimestampsAndAMissingInputIsSilence() {
         var guide = mix()
         guide.add(source: "A", channelCount: 1)
         guide.add(source: "B", channelCount: 1)
-        guide.receive([[0.4, 0.4]], from: "A", at: 2 * millisecond)
+        guide.receive([[0.2, 0.2]], from: "A", at: 2 * millisecond)
         guide.receive([[0.05]], from: "B", at: 3 * millisecond)
         let mixed = guide.mix(until: 5 * millisecond)[0]
-        let expected: [Float] = [0, 0, 0.4, 0.45, 0]
+        let expected: [Float] = [0, 0, 0.2, 0.25, 0]
         #expect(mixed.count == expected.count)
         for (sample, want) in zip(mixed, expected) { #expect(abs(sample - want) < 1e-6, "\(mixed)") }
     }
@@ -109,15 +114,15 @@ import Testing
     @Test func aPeekMixesWhatWaitsWithoutTakingIt() {
         var guide = mix(delay: .milliseconds(2))
         guide.add(source: "A", channelCount: 1)
-        guide.receive([[0.1, 0.2, 0.3, 0.4, 0.5]], from: "A", at: 0)
-        #expect(guide.mix(until: 4 * millisecond)[0] == [0.1, 0.2])
+        guide.receive([[0.05, 0.1, 0.15, 0.2, 0.25]], from: "A", at: 0)
+        #expect(guide.mix(until: 4 * millisecond)[0] == [0.05, 0.1])
         let peeked = guide.peek(upTo: 6)
         #expect(peeked.start == 2)
-        #expect(peeked.channels[0] == [0.3, 0.4, 0.5, 0])
+        #expect(peeked.channels[0] == [0.15, 0.2, 0.25, 0])
         #expect(guide.peek(upTo: 1).channels[0].isEmpty)
         // Nothing was taken: the next mix still has it.
         #expect(guide.mixedUpTo == 2)
-        #expect(guide.mix(until: 7 * millisecond)[0] == [0.3, 0.4, 0.5])
+        #expect(guide.mix(until: 7 * millisecond)[0] == [0.15, 0.2, 0.25])
     }
 
     @Test func aSampleThatIsNotFiniteBecomesSilence() {
@@ -147,9 +152,9 @@ import Testing
         var guide = mix(delay: .milliseconds(200))
         guide.add(source: "A", channelCount: 1)
         #expect(guide.mix(until: 150 * millisecond)[0].isEmpty)
-        guide.receive([[0.5, 0.5]], from: "A", at: 0)
-        #expect(guide.mix(until: 201 * millisecond)[0] == [0.5])
-        #expect(guide.mix(until: 203 * millisecond)[0] == [0.5, 0])
+        guide.receive([[0.25, 0.25]], from: "A", at: 0)
+        #expect(guide.mix(until: 201 * millisecond)[0] == [0.25])
+        #expect(guide.mix(until: 203 * millisecond)[0] == [0.25, 0])
         #expect(guide.mixedUpTo == 3)
     }
 
@@ -157,19 +162,19 @@ import Testing
         var guide = mix()
         guide.add(source: "A", channelCount: 1)
         _ = guide.mix(until: 2 * millisecond)[0]
-        guide.receive([[0.1, 0.2, 0.3]], from: "A", at: 1 * millisecond)
-        #expect(guide.mix(until: 4 * millisecond)[0] == [0.2, 0.3])
+        guide.receive([[0.05, 0.1, 0.15]], from: "A", at: 1 * millisecond)
+        #expect(guide.mix(until: 4 * millisecond)[0] == [0.1, 0.15])
     }
 
     @Test func anInputThatLeavesNoLongerCounts() {
         var guide = mix()
         guide.add(source: "A", channelCount: 1)
         guide.add(source: "B", channelCount: 1)
-        guide.receive([[0.5]], from: "B", at: 0)
+        guide.receive([[0.25]], from: "B", at: 0)
         guide.remove(source: "B")
-        guide.receive([[0.5]], from: "A", at: 0)
+        guide.receive([[0.25]], from: "A", at: 0)
         #expect(!guide.contains(source: "B"))
-        #expect(guide.mix(until: 1 * millisecond)[0] == [0.5])
+        #expect(guide.mix(until: 1 * millisecond)[0] == [0.25])
     }
 
     @Test func withNoInputTheMixIsSilence() {

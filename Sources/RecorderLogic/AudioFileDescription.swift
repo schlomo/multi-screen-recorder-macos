@@ -2,7 +2,7 @@ import Foundation
 
 /// What an audio file holds and says about itself (D46, D49): its audio
 /// tracks, the reel name in its timecode track and its metadata items, as a
-/// screen file's (`ScreenFileMetadata`).
+/// screen file's (`VideoFileMetadata`).
 public struct AudioFileDescription: Equatable, Sendable {
     public enum Source: Equatable, Sendable {
         /// An audio input under its number in the recording and its device name.
@@ -88,7 +88,7 @@ public struct AudioFileDescription: Equatable, Sendable {
     public var reelName: String { label }
 
     /// Each metadata item's full key and value: under
-    /// `ScreenFileMetadata.keyPrefix` as the manifest names them, the app
+    /// `VideoFileMetadata.keyPrefix` as the manifest names them, the app
     /// and the reel name also under the standard keys a screen file uses.
     public var items: [(key: String, value: String)] {
         var own = [("audioSource", sourceName)]
@@ -98,9 +98,9 @@ public struct AudioFileDescription: Equatable, Sendable {
         case .stereo: "stereo"
         }
         own += [("channels", channelsText), ("recordingStarted", recordingStarted), ("app", app)]
-        return own.map { (ScreenFileMetadata.keyPrefix + $0.0, $0.1) } + [
-            (ScreenFileMetadata.softwareKey, app), (ScreenFileMetadata.reelKey, reelName),
-            (ScreenFileMetadata.cameraNameKey, reelName),
+        return own.map { (VideoFileMetadata.keyPrefix + $0.0, $0.1) } + [
+            (VideoFileMetadata.softwareKey, app), (VideoFileMetadata.reelKey, reelName),
+            (VideoFileMetadata.cameraNameKey, reelName),
         ]
     }
 }

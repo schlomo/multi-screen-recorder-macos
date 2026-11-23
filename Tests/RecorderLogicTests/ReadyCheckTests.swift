@@ -13,14 +13,18 @@ import Testing
         screens: Result<[ScreenInfo], DeviceReadError>? = nil,
         audioInputs: [AudioInputInfo] = builtInMicrophoneOnly,
         audioInputsError: DeviceReadError? = nil,
-        outputFolder: OutputFolderProbe = .usable(.bytes(100_000_000_000))
+        outputFolder: OutputFolderProbe = .usable(.bytes(100_000_000_000)),
+        cameras: [CameraInfo] = [],
+        cameraGranted: Bool = true
     ) -> ReadyCheckFacts {
         ReadyCheckFacts(
             screenRecording: screenRecording,
             microphoneGranted: microphoneGranted,
             screens: screens ?? .success(fullHDScreens),
             audioInputs: audioInputsError.map { .failure($0) } ?? .success(audioInputs),
-            outputFolder: outputFolder
+            outputFolder: outputFolder,
+            cameraGranted: cameras.isEmpty ? nil : cameraGranted,
+            cameras: cameras
         )
     }
 
@@ -30,10 +34,11 @@ import Testing
     static let designExample = """
         ok    Screen & System Audio Recording permission
         ok    Microphone permission
+        ok    Camera permission
         ok    Screens: 2
         ok    Audio: system audio, MacBook Pro Microphone (default), RØDE Wireless GO II RX
         ok    Output folder: ~/Movies/Multi Screen Recorder
-        FAIL  Free disk space: 3.1 GB in ~/Movies/Multi Screen Recorder, 10.7 GB needed for 2 hours
+        FAIL  Free disk space: 3.1 GB in ~/Movies/Multi Screen Recorder, 12.8 GB needed for 2 hours
               Fix: free up space, or lower --required-recording-hours
         Not ready.
 
@@ -42,7 +47,7 @@ import Testing
     @Test func rendersExactlyAsTheDesign() {
         let result = ReadyCheck.evaluate(
             facts(screens: .success(DesignExample.screens), audioInputs: DesignExample.audioInputs,
-                  outputFolder: .usable(.bytes(3_100_000_000))),
+                  outputFolder: .usable(.bytes(3_100_000_000)), cameras: DesignExample.cameras),
             settings: .defaults)
         #expect(result.text == Self.designExample)
         #expect(!result.isReady)
@@ -50,6 +55,29 @@ import Testing
 
     @Test func theDesignShowsTheExample() throws {
         #expect(try repositoryFile("docs/design/recorder.md").contains("```\n\(Self.designExample)```\n"))
+    }
+
+    /// A denied Camera permission does not stop a recording: it records no camera, says so, and how to change it (D74).
+    @Test func aDeniedCameraPermissionPassesAndSaysNoCameraIsRecorded() throws {
+        let result = ReadyCheck.evaluate(facts(cameras: DesignExample.cameras, cameraGranted: false), settings: .manual)
+        #expect(result.isReady)
+        let item = try #require(result.items.first { $0.title.hasPrefix("Camera permission") })
+        #expect(item.title == "Camera permission denied: no camera is recorded")
+        #expect(item.passed)
+        let fix = "allow it in System Settings › Privacy & Security › Camera, then " + ReadyCheck.restartNote
+            + ReadyCheck.terminalNote + " Or record no camera: turn off Auto and move the Camera mode slider to None"
+            + " (--camera-mode none)."
+        #expect(item.fix == fix)
+        #expect(result.text.contains("ok    Camera permission denied: no camera is recorded\n      Fix: allow it in System Settings"))
+        let withoutCameras = ReadyCheck.evaluate(facts(), settings: .manual)
+        #expect(result.items.last == withoutCameras.items.last)
+        let granted = ReadyCheck.evaluate(facts(cameras: DesignExample.cameras), settings: .manual)
+        #expect(granted.items.contains(ReadyCheckItem(title: "Camera permission", passed: true, fix: nil)))
+        #expect(granted.items.last != withoutCameras.items.last)
+        var noCamera = Settings.manual
+        noCamera.cameraMode = .none
+        #expect(!ReadyCheck.evaluate(facts(cameras: DesignExample.cameras, cameraGranted: false), settings: noCamera)
+            .items.contains { $0.title == "Camera permission" })
     }
 
     /// A long fix wraps at 80 columns and keeps its indent, under the text after "Fix: ".

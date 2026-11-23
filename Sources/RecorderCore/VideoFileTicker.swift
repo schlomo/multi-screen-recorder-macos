@@ -3,31 +3,31 @@ import Foundation
 import Synchronization
 import RecorderLogic
 
-/// What a screen file needs of its writer; `ScreenFileWriter` in a
+/// What a video file needs of its writer; `VideoFileWriter` in a
 /// recording, a stand-in in tests.
-public protocol ScreenFileWriting: AnyObject {
+public protocol VideoFileWriting: AnyObject {
     var firstTick: Int64 { get }
     /// False when the writer is not ready, so the tick waits.
-    func append(_ frame: CVPixelBuffer, tick: Int64) throws(ScreenFileWriterError) -> Bool
+    func append(_ frame: CVPixelBuffer, tick: Int64) throws(VideoFileWriterError) -> Bool
     /// False when the guide track is not ready, so the samples wait.
-    func appendGuide(_ guide: GuideTrack, _ channels: [[Float]], at position: Int64) throws(ScreenFileWriterError) -> Bool
-    func finish(lastTick: Int64?) async throws(ScreenFileWriterError)
+    func appendGuide(_ guide: GuideTrack, _ channels: [[Float]], at position: Int64) throws(VideoFileWriterError) -> Bool
+    func finish(lastTick: Int64?) async throws(VideoFileWriterError)
 }
 
-/// How a screen file ended, for the recording manifest: its entry with
+/// How a video file ended, for the recording manifest: its entry with
 /// its end, state and late frames, the writer's error, if any, and the
 /// guide tracks that end before its video. A file whose writer failed
 /// ends where the file really ends; `failedAt` is the end its writer was
 /// given, the time of the failure, and `lost` says what the file lacks (D66).
-public struct ScreenFileEnd: Equatable, Sendable {
-    public var file: RecordingManifest.ScreenFile
-    public var error: ScreenFileWriterError?
+public struct VideoFileEnd<File: VideoFileEntry>: Equatable, Sendable {
+    public var file: File
+    public var error: VideoFileWriterError?
     public var guideTracksCut: [GuideTrackCut] = []
     public var failedAt: Double?
     public var lost: String?
 }
 
-/// A guide track that ends before its screen file's video, and why.
+/// A guide track that ends before its video file's video, and why.
 public struct GuideTrackCut: Equatable, Sendable {
     public enum Why: Equatable, Sendable {
         /// The samples of its last mix were no longer there.
@@ -45,7 +45,7 @@ public struct GuideTrackCut: Equatable, Sendable {
     }
 }
 
-/// A screen file's last mix: the hand-overs that reached it while it
+/// A video file's last mix: the hand-overs that reached it while it
 /// ended, then a peek per guide track at the samples the feed has not
 /// mixed yet, up to the end of its video.
 public struct GuideLastMix: Sendable {
@@ -80,27 +80,27 @@ public struct GuideLastMix: Sendable {
     }
 }
 
-/// One screen file's ticks: frames that passed the screen check go in,
-/// every tick writes the newest, and at the end the file is finalized. Not
-/// thread-safe: the capture's queue uses it, and once the capture ends only
-/// `finish` does.
-public final class ScreenFileTicker {
-    public typealias MakeWriter = (_ firstTick: Int64) throws(ScreenFileWriterError)
-        -> (writer: any ScreenFileWriting, entry: RecordingManifest.ScreenFile)
+/// One video file's ticks: a screen's frames that passed the screen check,
+/// or a camera's frames, go in, every tick writes the newest, and at the end
+/// the file is finalized. Not thread-safe: the capture's queue uses it, and
+/// once the capture ends only `finish` does.
+public final class VideoFileTicker<File: VideoFileEntry> {
+    public typealias MakeWriter = (_ firstTick: Int64) throws(VideoFileWriterError)
+        -> (writer: any VideoFileWriting, entry: File)
 
     public enum Outcome: Equatable, Sendable {
         case none
-        case fileStarted(RecordingManifest.ScreenFile)
-        case ended(ScreenTracker.StreamEnd)
+        case fileStarted(File)
+        case ended(VideoStreamEnd)
     }
 
     private let makeWriter: MakeWriter
     private let drainTimeout: Duration
     private var ticks: TickLoop<CVPixelBuffer>
-    private var writer: (any ScreenFileWriting)?
-    private var entry: RecordingManifest.ScreenFile?
+    private var writer: (any VideoFileWriting)?
+    private var entry: File?
     /// The writer's first error, for the manifest and the person.
-    private var writerError: ScreenFileWriterError?
+    private var writerError: VideoFileWriterError?
     /// Per guide track, the end of the samples received, from t0.
     private var guidesReceivedUpTo: [GuideTrack: Int64] = [:]
     /// Guide track samples waiting for the writer, by their position in the file.
@@ -109,21 +109,27 @@ public final class ScreenFileTicker {
     private let guideWaitBound = Int(RecorderValues.audioWaitBoundSeconds * 1000 / Int(RecorderValues.guideTrackInterval.nanoseconds / 1_000_000))
 
     /// How long the end waits for the writer: as long as ticks may wait (D53).
-    public static let defaultDrainTimeout = Duration.seconds(RecorderValues.screenFileLateTickSeconds)
+    /// The current file's frames repeated for lateness and placed late so far.
+    public var lateness: (repeated: Int, placedLate: Int) { (ticks.framesRepeatedForLateness, ticks.framesPlacedLate) }
 
-    /// `captureStart` in nanoseconds from t0: the file's first tick is never before it.
+    public static var defaultDrainTimeout: Duration { .seconds(RecorderValues.videoFileLateTickSeconds) }
+
+    /// `captureStart` in nanoseconds from t0: the file's first tick is
+    /// never before it; `decisionDelay`: how long a tick waits for a frame
+    /// captured after it (`TickLoop`), none for a screen, `RecorderValues.cameraDecisionDelay` for a camera.
     public init(
-        captureStart: Int64, drainTimeout: Duration = defaultDrainTimeout,
+        captureStart: Int64, decisionDelay: Duration = .zero, drainTimeout: Duration = defaultDrainTimeout,
         makeWriter: @escaping MakeWriter
     ) {
         self.makeWriter = makeWriter
         self.drainTimeout = drainTimeout
-        ticks = TickLoop(notBefore: captureStart)
+        ticks = TickLoop(notBefore: captureStart, decisionDelay: decisionDelay.nanoseconds)
     }
 
-    /// A frame that passed the screen check; the first starts the file.
-    public func receive(_ frame: CVPixelBuffer, capturedAt time: Int64) -> Outcome {
-        ticks.receive(frame, capturedAt: time)
+    /// A frame to write: a screen's that passed the screen check, or a
+    /// camera's, captured at `time` and arrived at `arrival`; the first starts the file.
+    public func receive(_ frame: CVPixelBuffer, capturedAt time: Int64, arrivedAt arrival: Int64) -> Outcome {
+        ticks.receive(frame, capturedAt: time, arrivedAt: arrival)
         guard writer == nil, let firstTick = ticks.firstTick else { return .none }
         do {
             let made = try makeWriter(firstTick)
@@ -136,11 +142,14 @@ public final class ScreenFileTicker {
         }
     }
 
-    /// Writes the ticks due by `now`; why the file must end, if it must.
-    public func tick(now: Int64) -> ScreenTracker.StreamEnd? {
+    /// Writes the ticks decided by `now`, at the file's end with
+    /// `waitingForLateFrames` false all due by then; why the file must end, if it must.
+    public func tick(now: Int64, waitingForLateFrames: Bool = true) -> VideoStreamEnd? {
         guard let writer else { return nil }
         do {
-            let outcome = try ticks.advance(to: now) { tick, frame in try writer.append(frame, tick: tick) }
+            let outcome = try ticks.advance(to: now, waitingForLateFrames: waitingForLateFrames) { tick, frame in
+                try writer.append(frame, tick: tick)
+            }
             if outcome == .writerFellBehind { return .writerFellBehind }
         } catch {
             return failed(error)
@@ -151,7 +160,7 @@ public final class ScreenFileTicker {
     /// Guide track samples, one array per channel, the first at
     /// `positionFromStart` samples from t0: the part within the file goes
     /// to the writer, the part before its first tick is dropped.
-    public func receiveGuide(_ guide: GuideTrack, _ channels: [[Float]], positionFromStart: Int64) -> ScreenTracker.StreamEnd? {
+    public func receiveGuide(_ guide: GuideTrack, _ channels: [[Float]], positionFromStart: Int64) -> VideoStreamEnd? {
         guard let writer, writerError == nil else { return nil }
         let fileStart = writer.firstTick * Int64(RecorderValues.audioSampleRate) / Int64(ticks.grid.framesPerSecond)
         let before = Int(max(0, fileStart - positionFromStart))
@@ -165,7 +174,7 @@ public final class ScreenFileTicker {
         return writeGuides(writer)
     }
 
-    private func writeGuides(_ writer: any ScreenFileWriting) -> ScreenTracker.StreamEnd? {
+    private func writeGuides(_ writer: any VideoFileWriting) -> VideoStreamEnd? {
         do {
             while let first = waitingGuides.first {
                 guard try writer.appendGuide(first.guide, first.channels, at: first.position) else { return nil }
@@ -177,9 +186,9 @@ public final class ScreenFileTicker {
         return nil
     }
 
-    private func failed(_ error: any Error) -> ScreenTracker.StreamEnd {
-        let error = error as? ScreenFileWriterError
-            ?? ScreenFileWriterError(detail: ErrorDetail(error), isDiskFull: false)
+    private func failed(_ error: any Error) -> VideoStreamEnd {
+        let error = error as? VideoFileWriterError
+            ?? VideoFileWriterError(detail: ErrorDetail(error), isDiskFull: false)
         writerError = writerError ?? error
         return error.isDiskFull ? .diskFull : .writerFailed(error.detail)
     }
@@ -199,11 +208,11 @@ public final class ScreenFileTicker {
     public func finish(
         now: Int64, writeWaitingTicks: Bool,
         lastMix: (_ videoEnd: Int64) async -> GuideLastMix = { _ in GuideLastMix(pending: [], peeks: [:]) }
-    ) async -> ScreenFileEnd? {
+    ) async -> VideoFileEnd<File>? {
         guard let writer, var file = entry else { return nil }
         var cut: [GuideTrackCut] = []
         if writerError == nil, writeWaitingTicks {
-            _ = tick(now: now)
+            _ = tick(now: now, waitingForLateFrames: false)
             if writerError == nil { await drain(writer) }
             if writerError == nil, let lastTick = ticks.lastWrittenTick {
                 let perTick = Int64(RecorderValues.audioSampleRate) / Int64(ticks.grid.framesPerSecond)
@@ -240,9 +249,14 @@ public final class ScreenFileTicker {
         }
         file.end = ticks.grid.seconds(ofTick: (ticks.lastWrittenTick ?? writer.firstTick - 1) + 1)
         file.framesRepeatedForLateness = ticks.framesRepeatedForLateness
+        if ticks.decisionDelay > 0, ticks.framesPlacedLate > 0 {
+            RecorderLog.detail(
+                DetailLine.framesPlacedLate(file: file.name, count: ticks.framesPlacedLate, largestLateArrival: ticks.largestLateArrival),
+                category: VideoFileWriter.detailCategory)
+        }
         self.writer = nil
-        ticks = TickLoop(notBefore: ticks.notBefore)
-        return ScreenFileEnd(file: file, error: writerError, guideTracksCut: cut)
+        ticks = TickLoop(notBefore: ticks.notBefore, decisionDelay: ticks.decisionDelay)
+        return VideoFileEnd(file: file, error: writerError, guideTracksCut: cut)
     }
 
     /// The parts of a last mix, in order, joined from the sample position
@@ -265,7 +279,7 @@ public final class ScreenFileTicker {
         return (joined, false)
     }
 
-    private func drainGuides(_ writer: any ScreenFileWriting) async {
+    private func drainGuides(_ writer: any VideoFileWriting) async {
         let clock = SuspendingClock()
         let deadline = clock.now + drainTimeout
         while writeGuides(writer) == nil, !waitingGuides.isEmpty, writerError == nil, clock.now < deadline {
@@ -273,7 +287,7 @@ public final class ScreenFileTicker {
         }
     }
 
-    private func drain(_ writer: any ScreenFileWriting) async {
+    private func drain(_ writer: any VideoFileWriting) async {
         let clock = SuspendingClock()
         let deadline = clock.now + drainTimeout
         while true {
@@ -286,7 +300,7 @@ public final class ScreenFileTicker {
             }
             if left == 0 { return }
             if clock.now >= deadline {
-                writerError = ScreenFileWriterError(
+                writerError = VideoFileWriterError(
                     description: "the writer took none of the last \(left) ticks within \(drainTimeout)", isDiskFull: false)
                 return
             }

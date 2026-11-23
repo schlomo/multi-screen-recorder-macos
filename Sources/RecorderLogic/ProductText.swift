@@ -2,6 +2,6 @@
 public enum ProductText {
     /// The opening paragraph of README.md, also shown in the About window.
     public static let purpose = "A reliable multi-source screen and audio recorder for macOS. It captures every"
-        + " screen and audio source, never loses a recording, and keeps going when screens, resolutions or audio"
+        + " screen, camera and audio source, never loses a recording, and keeps going when screens, resolutions or audio"
         + " sources change."
 }
