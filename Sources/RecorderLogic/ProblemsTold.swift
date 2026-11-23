@@ -134,8 +134,8 @@ public struct ProblemsTold: Sendable {
         case recovered
         /// Its source went away.
         case disconnected
-        /// Neither: its capture ended, as at Stop or when the camera mode leaves the camera.
-        case ended
+        /// The recorder stopped its capture, as at Stop or when the camera mode leaves the camera.
+        case stopped
     }
 
     /// A problem as told, with when it began and, once over, ended, in nanoseconds since the start.
@@ -218,7 +218,7 @@ public struct ProblemsTold: Sendable {
         let ending = switch latest.ending {
         case .recovered: "recovered"
         case .disconnected: "then disconnected"
-        case .ended: "ended"
+        case .stopped: "stopped"
         }
         let text = if repeats.count > 1 {
             "\(phrase) \(repeats.count) times, \(seconds(repeats.reduce(Int64(0)) { $0 + ($1.ended ?? now) - $1.began })) in total"

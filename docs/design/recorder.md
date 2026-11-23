@@ -652,7 +652,8 @@ with a code that is a four-character code also as one (`1852797029
 ('nope')`), the reason and the suggestion, then `: ` and the underlying
 errors, and line breaks become `⏎`. A problem made from an event has the event's name as its error
 detail's description, with the event's error detail under it. A failure is told while recording, at its event's
-time. A `result` of `problems` never comes with empty `problems` (D47):
+time; when the file it ended also had a writer error, that error is a
+second problem, the file's. A `result` of `problems` never comes with empty `problems` (D47):
 should nothing have been told, finalizing adds one problem, "A failure
 was not told while recording", naming the first failure and how many
 failure events there were (or, without a failure event, the first file
@@ -981,24 +982,24 @@ checked, reported or rewritten at the next start (D47).
   keeps a problem of its kind told after it from the manifest. A
   problem still lasting at the end keeps its colour by this rule. Each
   kind has its own words and names its source, such as `Screen 1 DELL not
-  captured`, `Camera BRIO stalled`, `Free space not read`, `Disk full`,
+  captured`, `Camera 2 BRIO stalled`, `Free space not read`, `Disk full`,
   `File <name> incomplete`, `Guide tracks of <name> cut`, and one line:
   `<words> since 0:12` while it lasts, `<words> for 4.0 s at 0:12,
   recovered` once over because its source works again (`, then
   disconnected` when its source went away: unplugged, or a screen gone,
-  also at once for a failure told after it went; `, ended` for a stall
-  whose capture the recorder ended), and when it came more than once
+  also at once for a screen's or a camera's failure told after it
+  went; `, stopped` for a stall whose capture the recorder stopped), and when it came more than once
   `<words> 3 times, 12 s in total` (the ongoing one counted to now),
   with its ending once none lasts; then the
   latest error after a colon, `latest: ` before it when the errors
-  differ. A stall reads `Camera <name> stalled since 0:53` and `Camera
-  <name> stalled 7.4 s at 0:53, recovered`, without its error, always
+  differ. A stall reads `Camera <n> <name> stalled since 0:53` and `Camera
+  <n> <name> stalled 7.4 s at 0:53, recovered`, without its error, always
   the same. A stall began at its end minus its length, or, while it
   lasts, 2 s (the stall limit) before it was told; another problem
   began when it was told. A stall ends when frames come again, when a
   new file of the camera starts, or at its capture's end (unplugged,
   out of the camera mode, Stop), its length then up to that end,
-  `, ended` unless unplugged. Times
+  `, stopped` unless unplugged. Times
   are `m:ss` since the start, `h:mm:ss` from an hour on; lengths have
   one decimal below 10 s as rounded, whole seconds from there (rounded
   once, so 10.45 s is `10 s`), `m:ss` from a minute on. The red lines

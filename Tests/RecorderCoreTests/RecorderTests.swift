@@ -558,7 +558,7 @@ extension GlobalRecordingLog {
         /// A video file's writer failure and a full disk reach the window's lines, red until a new file of the
         /// camera starts or there is room (D78).
         @Test(arguments: [
-            (VideoStreamEnd.writerFailed("cannot write c.mov"), "Camera Stand-in camera not captured since "),
+            (VideoStreamEnd.writerFailed("cannot write c.mov"), "Camera 1 Stand-in camera not captured since "),
             (.diskFull, "Disk full since "),
         ])
         func aCameraFileEndedByItsWriterOrAFullDiskIsARedLine(end: VideoStreamEnd, line: String) async throws {
@@ -755,11 +755,11 @@ extension GlobalRecordingLog {
             let camera = try #require(cameras.last)
             try await sendFrames(camera, until: "the camera file") { (try? manifestOnDisk().cameraFiles.count) == 1 }
             try await wait("the stall") { (try? manifestOnDisk().events.map(\.event)) == [.cameraStalled] }
-            #expect(recorder.problemLines().map(\.text) == ["Camera Stand-in camera stalled since 0:00"])
+            #expect(recorder.problemLines().map(\.text) == ["Camera 1 Stand-in camera stalled since 0:00"])
             cameras.connected.withLock { $0 = [] }
             recorder.camerasChanged()
             let line = try #require(recorder.problemLines().first)
-            #expect(line.text.hasPrefix("Camera Stand-in camera stalled "))
+            #expect(line.text.hasPrefix("Camera 1 Stand-in camera stalled "))
             #expect(line.text.hasSuffix(" s at 0:00, then disconnected"))
             #expect(!line.isRed)
             _ = await stop()
@@ -818,6 +818,20 @@ extension GlobalRecordingLog {
             _ = await stop()
         }
 
+        /// The cameras are read again only once a failed capture's end is handled: a camera whose fresh
+        /// reading says suspended still has its stream failure (D74).
+        @Test func aStreamFailureOfACameraNowSuspendedIsStillAFailure() async throws {
+            cameras.connected.withLock { $0 = [Self.camera] }
+            try start(cameraMode: .real)
+            let camera = try #require(cameras.last)
+            try await sendFrames(camera, until: "the camera file") { (try? manifestOnDisk().cameraFiles.count) == 1 }
+            cameras.connected.withLock { $0 = [Self.suspended] }
+            camera.lose(.streamFailed("the stand-in failed"))
+            try await wait("the file's end") { (try? manifestOnDisk().cameraFiles.first?.state) == .finalized }
+            let summary = await stop()
+            #expect(summary.manifest.events.map(\.event).contains(.cameraStreamFailed))
+        }
+
         /// A failed end of a camera's file, `lost` part of it, as `CameraCapture` reports it late.
         private func failedEnd(of file: RecordingManifest.CameraFile, lost: String? = nil) -> VideoFileEnd<RecordingManifest.CameraFile> {
             var file = file
@@ -840,7 +854,7 @@ extension GlobalRecordingLog {
             recorder.cameraCaptureEnded(
                 uniqueID: "StandInCamera", captureNumber: 1, camera: "Stand-in camera", reason: .writerFailed("cannot write"),
                 file: failedEnd(of: file))
-            let line = try #require(recorder.problemLines().first { $0.text.hasPrefix("Camera Stand-in camera not captured") })
+            let line = try #require(recorder.problemLines().first { $0.text.hasPrefix("Camera 1 Stand-in camera not captured") })
             #expect(line.text.contains(", recovered: "))
             #expect(!line.isRed)
             _ = await stop()
@@ -858,7 +872,7 @@ extension GlobalRecordingLog {
             let lines = recorder.problemLines()
             let lost = try #require(lines.first { $0.text.hasPrefix("File \(file.name) incomplete since ") })
             #expect(lost.isRed)
-            let failure = try #require(lines.first { $0.text.hasPrefix("Camera Stand-in camera not captured") })
+            let failure = try #require(lines.first { $0.text.hasPrefix("Camera 1 Stand-in camera not captured") })
             #expect(failure.text.contains(", then disconnected: "))
             #expect(!failure.isRed)
             _ = await stop()
@@ -927,8 +941,8 @@ extension GlobalRecordingLog {
             cameras.connected.withLock { $0 = [Self.suspended] }
             recorder.camerasChanged()
             let line = try #require(recorder.problemLines().first)
-            #expect(line.text.hasPrefix("Camera Stand-in camera stalled "))
-            #expect(line.text.hasSuffix(" s at 0:00, ended"))
+            #expect(line.text.hasPrefix("Camera 1 Stand-in camera stalled "))
+            #expect(line.text.hasSuffix(" s at 0:00, stopped"))
             _ = await stop()
         }
 

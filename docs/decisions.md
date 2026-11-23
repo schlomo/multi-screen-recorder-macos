@@ -2592,16 +2592,18 @@ architect's reading.
   is the general word for a problem line that is over, "recovered"
   means only that its source works again, and "then disconnected" is
   the other ending; a stall whose capture the recorder ended (Stop, out
-  of the camera mode, the camera suspended) ends `, ended`, as it
-  neither recovered nor was disconnected. Only a source's failure (a
+  of the camera mode, the camera suspended) ends `, stopped`, as it
+  neither recovered nor was disconnected (the word ruled after the
+  fourth review, as "ended" is the general term). Only a source's failure (a
   screen's, a camera's, an audio file's) is over when told because a
   newer file of its source started; a full disk, guide tracks cut and
   a video file lost in part never are. A line only shown (a video
   file's end, which the manifest lists already) never swallows the
   same kind told after it: every tell reaches the recording manifest.
-  A failure told after its source went away ends `, then disconnected`
-  at once. A screen's line names it with its number, `Screen 1 DELL
-  not captured`.
+  A screen's or a camera's failure told after its source went away
+  ends `, then disconnected` at once. A screen's or a camera's line
+  names it with its number, as its files do: `Screen 1 DELL not
+  captured`, `Camera 2 BRIO stalled`.
 - **Consequences:** The window tells at a glance what is broken (red)
   and what went wrong and passed or never touched the recording
   (orange), and keeps its size with many problems. The Dock

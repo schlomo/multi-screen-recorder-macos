@@ -154,12 +154,12 @@ import Testing
     }
 
     /// A stall whose capture ended neither by its frames coming again nor by an unplug: ended.
-    @Test func aStallEndedWithItsCaptureSaysEnded() {
+    @Test func aStallEndedWithItsCaptureSaysStopped() {
         var told = ProblemsTold()
         var manifest = manifest()
         stall(&told, &manifest, at: 30)
-        told.cleared(.cameraStalled("brio"), at: nanoseconds(31), ending: .ended)
-        #expect(told.lines(now: nanoseconds(32)).map(\.text) == ["Camera BRIO stalled 3.0 s at 0:28, ended"])
+        told.cleared(.cameraStalled("brio"), at: nanoseconds(31), ending: .stopped)
+        #expect(told.lines(now: nanoseconds(32)).map(\.text) == ["Camera BRIO stalled 3.0 s at 0:28, stopped"])
     }
 
     /// A failure of a file whose source already has a newer file is over when told: orange at once.

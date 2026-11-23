@@ -657,8 +657,8 @@ public final class Recorder {
             manifest.cameraFiles.filter { $0.cameraUniqueID == uniqueID && $0.start > end.file.start }.map(\.start).min()
         }
         videoFileEnded(
-            end, captureNumber: captureNumber, source: source, label: source, reason: reason, notCaptured: .cameraNotCaptured(uniqueID),
-            newerFileStart: newer)
+            end, captureNumber: captureNumber, source: source, label: cameraLabel(uniqueID, name: source), reason: reason,
+            notCaptured: .cameraNotCaptured(uniqueID), newerFileStart: newer)
     }
 
     /// A screen file or a camera file ended, as `fileEnded` says; `source` is the screen's or the camera's name,
@@ -703,8 +703,8 @@ public final class Recorder {
         context.update(screens, lastScreenChange: tracker.lastScreenChange)
         apply(step)
         screensForAudio(screens)
-        // A screen file ended by a failure is told at the failure's time,
-        // so the recording manifest lists it once (D47); a screen that
+        // A screen file ended by a failure is told at the failure's time (D47); a file whose writer also
+        // reported an error is a second problem, the file's (`fileEnded`); a screen that
         // stays listed but cannot be captured is never left unrecorded silently (N-A).
         for failure in step.events where failure.event.isFailure {
             var problem = failure.problem
@@ -824,11 +824,13 @@ public final class Recorder {
             capture.start()
         case .stop(let uniqueID):
             guard let (captureNumber, capture) = cameraCaptures.removeValue(forKey: uniqueID) else { return }
-            problemsTold.cleared(.cameraStalled(uniqueID), at: context.now(), ending: .ended)
+            problemsTold.cleared(.cameraStalled(uniqueID), at: context.now(), ending: .stopped)
             stopInProgress { [weak self] in
                 let file = await capture.stop()
-                self?.cameraCaptureGone(uniqueID, captureNumber: captureNumber)
-                self?.videoFileEnded(file, captureNumber: captureNumber, source: capture.name, reason: nil, uniqueID: uniqueID)
+                guard let self else { return }
+                let readAgain = cameraCaptureGone(uniqueID, captureNumber: captureNumber)
+                videoFileEnded(file, captureNumber: captureNumber, source: capture.name, reason: nil, uniqueID: uniqueID)
+                if readAgain { camerasChanged() }
             }
         }
     }
@@ -849,7 +851,8 @@ public final class Recorder {
         guard !isStopped, cameraCaptures[uniqueID]?.0 == captureNumber else { return }
         let step = cameraTracker.stalled(uniqueID, at: context.now())
         applyCameras(step)
-        for stalled in step.events { tell(stalled.problem, kind: .cameraStalled(uniqueID), source: stalled.camera, ofAnEvent: true) }
+        for stalled in step.events { tell(stalled.problem, kind: .cameraStalled(uniqueID), source: stalled.camera.map { cameraLabel(uniqueID, name: $0) },
+                                                ofAnEvent: true) }
     }
 
     private func cameraStallEnded(uniqueID: String, captureNumber: Int, length: Int64) {
@@ -883,11 +886,15 @@ public final class Recorder {
     }
 
     /// A camera capture's stream has stopped, reported once though both end paths may report it: its
-    /// camera's readings count another app's use again (D74, D76).
-    private func cameraCaptureGone(_ uniqueID: String, captureNumber: Int) {
-        guard cameraCapturesGone.insert(captureNumber).inserted, cameraTracker.captureEnded(uniqueID) else { return }
-        // A reading while our capture still counted was not taken: read again.
-        camerasChanged()
+    /// camera's readings count another app's use again (D74, D76). True when no capture of ours is left:
+    /// the caller reads the cameras again once it handled the end, as a reading meanwhile was not taken.
+    private func cameraCaptureGone(_ uniqueID: String, captureNumber: Int) -> Bool {
+        cameraCapturesGone.insert(captureNumber).inserted && cameraTracker.captureEnded(uniqueID)
+    }
+
+    /// A camera's source in its problem lines, with its number as its files have it: `2 BRIO`.
+    private func cameraLabel(_ uniqueID: String, name: String) -> String {
+        cameraTracker.sources.first { $0.uniqueID == uniqueID }?.number.map { "\($0) \(name)" } ?? name
     }
 
     /// As a screen capture's end by itself (`captureEnded`). Internal, so a test can deliver a late end
@@ -895,13 +902,14 @@ public final class Recorder {
     func cameraCaptureEnded(
         uniqueID: String, captureNumber: Int, camera: String, reason: VideoStreamEnd, file: VideoFileEnd<RecordingManifest.CameraFile>?
     ) {
-        cameraCaptureGone(uniqueID, captureNumber: captureNumber)
+        let readAgain = cameraCaptureGone(uniqueID, captureNumber: captureNumber)
+        defer { if readAgain { camerasChanged() } }
         videoFileEnded(file, captureNumber: captureNumber, source: camera, reason: reason, uniqueID: uniqueID)
         guard !isStopped, let (current, _) = cameraCaptures[uniqueID], current == captureNumber else { return }
         cameraCaptures[uniqueID] = nil
         let step = cameraTracker.streamEnded(uniqueID, reason, connected: readCameras(), at: context.now())
         applyCameras(step)
-        problemsTold.cleared(.cameraStalled(uniqueID), at: context.now(), ending: .ended)
+        problemsTold.cleared(.cameraStalled(uniqueID), at: context.now(), ending: .stopped)
         for failure in step.events where failure.event.isFailure {
             var problem = failure.problem
             if reason == .captureSourceGone, failure.event == .cameraStreamFailed {
@@ -909,7 +917,7 @@ public final class Recorder {
                     atSeconds: failure.at, problem: "Camera \(camera) cannot be captured", error: CameraTracker.captureSourceGoneAgain)
             }
             let over = gone(.cameraNotCaptured(uniqueID))
-            tell(problem, kind: .cameraNotCaptured(uniqueID), source: camera, endedAt: over?.at, ending: over?.ending ?? .recovered,
+            tell(problem, kind: .cameraNotCaptured(uniqueID), source: cameraLabel(uniqueID, name: camera), endedAt: over?.at, ending: over?.ending ?? .recovered,
                  ofAnEvent: true)
         }
     }

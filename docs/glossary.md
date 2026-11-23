@@ -110,8 +110,8 @@ recording manifest's `problems` with its time and full error (D46, D64).
 
 A problem that is over while the recording goes on: its line in the
 status window says how long it lasted, when it began and how it ended:
-`recovered`, `then disconnected` when its source went away, or `ended`
-when the recorder ended its capture (Stop, out of the camera mode); it
+`recovered`, `then disconnected` when its source went away, or `stopped`
+when the recorder stopped its capture (Stop, out of the camera mode); it
 is orange unless the problem damaged the recording (D78).
 
 ## Recovered
