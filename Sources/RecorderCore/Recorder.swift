@@ -101,6 +101,8 @@ public final class Recorder {
     /// The audio inputs' latest sound and the lags counted so far per audio file, for their delays (D77).
     let audioDelays = AudioDelayFeed()
     private var delayLags = AudioDelay.Lags()
+    /// The camera captures whose end was reported to the camera tracker.
+    private var cameraCapturesGone: Set<Int> = []
     private var delayTask: Task<Void, Never>?
     private var audioInputsRead: [AudioInputInfo] = []
     private var endReports = CaptureEndReports()
@@ -817,6 +819,7 @@ public final class Recorder {
             problemsTold.cleared(.cameraStalled(uniqueID), at: context.now())
             stopInProgress { [weak self] in
                 let file = await capture.stop()
+                self?.cameraCaptureGone(uniqueID, captureNumber: captureNumber)
                 self?.videoFileEnded(file, captureNumber: captureNumber, source: capture.name, reason: nil, uniqueID: uniqueID)
             }
         }
@@ -861,10 +864,18 @@ public final class Recorder {
         applyCameras(cameraTracker.pictureInOtherOrientation(uniqueID, beforeItsFile: beforeItsFile, at: context.now()))
     }
 
+    /// A camera capture's stream has stopped, reported once though both end paths may report it: its
+    /// camera's readings count another app's use again (D74, D76).
+    private func cameraCaptureGone(_ uniqueID: String, captureNumber: Int) {
+        guard cameraCapturesGone.insert(captureNumber).inserted else { return }
+        cameraTracker.captureEnded(uniqueID)
+    }
+
     /// As a screen capture's end by itself (`captureEnded`).
     private func cameraCaptureEnded(
         uniqueID: String, captureNumber: Int, camera: String, reason: VideoStreamEnd, file: VideoFileEnd<RecordingManifest.CameraFile>?
     ) {
+        cameraCaptureGone(uniqueID, captureNumber: captureNumber)
         videoFileEnded(file, captureNumber: captureNumber, source: camera, reason: reason, uniqueID: uniqueID)
         guard !isStopped, let (current, _) = cameraCaptures[uniqueID], current == captureNumber else { return }
         cameraCaptures[uniqueID] = nil

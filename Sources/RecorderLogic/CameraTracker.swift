@@ -67,6 +67,9 @@ public struct CameraTracker: Sendable {
         /// Another app used it, as read while the recording had no capture of it: a reading
         /// during its capture counts that capture too (CMIO), so it never sets this.
         var isUsedElsewhere = false
+        /// The recording's captures of it from their start until their capture-ended report, which
+        /// comes once the stream stopped: while any is, a reading is of our own session.
+        var ownCaptures = 0
         /// Its latest file started in the format the camera ran in, as another app used it.
         var keptFormat = false
         /// The orientation its picture showed to be (portrait -1, landscape 1), boxed in a frame of the other
@@ -75,7 +78,6 @@ public struct CameraTracker: Sendable {
         /// While recording, its picture showed to be the other orientation: a new file turned after the settle time.
         var turnsWhileRecording = false
 
-        var hasCapture: Bool { if case .recording = phase { true } else { false } }
         /// A turn waits for the settle time: never for a camera whose format another app took.
         var turnIsDue: Bool { turnsWhileRecording && !isTakenOver }
     }
@@ -165,7 +167,7 @@ public struct CameraTracker: Sendable {
                     cameras[uniqueID]?.phase = .idle
                 }
             }
-            if let reading, !tracked.hasCapture { cameras[uniqueID]?.isUsedElsewhere = reading.isRunningElsewhere }
+            if let reading, tracked.ownCaptures == 0 { cameras[uniqueID]?.isUsedElsewhere = reading.isRunningElsewhere }
             if tracked.isTakenOver, let reading, let before = tracked.reading, reading.activeFormat != before.activeFormat {
                 // Another app changing the format again settles as a screen's change does (`due`).
                 cameras[uniqueID]?.changedAt = now
@@ -271,6 +273,13 @@ public struct CameraTracker: Sendable {
         cameras[uniqueID]?.turnsWhileRecording = true
         cameras[uniqueID]?.changedAt = now
         return Step()
+    }
+
+    /// A capture of `uniqueID` reported its end, after its stream stopped: from then on, with no other
+    /// capture of it running, a reading tells whether another app uses it. Once per capture.
+    public mutating func captureEnded(_ uniqueID: String) {
+        guard let count = cameras[uniqueID]?.ownCaptures, count > 0 else { return }
+        cameras[uniqueID]?.ownCaptures = count - 1
     }
 
     /// A camera file of `uniqueID` started: its restart delay starts over.
@@ -400,6 +409,7 @@ public struct CameraTracker: Sendable {
         tracked.phase = .recording(frameSize: frameSize)
         tracked.isStalled = false
         tracked.keptFormat = keepsFormat
+        tracked.ownCaptures += 1
         cameras[uniqueID] = tracked
         return .start(
             uniqueID: uniqueID, format: format, setsFormat: !keepsFormat, frameSize: frameSize,

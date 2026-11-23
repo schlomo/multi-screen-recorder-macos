@@ -596,6 +596,35 @@ import Testing
         #expect(cameras.recordedReading(of: "O")?.isRunningElsewhere == false)
     }
 
+    /// A capture is the recording's own from its start until its capture-ended report, which comes once its
+    /// stream stopped: a reading before that counts our stopping session, never another app (D74, D76).
+    @Test func aReadingBeforeTheCaptureEndedReportIsTheRecordingsOwn() {
+        var cameras = tracker()
+        #expect(cameras.begin([Self.osmo], at: 0).actions == [start(Self.landscape)])
+        var suspended = Self.osmo
+        suspended.isSuspended = true
+        #expect(cameras.observe([suspended], at: 10 * second).actions == [.stop(uniqueID: "O")])
+        var resumed = Self.osmo
+        resumed.isRunningElsewhere = true
+        _ = cameras.observe([resumed], at: 10 * second + second / 10)
+        cameras.captureEnded("O")
+        #expect(cameras.due(at: 12 * second).actions == [start(Self.landscape)])
+    }
+
+    /// A reading after the capture-ended report counts: another app's use keeps its format.
+    @Test func aReadingAfterTheCaptureEndedReportCounts() {
+        var cameras = tracker()
+        _ = cameras.begin([Self.osmo], at: 0)
+        var suspended = Self.osmo
+        suspended.isSuspended = true
+        _ = cameras.observe([suspended], at: 10 * second)
+        cameras.captureEnded("O")
+        var elsewhere = Self.osmo
+        elsewhere.isRunningElsewhere = true
+        _ = cameras.observe([elsewhere], at: 10 * second + second / 10)
+        #expect(cameras.due(at: 12 * second).actions == [start(Self.landscape, setsFormat: false)])
+    }
+
     /// Another app taking the format while a turn waits: the takeover's new file and event, no turn.
     @Test func aTakeoverDuringAWaitingTurnIsTheTakeovers() {
         var cameras = tracker()

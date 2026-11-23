@@ -1743,9 +1743,12 @@ no audio of the camera's own.
   another app taking control"). "Another app uses it" is Core Media
   I/O's `kCMIODevicePropertyDeviceIsRunningSomewhere`, read for the
   device whose `kCMIODevicePropertyDeviceUID` is the camera's unique ID
-  (`CameraInfo.isRunningElsewhere`), taken only from a reading while the
-  recorder has no capture of the camera, as it counts the recorder's own
-  capture too, not AVFoundation's
+  (`CameraInfo.isRunningElsewhere`), taken only from a reading while no
+  capture of the recorder's own is the camera's, from that capture's
+  start until its capture-ended report, which comes once its
+  `stopRunning` has returned (a reading counts the recorder's own
+  session too; [ASSUMED] Core Media I/O is current once `stopRunning`
+  has returned), not AVFoundation's
   `isInUseByAnotherApplication`, which stays false for a camera a
   browser uses (D74). Otherwise the recorder sets its own format, as
   above. Once the recorder's own opening of a camera has finished
