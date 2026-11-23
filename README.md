@@ -114,7 +114,7 @@ confirmed yet.
 - **Audio delay:** some microphones deliver their sound later than
   others, such as a camera's built-in microphone over USB, about 0.5 s
   behind on the owner's Mac. The recorder measures each microphone's
-  delay against the default microphone while recording and the
+  delay while recording, relative to the earliest microphone, and the
   timeline file places its audio that much earlier; the audio files
   stay as recorded.
 - **USB docks:** plugging a USB device into a dock while recording can

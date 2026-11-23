@@ -39,12 +39,17 @@ private func failedEvent(at seconds: Double, error: ErrorDetail) -> RecordingEve
         var failed = fileEnd(writerError("cannot write f.mov: no luck"))
         failed.guideTracksCut = [GuideTrackCut(guide: .audioInputs, why: .samplesGone)]
         #expect(FileEndReport(reason: nil, end: failed, source: "LG", at: 3 * second).problem?.error == "cannot write f.mov: no luck")
+        // Guide tracks cut leave the video intact: their own kind, orange (D78).
+        #expect(report.problemKind(notCaptured: .screenNotCaptured("U")) == .guideTracksCut("f.mov"))
     }
 
     @Test func aWriterThatCouldNotBeCreatedIsAnEventNowAndAProblem() {
         let report = FileEndReport(reason: .writerFailed("cannot create f.mov"), end: noScreenFile, source: "LG", at: 3 * second)
         #expect(report.problem == RecordingProblem(at: 3 * second, problem: "Screen LG", error: "cannot create f.mov"))
         #expect(report.event == failedEvent(at: 3, error: "cannot create f.mov"))
+        #expect(report.problemKind(notCaptured: .screenNotCaptured("U")) == .screenNotCaptured("U"))
+        #expect(FileEndReport(reason: .diskFull, end: noScreenFile, source: "LG", at: 3 * second)
+            .problemKind(notCaptured: .screenNotCaptured("U")) == .diskFull)
     }
 
     @Test func aFullDiskIsAnEventAndAProblemFileOrNoFile() {

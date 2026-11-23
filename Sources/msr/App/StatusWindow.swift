@@ -11,7 +11,7 @@ final class StatusModel {
     var line = ""
     /// "CPU 23 %", our process only.
     var cpu = ""
-    /// Red while ongoing, orange once recovered (D78).
+    /// One line per kind of problem: red when broken, orange for a hiccup, red ones first (D78).
     var problems: [ProblemLine] = []
     /// Each audio source's level meter, drawn 10 times a second while the window is open (D69).
     var levels: [AudioTracker.SourceID: AudioLevel] = [:]

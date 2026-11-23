@@ -2436,7 +2436,9 @@ architect's reading.
   reading while the recorder has no capture of it, as Core Media I/O's
   running-somewhere counts the recorder's own capture, which had kept a
   turned camera in its format; a takeover while a turn waits is the
-  takeover's change, not a turn; the two bars must be equal within a
+  takeover's change, not a turn, and a boxed picture after a takeover
+  is no turn at all (it had left a turn due that never came, so the
+  recorder waited for it again and again); the two bars must be equal within a
   sample, and a dark first or last row of the picture does not stop a
   box.
 - **Consequences:** Such a camera is recorded in the orientation of its
@@ -2498,7 +2500,7 @@ architect's reading.
   delay"; `Sources/RecorderLogic/AudioDelay.swift`,
   `Sources/RecorderCore/AudioDelayFeed.swift`.
 
-## D78: A problem that recovered turns orange in the status window (2026-11-23)
+## D78: Problem lines: red when broken, orange for a hiccup, one line per kind (2026-11-23)
 
 - **Status:** in force.
 - **Context:** The status window listed every problem in red for the
@@ -2556,6 +2558,24 @@ architect's reading.
   audio file's line is per file, as its kind names the file, and ends
   when a new file of its source starts; a merged line carries the
   latest error.
+- **Amended after a second review (the architect's reading):** the
+  free space not read and the recording log not written are red while
+  they last, as a person should look at the disk; the screens or the
+  audio inputs not read stay red until the next read works, as a new
+  source might go unrecorded. A video file's end reaches the window as
+  every other problem: its writer failure as its source's not
+  captured, red until a new file of that source starts; a full disk,
+  red until there is room; a video file lost in part, always red; its
+  guide tracks cut, always orange (the video is intact). A failure of a
+  file whose source has a newer file already is over when told, so
+  orange at once; failed audio files are matched to their source by
+  its UID, not its name. Each kind has its own fixed words, then the
+  latest error after a colon, `latest: ` before it when the errors
+  differ; a stall or failure whose source went away ends `, then
+  disconnected`, orange; lengths are rounded once. Decided while
+  building: a stall's line leaves out its error, always the same; a
+  lost or cut file names the file (`File <name> incomplete`, `Guide
+  tracks of <name> cut`).
 - **Consequences:** The window tells at a glance what is broken (red)
   and what went wrong and passed or never touched the recording
   (orange), and keeps its size with many problems. The Dock

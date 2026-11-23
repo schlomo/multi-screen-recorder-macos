@@ -415,6 +415,15 @@ extension GlobalRecordingLog {
 
         /// A camera that offers its size in both orientations and delivers a portrait picture pillarboxed in
         /// its landscape format turns to the portrait format before its file starts (D76).
+        /// A camera that offers its size in both orientations, as the DJI Osmo Pocket.
+        static let osmo = CameraInfo(
+            uniqueID: "Osmo", name: "OsmoPocket4P", isDefault: true, isVirtual: false,
+            formats: [
+                CameraFormat(size: FrameSize(width: 320, height: 180), maxFramesPerSecond: 30),
+                CameraFormat(size: FrameSize(width: 180, height: 320), maxFramesPerSecond: 30),
+            ],
+            activeFormat: CameraFormat(size: FrameSize(width: 320, height: 180), maxFramesPerSecond: 30))
+
         @Test func aCameraWhosePictureIsBoxedInTheOtherOrientationTurnsBeforeItsFile() async throws {
             let osmo = CameraInfo(
                 uniqueID: "Osmo", name: "OsmoPocket4P", isDefault: true, isVirtual: false,
@@ -439,6 +448,43 @@ extension GlobalRecordingLog {
             #expect(landscape.isStopped)
             #expect(summary.manifest.cameraFiles.map(\.frameSize) == [[180, 320]])
             #expect(summary.manifest.events.isEmpty)
+        }
+
+        /// A video file's writer failure and a full disk reach the window's lines, red until a new file of the
+        /// camera starts or there is room (D78).
+        @Test(arguments: [
+            (VideoStreamEnd.writerFailed("cannot write c.mov"), "Camera Stand-in camera not captured since "),
+            (.diskFull, "Disk full since "),
+        ])
+        func aCameraFileEndedByItsWriterOrAFullDiskIsARedLine(end: VideoStreamEnd, line: String) async throws {
+            cameras.connected.withLock { $0 = [Self.camera] }
+            try start(cameraMode: .real)
+            let camera = try #require(cameras.last)
+            try await sendFrames(camera, until: "the camera file") { (try? manifestOnDisk().cameraFiles.count) == 1 }
+            camera.lose(end)
+            try await wait("the line") { recorder.problemLines().first?.text.hasPrefix(line) == true }
+            #expect(recorder.problemLines().first?.isRed == true)
+            _ = await stop()
+        }
+
+        /// A camera another app took over is never turned: a boxed picture after the takeover leaves
+        /// nothing due, so the recorder does not wait for it again and again (D76).
+        @Test func aTakenOverCameraWhosePictureIsBoxedIsNotTurnedAndNothingIsDue() async throws {
+            cameras.connected.withLock { $0 = [Self.osmo] }
+            try start(cameraMode: .real)
+            let camera = try #require(cameras.last)
+            try await sendFrames(camera, until: "the camera file") { (try? manifestOnDisk().cameraFiles.count) == 1 }
+            camera.formatChangedByAnotherApp()
+            // Past the next check (5 s) and its confirmation (2 s).
+            let end = ContinuousClock.now + .seconds(8)
+            while ContinuousClock.now < end {
+                try camera.sendFrame(pillarboxed: true)
+                try await Task.sleep(for: .milliseconds(30))
+            }
+            #expect(recorder.cameraTracker.nextDueTime() == nil)
+            let summary = await stop()
+            #expect(cameras.opened.withLock { $0.count } == 1)
+            #expect(!summary.manifest.events.contains { $0.event == .cameraOrientationChanged })
         }
 
         /// A camera whose stream takes long to stop: its file ends where the stop was asked, not
@@ -597,7 +643,7 @@ extension GlobalRecordingLog {
             #expect(summary.manifest.result == .problems)
         }
 
-        /// A stalled camera unplugged: its stall has recovered at the capture's end (D78).
+        /// A stalled camera unplugged: its stall ends there, then disconnected, orange (D78).
         @Test func aStalledCameraUnpluggedEndsItsStallLine() async throws {
             cameras.connected.withLock { $0 = [Self.camera] }
             try start(cameraMode: .real, cameraFrameWatch: Self.quickFrameWatch)
@@ -609,7 +655,8 @@ extension GlobalRecordingLog {
             recorder.camerasChanged()
             let line = try #require(recorder.problemLines().first)
             #expect(line.text.hasPrefix("Camera Stand-in camera stalled "))
-            #expect(line.text.hasSuffix(" s at 0:00, recovered"))
+            #expect(line.text.hasSuffix(" s at 0:00, then disconnected"))
+            #expect(!line.isRed)
             _ = await stop()
         }
 

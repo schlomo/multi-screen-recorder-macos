@@ -76,6 +76,8 @@ public struct CameraTracker: Sendable {
         var turnsWhileRecording = false
 
         var hasCapture: Bool { if case .recording = phase { true } else { false } }
+        /// A turn waits for the settle time: never for a camera whose format another app took.
+        var turnIsDue: Bool { turnsWhileRecording && !isTakenOver }
     }
 
     public let settings: Settings
@@ -195,7 +197,7 @@ public struct CameraTracker: Sendable {
             switch tracked.phase {
             case .idle: step.actions.append(start(uniqueID))
             case .waitingToRestart(let notBefore) where notBefore <= now: step.actions.append(start(uniqueID))
-            case .recording(let current) where tracked.turnsWhileRecording && !tracked.isTakenOver:
+            case .recording(let current) where tracked.turnIsDue:
                 let restart = start(uniqueID)
                 guard case .start(_, _, _, let frameSize, _, _, _) = restart else { break }
                 var turned = event(.cameraOrientationChanged, uniqueID, at: now)
@@ -228,7 +230,7 @@ public struct CameraTracker: Sendable {
             return switch tracked.phase {
             case .idle: settled
             case .waitingToRestart(let notBefore): max(settled, notBefore)
-            case .recording: tracked.turnsWhileRecording || frameSizeTakenOver(tracked) != nil ? settled : nil
+            case .recording: tracked.turnIsDue || frameSizeTakenOver(tracked) != nil ? settled : nil
             case .waitingForRoom: nil
             }
         }.min()
@@ -259,9 +261,10 @@ public struct CameraTracker: Sendable {
     /// turns to its format of that orientation (D76): before its file started, a
     /// new capture at once; while recording, a new file after the settle
     /// time with the event `camera orientation changed` (`due`). A camera
-    /// whose format another app set is never turned.
+    /// whose format another app set or took is never turned.
     public mutating func pictureInOtherOrientation(_ uniqueID: String, beforeItsFile: Bool, at now: Int64) -> Step {
-        guard var tracked = cameras[uniqueID], case .recording(let current) = tracked.phase, !tracked.keptFormat else { return Step() }
+        guard var tracked = cameras[uniqueID], case .recording(let current) = tracked.phase, !tracked.keptFormat, !tracked.isTakenOver
+        else { return Step() }
         tracked.pictureOrientation = -CameraInfo.orientation(of: current)
         cameras[uniqueID] = tracked
         guard !beforeItsFile else { return Step(actions: [.stop(uniqueID: uniqueID), start(uniqueID)]) }

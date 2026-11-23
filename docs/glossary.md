@@ -109,9 +109,11 @@ recording manifest's `problems` with its time and full error (D46, D64).
 ## Recovered
 
 A problem that ended while the recording went on, such as a camera
-stall whose frames came again: its line in the status window says how
-long it lasted and when it began, and is orange unless the problem
-damaged the recording (D78).
+stall whose frames came again or a failed screen whose next file
+started: its line in the status window says how long it lasted, when it
+began and how it ended (`recovered`, or `then disconnected` when its
+source went away), and is orange unless the problem damaged the
+recording (D78).
 
 ## Error detail
 

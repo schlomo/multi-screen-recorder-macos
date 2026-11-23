@@ -80,6 +80,7 @@ private func audioEnd(state: RecordingManifest.State) -> AudioFileEnd {
         #expect(report.problem?.at == 6.933)
         #expect(report.lostProblem?.problem == "Screen file s.mov")
         #expect(report.lostProblem?.error?.contains("1.266 s of the recording are lost") == true)
+        #expect(report.lostKind == .videoFileLost("s.mov"))
         var manifest = RecordingManifest(
             app: "x", started: Date(), timeZone: .gmt, settings: .defaults)
         var reports = CaptureEndReports()

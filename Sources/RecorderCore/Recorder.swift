@@ -85,7 +85,7 @@ public final class Recorder {
     /// some and the recording resolution records video. Without, it never
     /// lists a camera or asks for the Camera permission.
     private let readsCameras: Bool
-    private var cameraTracker: CameraTracker
+    private(set) var cameraTracker: CameraTracker
     /// The running capture of each camera, by its unique ID, with its number among all captures of the recording.
     private var cameraCaptures: [String: (Int, CameraCapture)] = [:]
     private var cameraDueTask: Task<Void, Never>?
@@ -566,6 +566,9 @@ public final class Recorder {
     /// Records the events, carries out the actions, and waits for what is due next.
     private func apply(_ step: ScreenTracker.Step) {
         guard !isStopped else { return }
+        for screen in tracker.sources where screen.state == .disconnected {
+            problemsTold.cleared(.screenNotCaptured(screen.uuid), at: context.now(), ending: .disconnected)
+        }
         manifest.events += step.events
         if !step.events.isEmpty { try? writeManifest() }
         told(step.events)
@@ -612,7 +615,7 @@ public final class Recorder {
             guard let (captureNumber, capture) = captures.removeValue(forKey: uuid) else { return }
             stopInProgress { [weak self] in
                 let file = await capture.stop()
-                self?.fileEnded(file, captureNumber: captureNumber, screen: capture.name, reason: nil)
+                self?.fileEnded(file, captureNumber: captureNumber, screen: capture.name, uuid: uuid, reason: nil)
             }
         }
     }
@@ -632,19 +635,44 @@ public final class Recorder {
     /// entry, so the file is listed even when its start was not reported
     /// yet. Its event and problem are recorded once per capture, also when
     /// the capture ended by itself while the recorder stopped it.
-    private func fileEnded(_ end: VideoFileEnd<RecordingManifest.ScreenFile>?, captureNumber: Int, screen: String, reason: VideoStreamEnd?) {
-        videoFileEnded(end, captureNumber: captureNumber, source: screen, reason: reason)
+    private func fileEnded(
+        _ end: VideoFileEnd<RecordingManifest.ScreenFile>?, captureNumber: Int, screen: String, uuid: String, reason: VideoStreamEnd?
+    ) {
+        let newer = end.flatMap { end in manifest.files.filter { $0.screenUUID == uuid && $0.start > end.file.start }.map(\.start).min() }
+        videoFileEnded(end, captureNumber: captureNumber, source: screen, reason: reason, notCaptured: .screenNotCaptured(uuid), newerFileStart: newer)
     }
 
-    /// A screen file or a camera file ended, as `fileEnded` says; `source` is the screen's or the camera's name.
-    private func videoFileEnded<File>(_ end: VideoFileEnd<File>?, captureNumber: Int, source: String, reason: VideoStreamEnd?) {
+    private func videoFileEnded(
+        _ end: VideoFileEnd<RecordingManifest.CameraFile>?, captureNumber: Int, source: String, reason: VideoStreamEnd?, uniqueID: String
+    ) {
+        let newer = end.flatMap { end in
+            manifest.cameraFiles.filter { $0.cameraUniqueID == uniqueID && $0.start > end.file.start }.map(\.start).min()
+        }
+        videoFileEnded(end, captureNumber: captureNumber, source: source, reason: reason, notCaptured: .cameraNotCaptured(uniqueID), newerFileStart: newer)
+    }
+
+    /// A screen file or a camera file ended, as `fileEnded` says; `source` is the screen's or the camera's name,
+    /// `notCaptured` its kind of a failure; `newerFileStart`, a newer file of the source that started already:
+    /// a failure of this one is over when told (D78).
+    private func videoFileEnded<File>(
+        _ end: VideoFileEnd<File>?, captureNumber: Int, source: String, reason: VideoStreamEnd?, notCaptured: ProblemKind,
+        newerFileStart: Double?
+    ) {
         let before = manifest
         let report = endReports.record(
             captureNumber: captureNumber, reason: reason, end: end, source: source, at: context.now(), into: &manifest)
         if manifest != before { try? writeManifest() }
         told(Array(manifest.events.dropFirst(before.events.count)))
-        if let problem = report?.problem { told(problem, ofAnEvent: report?.event != nil) }
-        if let lost = report?.lostProblem { told(lost) }
+        if let report, let problem = report.problem {
+            problemsTold.show(
+                problem, kind: report.problemKind(notCaptured: notCaptured), source: source,
+                endedAt: newerFileStart.map { Int64(($0 * 1_000_000_000).rounded()) })
+            told(problem, ofAnEvent: report.event != nil)
+        }
+        if let report, let lost = report.lostProblem {
+            problemsTold.show(lost, kind: report.lostKind)
+            told(lost)
+        }
         // Both end paths may report the same end: said once.
         if let end, manifest[keyPath: File.manifestFiles] != before[keyPath: File.manifestFiles] {
             RecorderLog.detail("file ended: \(end.file.name), \(end.file.state.rawValue)", category: "recorder")
@@ -654,7 +682,7 @@ public final class Recorder {
     private func captureEnded(
         uuid: String, captureNumber: Int, screen: String, reason: VideoStreamEnd, file: VideoFileEnd<RecordingManifest.ScreenFile>?
     ) {
-        fileEnded(file, captureNumber: captureNumber, screen: screen, reason: reason)
+        fileEnded(file, captureNumber: captureNumber, screen: screen, uuid: uuid, reason: reason)
         // One the recorder already stopped, or replaced, changes nothing more.
         guard !isStopped, let (current, capture) = captures[uuid], current == captureNumber else { return }
         captures[uuid] = nil
@@ -673,7 +701,7 @@ public final class Recorder {
                 problem = RecordingProblem(
                     atSeconds: failure.at, problem: "Screen \(screen) cannot be captured", error: ScreenTracker.captureSourceGoneAgain)
             }
-            tell(problem, kind: .screenNotCaptured(uuid), ofAnEvent: true)
+            tell(problem, kind: .screenNotCaptured(uuid), source: screen, ofAnEvent: true)
         }
     }
 
@@ -721,6 +749,10 @@ public final class Recorder {
     /// Records the camera events, carries out the actions, and waits for what is due next.
     private func applyCameras(_ step: CameraTracker.Step) {
         guard !isStopped else { return }
+        for camera in cameraTracker.sources where camera.state == .disconnected {
+            problemsTold.cleared(.cameraNotCaptured(camera.uniqueID), at: context.now(), ending: .disconnected)
+            problemsTold.cleared(.cameraStalled(camera.uniqueID), at: context.now(), ending: .disconnected)
+        }
         manifest.events += step.events
         if !step.events.isEmpty { try? writeManifest() }
         told(step.events)
@@ -782,7 +814,7 @@ public final class Recorder {
             problemsTold.cleared(.cameraStalled(uniqueID), at: context.now())
             stopInProgress { [weak self] in
                 let file = await capture.stop()
-                self?.videoFileEnded(file, captureNumber: captureNumber, source: capture.name, reason: nil)
+                self?.videoFileEnded(file, captureNumber: captureNumber, source: capture.name, reason: nil, uniqueID: uniqueID)
             }
         }
     }
@@ -803,7 +835,7 @@ public final class Recorder {
         guard !isStopped, cameraCaptures[uniqueID]?.0 == captureNumber else { return }
         let step = cameraTracker.stalled(uniqueID, at: context.now())
         applyCameras(step)
-        for stalled in step.events { tell(stalled.problem, kind: .cameraStalled(uniqueID), ofAnEvent: true) }
+        for stalled in step.events { tell(stalled.problem, kind: .cameraStalled(uniqueID), source: stalled.camera, ofAnEvent: true) }
     }
 
     private func cameraStallEnded(uniqueID: String, captureNumber: Int, length: Int64) {
@@ -830,19 +862,19 @@ public final class Recorder {
     private func cameraCaptureEnded(
         uniqueID: String, captureNumber: Int, camera: String, reason: VideoStreamEnd, file: VideoFileEnd<RecordingManifest.CameraFile>?
     ) {
-        videoFileEnded(file, captureNumber: captureNumber, source: camera, reason: reason)
+        videoFileEnded(file, captureNumber: captureNumber, source: camera, reason: reason, uniqueID: uniqueID)
         guard !isStopped, let (current, _) = cameraCaptures[uniqueID], current == captureNumber else { return }
         cameraCaptures[uniqueID] = nil
-        problemsTold.cleared(.cameraStalled(uniqueID), at: context.now())
         let step = cameraTracker.streamEnded(uniqueID, reason, connected: readCameras(), at: context.now())
         applyCameras(step)
+        problemsTold.cleared(.cameraStalled(uniqueID), at: context.now())
         for failure in step.events where failure.event.isFailure {
             var problem = failure.problem
             if reason == .captureSourceGone, failure.event == .cameraStreamFailed {
                 problem = RecordingProblem(
                     atSeconds: failure.at, problem: "Camera \(camera) cannot be captured", error: CameraTracker.captureSourceGoneAgain)
             }
-            tell(problem, kind: .cameraNotCaptured(uniqueID), ofAnEvent: true)
+            tell(problem, kind: .cameraNotCaptured(uniqueID), source: camera, ofAnEvent: true)
         }
     }
 
@@ -1068,7 +1100,7 @@ public final class Recorder {
         let started = audioTracker.fileStarted(id, at: Int64((file.start * 1_000_000_000).rounded()))
         problemsTold.cleared(.audioSourceFailed(name), at: context.now())
         // A failed file of the source is over once a new one starts (D78).
-        for earlier in manifest.audioFiles where earlier.audioSource == file.audioSource {
+        for earlier in manifest.audioFiles where earlier.audioSourceUID == file.audioSourceUID {
             problemsTold.cleared(.audioFileFailed(earlier.name), at: context.now())
         }
         let listed = manifest.audioFileStarted(file)
@@ -1086,9 +1118,12 @@ public final class Recorder {
         // At the file's end, so a lost end (`audio file writer fell behind`) is told once (D47).
         if end.error != nil || !end.events.isEmpty {
             let at = Int64((end.failureSeconds * 1_000_000_000).rounded())
+            let newer = manifest.audioFiles
+                .filter { $0.audioSourceUID == end.file.audioSourceUID && $0.start > end.file.start }
+                .map { Int64(($0.start * 1_000_000_000).rounded()) }.min()
             tell(RecordingProblem(at: at, problem: "Audio file \(end.file.name)",
                                   error: end.error?.detail ?? "its writer fell behind"),
-                 kind: .audioFileFailed(end.file.name), ofAnEvent: end.toldByAnEvent)
+                 kind: .audioFileFailed(end.file.name), endedAt: newer, ofAnEvent: end.toldByAnEvent)
             if let lost = end.lost {
                 tell(RecordingProblem(at: at, problem: "Audio file \(end.file.name)", error: ErrorDetail(message: lost)),
                      kind: .audioFileLost(end.file.name))
@@ -1154,6 +1189,7 @@ public final class Recorder {
         problemsTold.cleared(.freeSpaceNotRead, at: context.now())
         let threshold = lowDiskWarningBytes()
         let isLow = Double(free) < threshold
+        if !isLow { problemsTold.cleared(.diskFull, at: context.now()) }
         if isLow != isLowOnDisk {
             isLowOnDisk = isLow
             observer?.recorder(self, lowDiskSpace: isLow)
@@ -1265,8 +1301,10 @@ public final class Recorder {
         tell(RecordingProblem(at: time ?? context.now(), problem: problem, error: error), kind: kind, ofAnEvent: ofAnEvent)
     }
 
-    private func tell(_ problem: RecordingProblem, kind: ProblemKind, ofAnEvent: Bool = false) {
-        switch problemsTold.add(problem, kind: kind, to: &manifest) {
+    private func tell(
+        _ problem: RecordingProblem, kind: ProblemKind, source: String? = nil, endedAt: Int64? = nil, ofAnEvent: Bool = false
+    ) {
+        switch problemsTold.add(problem, kind: kind, source: source, endedAt: endedAt, to: &manifest) {
         case .tell(let writesManifest):
             if writesManifest { try? writeManifest() }
             told(problem, ofAnEvent: ofAnEvent)

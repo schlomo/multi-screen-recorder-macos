@@ -10,6 +10,20 @@ struct FileEndReport: Equatable {
     var problem: RecordingProblem?
     /// What a failed file lacks of what its writer was given (D66); a problem of its own.
     var lostProblem: RecordingProblem?
+    /// The file's name, or the source's when no file started.
+    var fileName = ""
+
+    /// The kind of `problem` in the window's lines (D78): a full disk, guide tracks cut (no event), else
+    /// `notCaptured`, the source's failure.
+    func problemKind(notCaptured: ProblemKind) -> ProblemKind {
+        switch event?.event {
+        case .diskFull?: .diskFull
+        case nil: .guideTracksCut(fileName)
+        default: notCaptured
+        }
+    }
+
+    var lostKind: ProblemKind { .videoFileLost(fileName) }
 
     /// The problem's text for guide tracks that end before the video.
     static func guideTracksCut(_ cuts: [GuideTrackCut]) -> String {
@@ -27,6 +41,7 @@ struct FileEndReport: Equatable {
     /// `source` is the screen's or the camera's name.
     init<File>(reason: VideoStreamEnd?, end: VideoFileEnd<File>?, source: String, at now: Int64) {
         let word = File.sourceWord
+        fileName = end?.file.name ?? source
         let reasonError: ErrorDetail? = switch reason {
         case .writerFailed(let error): error
         case .diskFull: "the disk is full"
