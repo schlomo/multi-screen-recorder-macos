@@ -187,10 +187,11 @@ screen or of another camera (D74).
 
 The video file for one camera, made exactly as a screen file: the same
 tick grid, timecode and guide tracks, no audio of the camera's own, its
-frame size its chosen format's size fitted into the recording
-resolution's box as a screen's: of the formats at 30 fps, of any aspect
-ratio, the one that records the largest size, and of those the
-smallest. Its tick waits up to 0.5 s for a frame captured before it. A camera
+frame size its chosen format's size fitted, as a screen's, into the
+recording resolution's box limited to 1920×1080: of the formats at 30
+fps, of any aspect ratio, the one that records the largest size, and of
+those the smallest; for a camera another app uses, the format it runs
+in. Another app changing that to another frame size starts a new one. Its tick waits up to 0.5 s for a frame captured before it. A camera
 that disappears, is suspended, delivers no frames for 10 s, or whose
 stream or writer fails ends its camera file; a new one begins when it is back;
 a stall does not end it (D74).
@@ -200,7 +201,7 @@ a stall does not end it (D74).
 A camera that delivers no frame for 2 s while recording: its camera file
 goes on, repeating its last frame, until frames come again (events
 `camera stalled` and `camera stall ended`) or, after 10 s, the stream
-counts as failing (D74).
+counts as failing. It makes the result `problems` (D47, D74).
 
 ## Camera mode
 

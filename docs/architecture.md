@@ -93,8 +93,9 @@ D28).
   one camera file per camera, made like a screen file, with the same
   two guide tracks; each camera at 30 fps in the format, of any aspect
   ratio, that records the largest size once fitted into the recording
-  resolution's box as a screen's picture is, the smallest of equal
-  ones; a camera tick waits up to 0.5 s for a late frame; a camera
+  resolution's box limited to 1920×1080, the smallest of equal ones,
+  and a camera another app uses in its own format, a change of its frame
+  size starting a new file; a camera tick waits up to 0.5 s for a late frame; a camera
   that pauses for 2 s is stalled, its file going on, and one that sends
   no frames for 10 s is a failing stream; a suspended one is not
   recorded; the Camera permission is asked only when a camera would be

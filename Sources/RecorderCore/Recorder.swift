@@ -40,7 +40,8 @@ struct RecorderDevices: Sendable {
     /// An audio input's input volume, nil when it has none (D69).
     var inputVolume: @Sendable (_ uid: String, _ name: String) -> (any InputVolumeControl)?
     var cameras: @Sendable () -> [CameraInfo]
-    var cameraSource: @Sendable (_ uniqueID: String, _ format: CameraFormat, _ frameSize: FrameSize) -> any CameraFrameSource
+    /// `format` nil: keep the format the camera runs in, as another app uses it.
+    var cameraSource: @Sendable (_ uniqueID: String, _ format: CameraFormat?, _ frameSize: FrameSize) -> any CameraFrameSource
     /// Read without asking.
     var cameraPermission: @Sendable () -> CameraPermission
     /// Asks if never asked: macOS shows its prompt.
@@ -664,12 +665,12 @@ public final class Recorder {
             DetailLine.cameraAction(action, names: cameraCaptures.mapValues { "Camera \($0.1.number) \($0.1.name)" }),
             category: "recorder")
         switch action {
-        case .start(let uniqueID, let format, let frameSize, let number, let name, let isContinuity):
+        case .start(let uniqueID, let format, let setsFormat, let frameSize, let number, let name, let isContinuity):
             captureCount += 1
             let captureNumber = captureCount
             let capture = CameraCapture(
                 uniqueID: uniqueID, number: number, name: name, frameSize: frameSize, isContinuity: isContinuity,
-                source: devices.cameraSource(uniqueID, format, frameSize), context: context, guides: guides,
+                source: devices.cameraSource(uniqueID, setsFormat ? format : nil, frameSize), context: context, guides: guides,
                 frameWatch: cameraFrameWatch,
                 onFileStarted: { [weak self] file in
                     Task { @MainActor in self?.cameraFileStarted(file, uniqueID: uniqueID) }

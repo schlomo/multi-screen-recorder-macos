@@ -483,6 +483,7 @@ public struct RecordingEvent: Codable, Equatable, Sendable {
         case screenFileWriterFailed = "screen file writer failed"
         case cameraConnected = "camera connected"
         case cameraDisconnected = "camera disconnected"
+        case cameraFrameSizeChanged = "camera frame size changed"
         case defaultCameraChanged = "default camera changed"
         case cameraStreamFailed = "camera stream failed"
         case cameraStalled = "camera stalled"
@@ -506,13 +507,14 @@ public struct RecordingEvent: Codable, Equatable, Sendable {
         case noAudioStarted = "no audio started"
         case noAudioStopped = "no audio stopped"
 
-        /// The events of a file ended by a failure, which make the result
-        /// `problems` and `msr record` exit 3 (D47). An audio input that
-        /// disconnects, a gap, a change of the input volume and no audio are none.
+        /// The events of a file ended by a failure, and a camera's stall,
+        /// which loses picture: they make the result `problems` and `msr
+        /// record` exit 3 (D47). An audio input that disconnects, a gap, a
+        /// change of the input volume and no audio are none.
         public var isFailure: Bool {
             switch self {
             case .screenStreamFailed, .screenShowsAnotherScreensPicture, .screenFileWriterFellBehind,
-                 .screenFileWriterFailed, .cameraStreamFailed, .cameraFileWriterFellBehind, .cameraFileWriterFailed, .diskFull,
+                 .screenFileWriterFailed, .cameraStreamFailed, .cameraStalled, .cameraFileWriterFellBehind, .cameraFileWriterFailed, .diskFull,
                  .audioInputFailed, .systemAudioFailed, .audioFileWriterFailed,
                  .audioFileWriterFellBehind: true
             default: false
@@ -569,7 +571,7 @@ public struct RecordingEvent: Codable, Equatable, Sendable {
     public var camera: String?
     /// The audio source the event is about, where it is about one.
     public var audioSource: String?
-    /// For `screen frame size changed`: the old and the new frame size;
+    /// For `screen frame size changed` and `camera frame size changed`: the old and the new frame size;
     /// for `default microphone changed`: the old and the new default
     /// microphone, absent where there was or is none, and as such for `default
     /// camera changed`; for `audio input

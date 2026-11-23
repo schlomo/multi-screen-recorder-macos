@@ -170,7 +170,8 @@ final class CameraCapture: @unchecked Sendable {
 /// detail lines.
 final class CameraSource: NSObject, CameraFrameSource, AVCaptureVideoDataOutputSampleBufferDelegate, @unchecked Sendable {
     let uniqueID: String
-    let format: CameraFormat
+    /// Nil: another app uses the camera, so its format stays as it is.
+    let format: CameraFormat?
     let frameSize: FrameSize
     private let sessionQueue: DispatchQueue
     private let lock = NSLock()
@@ -187,7 +188,7 @@ final class CameraSource: NSObject, CameraFrameSource, AVCaptureVideoDataOutputS
         var isStopped = false
     }
 
-    init(uniqueID: String, format: CameraFormat, frameSize: FrameSize) {
+    init(uniqueID: String, format: CameraFormat?, frameSize: FrameSize) {
         self.uniqueID = uniqueID
         self.format = format
         self.frameSize = frameSize
@@ -224,17 +225,21 @@ final class CameraSource: NSObject, CameraFrameSource, AVCaptureVideoDataOutputS
             endOnce(.captureSourceGone)
             return
         }
-        let matching = device.formats.filter { cameraFormat(of: $0) == format }
-        guard let deviceFormat = matching.first(where: { !Self.isMJPEG($0) }) ?? matching.first else {
-            throw SourceError(errorDescription: "the camera no longer offers the format \(format)")
-        }
-        if matching.count > 1 {
-            RecorderLog.detail(
-                "camera \(uniqueID): \(matching.count) formats are \(format) ("
-                    + matching.map { FrameFacts.fourCharacterCode(CMFormatDescriptionGetMediaSubType($0.formatDescription)) }
-                        .joined(separator: ", ")
-                    + "), opened in \(FrameFacts.fourCharacterCode(CMFormatDescriptionGetMediaSubType(deviceFormat.formatDescription)))",
-                category: VideoFileWriter.detailCategory)
+        var deviceFormat: AVCaptureDevice.Format?
+        if let format {
+            let matching = device.formats.filter { cameraFormat(of: $0) == format }
+            deviceFormat = matching.first(where: { !Self.isMJPEG($0) }) ?? matching.first
+            guard let deviceFormat else {
+                throw SourceError(errorDescription: "the camera no longer offers the format \(format)")
+            }
+            if matching.count > 1 {
+                RecorderLog.detail(
+                    "camera \(uniqueID): \(matching.count) formats are \(format) ("
+                        + matching.map { FrameFacts.fourCharacterCode(CMFormatDescriptionGetMediaSubType($0.formatDescription)) }
+                            .joined(separator: ", ")
+                        + "), opened in \(FrameFacts.fourCharacterCode(CMFormatDescriptionGetMediaSubType(deviceFormat.formatDescription)))",
+                    category: VideoFileWriter.detailCategory)
+            }
         }
         let input = try AVCaptureDeviceInput(device: device)
         let session = AVCaptureSession()
@@ -254,14 +259,16 @@ final class CameraSource: NSObject, CameraFrameSource, AVCaptureVideoDataOutputS
         session.addOutput(output)
         // After the input is added, so the session keeps the format and the frame rate.
         let wanted = Double(TickGrid.recording.framesPerSecond)
-        let frameDuration = Self.frameDuration(closestTo: TickGrid.recording.framesPerSecond, of: deviceFormat)
-        try device.lockForConfiguration()
-        device.activeFormat = deviceFormat
-        if let frameDuration {
-            device.activeVideoMinFrameDuration = frameDuration
-            device.activeVideoMaxFrameDuration = frameDuration
+        let frameDuration = deviceFormat.flatMap { Self.frameDuration(closestTo: TickGrid.recording.framesPerSecond, of: $0) }
+        if let deviceFormat {
+            try device.lockForConfiguration()
+            device.activeFormat = deviceFormat
+            if let frameDuration {
+                device.activeVideoMinFrameDuration = frameDuration
+                device.activeVideoMaxFrameDuration = frameDuration
+            }
+            device.unlockForConfiguration()
         }
-        device.unlockForConfiguration()
         session.commitConfiguration()
         let center = NotificationCenter.default
         let observers = [
@@ -290,15 +297,18 @@ final class CameraSource: NSObject, CameraFrameSource, AVCaptureVideoDataOutputS
             formatObservation.invalidate()
             return
         }
-        if device.isInUseByAnotherApplication {
-            RecorderLog.detail("camera \(uniqueID): in use by another app at the start", category: VideoFileWriter.detailCategory)
+        if device.isInUseByAnotherApplication || format == nil {
+            RecorderLog.detail(
+                "camera \(uniqueID): in use by another app at the start, "
+                    + (format == nil ? "its format kept" : "its format set as it was free when read"),
+                category: VideoFileWriter.detailCategory)
         }
         // A stop that comes from here on stops the session on this queue, after this.
         session.startRunning()
         let rate = frameDuration.map { 1 / $0.seconds }
         RecorderLog.detail(
             "camera \(uniqueID): active format \(Self.formatText(device))"
-                + (rate.map { abs($0 - wanted) < 0.001 ? "" : ", the format allows no \(Int(wanted)) fps, set to \(String(format: "%.3g", $0)) fps" }
+                + (deviceFormat == nil ? "" : rate.map { abs($0 - wanted) < 0.001 ? "" : ", the format allows no \(Int(wanted)) fps, set to \(String(format: "%.3g", $0)) fps" }
                     ?? ", the format lists no frame rate"),
             category: VideoFileWriter.detailCategory)
     }

@@ -80,7 +80,7 @@ import Testing
     @Test func theFailuresAreTheWaysAFileEndsBadly() {
         #expect(RecordingEvent.Kind.allCases.filter(\.isFailure) == [
             .screenStreamFailed, .screenShowsAnotherScreensPicture, .screenFileWriterFellBehind, .screenFileWriterFailed,
-            .cameraStreamFailed, .cameraFileWriterFellBehind, .cameraFileWriterFailed, .diskFull, .audioInputFailed, .systemAudioFailed, .audioFileWriterFailed, .audioFileWriterFellBehind,
+            .cameraStreamFailed, .cameraStalled, .cameraFileWriterFellBehind, .cameraFileWriterFailed, .diskFull, .audioInputFailed, .systemAudioFailed, .audioFileWriterFailed, .audioFileWriterFellBehind,
         ])
     }
 

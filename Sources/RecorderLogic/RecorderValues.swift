@@ -33,6 +33,9 @@ public enum RecorderValues {
     public static let continuityCameraFirstFrameLimit = Duration.seconds(10)
     public static let cameraFrameGapLimit = Duration.seconds(10)
     public static let cameraStallLimit = Duration.seconds(2)
+    /// The largest a camera file is: a camera's box is the recording
+    /// resolution's limited to this, turned upright for a portrait format (D74).
+    public static let cameraLargestSize = FrameSize(width: 1920, height: 1080)
     /// How long a camera file's tick waits for a frame captured after it (D74).
     public static let cameraDecisionDelay = Duration.milliseconds(500)
     /// How often the free space in the recording folder is checked.

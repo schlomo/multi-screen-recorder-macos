@@ -374,7 +374,8 @@ import Testing
         }
         #expect(shown.cameraRows.map(\.cells) == [
             ["Camera 1 - FaceTime HD Camera (default)", "", "", "1920×1080", videoFileRate(FrameSize(width: 1920, height: 1080))],
-            ["Camera 2 - Logitech BRIO", "", "", "3840×2160", videoFileRate(FrameSize(width: 3840, height: 2160))],
+            // At most 1920×1080 (D74).
+            ["Camera 2 - Logitech BRIO", "", "", "1920×1080", videoFileRate(FrameSize(width: 1920, height: 1080))],
             ["OBS Virtual Camera (virtual)", "", "", "-", "-"],
         ])
         #expect(shown.cameraRows.map(\.isRecorded) == [true, true, false])

@@ -20,7 +20,8 @@ public func currentCameras() -> [CameraInfo] {
             isVirtual: cameraIsVirtual(deviceType: device.deviceType, transportType: device.transportType),
             isContinuity: cameraIsContinuity(deviceType: device.deviceType, transportType: device.transportType),
             formats: CameraFormat.preferred(device.formats.map(cameraFormat)),
-            isSuspended: device.isSuspended)
+            isSuspended: device.isSuspended, activeFormat: cameraFormat(of: device.activeFormat),
+            isInUseByAnotherApplication: device.isInUseByAnotherApplication)
     }
 }
 
@@ -57,8 +58,9 @@ func cameraIsContinuity(deviceType: AVCaptureDevice.DeviceType, transportType: I
 
 /// Follows the cameras: one connected or disconnected (video devices only)
 /// or suspended or resumed (`isSuspended`, observed on every camera listed)
-/// calls `changed` on the main thread. Another app starting or ending its
-/// use of a camera (`isInUseByAnotherApplication`) is a detail line.
+/// calls `changed` on the main thread, as does another app starting or
+/// ending its use of a camera (`isInUseByAnotherApplication`, also a
+/// detail line) or a change of a camera's active format.
 @MainActor
 public final class CameraWatch {
     private let changed: @MainActor () -> Void
@@ -82,15 +84,18 @@ public final class CameraWatch {
     }
 
     private func observeDevices() {
+        let changed: @Sendable () -> Void = { [weak self] in
+            DispatchQueue.main.async { MainActor.assumeIsolated { self?.changed() } }
+        }
         observations = cameraDevices().flatMap { device in [
-            device.observe(\.isSuspended) { [weak self] _, _ in
-                DispatchQueue.main.async { MainActor.assumeIsolated { self?.changed() } }
-            },
+            device.observe(\.isSuspended) { _, _ in changed() },
+            device.observe(\.activeFormat) { _, _ in changed() },
             device.observe(\.isInUseByAnotherApplication) { device, _ in
                 RecorderLog.detail(
                     "camera \(device.localizedName) (\(device.uniqueID)): "
                         + (device.isInUseByAnotherApplication ? "now in use by another app" : "no longer in use by another app"),
                     category: "recorder")
+                changed()
             },
         ] }
     }

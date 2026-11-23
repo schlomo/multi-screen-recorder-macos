@@ -99,23 +99,31 @@ import Testing
         #expect(camera([]).chosenFormat(resolution: .native) == nil)
     }
 
-    /// Any aspect ratio: the largest format at 30 fps, by its pixels (D74).
-    @Test func theLargestFormatOfAnyAspectRatioIsChosenAtNative() {
-        #expect(camera([format(4096, 2160, 30), format(3840, 2160, 30)]).chosenFormat(resolution: .native) == format(4096, 2160, 30))
-        #expect(camera([format(1552, 1552, 30), format(1920, 1080, 30)]).chosenFormat(resolution: .native) == format(1552, 1552, 30))
-        #expect(camera([format(2160, 1440, 30), format(1920, 1080, 30)]).chosenFormat(resolution: .native) == format(2160, 1440, 30))
-        #expect(camera([format(1080, 1920, 30), format(1280, 720, 30)]).chosenFormat(resolution: .native) == format(1080, 1920, 30))
+    /// At Native a camera records at most 1920×1080, or 1080×1920 upright: the
+    /// owner's BRIO and DJI Osmo Pocket overloaded the USB bus at 4K (D74).
+    @Test func atNativeACameraRecordsAtMostFullHD() {
+        #expect(RecorderValues.cameraLargestSize == FrameSize(width: 1920, height: 1080))
+        let brio = camera([format(4096, 2160, 30), format(3840, 2160, 30), format(1920, 1080, 30), format(1280, 720, 30)])
+        #expect(brio.chosenFormat(resolution: .native) == format(1920, 1080, 30))
+        #expect(brio.frameSize(resolution: .native) == FrameSize(width: 1920, height: 1080))
+        // In its 9:16 mode the Osmo lists the upright picture and a pillarboxed landscape one.
+        let osmo = camera([format(1920, 1080, 30), format(1080, 1920, 30), format(3840, 2160, 30)])
+        #expect(osmo.chosenFormat(resolution: .native) == format(1080, 1920, 30))
+        #expect(osmo.frameSize(resolution: .native) == FrameSize(width: 1080, height: 1920))
+        #expect(osmo.chosenFormat(resolution: .p1080) == format(1080, 1920, 30))
+        #expect(camera([format(1552, 1552, 30), format(1920, 1080, 30)]).chosenFormat(resolution: .native) == format(1920, 1080, 30))
+        #expect(camera([format(2160, 1440, 30)]).frameSize(resolution: .native) == FrameSize(width: 1620, height: 1080))
     }
 
     /// Each format is fitted into the box as a screen's picture is (a portrait one against the box
     /// turned upright, never enlarged); the largest recorded size wins (D74).
     @Test func theFormatWithTheLargestRecordedSizeIsChosenWhateverItsAspectRatio() {
-        let threeByTwo = camera([format(2160, 1440, 30), format(1920, 1080, 30)])
-        #expect(threeByTwo.chosenFormat(resolution: .p1440) == format(2160, 1440, 30))
-        #expect(threeByTwo.chosenFormat(resolution: .p1080) == format(1920, 1080, 30))
+        let threeByTwo = camera([format(2160, 1440, 30), format(1440, 1080, 30)])
+        #expect(threeByTwo.chosenFormat(resolution: .p1080) == format(2160, 1440, 30))
+        #expect(threeByTwo.frameSize(resolution: .p1080) == FrameSize(width: 1620, height: 1080))
         let square = camera([format(1552, 1552, 30), format(1080, 1080, 30), format(1920, 1080, 30)])
         #expect(square.chosenFormat(resolution: .p1080) == format(1920, 1080, 30))
-        #expect(square.chosenFormat(resolution: .uhd4k) == format(1552, 1552, 30))
+        #expect(camera([format(1552, 1552, 30), format(1080, 1080, 30)]).chosenFormat(resolution: .uhd4k) == format(1080, 1080, 30))
         let portrait = camera([format(1080, 1920, 30), format(1280, 720, 30)])
         #expect(portrait.chosenFormat(resolution: .p1080) == format(1080, 1920, 30))
         #expect(portrait.frameSize(resolution: .p1080) == FrameSize(width: 1080, height: 1920))
@@ -136,10 +144,9 @@ import Testing
         let brio = camera([format(4096, 2160, 30), format(3840, 2160, 30), format(1920, 1080, 30), format(1280, 720, 30)])
         #expect(brio.chosenFormat(resolution: .p1080) == format(1920, 1080, 30))
         #expect(brio.frameSize(resolution: .p1080) == FrameSize(width: 1920, height: 1080))
-        #expect(brio.chosenFormat(resolution: .p1440) == format(3840, 2160, 30))
-        #expect(brio.frameSize(resolution: .p1440) == FrameSize(width: 2560, height: 1440))
-        #expect(brio.chosenFormat(resolution: .uhd4k) == format(3840, 2160, 30))
-        #expect(brio.chosenFormat(resolution: .native) == format(4096, 2160, 30))
+        #expect(brio.chosenFormat(resolution: .p1440) == format(1920, 1080, 30))
+        #expect(brio.frameSize(resolution: .p1440) == FrameSize(width: 1920, height: 1080))
+        #expect(brio.chosenFormat(resolution: .uhd4k) == format(1920, 1080, 30))
         let large = camera([format(3840, 2160, 30), format(1920, 1080, 30)])
         #expect(large.chosenFormat(resolution: .p720) == format(1920, 1080, 30))
     }
@@ -177,9 +184,12 @@ import Testing
         #expect(CameraFormat.frameRate(closestTo: 30, in: []) == nil)
     }
 
-    @Test func theRecordingResolutionCapsTheFrameSizeAsForAScreen() {
+    @Test func theCamerasBoxIsTheRecordingResolutionsLimitedToFullHD() {
         let fourK = camera([format(3840, 2160, 30)])
-        #expect(fourK.frameSize(resolution: .native) == FrameSize(width: 3840, height: 2160))
+        #expect(fourK.frameSize(resolution: .native) == FrameSize(width: 1920, height: 1080))
+        #expect(fourK.frameSize(resolution: .uhd4k) == FrameSize(width: 1920, height: 1080))
+        #expect(fourK.frameSize(resolution: .p1200) == FrameSize(width: 1920, height: 1080))
+        #expect(camera([format(2160, 3840, 30)]).frameSize(resolution: .native) == FrameSize(width: 1080, height: 1920))
         #expect(fourK.frameSize(resolution: .p1080) == FrameSize(width: 1920, height: 1080))
         #expect(fourK.frameSize(resolution: .p720) == FrameSize(width: 1280, height: 720))
         #expect(camera([format(640, 480, 30)]).frameSize(resolution: .p1080) == FrameSize(width: 640, height: 480))
@@ -201,16 +211,16 @@ import Testing
     }
 
     private func starts(_ step: CameraTracker.Step) -> [String] {
-        step.actions.compactMap { if case .start(let uniqueID, _, _, _, _, _) = $0 { uniqueID } else { nil } }
+        step.actions.compactMap { if case .start(let uniqueID, _, _, _, _, _, _) = $0 { uniqueID } else { nil } }
     }
 
     @Test func atTheStartTheDefaultCameraIsOneAndTheVirtualOneIsLeftOut() {
         var cameras = tracker()
         let step = cameras.begin([Self.obs, Self.usb, Self.builtIn], at: 0)
         #expect(step.actions == [
-            .start(uniqueID: "A", format: Self.builtIn.chosenFormat(resolution: .native)!, frameSize: FrameSize(width: 1920, height: 1080), number: 1,
+            .start(uniqueID: "A", format: Self.builtIn.chosenFormat(resolution: .native)!, setsFormat: true, frameSize: FrameSize(width: 1920, height: 1080), number: 1,
                    name: "FaceTime HD Camera", isContinuity: false),
-            .start(uniqueID: "B", format: Self.usb.chosenFormat(resolution: .native)!, frameSize: FrameSize(width: 1920, height: 1080), number: 2,
+            .start(uniqueID: "B", format: Self.usb.chosenFormat(resolution: .native)!, setsFormat: true, frameSize: FrameSize(width: 1920, height: 1080), number: 2,
                    name: "Logitech BRIO", isContinuity: false),
         ])
         #expect(step.events.isEmpty)
@@ -230,7 +240,7 @@ import Testing
         large.isDefault = false
         large.formats = [CameraFormat(size: FrameSize(width: 1920, height: 1080), maxFramesPerSecond: 30)]
         let starts = cameras.begin([Self.builtIn, large], at: 0).actions.compactMap { action -> (CameraFormat, FrameSize)? in
-            guard case .start(_, let format, let frameSize, _, _, _) = action else { return nil }
+            guard case .start(_, let format, _, let frameSize, _, _, _) = action else { return nil }
             return (format, frameSize)
         }
         #expect(starts.map(\.0.size) == [FrameSize(width: 1920, height: 1080), FrameSize(width: 1920, height: 1080)])
@@ -251,7 +261,7 @@ import Testing
         #expect(cameras.due(at: 20 * second + second / 2).actions.isEmpty)
         #expect(cameras.nextDueTime() == 21 * second)
         let started = cameras.due(at: 21 * second)
-        guard case .start("B", _, _, let number, _, _) = started.actions.first else {
+        guard case .start("B", _, _, _, let number, _, _) = started.actions.first else {
             Issue.record("B did not start")
             return
         }
@@ -358,7 +368,8 @@ import Testing
         var stalledEvent = RecordingEvent(at: 5 * second, event: .cameraStalled, camera: "FaceTime HD Camera")
         stalledEvent.errorDetail = CameraTracker.stalledError
         #expect(stalled == CameraTracker.Step(events: [stalledEvent]))
-        #expect(stalledEvent.event.isFailure == false)
+        // A stall loses picture: a failure (D47).
+        #expect(stalledEvent.event.isFailure)
         #expect(cameras.sources.first?.state == .stalled(FrameSize(width: 1920, height: 1080)))
         #expect(cameras.stalled("A", at: 6 * second) == CameraTracker.Step())
         let ended = cameras.stallEnded("A", length: 2_950_400_000, at: 6 * second)
@@ -382,7 +393,7 @@ import Testing
     @Test func anIPhoneCameraStartsAsSuch() {
         var cameras = tracker(.allCameras)
         let step = cameras.begin([camera("I", "iPhone Camera", isContinuity: true)], at: 0)
-        guard case .start(_, _, _, _, _, let isContinuity) = step.actions.first else {
+        guard case .start(_, _, _, _, _, _, let isContinuity) = step.actions.first else {
             Issue.record("the iPhone camera did not start")
             return
         }
@@ -404,6 +415,52 @@ import Testing
         #expect(on == CameraTracker.Step())
         #expect(cameras.due(at: 20 * second + second / 2).actions.isEmpty)
         #expect(starts(cameras.due(at: 21 * second)) == ["A"])
+    }
+
+    /// A camera another app uses keeps its active format, fitted into the camera's box (D74).
+    @Test func aCameraAnotherAppUsesIsRecordedInItsActiveFormatUnchanged() {
+        var cameras = tracker()
+        var inUse = Self.usb
+        inUse.isInUseByAnotherApplication = true
+        inUse.activeFormat = CameraFormat(size: FrameSize(width: 640, height: 480), maxFramesPerSecond: 30)
+        let step = cameras.begin([inUse], at: 0)
+        #expect(step.actions == [.start(
+            uniqueID: "B", format: CameraFormat(size: FrameSize(width: 640, height: 480), maxFramesPerSecond: 30), setsFormat: false,
+            frameSize: FrameSize(width: 640, height: 480), number: 1, name: "Logitech BRIO", isContinuity: false)])
+    }
+
+    /// Another app changing the format to another frame size ends the file and starts one at
+    /// the new size, never setting it back, as a screen's frame size change (D30, D74).
+    @Test func anotherAppChangingTheFrameSizeStartsANewFile() {
+        var cameras = tracker()
+        _ = cameras.begin([Self.usb], at: 0)
+        var takenOver = Self.usb
+        takenOver.isInUseByAnotherApplication = true
+        takenOver.activeFormat = CameraFormat(size: FrameSize(width: 1280, height: 720), maxFramesPerSecond: 30)
+        let step = cameras.observe([takenOver], at: 5 * second)
+        var changed = RecordingEvent(at: 5 * second, event: .cameraFrameSizeChanged, camera: "Logitech BRIO")
+        changed.from = [1920, 1080]
+        changed.to = [1280, 720]
+        #expect(step.events == [changed])
+        #expect(step.actions == [
+            .stop(uniqueID: "B"),
+            .start(uniqueID: "B", format: takenOver.activeFormat!, setsFormat: false, frameSize: FrameSize(width: 1280, height: 720),
+                   number: 1, name: "Logitech BRIO", isContinuity: false),
+        ])
+        #expect(cameras.observe([takenOver], at: 6 * second) == CameraTracker.Step())
+    }
+
+    /// Our own format, not yet set when read, and a format of the same frame size change nothing.
+    @Test func anActiveFormatOfNoOtherAppOrOfTheSameFrameSizeChangesNothing() {
+        var cameras = tracker()
+        _ = cameras.begin([Self.usb], at: 0)
+        var notYetOpened = Self.usb
+        notYetOpened.activeFormat = CameraFormat(size: FrameSize(width: 640, height: 480), maxFramesPerSecond: 30)
+        #expect(cameras.observe([notYetOpened], at: 5 * second) == CameraTracker.Step())
+        var sameSize = Self.usb
+        sameSize.isInUseByAnotherApplication = true
+        sameSize.activeFormat = CameraFormat(size: FrameSize(width: 3840, height: 2160), maxFramesPerSecond: 30)
+        #expect(cameras.observe([sameSize], at: 6 * second) == CameraTracker.Step())
     }
 
     @Test func noCameraNoActionNoEvent() {

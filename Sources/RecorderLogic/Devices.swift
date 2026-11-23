@@ -211,10 +211,14 @@ public struct CameraInfo: Equatable, Sendable {
     public var formats: [CameraFormat]
     /// Suspended by macOS, as a laptop's camera with its lid closed: it delivers no picture.
     public var isSuspended: Bool
+    /// The format the camera runs in now, nil where it cannot be read.
+    public var activeFormat: CameraFormat?
+    /// Another app uses the camera: the recording keeps its active format.
+    public var isInUseByAnotherApplication: Bool
 
     public init(
         uniqueID: String, name: String, isDefault: Bool, isVirtual: Bool, isContinuity: Bool = false, formats: [CameraFormat],
-        isSuspended: Bool = false
+        isSuspended: Bool = false, activeFormat: CameraFormat? = nil, isInUseByAnotherApplication: Bool = false
     ) {
         self.uniqueID = uniqueID
         self.name = name
@@ -223,29 +227,35 @@ public struct CameraInfo: Equatable, Sendable {
         self.isContinuity = isContinuity
         self.formats = formats
         self.isSuspended = isSuspended
+        self.activeFormat = activeFormat
+        self.isInUseByAnotherApplication = isInUseByAnotherApplication
     }
 
-    /// The format a recording at `resolution` opens the camera with (D74),
+    /// The format a recording at `resolution` records the camera in (D74).
+    /// One another app uses keeps its active format, never changed. Else,
     /// as for screens: each format that delivers the tick grid's frame rate,
-    /// of any aspect ratio, records its size fitted into the resolution's box
-    /// (`frameSize(forLooksLike:)`, never enlarged, a portrait one against the
+    /// of any aspect ratio, records its size fitted into the camera's box
+    /// (`cameraFrameSize(for:)`, never enlarged, a portrait one against the
     /// box turned upright); the format with the largest recorded size, and of
-    /// those the smallest, the least to decode. At Native the largest. A
+    /// those the smallest, the least to decode, then the narrower. A
     /// camera with no format at that rate delivers its fastest, the largest
     /// of those. Nil for a camera that lists no format. Not at None, which records no camera.
     public func chosenFormat(resolution: RecordingResolution) -> CameraFormat? {
+        if isInUseByAnotherApplication, let activeFormat { return activeFormat }
         let fastEnough = formats.filter(\.deliversTheTickRate)
         guard !fastEnough.isEmpty else {
             return formats.max { ($0.maxFramesPerSecond.rounded(), $0.size.pixelCount) < ($1.maxFramesPerSecond.rounded(), $1.size.pixelCount) }
         }
-        let recorded = { (format: CameraFormat) in resolution.frameSize(forLooksLike: format.size).pixelCount }
-        return fastEnough.max { (recorded($0), -$0.size.pixelCount) < (recorded($1), -$1.size.pixelCount) }
+        let recorded = { (format: CameraFormat) in resolution.cameraFrameSize(for: format.size).pixelCount }
+        // Of equal ones the narrower: the Osmo's upright 1080×1920, not its pillarboxed 1920×1080.
+        return fastEnough.max {
+            (recorded($0), -$0.size.pixelCount, -$0.size.width) < (recorded($1), -$1.size.pixelCount, -$1.size.width)
+        }
     }
 
-    /// The frame size of the camera's file: its chosen format's size, fitted
-    /// into the recording resolution's box as a screen's looks-like size is.
+    /// The frame size of the camera's file: its chosen format's size, fitted into the camera's box.
     public func frameSize(resolution: RecordingResolution) -> FrameSize? {
-        chosenFormat(resolution: resolution).map { resolution.frameSize(forLooksLike: $0.size) }
+        chosenFormat(resolution: resolution).map { resolution.cameraFrameSize(for: $0.size) }
     }
 
     /// "FaceTime HD Camera (default)" or just the name.

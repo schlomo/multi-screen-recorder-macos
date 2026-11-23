@@ -91,13 +91,16 @@ extension GlobalRecordingLog {
         /// A camera's frames, sent by the test with the host time of now.
         final class StandInCamera: CameraFrameSource, @unchecked Sendable {
             let frameSize: FrameSize
+            /// The format the recorder sets, nil to keep the camera's.
+            let format: CameraFormat?
             private let state = Mutex<(
                 queue: DispatchQueue?, deliver: (@Sendable (CMSampleBuffer) -> Void)?,
                 ended: (@Sendable (VideoStreamEnd) -> Void)?, stopped: Bool
             )>((nil, nil, nil, false))
 
-            init(frameSize: FrameSize) {
+            init(frameSize: FrameSize, format: CameraFormat?) {
                 self.frameSize = frameSize
+                self.format = format
             }
 
             var isStopped: Bool { state.withLock { $0.stopped } }
@@ -216,8 +219,8 @@ extension GlobalRecordingLog {
                     cameras.reads.withLock { $0 += 1 }
                     return cameras.connected.withLock { $0 }
                 },
-                cameraSource: { _, format, _ in
-                    let camera = StandInCamera(frameSize: format.size)
+                cameraSource: { _, format, frameSize in
+                    let camera = StandInCamera(frameSize: frameSize, format: format)
                     cameras.opened.withLock { $0.append(camera) }
                     return camera
                 },
@@ -453,6 +456,33 @@ extension GlobalRecordingLog {
             #expect(summary.manifest.result == .problems)
         }
 
+        /// A camera another app uses is opened without changing its format;
+        /// that app changing the frame size makes a new camera file (D74).
+        @Test func aCameraAnotherAppUsesKeepsItsFormatAndItsFrameSizeChangeStartsANewFile() async throws {
+            var inUse = Self.camera
+            inUse.isInUseByAnotherApplication = true
+            inUse.activeFormat = Self.camera.formats.first
+            cameras.connected.withLock { $0 = [inUse] }
+            try start(cameraMode: .real)
+            let first = try #require(cameras.last)
+            #expect(first.format == nil)
+            try await sendFrames(first, until: "the camera file") { (try? manifestOnDisk().cameraFiles.count) == 1 }
+            inUse.activeFormat = CameraFormat(size: FrameSize(width: 160, height: 90), maxFramesPerSecond: 30)
+            cameras.connected.withLock { $0 = [inUse] }
+            recorder.camerasChanged()
+            try await wait("the second camera") { cameras.opened.withLock { $0.count } == 2 }
+            let second = try #require(cameras.last)
+            #expect(second.format == nil)
+            #expect(second.frameSize == FrameSize(width: 160, height: 90))
+            try await sendFrames(second, until: "the second camera file") { (try? manifestOnDisk().cameraFiles.count) == 2 }
+            #expect(first.isStopped)
+            let summary = await stop()
+            #expect(summary.manifest.events.map(\.event) == [.cameraFrameSizeChanged])
+            #expect(summary.manifest.events.first?.to == [160, 90])
+            #expect(summary.manifest.cameraFiles.map(\.frameSize) == [[320, 180], [160, 90]])
+            #expect(summary.manifest.result == .ok)
+        }
+
         /// A camera that pauses is stalled: its file goes on, the stall is
         /// told once, and its end comes with its length; no restart.
         @Test func aCameraThatPausesIsStalledAndItsFileGoesOn() async throws {
@@ -472,8 +502,8 @@ extension GlobalRecordingLog {
             #expect(cameras.opened.withLock { $0.count } == 1)
             #expect(summary.manifest.cameraFiles.map(\.state) == [.finalized])
             #expect(summary.manifest.problems.count == 1)
-            // No file ended by a failure (D47).
-            #expect(summary.manifest.result == .ok)
+            // A stall loses picture (D47).
+            #expect(summary.manifest.result == .problems)
         }
 
         /// The writer takes only decoded pictures; a frame without one ends the capture, never silently.

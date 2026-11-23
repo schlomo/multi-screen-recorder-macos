@@ -10,9 +10,13 @@ import Foundation
 public struct CameraTracker: Sendable {
     /// What the recorder does for a camera.
     public enum Action: Equatable, Sendable {
-        /// Open the camera in `format` and start its camera file at `frameSize` with its first frame;
-        /// an iPhone camera (`isContinuity`) may take longer to its first frame.
-        case start(uniqueID: String, format: CameraFormat, frameSize: FrameSize, number: Int, name: String, isContinuity: Bool)
+        /// Open the camera and start its camera file at `frameSize` with its
+        /// first frame; `setsFormat`: set the camera to `format`, else, as
+        /// another app uses it, keep the format it runs in. An iPhone camera
+        /// (`isContinuity`) may take longer to its first frame.
+        case start(
+            uniqueID: String, format: CameraFormat, setsFormat: Bool, frameSize: FrameSize, number: Int, name: String,
+            isContinuity: Bool)
         /// End the camera's stream and finalize its camera file.
         case stop(uniqueID: String)
     }
@@ -146,6 +150,19 @@ public struct CameraTracker: Sendable {
             }
             cameras[uniqueID]?.reading = reading
             cameras[uniqueID]?.isWanted = isWanted
+            if case .recording(let current) = cameras[uniqueID]?.phase, let reading, reading.isInUseByAnotherApplication,
+               let active = reading.activeFormat {
+                // Another app took control of the camera's format: a new file at its size, never set back.
+                let frameSize = settings.effectiveResolution.cameraFrameSize(for: active.size)
+                if frameSize != current {
+                    var changed = event(.cameraFrameSizeChanged, uniqueID, at: now)
+                    changed.from = [current.width, current.height]
+                    changed.to = [frameSize.width, frameSize.height]
+                    step.events.append(changed)
+                    step.actions.append(.stop(uniqueID: uniqueID))
+                    step.actions.append(start(uniqueID))
+                }
+            }
         }
         for camera in connected where cameras[camera.uniqueID] == nil && Self.records(camera, settings: settings) {
             cameras[camera.uniqueID] = Tracked(
@@ -307,13 +324,13 @@ public struct CameraTracker: Sendable {
         }
         // `records` holds for a wanted camera, so it has a format, and the resolution records video.
         let format = reading.chosenFormat(resolution: settings.effectiveResolution)!
-        let frameSize = settings.effectiveResolution.frameSize(forLooksLike: format.size)
+        let frameSize = settings.effectiveResolution.cameraFrameSize(for: format.size)
         tracked.phase = .recording(frameSize: frameSize)
         tracked.isStalled = false
         cameras[uniqueID] = tracked
         return .start(
-            uniqueID: uniqueID, format: format, frameSize: frameSize, number: tracked.number!, name: tracked.name,
-            isContinuity: reading.isContinuity)
+            uniqueID: uniqueID, format: format, setsFormat: !reading.isInUseByAnotherApplication, frameSize: frameSize,
+            number: tracked.number!, name: tracked.name, isContinuity: reading.isContinuity)
     }
 
     private mutating func streamFailed(_ uniqueID: String, error: ErrorDetail, isPresent: Bool, at now: Int64) -> Step {

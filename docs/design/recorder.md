@@ -132,8 +132,8 @@ permission is denied (`msr list` reads the permission without asking); under Non
 recording resolution None, and for a real camera not the default under
 Default camera nothing, as the settings line gives the reason. A
 camera's Records at is the frame size of its chosen format (see
-"Cameras") fitted into the recording resolution's box as a screen's
-looks-like size is; Looks like and Drawn at stay empty.
+"Cameras") fitted into the camera's box, the recording resolution's
+limited to 1920×1080; Looks like and Drawn at stay empty.
 
 In the table the "Looks like" column is what macOS calls "looks like" (a
 screen's size in points) and "Drawn at" the size it is drawn at (its
@@ -568,8 +568,8 @@ disconnected`, `screen frame size changed`, `screen mirroring started`,
 `screen mirroring stopped`, `main screen changed`, `screen stream
 failed`, `screen shows another screen's picture`, `screen file writer
 fell behind`, `screen file writer failed`, for cameras (D74) `camera
-connected`, `camera disconnected`, `default camera changed`, `camera
-stream failed`, `camera stalled`, `camera stall ended`, `camera file
+connected`, `camera disconnected`, `camera frame size changed`,
+`default camera changed`, `camera stream failed`, `camera stalled`, `camera stall ended`, `camera file
 writer fell behind`, `camera file writer failed`, then `disk full`, `sleep`, `wake`,
 and for audio `audio input connected`, `audio input disconnected`,
 `system audio started`, `system audio stopped`, `default microphone
@@ -585,7 +585,8 @@ lost at a file's end, so one recording can have it twice for the same
 file. Their fields: `at`, `event`, `screen`, `camera` or `audioSource`; `from` and
 `to` (the old and the new frame size) for `screen frame size changed`,
 the old and the new default microphone for `default microphone
-changed` and the old and the new default camera for `default camera
+changed`, the old and the new frame size for `camera frame size
+changed`, and the old and the new default camera for `default camera
 changed` (either absent where there was or is none), and the old and
 the new input volume, 0 to 1, for `audio input volume changed` (D69);
 `mirrors` (the
@@ -599,14 +600,16 @@ audio failed`, `audio file writer failed`, and `audio file writer fell
 behind` when samples were lost at a file's end. The manifest's `state`
 is `recording` or `finalized`; a file's `state` is `recording`,
 `finalized` or `not finalized`. `ended` is the local end time, as
-`started`, and `result` is `ok` when every file is finalized and no file
-was ended by a failure (`screen stream failed`, `screen file writer
+`started`, and `result` is `ok` when every file is finalized, no file
+was ended by a failure and no camera stalled, as a stall loses picture
+(`screen stream failed`, `screen file writer
 failed`, `disk full`, `screen file writer fell behind`, `screen shows
-another screen's picture`, `camera stream failed`, `camera file writer
-failed`, `camera file writer fell behind`, `audio input failed`, `system audio failed`,
-`audio file writer failed`, `audio file writer fell behind`; an
-unplugged audio input, a gap, a camera's stall, a change of the input volume and no audio
-are none), otherwise `problems` (D47);
+another screen's picture`, `camera stream failed`, `camera stalled`,
+`camera file writer failed`, `camera file writer fell behind`, `audio
+input failed`, `system audio failed`, `audio file writer failed`,
+`audio file writer fell behind`; an unplugged audio input, a gap, a
+change of the input volume and no audio are none), otherwise `problems`
+(D47);
 `cpu` is our process's CPU use over the recording, `averagePercent` and
 `peakPercent` in percent of one core as Activity Monitor shows it,
 sampled every second, to one decimal (encoding and capture in macOS's
@@ -1507,30 +1510,58 @@ no audio of the camera's own.
   recorded, and its file ends when it is suspended and starts again
   after the settle time when it is resumed; the recorder and the app
   observe the suspension and read the cameras again when it changes.
-- **Format.** Per frame size the variant with the lowest highest frame
-  rate that still reaches 30 fps (a rate rounded to whole frames), or
-  the fastest where none does. As for screens (the owner, 2026-11-22):
-  each format reaching 30 fps, of any aspect ratio (16:9, 9:16, 3:2,
-  square), records its size fitted into the recording resolution's box
-  as a screen's looks-like size is (never enlarged, a portrait format
-  against the box turned upright); the format with the largest recorded
-  size is chosen, and of formats with that same recorded size the
-  smallest, the least to decode. At Native the largest. Of formats that
-  record as much and are as large (such as 1280×720 and 720×1280), the
-  narrower is opened, the order being fixed whatever the camera lists
-  first. So at 720p a
-  camera with 640×480 and 1920×1080 records 1920×1080 scaled to
-  1280×720, and a BRIO with 4096×2160, 3840×2160 and 1920×1080 records
-  1920×1080 as it is at 1080p. A camera with no format
-  reaching 30 fps records its fastest, the largest of those. The
-  camera's frame duration is set to 1/30 s where the format's ranges
-  allow it, otherwise to the allowed rate closest to 30, told in a
-  detail line. Where the camera lists several formats of that size and
-  rate (such as MJPEG and 420v), the one that needs no decoding is
-  opened (420v or 420f), else the first, with a detail line naming
-  them. AVFoundation decodes the format (an MJPEG one too) and
-  scales its frames to the camera file's frame size. A frame without a
-  decoded picture ends the capture as a failing stream.
+- **Format.** A camera's box is the recording resolution's box limited
+  to 1920×1080 (*data*, `RecorderValues.cameraLargestSize`), so at
+  Native, 4K and 1440p a camera records at most 1920×1080, or 1080×1920
+  upright, and at 720p 1280×720 (the owner, 2026-11-23: "quality and
+  reliability trumps all"). The reason: at Native a BRIO (USB 3) opened
+  4096×2160 and a DJI Osmo Pocket (USB 2, on the same dock controller as
+  a USB microphone and the keyboard) 3840×2160; the system log showed
+  about 1100 USB errors, the BRIO stalled and the microphone's file was
+  padded with zeros. At 1080p the same two cameras (1920×1080 and
+  1080×1920) gave no USB error, no stall and no late frame. The limit is
+  set before the start, never adapted while recording. Per frame size
+  the variant with the lowest highest frame rate that still reaches 30
+  fps (a rate rounded to whole frames), or the fastest where none does.
+  As for screens (the owner, 2026-11-22): each format reaching 30 fps,
+  of any aspect ratio (16:9, 9:16, 3:2, square), records its size
+  fitted into the camera's box as a screen's looks-like size is (never
+  enlarged, a portrait format against the box turned upright); the
+  format with the largest recorded size is chosen, and of formats with
+  that same recorded size the smallest, the least to decode. Of formats
+  that record as much and are as large (such as 1920×1080 and
+  1080×1920), the narrower is opened, whatever the camera lists first:
+  the Osmo in its 9:16 mode lists 1080×1920 and a 1920×1080 with the
+  upright picture pillarboxed in it, and the narrower is the real
+  picture. So at 720p a camera with 640×480 and 1920×1080 records
+  1920×1080 scaled to 1280×720, and a BRIO with 4096×2160, 3840×2160
+  and 1920×1080 records 1920×1080 as it is at 1080p and at Native. A
+  camera with no format reaching 30 fps records its fastest, the
+  largest of those. The camera's frame duration is set to 1/30 s where
+  the format's ranges allow it, otherwise to the allowed rate closest
+  to 30, told in a detail line. Where the camera lists several formats
+  of that size and rate, differing in the pixel format macOS delivers
+  them in (such as `420v`, `yuvs`, `2vuy` or MJPEG), the first that is
+  not MJPEG is opened, else the first, with a detail line naming them:
+  a deterministic pick among what macOS delivers, not a choice of what
+  crosses the cable, which is the driver's and not visible (the Osmo
+  cannot send 1080×1920 `2vuy` at 30 fps over USB 2; its driver decodes
+  MJPEG). AVFoundation scales the frames to the camera file's frame
+  size. A frame without a decoded picture ends the capture as a failing
+  stream.
+- **Another app.** A camera another app uses
+  (`isInUseByAnotherApplication`) when the recorder reads the cameras
+  before its start is opened without changing its format or frame
+  duration: it records the format the camera runs in, fitted into the
+  camera's box like any format (the owner, 2026-11-23: "accept another
+  app taking control"). Otherwise the recorder sets its own format, as
+  above. When another app uses the camera and changes its format so that
+  the recorded frame size changes, the camera file ends and a new one
+  starts at the new size, with the event `camera frame size changed`
+  (from and to), as a screen's frame size change makes a new screen
+  file (D30); the format is never set back. The recorder reads the
+  cameras again when a camera's active format or its use by another app
+  changes.
 - **Placement.** A camera's frames arrive late more often than a
   screen's: USB cameras deliver them in bursts, seen 0.1 s to 1.5 s
   after their capture when the USB bus was overloaded (a BRIO and a DJI
@@ -1548,10 +1579,11 @@ no audio of the camera's own.
   stalled`): the camera file goes on, repeating its last frame, the
   status window shows the camera as `stalled`, and the problem is told
   once per stall; when frames come again, the event `camera stall
-  ended` gives its length. A stall is no failure: the stream recovers
-  by itself, as a BRIO's 2.95 s USB stall did on the owner's Mac
-  (2026-11-22), where ending and restarting the capture only split the
-  file and left a 1.17 s hole. The capture ends as `camera stream
+  ended` gives its length. The capture goes on through a stall, as the
+  stream recovers by itself, as a BRIO's 2.95 s USB stall did on the
+  owner's Mac (2026-11-22), where ending and restarting the capture
+  only split the file and left a 1.17 s hole; as it loses picture, a
+  stall makes the result `problems` (D47). The capture ends as `camera stream
   failed`, and starts again after the restart delay, only on a runtime
   error of AVFoundation's capture session
   (`AVCaptureSession.runtimeErrorNotification`), when no first frame
@@ -1657,8 +1689,10 @@ fails on some Macs only (the hosted runner, about 2 of 7 runs, with
 - Per camera capture (D74): at the session's start `camera <unique ID>:
   active format <w>×<h> <subtype>, frame duration <min> to <max>` (such
   as `1/30 s to 1/30 s`), with `the format allows no 30 fps, set to <n>
-  fps` when it cannot run at 30, and before it `camera <unique ID>: in
-  use by another app at the start` when another app uses the camera;
+  fps` when it cannot run at 30 (left out when its format was kept), and
+  before it `camera <unique ID>: in use by another app at the start, its
+  format kept` (or `its format set as it was free when read`) when
+  another app uses the camera;
   `camera <unique ID>: active format changed to <w>×<h> <subtype>, frame
   duration <min> to <max>` when the open camera's active format changes;
   `camera <unique ID>: <n> frames dropped: <reason> <count>, …` for the
