@@ -1,6 +1,7 @@
 import CoreVideo
 import Foundation
 import RecorderLogic
+import Synchronization
 
 private let feedQueueKey = DispatchSpecificKey<Int>()
 
@@ -33,6 +34,8 @@ final class VideoFileFeed<File: VideoFileEntry>: @unchecked Sendable {
     private var endingGuides: [GuideLastMix.Chunk] = []
     /// Finishing the file, by the capture itself or at the recorder's request; set once.
     private var finishTask: Task<VideoFileEnd<File>?, Never>?
+    /// The ticker's lateness as the queue last left it, for the status window to read without waiting on the queue.
+    private let latenessSoFar = Mutex<(repeated: Int, placedLate: Int)?>((0, 0))
 
     init(
         queue: DispatchQueue, context: RecordingContext, guides: GuideTrackFeed, ticker: VideoFileTicker<File>,
@@ -54,6 +57,7 @@ final class VideoFileFeed<File: VideoFileEntry>: @unchecked Sendable {
     /// first starts the file. On the queue.
     func receive(_ frame: CVPixelBuffer, capturedAt: Int64) {
         guard !isEnding, let ticker else { return }
+        defer { latenessSoFar.withLock { $0 = self.ticker?.lateness } }
         switch ticker.receive(frame, capturedAt: capturedAt, arrivedAt: context.now()) {
         case .none: break
         case .fileStarted(let entry):
@@ -85,12 +89,14 @@ final class VideoFileFeed<File: VideoFileEntry>: @unchecked Sendable {
 
     private func tick() {
         guard !isEnding, let ticker else { return }
-        if let reason = ticker.tick(now: context.now()) { end(reason) }
+        let reason = ticker.tick(now: context.now())
+        latenessSoFar.withLock { $0 = ticker.lateness }
+        if let reason { end(reason) }
     }
 
     /// The running file's frames repeated for lateness and placed late so far; nil without one.
     func lateness() -> (repeated: Int, placedLate: Int)? {
-        queue.sync { ticker?.lateness }
+        latenessSoFar.withLock { $0 }
     }
 
     /// Ends the capture by itself, then reports why; unless the recorder stopped it first. On the queue.
@@ -147,6 +153,7 @@ final class VideoFileFeed<File: VideoFileEntry>: @unchecked Sendable {
             return GuideLastMix(pending: pending, peeks: peeks)
         }
         if let listener { _ = guides.stopListening(listener, peekingUpTo: nil) }
+        latenessSoFar.withLock { $0 = nil }
         queue.sync {
             self.ticker = nil
             self.guideListener = nil
