@@ -1677,7 +1677,8 @@ no audio of the camera's own.
   (`sampledLuma`, the middle pixel of each cell), the picture being what
   lies between whole columns or rows within 4 of black (16 in video
   range); the picture is boxed in the other orientation when it has bars on
-  both sides across the long side, none across the short side, and its
+  both sides across the long side, equal within a sample, none across
+  the short side (a dark first or last row of the picture allowed), and its
   aspect ratio is within 5% of the frame turned. A dark room has no
   pure black bars and a picture of another aspect ratio does not match.
   At the capture's start its frames go to no file until the orientation is
@@ -1689,8 +1690,10 @@ no audio of the camera's own.
   picture for 2 s, the camera turns as a frame size change does: after
   the settle time its file ends and a new one starts in the other
   orientation, with the event `camera orientation changed` (from and to). The
-  orientation stays turned for the rest of the recording, also when the
-  camera's active format says the other. A camera another app uses
+  orientation stays turned, also when the camera's active format says
+  the other, until its picture shows it boxed again. A takeover by
+  another app while a turn waits cancels the turn: the new file is the
+  takeover's, with its event. A camera another app uses
   keeps that app's format and is never turned (see "Another app").
 - **Another app.** A camera another app uses when the recorder reads
   the cameras before its start is opened without changing its format or
@@ -1699,7 +1702,9 @@ no audio of the camera's own.
   another app taking control"). "Another app uses it" is Core Media
   I/O's `kCMIODevicePropertyDeviceIsRunningSomewhere`, read for the
   device whose `kCMIODevicePropertyDeviceUID` is the camera's unique ID
-  (`CameraInfo.isRunningElsewhere`), not AVFoundation's
+  (`CameraInfo.isRunningElsewhere`), taken only from a reading while the
+  recorder has no capture of the camera, as it counts the recorder's own
+  capture too, not AVFoundation's
   `isInUseByAnotherApplication`, which stays false for a camera a
   browser uses (D74). Otherwise the recorder sets its own format, as
   above. Once the recorder's own opening of a camera has finished

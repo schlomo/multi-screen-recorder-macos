@@ -304,9 +304,9 @@ public struct CameraInfo: Equatable, Sendable {
         let recorded = { (format: CameraFormat) in resolution.cameraFrameSize(for: format.size, limited: limited).pixelCount }
         // The active format's orientation is the picture the camera means: the Osmo's 9:16 mode is
         // 1080×1920, also listed pillarboxed as 1920×1080, while the FaceTime camera means 1920×1080.
-        let turnedAsActive = { (format: CameraFormat) in activeFormat.map { Self.turn(of: $0.size) == Self.turn(of: format.size) } ?? false }
+        let inActiveOrientation = { (format: CameraFormat) in activeFormat.map { Self.orientation(of: $0.size) == Self.orientation(of: format.size) } ?? false }
         let key = { (format: CameraFormat) in
-            (recorded(format), -format.size.pixelCount, turnedAsActive(format) ? 1 : 0,
+            (recorded(format), -format.size.pixelCount, inActiveOrientation(format) ? 1 : 0,
              format.size.width > format.size.height ? 1 : 0, -format.size.width)
         }
         return fastEnough.max { key($0) < key($1) }
@@ -329,7 +329,7 @@ public struct CameraInfo: Equatable, Sendable {
     }
 
     /// Portrait (-1), square (0) or landscape (1).
-    static func turn(of size: FrameSize) -> Int { (size.width - size.height).signum() }
+    static func orientation(of size: FrameSize) -> Int { (size.width - size.height).signum() }
 
     /// "FaceTime HD Camera (default)" or just the name.
     public var shownName: String { isDefault ? "\(name) (default)" : name }

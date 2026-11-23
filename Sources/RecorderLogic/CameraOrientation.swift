@@ -62,16 +62,18 @@ public enum CameraOrientation {
     }
 
     /// Whether `picture` is the other orientation's, boxed in a frame of `luma`'s
-    /// size: bars on both sides across the long side, none across the short
-    /// side, and the picture's aspect ratio within `aspectTolerance` of the
-    /// frame turned.
+    /// size: bars on both sides across the long side, equal within a sample,
+    /// none across the short side (a dark first or last row of the picture
+    /// allowed), and the picture's aspect ratio within `aspectTolerance` of
+    /// the frame turned.
     public static func isBoxedInTheOtherOrientation(_ picture: Picture, in luma: Luma) -> Bool {
-        let isLandscape = luma.width > luma.height
         guard luma.width != luma.height else { return false }
-        let barsAcross = isLandscape
-            ? picture.x > 0 && picture.x + picture.width < luma.width && picture.height == luma.height
-            : picture.y > 0 && picture.y + picture.height < luma.height && picture.width == luma.width
-        guard barsAcross else { return false }
+        let isLandscape = luma.width > luma.height
+        let (start, length, frameLength, across, frameAcross) = isLandscape
+            ? (picture.x, picture.width, luma.width, picture.height, luma.height)
+            : (picture.y, picture.height, luma.height, picture.width, luma.width)
+        let end = frameLength - start - length
+        guard start > 0, end > 0, abs(start - end) <= 1, across >= frameAcross - 2 else { return false }
         let turned = Double(luma.height) / Double(luma.width)
         let aspect = Double(picture.width) / Double(picture.height)
         return abs(aspect - turned) <= aspectTolerance * turned

@@ -64,13 +64,18 @@ public struct CameraTracker: Sendable {
         /// Another app changed its format during the recording: from then on
         /// the recording keeps the camera's format, never setting it back.
         var isTakenOver = false
+        /// Another app used it, as read while the recording had no capture of it: a reading
+        /// during its capture counts that capture too (CMIO), so it never sets this.
+        var isUsedElsewhere = false
         /// Its latest file started in the format the camera ran in, as another app used it.
         var keptFormat = false
         /// The orientation its picture showed to be (portrait -1, landscape 1), boxed in a frame of the other
         /// orientation: its format turned to it from then on (D76).
-        var pictureTurn: Int?
+        var pictureOrientation: Int?
         /// While recording, its picture showed to be the other orientation: a new file turned after the settle time.
         var turnsWhileRecording = false
+
+        var hasCapture: Bool { if case .recording = phase { true } else { false } }
     }
 
     public let settings: Settings
@@ -158,6 +163,7 @@ public struct CameraTracker: Sendable {
                     cameras[uniqueID]?.phase = .idle
                 }
             }
+            if let reading, !tracked.hasCapture { cameras[uniqueID]?.isUsedElsewhere = reading.isRunningElsewhere }
             if tracked.isTakenOver, let reading, let before = tracked.reading, reading.activeFormat != before.activeFormat {
                 // Another app changing the format again settles as a screen's change does (`due`).
                 cameras[uniqueID]?.changedAt = now
@@ -168,7 +174,7 @@ public struct CameraTracker: Sendable {
         for camera in connected where cameras[camera.uniqueID] == nil && Self.records(camera, settings: settings) {
             cameras[camera.uniqueID] = Tracked(
                 name: camera.name, reading: camera, isWanted: true, changedAt: isBeginning ? Int64.min / 2 : now,
-                restartDelay: firstRestartDelay)
+                restartDelay: firstRestartDelay, isUsedElsewhere: camera.isRunningElsewhere)
             order.append(camera.uniqueID)
             // Newly listed, not only newly recorded, as when it becomes the default.
             if !isBeginning, !listedBefore.contains(camera.uniqueID) {
@@ -189,7 +195,7 @@ public struct CameraTracker: Sendable {
             switch tracked.phase {
             case .idle: step.actions.append(start(uniqueID))
             case .waitingToRestart(let notBefore) where notBefore <= now: step.actions.append(start(uniqueID))
-            case .recording(let current) where tracked.turnsWhileRecording:
+            case .recording(let current) where tracked.turnsWhileRecording && !tracked.isTakenOver:
                 let restart = start(uniqueID)
                 guard case .start(_, _, _, let frameSize, _, _, _) = restart else { break }
                 var turned = event(.cameraOrientationChanged, uniqueID, at: now)
@@ -243,6 +249,8 @@ public struct CameraTracker: Sendable {
     public mutating func formatTakenOver(_ uniqueID: String, at now: Int64) {
         guard case .recording = cameras[uniqueID]?.phase else { return }
         cameras[uniqueID]?.isTakenOver = true
+        // A kept format is never turned: a turn waiting gives way to the takeover.
+        cameras[uniqueID]?.turnsWhileRecording = false
         cameras[uniqueID]?.changedAt = now
     }
 
@@ -254,7 +262,7 @@ public struct CameraTracker: Sendable {
     /// whose format another app set is never turned.
     public mutating func pictureInOtherOrientation(_ uniqueID: String, beforeItsFile: Bool, at now: Int64) -> Step {
         guard var tracked = cameras[uniqueID], case .recording(let current) = tracked.phase, !tracked.keptFormat else { return Step() }
-        tracked.pictureTurn = -CameraInfo.turn(of: current)
+        tracked.pictureOrientation = -CameraInfo.orientation(of: current)
         cameras[uniqueID] = tracked
         guard !beforeItsFile else { return Step(actions: [.stop(uniqueID: uniqueID), start(uniqueID)]) }
         cameras[uniqueID]?.turnsWhileRecording = true
@@ -377,10 +385,10 @@ public struct CameraTracker: Sendable {
             nextNumber += 1
         }
         // `records` holds for a wanted camera, so it has a format, and the resolution records video.
-        let keepsFormat = reading.isRunningElsewhere || tracked.isTakenOver
+        let keepsFormat = tracked.isUsedElsewhere || tracked.isTakenOver
         var format = (keepsFormat ? reading.activeFormat : nil)
             ?? reading.chosenFormat(resolution: settings.effectiveResolution, limited: settings.limitCameras)!
-        if !keepsFormat, let turn = tracked.pictureTurn, CameraInfo.turn(of: format.size) != turn,
+        if !keepsFormat, let orientation = tracked.pictureOrientation, CameraInfo.orientation(of: format.size) != orientation,
            let turned = reading.otherOrientation(of: format) {
             format = turned
         }

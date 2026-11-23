@@ -43,6 +43,23 @@ import Testing
         #expect(CameraOrientation.picture(in: Self.luma(192, 108, picture: (0, 0, 0, 0))) == nil)
     }
 
+    /// A bright middle in a black frame is no box: its bars differ by more than a sample, or it has black rows too.
+    @Test func aBrightMiddleInABlackFrameIsNot() throws {
+        for middle in [Self.luma(192, 108, picture: (50, 0, 61, 108)), Self.luma(192, 108, picture: (66, 10, 61, 88))] {
+            let picture = try #require(CameraOrientation.picture(in: middle))
+            #expect(!CameraOrientation.isBoxedInTheOtherOrientation(picture, in: middle))
+        }
+    }
+
+    /// A picture whose first and last rows are dark is still boxed: the bars decide, not the picture's edge.
+    @Test func aPictureWithDarkEdgeRowsIsStillBoxed() throws {
+        let darkEdges = Self.luma(192, 108, picture: (66, 1, 61, 106))
+        let picture = try #require(CameraOrientation.picture(in: darkEdges))
+        #expect(CameraOrientation.isBoxedInTheOtherOrientation(picture, in: darkEdges))
+        let darkEdgesLetterboxed = Self.luma(108, 192, picture: (1, 66, 106, 61))
+        #expect(CameraOrientation.isBoxedInTheOtherOrientation(try #require(CameraOrientation.picture(in: darkEdgesLetterboxed)), in: darkEdgesLetterboxed))
+    }
+
     /// Dark sides that are not pure black, as a dark room's, are no bars.
     @Test func aDarkRoomIsNoBars() throws {
         var generator = SeededRandom(seed: 9)

@@ -125,7 +125,7 @@ public enum SourceDetails {
         let recorded = { (format: CameraFormat) in resolution.cameraFrameSize(for: format.size, limited: settings.limitCameras).pixelCount }
         let tiedByTurn = fastEnough.contains { other in
             recorded(other) == recorded(format) && other.size.pixelCount == format.size.pixelCount
-                && CameraInfo.turn(of: other.size) != CameraInfo.turn(of: format.size)
+                && CameraInfo.orientation(of: other.size) != CameraInfo.orientation(of: format.size)
         }
         if tiedByTurn, camera.activeFormat != nil { reasons.append("turned as the camera's active format") }
         return reasons.joined(separator: ", ")

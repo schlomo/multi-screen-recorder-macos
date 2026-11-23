@@ -2427,7 +2427,14 @@ architect's reading.
   ratio within 5%; at the start 3 frames in a row decide, and 1 s from
   the first frame without that starts the file; while confirming, a
   frame every 0.5 s; a turn at the start has no event; the turned
-  orientation holds for the rest of the recording.
+  orientation holds until the picture shows it boxed again. Fixed in
+  review: whether another app uses the camera is taken only from a
+  reading while the recorder has no capture of it, as Core Media I/O's
+  running-somewhere counts the recorder's own capture, which had kept a
+  turned camera in its format; a takeover while a turn waits is the
+  takeover's change, not a turn; the two bars must be equal within a
+  sample, and a dark first or last row of the picture does not stop a
+  box.
 - **Consequences:** Such a camera is recorded in the orientation of its
   picture, without black bars, whichever format a host left it in.
   Checking costs one sampled frame every 5 s per such camera. The camera

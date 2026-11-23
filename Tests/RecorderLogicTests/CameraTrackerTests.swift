@@ -579,6 +579,41 @@ import Testing
         #expect(format.size == Self.portrait)
     }
 
+    /// A reading during the recording counts its own capture as running elsewhere (CMIO), and the
+    /// recording's own format setting makes one: it never makes the camera another app's.
+    @Test func aReadingDuringItsOwnCaptureDoesNotStopTheTurn() {
+        var cameras = tracker()
+        _ = cameras.begin([Self.osmo], at: 0)
+        var ownCapture = Self.osmo
+        ownCapture.isRunningElsewhere = true
+        #expect(cameras.observe([ownCapture], at: 10 * second) == CameraTracker.Step())
+        _ = cameras.pictureInOtherOrientation("O", beforeItsFile: false, at: 20 * second)
+        #expect(cameras.observe([ownCapture], at: 20 * second + second / 2) == CameraTracker.Step())
+        var changed = RecordingEvent(at: 21 * second, event: .cameraOrientationChanged, camera: "OsmoPocket4P")
+        changed.from = [1920, 1080]
+        changed.to = [1080, 1920]
+        #expect(cameras.due(at: 21 * second) == CameraTracker.Step(events: [changed], actions: [.stop(uniqueID: "O"), start(Self.portrait)]))
+        #expect(cameras.recordedReading(of: "O")?.isRunningElsewhere == false)
+    }
+
+    /// Another app taking the format while a turn waits: the takeover's new file and event, no turn.
+    @Test func aTakeoverDuringAWaitingTurnIsTheTakeovers() {
+        var cameras = tracker()
+        _ = cameras.begin([Self.osmo], at: 0)
+        _ = cameras.pictureInOtherOrientation("O", beforeItsFile: false, at: 20 * second)
+        var takenOver = Self.osmo
+        takenOver.isRunningElsewhere = true
+        takenOver.activeFormat = CameraFormat(size: Self.portrait, maxFramesPerSecond: 30)
+        _ = cameras.observe([takenOver], at: 20 * second + second / 2)
+        cameras.formatTakenOver("O", at: 20 * second + second / 2)
+        var changed = RecordingEvent(at: 22 * second, event: .cameraFrameSizeChanged, camera: "OsmoPocket4P")
+        changed.from = [1920, 1080]
+        changed.to = [1080, 1920]
+        #expect(cameras.due(at: 22 * second)
+            == CameraTracker.Step(events: [changed], actions: [.stop(uniqueID: "O"), start(Self.portrait, setsFormat: false)]))
+        #expect(cameras.nextDueTime() == nil)
+    }
+
     /// A camera another app uses keeps that app's format: never turned (D74, D76).
     @Test func aCameraRunningElsewhereIsNeverTurned() {
         var cameras = tracker()
