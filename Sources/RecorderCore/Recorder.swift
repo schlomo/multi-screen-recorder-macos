@@ -1061,7 +1061,7 @@ public final class Recorder {
         let problem = RecordingProblem(
             atSeconds: event.at, problem: event.problem.problem,
             error: ErrorDetail(message: event.event.rawValue, underlying: [ErrorDetail(message: AudioDelay.text(delay))]))
-        tell(problem, kind: .audioInputOutOfTheGuideTrack(uid), source: number.map { "Audio \($0) \(file.audioSource)" } ?? file.audioSource,
+        tell(problem, kind: .audioInputOutOfTheGuideTrack(uid), source: (number.map { "Audio \($0) \(file.audioSource)" } ?? file.audioSource) + " " + AudioDelay.text(delay),
              ofAnEvent: true)
     }
 

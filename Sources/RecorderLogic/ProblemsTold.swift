@@ -37,8 +37,9 @@ public enum ProblemKind: Hashable, Sendable {
     case inputVolumeNotSet(String)
     /// An audio input whose input volume changes cannot be followed, by its name; clears when following it works (D69).
     case inputVolumeNotFollowed(String)
-    /// An audio input, by its UID, whose file left the "Audio inputs" guide track as too late; ends when a
-    /// new file of it starts (D79).
+    /// An audio input, by its UID, whose file left the "Audio inputs" guide track as too late; `source` names
+    /// the input and its audio delay. Its line has no time and no ending; it ends when a new file of the input
+    /// starts, so leaving again is told again (D79).
     case audioInputOutOfTheGuideTrack(String)
     /// A video file a full disk ended; clears when there is room again.
     case diskFull
@@ -102,7 +103,7 @@ extension ProblemKind {
         case .diskFull: "Disk full"
         case .guideTracksCut(let name): "Guide tracks of \(name) cut"
         case .audioInputOutOfTheGuideTrack(let uid):
-            "\(source ?? uid) too far out of sync, not in the guide track; own audio track recorded"
+            "\(source ?? uid), not in the guide track; its own audio track is recorded"
         }
     }
 }
@@ -212,11 +213,14 @@ public struct ProblemsTold: Sendable {
         return lines.filter(\.isRed) + lines.filter { !$0.isRed }
     }
 
-    /// `<phrase> since 0:53`, `<phrase> for 7.4 s at 0:53, recovered` (or `, then disconnected`, `, ended`: the `Ending`),
+    /// `<phrase> since 0:53`, `<phrase> for 7.4 s at 0:53, recovered` (or `, then disconnected`, `, stopped`: the `Ending`),
     /// `<phrase> 3 times, 12 s in total[, <ending>]`, then the latest error after a colon, `latest: ` before it
-    /// when the errors differ; a stall reads `stalled 7.4 s`, without its error, always the same.
+    /// when the errors differ; a stall reads `stalled 7.4 s`, without its error, always the same; an input out of
+    /// the guide track is its phrase alone.
     private static func line(_ repeats: [Told], now: Int64) -> ProblemLine {
         let latest = repeats[repeats.count - 1]
+        // No meaningful length: the latest as it is, orange (D79).
+        if case .audioInputOutOfTheGuideTrack = latest.kind { return ProblemLine(text: latest.kind.phrase(source: latest.source), isRed: false) }
         let isStall = if case .cameraStalled = latest.kind { true } else { false }
         let phrase = latest.kind.phrase(source: latest.source)
         let errors = repeats.map(\.problem.error)

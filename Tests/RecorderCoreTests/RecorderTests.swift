@@ -545,8 +545,7 @@ extension GlobalRecordingLog {
             #expect(event.audioSource == "Mic A")
             #expect(abs(try #require(event.delay) - 0.5) < 0.002)
             let line = try #require(recorder.problemLines().first)
-            #expect(line.text.hasPrefix("Audio 2 Mic A too far out of sync, not in the guide track; own audio track recorded since 0:"))
-            #expect(line.text.hasSuffix(": audio input left the guide track: 500 ms late"))
+            #expect(line.text == "Audio 2 Mic A 500 ms late, not in the guide track; its own audio track is recorded")
             #expect(!line.isRed)
             #expect(try manifestOnDisk().problems.map(\.problem) == ["Audio source Mic A"])
             #expect(try manifestOnDisk().audioFiles.allSatisfy { $0.end == nil })
@@ -558,7 +557,14 @@ extension GlobalRecordingLog {
                 try? send(0.1, buffers: 1, to: sources.last(of: "A"))
                 return recorder.guides.contains(source: a, in: .audioInputs)
             }
-            #expect(recorder.problemLines().contains { $0.text.contains("too far out of sync") && $0.text.contains(", recovered") })
+            // The line stays as it was; the new file, once measured late too, leaves again and is told again.
+            #expect(recorder.problemLines().contains(line))
+            feedDelayedNoise(["R": 0, "A": 0.5])
+            await recorder.measureAudioDelays()
+            try await wait("A out of the guide track again") { !recorder.guides.contains(source: a, in: .audioInputs) }
+            let leftTwice = try manifestOnDisk().problems.filter { $0.error?.hasPrefix("audio input left the guide track") == true }
+            #expect(leftTwice.map(\.problem) == ["Audio source Mic A", "Audio source Mic A"])
+            #expect(recorder.problemLines().filter { $0.text.hasPrefix("Audio 2 Mic A") } == [line])
             _ = await stop()
         }
 

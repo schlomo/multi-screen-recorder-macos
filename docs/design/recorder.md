@@ -1547,9 +1547,11 @@ the metadata items (see "Output on disk").
   10 s instead of 30 s; `measuredDelay` and the timeline file keep the
   median. The reference microphone and the earliest input never leave.
   It writes the event `audio input left the guide track` with its
-  `delay` and tells the problem `Audio <n> <name> too far out of sync,
-  not in the guide track; own audio track recorded`, always orange
-  (the recording works), recovered when the input's next file starts.
+  `delay` and tells a problem whose line reads `Audio <n> <name> 500 ms
+  late, not in the guide track; its own audio track is recorded`,
+  always orange (the recording works), without a time or an ending, as
+  it has no meaningful length; it stays as it is when the input's next
+  file starts, and that file leaving too is told again.
   Its own audio file is unchanged and the timeline file still places it
   by its measured delay. Each source is placed by
   its own timestamps, the mix runs 200 ms (*data*) behind real time so

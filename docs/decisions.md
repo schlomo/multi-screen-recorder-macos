@@ -2644,14 +2644,16 @@ architect's reading.
   audio file is unchanged. It is the event `audio input left the guide
   track` with the input as `audioSource` and its `delay`, in
   `recording.json` and the timeline file's markers, and a problem of
-  its own kind, always orange (the recording works): `Audio <n> <name>
-  too far out of sync, not in the guide track; own audio track
-  recorded`, one line per input, merged as every kind, recovered when
-  the input's next file starts. Decided while building: the line names
-  the input as `Audio <n> <name>`, as screens' and cameras' lines do;
-  the problem's error is the event's name with the delay under it
-  (`audio input left the guide track: 500 ms late`); the event's word is
-  "guide track", the glossary's.
+  its own kind, always orange (the recording works), one line per
+  input: `Audio <n> <name> 500 ms late, not in the guide track; its own
+  audio track is recorded`, with no time and no ending, as it has no
+  meaningful length; when the input's next file starts it stays as it
+  is (nothing recovered, a new file started), and that file leaving too
+  is told again. Decided while building: the line names the input as
+  `Audio <n> <name>`, as screens' and cameras' lines do; the problem in
+  `recording.json` has the event's name as its error with the delay
+  under it (`audio input left the guide track: 500 ms late`); the
+  event's word is "guide track", the glossary's.
 - **Consequences:** A clearly late microphone no longer echoes in the
   guide; until its first clear window it still does, and an input
   between 0 and 0.1 s late stays in. The next change raises the limit
