@@ -319,6 +319,15 @@ public struct CameraInfo: Equatable, Sendable {
         return chosenFormat(resolution: resolution, limited: limited).map { resolution.cameraFrameSize(for: $0.size, limited: limited) }
     }
 
+    /// The format of `format`'s size turned, portrait for landscape or the
+    /// other way, that delivers the tick grid's frame rate; nil where the
+    /// camera offers none, or `format` is square (D76).
+    public func otherOrientation(of format: CameraFormat) -> CameraFormat? {
+        let turned = FrameSize(width: format.size.height, height: format.size.width)
+        guard turned != format.size else { return nil }
+        return formats.first { $0.size == turned && $0.deliversTheTickRate }
+    }
+
     /// Portrait (-1), square (0) or landscape (1).
     static func turn(of size: FrameSize) -> Int { (size.width - size.height).signum() }
 

@@ -505,6 +505,7 @@ public struct RecordingEvent: Codable, Equatable, Sendable {
         case cameraConnected = "camera connected"
         case cameraDisconnected = "camera disconnected"
         case cameraFrameSizeChanged = "camera frame size changed"
+        case cameraOrientationChanged = "camera orientation changed"
         case defaultCameraChanged = "default camera changed"
         case cameraStreamFailed = "camera stream failed"
         case cameraStalled = "camera stalled"
@@ -592,7 +593,7 @@ public struct RecordingEvent: Codable, Equatable, Sendable {
     public var camera: String?
     /// The audio source the event is about, where it is about one.
     public var audioSource: String?
-    /// For `screen frame size changed` and `camera frame size changed`: the old and the new frame size;
+    /// For `screen frame size changed`, `camera frame size changed` and `camera orientation changed`: the old and the new frame size;
     /// for `default microphone changed`: the old and the new default
     /// microphone, absent where there was or is none, and as such for `default
     /// camera changed`; for `audio input

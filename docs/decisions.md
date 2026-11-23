@@ -2397,6 +2397,47 @@ architect's reading.
 - **Evidence:** [design/recorder.md](design/recorder.md), "Guide
   tracks"; `Sources/RecorderLogic/GuideTrackMix.swift`.
 
+## D76: A camera whose picture is boxed in the other orientation is turned to it (2026-11-23)
+
+- **Status:** in force. Amends D74's choice of a camera's format.
+- **Context:** On the owner's Mac on 2026-11-23 a DJI Osmo Pocket, which
+  offers 1920×1080 and 1080×1920, delivered in the orientation it was
+  not set to its picture between pure black bars, and opened in the
+  format a host last set (it persisted across a replug), not in its own
+  mode: the recording held a portrait picture pillarboxed in 1920×1080,
+  and after the owner switched it to landscape while unplugged, a
+  landscape picture letterboxed in 1080×1920. The owner: "I guess there
+  are only few cameras like the osmo, it would be nice if we could
+  smartly handle that".
+- **Decision:** The architect's design, signed off by the owner: only
+  for a camera that offers a format of the same size in both
+  orientations, both at 30 fps, and whose format the recorder sets (a
+  camera another app uses keeps its format, D74). At a capture's start
+  its first frames are checked before its file starts; a picture
+  between pure black bars whose aspect ratio is the other orientation's
+  turns the camera to the format of that orientation before any file
+  (the start takes up to about 1 s longer). While recording one frame is
+  checked every 5 s; boxed in the other orientation continuously for
+  2 s, the file ends and a new one starts in the other orientation after
+  the settle time, as a frame size change (D30), with the event `camera
+  orientation changed`. Bars must be pure black, the picture box steady
+  and its aspect ratio the other orientation's, so a dark room does not
+  turn a camera. Decided while building: the luma is sampled at 192
+  points along the long side; a bar is within 4 of black; the aspect
+  ratio within 5%; at the start 3 frames in a row decide, and 1 s from
+  the first frame without that starts the file; while confirming, a
+  frame every 0.5 s; a turn at the start has no event; the turned
+  orientation holds for the rest of the recording.
+- **Consequences:** Such a camera is recorded in the orientation of its
+  picture, without black bars, whichever format a host left it in.
+  Checking costs one sampled frame every 5 s per such camera. The camera
+  files of that test recording, decoded through the same checks: both Osmo files
+  boxed in every sampled frame and turned after 3 frames; the BRIO and
+  the FaceTime HD Camera never.
+- **Evidence:** [design/recorder.md](design/recorder.md), "Cameras",
+  "Orientation"; `Sources/RecorderLogic/CameraOrientation.swift`,
+  `Sources/RecorderCore/CameraLuma.swift`.
+
 ## D77: Each audio input's delay is measured while recording and the timeline file shifts its audio (2026-11-23)
 
 - **Status:** in force.

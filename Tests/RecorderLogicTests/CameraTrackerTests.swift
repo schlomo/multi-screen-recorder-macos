@@ -533,6 +533,68 @@ import Testing
         #expect(cameras.due(at: 13 * second) == CameraTracker.Step())
     }
 
+    /// The DJI Osmo Pocket: 1920×1080 and 1080×1920, opened in the orientation a host last set.
+    private static let osmo = CameraInfo(
+        uniqueID: "O", name: "OsmoPocket4P", isDefault: false, isVirtual: false,
+        formats: [
+            CameraFormat(size: FrameSize(width: 1920, height: 1080), maxFramesPerSecond: 30),
+            CameraFormat(size: FrameSize(width: 1080, height: 1920), maxFramesPerSecond: 30),
+        ],
+        activeFormat: CameraFormat(size: FrameSize(width: 1920, height: 1080), maxFramesPerSecond: 30))
+    private static let landscape = FrameSize(width: 1920, height: 1080)
+    private static let portrait = FrameSize(width: 1080, height: 1920)
+
+    private func start(_ format: FrameSize, setsFormat: Bool = true) -> CameraTracker.Action {
+        .start(uniqueID: "O", format: CameraFormat(size: format, maxFramesPerSecond: 30), setsFormat: setsFormat, frameSize: format,
+               number: 1, name: "OsmoPocket4P", isContinuity: false)
+    }
+
+    /// A picture in the other orientation before the camera's file starts turns it at once, with no event (D76).
+    @Test func aPictureInTheOtherOrientationAtTheStartTurnsTheCameraAtOnce() {
+        var cameras = tracker()
+        #expect(cameras.begin([Self.osmo], at: 0).actions == [start(Self.landscape)])
+        let turned = cameras.pictureInOtherOrientation("O", beforeItsFile: true, at: second / 2)
+        #expect(turned == CameraTracker.Step(actions: [.stop(uniqueID: "O"), start(Self.portrait)]))
+        #expect(cameras.due(at: 10 * second) == CameraTracker.Step())
+    }
+
+    /// While recording, after the settle time, a new file in the other orientation with its event; the camera keeps
+    /// that orientation when it starts again, though its active format says the other.
+    @Test func aPictureInTheOtherOrientationWhileRecordingTurnsTheCameraAfterTheSettleTime() {
+        var cameras = tracker()
+        _ = cameras.begin([Self.osmo], at: 0)
+        #expect(cameras.pictureInOtherOrientation("O", beforeItsFile: false, at: 20 * second) == CameraTracker.Step())
+        #expect(cameras.nextDueTime() == 21 * second)
+        #expect(cameras.due(at: 20 * second) == CameraTracker.Step())
+        var changed = RecordingEvent(at: 21 * second, event: .cameraOrientationChanged, camera: "OsmoPocket4P")
+        changed.from = [1920, 1080]
+        changed.to = [1080, 1920]
+        #expect(cameras.due(at: 21 * second) == CameraTracker.Step(events: [changed], actions: [.stop(uniqueID: "O"), start(Self.portrait)]))
+        #expect(cameras.due(at: 30 * second) == CameraTracker.Step())
+        _ = cameras.streamEnded("O", .streamFailed("lost"), connected: [Self.osmo], at: 31 * second)
+        guard case .start(_, let format, _, _, _, _, _)? = cameras.due(at: 40 * second).actions.first else {
+            Issue.record("the camera did not start again")
+            return
+        }
+        #expect(format.size == Self.portrait)
+    }
+
+    /// A camera another app uses keeps that app's format: never turned (D74, D76).
+    @Test func aCameraRunningElsewhereIsNeverTurned() {
+        var cameras = tracker()
+        var elsewhere = Self.osmo
+        elsewhere.isRunningElsewhere = true
+        #expect(cameras.begin([elsewhere], at: 0).actions == [start(Self.landscape, setsFormat: false)])
+        #expect(cameras.pictureInOtherOrientation("O", beforeItsFile: true, at: second) == CameraTracker.Step())
+        #expect(cameras.pictureInOtherOrientation("O", beforeItsFile: false, at: second) == CameraTracker.Step())
+        #expect(cameras.nextDueTime() == nil)
+    }
+
+    @Test func onlyACameraOfferingTheTurnedSizeHasAnotherOrientation() {
+        #expect(Self.osmo.otherOrientation(of: Self.osmo.formats[0]) == Self.osmo.formats[1])
+        #expect(Self.usb.otherOrientation(of: Self.usb.formats[1]) == nil)
+    }
+
     @Test func noCameraNoActionNoEvent() {
         var cameras = tracker()
         #expect(cameras.begin([], at: 0) == CameraTracker.Step())

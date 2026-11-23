@@ -760,6 +760,12 @@ public final class Recorder {
                 onFormatTakenOver: { [weak self] in
                     Task { @MainActor in self?.cameraFormatTakenOver(uniqueID: uniqueID, captureNumber: captureNumber) }
                 },
+                checksOrientation: setsFormat && cameraTracker.recordedReading(of: uniqueID)?.otherOrientation(of: format) != nil,
+                onPictureInOtherOrientation: { [weak self] beforeItsFile in
+                    Task { @MainActor in
+                        self?.cameraPictureInOtherOrientation(uniqueID: uniqueID, captureNumber: captureNumber, beforeItsFile: beforeItsFile)
+                    }
+                },
                 onEnded: { [weak self] reason, file in
                     Task { @MainActor in
                         self?.cameraCaptureEnded(uniqueID: uniqueID, captureNumber: captureNumber, camera: name, reason: reason, file: file)
@@ -807,6 +813,12 @@ public final class Recorder {
         guard !isStopped, cameraCaptures[uniqueID]?.0 == captureNumber else { return }
         cameraTracker.formatTakenOver(uniqueID, at: context.now())
         camerasChanged()
+    }
+
+    /// The running capture's picture is boxed in the other orientation: the camera turns (D76).
+    private func cameraPictureInOtherOrientation(uniqueID: String, captureNumber: Int, beforeItsFile: Bool) {
+        guard !isStopped, cameraCaptures[uniqueID]?.0 == captureNumber else { return }
+        applyCameras(cameraTracker.pictureInOtherOrientation(uniqueID, beforeItsFile: beforeItsFile, at: context.now()))
     }
 
     /// As a screen capture's end by itself (`captureEnded`).

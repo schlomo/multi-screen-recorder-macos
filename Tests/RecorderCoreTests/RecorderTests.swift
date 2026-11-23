@@ -124,13 +124,15 @@ extension GlobalRecordingLog {
                 state.withLock { $0.stopped = true }
             }
 
-            /// A decoded frame captured `ago` before now, handed to the capture on its queue.
-            func sendFrame(capturedAgo ago: Duration = .zero) throws {
+            /// A decoded frame captured `ago` before now, handed to the capture on its queue; `pillarboxed`,
+            /// a portrait picture between black bars in a landscape frame, as the DJI Osmo Pocket delivers it.
+            func sendFrame(capturedAgo ago: Duration = .zero, pillarboxed: Bool = false) throws {
                 var pixelBuffer: CVPixelBuffer?
                 CVPixelBufferCreate(
                     nil, frameSize.width, frameSize.height, kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange,
                     [kCVPixelBufferIOSurfacePropertiesKey: [:]] as CFDictionary, &pixelBuffer)
                 let picture = try #require(pixelBuffer)
+                Self.paint(picture, pillarboxed: pillarboxed)
                 var format: CMVideoFormatDescription?
                 CMVideoFormatDescriptionCreateForImageBuffer(allocator: nil, imageBuffer: picture, formatDescriptionOut: &format)
                 var timing = Self.timingNow(ago: ago)
@@ -139,6 +141,23 @@ extension GlobalRecordingLog {
                     allocator: nil, imageBuffer: picture, formatDescription: try #require(format), sampleTiming: &timing,
                     sampleBufferOut: &buffer)
                 deliver(try #require(buffer))
+            }
+
+            /// Grey luma with a pattern; with `pillarboxed` only in the middle, black at the sides.
+            private static func paint(_ picture: CVPixelBuffer, pillarboxed: Bool) {
+                CVPixelBufferLockBaseAddress(picture, [])
+                defer { CVPixelBufferUnlockBaseAddress(picture, []) }
+                let width = CVPixelBufferGetWidthOfPlane(picture, 0), height = CVPixelBufferGetHeightOfPlane(picture, 0)
+                let bytesPerRow = CVPixelBufferGetBytesPerRowOfPlane(picture, 0)
+                let luma = CVPixelBufferGetBaseAddressOfPlane(picture, 0)!.assumingMemoryBound(to: UInt8.self)
+                let pictureWidth = pillarboxed ? height * height / width : width
+                let left = (width - pictureWidth) / 2
+                for y in 0..<height {
+                    for x in 0..<width {
+                        let inside = x >= left && x < left + pictureWidth
+                        luma[y * bytesPerRow + x] = inside ? UInt8(60 + (x * 7 + y * 3) % 120) : 16
+                    }
+                }
             }
 
             /// A frame without a decoded picture, as a camera's compressed stream would come.
@@ -392,6 +411,34 @@ extension GlobalRecordingLog {
             #expect(summary.manifest.cameraFiles.map(\.state) == [.finalized])
             #expect(summary.manifest.cameraFiles.first?.end != nil)
             #expect(summary.manifest.result == .ok)
+        }
+
+        /// A camera that offers its size in both orientations and delivers a portrait picture pillarboxed in
+        /// its landscape format turns to the portrait format before its file starts (D76).
+        @Test func aCameraWhosePictureIsBoxedInTheOtherOrientationTurnsBeforeItsFile() async throws {
+            let osmo = CameraInfo(
+                uniqueID: "Osmo", name: "OsmoPocket4P", isDefault: true, isVirtual: false,
+                formats: [
+                    CameraFormat(size: FrameSize(width: 320, height: 180), maxFramesPerSecond: 30),
+                    CameraFormat(size: FrameSize(width: 180, height: 320), maxFramesPerSecond: 30),
+                ],
+                activeFormat: CameraFormat(size: FrameSize(width: 320, height: 180), maxFramesPerSecond: 30))
+            cameras.connected.withLock { $0 = [osmo] }
+            try start(cameraMode: .real)
+            let landscape = try #require(cameras.last)
+            #expect(landscape.frameSize == FrameSize(width: 320, height: 180))
+            try await wait("the turned camera") {
+                try? landscape.sendFrame(pillarboxed: true)
+                return cameras.opened.withLock { $0.count } == 2
+            }
+            let portrait = try #require(cameras.last)
+            #expect(portrait.frameSize == FrameSize(width: 180, height: 320))
+            #expect(portrait.format?.size == FrameSize(width: 180, height: 320))
+            try await sendFrames(portrait, until: "the camera file") { (try? manifestOnDisk().cameraFiles.count) == 1 }
+            let summary = await stop()
+            #expect(landscape.isStopped)
+            #expect(summary.manifest.cameraFiles.map(\.frameSize) == [[180, 320]])
+            #expect(summary.manifest.events.isEmpty)
         }
 
         /// A camera whose stream takes long to stop: its file ends where the stop was asked, not

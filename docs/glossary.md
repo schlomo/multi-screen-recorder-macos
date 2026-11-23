@@ -191,10 +191,19 @@ frame size its chosen format's size fitted, as a screen's, into the
 recording resolution's box, limited to 1920×1080 unless `limitCameras` is off: of the formats at 30
 fps, of any aspect ratio, the one that records the largest size, and of
 those the smallest; for a camera another app uses, the format it runs
-in. Another app changing that to another frame size starts a new one. Its tick waits up to 0.5 s for a frame captured before it. A camera
+in; for a camera that offers its size in both orientations and delivers its
+picture boxed in the other one, that other orientation (D76). Another app changing that to another frame size starts a new one. Its tick waits up to 0.5 s for a frame captured before it. A camera
 that disappears, is suspended, delivers no frames for 10 s, or whose
 stream or writer fails ends its camera file; a new one begins when it is back;
 a stall does not end it (D74).
+
+## Orientation
+
+Whether a frame or a picture is portrait, landscape or square. A camera
+that offers its size in both orientations (W×H and H×W) and delivers its
+picture boxed between black bars in the other one is turned to that
+orientation, with the event `camera orientation changed` while recording
+(D76).
 
 ## Stall
 

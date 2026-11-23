@@ -582,6 +582,7 @@ disconnected`, `screen frame size changed`, `screen mirroring started`,
 failed`, `screen shows another screen's picture`, `screen file writer
 fell behind`, `screen file writer failed`, for cameras (D74) `camera
 connected`, `camera disconnected`, `camera frame size changed`,
+`camera orientation changed` (D76),
 `default camera changed`, `camera stream failed`, `camera stalled`, `camera stall ended`, `camera file
 writer fell behind`, `camera file writer failed`, then `disk full`, `sleep`, `wake`,
 and for audio `audio input connected`, `audio input disconnected`,
@@ -599,7 +600,7 @@ file. Their fields: `at`, `event`, `screen`, `camera` or `audioSource`; `from` a
 `to` (the old and the new frame size) for `screen frame size changed`,
 the old and the new default microphone for `default microphone
 changed`, the old and the new frame size for `camera frame size
-changed`, and the old and the new default camera for `default camera
+changed` and `camera orientation changed`, and the old and the new default camera for `default camera
 changed` (either absent where there was or is none), and the old and
 the new input volume, 0 to 1, for `audio input volume changed` (D69);
 `mirrors` (the
@@ -1644,6 +1645,33 @@ no audio of the camera's own.
   MJPEG). AVFoundation scales the frames to the camera file's frame
   size. A frame without a decoded picture ends the capture as a failing
   stream.
+- **Orientation (D76).** A camera that offers its format's size in both
+  orientations (W×H and H×W, both at 30 fps), such as a DJI Osmo Pocket
+  (1920×1080 and 1080×1920), delivers in the orientation it is not set to its
+  picture between pure black bars, and opens in the orientation a host last
+  set, not in its own mode (the owner's Mac, 2026-11-23: a portrait
+  picture pillarboxed in 1920×1080, and after a switch to landscape
+  while unplugged a landscape picture letterboxed in 1080×1920). So the
+  recorder checks such a camera's picture (`CameraOrientation`): the
+  luma of a frame sampled on a grid of 192 samples along its long side
+  (`sampledLuma`, the middle pixel of each cell), the picture being what
+  lies between whole columns or rows within 4 of black (16 in video
+  range); the picture is boxed in the other orientation when it has bars on
+  both sides across the long side, none across the short side, and its
+  aspect ratio is within 5% of the frame turned. A dark room has no
+  pure black bars and a picture of another aspect ratio does not match.
+  At the capture's start its frames go to no file until the orientation is
+  told: 3 frames in a row boxed with the same picture turn the camera at
+  once, before any file of it (no event); 3 frames in a row not boxed,
+  or 1 s from the first frame, start the file (a frame black all over
+  tells nothing). While recording, a frame is checked every 5 s, and
+  every 0.5 s while a boxed picture is confirmed; boxed with the same
+  picture for 2 s, the camera turns as a frame size change does: after
+  the settle time its file ends and a new one starts in the other
+  orientation, with the event `camera orientation changed` (from and to). The
+  orientation stays turned for the rest of the recording, also when the
+  camera's active format says the other. A camera another app uses
+  keeps that app's format and is never turned (see "Another app").
 - **Another app.** A camera another app uses when the recorder reads
   the cameras before its start is opened without changing its format or
   frame duration: it records the format the camera runs in, fitted into

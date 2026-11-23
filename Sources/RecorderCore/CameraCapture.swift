@@ -17,9 +17,12 @@ protocol CameraFrameSource: AnyObject, Sendable {
 /// One camera's stream and its camera file (D74): the camera's frames go
 /// to the camera file's feed as a screen's do, with no screen check. A
 /// camera that pauses is stalled, and one that delivers no frames is
-/// failing (`CameraFrameWatch`). A capture has at most one camera file; a
-/// new file needs a new capture. Everything runs on its own queue until
-/// the capture ends.
+/// failing (`CameraFrameWatch`). A camera that offers its format in both
+/// orientations has its picture checked (`CameraOrientation.Watch`, D76): its
+/// first frames before its file starts, then every few seconds; a picture
+/// boxed in the other orientation is told once. A capture has at most one camera
+/// file; a new file needs a new capture. Everything runs on its own queue
+/// until the capture ends.
 final class CameraCapture: @unchecked Sendable {
     let uniqueID: String
     let number: Int
@@ -34,7 +37,13 @@ final class CameraCapture: @unchecked Sendable {
     private let onStalled: @Sendable () -> Void
     private let onStallEnded: @Sendable (_ length: Int64) -> Void
     private let onFormatTakenOver: @Sendable () -> Void
+    private let onPictureInOtherOrientation: @Sendable (_ beforeItsFile: Bool) -> Void
     // Confined to `queue`.
+    /// Nil for a camera whose format has only one orientation.
+    private var orientation: CameraOrientation.Watch?
+    /// While its picture's orientation is told at the start, no frame goes to the file.
+    private var holdsBack: Bool
+    private var toldOtherOrientation = false
     private var startedAt: Int64 = 0
     /// When the last frame came, on the shared clock; nil before the first.
     private var lastFrameAt: Int64?
@@ -51,8 +60,13 @@ final class CameraCapture: @unchecked Sendable {
         onStalled: @escaping @Sendable () -> Void,
         onStallEnded: @escaping @Sendable (_ length: Int64) -> Void,
         onFormatTakenOver: @escaping @Sendable () -> Void,
+        checksOrientation: Bool = false,
+        onPictureInOtherOrientation: @escaping @Sendable (_ beforeItsFile: Bool) -> Void = { _ in },
         onEnded: @escaping @Sendable (VideoStreamEnd, VideoFileEnd<RecordingManifest.CameraFile>?) -> Void
     ) {
+        orientation = checksOrientation ? CameraOrientation.Watch() : nil
+        holdsBack = checksOrientation
+        self.onPictureInOtherOrientation = onPictureInOtherOrientation
         self.uniqueID = uniqueID
         self.number = number
         self.name = name
@@ -131,8 +145,31 @@ final class CameraCapture: @unchecked Sendable {
             onStallEnded(now - lastFrameAt)
         }
         lastFrameAt = now
+        guard recordsFrame(pixelBuffer, at: now) else { return }
         let pts = CMTimeConvertScale(CMSampleBufferGetPresentationTimeStamp(buffer), timescale: 1_000_000_000, method: .roundHalfAwayFromZero)
         feed.receive(pixelBuffer, capturedAt: context.clock.sinceStart(host: UInt64(max(0, pts.value))))
+    }
+
+    /// Whether the frame goes to the file: not while its picture's orientation is
+    /// told at the start. A picture boxed in the other orientation is told once,
+    /// and before the file started, no frame of it is recorded.
+    private func recordsFrame(_ pixelBuffer: CVPixelBuffer, at now: Int64) -> Bool {
+        guard var watch = orientation else { return true }
+        let verdict = watch.observe(watch.checks(at: now) ? sampledLuma(of: pixelBuffer) : nil, at: now)
+        orientation = watch
+        switch verdict {
+        case .holdBack: return false
+        case .record: holdsBack = false
+        case .otherOrientation:
+            if !toldOtherOrientation {
+                toldOtherOrientation = true
+                RecorderLog.detail(
+                    "Camera \(number) \(name): its picture is boxed in the other orientation \(holdsBack ? "at the start" : "while recording")",
+                    category: VideoFileWriter.detailCategory)
+                onPictureInOtherOrientation(holdsBack)
+            }
+        }
+        return !holdsBack
     }
 
     /// On the queue: a camera that pauses is stalled once per pause, its
