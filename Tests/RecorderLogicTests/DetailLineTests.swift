@@ -3,6 +3,12 @@ import Testing
 
 /// Detail lines read as sentences, not as Swift's description of a struct.
 @Suite struct DetailLineTests {
+    @Test func aBlockingCallsTimeIsInWholeMilliseconds() {
+        #expect(DetailLine.milliseconds(.milliseconds(2612)) == "2612 ms")
+        #expect(DetailLine.milliseconds(.microseconds(1500)) == "2 ms")
+        #expect(DetailLine.milliseconds(.zero) == "0 ms")
+    }
+
     private let dell = ScreenInfo(name: "DELL P3421W", pixelSize: FrameSize(width: 3440, height: 1440),
                                    pointSize: FrameSize(width: 3440, height: 1440), isMain: true, originX: 0, originY: 0)
     private let retina = ScreenInfo(name: "Built-in Retina Display", pixelSize: FrameSize(width: 3456, height: 2234),

@@ -318,7 +318,9 @@ final class CameraSource: NSObject, CameraFrameSource, AVCaptureVideoDataOutputS
             RecorderLog.detail("camera \(uniqueID): in use by another app at the start, its format kept", category: VideoFileWriter.detailCategory)
         }
         // A stop that comes from here on stops the session on this queue, after this.
-        session.startRunning()
+        let clock = ContinuousClock()
+        let startTook = clock.measure { session.startRunning() }
+        RecorderLog.detail("camera \(uniqueID): startRunning took \(DetailLine.milliseconds(startTook))", category: VideoFileWriter.detailCategory)
         // From here on a change of the format the recording did not make is another app's.
         withState { $0.formatWatch.opened(in: cameraFormat(of: device.activeFormat)) }
         let rate = frameDuration.map { 1 / $0.seconds }
@@ -399,8 +401,9 @@ final class CameraSource: NSObject, CameraFrameSource, AVCaptureVideoDataOutputS
         nonisolated(unsafe) let running = session
         guard running != nil else { return }
         await withCheckedContinuation { (done: CheckedContinuation<Void, Never>) in
-            sessionQueue.async {
-                running?.stopRunning()
+            sessionQueue.async { [uniqueID] in
+                let stopTook = ContinuousClock().measure { running?.stopRunning() }
+                RecorderLog.detail("camera \(uniqueID): stopRunning took \(DetailLine.milliseconds(stopTook))", category: VideoFileWriter.detailCategory)
                 done.resume()
             }
         }

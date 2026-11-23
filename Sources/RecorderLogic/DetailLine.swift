@@ -144,6 +144,11 @@ public enum DetailLine {
         }
     }
 
+    /// "2612 ms": how long a blocking call took, in whole milliseconds, so a freeze can be traced.
+    public static func milliseconds(_ duration: Duration) -> String {
+        "\(Int((Double(duration.components.seconds) * 1000 + Double(duration.components.attoseconds) / 1e15).rounded())) ms"
+    }
+
     private static func list(_ items: [String]) -> String { items.isEmpty ? "none" : items.joined(separator: ", ") }
 
     private static func point(_ value: Double) -> String {

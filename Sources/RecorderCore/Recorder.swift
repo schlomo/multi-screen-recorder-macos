@@ -669,8 +669,9 @@ public final class Recorder {
     /// the cameras are read again at the answer; denied, the problem is
     /// told once. Without it the tracker sees no camera.
     private func readCameras() -> [CameraInfo] {
-        let cameras = devices.cameras()
-        RecorderLog.detail("cameras: \(DetailLine.cameras(cameras, resolution: settings.effectiveResolution, limitCameras: settings.limitCameras))", category: "recorder")
+        var cameras: [CameraInfo] = []
+        let readTook = ContinuousClock().measure { cameras = devices.cameras() }
+        RecorderLog.detail("cameras, read in \(DetailLine.milliseconds(readTook)): \(DetailLine.cameras(cameras, resolution: settings.effectiveResolution, limitCameras: settings.limitCameras))", category: "recorder")
         camerasWithoutPermission = []
         guard cameras.contains(where: { CameraTracker.records($0, settings: settings) }) else { return cameras }
         switch devices.cameraPermission() {

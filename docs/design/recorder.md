@@ -1751,7 +1751,10 @@ fails on some Macs only (the hosted runner, about 2 of 7 runs, with
   before: yes or no` (the ticker appends the last passed frame again
   when the screen shows no new one).
 
-- Per camera capture (D74): at the session's start `camera <unique ID>:
+- Per camera capture (D74): `camera <unique ID>: startRunning took <ms>
+  ms` and at its end `camera <unique ID>: stopRunning took <ms> ms`, so
+  a freeze can be traced (both block the session's own queue); at the
+  session's start `camera <unique ID>:
   active format <w>×<h> <subtype>, frame duration <min> to <max>` (such
   as `1/30 s to 1/30 s`), with `the format allows no 30 fps, set to <n>
   fps` when it cannot run at 30 (left out when its format was kept), and
@@ -1770,9 +1773,11 @@ fails on some Macs only (the hosted runner, about 2 of 7 runs, with
   end, when frames arrived after their tick was decided, `<file>: <n>
   frames arrived after their tick was decided and were placed late, the
   latest <ms> ms after its capture` (see "Cameras"). In category
-  `recorder`, at every reading of the cameras, `cameras: <name> [virtual]
-  [Continuity Camera] [suspended] <format>, …`, the format the camera is
-  opened with at the recording resolution (none at None), and when
+  `recorder`, at every reading of the cameras, `cameras, read in <ms>
+  ms: <name> [virtual] [Continuity Camera] [suspended] <format>, …`, how
+  long listing them took (AVFoundation's list and the Core Media I/O
+  read, on the main thread) and the format the camera is opened with at
+  the recording resolution (none at None), and when
   AVFoundation's `isInUseByAnotherApplication` of a camera changes,
   `camera <name> (<unique ID>): now in use by another app` or `no longer
   in use by another app`.
