@@ -965,8 +965,11 @@ checked, reported or rewritten at the next start (D47).
   now), with `, recovered` and orange once none lasts. A stall began
   at its end minus its length, or, while it lasts, 2 s (the stall
   limit) before it was told; another problem began when it was told.
-  Times are `m:ss` since the start, `h:mm:ss` from an hour on; lengths
-  have one decimal below 10 s, whole seconds from there. A failure (a
+  A stall recovers when frames come again, when a new file of the
+  camera starts, or at its capture's end (unplugged, out of the camera
+  mode, Stop), its length then up to that end. Times are `m:ss` since
+  the start, `h:mm:ss` from an hour on; lengths have one decimal below
+  10 s as rounded, whole seconds from there, `m:ss` from a minute on. A failure (a
   file ended by a failure, a stream or an audio source that failed, an
   audio file lost, the Dock icon or the timeline file) stays red as
   told, even when a new file starts: it cost a file split and a gap.

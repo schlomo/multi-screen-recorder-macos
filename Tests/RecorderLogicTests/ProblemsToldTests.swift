@@ -119,5 +119,15 @@ import Testing
         told.cleared(.audioSourceFailed("BlackHole"), at: 9 * second)
         #expect(told.lines(now: 10 * second) == [ProblemLine(text: failed.text, isRecovered: false)])
     }
-}
 
+    /// One decimal below 10 s (as rounded), whole seconds from there, m:ss from a minute on.
+    @Test func lengthsAreShownAsTheyRound() {
+        for (length, shown) in [(9.94, "9.9 s"), (9.96, "10 s"), (59.6, "1:00"), (125.0, "2:05")] {
+            var told = ProblemsTold()
+            var manifest = manifest()
+            _ = told.add(problem(0), kind: .freeSpaceNotRead, to: &manifest)
+            told.cleared(.freeSpaceNotRead, at: nanoseconds(length))
+            #expect(told.lines(now: nanoseconds(length)).first?.text == "The free space cannot be read for \(shown) at 0:00, recovered: denied")
+        }
+    }
+}

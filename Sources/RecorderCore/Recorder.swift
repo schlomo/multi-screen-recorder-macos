@@ -778,6 +778,7 @@ public final class Recorder {
             capture.start()
         case .stop(let uniqueID):
             guard let (captureNumber, capture) = cameraCaptures.removeValue(forKey: uniqueID) else { return }
+            problemsTold.cleared(.cameraStalled(uniqueID), at: context.now())
             stopInProgress { [weak self] in
                 let file = await capture.stop()
                 self?.videoFileEnded(file, captureNumber: captureNumber, source: capture.name, reason: nil)
@@ -831,6 +832,7 @@ public final class Recorder {
         videoFileEnded(file, captureNumber: captureNumber, source: camera, reason: reason)
         guard !isStopped, let (current, _) = cameraCaptures[uniqueID], current == captureNumber else { return }
         cameraCaptures[uniqueID] = nil
+        problemsTold.cleared(.cameraStalled(uniqueID), at: context.now())
         let step = cameraTracker.streamEnded(uniqueID, reason, connected: readCameras(), at: context.now())
         applyCameras(step)
         for failure in step.events where failure.event.isFailure {

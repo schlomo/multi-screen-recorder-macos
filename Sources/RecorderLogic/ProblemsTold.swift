@@ -154,9 +154,11 @@ public struct ProblemsTold: Sendable {
         return whole < 3600 ? String(format: "%d:%02d", whole / 60, whole % 60) : RecordingStatusTable.elapsed(Double(whole))
     }
 
-    /// "7.4 s" below 10 s, "12 s" from there on.
+    /// "7.4 s" below 10 s as rounded, "12 s" from there, "1:05" from a minute on.
     private static func seconds(_ nanoseconds: Int64) -> String {
-        let seconds = Double(nanoseconds) / 1_000_000_000
-        return String(format: seconds < 10 ? "%.1f s" : "%.0f s", seconds)
+        let tenths = (Double(nanoseconds) / 100_000_000).rounded()
+        guard tenths >= 100 else { return String(format: "%.1f s", tenths / 10) }
+        let whole = Int((tenths / 10).rounded())
+        return whole < 60 ? "\(whole) s" : time(Int64(whole) * 1_000_000_000)
     }
 }

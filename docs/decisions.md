@@ -2512,7 +2512,10 @@ architect's reading.
   line after a colon (`… since 0:12: <error>`), a stall's (always the
   same) is left out; the total of a camera's stalls counts an ongoing
   one up to now; times are `h:mm:ss` from an hour on; lengths have one
-  decimal below 10 s and whole seconds from there.
+  decimal below 10 s as rounded, whole seconds from there and `m:ss`
+  from a minute on. Fixed in review: a stall also recovers at its
+  capture's end (unplugged, out of the camera mode, Stop), its length
+  up to that end.
 - **Consequences:** The window tells at a glance what still needs the
   person (red) and what went wrong and passed (orange). The Dock
   badge, the status line's count and the lines on standard error stay
