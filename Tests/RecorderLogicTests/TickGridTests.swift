@@ -183,6 +183,22 @@ import Testing
         #expect(ticks.largestLateArrival == delay + 300_000_000)
     }
 
+    /// Of a burst of late frames only the one a tick shows is counted, once, however often it repeats.
+    @Test func onlyALateFrameATickShowsIsCountedOnce() {
+        var ticks = TickLoop<String>(decisionDelay: delay)
+        let grid = ticks.grid
+        var written: [String] = []
+        ticks.receive("a", capturedAt: 0)
+        _ = ticks.advance(to: grid.time(ofTick: 3) + delay) { written.append($1); return true }
+        ticks.receive("b", capturedAt: grid.time(ofTick: 1), arrivedAt: grid.time(ofTick: 3) + delay)
+        ticks.receive("c", capturedAt: grid.time(ofTick: 2), arrivedAt: grid.time(ofTick: 3) + delay + 1)
+        _ = ticks.advance(to: grid.time(ofTick: 6) + delay) { written.append($1); return true }
+        #expect(!written.contains("b"))
+        #expect(written.filter { $0 == "c" }.count == 3)
+        #expect(ticks.framesPlacedLate == 1)
+        #expect(ticks.largestLateArrival == grid.time(ofTick: 3) + delay + 1 - grid.time(ofTick: 2))
+    }
+
     @Test func atTheFilesEndEveryDueTickIsDecided() {
         var ticks = TickLoop<String>(decisionDelay: delay)
         var written: [Int64] = []

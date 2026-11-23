@@ -46,7 +46,7 @@ import Testing
     }
 
     /// D47: the result is ok when every file is finalized and no screen
-    /// file was ended by a failure; a problem told alone does not change it.
+    /// file was ended by a failure or a camera stalled; a problem told alone does not change it.
     @Test(arguments: [
         RecordingEvent.Kind.screenStreamFailed, .screenFileWriterFailed, .diskFull, .screenFileWriterFellBehind,
         .screenShowsAnotherScreensPicture,

@@ -254,9 +254,9 @@ public struct RecordingManifest: Codable, Equatable, Sendable {
 
     /// How a finalized recording went (D47).
     public enum Result: String, Codable, Sendable {
-        /// Every file is finalized and no file was ended by a failure.
+        /// Every file is finalized, no file was ended by a failure and no camera stalled.
         case ok
-        /// A file is not finalized or was ended by a failure.
+        /// A file is not finalized or was ended by a failure, or a camera stalled (`RecordingEvent.Kind.isFailure`).
         case problems
     }
 
@@ -374,8 +374,9 @@ public struct RecordingManifest: Codable, Equatable, Sendable {
             .map(\.element)
     }
 
-    /// Whether nothing was lost: every file is finalized and no file was
-    /// ended by a failure. A problem told alone changes nothing (D47).
+    /// Whether nothing was lost: every file is finalized, no file was
+    /// ended by a failure and no camera stalled (`isFailure`). A problem
+    /// told alone changes nothing (D47).
     public var endedWell: Bool {
         files.allSatisfy { $0.state == .finalized } && cameraFiles.allSatisfy { $0.state == .finalized }
             && audioFiles.allSatisfy { $0.state == .finalized }

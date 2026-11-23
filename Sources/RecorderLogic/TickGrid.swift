@@ -63,14 +63,15 @@ public struct TickLoop<Frame> {
     public private(set) var lastWrittenTick: Int64?
     /// Ticks written late because the writer was not ready.
     public private(set) var framesRepeatedForLateness = 0
-    /// Frames that arrived after their tick was decided, placed on a later one.
+    /// Frames that arrived after their tick was decided and were written on a
+    /// later one; a late frame superseded before any tick shows it is not counted.
     public private(set) var framesPlacedLate = 0
     /// The longest a frame placed late took from its capture to its arrival, in nanoseconds.
     public private(set) var largestLateArrival: Int64 = 0
 
     /// Frames in order of capture: the newest at or before the last chosen
-    /// tick, and any captured after it.
-    private var frames: [(time: Int64, frame: Frame)] = []
+    /// tick, and any captured after it; a late one with how late it arrived, until a tick shows it.
+    private var frames: [(time: Int64, frame: Frame, lateArrival: Int64?)] = []
     private var waiting: [(tick: Int64, frame: Frame, isLate: Bool)] = []
 
     /// The capture's start: the file's first tick is never before it.
@@ -96,17 +97,15 @@ public struct TickLoop<Frame> {
     /// kept is ignored: frames arrive in capture order.
     public mutating func receive(_ frame: Frame, capturedAt time: Int64, arrivedAt arrival: Int64? = nil) {
         if let newest = frames.last, time < newest.time { return }
+        var lateArrival: Int64?
         if let firstTick {
-            if nextTick > firstTick, time <= grid.time(ofTick: nextTick - 1) {
-                framesPlacedLate += 1
-                largestLateArrival = max(largestLateArrival, (arrival ?? time) - time)
-            }
+            if nextTick > firstTick, time <= grid.time(ofTick: nextTick - 1) { lateArrival = (arrival ?? time) - time }
         } else {
             let tick = grid.firstTick(atOrAfter: max(time, notBefore))
             firstTick = tick
             nextTick = tick
         }
-        frames.append((time, frame))
+        frames.append((time, frame, lateArrival))
     }
 
     /// Chooses a frame for every tick decided by `now` and hands the
@@ -122,6 +121,11 @@ public struct TickLoop<Frame> {
             if waitingForLateFrames, now - tickTime < decisionDelay, let newest = frames.last, newest.time <= tickTime { break }
             guard let chosen = frames.lastIndex(where: { $0.time <= tickTime }) else { break }
             waiting.append((nextTick, frames[chosen].frame, false))
+            if let lateArrival = frames[chosen].lateArrival {
+                framesPlacedLate += 1
+                largestLateArrival = max(largestLateArrival, lateArrival)
+                frames[chosen].lateArrival = nil
+            }
             frames.removeFirst(chosen)
             nextTick += 1
         }

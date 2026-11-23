@@ -241,7 +241,7 @@ public struct CameraInfo: Equatable, Sendable {
     /// camera's active format (portrait, landscape or square), then
     /// landscape before the rest, then the narrower. A
     /// camera with no format at that rate delivers its fastest, the largest
-    /// of those. Nil for a camera that lists no format. Not at None, which records no camera.
+    /// of those. Nil for a camera that lists no format.
     public func chosenFormat(resolution: RecordingResolution) -> CameraFormat? {
         if isInUseByAnotherApplication, let activeFormat { return activeFormat }
         let fastEnough = formats.filter(\.deliversTheTickRate)
@@ -259,9 +259,11 @@ public struct CameraInfo: Equatable, Sendable {
         return fastEnough.max { key($0) < key($1) }
     }
 
-    /// The frame size of the camera's file: its chosen format's size, fitted into the camera's box.
+    /// The frame size of the camera's file: its chosen format's size, fitted
+    /// into the camera's box; nil at None, which records no camera.
     public func frameSize(resolution: RecordingResolution) -> FrameSize? {
-        chosenFormat(resolution: resolution).map { resolution.cameraFrameSize(for: $0.size) }
+        guard resolution.recordsScreens else { return nil }
+        return chosenFormat(resolution: resolution).map { resolution.cameraFrameSize(for: $0.size) }
     }
 
     /// Portrait (-1), square (0) or landscape (1).

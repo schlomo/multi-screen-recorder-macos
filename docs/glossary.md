@@ -244,6 +244,20 @@ even number (D11, D25, D30, D44).
 One of the instants, 1/30 s apart from the recording's start, at which
 every screen file and every camera file gets a frame (D11, D21, D74).
 
+## Decision delay
+
+How long after its time a camera file's tick waits for a frame captured
+after it before its frame is chosen: 0.5 s; a screen file's tick has
+none (D74).
+
+## Placed late
+
+A frame that arrived after its tick was decided and was shown on a later
+tick, counted in a detail line at the camera file's end (D74). Not the
+same as a frame repeated for lateness (`framesRepeatedForLateness`): a
+tick written late because the writer was not ready, with the frame of
+its own time (D11).
+
 ## Timecode
 
 The time-of-day track in every screen file, camera file and audio file, by

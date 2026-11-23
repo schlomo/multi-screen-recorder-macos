@@ -148,21 +148,13 @@ public struct CameraTracker: Sendable {
                     cameras[uniqueID]?.phase = .idle
                 }
             }
+            if let reading, let before = tracked.reading,
+               reading.activeFormat != before.activeFormat || reading.isInUseByAnotherApplication != before.isInUseByAnotherApplication {
+                // Another app changing the format settles as a screen's change does (`due`).
+                cameras[uniqueID]?.changedAt = now
+            }
             cameras[uniqueID]?.reading = reading
             cameras[uniqueID]?.isWanted = isWanted
-            if case .recording(let current) = cameras[uniqueID]?.phase, let reading, reading.isInUseByAnotherApplication,
-               let active = reading.activeFormat {
-                // Another app took control of the camera's format: a new file at its size, never set back.
-                let frameSize = settings.effectiveResolution.cameraFrameSize(for: active.size)
-                if frameSize != current {
-                    var changed = event(.cameraFrameSizeChanged, uniqueID, at: now)
-                    changed.from = [current.width, current.height]
-                    changed.to = [frameSize.width, frameSize.height]
-                    step.events.append(changed)
-                    step.actions.append(.stop(uniqueID: uniqueID))
-                    step.actions.append(start(uniqueID))
-                }
-            }
         }
         for camera in connected where cameras[camera.uniqueID] == nil && Self.records(camera, settings: settings) {
             cameras[camera.uniqueID] = Tracked(
@@ -188,7 +180,16 @@ public struct CameraTracker: Sendable {
             switch tracked.phase {
             case .idle: step.actions.append(start(uniqueID))
             case .waitingToRestart(let notBefore) where notBefore <= now: step.actions.append(start(uniqueID))
-            case .recording, .waitingToRestart, .waitingForRoom: break
+            case .recording(let current):
+                // Another app took control of the camera's format: a new file at its size, never set back.
+                guard let frameSize = frameSizeTakenOver(tracked) else { break }
+                var changed = event(.cameraFrameSizeChanged, uniqueID, at: now)
+                changed.from = [current.width, current.height]
+                changed.to = [frameSize.width, frameSize.height]
+                step.events.append(changed)
+                step.actions.append(.stop(uniqueID: uniqueID))
+                step.actions.append(start(uniqueID))
+            case .waitingToRestart, .waitingForRoom: break
             }
         }
         return step
@@ -203,9 +204,19 @@ public struct CameraTracker: Sendable {
             return switch tracked.phase {
             case .idle: settled
             case .waitingToRestart(let notBefore): max(settled, notBefore)
-            case .recording, .waitingForRoom: nil
+            case .recording: frameSizeTakenOver(tracked) == nil ? nil : settled
+            case .waitingForRoom: nil
             }
         }.min()
+    }
+
+    /// The frame size of a recording camera whose format another app
+    /// changed to one of another recorded frame size, if so.
+    private func frameSizeTakenOver(_ tracked: Tracked) -> FrameSize? {
+        guard case .recording(let current) = tracked.phase, let reading = tracked.reading, reading.isInUseByAnotherApplication,
+              let active = reading.activeFormat else { return nil }
+        let frameSize = settings.effectiveResolution.cameraFrameSize(for: active.size)
+        return frameSize == current ? nil : frameSize
     }
 
     /// A camera file of `uniqueID` started: its restart delay starts over.

@@ -30,7 +30,8 @@ import Testing
     }
 
     @Test func camerasBeingRecordedAreCountedOnlyWhenThereAreAny() {
-        let rows = [row(.screen(1, name: "A")), row(.camera(1, name: "FaceTime")), row(.camera(2, name: "BRIO")),
+        // A stalled camera's file is still written.
+        let rows = [row(.screen(1, name: "A")), row(.camera(1, name: "FaceTime")), row(.camera(2, name: "BRIO"), state: "stalled"),
                     row(.audioInput(1, name: "Mic"))]
         #expect(StatusLine.text(line: line, cpu: nil, rows: rows, status: status(problems: 0)).hasSuffix(" · 1 screen, 2 cameras, 1 audio"))
     }

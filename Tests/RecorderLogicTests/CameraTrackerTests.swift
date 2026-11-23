@@ -197,6 +197,12 @@ import Testing
         #expect(camera([format(1080, 1920, 30), format(1920, 1080, 30)]).chosenFormat(resolution: .p720) == format(1920, 1080, 30))
     }
 
+    @Test func atNoneACameraHasAFormatButNoFrameSize() {
+        let brio = camera([format(3840, 2160, 30), format(1920, 1080, 30)])
+        #expect(brio.chosenFormat(resolution: .none) == format(1920, 1080, 30))
+        #expect(brio.frameSize(resolution: .none) == nil)
+    }
+
     @Test func theCamerasBoxIsTheRecordingResolutionsLimitedToFullHD() {
         let fourK = camera([format(3840, 2160, 30)])
         #expect(fourK.frameSize(resolution: .native) == FrameSize(width: 1920, height: 1080))
@@ -450,8 +456,10 @@ import Testing
         var takenOver = Self.usb
         takenOver.isInUseByAnotherApplication = true
         takenOver.activeFormat = CameraFormat(size: FrameSize(width: 1280, height: 720), maxFramesPerSecond: 30)
-        let step = cameras.observe([takenOver], at: 5 * second)
-        var changed = RecordingEvent(at: 5 * second, event: .cameraFrameSizeChanged, camera: "Logitech BRIO")
+        #expect(cameras.observe([takenOver], at: 5 * second) == CameraTracker.Step())
+        #expect(cameras.nextDueTime() == 6 * second)
+        let step = cameras.due(at: 6 * second)
+        var changed = RecordingEvent(at: 6 * second, event: .cameraFrameSizeChanged, camera: "Logitech BRIO")
         changed.from = [1920, 1080]
         changed.to = [1280, 720]
         #expect(step.events == [changed])
@@ -460,7 +468,25 @@ import Testing
             .start(uniqueID: "B", format: takenOver.activeFormat!, setsFormat: false, frameSize: FrameSize(width: 1280, height: 720),
                    number: 1, name: "Logitech BRIO", isContinuity: false),
         ])
-        #expect(cameras.observe([takenOver], at: 6 * second) == CameraTracker.Step())
+        #expect(cameras.observe([takenOver], at: 7 * second) == CameraTracker.Step())
+        #expect(cameras.due(at: 9 * second) == CameraTracker.Step())
+    }
+
+    /// An app changing the format again within the settle time gives one new file, at the last size.
+    @Test func quickFormatChangesSettleIntoOneNewFile() {
+        var cameras = tracker()
+        _ = cameras.begin([Self.usb], at: 0)
+        var takenOver = Self.usb
+        takenOver.isInUseByAnotherApplication = true
+        takenOver.activeFormat = CameraFormat(size: FrameSize(width: 640, height: 480), maxFramesPerSecond: 30)
+        _ = cameras.observe([takenOver], at: 5 * second)
+        takenOver.activeFormat = CameraFormat(size: FrameSize(width: 1280, height: 720), maxFramesPerSecond: 30)
+        _ = cameras.observe([takenOver], at: 5 * second + second / 2)
+        #expect(cameras.due(at: 6 * second) == CameraTracker.Step())
+        let step = cameras.due(at: 6 * second + second / 2)
+        #expect(step.events.map(\.to) == [[1280, 720]])
+        #expect(step.actions.count == 2)
+        #expect(cameras.due(at: 8 * second) == CameraTracker.Step())
     }
 
     /// Our own format, not yet set when read, and a format of the same frame size change nothing.
