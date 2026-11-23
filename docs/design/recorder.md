@@ -1071,8 +1071,15 @@ file with the event `screen file writer fell behind`, and a new
 screen file starts, as after a failing stream. The v1 gate's clock
 recording checks this from outside the recorder. A screen file starts
 at the first tick after its stream's first frame that passes the
-screen check (below), and never before the stream's own start. When a
-screen file ends, the ticks due are written, then those still waiting,
+screen check (below), and never before the stream's own start. A
+screen file and a camera file end at the tick at or before the moment
+their end was asked (Stop, sleep, a change or a failure), however long
+the stream then takes to stop: an audit of a 240 s recording on the
+owner's Mac, 2026-11-23, found a suspended FaceTime HD Camera's
+`stopRunning` blocking about 2.6 s and its file, ended when the stream
+had stopped, repeating its last frame 77 times after Stop, and every
+file at Stop 0.10 s to 0.27 s of frozen tail. When a file ends, the
+ticks due by then are written, then those still waiting,
 for at most the late-tick bound (6 s, D53) on a clock that does not count
 sleep, and the file is finalized also when the writer fell behind or
 the wait ran out; what failed is in the manifest.

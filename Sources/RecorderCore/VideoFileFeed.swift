@@ -107,23 +107,26 @@ final class VideoFileFeed<File: VideoFileEntry>: @unchecked Sendable {
         return await finishing?.value
     }
 
-    /// Starts finishing the file once; nil when that has begun already.
+    /// Starts finishing the file once; nil when that has begun already. The
+    /// file ends at the tick at or before now, however long its stream then
+    /// takes to stop.
     private func beginFinishing(writeWaitingTicks: Bool) -> Task<VideoFileEnd<File>?, Never>? {
         let begin = { () -> Task<VideoFileEnd<File>?, Never>? in
             guard self.finishTask == nil else { return nil }
+            let askedAt = self.context.now()
             self.isEnding = true
             self.timer?.cancel()
             self.timer = nil
-            let task = Task { await self.finish(writeWaitingTicks: writeWaitingTicks) }
+            let task = Task { await self.finish(writeWaitingTicks: writeWaitingTicks, endingAt: askedAt) }
             self.finishTask = task
             return task
         }
         return DispatchQueue.getSpecific(key: feedQueueKey) == ObjectIdentifier(self).hashValue ? begin() : queue.sync(execute: begin)
     }
 
-    /// Stops the stream, finalizes the file and lets go of the writer and
-    /// the frames it held.
-    private func finish(writeWaitingTicks: Bool) async -> VideoFileEnd<File>? {
+    /// Stops the stream, finalizes the file up to `endingAt`, when finishing
+    /// was asked, and lets go of the writer and the frames it held.
+    private func finish(writeWaitingTicks: Bool, endingAt: Int64) async -> VideoFileEnd<File>? {
         let stop = queue.sync {
             defer { self.stopStream = nil }
             return self.stopStream
@@ -134,7 +137,7 @@ final class VideoFileFeed<File: VideoFileEntry>: @unchecked Sendable {
         // delivered up to the video's end, or the wait ran out, stopping
         // hands it every hand-over before, queued here, and peeks at what
         // comes after.
-        let file = await ticker?.finish(now: context.now(), writeWaitingTicks: writeWaitingTicks) { [guides, queue] videoEnd in
+        let file = await ticker?.finish(now: endingAt, writeWaitingTicks: writeWaitingTicks) { [guides, queue] videoEnd in
             _ = await guides.waitUntilReceived(upTo: videoEnd, bound: .seconds(RecorderValues.audioWaitBoundSeconds))
             let peeks = listener.map { guides.stopListening($0, peekingUpTo: videoEnd) } ?? [:]
             let pending = queue.sync {

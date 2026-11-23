@@ -104,6 +104,8 @@ extension GlobalRecordingLog {
             }
 
             var isStopped: Bool { state.withLock { $0.stopped } }
+            /// How long `stop` takes, as `stopRunning` of a suspended camera blocked for 2.6 s.
+            let stopTakes = Mutex(Duration.zero)
 
             func start(
                 queue: DispatchQueue, deliver: @escaping @Sendable (CMSampleBuffer) -> Void,
@@ -118,6 +120,7 @@ extension GlobalRecordingLog {
             }
 
             func stop() async {
+                try? await Task.sleep(for: stopTakes.withLock { $0 })
                 state.withLock { $0.stopped = true }
             }
 
@@ -389,6 +392,22 @@ extension GlobalRecordingLog {
             #expect(summary.manifest.cameraFiles.map(\.state) == [.finalized])
             #expect(summary.manifest.cameraFiles.first?.end != nil)
             #expect(summary.manifest.result == .ok)
+        }
+
+        /// A camera whose stream takes long to stop: its file ends where the stop was asked, not
+        /// after the stream stopped, with no ticks of its last frame repeated for the wait.
+        @Test func aCameraFileEndsWhereTheStopWasAskedThoughItsStreamStopsLate() async throws {
+            cameras.connected.withLock { $0 = [Self.camera] }
+            try start(cameraMode: .real)
+            let camera = try #require(cameras.last)
+            camera.stopTakes.withLock { $0 = .seconds(1) }
+            try await sendFrames(camera, until: "the camera file") { (try? manifestOnDisk().cameraFiles.count) == 1 }
+            let asked = recorder.elapsedSeconds
+            let summary = await stop()
+            #expect(recorder.elapsedSeconds - asked >= 1)
+            let end = try #require(summary.manifest.cameraFiles.first?.end)
+            #expect(end <= asked + 1.0 / 30)
+            #expect(end > asked - 0.2)
         }
 
         @Test func atSleepTheCameraFileEndsAndAtWakeANewOneStarts() async throws {
