@@ -518,74 +518,105 @@ extension GlobalRecordingLog {
             _ = await stop()
         }
 
-        /// An audio input whose first clear window says it is 0.5 s late leaves the "Audio inputs" guide track at
-        /// once, with its event and an orange line; its own file goes on, and its next file joins again (D79).
-        @Test func anAudioInputClearlyLateLeavesTheGuideTrackUntilItsNextFile() async throws {
+        /// R the reference and A, both recorded with a camera so the guide tracks exist, their files started.
+        private func startTwoInputs() async throws -> (r: String, a: String) {
             cameras.connected.withLock { $0 = [Self.camera] }
             let inputs = ["R", "A"].map { AudioInputInfo(name: "Mic \($0)", channelCount: 1, isDefault: $0 == "R", transport: .usb, uid: $0) }
             try start(cameraMode: .real, inputs: inputs)
             try await wait("the audio inputs' captures") { sources.byUID.withLock { $0.count } == 2 }
             try await startAudioFiles(["R", "A"])
-            let a = SourceLabel.audioInput(2, name: "Mic A"), r = SourceLabel.audioInput(1, name: "Mic R")
-            #expect(recorder.guides.contains(source: a, in: .audioInputs))
+            return (SourceLabel.audioInput(1, name: "Mic R"), SourceLabel.audioInput(2, name: "Mic A"))
+        }
+
+        private func isInTheGuideTrack(_ label: String) -> Bool { recorder.guides.contains(source: label, in: .audioInputs) }
+
+        /// An input whose first counted window puts it 0.5 s after the reference leaves the "Audio inputs" guide
+        /// track: the event, an orange line without a Dock bounce, badge or count, its own file going on; its
+        /// file's end turns the line to the past, and its next file starts in the guide track (D79).
+        @Test func anAudioInputOutOfSyncLeavesTheGuideTrackUntilItsFileEnds() async throws {
+            let (r, a) = try await startTwoInputs()
+            #expect(isInTheGuideTrack(a))
             feedDelayedNoise(["R": 0, "A": 0.5])
             await recorder.measureAudioDelays()
-            // More of its sound changes nothing: it stays out for the rest of its file.
+            // More of its sound changes nothing: it stays out.
             try await wait("A out of the guide track") {
                 try? send(0.1, buffers: 1, to: sources.last(of: "A"))
-                return !recorder.guides.contains(source: a, in: .audioInputs)
+                return !isInTheGuideTrack(a)
             }
             try send(0.1, buffers: 3, to: sources.last(of: "A"))
             try await Task.sleep(for: .milliseconds(50))
-            #expect(!recorder.guides.contains(source: a, in: .audioInputs))
-            #expect(recorder.guides.contains(source: r, in: .audioInputs))
+            #expect(!isInTheGuideTrack(a))
+            #expect(isInTheGuideTrack(r))
             let left = try manifestOnDisk().events.filter { $0.event == .audioInputLeftTheGuideTrack }
-            #expect(left.count == 1)
-            let event = try #require(left.first)
-            #expect(event.audioSource == "Mic A")
-            #expect(abs(try #require(event.delay) - 0.5) < 0.002)
-            let line = try #require(recorder.problemLines().first)
-            #expect(line.text == "Audio 2 Mic A 500 ms late, not in the guide track; its own audio track is recorded")
-            #expect(!line.isRed)
+            #expect(left.map(\.audioSource) == ["Mic A"])
+            #expect(abs(try #require(left.first?.lag) - 0.5) < 0.002)
+            #expect(recorder.problemLines() == [ProblemLine(
+                text: "Audio 2 Mic A 500 ms late, not in the guide track; its own audio track is recorded", isRed: false)])
             #expect(try manifestOnDisk().problems.map(\.problem) == ["Audio source Mic A"])
+            #expect(observer.problems.isEmpty)
             #expect(try manifestOnDisk().audioFiles.allSatisfy { $0.end == nil })
 
             try #require(sources.last(of: "A")).lose(.captureFailed("the stand-in failed"))
+            try await wait("A's file's end") { (try? manifestOnDisk().audioFiles.first { $0.audioSource == "Mic A" }?.end) != nil }
+            let past = try #require(recorder.problemLines().first { $0.text.hasPrefix("Audio 2 Mic A") })
+            #expect(past.text.wholeMatch(of: /Audio 2 Mic A was not in the guide track from 0:0\d to 0:0\d \(500 ms late\); its own audio track is recorded/) != nil)
+            #expect(!past.isRed)
             try await wait("A's restart") { sources.byUID.withLock { $0["A"]?.count } == 2 }
             try await startAudioFiles(["A"], "A's new file", count: 3)
             try await wait("A back in the guide track") {
                 try? send(0.1, buffers: 1, to: sources.last(of: "A"))
-                return recorder.guides.contains(source: a, in: .audioInputs)
+                return isInTheGuideTrack(a)
             }
-            // The line stays as it was; the new file, once measured late too, leaves again and is told again.
-            #expect(recorder.problemLines().contains(line))
+            _ = await stop()
+        }
+
+        /// A false first counted window takes an input out; the median of its counted windows in sync brings it
+        /// back, the line turning to the past (D79).
+        @Test func anAudioInputOutOnAFalseFirstWindowRejoinsOnItsMedian() async throws {
+            let (_, a) = try await startTwoInputs()
             feedDelayedNoise(["R": 0, "A": 0.5])
             await recorder.measureAudioDelays()
-            try await wait("A out of the guide track again") { !recorder.guides.contains(source: a, in: .audioInputs) }
-            let leftTwice = try manifestOnDisk().problems.filter { $0.error?.hasPrefix("audio input left the guide track") == true }
-            #expect(leftTwice.map(\.problem) == ["Audio source Mic A", "Audio source Mic A"])
-            #expect(recorder.problemLines().filter { $0.text.hasPrefix("Audio 2 Mic A") } == [line])
+            try await wait("A out of the guide track") { !isInTheGuideTrack(a) }
+            feedDelayedNoise(["R": 0, "A": 0])
+            for _ in 0..<3 { await recorder.measureAudioDelays() }
+            try await wait("A back in the guide track") {
+                try? send(0.1, buffers: 1, to: sources.last(of: "A"))
+                return isInTheGuideTrack(a)
+            }
+            let line = try #require(recorder.problemLines().first)
+            #expect(line.text.hasPrefix("Audio 2 Mic A was not in the guide track from 0:0"))
+            #expect(line.text.hasSuffix(" (500 ms late); its own audio track is recorded"))
+            #expect(try manifestOnDisk().events.filter { $0.event == .audioInputLeftTheGuideTrack }.count == 1)
+            _ = await stop()
+        }
+
+        /// A leave its capture did not carry out, as for a file no longer its current one, is neither an event
+        /// nor a problem (D79).
+        @Test func aLeaveTheCaptureDidNotCarryOutIsNotTold() async throws {
+            _ = try await startTwoInputs()
+            try #require(sources.last(of: "A")).lose(.captureFailed("the stand-in failed"))
+            try await wait("A's restart") { sources.byUID.withLock { $0["A"]?.count } == 2 }
+            try await startAudioFiles(["A"], "A's new file", count: 3)
+            let first = try #require(try manifestOnDisk().audioFiles.first { $0.audioSource == "Mic A" })
+            recorder.leaveTheGuideTrack(file: first.name, lag: 0.5)
+            #expect(try manifestOnDisk().events.filter { $0.event == .audioInputLeftTheGuideTrack }.isEmpty)
+            #expect(!recorder.problemLines().contains { $0.text.hasPrefix("Audio 2 Mic A") })
             _ = await stop()
         }
 
         /// A file that left the guide track and ends while its capture goes on, here as no audio: the input
         /// joins the guide track again for its next file (D79).
         @Test func anAudioInputThatLeftTheGuideTrackJoinsAgainWhenItsFileEnds() async throws {
-            cameras.connected.withLock { $0 = [Self.camera] }
-            let inputs = ["R", "A"].map { AudioInputInfo(name: "Mic \($0)", channelCount: 1, isDefault: $0 == "R", transport: .usb, uid: $0) }
-            try start(cameraMode: .real, inputs: inputs)
-            try await wait("the audio inputs' captures") { sources.byUID.withLock { $0.count } == 2 }
-            try await startAudioFiles(["R", "A"])
-            let a = SourceLabel.audioInput(2, name: "Mic A")
+            let (_, a) = try await startTwoInputs()
             feedDelayedNoise(["R": 0, "A": 0.5])
             await recorder.measureAudioDelays()
-            try await wait("A out of the guide track") { !recorder.guides.contains(source: a, in: .audioInputs) }
+            try await wait("A out of the guide track") { !isInTheGuideTrack(a) }
             let buffersOfNoAudio = Int(RecorderValues.noAudioTime.nanoseconds * Int64(RecorderValues.audioSampleRate) / 1_000_000_000)
                 / samplesPerBuffer
             try send(0, buffers: buffersOfNoAudio + 10, after: 5, to: sources.last(of: "A"))
             try await wait("A's file's end") { (try? manifestOnDisk().audioFiles.first { $0.audioSource == "Mic A" }?.end) != nil }
             try send(0, buffers: 1, after: buffersOfNoAudio + 15, to: sources.last(of: "A"))
-            try await wait("A back in the guide track") { recorder.guides.contains(source: a, in: .audioInputs) }
+            try await wait("A back in the guide track") { isInTheGuideTrack(a) }
             #expect(sources.byUID.withLock { $0["A"]?.count } == 1)
             _ = await stop()
         }

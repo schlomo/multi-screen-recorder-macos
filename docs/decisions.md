@@ -2400,8 +2400,11 @@ architect's reading.
   the decoded peak by only about 0.7 dB. In a simulation on the
   2026-11-23 recording, −6/−12 dBFS decoded to at most about 0.78,
   roughly 2 dB below full scale.
-- **Consequences:** Loud passages on the "Audio inputs" guide track are
-  about 1.6 dB quieter than with −2 dBFS. The decoded peak is not
+- **Consequences:** The curve takes nothing off below −12 dBFS, about
+  1.1 dB at −6 dBFS and up to about 4 dB towards the ceiling, so speech
+  peaks on the "Audio inputs" guide track are now shaped by the curve
+  (corrected in review: an earlier "about 1.6 dB quieter" did not hold
+  for the curve). The decoded peak is not
   bounded: it depends on the material, and the margin seen is a
   simulation's, to be checked at the next real test. A true-peak
   limiter (a low-pass and lookahead before the limiter) is deferred.
@@ -2620,7 +2623,7 @@ architect's reading.
 - **Evidence:** [design/recorder.md](design/recorder.md), "Status
   window"; `Sources/RecorderLogic/ProblemsTold.swift`.
 
-## D79: An audio input clearly late leaves the "Audio inputs" guide track (2026-11-23)
+## D79: Audio inputs out of sync with the others leave the "Audio inputs" guide track (2026-11-23)
 
 - **Status:** in force. Amends D52's guide mix and D77, which left the
   guide tracks unchanged.
@@ -2633,32 +2636,49 @@ architect's reading.
 - **Decision:** The architect's design, approved by the owner: an audio
   input whose file's first counted window (clarity at least 12, as
   D77), normalized as D77's delays, is later than
-  `RecorderValues.guideDelayLimit`, 0.1 s (*data*), leaves the "Audio
-  inputs" mix (`GuideTrackMix.remove(source:)`) for every video file
-  alike, for the rest of that audio file; its next file (a replug, a
-  restart) starts in the guide again until it is measured, so there is
-  no flapping within a file. The first counted window decides, not the
-  median of 3, so the echo lasts about 10 s instead of 30 s;
-  `measuredDelay` and the timeline file keep D77's median. The
-  reference microphone and the earliest input never leave. Its own
-  audio file is unchanged. It is the event `audio input left the guide
-  track` with the input as `audioSource` and its `delay`, in
-  `recording.json` and the timeline file's markers, and a problem of
-  its own kind, always orange (the recording works), one line per
-  input: `Audio <n> <name> 500 ms late, not in the guide track; its own
-  audio track is recorded`, with no time and no ending, as it has no
-  meaningful length; when the input's next file starts it stays as it
-  is (nothing recovered, a new file started), and that file leaving too
-  is told again. Decided while building: the line names the input as
-  `Audio <n> <name>`, as screens' and cameras' lines do; the problem in
-  `recording.json` has the event's name as its error with the delay
-  under it (`audio input left the guide track: 500 ms late`); the
-  event's word is "guide track", the glossary's.
-- **Consequences:** A clearly late microphone no longer echoes in the
-  guide; until its first clear window it still does, and an input
-  between 0 and 0.1 s late stays in. The next change raises the limit
-  to about 0.8 s and aligns late microphones in the guide instead of
-  removing them: one data value and its decision.
+  `RecorderValues.guideTrackLateLimit`, 0.1 s (*data*), leaves the
+  "Audio inputs" mix (`GuideTrackMix.remove(source:)`) for every video
+  file alike; its own audio file is unchanged, and `measuredDelay` and
+  the timeline file keep D77's median. The first counted window
+  decides, so the echo lasts about 10 s instead of 30 s. It is the
+  event `audio input left the guide track` in `recording.json` and the
+  timeline file's markers, and an orange problem of its own kind.
+- **Amended in review (the architect's reading):** which inputs stay is
+  the largest group of the files being written whose values lie within
+  the limit of each other, on a tie the group with the earliest input;
+  a file's value is its first counted window's lag against the
+  reference's file, or, once it left or rejoined, the median of its
+  counted windows, the reference's own file 0; ended files are
+  forgotten. The reference has no exemption: an Osmo as the default
+  microphone late after two microphones in sync leaves. A file that
+  left rejoins when its median lies within the limit of the staying
+  group, and after a rejoin only its median makes it leave again, so
+  it does not flap; an input's next file starts in the guide track. A
+  leave is written and told only once the capture took the file out.
+  The event's field is `lag`, the file's lag after the staying group's
+  earliest input (one counted window's, or the median's), not its audio
+  delay. The line reads `Audio <n> <name> 553 ms late, not in the guide
+  track; its own audio track is recorded` while the file is out, and
+  `Audio <n> <name> was not in the guide track from 0:50 to 1:40 (553
+  ms late); its own audio track is recorded` once it rejoins, its file
+  ends or it disconnects; always orange, and as by-design handling,
+  not a problem a person must act on, it neither bounces the Dock icon
+  nor sets the "!" badge nor counts in the status line's problem count;
+  it is still in `recording.json`'s `problems` and the window's lines.
+  The limit is `guideTrackLateLimit`. A leaving source is cut, not
+  faded: `GuideTrackMix.remove` drops its samples not mixed yet, and a
+  fade would keep a leaving source in the mix for its last 10 ms, which
+  the mix does not support cheaply. Decided while building: the line
+  names the input as `Audio <n> <name>`, as screens' and cameras' lines
+  do; the problem in `recording.json` has the event's name as its error
+  with the lag under it (`audio input left the guide track: 500 ms
+  late`); the event's word is "guide track", the glossary's.
+- **Consequences:** A microphone out of sync no longer echoes in the
+  guide; until its first counted window it still does, and inputs
+  within 0.1 s of each other stay in. Planned, not decided: a next
+  change raising the limit to about 0.8 s and aligning late
+  microphones in the guide instead of removing them, one data value and
+  its decision.
 - **Evidence:** [design/recorder.md](design/recorder.md), "Guide
-  tracks"; `Sources/RecorderLogic/GuideTrackLeaving.swift`,
+  tracks"; `Sources/RecorderLogic/GuideTrackMembership.swift`,
   `Sources/RecorderCore/Recorder.swift` (`leaveTheGuideTrack`).

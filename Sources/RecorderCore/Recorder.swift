@@ -104,7 +104,7 @@ public final class Recorder {
     /// The camera captures whose end was reported to the camera tracker.
     private var cameraCapturesGone: Set<Int> = []
     private var delayTask: Task<Void, Never>?
-    private var guideTrackLeaving = GuideTrackLeaving()
+    private var guideTrackMembership = GuideTrackMembership()
     private var audioInputsRead: [AudioInputInfo] = []
     private var endReports = CaptureEndReports()
     private var problemsTold = ProblemsTold()
@@ -1009,7 +1009,7 @@ public final class Recorder {
 
     /// Measures each audio input file being written against the reference
     /// microphone over their latest common window, off the main thread, and
-    /// keeps the clear windows' lags; a file's delay is their median, normalized (D77). Nothing after Stop.
+    /// keeps the counted windows' lags; a file's delay is their median, normalized (D77). Nothing after Stop.
     func measureAudioDelays() async {
         guard !isStopped else { return }
         let writing = manifest.audioFiles.filter { $0.end == nil && $0.audioSourceUID != nil }
@@ -1036,9 +1036,11 @@ public final class Recorder {
                 _ = manifest.audioDelayMeasured(nil, file: file)
             }
             delayLags.add(window.lag, file: file, reference: referenceFile)
-            guideTrackLeaving.add(window.lag, file: file, reference: referenceFile)
+            guideTrackMembership.add(window.lag, file: file, reference: referenceFile)
         }
-        for (file, delay) in guideTrackLeaving.leaving(reference: referenceFile) { leaveTheGuideTrack(file: file, delay: delay) }
+        let membership = guideTrackMembership.update(writing: Set(writing.map(\.name)), reference: referenceFile)
+        for (file, lag) in membership.leaving.sorted(by: { $0.key < $1.key }) { leaveTheGuideTrack(file: file, lag: lag) }
+        for file in membership.rejoining.sorted() { rejoinTheGuideTrack(file: file) }
         var delays = delayLags.delays(reference: referenceFile)
         // The reference's file once shifted keeps a value: 0 when it is the earliest again.
         if delays[referenceFile] == nil, manifest.audioFiles.first(where: { $0.name == referenceFile })?.measuredDelay != nil {
@@ -1048,21 +1050,30 @@ public final class Recorder {
         if manifest.audioFiles.map(\.measuredDelay) != before { try? writeManifest() }
     }
 
-    /// An audio input's file clearly late leaves the "Audio inputs" guide track, its own file unchanged (D79).
-    private func leaveTheGuideTrack(file name: String, delay: Double) {
-        guard let file = manifest.audioFiles.first(where: { $0.name == name }), let uid = file.audioSourceUID else { return }
-        audioCaptures[.input(uid)]?.1.leaveTheGuideTrack(file: name)
+    /// An audio input's file out of sync with the staying group leaves the "Audio inputs" guide track, its own
+    /// file unchanged; its event and problem once its capture took it out (D79). By design: no Dock bounce,
+    /// badge or count. Internal, so a test can ask for a leave its capture does not carry out.
+    func leaveTheGuideTrack(file name: String, lag: Double) {
+        guard let file = manifest.audioFiles.first(where: { $0.name == name }), let uid = file.audioSourceUID,
+              audioCaptures[.input(uid)]?.1.leaveTheGuideTrack(file: name) == true else { return }
         var event = RecordingEvent(at: context.now(), event: .audioInputLeftTheGuideTrack, audioSource: file.audioSource)
-        event.delay = (delay * 10_000).rounded() / 10_000
+        event.lag = (lag * 10_000).rounded() / 10_000
         guard manifest.record([event]) else { return }
         try? writeManifest()
         told([event])
         let number = audioTracker.sourcesShown.first { $0.id == .input(uid) }?.number
         let problem = RecordingProblem(
             atSeconds: event.at, problem: event.problem.problem,
-            error: ErrorDetail(message: event.event.rawValue, underlying: [ErrorDetail(message: AudioDelay.text(delay))]))
-        tell(problem, kind: .audioInputOutOfTheGuideTrack(uid), source: (number.map { "Audio \($0) \(file.audioSource)" } ?? file.audioSource) + " " + AudioDelay.text(delay),
-             ofAnEvent: true)
+            error: ErrorDetail(message: event.event.rawValue, underlying: [ErrorDetail(message: AudioDelay.text(lag))]))
+        tell(problem, kind: .audioInputOutOfTheGuideTrack(uid), source: number.map { "Audio \($0) \(file.audioSource)" } ?? file.audioSource,
+             note: AudioDelay.text(lag), ofAnEvent: true, notifies: false)
+    }
+
+    /// A file that left the guide track rejoins it; its line turns to the past (D79).
+    private func rejoinTheGuideTrack(file name: String) {
+        guard let file = manifest.audioFiles.first(where: { $0.name == name }), let uid = file.audioSourceUID,
+              audioCaptures[.input(uid)]?.1.rejoinTheGuideTrack(file: name) == true else { return }
+        problemsTold.cleared(.audioInputOutOfTheGuideTrack(uid), at: context.now())
     }
 
     /// The default microphone when it is recorded, else the recorded audio input with the lowest number (D77).
@@ -1175,7 +1186,6 @@ public final class Recorder {
         RecorderLog.detail("file started: \(file.name)", category: "recorder")
         let started = audioTracker.fileStarted(id, at: Int64((file.start * 1_000_000_000).rounded()))
         problemsTold.cleared(.audioSourceFailed(name), at: context.now())
-        if let uid = file.audioSourceUID { problemsTold.cleared(.audioInputOutOfTheGuideTrack(uid), at: context.now()) }
         // A failed file of the source is over once a new one starts (D78).
         for earlier in manifest.audioFiles where earlier.audioSourceUID == file.audioSourceUID {
             problemsTold.cleared(.audioFileFailed(earlier.name), at: context.now())
@@ -1189,6 +1199,7 @@ public final class Recorder {
     /// Internal, so a test can deliver a failed file's end, as the stand-in audio sources cannot fail a writer.
     func audioFileEnded(_ end: AudioFileEnd) {
         guard manifest.audioFileEnded(end.file) else { return }
+        if let uid = end.file.audioSourceUID { problemsTold.cleared(.audioInputOutOfTheGuideTrack(uid), at: context.now()) }
         RecorderLog.detail("file ended: \(end.file.name), \(end.file.state.rawValue)", category: "recorder")
         _ = manifest.record(end.events)
         try? writeManifest()
@@ -1380,13 +1391,13 @@ public final class Recorder {
     }
 
     private func tell(
-        _ problem: RecordingProblem, kind: ProblemKind, source: String? = nil, endedAt: Int64? = nil,
-        ending: ProblemsTold.Ending = .recovered, ofAnEvent: Bool = false
+        _ problem: RecordingProblem, kind: ProblemKind, source: String? = nil, note: String? = nil, endedAt: Int64? = nil,
+        ending: ProblemsTold.Ending = .recovered, ofAnEvent: Bool = false, notifies: Bool = true
     ) {
-        switch problemsTold.add(problem, kind: kind, source: source, endedAt: endedAt, ending: ending, to: &manifest) {
+        switch problemsTold.add(problem, kind: kind, source: source, note: note, endedAt: endedAt, ending: ending, to: &manifest) {
         case .tell(let writesManifest):
             if writesManifest { try? writeManifest() }
-            told(problem, ofAnEvent: ofAnEvent)
+            told(problem, ofAnEvent: ofAnEvent, notifies: notifies)
         case .alreadyTold:
             break
         case .afterTheEnd:
@@ -1396,10 +1407,11 @@ public final class Recorder {
         }
     }
 
-    private func told(_ problem: RecordingProblem, ofAnEvent: Bool = false) {
+    /// To the logs and, if it `notifies`, the observer: the Dock, the badge and the count (D79).
+    private func told(_ problem: RecordingProblem, ofAnEvent: Bool = false, notifies: Bool = true) {
         RecorderLog.error("at \(problem.at)s: \(problem.text)", category: "recorder")
         recordingLog?.problem(problem)
-        observer?.recorder(self, problem: problem, ofAnEvent: ofAnEvent)
+        if notifies { observer?.recorder(self, problem: problem, ofAnEvent: ofAnEvent) }
     }
 
     /// Events now in the manifest: every one to the logs, to the observer

@@ -611,9 +611,9 @@ the new input volume, 0 to 1, for `audio input volume changed` (D69);
 `mirrors` (the
 screen mirrored) for `screen mirroring started`; `length` (seconds, to
 the millisecond) for `audio input gap` and `camera stall ended` (from
-the camera's last frame before the stall to its next); `delay` (its
-audio delay in seconds, to 0.0001 s) for `audio input left the guide
-track` (D79); `error` (why, as one line) and
+the camera's last frame before the stall to its next); `lag` (the
+file's lag in seconds after the staying group's earliest input, to
+0.0001 s) for `audio input left the guide track` (D79); `error` (why, as one line) and
 `errorDetail` (the same error as its full chain, below) for `screen stream
 failed`, `screen file writer failed`, `camera stream failed`, `camera
 stalled`, `camera file writer failed`, `audio input failed`, `system
@@ -679,7 +679,7 @@ null when it cannot be read, absent for the system audio (D69);
 `measuredDelay` the seconds its sound is later than the earliest
 measured audio input's, measured while recording, to 0.0001 s, never
 negative, null when not measured: for the system audio, the reference
-when it is the earliest, and a file with fewer than 3 clear windows
+when it is the earliest, and a file with fewer than 3 counted windows
 against the current reference's file; once measured it stays, unless
 the reference's file changes (see "Audio delay", D77). `files` lists the screen
 files, the camera files and the audio files in the order of their start.
@@ -978,7 +978,9 @@ checked, reported or rewritten at the next start (D47).
   always a camera stall (its file goes on), the Dock icon not shown, an
   input volume not set or not followed, a video file's guide tracks cut
   before its video (the video is intact) and the timeline file not
-  written (the media are intact). A failure of a file whose source has
+  written (the media are intact), and an audio input out of the
+  "Audio inputs" guide track (D79), which also neither bounces the
+  Dock icon nor sets the badge nor counts in the status line. A failure of a file whose source has
   started a newer file is over when told, so it is orange at once; a
   full disk, guide tracks cut or a file lost in part never is. A line
   only shown, as a video file's end the manifest lists already, never
@@ -986,7 +988,9 @@ checked, reported or rewritten at the next start (D47).
   problem still lasting at the end keeps its colour by this rule. Each
   kind has its own words and names its source, such as `Screen 1 DELL not
   captured`, `Camera 2 BRIO stalled`, `Free space not read`, `Disk full`,
-  `File <name> incomplete`, `Guide tracks of <name> cut`, and one line:
+  `File <name> incomplete`, `Guide tracks of <name> cut`, and one line
+  (an audio input out of the guide track has its own, see "Guide
+  tracks"):
   `<words> since 0:12` while it lasts, `<words> for 4.0 s at 0:12,
   recovered` once over because its source works again (`, then
   disconnected` when its source went away: unplugged, or a screen gone,
@@ -1012,7 +1016,8 @@ checked, reported or rewritten at the next start (D47).
   past that for problems; the line naming the files for a report stays
   below it. The recording manifest's `problems`, the result, the exit
   code and the lines on standard error are unchanged; the status line
-  counts every time a problem was told.
+  counts every time a problem was told, except an audio input out of the
+  guide track.
 - **Stop:** Stop in the status window finalizes, opens the recording folder itself
   in Finder (D46) and quits the app: a recording is typically one shot (D45).
   Logout, restart and shutdown finalize without asking, told apart from
@@ -1500,8 +1505,8 @@ the metadata items (see "Output on disk").
   window's Clock drift column (`· 550 ms late`) and the
   timeline file, which places the file's clip earlier by it; each
   counted window is a detail line (`<file>: lag 550 ms late, clarity
-  31`). The audio files are not changed; an input clearly late leaves
-  the "Audio inputs" guide track (see "Guide tracks", D79).
+  31`). The audio files are not changed; an input out of sync with the
+  others leaves the "Audio inputs" guide track (see "Guide tracks", D79).
 - **Failures.** A failing audio capture or writer and a full disk are
   handled for an audio file as for a screen file (below): the file
   ends, the event (`audio input failed`, `system audio failed`, `audio
@@ -1536,24 +1541,33 @@ the metadata items (see "Output on disk").
   material; in a simulation on that recording the mix decoded to at
   most about 0.78, roughly 2 dB below full scale, but the decoded peak
   is not bounded. A true-peak limiter (a low-pass and lookahead) is
-  deferred. "System audio" is clamped to ±1. **An audio input clearly
-  late leaves "Audio inputs" (D79):** when the first counted window of
-  one of its files, normalized as the audio delays are (see "Audio
-  delay"), says it is more than 0.1 s (`guideDelayLimit`, *data*) later
-  than the earliest input, that file's sound leaves the mix of every
-  video file alike, for the rest of the file; its next file (after a
-  replug or a restart) joins again until it is measured. The first
-  counted window decides, not the median of 3, so the echo lasts about
-  10 s instead of 30 s; `measuredDelay` and the timeline file keep the
-  median. The reference microphone and the earliest input never leave.
-  It writes the event `audio input left the guide track` with its
-  `delay` and tells a problem whose line reads `Audio <n> <name> 500 ms
-  late, not in the guide track; its own audio track is recorded`,
-  always orange (the recording works), without a time or an ending, as
-  it has no meaningful length; it stays as it is when the input's next
-  file starts, and that file leaving too is told again.
-  Its own audio file is unchanged and the timeline file still places it
-  by its measured delay. Each source is placed by
+  deferred. "System audio" is clamped to ±1. **Which audio inputs "Audio inputs" mixes
+  (D79):** each audio input file being written has a value against the
+  reference's file (see "Audio delay"): its first counted window's lag,
+  or, once it left or rejoined, the median of its counted windows; the
+  reference's own file is 0, and ended files are forgotten. The largest
+  group of them whose values lie within 0.1 s (`guideTrackLateLimit`,
+  *data*) of each other stays, on a tie the group with the earliest
+  input; a file outside it leaves the mix of every video file alike, the
+  reference's included, so an Osmo as the default microphone late after
+  two microphones in sync leaves. The first counted window decides,
+  so the echo lasts about 10 s, not the 30 s of the median of 3;
+  `measuredDelay` and the timeline file keep the median. A file that
+  left rejoins when the median of its counted windows lies within the
+  limit of the staying group, and after that only its median makes it
+  leave again, so it does not flap; an input's next file (after no
+  audio, a replug or a restart) starts in the guide track until it is
+  measured. A leave is told only once the capture took the file out:
+  the event `audio input left the guide track` with its `lag` (after
+  the staying group's earliest input), and a problem whose line reads,
+  while out, `Audio <n> <name> 553 ms late, not in the guide track; its
+  own audio track is recorded`, and once it rejoins, its file ends or it
+  disconnects, `Audio <n> <name> was not in the guide track from 0:50
+  to 1:40 (553 ms late); its own audio track is recorded`; always
+  orange, and by design neither a Dock bounce nor the badge nor the
+  status line's count. A leaving source is cut, its samples not mixed
+  yet dropped. Its own audio file is unchanged and the timeline file
+  still places it by its measured delay. Each source is placed by
   its own timestamps, the mix runs 200 ms (*data*) behind real time so
   every source's buffers have arrived, and a source that is missing is
   silence in its guide track. The mix is handed to every open screen

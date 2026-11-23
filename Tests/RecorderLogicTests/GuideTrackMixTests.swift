@@ -91,6 +91,7 @@ import Testing
         guide.receive([[0.125, -0.125, -0.1]], from: "B", at: 0)
         #expect(guide.mix(until: 3 * millisecond)[0] == [0.25, -0.25, 0])
         // Just above it, the curve starts with the same slope: no step.
+        #expect(GuideTrackMix.limit(GuideTrackMix.limiterKnee) == GuideTrackMix.limiterKnee)
         let above = GuideTrackMix.limiterKnee + 0.0001
         #expect(abs(GuideTrackMix.limit(above) - above) < 1e-6)
         #expect(GuideTrackMix.limit(100) <= GuideTrackMix.limiterCeiling)

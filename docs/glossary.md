@@ -352,8 +352,9 @@ screen file has follows from the settings alone; a missing source is
 silence in its guide track (D31). It ends with its screen file's video
 (D51), unless the file ended by a failure, or the samples for its last
 mix were no longer there or the writer did not take them in time,
-which is told as a problem. An audio input whose audio delay is clearly
-late leaves "Audio inputs" for the rest of its audio file (D79).
+which is told as a problem. An audio input out of sync with the
+others leaves "Audio inputs" (D79): the largest group of inputs whose lags
+lie within 0.1 s of each other stays.
 
 ## Level meter
 
@@ -403,6 +404,14 @@ by it; the audio file itself is unchanged.
 One window's measurement of an audio delay: how many seconds a file's
 sound is later than the reference microphone's in the latest 10 s
 (D77). A file's audio delay is the median of its counted lags.
+
+## Counted window
+
+A window of an audio delay measurement whose match is clear enough to
+count, its peak of |correlation| at least 12 times its median (D77):
+only counted windows give a lag. The first counted window of a file
+decides whether its input stays in the "Audio inputs" guide track
+(D79).
 
 ## Recording resolution
 

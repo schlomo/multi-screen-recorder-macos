@@ -37,9 +37,8 @@ public enum ProblemKind: Hashable, Sendable {
     case inputVolumeNotSet(String)
     /// An audio input whose input volume changes cannot be followed, by its name; clears when following it works (D69).
     case inputVolumeNotFollowed(String)
-    /// An audio input, by its UID, whose file left the "Audio inputs" guide track as too late; `source` names
-    /// the input and its audio delay. Its line has no time and no ending; it ends when a new file of the input
-    /// starts, so leaving again is told again (D79).
+    /// An audio input, by its UID, whose file is out of the "Audio inputs" guide track, `source` naming the
+    /// input and the note its lag; ends when it rejoins, its file ends or it disconnects (D79).
     case audioInputOutOfTheGuideTrack(String)
     /// A video file a full disk ended; clears when there is room again.
     case diskFull
@@ -102,8 +101,7 @@ extension ProblemKind {
         case .inputVolumeNotFollowed(let name): "Input volume of \(name) not followed"
         case .diskFull: "Disk full"
         case .guideTracksCut(let name): "Guide tracks of \(name) cut"
-        case .audioInputOutOfTheGuideTrack(let uid):
-            "\(source ?? uid), not in the guide track; its own audio track is recorded"
+        case .audioInputOutOfTheGuideTrack(let uid): source ?? uid
         }
     }
 }
@@ -155,6 +153,8 @@ public struct ProblemsTold: Sendable {
         var ending = Ending.recovered
         /// Told with `add`, not only shown: a tell of its kind waits for it to end.
         var isTold = false
+        /// What its line says besides its source, for a kind whose line is its own (D79).
+        var note: String?
     }
 
     private var told: [Told] = []
@@ -166,8 +166,8 @@ public struct ProblemsTold: Sendable {
     /// `endedAt`: already over when told, for a failure that ends with a new file (`endsWithANewFile`) after a
     /// newer file of its source started, or after its source went away (`ending`).
     public mutating func add(
-        _ problem: RecordingProblem, kind: ProblemKind, source: String? = nil, endedAt: Int64? = nil, ending: Ending = .recovered,
-        to manifest: inout RecordingManifest
+        _ problem: RecordingProblem, kind: ProblemKind, source: String? = nil, note: String? = nil, endedAt: Int64? = nil,
+        ending: Ending = .recovered, to manifest: inout RecordingManifest
     ) -> Outcome {
         guard manifest.state != .finalized else { return .afterTheEnd }
         guard !told.contains(where: { $0.kind == kind && $0.ended == nil && $0.isTold }) else { return .alreadyTold }
@@ -178,6 +178,7 @@ public struct ProblemsTold: Sendable {
         } else {
             show(problem, kind: kind, source: source, endedAt: endedAt, ending: ending)
             told[told.count - 1].isTold = true
+            told[told.count - 1].note = note
         }
         return .tell(writeManifest: kind != .manifestNotWritten)
     }
@@ -216,11 +217,10 @@ public struct ProblemsTold: Sendable {
     /// `<phrase> since 0:53`, `<phrase> for 7.4 s at 0:53, recovered` (or `, then disconnected`, `, stopped`: the `Ending`),
     /// `<phrase> 3 times, 12 s in total[, <ending>]`, then the latest error after a colon, `latest: ` before it
     /// when the errors differ; a stall reads `stalled 7.4 s`, without its error, always the same; an input out of
-    /// the guide track is its phrase alone.
+    /// the guide track has its own (`outOfTheGuideTrack`).
     private static func line(_ repeats: [Told], now: Int64) -> ProblemLine {
         let latest = repeats[repeats.count - 1]
-        // No meaningful length: the latest as it is, orange (D79).
-        if case .audioInputOutOfTheGuideTrack = latest.kind { return ProblemLine(text: latest.kind.phrase(source: latest.source), isRed: false) }
+        if case .audioInputOutOfTheGuideTrack = latest.kind { return outOfTheGuideTrack(latest) }
         let isStall = if case .cameraStalled = latest.kind { true } else { false }
         let phrase = latest.kind.phrase(source: latest.source)
         let errors = repeats.map(\.problem.error)
@@ -239,6 +239,19 @@ public struct ProblemsTold: Sendable {
             "\(phrase) since \(time(latest.began))"
         }
         return ProblemLine(text: text + why, isRed: latest.kind.isRed(ongoing: latest.ended == nil))
+    }
+
+    /// An input out of the guide track, the latest time, orange: "Audio 2 Mic A 553 ms late, not in the guide track;
+    /// its own audio track is recorded", once over "Audio 2 Mic A was not in the guide track from 0:50 to 1:40 (553 ms
+    /// late); its own audio track is recorded" (D79).
+    private static func outOfTheGuideTrack(_ latest: Told) -> ProblemLine {
+        let input = latest.kind.phrase(source: latest.source), note = latest.note ?? ""
+        let text = if let ended = latest.ended {
+            "\(input) was not in the guide track from \(time(latest.began)) to \(time(ended)) (\(note)); its own audio track is recorded"
+        } else {
+            "\(input) \(note), not in the guide track; its own audio track is recorded"
+        }
+        return ProblemLine(text: text, isRed: false)
     }
 
     /// "0:53" since the start, "1:02:03" from an hour on.

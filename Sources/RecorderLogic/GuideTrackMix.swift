@@ -5,7 +5,7 @@ import Foundation
 /// timestamps, and a source with no samples for a stretch is silence there.
 /// "Audio inputs" is one mono mix: each recorded audio input averaged to
 /// mono, the inputs summed at unity gain, through a soft limiter
-/// (`limit`) with its ceiling at −2 dBFS. "System audio" carries the system audio's two channels as
+/// (`limit`) with its knee at −12 dBFS and its ceiling at −6 dBFS (D75). "System audio" carries the system audio's two channels as
 /// they are, clamped to ±1. Times are nanoseconds from t0 on the shared
 /// clock; positions are samples from t0. A sample that is not finite is
 /// silence.
