@@ -46,6 +46,9 @@ struct RecorderDevices: Sendable {
     var cameraPermission: @Sendable () -> CameraPermission
     /// Asks if never asked: macOS shows its prompt.
     var requestCameraPermission: @Sendable () async -> Bool
+    /// Follows the audio devices' changes, calling `changed` at each.
+    var watchAudioInputs: @MainActor @Sendable (_ changed: @escaping @MainActor @Sendable () -> Void) throws(DeviceReadError) -> AudioInputWatch =
+        { changed throws(DeviceReadError) in try AudioInputWatch(changed: changed) }
 
     static let system = RecorderDevices(
         screens: connectedScreens,
@@ -459,7 +462,7 @@ public final class Recorder {
         ]
         if readsCameras { cameraWatch = CameraWatch { [weak self] in self?.camerasChanged() } }
         do {
-            audioWatch = try AudioInputWatch { [weak self] in self?.audioInputsChanged() }
+            audioWatch = try devices.watchAudioInputs { [weak self] in self?.audioInputsChanged() }
         } catch {
             tell("Changes of the audio inputs cannot be followed", error: ErrorDetail(error), kind: .audioInputChangesNotFollowed)
         }

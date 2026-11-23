@@ -419,7 +419,10 @@ Media are linked by file name only, relative to the timeline file.
   number: one stereo track for the system audio, and for an audio input
   with n channels n mono tracks, `<label>` for one and `<label>, channel
   <k>` for more. The channels of one file are a linked group in Resolve.
-  A gap fills each space before a clip, none follows the last clip.
+  A gap fills each space before a clip, none follows the last clip. A
+  clip that starts before its track's previous clip ends, by a frame's
+  rounding or a measured delay, leaves out its overlapping head, so what
+  it plays stays at its own time.
 - **Audio delay (D77):** an audio file with a `measuredDelay` is placed
   that much earlier, rounded to the nearest frame, as the timeline
   places every clip at a whole frame, so up to 17 ms remain; a clip that

@@ -286,6 +286,19 @@ private extension Dictionary where Key == String, Value == Any {
         #expect(children[1].frames == (1_080_317, 283))
     }
 
+    /// A screen file that starts a frame before its source's previous one ends, by rounding, leaves out
+    /// that frame, so the rest plays at its own time.
+    @Test func aVideoClipOverlappingThePreviousOneByAFrameLeavesOutThatFrame() throws {
+        let result = try timeline(manifest(files: [
+            screen("10.00.00", "Screen 1 - A", timecode: "10:00:00:00", start: 0, end: 10.04),
+            screen("10.00.10", "Screen 1 - A", timecode: "10:00:10:00", start: 10, end: 20),
+        ]))
+        let children = result.tracks[0].children
+        #expect(children.map { $0["OTIO_SCHEMA"] as! String } == ["Clip.2", "Clip.2"])
+        #expect(children[0].frames == (1_080_000, 301))
+        #expect(children[1].frames == (1_080_301, 299))
+    }
+
     @Test func aSourceWithTwoFilesIsOneTrackWithAGapBetweenAndNoGapAfter() throws {
         let result = try timeline(manifest(files: [
             audio("10.00.00", "Audio 2 - R", channels: "1", timecode: "10:00:00:10", start: 0.3, end: 3),

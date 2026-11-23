@@ -220,7 +220,7 @@ extension GlobalRecordingLog {
 
         private func start(
             readsScreens: Bool = false, cameraMode: CameraMode = .none, cameraFrameWatch: CameraFrameWatch = CameraFrameWatch(),
-            inputs: [AudioInputInfo]? = nil
+            inputs: [AudioInputInfo]? = nil, audioInputsFollowed: Bool = true
         ) throws {
             var settings = Settings.defaults
             settings.auto = false
@@ -264,12 +264,16 @@ extension GlobalRecordingLog {
                     cameras.permission.withLock { $0 = answer }
                     return answer == .granted
                 })
+            var devicesUsed = devices
+            if !audioInputsFollowed {
+                devicesUsed.watchAudioInputs = { _ throws(DeviceReadError) in throw DeviceReadError("the stand-in's listener failed") }
+            }
             let facts = ReadyCheckFacts(
                 screenRecording: nil, microphoneGranted: true, screens: .success([]), audioInputs: .success(inputs),
                 outputFolder: .unusable("not probed by the tests"))
             recorder = try Recorder(
                 settings: settings, homeFolder: home, app: "Multi Screen Recorder (tests)", readyCheckFacts: facts, observer: observer,
-                devices: devices, cameraFrameWatch: cameraFrameWatch)
+                devices: devicesUsed, cameraFrameWatch: cameraFrameWatch)
         }
 
         private var source: AudioCaptureTests.StandInSource { sources.last }
@@ -457,6 +461,16 @@ extension GlobalRecordingLog {
             #expect(summary.manifest.events.isEmpty)
         }
 
+        /// The audio inputs' changes that cannot be followed: told, red for the whole recording (D78).
+        @Test func audioInputChangesThatCannotBeFollowedAreARedLine() async throws {
+            try start(audioInputsFollowed: false)
+            #expect(observer.problems.map(\.problem.problem) == ["Changes of the audio inputs cannot be followed"])
+            let line = try #require(recorder.problemLines().first)
+            #expect(line.text == "Changes of the audio inputs not followed since 0:00: the stand-in's listener failed")
+            #expect(line.isRed)
+            _ = await stop()
+        }
+
         /// Three microphones' sound, the reference R and A 0.5 s earlier, B 0.2 s later, placed straight into the
         /// delay measurement's rings from 1 s to 13 s of the recording, so every window is there at once.
         private func feedDelayedNoise(_ uids: [String: Double]) {
@@ -502,6 +516,24 @@ extension GlobalRecordingLog {
             await recorder.measureAudioDelays()
             #expect(abs(((try delays()["Mic B"] ?? nil) ?? 0) - 0.7) < 0.002)
             _ = await stop()
+        }
+
+        /// A measurement during Stop, while a camera's stream still stops, changes the recording no more (D77).
+        @Test func noAudioDelayIsMeasuredOnceStopBegan() async throws {
+            cameras.connected.withLock { $0 = [Self.camera] }
+            let inputs = ["R", "A"].map { AudioInputInfo(name: "Mic \($0)", channelCount: 1, isDefault: $0 == "R", transport: .usb, uid: $0) }
+            try start(cameraMode: .real, inputs: inputs)
+            let camera = try #require(cameras.last)
+            camera.stopTakes.withLock { $0 = .seconds(2) }
+            try await wait("the audio inputs' captures") { sources.byUID.withLock { $0.count } == 2 }
+            for uid in ["R", "A"] { try send(0.1, buffers: 1, to: sources.last(of: uid)) }
+            try await wait("the audio files") { (try? manifestOnDisk().audioFiles.count) == 2 }
+            feedDelayedNoise(["R": 0, "A": 0.2])
+            let stopping = Task { await recorder.stop() }
+            try await Task.sleep(for: .milliseconds(200))
+            for _ in 0..<3 { await recorder.measureAudioDelays() }
+            let summary = await stopping.value
+            #expect(summary.manifest.audioFiles.allSatisfy { $0.measuredDelay == nil })
         }
 
         /// A video file's writer failure and a full disk reach the window's lines, red until a new file of the

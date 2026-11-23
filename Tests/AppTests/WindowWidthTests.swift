@@ -168,4 +168,25 @@ import Testing
         #expect(width(status(statusModel(name: "Mic", cpu: "")))
             < width(status(statusModel(name: String(repeating: "CalDigit Thunderbolt 3 Audio ", count: 3), cpu: ""))))
     }
+
+    private func height(_ view: some View) -> CGFloat {
+        _ = NSApplication.shared
+        let controller = NSHostingController(rootView: view)
+        controller.view.layoutSubtreeIfNeeded()
+        return controller.view.fittingSize.height
+    }
+
+    /// The problems area grows to 5 lines, more scroll inside it: the window is no taller with 6 or 30 (D78).
+    @Test func theProblemsAreaGrowsToFiveLinesAndNoFurther() {
+        func heightWith(_ count: Int) -> CGFloat {
+            let model = statusModel(name: "Mic", cpu: "CPU 3 %")
+            model.problems = (0..<count).map { ProblemLine(text: "Screen DELL not captured since 0:\($0 % 6)0: failed", isRed: $0 % 2 == 0) }
+            return height(status(model))
+        }
+        let one = heightWith(1), five = heightWith(5)
+        #expect(one < five)
+        #expect(heightWith(6) == five)
+        #expect(heightWith(30) == five)
+    }
 }
+
