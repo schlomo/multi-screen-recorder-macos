@@ -2689,6 +2689,11 @@ architect's reading.
   says `<n> ms late` or `<n> ms early`: `Audio 2 Mic A 400 ms early,
   not in the guide track; its own audio track is recorded`, and in the
   past `… from 0:50 to 1:40 (400 ms early); …`.
+- **Amended after a third review (the architect's reading):** the
+  tolerance is a quarter of a sample at 8 kHz, not half, as the median
+  of an even count moves in half-sample steps: a pair half a sample
+  beyond the limit is apart. A file that is out no longer counts among
+  the files that stayed when a tie is decided.
 - **Consequences:** A microphone out of sync no longer echoes in the
   guide; until its first counted window it still does, and inputs
   within 0.1 s of each other stay in. Planned, not decided: a next

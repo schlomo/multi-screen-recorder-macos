@@ -356,6 +356,14 @@ which is told as a problem. An audio input out of sync with the
 others leaves "Audio inputs" (D79): the largest group of inputs whose
 values lie within 0.1 s of each other stays.
 
+## Value (audio delay)
+
+The figure of an audio input file compared against the reference's
+file: its first counted window's lag until it has 3 counted windows,
+then their median; the reference's own file is 0. The "Audio inputs"
+guide track keeps the largest group whose values lie within 0.1 s of
+each other (D79).
+
 ## Offset (guide track)
 
 An audio input file's distance from the earliest input of the group the "Audio inputs" guide track keeps, in seconds, negative when earlier (D79).
@@ -413,9 +421,9 @@ sound is later than the reference microphone's in the latest 10 s
 
 A window of an audio delay measurement whose match is clear enough to
 count, its peak of |correlation| at least 12 times its median (D77):
-only counted windows give a lag. The first counted window of a file
-decides whether its input stays in the "Audio inputs" guide track
-(D79).
+only counted windows give a lag. Whether its input stays in the "Audio
+inputs" guide track, the first counted window of a file decides until
+the file has 3 counted windows, then their median does (D79).
 
 ## Recording resolution
 

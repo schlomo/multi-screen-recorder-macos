@@ -19,8 +19,9 @@ public struct GuideTrackMembership: Sendable {
     private var lags: [String: (reference: String, lags: [Double])] = [:]
     private var out: Set<String> = []
     private var staying: Set<String> = []
-    /// Half a counted window's sample at 8 kHz: values at the limit stay together wherever they lie.
-    private static let tolerance = 0.5 / Double(AudioDelay.sampleRate)
+    /// A quarter of a sample at 8 kHz, below the half-sample step of a median: values at the limit stay
+    /// together wherever they lie, and a half sample beyond it is apart.
+    private static let tolerance = 0.25 / Double(AudioDelay.sampleRate)
 
     public init() {}
 
@@ -50,7 +51,7 @@ public struct GuideTrackMembership: Sendable {
                 values[file] = first
             }
         }
-        let staying = Self.largestGroup(values, limit: limit, holding: self.staying.intersection(values.keys))
+        let staying = Self.largestGroup(values, limit: limit, holding: self.staying.subtracting(out).intersection(values.keys))
         self.staying = staying
         let earliest = staying.compactMap { values[$0] }.min() ?? 0
         var change = Change()

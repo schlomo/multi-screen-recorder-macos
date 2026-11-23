@@ -77,6 +77,14 @@ import Testing
         #expect(update(&membership, writing: ["a.mov", "b.mov"]) == Change(leaving: ["r.mov": -0.3]))
     }
 
+    /// Half a sample beyond the limit, the step of an even-count median, is apart, wherever the pair lies.
+    @Test func aPairHalfASampleBeyondTheLimitIsApart() {
+        var membership = GuideTrackMembership()
+        let beyond = 0.3 + 800.5 / Double(AudioDelay.sampleRate)
+        measure(&membership, ["a.mov": [0.3], "b.mov": [beyond]])
+        #expect(update(&membership, writing: ["a.mov", "b.mov"]).leaving.keys.sorted() == ["a.mov", "b.mov"])
+    }
+
     /// On a tie the group with the earliest input stays.
     @Test func onATieTheGroupWithTheEarliestInputStays() {
         var membership = GuideTrackMembership()
@@ -95,7 +103,7 @@ import Testing
         measure(&membership, ["a.mov": [0.02]])
         #expect(update(&membership, writing: ["a.mov"]) == Change(rejoining: ["a.mov"]))
         #expect(!membership.isOut("a.mov"))
-        // One late window moves the median of 4 [0.01, 0.02, 0.5, 0.6] to 0.26: out again on the median.
+        // A second late window of four [0.5, 0.01, 0.02, 0.6] moves the median to 0.26: out again on the median.
         measure(&membership, ["a.mov": [0.6]])
         let left = update(&membership, writing: ["a.mov"]).leaving
         #expect(abs((left["a.mov"] ?? 0) - 0.26) < 1e-9)
@@ -109,6 +117,28 @@ import Testing
         measure(&membership, ["b.mov": [0.5]])
         #expect(update(&membership, writing: ["a.mov", "b.mov"]) == Change(leaving: ["r.mov": -0.5]))
         #expect(membership.isOut("a.mov"))
+    }
+
+    /// A single late window does not evict a file whose median of 3 or more in-sync windows stays.
+    @Test func aSingleLateWindowDoesNotEvictAFileWithItsMedianInSync() {
+        var membership = GuideTrackMembership()
+        measure(&membership, ["a.mov": [0, 0.01, 0.02]])
+        #expect(update(&membership, writing: ["a.mov"]) == Change())
+        measure(&membership, ["a.mov": [0.5]])
+        #expect(update(&membership, writing: ["a.mov"]) == Change())
+        #expect(!membership.isOut("a.mov"))
+    }
+
+    /// A file that is out does not pull a tie towards its group: with the other file that stayed gone, the
+    /// tie falls back to the earliest group, and the reference rejoins.
+    @Test func aFileThatIsOutDoesNotPullATie() {
+        var membership = GuideTrackMembership()
+        measure(&membership, ["a.mov": [0.5]])
+        _ = update(&membership, writing: ["a.mov"])
+        measure(&membership, ["b.mov": [0.5]])
+        #expect(update(&membership, writing: ["a.mov", "b.mov"]) == Change(leaving: ["r.mov": -0.5]))
+        measure(&membership, ["c.mov": [0], "d.mov": [0.5]])
+        #expect(update(&membership, writing: ["a.mov", "c.mov", "d.mov"]) == Change(leaving: ["d.mov": 0.5], rejoining: ["r.mov"]))
     }
 
     /// A file stays out until its median says otherwise; its input's next file starts in the guide track.

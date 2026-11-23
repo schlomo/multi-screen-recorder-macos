@@ -1547,8 +1547,8 @@ the metadata items (see "Output on disk").
   windows once it has 3, its first counted window's lag before; the
   reference's own file is 0, and ended files are forgotten. The largest
   group of them whose values lie within 0.1 s (`guideTrackSyncLimit`,
-  *data*, early or late; compared with a tolerance of half a sample at
-  8 kHz) of each other stays; on a tie the group holding the files that
+  *data*, early or late; compared with a tolerance of a quarter of a
+  sample at 8 kHz, below the half-sample step of a median) of each other stays; on a tie the group holding the files that
   stayed before, so a newcomer never evicts them, else the group with
   the earliest input; a file outside it leaves the mix of every video file alike, the
   reference's included, so an Osmo as the default microphone late after
@@ -1556,8 +1556,11 @@ the metadata items (see "Output on disk").
   so the echo lasts about 10 s, not the 30 s of the median of 3;
   `measuredDelay` and the timeline file keep the median. A file that
   left rejoins when the median of its counted windows lies within the
-  limit of the staying group, and only its median makes it leave again,
-  so it does not flap; an input's next file (after no
+  limit of the staying group; every file with 3 or more counted windows
+  is judged on its median, staying or out, with no hysteresis, so a
+  single late window does not take out a file whose median is in sync,
+  but a median that moves back and forth across the limit moves the file
+  out and in with it; an input's next file (after no
   audio, a replug or a restart) starts in the guide track until it is
   measured. A leave is told only once the capture took the file out:
   the event `audio input left the guide track` with its `offset` (from
