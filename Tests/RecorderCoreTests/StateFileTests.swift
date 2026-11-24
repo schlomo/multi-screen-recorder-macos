@@ -58,9 +58,9 @@ import RecorderLogic
         defer { try? FileManager.default.removeItem(at: home) }
         let file = StateFile(homeFolder: home)
         try file.save(AppState(lastOfferedCrashReport: "msr-2026-11-14-212425.ips"))
-        try file.update { $0.recorded(folder: "/r", result: .problems) }
+        try file.update { $0.recorded(folder: "/r", noticeWanted: true) }
         #expect(try file.load() == AppState(
             lastOfferedCrashReport: "msr-2026-11-14-212425.ips",
-            lastRecording: AppState.LastRecording(folder: "/r", result: .problems)))
+            lastRecording: AppState.LastRecording(folder: "/r", noticeWanted: true)))
     }
 }

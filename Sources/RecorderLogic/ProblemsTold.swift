@@ -72,6 +72,49 @@ extension ProblemKind {
     }
 }
 
+/// What a person has to do about a problem (D84, the owner's rule): only a problem with one bounces the Dock
+/// icon, sets the badge and counts in `msr record`'s status line; one without stays quiet, listed in the status
+/// window, `recording.json` and the recording log.
+public enum CallToAction: Equatable, Sendable {
+    case freeUpDiskSpace
+    case grantThePermission
+    case unplugAndPlugInAgain
+    /// A file is incomplete.
+    case reportIt
+    /// Stop and start the recording again, or unplug and plug in the device again, and report it.
+    case startAgainAndReportIt
+
+    /// Whether it asks for a report: only then does the recording ask to report it once it ended (D84).
+    public var includesReportIt: Bool { self == .reportIt || self == .startAgainAndReportIt }
+}
+
+extension ProblemKind {
+    /// Its call to action, nil for none (D84).
+    public var callToAction: CallToAction? {
+        switch self {
+        case .diskFull, .manifestNotWritten, .timelineFileNotWritten, .recordingLogNotWritten: .freeUpDiskSpace
+        case .cameraPermissionMissing: .grantThePermission
+        case .audioInputSilentAfterGaps: .unplugAndPlugInAgain
+        case .audioFileLost, .videoFileLost: .reportIt
+        case .screenNotCaptured, .cameraNotCaptured, .audioSourceFailed, .audioFileFailed, .audioInputNotRecordable,
+             .audioInputChangesNotFollowed:
+            .startAgainAndReportIt
+        case .cameraStalled, .audioInputOutOfTheGuideTrack, .guideTracksCut, .dockIconNotShown, .inputVolumeNotSet,
+             .inputVolumeNotFollowed, .screensNotRead, .audioInputsNotRead, .freeSpaceNotRead:
+            nil
+        }
+    }
+
+    /// A source that fails: its call to action only once it lasted `RecorderValues.unrecoveredAfter` without
+    /// ending, as most come back by themselves (D84).
+    var callsToActionOnlyUnrecovered: Bool {
+        switch self {
+        case .screenNotCaptured, .cameraNotCaptured, .audioSourceFailed, .audioFileFailed, .audioInputNotRecordable: true
+        default: false
+        }
+    }
+}
+
 extension ProblemKind {
     /// A failure that ends with a new file of its source: a file's failure told after a newer file of its
     /// source started is over when told (D78).
@@ -159,6 +202,8 @@ public struct ProblemsTold: Sendable {
         var isTold = false
         /// What its line says besides its source, for a kind whose line is its own (D79).
         var note: String?
+        /// Its call to action was given (D84).
+        var calledToAction = false
     }
 
     private var told: [Told] = []
@@ -207,6 +252,30 @@ public struct ProblemsTold: Sendable {
         told[index].ended = now
         told[index].ending = ending
         if let length { told[index].began = max(0, now - length) }
+    }
+
+    /// The problems whose call to action falls due at `now`, each given once (D84): at once, or for a source that
+    /// fails once it lasted `unrecoveredAfter` without ending.
+    public mutating func callsToAction(now: Int64, unrecoveredAfter: Duration = RecorderValues.unrecoveredAfter) -> [RecordingProblem] {
+        var due: [RecordingProblem] = []
+        for index in told.indices where !told[index].calledToAction && told[index].kind.callToAction != nil {
+            let entry = told[index]
+            if entry.kind.callsToActionOnlyUnrecovered, entry.ended != nil || now - entry.began < unrecoveredAfter.nanoseconds { continue }
+            told[index].calledToAction = true
+            due.append(entry.problem)
+        }
+        return due
+    }
+
+    /// When the next call to action of a failing source falls due, if it lasts that long (D84).
+    public func nextCallToAction(unrecoveredAfter: Duration = RecorderValues.unrecoveredAfter) -> Int64? {
+        told.filter { !$0.calledToAction && $0.ended == nil && $0.kind.callsToActionOnlyUnrecovered }
+            .map { $0.began + unrecoveredAfter.nanoseconds }.min()
+    }
+
+    /// A call to action given that includes "report it": the recording asks to report it once it ended (D84).
+    public var asksToReportIt: Bool {
+        told.contains { $0.calledToAction && $0.kind.callToAction?.includesReportIt == true }
     }
 
     /// The status window's lines, one per kind (a kind names its source): red first, then

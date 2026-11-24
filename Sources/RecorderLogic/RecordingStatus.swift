@@ -2,16 +2,13 @@
 /// "!" when something needs them; the status window lists the problems (recorder.md, "The app").
 public struct RecordingStatus: Equatable, Sendable {
     public var isLowOnDisk = false
-    /// The screen whose file ended because it showed another screen's picture, until it is tried again.
-    public var screenShowingAnotherScreensPicture: String?
-    /// What went wrong that the recording could not handle by itself, such as
-    /// a manifest that cannot be written or a failing writer.
+    /// The problems whose call to action was given (D84): something the person has to do.
     public var problems: [String] = []
 
     public init() {}
 
     public var needsAttention: Bool {
-        isLowOnDisk || screenShowingAnotherScreensPicture != nil || !problems.isEmpty
+        isLowOnDisk || !problems.isEmpty
     }
 
     /// "!" when something needs the person, otherwise none (D47).

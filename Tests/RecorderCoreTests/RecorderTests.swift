@@ -16,6 +16,7 @@ extension GlobalRecordingLog {
         final class Observer: RecorderObserver {
             var problems: [(problem: RecordingProblem, ofAnEvent: Bool)] = []
             var eventLines: [(line: String, isFailure: Bool)] = []
+            var callsToAction: [RecordingProblem] = []
 
             func recorder(_ recorder: Recorder, lowDiskSpace: Bool) {}
             func recorder(_ recorder: Recorder, screenShowsAnotherScreensPicture screen: String?) {}
@@ -24,6 +25,9 @@ extension GlobalRecordingLog {
             }
             func recorder(_ recorder: Recorder, eventLine: String, isFailure: Bool) {
                 eventLines.append((eventLine, isFailure))
+            }
+            func recorder(_ recorder: Recorder, callToAction problem: RecordingProblem) {
+                callsToAction.append(problem)
             }
         }
 
@@ -220,7 +224,8 @@ extension GlobalRecordingLog {
 
         private func start(
             readsScreens: Bool = false, cameraMode: CameraMode = .none, cameraFrameWatch: CameraFrameWatch = CameraFrameWatch(),
-            inputs: [AudioInputInfo]? = nil, audioInputsFollowed: Bool = true, audioDelayInterval: Duration = .seconds(3600)
+            inputs: [AudioInputInfo]? = nil, audioInputsFollowed: Bool = true, audioDelayInterval: Duration = .seconds(3600),
+            unrecoveredAfter: Duration = RecorderValues.unrecoveredAfter
         ) throws {
             var settings = Settings.defaults
             settings.auto = false
@@ -274,7 +279,8 @@ extension GlobalRecordingLog {
             recorder = try Recorder(
                 settings: settings, homeFolder: home, app: "Multi Screen Recorder (tests)", readyCheckFacts: facts, observer: observer,
                 // By default measured only when a test calls `measureAudioDelays`, never by the timer mid-test.
-                devices: devicesUsed, cameraFrameWatch: cameraFrameWatch, audioDelayInterval: audioDelayInterval)
+                devices: devicesUsed, cameraFrameWatch: cameraFrameWatch, audioDelayInterval: audioDelayInterval,
+                unrecoveredAfter: unrecoveredAfter)
         }
 
         private var source: AudioCaptureTests.StandInSource { sources.last }
@@ -484,6 +490,8 @@ extension GlobalRecordingLog {
         @Test func audioInputChangesThatCannotBeFollowedAreARedLine() async throws {
             try start(audioInputsFollowed: false)
             #expect(observer.problems.map(\.problem.problem) == ["Changes of the audio inputs cannot be followed"])
+            // Stop and start the recording again, and report it, at once (D84).
+            #expect(observer.callsToAction.map(\.problem) == ["Changes of the audio inputs cannot be followed"])
             let line = try #require(recorder.problemLines().first)
             #expect(line.text == "Changes of the audio inputs not followed since 0:00: the stand-in's listener failed")
             #expect(line.isRed)
@@ -1179,6 +1187,8 @@ extension GlobalRecordingLog {
             #expect(stalledRow.details.contains("\nThis file so far: "))
             #expect(recorder.status().rows.allSatisfy { $0.details.hasPrefix($0.source.text) })
             #expect(observer.problems.map(\.problem.text) == ["Camera Stand-in camera: camera stalled: \(CameraTracker.stalledError.text)"])
+            // Nothing a person can do about a stall: no call to action (D84).
+            #expect(observer.callsToAction.isEmpty)
             try await sendFrames(camera, until: "the stall's end") { (try? manifestOnDisk().events.count) == 2 }
             let ended = try #require(try manifestOnDisk().events.last)
             #expect(ended.event == .cameraStallEnded)
@@ -1188,8 +1198,9 @@ extension GlobalRecordingLog {
             #expect(cameras.opened.withLock { $0.count } == 1)
             #expect(summary.manifest.cameraFiles.map(\.state) == [.finalized])
             #expect(summary.manifest.problems.count == 1)
-            // A stall loses picture (D47).
+            // A stall loses picture (D47), but asks for no report (D84).
             #expect(summary.manifest.result == .problems)
+            #expect(summary.endedWithError && !summary.asksToReportIt)
         }
 
         /// A stalled camera unplugged: its stall ends there, then disconnected, orange (D78).
@@ -1574,6 +1585,7 @@ extension GlobalRecordingLog {
             #expect(try manifestOnDisk().events.map(\.event) == [.audioInputGap, .noAudioStarted])
             #expect(recorder.problemLines() == [ProblemLine(
                 text: "Audio 1 \(name) sends only silence since its gaps at 0:00; unplug and plug it in again", isRed: true)])
+            #expect(observer.callsToAction.map(\.problem) == ["The audio input \(name) sends only silence since its gaps at 0:00"])
             #expect(try manifestOnDisk().problems.map(\.problem) == ["The audio input \(name) sends only silence since its gaps at 0:00"])
             try send(0.25, buffers: 10, after: buffersOfNoAudio + 23, from: origin)
             try await wait("the sound") { recorder.status().rows.first?.state == "recording" }
@@ -1583,6 +1595,28 @@ extension GlobalRecordingLog {
             _ = await stop()
             let log = try String(contentsOf: recorder.folder.appending(path: RecordingNames.recordingLog), encoding: .utf8)
             #expect(log.contains("Audio 1 \(name): no audio since 0:00, right after its gap at 0:00: a red problem (D81)"))
+        }
+
+        /// A source that fails and does not come back calls to action once it lasted `unrecoveredAfter`, and the
+        /// recording then asks to report it; one that is captured again before stays quiet (D84).
+        @Test func aSourceFailingUnrecoveredCallsToActionAndAsksToReportIt() async throws {
+            try start(unrecoveredAfter: .seconds(3))
+            try send(0.25, buffers: 2)
+            try await wait("the file") { (try? manifestOnDisk().audioFiles.count) == 1 }
+            source.lose(.captureFailed("the stand-in failed"))
+            try await wait("the problem") { !observer.problems.isEmpty }
+            try await wait("the restart") { sources.count == 2 }
+            try await wait("the new file") {
+                try? sendNext(0.25, buffers: 1, to: sources.last)
+                return (try? manifestOnDisk().audioFiles.count) == 2
+            }
+            try await Task.sleep(for: .milliseconds(3100))
+            #expect(observer.callsToAction.isEmpty)
+            sources.last.lose(.captureFailed("the stand-in failed again"))
+            try await wait("the call to action", seconds: 10) { !observer.callsToAction.isEmpty }
+            #expect(observer.callsToAction.map(\.problem) == ["The audio input \(name) failed"])
+            let summary = await stop()
+            #expect(summary.asksToReportIt)
         }
 
         /// A capture ending while its input has no audio ends that no audio with it: its line turns to the past,
@@ -1643,7 +1677,9 @@ extension GlobalRecordingLog {
             #expect(summary.manifest.audioFiles.count == 1)
             #expect(summary.manifest.problems.isEmpty)
             #expect(summary.manifest.result == .ok)
+            #expect(!summary.asksToReportIt)
             #expect(observer.problems.isEmpty)
+            #expect(observer.callsToAction.isEmpty)
             #expect(observer.eventLines.allSatisfy { !$0.isFailure })
             let log = try String(contentsOf: recorder.folder.appending(path: RecordingNames.recordingLog), encoding: .utf8)
             #expect(log.contains("Audio 1 \(name): no audio since 0:00, no gap within 10 s before: no problem (D81)"))

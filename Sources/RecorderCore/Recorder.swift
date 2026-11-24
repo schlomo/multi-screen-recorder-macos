@@ -7,12 +7,15 @@ import RecorderLogic
 /// `msr record`, standard error.
 @MainActor
 public protocol RecorderObserver: AnyObject {
+    /// A problem's call to action falls due (D84): the Dock bounces, the badge shows "!" and `msr record`'s
+    /// status line counts it.
+    func recorder(_ recorder: Recorder, callToAction problem: RecordingProblem)
     /// Free space below the low disk warning threshold, or back above it.
     func recorder(_ recorder: Recorder, lowDiskSpace: Bool)
     /// A screen's file ended because it showed another screen's picture,
     /// or (nil) no screen is in that state any more.
     func recorder(_ recorder: Recorder, screenShowsAnotherScreensPicture screen: String?)
-    /// A problem, also listed in the recording manifest's `problems`;
+    /// A problem, also listed in the recording manifest's `problems`, for `msr record`'s standard error;
     /// `ofAnEvent` when an event's line tells the same failure (D65).
     func recorder(_ recorder: Recorder, problem: RecordingProblem, ofAnEvent: Bool)
     /// An event of the recording manifest, as one line (`EventLine`), or
@@ -143,6 +146,9 @@ public final class Recorder {
     private let cameraFrameWatch: CameraFrameWatch
     /// How often the audio delays are measured.
     private let audioDelayInterval: Duration
+    /// How long a failing source's problem waits for its call to action (D84).
+    private let unrecoveredAfter: Duration
+    private var callToActionTask: Task<Void, Never>?
     /// The input volume of each audio input with a running capture, by its UID (D69).
     private var inputVolumes: [String: InputVolumeFollow] = [:]
     private var inputVolumeTask: Task<Void, Never>?
@@ -174,11 +180,12 @@ public final class Recorder {
     init(
         settings: Settings, homeFolder: URL, app: String, readyCheckFacts: ReadyCheckFacts, observer: any RecorderObserver,
         devices: RecorderDevices, cameraFrameWatch: CameraFrameWatch = CameraFrameWatch(),
-        audioDelayInterval: Duration = AudioDelay.interval
+        audioDelayInterval: Duration = AudioDelay.interval, unrecoveredAfter: Duration = RecorderValues.unrecoveredAfter
     ) throws(RecorderStartError) {
         self.devices = devices
         self.cameraFrameWatch = cameraFrameWatch
         self.audioDelayInterval = audioDelayInterval
+        self.unrecoveredAfter = unrecoveredAfter
         let readsScreens = ReadyCheck.needsScreenRecording(settings)
         let screens: [ConnectedScreen]
         do {
@@ -420,6 +427,7 @@ public final class Recorder {
             freeSpaceTask?.cancel()
             cpuTask?.cancel()
             delayTask?.cancel()
+            callToActionTask?.cancel()
             stopReadingInputVolumes()
             sampleCPU()
             unregisterForChanges()
@@ -458,7 +466,7 @@ public final class Recorder {
         }
         return RecordingSummary(
             manifest: manifest, recordingFolder: folder.path(percentEncoded: false), seconds: elapsedSeconds,
-            manifestWritten: finalManifestWritten)
+            manifestWritten: finalManifestWritten, problemsAskToReportIt: problemsTold.asksToReportIt)
     }
 
     // MARK: Screen changes
@@ -1545,11 +1553,30 @@ public final class Recorder {
         }
     }
 
-    /// To the logs and, if it `notifies`, the observer: the Dock, the badge and the count (D79).
+    /// To the logs and, if it `notifies`, the observer (`msr record`'s standard error, D79); then the calls to
+    /// action due.
     private func told(_ problem: RecordingProblem, ofAnEvent: Bool = false, notifies: Bool = true) {
         RecorderLog.error("at \(problem.at)s: \(problem.text)", category: "recorder")
         recordingLog?.problem(problem)
         if notifies { observer?.recorder(self, problem: problem, ofAnEvent: ofAnEvent) }
+        callToAction()
+    }
+
+    /// Each problem whose call to action is due to the observer, and a wait for the next one of a failing
+    /// source (D84).
+    private func callToAction() {
+        let now = context.now()
+        for problem in problemsTold.callsToAction(now: now, unrecoveredAfter: unrecoveredAfter) {
+            RecorderLog.detail("call to action: \(problem.text)", category: "recorder")
+            observer?.recorder(self, callToAction: problem)
+        }
+        callToActionTask?.cancel()
+        guard !isStopped, let due = problemsTold.nextCallToAction(unrecoveredAfter: unrecoveredAfter) else { return }
+        callToActionTask = Task { [weak self] in
+            try? await Task.sleep(for: .nanoseconds(max(0, due - now)))
+            guard !Task.isCancelled else { return }
+            self?.callToAction()
+        }
     }
 
     /// Events now in the manifest: every one to the logs, to the observer

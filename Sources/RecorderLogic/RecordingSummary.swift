@@ -7,17 +7,28 @@ public struct RecordingSummary: Equatable, Sendable {
     public let seconds: Double
     /// Whether the finalized manifest was written; if not, the file on disk has no `ended`.
     public let manifestWritten: Bool
+    /// A problem whose call to action includes "report it" was told (`ProblemsTold.asksToReportIt`, D84).
+    public let problemsAskToReportIt: Bool
 
-    public init(manifest: RecordingManifest, recordingFolder: String, seconds: Double, manifestWritten: Bool) {
+    public init(manifest: RecordingManifest, recordingFolder: String, seconds: Double, manifestWritten: Bool, problemsAskToReportIt: Bool) {
         self.manifest = manifest
         self.recordingFolder = recordingFolder
         self.seconds = seconds
         self.manifestWritten = manifestWritten
+        self.problemsAskToReportIt = problemsAskToReportIt
     }
 
     /// Ended with an error (exit 3): the manifest's result is `problems`
     /// (D47, D64), or the finalized manifest could not be written (F3).
     public var endedWithError: Bool { !manifest.endedWell || manifest.result == .problems || !manifestWritten }
+
+    /// Whether the person is asked to report the recording, by `msr record`'s `Report it:` line and the app's
+    /// next start (D84): a problem asked to report it, or data was lost, a file not finalized or the manifest
+    /// without its end.
+    public var asksToReportIt: Bool {
+        let files = manifest.files.map(\.state) + manifest.cameraFiles.map(\.state) + manifest.audioFiles.map(\.state)
+        return problemsAskToReportIt || !manifestWritten || files.contains { $0 != .finalized }
+    }
 
     public var text: String {
         var lines = ["Recorded \(Self.elapsed(seconds: seconds)) into \(recordingFolder)"]
@@ -60,7 +71,7 @@ public struct RecordingSummary: Equatable, Sendable {
         Self.failureLines(of: manifest, endMissing: !manifestWritten)
     }
 
-    /// The end of the summary of a recording that ended with an error: the
+    /// The end of the summary of a recording that asks to report it (D84): the
     /// link to report it, with what went wrong, and what to attach (D64).
     public func reportText(version: String) -> String {
         "Report it: \(ProblemReport.issueURL(whatWentWrong: whatWentWrong, version: version).absoluteString)\n"

@@ -62,13 +62,11 @@ import Testing
 }
 
 @Suite struct RecordingStatusBadgeTests {
-    @Test func lowDiskSpaceAScreenShowingAnotherPictureAndProblemsEachSetTheBadge() {
+    /// The problems are those whose call to action was given (D84).
+    @Test func lowDiskSpaceAndProblemsEachSetTheBadge() {
         #expect(RecordingStatus().badge == nil)
         var status = RecordingStatus()
         status.isLowOnDisk = true
-        #expect(status.badge == "!")
-        status = RecordingStatus()
-        status.screenShowingAnotherScreensPicture = "Screen 2"
         #expect(status.badge == "!")
         status = RecordingStatus()
         status.problems = ["a"]

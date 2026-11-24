@@ -5,7 +5,7 @@ public enum StatusLine {
     /// with a camera being recorded "2 screens, 1 camera, 5 audio";
     /// `line` is the window's line, `rows` its table: the sources being recorded are the rows that say
     /// "recording", and a stalled camera, whose file is still written.
-    /// The problems are the status's `problems`; none are not mentioned.
+    /// The problems are the status's `problems`, those whose call to action was given (D84); none are not mentioned.
     public static func text(line: String, cpu: String?, rows: [RecordingStatusTable.Row], status: RecordingStatus) -> String {
         let written: Set = [RecordingStatusTable.StateText.recording.rawValue, RecordingStatusTable.StateText.stalled.rawValue]
         let recording = rows.filter { written.contains($0.state) }

@@ -169,7 +169,7 @@ final class RecordCommandDelegate: NSObject, NSApplicationDelegate {
         stopping = Task {
             if let summary = await session.stop() {
                 // The summary is the message of a run that exits 3, so `--quiet` still tells it then.
-                let report = summary.endedWithError ? summary.reportText(version: runningVersion.description) : ""
+                let report = summary.asksToReportIt ? summary.reportText(version: runningVersion.description) : ""
                 output.tell(.summary(endedWithError: summary.endedWithError), summary.text + report)
                 if summary.endedWithError { exitStatus = recordingEndedWithErrorExitCode }
             }
