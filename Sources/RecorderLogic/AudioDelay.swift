@@ -65,8 +65,8 @@ public enum AudioDelay {
         /// When its windows began to be measured against another reference, and the value before: hindsight's
         /// other places to split a file, never merged across (D85).
         private var referenceChanges: [(at: Double, before: Double)] = []
-        /// The reference device its latest window was measured against.
-        private var reference: String?
+        /// The device its latest window was measured against.
+        private var latestReferenceDevice: String?
 
         public init() {}
 
@@ -83,8 +83,8 @@ public enum AudioDelay {
         /// the audio delay changed.
         @discardableResult
         public mutating func add(_ lag: Double, at: Double, against reference: String? = nil) -> Bool {
-            if let delay, let before = self.reference, let reference, before != reference { referenceChanges.append((at, delay)) }
-            if let reference { self.reference = reference }
+            if let delay, let before = latestReferenceDevice, let reference, before != reference { referenceChanges.append((at, delay)) }
+            if let reference { latestReferenceDevice = reference }
             windows.append((at, lag))
             let wasCarriedOver = isCarriedOver
             isCarriedOver = false
@@ -126,7 +126,8 @@ public enum AudioDelay {
 
         /// The stretches split at each change of the 60 s rule and of the reference, each with the median of the
         /// windows ending within it, one with fewer than 2 with its live value (the value before the next change,
-        /// or `current`); neighbours within a frame merge, never across a change of the reference (D85); the first at 0.
+        /// or `current`); neighbours within a frame merge, but across a change of the reference one within a frame of
+        /// the entry before only adds no entry, its windows kept apart (D85); the first at 0.
         static func stretches(
             windows: [(at: Double, lag: Double)], ruleChanges: [(at: Double, before: Double)],
             referenceChanges: [(at: Double, before: Double)] = [], current: Double, fileStart: Double = 0
@@ -137,14 +138,19 @@ public enum AudioDelay {
             var lags: [[Double]] = Array(repeating: [], count: bounds.count + 1)
             for window in windows { lags[bounds.firstIndex { window.at < $0 } ?? bounds.count].append(window.lag) }
             let live = splits.map(\.before) + [current]
-            var merged: [(start: Double, lags: [Double], delay: Double)] = []
+            // `sealed`: a stretch after a change of reference was dropped into it, so it takes no more windows.
+            var merged: [(start: Double, lags: [Double], delay: Double, sealed: Bool)] = []
             for index in lags.indices {
                 let delay = lags[index].count >= 2 ? median(lags[index])! : live[index]
-                if let last = merged.last, !splits[index - 1].ofReference, abs(delay - last.delay) <= RecorderValues.audioDelayTolerance {
-                    let both = last.lags + lags[index]
-                    merged[merged.count - 1] = (last.start, both, both.count >= 2 ? median(both)! : last.delay)
+                if let last = merged.last, abs(delay - last.delay) <= RecorderValues.audioDelayTolerance {
+                    if last.sealed || splits[index - 1].ofReference {
+                        merged[merged.count - 1].sealed = true
+                    } else {
+                        let both = last.lags + lags[index]
+                        merged[merged.count - 1] = (last.start, both, both.count >= 2 ? median(both)! : last.delay, false)
+                    }
                 } else {
-                    merged.append((index == 0 ? 0 : max(0, bounds[index - 1] - fileStart), lags[index], delay))
+                    merged.append((index == 0 ? 0 : max(0, bounds[index - 1] - fileStart), lags[index], delay, false))
                 }
             }
             return merged.map { .init(at: ($0.start * 1000).rounded() / 1000, delay: ($0.delay * 10_000).rounded() / 10_000) }

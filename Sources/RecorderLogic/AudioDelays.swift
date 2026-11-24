@@ -60,14 +60,15 @@ public struct AudioDelays: Sendable {
     /// start-over (D80).
     public private(set) var anchor: String?
     /// The anchor's files, its audio delay 0 by definition: those of its device that became known while it was
-    /// the reference (D85).
+    /// the reference, as its first file or after another of them (D85).
     private var anchorFiles: Set<String> = []
     /// By device UID, so an input out of the guide track stays out with its next file.
     private var membership = GuideTrackMembership()
     private var earlierBy: [String: Double?] = [:]
     /// How much earlier each device's file was placed, by the device's UID, so a new file is no new join.
     private var placed: [String: Double] = [:]
-    private var reference: String?
+    /// The reference's file, by name.
+    private var referenceFile: String?
     private var known = 0
 
     public init() {}
@@ -86,7 +87,8 @@ public struct AudioDelays: Sendable {
         for (name, uid) in newest.sorted(by: { $0.key < $1.key }) where files[name] == nil {
             let earlier = files.filter { $0.value.uid == uid }.max { $0.value.order < $1.value.order }
             known += 1
-            if uid == anchor, referenceUID == anchor {
+            // Only after an anchor file, or as the device's first: a file after a measured one carries that over.
+            if uid == anchor, referenceUID == anchor, earlier.map({ anchorFiles.contains($0.key) }) ?? true {
                 anchorFiles.insert(name)
                 files[name] = File(uid: uid, order: known, applied: AudioDelay.Applied())
                 continue
@@ -100,9 +102,9 @@ public struct AudioDelays: Sendable {
                 uid: uid, order: known, applied: carried.map { AudioDelay.Applied(carriedOver: $0.1) } ?? AudioDelay.Applied())
         }
         self.newest = Dictionary(newest.map { ($0.value, $0.key) }) { $1 }
-        let previous = self.reference.flatMap { files[$0] }
+        let previous = referenceFile.flatMap { files[$0] }
         if delay(of: reference) == nil {
-            lines.append("reference \(self.reference ?? "none") → \(reference): it has no audio delay, so it is the new anchor and every input starts over")
+            lines.append("reference \(referenceFile ?? "none") → \(reference): it has no audio delay, so it is the new anchor and every input starts over")
             // shortcut: only when no input being written has an audio delay (the recorder picks such a reference
             // first), the new anchor's audio delay against the old one is unknown and taken as 0, so every input
             // starts over and the entries written so far stay against the old anchor; keep the old anchor's last
@@ -116,9 +118,9 @@ public struct AudioDelays: Sendable {
         // the reference against another input with an audio delay if a drifting reference proves common.
         let base = delay(of: reference)!
         if let previous, previous.uid != referenceUID, !lines.contains(where: { $0.hasPrefix("reference ") }) {
-            lines.append("reference \(self.reference!) → \(reference): lags re-based onto the anchor by \(AudioDelay.text(base))")
+            lines.append("reference \(referenceFile!) → \(reference): lags re-based onto the anchor by \(AudioDelay.text(base))")
         }
-        self.reference = reference
+        referenceFile = reference
         for name in unclear.sorted() where files[name] != nil {
             files[name]!.unclear += 1
             if files[name]!.unclear == RecorderValues.audioDelayUnclearMeasurements, delay(of: name) == nil {
@@ -187,7 +189,7 @@ public struct AudioDelays: Sendable {
     }
 
     /// The device of the reference in use: it stays the reference while its file is written (D85).
-    public var referenceDevice: String? { reference.flatMap { files[$0]?.uid } }
+    public var referenceDevice: String? { referenceFile.flatMap { files[$0]?.uid } }
 
     /// Whether the file has an audio delay, or will carry one over once known, so the recorder can pick another
     /// reference when the reference's file ends (D80, D85). The anchor's files have one, 0.
