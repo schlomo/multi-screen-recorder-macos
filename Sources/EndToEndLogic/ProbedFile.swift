@@ -94,7 +94,9 @@ public enum FileCheck {
                 let expected = Int((((file.end ?? file.start) - file.start) * framesPerSecond).rounded())
                 if abs(frames - expected) > 1 { fail("\(frames) frames, expected \(expected) for its length (30 per second)") }
             case .killed(let at):
-                let least = Int(((at - file.start - fragmentSeconds - slack) * framesPerSecond).rounded(.down))
+                // Its fragments wait for the guide tracks, mixed `guideTrackDelay` behind.
+                let least = Int(((at - file.start - fragmentSeconds - EndToEndValues.guideTrackDelay - slack) * framesPerSecond)
+                    .rounded(.down))
                 if frames < least { fail("\(frames) frames readable after the kill, expected at least \(least)") }
             }
         case .audioInput(_, _, let channels):

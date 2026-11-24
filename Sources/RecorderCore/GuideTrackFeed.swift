@@ -4,7 +4,8 @@ import Synchronization
 
 /// The guide tracks of a recording (D31, D49): audio captures hand their
 /// buffers in, and every `guideTrackInterval` the mixes, `guideTrackDelay`
-/// behind real time, go to every screen file listening. Thread-safe.
+/// behind real time, each audio input placed by its audio delay (D80), go
+/// to every screen file listening. Thread-safe.
 public final class GuideTrackFeed: Sendable {
     public typealias Listener = @Sendable (_ guide: GuideTrack, _ channels: [[Float]], _ positionFromStart: Int64) -> Void
 
@@ -83,12 +84,31 @@ public final class GuideTrackFeed: Sendable {
         }
     }
 
-    /// An audio source joins its guide track, if the recording has it.
-    func add(source name: String, channelCount: Int, to guide: GuideTrack) {
+    /// An audio source joins its guide track, if the recording has it, placed `earlierBy` samples earlier;
+    /// nil: not mixed until it is placed (D80).
+    func add(source name: String, channelCount: Int, earlierBy: Int64? = 0, to guide: GuideTrack) {
         state.withLock { state in
             guard state.mixes[guide] != nil, state.mixes[guide]?.contains(source: name) == false else { return }
-            state.mixes[guide]?.add(source: name, channelCount: channelCount)
+            state.mixes[guide]?.add(source: name, channelCount: channelCount, earlierBy: earlierBy)
         }
+    }
+
+    /// A source's placement in its guide track changes (`GuideTrackMix.place`), if it is in it.
+    func place(source name: String, earlierBy: Int64?, in guide: GuideTrack) {
+        state.withLock { state in
+            guard state.mixes[guide]?.contains(source: name) == true else { return }
+            state.mixes[guide]?.place(source: name, earlierBy: earlierBy)
+        }
+    }
+
+    /// Whether the source is mixed: in its guide track with a placement.
+    func isMixed(source name: String, in guide: GuideTrack) -> Bool {
+        state.withLock { $0.mixes[guide]?.isMixed(source: name) == true }
+    }
+
+    /// The sample position the guide track's next mix starts at, if the recording has it.
+    func mixedUpTo(_ guide: GuideTrack) -> Int64? {
+        state.withLock { $0.mixes[guide]?.mixedUpTo }
     }
 
     func remove(source name: String, from guide: GuideTrack) {
@@ -96,10 +116,6 @@ public final class GuideTrackFeed: Sendable {
             guard state.mixes[guide]?.contains(source: name) == true else { return }
             state.mixes[guide]?.remove(source: name)
         }
-    }
-
-    func contains(source name: String, in guide: GuideTrack) -> Bool {
-        state.withLock { $0.mixes[guide]?.contains(source: name) == true }
     }
 
     func receive(_ channels: [[Float]], from name: String, to guide: GuideTrack, at time: Int64) {

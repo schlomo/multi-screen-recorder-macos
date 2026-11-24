@@ -260,7 +260,7 @@ The named scenarios, each about 10 to 25 s of recording:
 | `tone` | the test tone in BlackHole, all audio inputs recorded, no system audio | the tone's level, no silent stretch and a click every second in each of BlackHole's tracks; the clicks at the same time of day, by timecode, in every screen file's guide track "Audio inputs" |
 | `system-audio` | as `tone`, with the system audio | the system audio's file: one stereo track, its length |
 | `stop-by-ctrl-c` | auto mode, SIGINT | exit 0, finalized |
-| `stop-by-kill` | auto mode, `kill -9` | no `ended`, every file `recording` and readable up to its last fragment |
+| `stop-by-kill` | auto mode, `kill -9` | no `ended`, every file `recording` and readable up to its last fragment, less 0.5 s of slack (`killSlack`); a screen file's less the guide tracks' delay of 1 s too, as its fragment is written only once its guide samples arrive (`EndToEndValues.guideTrackDelay`, D80) |
 
 Every scenario's checks: `msr record`'s exit status, the recording
 folder's path alone on standard output, `recording.log` present next to `recording.json`, the timeline file (D68) in the folder not counted as a recorded file (its content is not checked here), `recording.json` exactly

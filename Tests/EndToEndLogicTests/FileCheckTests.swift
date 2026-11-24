@@ -119,9 +119,12 @@ import Testing
         #expect(try failures(killed, Self.audioProbe(titles: Self.audioTitles), ending: .killed(at: 9)).count == 2)
         var screen = Self.screenFile
         screen.end = nil
-        #expect(try failures(screen, Self.screenProbe(frames: 147), ending: .killed(at: 7)) == [])
-        #expect(try failures(screen, Self.screenProbe(frames: 147), ending: .killed(at: 8)) == [
-            "2026-11-19 08.00.56 Screen 2 - Wacom One 13T.mov: 147 frames readable after the kill, expected at least 156",
+        // A screen file's fragments also wait for its guide tracks, mixed 1 s behind (D80):
+        // a kill at 8 s needs (8 - 0.3 - 2 - 1 - 0.5) × 30 = 126 frames, at 9.51 s 171.
+        #expect(EndToEndValues.guideTrackDelay == 1)
+        #expect(try failures(screen, Self.screenProbe(frames: 147), ending: .killed(at: 8)) == [])
+        #expect(try failures(screen, Self.screenProbe(frames: 147), ending: .killed(at: 9.51)) == [
+            "2026-11-19 08.00.56 Screen 2 - Wacom One 13T.mov: 147 frames readable after the kill, expected at least 171",
         ])
     }
 

@@ -98,10 +98,11 @@ public enum RecordingStatusTable {
     /// The audio sources' rows, below the cameras': Records at is the
     /// channels of the source's newest audio file; `clockDrift` the latest
     /// clock drift correction status of each source's running capture; Clock
-    /// drift adds the delay measured for its file being written (D77): "-116 ppm (+34.9 ms) · 550 ms late".
+    /// drift adds what `audioDelays` shows for its file being written (D80):
+    /// "-116 ppm (+34.9 ms) · synced 550 ms late (measured)".
     public static func audioRows(
         sources: [AudioTracker.Source], files: [RecordingManifest.AudioFile], bytes: [String: Int64],
-        clockDrift: [AudioTracker.SourceID: ClockDriftCorrection.Status]
+        clockDrift: [AudioTracker.SourceID: ClockDriftCorrection.Status], audioDelays: [String: AudioDelays.Shown] = [:]
     ) -> [Row] {
         sources.map { source in
             let own = files.filter { file in
@@ -120,10 +121,18 @@ public enum RecordingStatusTable {
             let cell: SourceCell = source.id == .systemAudio
                 ? .systemAudio(isRecorded: true) : .audioInput(source.number, name: source.name)
             let drift = source.state == .recording || source.state == .noAudio ? clockDriftText(clockDrift[source.id]) : ""
-            let delay = own.last { $0.end == nil }?.measuredDelay.map(AudioDelay.text)
+            let delay = own.last { $0.end == nil }.flatMap { audioDelays[$0.name] }.map(audioDelayText)
             return Row(
                 source: cell, recordsAt: channels, files: own.count, written: written, state: text(source.state),
                 clockDrift: [drift, delay ?? ""].filter { !$0.isEmpty }.joined(separator: " · "), audioSource: source.id)
+        }
+    }
+
+    /// "synced 550 ms late (measured)", "synced 550 ms late (carried over)", "not in the guide track yet".
+    static func audioDelayText(_ shown: AudioDelays.Shown) -> String {
+        switch shown {
+        case .notInTheGuideTrackYet: "not in the guide track yet"
+        case .synced(let delay, let carriedOver): "synced \(AudioDelay.text(delay)) (\(carriedOver ? "carried over" : "measured"))"
         }
     }
 

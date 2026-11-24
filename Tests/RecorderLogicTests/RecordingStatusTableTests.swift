@@ -152,29 +152,35 @@ import Testing
         #expect(text(.init(clockDriftPpm: -0.3, applied: -0.000_04, remaining: 0)) == "0 ppm (0 ms)")
     }
 
-    /// Once measured, the delay of the file being written follows the clock drift (D77).
-    @Test func anAudioInputShowsItsMeasuredDelay() {
+    /// The audio delay of the file being written follows the clock drift, uncoloured: synced, measured or
+    /// carried over, or not in the guide track yet (D80).
+    @Test func anAudioInputShowsItsAudioDelay() {
         var settings = Settings.defaults
         settings.auto = false
         settings.audioMode = .allInputs
         settings.systemAudio = false
         var tracker = AudioTracker(settings: settings)
-        let osmo = AudioInputInfo(name: "OsmoPocket4P", channelCount: 1, isDefault: false, transport: .usb, uid: "O")
-        let razer = AudioInputInfo(name: "Razer Seiren V3 Mini", channelCount: 1, isDefault: true, transport: .usb, uid: "R")
-        _ = tracker.begin(inputs: [osmo, razer], mainDisplayID: 1, screens: [1], at: 0)
-        _ = tracker.fileStarted(.input("O"), at: 0)
-        _ = tracker.fileStarted(.input("R"), at: 0)
-        var measured = RecordingManifest.AudioFile(
-            name: "o.mov", audioSource: "OsmoPocket4P", audioSourceUID: "O", channels: .mono(1), start: 0, timecode: "t")
-        measured.measuredDelay = 0.5504
-        var ended = RecordingManifest.AudioFile(
-            name: "r.mov", audioSource: "Razer Seiren V3 Mini", audioSourceUID: "R", channels: .mono(1), start: 0, timecode: "t")
-        ended.measuredDelay = -0.2
-        ended.end = 5
-        let rows = RecordingStatusTable.audioRows(sources: tracker.sourcesShown, files: [measured, ended], bytes: [:], clockDrift: [
-            .input("O"): ClockDriftCorrection.Status(clockDriftPpm: -116.12, applied: 0.03494, remaining: 0.00004),
+        let inputs = [("O", "OsmoPocket4P"), ("R", "Razer Seiren V3 Mini"), ("B", "BRIO"), ("C", "CalDigit")].map { uid, name in
+            AudioInputInfo(name: name, channelCount: 1, isDefault: uid == "R", transport: .usb, uid: uid)
+        }
+        _ = tracker.begin(inputs: inputs, mainDisplayID: 1, screens: [1], at: 0)
+        let files = inputs.compactMap { input in
+            input.uid.map { uid in
+                RecordingManifest.AudioFile(
+                    name: "\(uid).mov", audioSource: input.name, audioSourceUID: uid, channels: .mono(1), start: 0, timecode: "t")
+            }
+        }
+        for file in files { _ = tracker.fileStarted(.input(file.audioSourceUID!), at: 0) }
+        let rows = RecordingStatusTable.audioRows(
+            sources: tracker.sourcesShown, files: files, bytes: [:],
+            clockDrift: [.input("O"): ClockDriftCorrection.Status(clockDriftPpm: -116.12, applied: 0.03494, remaining: 0.00004)],
+            audioDelays: [
+                "O.mov": .synced(0.5504, carriedOver: false), "B.mov": .synced(0.03, carriedOver: true), "C.mov": .notInTheGuideTrackYet,
+            ])
+        #expect(rows.map(\.clockDrift) == [
+            "-116 ppm (+34.9 ms) · synced 550 ms late (measured)", "measuring",
+            "measuring · synced 30 ms late (carried over)", "measuring · not in the guide track yet",
         ])
-        #expect(rows.map(\.clockDrift) == ["-116 ppm (+34.9 ms) · 550 ms late", "measuring"])
     }
 
     /// An audio row knows its source, for its level meter and its input

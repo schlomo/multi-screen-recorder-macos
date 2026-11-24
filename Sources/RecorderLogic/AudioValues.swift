@@ -11,9 +11,13 @@ extension RecorderValues {
     /// The longest gap filled with silence; a longer one ends the audio
     /// file and a new one starts (D46).
     public static let longestFilledAudioGap = Duration.seconds(1)
-    /// How far behind real time the guide track "Audio inputs" is mixed, so
-    /// every source's buffers have arrived.
-    public static let guideTrackDelay = Duration.milliseconds(200)
+    /// How far behind real time the guide tracks are mixed, so every
+    /// source's buffers have arrived, also those of an input placed up to
+    /// `guideTrackSyncLimit` earlier by its audio delay (D80).
+    public static let guideTrackDelay = Duration.seconds(1)
+    /// How long a change of an input's placement in "Audio inputs" fades
+    /// from the earlier placement to the new one (D80).
+    public static let guideTrackCrossfade = Duration.milliseconds(20)
     /// How often the guide tracks are mixed and handed to the screen files.
     public static let guideTrackInterval = Duration.milliseconds(100)
     /// How much audio an audio file's writer takes in one append, about
@@ -44,6 +48,21 @@ extension RecorderValues {
     /// How long an audio input must deliver exact zeros before it has no
     /// audio and its audio file ends.
     public static let noAudioTime = Duration.seconds(10)
+    /// No audio whose zeros began this soon after a gap of the same input
+    /// is the input broken by the gap, a problem (D81).
+    public static let silenceAfterGapsTime = Duration.seconds(10)
+}
+
+/// An audio input file's audio delay (D80): set at its first counted
+/// window, set once more at `AudioDelay.windowsNeeded` to their median,
+/// then changed only by the median of the counted windows of the latest
+/// `audioDelayChangeWindowSeconds`, at least `audioDelayChangeWindows` of
+/// them, each time only beyond `audioDelayTolerance`.
+extension RecorderValues {
+    public static let audioDelayChangeWindowSeconds = 60.0
+    public static let audioDelayChangeWindows = 5
+    /// One frame at 30 fps: closer than this, a new median changes nothing.
+    public static let audioDelayTolerance = 1.0 / Double(framesPerSecond)
 }
 
 /// The clock drift correction's values (*data*): the intervals the

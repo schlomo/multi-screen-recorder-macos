@@ -104,7 +104,8 @@ extension AudioFileWriter: AudioFileWriting {}
 /// to follow the shared clock by `ClockDriftCorrection`, and its corrected
 /// audio placed on the tick grid by `AudioFileTimeline`, written by an
 /// `AudioFileWriting` in appends of about 100 ms
-/// (`audioFileAppendSamples`), and handed to the source's guide track. A gap over
+/// (`audioFileAppendSamples`), and handed to the source's guide track, an
+/// audio input's placed as the recorder says (D80). A gap over
 /// the longest filled gap or a change of the channel count ends the file
 /// and starts a new one, in the same capture; an audio input's new file,
 /// after that or after no audio, starts only with its sound
@@ -149,8 +150,12 @@ final class AudioCapture: @unchecked Sendable {
     private var finishing: [Task<Void, Never>] = []
     private var isEnding = false
     private var guideChannels: Int?
-    /// The current file is out of its guide track (D79): its sound joins again when it rejoins or with the next file.
+    /// The current file is out of its guide track (D79): its sound joins again when it rejoins, or with the next
+    /// file, which the recorder then places or takes out at once (D80).
     private var isOutOfTheGuideTrack = false
+    /// The samples its sound is placed earlier in its guide track (D80); nil while an audio input is not in it
+    /// yet, which the recorder decides for each file. The system audio's is 0.
+    private var guidePlacement: Int64?
     private var correction = ClockDriftCorrection()
     /// The correction applied up to the current file's start and up to the
     /// end of what was placed in it, in seconds.
@@ -252,6 +257,7 @@ final class AudioCapture: @unchecked Sendable {
         self.context = context
         self.guides = guides
         guide = id == .systemAudio ? .systemAudio : .audioInputs
+        guidePlacement = id == .systemAudio ? 0 : nil
         self.reports = reports
         self.drainTimeout = drainTimeout
         self.now = now ?? { [context] in context.now() }
@@ -322,6 +328,17 @@ final class AudioCapture: @unchecked Sendable {
             guard open?.entry.name == name else { return false }
             isOutOfTheGuideTrack = true
             leaveGuide()
+            return true
+        }
+    }
+
+    /// The file `name`, if still the current one, is placed `earlierBy` samples earlier in its guide track,
+    /// nil: not in it yet; whether it is (D80).
+    func placeInTheGuideTrack(file name: String, earlierBy: Int64?) -> Bool {
+        queue.sync {
+            guard open?.entry.name == name else { return false }
+            guidePlacement = earlierBy
+            if guideChannels != nil { guides.place(source: label, earlierBy: earlierBy, in: guide) }
             return true
         }
     }
@@ -593,7 +610,7 @@ final class AudioCapture: @unchecked Sendable {
     private func joinGuide(channelCount: Int) {
         guard !isOutOfTheGuideTrack, guideChannels != channelCount else { return }
         if guideChannels != nil { guides.remove(source: label, from: guide) }
-        guides.add(source: label, channelCount: channelCount, to: guide)
+        guides.add(source: label, channelCount: channelCount, earlierBy: guidePlacement, to: guide)
         guideChannels = channelCount
     }
 

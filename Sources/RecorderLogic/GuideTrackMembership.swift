@@ -1,9 +1,8 @@
-/// Which audio inputs' files the "Audio inputs" guide track mixes (D79). Each file being written has a
-/// value against the reference's file: the median of its counted windows once it has 3 (D77), its first
-/// counted window's lag before; the reference's own file is 0. The largest group whose values lie within
-/// `RecorderValues.guideTrackSyncLimit` of each other stays; on a tie the group holding the files that
-/// stayed before, else the one with the earliest input. A file outside it leaves; a file that left rejoins
-/// when its median lies within the group.
+/// Which audio inputs' files the "Audio inputs" guide track mixes (D79, D80), by their audio delays against
+/// the reference's file, the reference's own 0. The largest group whose audio delays lie within
+/// `RecorderValues.guideTrackSyncLimit` of each other stays; on a tie the group holding the files that stayed
+/// before, else the one with the earliest input. A file outside it leaves; a file that left rejoins when its
+/// audio delay lies within the group, or when it no longer has one (it is then not in the guide track yet).
 public struct GuideTrackMembership: Sendable {
     public struct Change: Equatable, Sendable {
         /// The files that leave, each with its offset from the staying group's earliest input.
@@ -16,7 +15,6 @@ public struct GuideTrackMembership: Sendable {
         }
     }
 
-    private var lags: [String: (reference: String, lags: [Double])] = [:]
     private var out: Set<String> = []
     private var staying: Set<String> = []
     /// A quarter of a sample at 8 kHz, below the half-sample step of a median: values at the limit stay
@@ -25,40 +23,22 @@ public struct GuideTrackMembership: Sendable {
 
     public init() {}
 
-    /// A counted window's lag of `file` against the reference's file `reference`: against another than
-    /// before, its lags start again.
-    public mutating func add(_ lag: Double, file: String, reference: String) {
-        if lags[file]?.reference != reference { lags[file] = (reference, []) }
-        lags[file]?.lags.append(lag)
-    }
-
     public func isOut(_ file: String) -> Bool { out.contains(file) }
 
-    /// The files that leave and rejoin now; `writing` are the files being written, `reference` among them:
-    /// every other file is forgotten.
+    /// The files that leave and rejoin now; `delays` are the audio delays of the files being written that
+    /// have one, `writing` all files being written: every other file is forgotten.
     public mutating func update(
-        writing: Set<String>, reference: String, limit: Double = RecorderValues.guideTrackSyncLimit
+        delays: [String: Double], writing: Set<String>, limit: Double = RecorderValues.guideTrackSyncLimit
     ) -> Change {
-        lags = lags.filter { writing.contains($0.key) }
         out.formIntersection(writing)
-        var values = [reference: 0.0]
-        var medians: Set<String> = [reference]
-        for (file, measured) in lags where measured.reference == reference && file != reference {
-            if let median = AudioDelay.delay(ofCountedLags: measured.lags) {
-                values[file] = median
-                medians.insert(file)
-            } else if let first = measured.lags.first {
-                values[file] = first
-            }
-        }
-        let staying = Self.largestGroup(values, limit: limit, holding: self.staying.subtracting(out).intersection(values.keys))
+        let staying = Self.largestGroup(delays, limit: limit, holding: self.staying.subtracting(out).intersection(delays.keys))
         self.staying = staying
-        let earliest = staying.compactMap { values[$0] }.min() ?? 0
+        let earliest = staying.compactMap { delays[$0] }.min() ?? 0
         var change = Change()
-        for (file, value) in values where !staying.contains(file) && !out.contains(file) {
-            change.leaving[file] = value - earliest
+        for (file, delay) in delays where !staying.contains(file) && !out.contains(file) {
+            change.leaving[file] = delay - earliest
         }
-        change.rejoining = Set(values.keys.filter { staying.contains($0) && out.contains($0) && medians.contains($0) })
+        change.rejoining = out.filter { staying.contains($0) || delays[$0] == nil }
         out.formUnion(change.leaving.keys)
         out.subtract(change.rejoining)
         return change

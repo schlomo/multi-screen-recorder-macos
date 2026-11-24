@@ -40,6 +40,9 @@ public enum ProblemKind: Hashable, Sendable {
     /// An audio input, by its UID, whose file is out of the "Audio inputs" guide track, `source` naming the
     /// input and the note its offset; ends when it rejoins, its file ends or it disconnects (D79).
     case audioInputOutOfTheGuideTrack(String)
+    /// An audio input, by its UID, whose no audio began right after its gaps, `source` naming the input and
+    /// the note its gaps' time; ends when its sound returns or it disconnects (D81).
+    case audioInputSilentAfterGaps(String)
     /// A video file a full disk ended; clears when there is room again.
     case diskFull
     /// A screen file or a camera file whose writer failed and that lacks what its writer was given, by its name (D66).
@@ -62,7 +65,8 @@ extension ProblemKind {
              .guideTracksCut, .audioInputOutOfTheGuideTrack:
             false
         case .diskFull, .cameraPermissionMissing, .screenNotCaptured, .cameraNotCaptured, .audioSourceFailed, .audioFileFailed,
-             .recordingLogNotWritten, .manifestNotWritten, .freeSpaceNotRead, .screensNotRead, .audioInputsNotRead:
+             .recordingLogNotWritten, .manifestNotWritten, .freeSpaceNotRead, .screensNotRead, .audioInputsNotRead,
+             .audioInputSilentAfterGaps:
             ongoing
         }
     }
@@ -101,7 +105,7 @@ extension ProblemKind {
         case .inputVolumeNotFollowed(let name): "Input volume of \(name) not followed"
         case .diskFull: "Disk full"
         case .guideTracksCut(let name): "Guide tracks of \(name) cut"
-        case .audioInputOutOfTheGuideTrack(let uid): source ?? uid
+        case .audioInputOutOfTheGuideTrack(let uid), .audioInputSilentAfterGaps(let uid): source ?? uid
         }
     }
 }
@@ -221,15 +225,12 @@ public struct ProblemsTold: Sendable {
     private static func line(_ repeats: [Told], now: Int64) -> ProblemLine {
         let latest = repeats[repeats.count - 1]
         if case .audioInputOutOfTheGuideTrack = latest.kind { return outOfTheGuideTrack(latest) }
+        if case .audioInputSilentAfterGaps = latest.kind { return silentAfterGaps(latest, now: now) }
         let isStall = if case .cameraStalled = latest.kind { true } else { false }
         let phrase = latest.kind.phrase(source: latest.source)
         let errors = repeats.map(\.problem.error)
         let why = isStall ? "" : latest.problem.error.map { ": " + (Set(errors).count > 1 ? "latest: " : "") + $0 } ?? ""
-        let ending = switch latest.ending {
-        case .recovered: "recovered"
-        case .disconnected: "then disconnected"
-        case .stopped: "stopped"
-        }
+        let ending = text(latest.ending)
         let text = if repeats.count > 1 {
             "\(phrase) \(repeats.count) times, \(seconds(repeats.reduce(Int64(0)) { $0 + ($1.ended ?? now) - $1.began })) in total"
                 + (latest.ended == nil ? "" : ", \(ending)")
@@ -254,8 +255,37 @@ public struct ProblemsTold: Sendable {
         return ProblemLine(text: text, isRed: false)
     }
 
+    /// An input silent right after its gaps, the latest time: "Audio 3 BRIO sends only silence since its gaps at
+    /// 0:25; unplug and plug it in again", red; once over "Audio 3 BRIO sent only silence for 1:05 after its gaps
+    /// at 0:25, recovered" (or the other `Ending`), orange (D81).
+    private static func silentAfterGaps(_ latest: Told, now: Int64) -> ProblemLine {
+        let input = latest.kind.phrase(source: latest.source), gaps = latest.note ?? ""
+        guard let ended = latest.ended else {
+            return ProblemLine(text: "\(input) sends only silence since its gaps at \(gaps); unplug and plug it in again", isRed: true)
+        }
+        return ProblemLine(
+            text: "\(input) sent only silence for \(seconds(ended - latest.began)) after its gaps at \(gaps), \(text(latest.ending))",
+            isRed: false)
+    }
+
+    private static func text(_ ending: Ending) -> String {
+        switch ending {
+        case .recovered: "recovered"
+        case .disconnected: "then disconnected"
+        case .stopped: "stopped"
+        }
+    }
+
+    /// The time of the first `audio input gap` of `noAudio`'s input from `silenceAfterGapsTime` before its
+    /// zeros began (`noAudioTime` before it) up to it, in seconds; nil without one: no audio right after gaps (D81).
+    public static func gapsBefore(_ noAudio: RecordingEvent, in events: [RecordingEvent]) -> Double? {
+        let from = noAudio.at - Double(RecorderValues.noAudioTime.nanoseconds + RecorderValues.silenceAfterGapsTime.nanoseconds) / 1e9
+        return events.filter { $0.event == .audioInputGap && $0.audioSource == noAudio.audioSource && (from...noAudio.at).contains($0.at) }
+            .map(\.at).min()
+    }
+
     /// "0:53" since the start, "1:02:03" from an hour on.
-    private static func time(_ nanoseconds: Int64) -> String {
+    public static func time(_ nanoseconds: Int64) -> String {
         let whole = Int(nanoseconds / 1_000_000_000)
         return whole < 3600 ? String(format: "%d:%02d", whole / 60, whole % 60) : RecordingStatusTable.elapsed(Double(whole))
     }

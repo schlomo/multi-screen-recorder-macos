@@ -4,8 +4,7 @@ import Accelerate
 /// microphone's (D77): measured while recording by cross-correlating the
 /// two over windows of `windowSeconds` at `sampleRate` mono, searching
 /// ±`searchSeconds`; a window counts only when its match is clear, and a
-/// file's delay is the median of its counted windows, once it has
-/// `windowsNeeded`.
+/// file's audio delay follows its counted windows by D80's rules (`Applied`).
 public enum AudioDelay {
     public static let sampleRate = 8000
     /// The input's samples per measured sample: 48 kHz to 8 kHz.
@@ -17,6 +16,7 @@ public enum AudioDelay {
     /// The peak of |correlation| over its median for a window to count: the
     /// owner's Mac on 2026-11-23 gave 13 to 68 for clear windows, 5 to 9 for unclear ones.
     public static let clarityNeeded: Float = 12
+    /// The counted windows at which an audio delay is set once more, to their median (D80).
     public static let windowsNeeded = 3
     /// The RMS below which a window is silent and not measured.
     static let silence: Float = 1e-5
@@ -46,43 +46,42 @@ public enum AudioDelay {
         return Window(lag: Double(lags[best]) / Double(sampleRate), clarity: Float(Double(magnitudes[best]) / median))
     }
 
-    /// The file's delay: the median of its counted windows' lags, nil with fewer than `windowsNeeded`.
-    public static func delay(ofCountedLags lags: [Double]) -> Double? {
-        lags.count >= windowsNeeded ? median(lags) : nil
-    }
-
-    /// The files' delays as written and shown: the medians against the reference
-    /// (whose own file, `reference`, counts as 0), less the smallest of them where it is
-    /// below 0, so the earliest measured input is 0 and a delayed reference never moves
-    /// the others later; the reference's file is listed when that shifts it.
-    public static func normalized(_ delays: [String: Double], reference: String?) -> [String: Double] {
-        let shift = min(0, delays.values.min() ?? 0)
-        var normalized = delays.mapValues { $0 - shift }
-        if let reference, shift < 0 { normalized[reference] = -shift }
-        return normalized
-    }
-
-    /// Each audio file's counted lags, against the reference's file they were measured with.
-    public struct Lags: Sendable {
-        private var byFile: [String: (reference: String, lags: [Double])] = [:]
+    /// An audio input file's audio delay against the reference's file (D80): set by its first counted
+    /// window, once more at `windowsNeeded` to their median if that lies more than `audioDelayTolerance`
+    /// away, then only when the median of the counted windows of the latest `audioDelayChangeWindowSeconds`,
+    /// at least `audioDelayChangeWindows`, does. One carried over from the input's earlier file holds until
+    /// the first own counted window confirms it (within the tolerance) or replaces it.
+    public struct Applied: Sendable {
+        public private(set) var delay: Double?
+        /// Carried over from the input's earlier file and not yet confirmed or replaced by an own window.
+        public private(set) var isCarriedOver = false
+        /// The own counted windows: when each ended, in seconds of the recording, and its lag.
+        private var windows: [(at: Double, lag: Double)] = []
 
         public init() {}
 
-        /// A counted window's lag against the reference's file `reference`; against another than before, the
-        /// file starts again: a new reference, or the same one's new file, as after a reconnect at another latency.
-        public mutating func add(_ lag: Double, file: String, reference: String) {
-            if byFile[file]?.reference != reference { byFile[file] = (reference, []) }
-            byFile[file]?.lags.append(lag)
+        public init(carriedOver delay: Double) {
+            self.delay = delay
+            isCarriedOver = true
         }
 
-        /// The reference's file `file` was last measured against.
-        public func reference(of file: String) -> String? { byFile[file]?.reference }
-
-        /// The delays of every file measured against the reference's file `reference`, ended ones included,
-        /// `normalized`; a file without one is not listed.
-        public func delays(reference: String) -> [String: Double] {
-            normalized(byFile.compactMapValues { $0.reference == reference ? AudioDelay.delay(ofCountedLags: $0.lags) : nil },
-                       reference: reference)
+        /// A counted window's lag, the window ending at `at`; whether the audio delay changed.
+        @discardableResult
+        public mutating func add(_ lag: Double, at: Double) -> Bool {
+            windows.append((at, lag))
+            isCarriedOver = false
+            let candidate: Double? = switch windows.count {
+            case 1: lag
+            case windowsNeeded: AudioDelay.median(windows.map(\.lag))
+            case (windowsNeeded + 1)...:
+                Optional(windows.filter { $0.at > at - RecorderValues.audioDelayChangeWindowSeconds }.map(\.lag))
+                    .flatMap { $0.count >= RecorderValues.audioDelayChangeWindows ? AudioDelay.median($0) : nil }
+            default: nil
+            }
+            guard let candidate else { return false }
+            if let delay, abs(candidate - delay) <= RecorderValues.audioDelayTolerance { return false }
+            delay = candidate
+            return true
         }
     }
 

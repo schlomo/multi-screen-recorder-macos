@@ -32,7 +32,7 @@ import Testing
         let other = (0..<count).map { _ in Float.random(in: -0.1...0.1, using: &generator) }
         let window = try #require(AudioDelay.window(reference: reference, other: other))
         #expect(!window.counts)
-        #expect(AudioDelay.delay(ofCountedLags: []) == nil)
+        #expect(AudioDelay.Applied().delay == nil)
     }
 
     @Test func aSilentWindowIsNotMeasured() {
@@ -41,34 +41,56 @@ import Testing
         #expect(AudioDelay.window(reference: reference, other: [Float](repeating: 0, count: count)) == nil)
     }
 
-    @Test func theDelayIsTheMedianOfAtLeastThreeCountedWindows() {
-        #expect(AudioDelay.delay(ofCountedLags: [0.55, 0.56]) == nil)
-        #expect(AudioDelay.delay(ofCountedLags: [0.55, 0.52, 0.6]) == 0.55)
-        #expect(AudioDelay.delay(ofCountedLags: [0.5, 0.52, 0.6, 0.4]) == 0.51)
+    @Test func theAudioDelaysValuesAreData() {
+        #expect(AudioDelay.windowsNeeded == 3)
+        #expect(RecorderValues.audioDelayChangeWindowSeconds == 60)
+        #expect(RecorderValues.audioDelayChangeWindows == 5)
+        #expect(RecorderValues.audioDelayTolerance == 1.0 / 30)
     }
 
-    /// The earliest measured input is 0: a delayed reference (an Osmo, a Bluetooth microphone)
-    /// moves itself later, never the others (D77).
-    @Test func theDelaysAreNormalizedSoTheEarliestInputIsZero() {
-        #expect(AudioDelay.normalized(["a": 0.5, "b": -0.25], reference: "r") == ["a": 0.75, "b": 0, "r": 0.25])
-        #expect(AudioDelay.normalized(["a": 0.55], reference: "r") == ["a": 0.55])
-        #expect(AudioDelay.normalized(["a": -0.1], reference: nil) == ["a": 0])
-        #expect(AudioDelay.normalized([:], reference: "r") == [:])
+    /// Counted windows `lags`, 10 s apart from 10 s on; the audio delay after each.
+    private func applied(_ lags: [Double], from start: AudioDelay.Applied = AudioDelay.Applied()) -> [Double?] {
+        var applied = start
+        return lags.enumerated().map { index, lag in
+            applied.add(lag, at: Double(index + 1) * 10)
+            // To a microsecond: a median of an even count averages two lags.
+            return applied.delay.map { ($0 * 1e6).rounded() / 1e6 }
+        }
     }
 
-    /// A file's lags count against one reference file: another (a new reference, or the same one's new
-    /// file) starts it again; every file measured against the reference counts in the normalization (D77).
-    @Test func aNewReferenceFileStartsAFilesLagsAgain() {
-        var lags = AudioDelay.Lags()
-        for lag in [0.5, 0.5, 0.5] { lags.add(lag, file: "a", reference: "r1") }
-        for lag in [-0.25, -0.25, -0.25] { lags.add(lag, file: "b", reference: "r1") }
-        #expect(lags.delays(reference: "r1") == ["a": 0.75, "b": 0, "r1": 0.25])
-        #expect(lags.reference(of: "a") == "r1")
-        lags.add(0.5, file: "a", reference: "r2")
-        #expect(lags.reference(of: "a") == "r2")
-        #expect(lags.delays(reference: "r2") == [:])
-        for lag in [0.25, 0.25] { lags.add(lag, file: "a", reference: "r2") }
-        #expect(lags.delays(reference: "r2") == ["a": 0.25])
+    /// The first counted window sets the audio delay, the third once more to the median if it lies more than
+    /// a frame away; one frame or less changes nothing (D80).
+    @Test func theFirstCountedWindowSetsTheAudioDelayAndTheThirdCorrectsIt() {
+        #expect(applied([0.01, 0.5, 0.5]) == [0.01, 0.01, 0.5])
+        #expect(applied([0.55, 0.52, 0.53]) == [0.55, 0.55, 0.55])
+    }
+
+    /// After the third, only the median of the latest 60 s, at least 5 counted windows, changes it, and only
+    /// beyond a frame: a single stray window never does (D80).
+    @Test func afterTheThirdOnlyTheMedianOfTheLatestMinuteChangesIt() {
+        let lags = [0.55, 0.55, 0.55, 0.9, 0.47, 0.47, 0.47, 0.47, 0.47, 0.47]
+        // From the 7th the latest 60 s hold 6 windows: their median 0.51, then 0.47.
+        #expect(applied(lags) == [0.55, 0.55, 0.55, 0.55, 0.55, 0.55, 0.51, 0.47, 0.47, 0.47])
+        // Fewer than 5 counted windows in the latest 60 s: no change, however far the median.
+        var sparse = AudioDelay.Applied()
+        for (index, lag) in [0.55, 0.55, 0.55].enumerated() { sparse.add(lag, at: Double(index + 1) * 10) }
+        for (index, lag) in [0.3, 0.3, 0.3, 0.3].enumerated() { sparse.add(lag, at: 100 + Double(index) * 20) }
+        #expect(sparse.delay == 0.55)
+    }
+
+    /// A carried-over audio delay holds until the file's own first counted window: within a frame it is
+    /// confirmed, beyond it replaced; either way it is measured from then on (D80).
+    @Test func aCarriedOverAudioDelayIsConfirmedOrReplacedByTheFirstOwnWindow() {
+        var confirmed = AudioDelay.Applied(carriedOver: 0.55)
+        #expect(confirmed.isCarriedOver)
+        let changed = confirmed.add(0.56, at: 10)
+        #expect(!changed)
+        #expect(confirmed.delay == 0.55 && !confirmed.isCarriedOver)
+        var replaced = AudioDelay.Applied(carriedOver: 0.55)
+        let replacedChanged = replaced.add(0.47, at: 10)
+        #expect(replacedChanged)
+        #expect(replaced.delay == 0.47 && !replaced.isCarriedOver)
+        #expect(applied([0.47, 0.6, 0.6], from: AudioDelay.Applied(carriedOver: 0.55)) == [0.47, 0.47, 0.6])
     }
 
     @Test func theDelayReadsLateOrEarly() {
