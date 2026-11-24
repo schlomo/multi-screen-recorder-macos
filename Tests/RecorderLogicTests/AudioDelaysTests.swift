@@ -68,13 +68,13 @@ import Testing
     }
 
     /// A new file of an input whose earlier file had an audio delay starts with it, carried over, until its
-    /// own first counted window confirms it; the list names the earlier file while it is carried over.
+    /// own first counted window confirms it; the list gives the value alone, a confirmation adding nothing.
     @Test func aNewFileOfAnInputCarriesOverItsAudioDelay() {
         var delays = AudioDelays()
         _ = delays.update(files: recorded(["a1.mov"]), reference: "r.mov", lags: ["a1.mov": 0.5], at: 20)
         let carried = delays.update(files: recorded(["a2.mov"]), reference: "r.mov")
         #expect(carried.earlierBy == ["r.mov": 0, "a2.mov": 0.5])
-        #expect(carried.delays == ["a2.mov": Entry(delay: 0.5, carriedOverFrom: "a1.mov")])
+        #expect(carried.delays == ["a2.mov": Entry(delay: 0.5)])
         #expect(delays.shown("a2.mov") == .synced(0.5, carriedOver: true))
         let confirmed = delays.update(files: recorded(["a2.mov"]), reference: "r.mov", lags: ["a2.mov": 0.51], at: 40)
         #expect(confirmed.delays == ["a2.mov": Entry(delay: 0.5)])
@@ -98,6 +98,7 @@ import Testing
         var delays = AudioDelays()
         _ = delays.update(files: recorded(["a.mov", "b.mov"]), reference: "r.mov", lags: ["a.mov": 0.5, "b.mov": 0.2], at: 20)
         let without = delays.update(files: ["a.mov": "A", "b.mov": "B"], reference: "a.mov", lags: ["b.mov": -0.3], at: 30)
+        #expect(without.lines.first == "reference r.mov → a.mov: lags re-based onto the anchor by 500 ms late")
         #expect(rounded(without.earlierBy) == ["a.mov": 0.3, "b.mov": 0])
         #expect(rounded(without.delays) == ["a.mov": 0.5, "b.mov": 0.2])
         #expect(without.leaving.isEmpty)
@@ -111,6 +112,7 @@ import Testing
         var delays = AudioDelays()
         _ = delays.update(files: recorded(["a1.mov", "c.mov"]), reference: "r.mov", lags: ["a1.mov": 0.5], at: 20)
         let other = delays.update(files: ["a1.mov": "A", "c.mov": "C"], reference: "c.mov")
+        #expect(other.lines.first == "reference r.mov → c.mov: it has no audio delay, so it is the new anchor and every input starts over")
         #expect(other.earlierBy == ["c.mov": 0, "a1.mov": nil])
         #expect(other.delays.isEmpty)
         #expect(delays.shown("a1.mov") == .notInTheGuideTrackYet)
@@ -127,5 +129,32 @@ import Testing
         let after = delays.update(files: recorded(["b.mov"]), reference: "r.mov")
         #expect(rounded(after.delays) == ["b.mov": 0.2])
         #expect(rounded(after.earlierBy) == ["r.mov": 0, "b.mov": 0.2])
+    }
+
+    /// The recording log's lines say every decision: a carry-over and its confirmation, and a change by the
+    /// median of the latest minute, the mix crossfading.
+    @Test func everyDecisionIsALineForTheRecordingLog() {
+        var delays = AudioDelays()
+        let first = delays.update(files: recorded(["a1.mov"]), reference: "r.mov", lags: ["a1.mov": 0.5], at: 10)
+        #expect(first.lines == [
+            "a1.mov: audio delay set by its first counted window: 500 ms late",
+            "a1.mov: joins the guide track placed earlier by 500 ms (the mix's zero: r.mov)",
+            "r.mov: joins the guide track placed earlier by 0 ms (the mix's zero: r.mov)",
+        ])
+        let carried = delays.update(files: recorded(["a2.mov"]), reference: "r.mov")
+        #expect(carried.lines == ["a2.mov: carries over 500 ms late from a1.mov", "a2.mov: in the guide track with the carried-over audio delay"])
+        let confirmed = delays.update(files: recorded(["a2.mov"]), reference: "r.mov", lags: ["a2.mov": 0.51], at: 20)
+        #expect(confirmed.lines == [
+            "a2.mov: audio delay its first counted window on the carried-over: kept at 500 ms late, 10.0 ms off, within a frame, confirmed"])
+        var changed = AudioDelays.Outcome()
+        for (at, lag) in [(30.0, 0.5), (40, 0.5), (50, 0.6), (60, 0.6), (70, 0.6), (80, 0.6)] {
+            changed = delays.update(files: recorded(["a2.mov"]), reference: "r.mov", lags: ["a2.mov": lag], at: at)
+        }
+        // The last 6 windows from 30 s on, the 510 ms one at 20 s out of the latest minute.
+        #expect(changed.lines == [
+            "a2.mov: audio delay the median of its 6 counted windows of the latest 60 s: 555 ms late → 600 ms late",
+            "a2.mov: placed earlier by 555 ms → 600 ms (the mix's zero: r.mov)",
+        ])
+        #expect(changed.isMoved)
     }
 }

@@ -533,7 +533,9 @@ extension GlobalRecordingLog {
             #expect(try delays()["Mic R"] == [])
             let files = try manifestOnDisk().audioFiles.filter { $0.audioSource == "Mic A" }
             #expect(files.count == 2)
-            #expect(files.last?.delays.map(\.carriedOverFrom) == [files.first?.name])
+            // Carried over: the new file's first entry, at its start, the same value.
+            #expect(files.last?.delays.map(\.at) == [0])
+            #expect(files.last?.delays.map(\.delay) == files.first?.delays.map(\.delay))
             #expect(files.first?.delays.count == 1)
             _ = await stop()
         }
@@ -762,7 +764,7 @@ extension GlobalRecordingLog {
             #expect(recorder.problemLines().map(\.text) == [
                 "Audio 2 Mic A 900 ms late, not in the guide track; its own audio track is recorded"])
             let next = try #require(try manifestOnDisk().audioFiles.last { $0.audioSource == "Mic A" })
-            #expect(next.delays.first?.carriedOverFrom != nil)
+            #expect(next.delays.map(\.at) == [0])
             #expect(sources.byUID.withLock { $0["A"]?.count } == 1)
             _ = await stop()
         }

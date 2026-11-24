@@ -301,7 +301,11 @@ instead and only copies them into the checkout (D82).
   in the app record the screens and, by default, every real camera,
   asking for the Camera permission if never asked (D74); `msr list`
   reads the devices. An agent
-  runs these on the owner's Mac only to test the roadmap's work, into its
+  runs these on the owner's Mac only to test the roadmap's work, or
+  through `scripts/update-homepage-screenshots --this-mac` to take the
+  homepage's screenshots, which records the owner's real screens,
+  cameras and microphones, the owner told before each such run (D82);
+  the tests run into its
   own scratch folder (`--output-folder`) with `HOME` set to a scratch
   folder too, so the owner's settings and last-recording notice are
   never overwritten or faked (the permissions do not depend on `HOME`;

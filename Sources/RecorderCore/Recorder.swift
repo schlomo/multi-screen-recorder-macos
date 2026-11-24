@@ -1022,16 +1022,25 @@ public final class Recorder {
         guard !isStopped else { return }
         let ended = Set(manifest.audioFiles.filter { $0.end != nil }.map(\.name))
         let writing = audioInputFiles().filter { !ended.contains($0.key) }
-        guard let (reference, referenceFile) = delayReference(among: audioInputFiles()), writing[referenceFile] != nil,
-              let referenceEnd = audioDelayFeed.endIndex(of: reference) else { return }
+        guard let (reference, referenceFile) = delayReference(among: audioInputFiles()) else { return }
+        let others = writing.filter { $0.value != reference }.keys.sorted()
+        guard writing[referenceFile] != nil, let referenceEnd = audioDelayFeed.endIndex(of: reference) else {
+            for file in others { RecorderLog.detail("\(file): not measured, the reference \(referenceFile) has no sound being written", category: "recorder") }
+            return
+        }
         let count = AudioDelay.windowSeconds * AudioDelay.sampleRate
-        let jobs = writing.compactMap { file, uid -> (file: String, reference: [Float], other: [Float])? in
-            guard uid != reference, let end = audioDelayFeed.endIndex(of: uid).map({ min($0, referenceEnd) }),
+        var jobs: [(file: String, reference: [Float], other: [Float])] = []
+        for file in others {
+            let uid = writing[file]!
+            guard let end = audioDelayFeed.endIndex(of: uid).map({ min($0, referenceEnd) }),
                   let start = manifest.audioFiles.first(where: { $0.name == file })?.start,
                   Double(end - Int64(count)) / Double(AudioDelay.sampleRate) >= start,
                   let other = audioDelayFeed.window(of: uid, endingAt: end, count: count),
-                  let referenceWindow = audioDelayFeed.window(of: reference, endingAt: end, count: count) else { return nil }
-            return (file, referenceWindow, other)
+                  let referenceWindow = audioDelayFeed.window(of: reference, endingAt: end, count: count) else {
+                RecorderLog.detail("\(file): not measured, it or the reference \(referenceFile) has less than a window of sound", category: "recorder")
+                continue
+            }
+            jobs.append((file, referenceWindow, other))
         }
         guard !jobs.isEmpty else { return }
         let windows = await Task.detached(priority: .utility) {
@@ -1039,9 +1048,15 @@ public final class Recorder {
         }.value
         guard !isStopped else { return }
         var lags: [String: Double] = [:]
-        for case let (file, window?) in windows where window.counts {
-            RecorderLog.detail("\(file): lag \(AudioDelay.text(window.lag)), clarity \(Int(window.clarity.rounded()))", category: "recorder")
-            lags[file] = window.lag
+        for (file, window) in windows {
+            guard let window else {
+                RecorderLog.detail("\(file): not measured, it or the reference \(referenceFile) is silent", category: "recorder")
+                continue
+            }
+            RecorderLog.detail(
+                "\(file): lag \(AudioDelay.text(window.lag)) against \(referenceFile), clarity \(Int(window.clarity.rounded())), "
+                    + (window.counts ? "counted" : "not counted"), category: "recorder")
+            if window.counts { lags[file] = window.lag }
         }
         applyAudioDelays(lags: lags, measuredAgainst: referenceFile, at: Double(referenceEnd) / Double(AudioDelay.sampleRate))
     }
@@ -1061,6 +1076,7 @@ public final class Recorder {
         let files = audioInputFiles()
         guard let (_, reference) = delayReference(among: files) else { return }
         let outcome = audioDelays.update(files: files, reference: reference, lags: measuredAgainst == reference ? lags : [:], at: at)
+        for line in outcome.lines { RecorderLog.detail(line, category: "recorder") }
         for (file, offset) in outcome.leaving.sorted(by: { $0.key < $1.key }) { leaveTheGuideTrack(file: file, offset: offset) }
         for file in outcome.rejoining.sorted() { rejoinTheGuideTrack(file: file) }
         let rate = Double(RecorderValues.audioSampleRate)
@@ -1068,7 +1084,11 @@ public final class Recorder {
             guard let uid = files[file] else { continue }
             _ = audioCaptures[.input(uid)]?.1.placeInTheGuideTrack(file: file, earlierBy: earlierBy.map { Int64(($0 * rate).rounded()) })
         }
-        let mixedUpTo = guides.mixedUpTo(.audioInputs).map { Double($0) / rate }
+        let mixedPosition = guides.mixedUpTo(.audioInputs)
+        if outcome.isMoved, let mixedPosition {
+            RecorderLog.detail("the \(GuideTrack.audioInputs.name) guide track crossfades from its sample \(mixedPosition)", category: "recorder")
+        }
+        let mixedUpTo = mixedPosition.map { Double($0) / rate }
             ?? Double(context.now() - RecorderValues.guideTrackDelay.nanoseconds) / 1e9
         var changed = false
         for (file, entry) in outcome.delays.sorted(by: { $0.key < $1.key }) {
@@ -1272,9 +1292,15 @@ public final class Recorder {
         }
         let events = audioInputEvents[uid] ?? []
         guard let source = audioTracker.sourcesShown.first(where: { $0.id == id }),
-              let started = events.last(where: { $0.event == .noAudioStarted }),
-              let gaps = ProblemsTold.gapsBefore(started, in: events) else { return }
+              let started = events.last(where: { $0.event == .noAudioStarted }) else { return }
         let silentSince = started.at - Double(RecorderValues.noAudioTime.nanoseconds) / 1e9
+        guard let gaps = ProblemsTold.gapsBefore(started, in: events) else {
+            RecorderLog.detail("\(source.name): no audio since \(ProblemsTold.time(Int64((silentSince * 1e9).rounded()))), no gap within "
+                + "\(Int(RecorderValues.silenceAfterGapsTime.nanoseconds / 1_000_000_000)) s before: no problem (D81)", category: "recorder")
+            return
+        }
+        RecorderLog.detail("\(source.name): no audio since \(ProblemsTold.time(Int64((silentSince * 1e9).rounded()))), right after its gap at "
+            + "\(ProblemsTold.time(Int64((gaps * 1e9).rounded()))): a red problem (D81)", category: "recorder")
         let gapsAt = ProblemsTold.time(Int64((gaps * 1e9).rounded()))
         tell(RecordingProblem(
                 atSeconds: silentSince, problem: "The audio input \(source.name) sends only silence since its gaps at \(gapsAt)",

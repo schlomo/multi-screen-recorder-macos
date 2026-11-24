@@ -198,18 +198,14 @@ public struct RecordingManifest: Codable, Equatable, Sendable {
         public var delays: [Delay]
 
         /// From `at` seconds of the file on, its sound is `delay` seconds
-        /// later than the earliest input measured against the reference
-        /// (D77, D80); `carriedOverFrom` names the input's earlier file an
-        /// entry started from.
+        /// later than the recording's anchor's, negative when earlier (D77, D80).
         public struct Delay: Codable, Equatable, Sendable {
             public var at: Double
             public var delay: Double
-            public var carriedOverFrom: String?
 
-            public init(at: Double, delay: Double, carriedOverFrom: String? = nil) {
+            public init(at: Double, delay: Double) {
                 self.at = at
                 self.delay = delay
-                self.carriedOverFrom = carriedOverFrom
             }
         }
 
@@ -464,7 +460,7 @@ public struct RecordingManifest: Codable, Equatable, Sendable {
         let delay = (entry.delay * 10_000).rounded() / 10_000
         guard audioFiles[index].delays.last?.delay != delay else { return false }
         let since = (max(0, at - audioFiles[index].start) * 1000).rounded() / 1000
-        audioFiles[index].delays.append(.init(at: since, delay: delay == 0 ? 0 : delay, carriedOverFrom: entry.carriedOverFrom))
+        audioFiles[index].delays.append(.init(at: since, delay: delay == 0 ? 0 : delay))
         return true
     }
 

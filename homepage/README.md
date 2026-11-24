@@ -74,7 +74,9 @@ repository, and the requirements.
      the app's version (the owner chooses the app; nothing is compared
      with a release), and copies them into this checkout, with no commit
      and no push (commit them as the usual flow); the pictures then show
-     this Mac's real screens, cameras and microphones. The terminal needs
+     this Mac's real screens, cameras and microphones, so an agent tells
+     the owner before each run. It refuses while the app runs (quit it
+     first) or in dark mode. The terminal needs
      the Screen & System Audio Recording permission and Automation for the
      app, System Events and Finder; a missing one is an error naming it.
   2. Preview with `hugo server` (below) and check that the arrows still

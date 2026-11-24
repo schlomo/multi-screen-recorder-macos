@@ -65,24 +65,42 @@ public enum AudioDelay {
             isCarriedOver = true
         }
 
+        /// The rule the latest window's lag was evaluated by and its outcome, for the recording log; nil when
+        /// no rule was evaluated.
+        public private(set) var decision: String?
+
         /// A counted window's lag, the window ending at `at`; whether the audio delay changed.
         @discardableResult
         public mutating func add(_ lag: Double, at: Double) -> Bool {
             windows.append((at, lag))
+            let wasCarriedOver = isCarriedOver
             isCarriedOver = false
-            let candidate: Double? = switch windows.count {
-            case 1: lag
-            case windowsNeeded: AudioDelay.median(windows.map(\.lag))
+            let latest = windows.filter { $0.at > at - RecorderValues.audioDelayChangeWindowSeconds }.map(\.lag)
+            let (candidate, rule): (Double?, String) = switch windows.count {
+            case 1: (lag, wasCarriedOver ? "its first counted window on the carried-over" : "set by its first counted window")
+            case windowsNeeded: (AudioDelay.median(windows.map(\.lag)), "the median of its first \(windowsNeeded) counted windows")
             case (windowsNeeded + 1)...:
-                Optional(windows.filter { $0.at > at - RecorderValues.audioDelayChangeWindowSeconds }.map(\.lag))
-                    .flatMap { $0.count >= RecorderValues.audioDelayChangeWindows ? AudioDelay.median($0) : nil }
-            default: nil
+                latest.count >= RecorderValues.audioDelayChangeWindows
+                    ? (AudioDelay.median(latest), "the median of its \(latest.count) counted windows of the latest \(Int(RecorderValues.audioDelayChangeWindowSeconds)) s")
+                    : (nil, "")
+            default: (nil, "")
             }
-            guard let candidate else { return false }
-            if let delay, abs(candidate - delay) <= RecorderValues.audioDelayTolerance { return false }
+            guard let candidate else {
+                decision = nil
+                return false
+            }
+            if let delay, abs(candidate - delay) <= RecorderValues.audioDelayTolerance {
+                decision = "\(rule): kept at \(AudioDelay.text(delay)), \(Self.milliseconds(candidate - delay)) off, within a frame"
+                    + (wasCarriedOver ? ", confirmed" : "")
+                return false
+            }
+            decision = delay.map { "\(rule): \(AudioDelay.text($0)) → \(AudioDelay.text(candidate))" + (wasCarriedOver ? ", replaced" : "") }
+                ?? "\(rule): \(AudioDelay.text(candidate))"
             delay = candidate
             return true
         }
+
+        private static func milliseconds(_ seconds: Double) -> String { String(format: "%.1f ms", abs(seconds) * 1000) }
     }
 
     /// "550 ms late", "30 ms early", "0 ms".

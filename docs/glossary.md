@@ -355,7 +355,8 @@ mix were no longer there or the writer did not take them in time,
 which is told as a problem. "Audio inputs" is mixed 1 s behind and
 places each audio input earlier by its audio delay, less the smallest
 of those it mixes; the reference is in it from the start, another input
-only once its file has an audio delay (D80). An audio input out of sync
+only once its file has an audio delay, an input whose file ended keeping
+its place until its capture ends (D80). An audio input out of sync
 with the others leaves it (D79): the largest group of inputs whose
 audio delays lie within 0.8 s of each other stays.
 
@@ -382,7 +383,7 @@ Not "gain", which is the guide track mix's (D52, D69).
 An audio input that delivered only exact zeros for 10 s: its audio file
 ends and its State says `no audio` until its sound returns, which starts
 a new audio file. Not a problem, unless its zeros began within 10 s
-after a gap of the same input: then it is broken by that hiccup, a red
+after a gap of the same input: then it is broken by those gaps, a red
 problem until its sound returns (D81). The system audio never has no
 audio (D69).
 
@@ -400,17 +401,27 @@ whole file) and the sound the correction added as
 
 ## Audio delay
 
-How much later an audio input's sound arrives than the reference
-microphone's (the default microphone when recorded, else the recorded
-audio input with the lowest number), beyond what its clock drift
-explains; measured while recording by cross-correlation (D77). A file's
-audio delay is set by its first counted window, once more by the median
-of its first 3, then only by the median of the latest 60 s, each time
-only beyond a frame (D80); a new file of the same input starts with the
-earlier file's, carried over. Written as the audio file's `delays`, one
-entry per change, normalized so the earliest measured input's is 0. The
-"Audio inputs" guide track and the timeline file place the file's sound
-earlier by it; the audio file itself is unchanged.
+How much later an audio input's sound arrives than the anchor's,
+negative when earlier, beyond what its clock drift explains; measured
+while recording by cross-correlation against the reference microphone
+(the default microphone when recorded, else the recorded audio input
+with the lowest number), whose own audio delay turns the lags into ones
+against the anchor (D77, D80). A file's audio delay is set by its first
+counted window, once more by the median of its first 3, then only by the
+median of the latest 60 s, each time only beyond a frame (D80); a new
+file of the same input starts with the earlier file's, carried over.
+Written as the audio file's `delays`, one entry per change of its own;
+the anchor's files list none. The "Audio inputs" guide track places the
+file's sound earlier by it less the smallest of the inputs it mixes, the
+timeline file by it less the recording's smallest; the audio file itself
+is unchanged.
+
+## Anchor
+
+The device every audio delay of a recording is against: the first
+reference microphone, its own audio delay 0. Another reference later
+leaves it the anchor; only a reference without an audio delay becomes
+the new anchor, every input then starting over (D80).
 
 ## Lag
 

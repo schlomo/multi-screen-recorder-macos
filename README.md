@@ -56,9 +56,11 @@ own clock is resampled continuously to stay with the screen files
   - Two guide tracks in every video file (screen and camera), the audio inputs and the
     system audio, for playback and for syncing by waveform with a
     separate recording. Each microphone is placed in the audio inputs' guide
-    track by its measured delay, so a late one is in sync there; one more
-    than 0.8 s off the others leaves it rather than echo in it; its own
-    audio track is still recorded.
+    track by its measured delay, so a late one is in sync there. A
+    microphone joins it only once measured: for about the first 10 s only
+    the default microphone is in it, and one never measured never joins;
+    one more than 0.8 s off the others leaves it rather than echo in it;
+    its own audio track is still recorded.
 - **Scriptable.** Everything also works from the command line.
 - **Nothing leaves your Mac.** The app makes no network connections.
 

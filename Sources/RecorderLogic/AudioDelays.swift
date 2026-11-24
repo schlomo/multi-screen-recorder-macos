@@ -12,14 +12,13 @@ public struct AudioDelays: Sendable {
         case synced(Double, carriedOver: Bool)
     }
 
-    /// An audio file's audio delay as `recording.json` lists it.
+    /// An audio file's audio delay as `recording.json` lists it: the value alone, how it came about is for
+    /// the detail lines.
     public struct Entry: Equatable, Sendable {
         public var delay: Double
-        public var carriedOverFrom: String?
 
-        public init(delay: Double, carriedOverFrom: String? = nil) {
+        public init(delay: Double) {
             self.delay = delay
-            self.carriedOverFrom = carriedOverFrom
         }
     }
 
@@ -32,6 +31,10 @@ public struct AudioDelays: Sendable {
         public var earlierBy: [String: Double?] = [:]
         /// Each file with an audio delay against the anchor, the anchor's own files left out.
         public var delays: [String: Entry] = [:]
+        /// A file mixed before is placed elsewhere now: the mix crossfades.
+        public var isMoved = false
+        /// Every decision taken, one line each, for the recording log.
+        public var lines: [String] = []
     }
 
     private struct File: Sendable {
@@ -39,7 +42,6 @@ public struct AudioDelays: Sendable {
         /// The order the files became known in.
         let order: Int
         var applied: AudioDelay.Applied
-        var carriedOverFrom: String?
     }
 
     private var files: [String: File] = [:]
@@ -49,6 +51,9 @@ public struct AudioDelays: Sendable {
     /// By device UID, so an input out of the guide track stays out with its next file.
     private var membership = GuideTrackMembership()
     private var earlierBy: [String: Double?] = [:]
+    /// How much earlier each device's file was placed, by the device's UID, so a new file is no new join.
+    private var placed: [String: Double] = [:]
+    private var reference: String?
     private var known = 0
 
     public init() {}
@@ -60,28 +65,37 @@ public struct AudioDelays: Sendable {
         files newest: [String: String], reference: String, lags: [String: Double] = [:], at: Double = 0
     ) -> Outcome {
         guard let referenceUID = newest[reference] else { preconditionFailure("the reference \(reference) is not recorded") }
+        var lines: [String] = []
+        var carriedOver: [String] = []
         for (name, uid) in newest.sorted(by: { $0.key < $1.key }) where files[name] == nil {
             let earlier = files.filter { $0.value.uid == uid }.max { $0.value.order < $1.value.order }
             let carried = earlier.flatMap { file in file.value.applied.delay.map { (file.key, $0) } }
+            if let carried {
+                lines.append("\(name): carries over \(AudioDelay.text(carried.1)) from \(carried.0)")
+                carriedOver.append(name)
+            }
             known += 1
             files[name] = File(
-                uid: uid, order: known, applied: carried.map { AudioDelay.Applied(carriedOver: $0.1) } ?? AudioDelay.Applied(),
-                carriedOverFrom: carried?.0)
+                uid: uid, order: known, applied: carried.map { AudioDelay.Applied(carriedOver: $0.1) } ?? AudioDelay.Applied())
         }
         self.newest = Dictionary(newest.map { ($0.value, $0.key) }) { $1 }
+        let previous = self.reference.flatMap { files[$0] }
         if anchor == nil { anchor = referenceUID }
         if delay(of: reference) == nil {
+            lines.append("reference \(self.reference ?? "none") → \(reference): it has no audio delay, so it is the new anchor and every input starts over")
             // shortcut: its delay against the old anchor is taken as 0, so every input starts over; measure it
             // against the old anchor first if starting over loses too much.
             anchor = referenceUID
-            for name in files.keys {
-                files[name]!.applied = AudioDelay.Applied()
-                files[name]!.carriedOverFrom = nil
-            }
+            for name in files.keys { files[name]!.applied = AudioDelay.Applied() }
         }
         let base = delay(of: reference)!
-        for (name, lag) in lags where name != reference && newest[name] != nil && files[name]?.uid != anchor {
+        if let previous, previous.uid != referenceUID, !lines.contains(where: { $0.hasPrefix("reference ") }) {
+            lines.append("reference \(self.reference!) → \(reference): lags re-based onto the anchor by \(AudioDelay.text(base))")
+        }
+        self.reference = reference
+        for (name, lag) in lags.sorted(by: { $0.key < $1.key }) where name != reference && newest[name] != nil && files[name]?.uid != anchor {
             files[name]!.applied.add(lag + base, at: at)
+            if let decision = files[name]!.applied.decision { lines.append("\(name): audio delay \(decision)") }
         }
 
         let delays = Dictionary(uniqueKeysWithValues: self.newest.compactMap { uid, name in delay(of: name).map { (uid, $0) } })
@@ -94,11 +108,33 @@ public struct AudioDelays: Sendable {
             outcome.earlierBy[name] = .some(delays[uid].map { $0 - zero })
         }
         earlierBy = outcome.earlierBy
+        let zeroName = delays.filter { !membership.isOut($0.key) }.min { $0.value < $1.value }.map { self.newest[$0.key]! }
+        for name in carriedOver {
+            lines.append("\(name): \(membership.isOut(newest[name]!) ? "out of the guide track" : "in the guide track") with the carried-over audio delay")
+        }
+        for (name, offset) in outcome.leaving.sorted(by: { $0.key < $1.key }) {
+            lines.append("\(name): leaves the guide track, \(AudioDelay.text(offset)) from the staying group's earliest")
+        }
+        for name in outcome.rejoining.sorted() { lines.append("\(name): rejoins the guide track") }
+        var placed: [String: Double] = [:]
+        for (uid, name) in self.newest.sorted(by: { $0.value < $1.value }) {
+            guard let now = outcome.earlierBy[name] ?? nil else { continue }
+            placed[uid] = now
+            let zero = "the mix's zero: \(zeroName ?? name)"
+            switch self.placed[uid] {
+            case nil: lines.append("\(name): joins the guide track placed earlier by \(Self.milliseconds(now)) (\(zero))")
+            case let before? where (before * 10_000).rounded() != (now * 10_000).rounded():
+                lines.append("\(name): placed earlier by \(Self.milliseconds(before)) → \(Self.milliseconds(now)) (\(zero))")
+                outcome.isMoved = true
+            default: break
+            }
+        }
+        self.placed = placed
         for (uid, name) in self.newest where uid != anchor {
             guard let delay = delays[uid] else { continue }
-            let file = files[name]!
-            outcome.delays[name] = Entry(delay: delay, carriedOverFrom: file.applied.isCarriedOver ? file.carriedOverFrom : nil)
+            outcome.delays[name] = Entry(delay: delay)
         }
+        outcome.lines = lines
         return outcome
     }
 
@@ -109,6 +145,8 @@ public struct AudioDelays: Sendable {
         guard let placed else { return .notInTheGuideTrackYet }
         return placed == 0 ? nil : .synced(placed, carriedOver: file.applied.isCarriedOver)
     }
+
+    private static func milliseconds(_ seconds: Double) -> String { "\(Int((seconds * 1000).rounded())) ms" }
 
     /// The audio delay against the anchor: 0 for a file of the anchor device.
     private func delay(of name: String) -> Double? {

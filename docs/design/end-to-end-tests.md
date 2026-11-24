@@ -174,9 +174,12 @@ screen connected, no dark appearance, no window moved (no Accessibility
 permission), `HOME`, the recording (about 15 s) and the scratch folder
 deleted afterwards. It needs the Screen & System Audio Recording
 permission and Automation for the app, System Events and Finder for the
-program running it, and says which is missing. The screenshots then show
-this Mac's real screens, cameras and microphones; the VM run stays the
-gate for marking a PR ready.
+program running it, and says which is missing; it refuses, before
+building, while the app runs (quit it first) or the Mac is in dark mode,
+sends the reopen event to the app's process it started, and removes its
+restore file after a clean run. The screenshots then show this Mac's
+real screens, cameras and microphones, so an agent tells the owner
+before each run; the VM run stays the gate for marking a PR ready.
 
 **When:** before a PR that touches the recorder or the driver is marked
 ready, the architect runs it on the PR's head and records the commit and
@@ -270,8 +273,15 @@ The named scenarios, each about 10 to 25 s of recording:
 | `plain-recording` | auto mode, ended by `--duration` | exit 0 |
 | `virtual-screen` | a virtual screen of 1280 × 720 connects, switches to 1600 × 900 and back, disconnects; stopped by SIGINT | the screen's three files, frame sizes, number and times, and its events in order at their times |
 | `virtual-screen-stress` | a virtual screen of 1280 × 720 connects, its mode is switched ten times, 1280 × 720 ↔ 1600 × 900, about 2 s apart (the next switch waits for the screen to settle, so at least that), and it disconnects; stopped by SIGINT | as `virtual-screen`, as strictly: no failure event, a `screen frame size changed` per switch, no lost content. Added to make the writer failure of `OSStatus -19092` happen often enough to study (D66); it passed on the hosted runner, and no frame of the new size reached the old file (D67) |
-| `tone` | the test tone in BlackHole, all audio inputs recorded, no system audio | the tone's level, no silent stretch and a click every second in each of BlackHole's tracks; the clicks at the same time of day, by timecode, in every screen file's guide track "Audio inputs" |
+| `tone` | the test tone in BlackHole, BlackHole the default microphone for the run (the original put back after it, and by the restore), all audio inputs recorded, no system audio | the tone's level, no silent stretch and a click every second in each of BlackHole's tracks; the clicks at the same time of day, by timecode, in every screen file's guide track "Audio inputs" |
 | `system-audio` | as `tone`, with the system audio | the system audio's file: one stereo track, its length |
+
+BlackHole is the default microphone while the tone plays, so it is the
+reference and in the guide track "Audio inputs" from the start (D80): the
+VM's default, the Apple Virtual Sound Device, hears the tone 300 to 400 ms
+late, and BlackHole, measured against it, got no audio delay within the
+10 s of the run (the run of 2026-11-24 at 2628b9d), so it never joined the
+guide and the clicks were missing there.
 | `stop-by-ctrl-c` | auto mode, SIGINT | exit 0, finalized |
 | `stop-by-kill` | auto mode, `kill -9` | no `ended`, every file `recording` and readable up to its last fragment, less 0.5 s of slack (`killSlack`); a screen file's less the guide tracks' delay of 1 s too, as its fragment is written only once its guide samples arrive (`EndToEndValues.guideTrackDelay`, D80) |
 
@@ -549,7 +559,7 @@ only if that falls short. See "Unknowns".
 | **A change handled wrongly** | every screen and audio event below | the right file ends and the right one begins; a frame size change leaves under one second without picture (D30); the audio files have no gap across it; a screen keeps its number; an unchanged frame size continues the file |
 | **The recording manifest is wrong** | all of them | `recording.json` lists exactly the files in the folder; each event the recorder design defines appears once, in order, at the scenario's time; its state is right after Stop and after a kill |
 | **Resources run out** | a small disk image as output folder, filled during a recording, then given room again; processor and memory pressure; more screens than the Mac has hardware encoder sessions | what was written stays readable; the recorder keeps retrying and continues in new files once there is room (D14); nothing is discarded |
-| **The process ends badly** | `kill -9`, `SIGTERM`, a second recording into the same recording folder, a recording into another folder in parallel (D20) | after `kill -9` the recording manifest has no `ended` and the files are readable up to the last 2 s (D47); after `SIGTERM` the recording ends as after Stop, finalized ([recorder.md](recorder.md), "Command line"); the second recording into the same folder is refused; parallel recordings do not disturb each other |
+| **The process ends badly** | `kill -9`, `SIGTERM`, a second recording into the same recording folder, a recording into another folder in parallel (D20) | after `kill -9` the recording manifest has no `ended` and the audio files are readable up to the last 2 s and the video files up to about the last 3 s, a fragment waiting for its guide samples (D47, D80); after `SIGTERM` the recording ends as after Stop, finalized ([recorder.md](recorder.md), "Command line"); the second recording into the same folder is refused; parallel recordings do not disturb each other |
 | **Settings and start** | old, damaged and empty settings files; auto mode on and off (D34) | a settings file is never refused; the recording folder holds what the settings ask for |
 
 ### Events
