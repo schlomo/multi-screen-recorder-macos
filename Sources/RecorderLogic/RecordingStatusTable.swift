@@ -139,20 +139,24 @@ public enum RecordingStatusTable {
         switch shown {
         case .notInTheGuideTrackYet: "not synced yet"
         case .noClearSoundToSync: "no clear sound"
-        case .synced(let delay, let carriedOver): "synced \(Int((abs(delay) * 1000).rounded())) ms" + (carriedOver ? " (carried)" : "")
+        case .synced(let placed, let carriedOver): "synced \(Int((abs(placed) * 1000).rounded())) ms" + (carriedOver ? " (carried)" : "")
+        case .anchor(let placed): "synced \(Int((abs(placed) * 1000).rounded())) ms"
         }
     }
 
-    /// The mouse-over's line for the audio delay a row shows, with the full reason.
+    /// The mouse-over's line for what a row shows of its audio delay: where the guide track places the file, and
+    /// how its audio delay came about, or why it is not in the guide track.
     public static func audioDelayDetail(_ shown: AudioDelays.Shown) -> String {
-        let placed = "the guide track and the timeline file place it earlier by that"
+        func placed(_ seconds: Double) -> String {
+            "Placed \(Int((abs(seconds) * 1000).rounded())) ms earlier in the guide track, in line with the earliest microphone"
+        }
         return switch shown {
         case .notInTheGuideTrackYet: "Not in the guide track until its audio delay is measured; its own audio track is recorded"
         case .noClearSoundToSync:
             "Not in the guide track: no clear sound to measure its audio delay against; its own audio track is recorded"
-        case .synced(let delay, carriedOver: false): "Audio delay: \(AudioDelay.text(delay)), measured; \(placed)"
-        case .synced(let delay, carriedOver: true):
-            "Audio delay: \(AudioDelay.text(delay)), carried over from its previous file until measured; \(placed)"
+        case .synced(let seconds, carriedOver: false): "\(placed(seconds)); measured"
+        case .synced(let seconds, carriedOver: true): "\(placed(seconds)); carried over from its previous file until measured"
+        case .anchor(let seconds): placed(seconds)
         }
     }
 

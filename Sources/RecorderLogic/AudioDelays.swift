@@ -13,6 +13,8 @@ public struct AudioDelays: Sendable {
         /// How much earlier the mix places the file; carried over from the input's earlier file until its own
         /// windows set or confirm its audio delay.
         case synced(Double, carriedOver: Bool)
+        /// How much earlier the mix places the anchor's own file, its audio delay 0 by definition.
+        case anchor(Double)
     }
 
     /// An audio file's audio delay as `recording.json` lists it: the value alone, how it came about is for
@@ -169,7 +171,8 @@ public struct AudioDelays: Sendable {
         guard let placed else {
             return file.unclear >= RecorderValues.audioDelayUnclearMeasurements ? .noClearSoundToSync : .notInTheGuideTrackYet
         }
-        return (placed * 1000).rounded() == 0 ? nil : .synced(placed, carriedOver: file.applied.isCarriedOver)
+        guard (placed * 1000).rounded() != 0 else { return nil }
+        return file.uid == anchor ? .anchor(placed) : .synced(placed, carriedOver: file.applied.isCarriedOver)
     }
 
     /// Whether the file has an audio delay, or will carry one over once known, so the recorder can pick a

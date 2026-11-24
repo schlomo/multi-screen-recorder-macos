@@ -959,11 +959,12 @@ checked, reported or rewritten at the next start (D47).
   `· no clear sound` once its file had sound in 3 measurements
   (`audioDelayUnclearMeasurements`, *data*) without a counted window
   (it is still recorded and joins once a window counts); the row's
-  mouse-over adds the full reason as its last line: `Audio delay: 553 ms
-  late, measured; the guide track and the timeline file place it
-  earlier by that`, `Audio delay: 533 ms late, carried over from its
-  previous file until measured; the guide track and the timeline file
-  place it earlier by that`, `Not in the guide track until its audio
+  mouse-over adds the full reason as its last line: `Placed 553 ms
+  earlier in the guide track, in line with the earliest microphone;
+  measured` (or `; carried over from its previous file until
+  measured`; for the anchor's own file, which an earlier input moves,
+  the placement alone, as its audio delay is 0 by definition),
+  `Not in the guide track until its audio
   delay is measured; its own audio track is recorded`, `Not in the
   guide track: no clear sound to measure its audio delay against; its
   own audio track is recorded`;

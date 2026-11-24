@@ -54,7 +54,7 @@ import Testing
         let outcome = delays.update(files: recorded(["a.mov", "b.mov"]), reference: "r.mov", lags: ["a.mov": -0.3, "b.mov": 0.2], at: 20)
         #expect(rounded(outcome.earlierBy) == ["a.mov": 0, "r.mov": 0.3, "b.mov": 0.5])
         #expect(rounded(outcome.delays) == ["a.mov": -0.3, "b.mov": 0.2, "r.mov": 0])
-        #expect(delays.shown("r.mov") == .synced(0.3, carriedOver: false))
+        #expect(delays.shown("r.mov") == .anchor(0.3))
         #expect(delays.shown("a.mov") == nil)
     }
 

@@ -153,7 +153,7 @@ import Testing
     }
 
     /// The audio delay of the file being written follows the clock drift, uncoloured: synced, measured or
-    /// carried over, not synced yet, or no clear sound, the mouse-over saying why (D80).
+    /// carried over, the anchor's own placement, not synced yet, or no clear sound, the mouse-over saying why (D80).
     @Test func anAudioInputShowsItsAudioDelay() {
         var settings = Settings.defaults
         settings.auto = false
@@ -176,19 +176,22 @@ import Testing
             clockDrift: [.input("O"): ClockDriftCorrection.Status(clockDriftPpm: -116.12, applied: 0.03494, remaining: 0.00004)],
             audioDelays: [
                 "O.mov": .synced(0.5504, carriedOver: false), "B.mov": .synced(0.03, carriedOver: true), "C.mov": .notInTheGuideTrackYet,
-                "R.mov": .noClearSoundToSync,
+                "R.mov": .anchor(0.2),
             ])
         #expect(rows.map(\.clockDrift) == [
-            "-116 ppm (+34.9 ms) · synced 550 ms", "measuring · no clear sound",
+            "-116 ppm (+34.9 ms) · synced 550 ms", "measuring · synced 200 ms",
             "measuring · synced 30 ms (carried)", "measuring · not synced yet",
         ])
         #expect(rows.map { $0.audioDelay.map(RecordingStatusTable.audioDelayDetail) } == [
-            "Audio delay: 550 ms late, measured; the guide track and the timeline file place it earlier by that",
-            "Not in the guide track: no clear sound to measure its audio delay against; its own audio track is recorded",
-            "Audio delay: 30 ms late, carried over from its previous file until measured; the guide track and the timeline "
-                + "file place it earlier by that",
+            "Placed 550 ms earlier in the guide track, in line with the earliest microphone; measured",
+            "Placed 200 ms earlier in the guide track, in line with the earliest microphone",
+            "Placed 30 ms earlier in the guide track, in line with the earliest microphone; carried over from its previous "
+                + "file until measured",
             "Not in the guide track until its audio delay is measured; its own audio track is recorded",
         ])
+        #expect(RecordingStatusTable.audioDelayText(.noClearSoundToSync) == "no clear sound")
+        #expect(RecordingStatusTable.audioDelayDetail(.noClearSoundToSync)
+            == "Not in the guide track: no clear sound to measure its audio delay against; its own audio track is recorded")
     }
 
     /// An audio row knows its source, for its level meter and its input

@@ -163,4 +163,3 @@ import Testing
         #expect(hindsight(AudioDelay.Applied()) == nil)
     }
 }
-
