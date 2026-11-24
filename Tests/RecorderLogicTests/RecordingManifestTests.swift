@@ -567,7 +567,7 @@ import Testing
         status.isLowOnDisk = true
         #expect(status.badge == "!")
         status.isLowOnDisk = false
-        status.problems.append("Cannot write the recording manifest: full")
+        status.problemsCalledToAction.append("Cannot write the recording manifest: full")
         #expect(status.badge == "!")
     }
 }

@@ -3,12 +3,12 @@
 public struct RecordingStatus: Equatable, Sendable {
     public var isLowOnDisk = false
     /// The problems whose call to action was given (D84): something the person has to do.
-    public var problems: [String] = []
+    public var problemsCalledToAction: [String] = []
 
     public init() {}
 
     public var needsAttention: Bool {
-        isLowOnDisk || !problems.isEmpty
+        isLowOnDisk || !problemsCalledToAction.isEmpty
     }
 
     /// "!" when something needs the person, otherwise none (D47).

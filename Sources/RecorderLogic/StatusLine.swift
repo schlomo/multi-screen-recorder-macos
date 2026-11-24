@@ -12,7 +12,7 @@ public enum StatusLine {
         let screens = recording.filter { $0.source.kind == .screen }.count
         let cameras = recording.filter { $0.source.kind == .camera }.count
         let audioSources = recording.count - screens - cameras
-        let problems = status.problems.count
+        let problems = status.problemsCalledToAction.count
         let sources = [count(screens, "screen")] + (cameras == 0 ? [] : [count(cameras, "camera")]) + ["\(audioSources) audio"]
         return [problems == 0 ? nil : count(problems, "problem"), line, cpu, sources.joined(separator: ", ")]
             .compactMap(\.self).joined(separator: " · ")

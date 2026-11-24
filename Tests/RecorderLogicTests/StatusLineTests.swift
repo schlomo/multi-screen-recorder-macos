@@ -9,7 +9,7 @@ import Testing
 
     private func status(problems: Int, isLowOnDisk: Bool = false) -> RecordingStatus {
         var status = RecordingStatus()
-        status.problems = Array(repeating: "problem", count: problems)
+        status.problemsCalledToAction = Array(repeating: "problem", count: problems)
         status.isLowOnDisk = isLowOnDisk
         return status
     }
@@ -69,7 +69,7 @@ import Testing
         status.isLowOnDisk = true
         #expect(status.badge == "!")
         status = RecordingStatus()
-        status.problems = ["a"]
+        status.problemsCalledToAction = ["a"]
         #expect(status.badge == "!")
     }
 }

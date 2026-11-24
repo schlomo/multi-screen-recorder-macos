@@ -154,7 +154,7 @@ final class RecordingSession: RecorderObserver {
     }
 
     func recorder(_ recorder: Recorder, callToAction problem: RecordingProblem) {
-        status.problems.append(problem.text)
+        status.problemsCalledToAction.append(problem.text)
         needsAttention()
     }
 }
