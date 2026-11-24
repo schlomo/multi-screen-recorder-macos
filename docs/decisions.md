@@ -2800,11 +2800,14 @@ architect's reading.
   detail lines, one per decision ("make sure that the --debug output
   remains super useful", the owner).
 - **Amended after the delta review (the architect's reading,
-  2026-11-24):** the reference is the default microphone only while its
-  file is being written and it has a delay or no anchor exists yet,
-  otherwise the lowest-numbered input being written that has one, so a
-  muted default never stalls measuring and is measured before it
-  becomes the reference (amends D77's choice of the reference); the
+  2026-11-24):** the anchor is the first input whose file is written,
+  and the reference is the anchor while its file is being written,
+  otherwise the lowest-numbered input being written that has a delay;
+  only when none has one, the lowest-numbered input being written
+  becomes the new anchor and every input starts over. The default
+  microphone plays no part (amends D77's choice of the reference), so
+  every input is measured against the anchor while it sounds, its drift
+  included, and a silent anchor never stalls measuring; the
   timeline file's smallest delay is over each file's last entry, so a
   corrected false window moves nothing; the anchor's file lists
   `{at: 0, delay: 0}`, so an empty `delays` means only "never
