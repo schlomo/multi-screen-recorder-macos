@@ -216,7 +216,7 @@ public struct ProblemsTold: Sendable {
     /// shown does not keep it from the manifest. `source` names the screen or camera of a kind keyed by its ID;
     /// `endedAt`: already over when told, for a failure that ends with a new file (`endsWithANewFile`) after a
     /// newer file of its source started, or after its source went away (`ending`); `withoutCallToAction` for a
-    /// screen that showed another screen's picture (D84).
+    /// screen that showed another screen's picture (D84); told on a line only shown, it replaces that line's.
     public mutating func add(
         _ problem: RecordingProblem, kind: ProblemKind, source: String? = nil, note: String? = nil, endedAt: Int64? = nil,
         ending: Ending = .recovered, withoutCallToAction: Bool = false, to manifest: inout RecordingManifest
@@ -227,7 +227,11 @@ public struct ProblemsTold: Sendable {
         if let shown = told.lastIndex(where: { $0.kind == kind && $0.ended == nil }) {
             told[shown].problem = problem
             told[shown].isTold = true
-            told[shown].withoutCallToAction = told[shown].withoutCallToAction || withoutCallToAction
+            if told[shown].withoutCallToAction && !withoutCallToAction {
+                // A failure of its own after another screen's picture: its wait counts from now.
+                told[shown].began = Int64((problem.at * 1_000_000_000).rounded())
+            }
+            told[shown].withoutCallToAction = withoutCallToAction
         } else {
             show(problem, kind: kind, source: source, endedAt: endedAt, ending: ending, withoutCallToAction: withoutCallToAction)
             told[told.count - 1].isTold = true

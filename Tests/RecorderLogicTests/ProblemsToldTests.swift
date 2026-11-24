@@ -354,11 +354,24 @@ import Testing
         var told = ProblemsTold()
         var manifest = manifest()
         told.show(problem(1 * second, "Screen file s.mov"), kind: .screenNotCaptured("U"), withoutCallToAction: true)
-        _ = told.add(problem(1 * second, "Screen 1 LG"), kind: .screenNotCaptured("U"), to: &manifest)
+        _ = told.add(problem(1 * second, "Screen 1 LG"), kind: .screenNotCaptured("U"), withoutCallToAction: true, to: &manifest)
         _ = told.add(problem(1 * second, "Screen 2 DELL"), kind: .screenNotCaptured("V"), withoutCallToAction: true, to: &manifest)
         #expect(told.nextCallToAction() == nil)
         #expect(told.callsToAction(now: 100 * second).isEmpty)
         #expect(!told.asksToReportIt)
+    }
+
+    /// The screen's capture failing for another reason after its file showed another screen's picture is a
+    /// failure like any other: it calls to action once unrecovered for the wait, counted from its tell.
+    @Test func aFailureToldAfterAnotherScreensPictureCallsToAction() {
+        var told = ProblemsTold()
+        var manifest = manifest()
+        told.show(problem(1 * second, "Screen file s.mov"), kind: .screenNotCaptured("U"), withoutCallToAction: true)
+        _ = told.add(problem(5 * second, "Screen 1 LG"), kind: .screenNotCaptured("U"), to: &manifest)
+        #expect(told.nextCallToAction() == 15 * second)
+        #expect(told.callsToAction(now: 14 * second).isEmpty)
+        #expect(told.callsToAction(now: 15 * second).map(\.problem) == ["Screen 1 LG"])
+        #expect(told.asksToReportIt)
     }
 }
 
