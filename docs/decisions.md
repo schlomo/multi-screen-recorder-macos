@@ -2770,12 +2770,34 @@ architect's reading.
   or for the reference while it is the earliest; how much earlier an
   input is placed is "placed earlier by" (`earlierBy`), as "placement"
   is an audio file's place on the tick grid.
+- **Amended after review (2026-11-24):** the review found that
+  normalizing each entry as D77's makes every file's delay change when
+  a new earliest input appears, splitting every clip in the timeline
+  file. The owner, asked which data design: "I'm not sure I fully
+  grasp the impact ... What works better with Resolve in the end? ...
+  I really don't know"; the architect's decision, after explaining
+  that it decides how often a clip is cut in Resolve: a `delays`
+  entry is the file's delay against the recording's **anchor**, the
+  first reference device, negative when earlier, and changes only when
+  that file's own delay changes; the timeline file subtracts the
+  smallest delay of the recording once, so the earliest input is at 0.
+  When the reference device changes, every delay is re-based onto the
+  anchor through the new reference's own delay, and the mix keeps every
+  input; only when the new reference has none, it becomes the anchor
+  and every input starts over (shortcut: its delay against the old
+  anchor is taken as 0). The mix's zero is the smallest latest delay of
+  the devices staying in it, a device whose file ended keeping its last
+  delay and its place in or out of the mix until its capture ends. The
+  status row shows how much earlier the mix places the file, nothing
+  at 0. The writing files of a device are only its newest.
 - **Consequences:** The guide is in sync to within a frame for every
   input within 0.8 s of the earliest; an input never measured stays
   out of it. A crash loses up to about 3 s of a video file instead of 2,
   as its fragment waits for its guide samples (the end-to-end run of
-  2026-11-24); the audio files still lose up to 2 s. Stop waits
-  about 1 s longer for the last mix. A change repeats or skips its size
+  2026-11-24); the audio files still lose up to 2 s. Stop waits up to
+  0.8 s longer for the last mix (the most any input is placed earlier),
+  and an input whose capture ends loses up to 1 s of its last sound in
+  the guide instead of 0.2 s. A change repeats or skips its size
   of sound in the guide once.
 - **Evidence:** backlog item 38; [design/recorder.md](design/recorder.md),
   "Audio delay" and "Guide tracks".
