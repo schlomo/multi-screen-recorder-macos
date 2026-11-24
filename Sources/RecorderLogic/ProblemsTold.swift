@@ -92,7 +92,7 @@ extension ProblemKind {
     /// Its call to action, nil for none (D84).
     public var callToAction: CallToAction? {
         switch self {
-        case .diskFull, .manifestNotWritten, .timelineFileNotWritten, .recordingLogNotWritten: .freeUpDiskSpace
+        case .diskFull, .manifestNotWritten, .recordingLogNotWritten: .freeUpDiskSpace
         case .cameraPermissionMissing: .grantThePermission
         case .audioInputSilentAfterGaps: .unplugAndPlugInAgain
         case .audioFileLost, .videoFileLost: .reportIt
@@ -100,7 +100,7 @@ extension ProblemKind {
              .audioInputChangesNotFollowed:
             .startAgainAndReportIt
         case .cameraStalled, .audioInputOutOfTheGuideTrack, .guideTracksCut, .dockIconNotShown, .inputVolumeNotSet,
-             .inputVolumeNotFollowed, .screensNotRead, .audioInputsNotRead, .freeSpaceNotRead:
+             .inputVolumeNotFollowed, .screensNotRead, .audioInputsNotRead, .freeSpaceNotRead, .timelineFileNotWritten:
             nil
         }
     }

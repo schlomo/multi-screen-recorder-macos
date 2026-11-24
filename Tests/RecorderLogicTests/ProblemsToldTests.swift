@@ -269,7 +269,8 @@ import Testing
     @Test func eachKindHasItsCallToActionOrNone() {
         #expect(ProblemKind.diskFull.callToAction == .freeUpDiskSpace)
         #expect(ProblemKind.manifestNotWritten.callToAction == .freeUpDiskSpace)
-        #expect(ProblemKind.timelineFileNotWritten.callToAction == .freeUpDiskSpace)
+        // The timeline file is rewritten from the manifest by `msr timeline`: nothing is lost.
+        #expect(ProblemKind.timelineFileNotWritten.callToAction == nil)
         #expect(ProblemKind.recordingLogNotWritten.callToAction == .freeUpDiskSpace)
         #expect(ProblemKind.cameraPermissionMissing.callToAction == .grantThePermission)
         #expect(ProblemKind.audioInputSilentAfterGaps("u").callToAction == .unplugAndPlugInAgain)
