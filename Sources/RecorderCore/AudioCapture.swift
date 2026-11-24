@@ -331,11 +331,11 @@ final class AudioCapture: @unchecked Sendable {
         }
     }
 
-    /// The file `name`, if still the current one, is placed `earlierBy` samples earlier in its guide track,
-    /// nil: not in it yet; whether it is (D80).
+    /// The file `name`, if still the current one or the last while none is open, is placed `earlierBy`
+    /// samples earlier in its guide track, nil: not in it yet; whether it is (D80).
     func placeInTheGuideTrack(file name: String, earlierBy: Int64?) -> Bool {
         queue.sync {
-            guard open?.entry.name == name else { return false }
+            guard open.map({ $0.entry.name == name }) ?? true else { return false }
             guideEarlierBy = earlierBy
             if guideChannels != nil { guides.place(source: label, earlierBy: earlierBy, in: guide) }
             return true

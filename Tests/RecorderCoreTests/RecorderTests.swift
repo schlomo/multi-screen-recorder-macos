@@ -520,7 +520,7 @@ extension GlobalRecordingLog {
                 Dictionary(try manifestOnDisk().audioFiles.map { ($0.audioSource, $0.delays.map(\.delay)) }, uniquingKeysWith: { _, last in last })
             }
             let measured = try delays()
-            #expect(measured["Mic R"] == [])
+            #expect(measured["Mic R"] == [0])
             #expect(measured["Mic A"]?.count == 1 && abs((measured["Mic A"]?.last ?? 0) + 0.5) < 0.002)
             #expect(measured["Mic B"]?.count == 1 && abs((measured["Mic B"]?.last ?? 0) - 0.2) < 0.002)
             // A's file ends, and A starts again in a new file without a measurement yet.
@@ -530,7 +530,7 @@ extension GlobalRecordingLog {
             feedDelayedNoise(["R": 0, "B": 0.2])
             await recorder.measureAudioDelays()
             #expect(try delays()["Mic B"] == measured["Mic B"])
-            #expect(try delays()["Mic R"] == [])
+            #expect(try delays()["Mic R"] == [0])
             let files = try manifestOnDisk().audioFiles.filter { $0.audioSource == "Mic A" }
             #expect(files.count == 2)
             // Carried over: the new file's first entry, at its start, the same value.
@@ -572,6 +572,55 @@ extension GlobalRecordingLog {
             await recorder.measureAudioDelays()
             #expect(try delays() == measured)
             #expect(leavesOfTheGuideTrack() == 0)
+            _ = await stop()
+        }
+
+        /// A default microphone silent at Start leaves the reference and the anchor to the next input; once it
+        /// sounds it is measured against that before it becomes the reference, so nothing starts over (D80).
+        @Test func aDefaultMicrophoneSilentAtStartIsMeasuredBeforeItBecomesTheReference() async throws {
+            cameras.connected.withLock { $0 = [Self.camera] }
+            let inputs = ["R", "A"].map { AudioInputInfo(name: "Mic \($0)", channelCount: 1, isDefault: $0 == "R", transport: .usb, uid: $0) }
+            try start(cameraMode: .real, inputs: inputs)
+            try await wait("the audio inputs' captures") { sources.byUID.withLock { $0.count } == 2 }
+            let a = SourceLabel.audioInput(2, name: "Mic A")
+            try await startAudioFiles(["A"], "A's file", count: 1)
+            try await wait("A in the guide track") {
+                try? sendNext(0.1, buffers: 1, to: sources.last(of: "A"))
+                return isInTheGuideTrack(a)
+            }
+            try await startAudioFiles(["R"], "R's file", count: 2)
+            feedDelayedNoise(["R": 0.5, "A": 0])
+            await recorder.measureAudioDelays()
+            await recorder.measureAudioDelays()
+            try sendNext(0.1, buffers: 2, to: sources.last(of: "A"))
+            try await Task.sleep(for: .milliseconds(50))
+            #expect(isInTheGuideTrack(a))
+            let files = try manifestOnDisk().audioFiles
+            let r = try #require(files.first { $0.audioSource == "Mic R" })
+            #expect(r.delays.count == 1 && abs((r.delays.first?.delay ?? 0) - 0.5) < 0.002)
+            #expect(files.first { $0.audioSource == "Mic A" }?.delays.map(\.delay) == [0])
+            _ = await stop()
+        }
+
+        /// The default microphone muted mid-recording, its file ended on no audio, hands the reference to the
+        /// next input with an audio delay, so an input waiting to join is measured and joins (D80).
+        @Test func aMutedDefaultMicrophoneDoesNotStallAnInputWaitingToJoin() async throws {
+            try await startInputs(["R", "A", "B"])
+            let b = SourceLabel.audioInput(3, name: "Mic B")
+            feedDelayedNoise(["R": 0, "A": 0.5])
+            await recorder.measureAudioDelays()
+            let buffersOfNoAudio = Int(RecorderValues.noAudioTime.nanoseconds * Int64(RecorderValues.audioSampleRate) / 1_000_000_000)
+                / samplesPerBuffer
+            try sendNext(0, buffers: buffersOfNoAudio + 10, to: sources.last(of: "R"))
+            try await wait("R's file's end") { (try? manifestOnDisk().audioFiles.first { $0.audioSource == "Mic R" }?.end) != nil }
+            feedDelayedNoise(["A": 0.5, "B": 0.2])
+            await recorder.measureAudioDelays()
+            try await wait("B in the guide track") {
+                try? sendNext(0.1, buffers: 1, to: sources.last(of: "B"))
+                return isInTheGuideTrack(b)
+            }
+            let delays = try #require(try manifestOnDisk().audioFiles.first { $0.audioSource == "Mic B" }?.delays)
+            #expect(delays.count == 1 && abs((delays.first?.delay ?? 0) - 0.2) < 0.002)
             _ = await stop()
         }
 
@@ -783,7 +832,9 @@ extension GlobalRecordingLog {
             try await Task.sleep(for: .milliseconds(200))
             for _ in 0..<3 { await recorder.measureAudioDelays() }
             let summary = await stopping.value
-            #expect(summary.manifest.audioFiles.allSatisfy { $0.delays.isEmpty })
+            // Only the anchor's own 0, listed at its file's start; nothing measured.
+            #expect(Dictionary(uniqueKeysWithValues: summary.manifest.audioFiles.map { ($0.audioSource, $0.delays.map(\.delay)) })
+                == ["Mic R": [0], "Mic A": []])
         }
 
         /// A measurement already running when Stop begins changes the recording no more (D77): the
@@ -802,7 +853,9 @@ extension GlobalRecordingLog {
             let stopping = Task { await recorder.stop() }
             await measuring.value
             let summary = await stopping.value
-            #expect(summary.manifest.audioFiles.allSatisfy { $0.delays.isEmpty })
+            // Only the anchor's own 0, listed at its file's start; nothing measured.
+            #expect(Dictionary(uniqueKeysWithValues: summary.manifest.audioFiles.map { ($0.audioSource, $0.delays.map(\.delay)) })
+                == ["Mic R": [0], "Mic A": []])
         }
 
         /// A video file's writer failure and a full disk reach the window's lines, red until a new file of the

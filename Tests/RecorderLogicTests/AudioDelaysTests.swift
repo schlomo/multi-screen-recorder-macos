@@ -18,12 +18,12 @@ import Testing
         var delays = AudioDelays()
         let first = delays.update(files: recorded(["a.mov", "b.mov"]), reference: "r.mov")
         #expect(first.earlierBy == ["r.mov": 0, "a.mov": nil, "b.mov": nil])
-        #expect(first.delays.isEmpty)
+        #expect(first.delays == ["r.mov": Entry(delay: 0)])
         #expect(delays.shown("a.mov") == .notInTheGuideTrackYet)
         #expect(delays.shown("r.mov") == nil)
         let measured = delays.update(files: recorded(["a.mov", "b.mov"]), reference: "r.mov", lags: ["a.mov": 0.5], at: 20)
         #expect(measured.earlierBy == ["r.mov": 0, "a.mov": 0.5, "b.mov": nil])
-        #expect(measured.delays == ["a.mov": Entry(delay: 0.5)])
+        #expect(measured.delays == ["a.mov": Entry(delay: 0.5), "r.mov": Entry(delay: 0)])
         #expect(measured.leaving.isEmpty && measured.rejoining.isEmpty)
         #expect(delays.shown("a.mov") == .synced(0.5, carriedOver: false))
         #expect(delays.shown("b.mov") == .notInTheGuideTrackYet)
@@ -39,7 +39,7 @@ import Testing
         var delays = AudioDelays()
         let outcome = delays.update(files: recorded(["a.mov", "b.mov"]), reference: "r.mov", lags: ["a.mov": -0.3, "b.mov": 0.2], at: 20)
         #expect(rounded(outcome.earlierBy) == ["a.mov": 0, "r.mov": 0.3, "b.mov": 0.5])
-        #expect(rounded(outcome.delays) == ["a.mov": -0.3, "b.mov": 0.2])
+        #expect(rounded(outcome.delays) == ["a.mov": -0.3, "b.mov": 0.2, "r.mov": 0])
         #expect(delays.shown("r.mov") == .synced(0.3, carriedOver: false))
         #expect(delays.shown("a.mov") == nil)
     }
@@ -49,9 +49,9 @@ import Testing
         var delays = AudioDelays()
         let before = delays.update(files: recorded(["a.mov", "b.mov"]), reference: "r.mov", lags: ["a.mov": 0.5], at: 20)
         let after = delays.update(files: recorded(["a.mov", "b.mov"]), reference: "r.mov", lags: ["b.mov": -0.3], at: 30)
-        #expect(before.delays == ["a.mov": Entry(delay: 0.5)])
+        #expect(before.delays == ["a.mov": Entry(delay: 0.5), "r.mov": Entry(delay: 0)])
         #expect(after.delays["a.mov"] == Entry(delay: 0.5))
-        #expect(after.delays["r.mov"] == nil)
+        #expect(after.delays["r.mov"] == Entry(delay: 0))
         #expect(rounded(after.earlierBy) == ["b.mov": 0, "r.mov": 0.3, "a.mov": 0.8])
     }
 
@@ -63,7 +63,7 @@ import Testing
             files: recorded(["a.mov", "b.mov", "c.mov"]), reference: "r.mov", lags: ["a.mov": -0.9, "b.mov": 0.1, "c.mov": 0], at: 20)
         #expect(outcome.leaving == ["a.mov": -0.9])
         #expect(outcome.earlierBy == ["r.mov": 0, "b.mov": 0.1, "c.mov": 0])
-        #expect(outcome.delays == ["a.mov": Entry(delay: -0.9), "b.mov": Entry(delay: 0.1), "c.mov": Entry(delay: 0)])
+        #expect(outcome.delays == ["a.mov": Entry(delay: -0.9), "b.mov": Entry(delay: 0.1), "c.mov": Entry(delay: 0), "r.mov": Entry(delay: 0)])
         #expect(delays.shown("a.mov") == nil)
     }
 
@@ -74,10 +74,10 @@ import Testing
         _ = delays.update(files: recorded(["a1.mov"]), reference: "r.mov", lags: ["a1.mov": 0.5], at: 20)
         let carried = delays.update(files: recorded(["a2.mov"]), reference: "r.mov")
         #expect(carried.earlierBy == ["r.mov": 0, "a2.mov": 0.5])
-        #expect(carried.delays == ["a2.mov": Entry(delay: 0.5)])
+        #expect(carried.delays == ["a2.mov": Entry(delay: 0.5), "r.mov": Entry(delay: 0)])
         #expect(delays.shown("a2.mov") == .synced(0.5, carriedOver: true))
         let confirmed = delays.update(files: recorded(["a2.mov"]), reference: "r.mov", lags: ["a2.mov": 0.51], at: 40)
-        #expect(confirmed.delays == ["a2.mov": Entry(delay: 0.5)])
+        #expect(confirmed.delays == ["a2.mov": Entry(delay: 0.5), "r.mov": Entry(delay: 0)])
         #expect(delays.shown("a2.mov") == .synced(0.5, carriedOver: false))
     }
 
@@ -104,7 +104,7 @@ import Testing
         #expect(without.leaving.isEmpty)
         let back = delays.update(files: recorded(["a.mov", "b.mov"], reference: "r2.mov"), reference: "r2.mov")
         #expect(rounded(back.earlierBy) == ["r2.mov": 0, "a.mov": 0.5, "b.mov": 0.2])
-        #expect(rounded(back.delays) == ["a.mov": 0.5, "b.mov": 0.2])
+        #expect(rounded(back.delays) == ["a.mov": 0.5, "b.mov": 0.2, "r2.mov": 0])
     }
 
     /// A reference without an audio delay becomes the anchor: every input starts over, carrying nothing over.
@@ -114,12 +114,12 @@ import Testing
         let other = delays.update(files: ["a1.mov": "A", "c.mov": "C"], reference: "c.mov")
         #expect(other.lines.first == "reference r.mov → c.mov: it has no audio delay, so it is the new anchor and every input starts over")
         #expect(other.earlierBy == ["c.mov": 0, "a1.mov": nil])
-        #expect(other.delays.isEmpty)
+        #expect(other.delays == ["c.mov": Entry(delay: 0)])
         #expect(delays.shown("a1.mov") == .notInTheGuideTrackYet)
         let next = delays.update(files: ["a2.mov": "A", "c.mov": "C"], reference: "c.mov")
         #expect(next.earlierBy == ["c.mov": 0, "a2.mov": nil])
         let measured = delays.update(files: ["a2.mov": "A", "c.mov": "C"], reference: "c.mov", lags: ["a2.mov": 0.4], at: 40)
-        #expect(measured.delays == ["a2.mov": Entry(delay: 0.4)])
+        #expect(measured.delays == ["a2.mov": Entry(delay: 0.4), "c.mov": Entry(delay: 0)])
     }
 
     /// An input whose capture ended no longer places the others.
@@ -127,7 +127,7 @@ import Testing
         var delays = AudioDelays()
         _ = delays.update(files: recorded(["a.mov", "b.mov"]), reference: "r.mov", lags: ["a.mov": -0.5, "b.mov": 0.2], at: 20)
         let after = delays.update(files: recorded(["b.mov"]), reference: "r.mov")
-        #expect(rounded(after.delays) == ["b.mov": 0.2])
+        #expect(rounded(after.delays) == ["b.mov": 0.2, "r.mov": 0])
         #expect(rounded(after.earlierBy) == ["r.mov": 0, "b.mov": 0.2])
     }
 
@@ -156,5 +156,36 @@ import Testing
             "a2.mov: placed earlier by 555 ms → 600 ms (the mix's zero: r.mov)",
         ])
         #expect(changed.isMoved)
+    }
+
+    /// A placement that rounds to 0 ms shows nothing, as one at 0 does.
+    @Test func aPlacementRoundingTo0MillisecondsShowsNothing() {
+        var delays = AudioDelays()
+        _ = delays.update(files: recorded(["a.mov"]), reference: "r.mov", lags: ["a.mov": 0.0004], at: 10)
+        #expect(delays.shown("a.mov") == nil)
+    }
+
+    /// A counted window no rule takes and a lag dropped say why in the recording log.
+    @Test func aWindowNoRuleTakesAndADroppedLagAreLines() {
+        var delays = AudioDelays()
+        _ = delays.update(files: recorded(["a.mov"]), reference: "r.mov", lags: ["a.mov": 0.5], at: 10)
+        let second = delays.update(files: recorded(["a.mov"]), reference: "r.mov", lags: ["a.mov": 0.5, "r.mov": 0, "x.mov": 0.1], at: 20)
+        #expect(second.lines == [
+            "a.mov: audio delay no rule: 2 of 3 counted windows for the median",
+            "r.mov: lag 0 ms dropped, the reference's own",
+            "x.mov: lag 100 ms late dropped, not a device's newest file",
+        ])
+    }
+
+    /// Whether a file has an audio delay for being the reference: the anchor's always, a new file of a
+    /// measured device by its carry-over before it is known, an unmeasured one not.
+    @Test func whetherAFileHasAnAudioDelayCountsTheAnchorAndTheCarryOver() {
+        var delays = AudioDelays()
+        #expect(!delays.hasAnchor)
+        _ = delays.update(files: recorded(["a1.mov", "b.mov"]), reference: "r.mov", lags: ["a1.mov": 0.5], at: 10)
+        #expect(delays.hasAnchor)
+        #expect(delays.hasAudioDelay("r2.mov", device: "R"))
+        #expect(delays.hasAudioDelay("a2.mov", device: "A"))
+        #expect(!delays.hasAudioDelay("b.mov", device: "B"))
     }
 }

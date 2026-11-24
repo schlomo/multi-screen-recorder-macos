@@ -65,8 +65,8 @@ public enum AudioDelay {
             isCarriedOver = true
         }
 
-        /// The rule the latest window's lag was evaluated by and its outcome, for the recording log; nil when
-        /// no rule was evaluated.
+        /// The rule the latest window's lag was evaluated by and its outcome, or why no rule was, for the
+        /// recording log.
         public private(set) var decision: String?
 
         /// A counted window's lag, the window ending at `at`; whether the audio delay changed.
@@ -86,7 +86,9 @@ public enum AudioDelay {
             default: (nil, "")
             }
             guard let candidate else {
-                decision = nil
+                decision = windows.count < windowsNeeded
+                    ? "no rule: \(windows.count) of \(windowsNeeded) counted windows for the median"
+                    : "no rule: \(latest.count) of \(RecorderValues.audioDelayChangeWindows) counted windows in the latest \(Int(RecorderValues.audioDelayChangeWindowSeconds)) s"
                 return false
             }
             if let delay, abs(candidate - delay) <= RecorderValues.audioDelayTolerance {

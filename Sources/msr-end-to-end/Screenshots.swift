@@ -84,12 +84,19 @@ enum Screenshots {
     }
 
     /// Sends a core Apple event to the process, quit as Quit does, reopen as a click on its Dock icon;
-    /// refuses, rather than asks, should macOS want the person's consent.
-    static func send(_ eventID: AEEventID, to pid: pid_t) throws {
+    /// refuses, rather than asks, should macOS want the person's consent, unless `askingIfNeeded` (on the
+    /// person's own Mac, D82), where macOS shows its prompt and waits for the answer.
+    static func send(_ eventID: AEEventID, to pid: pid_t, askingIfNeeded: Bool = false) throws {
         let target = NSAppleEventDescriptor(processIdentifier: pid)
-        let permission = AEDeterminePermissionToAutomateTarget(target.aeDesc, AEEventClass(kCoreEventClass), eventID, false)
-        guard permission == noErr else {
-            throw DriverError("macOS does not let this program send the event without asking (status \(permission))")
+        let permission = AEDeterminePermissionToAutomateTarget(target.aeDesc, AEEventClass(kCoreEventClass), eventID, askingIfNeeded)
+        switch permission {
+        case noErr: break
+        case OSStatus(errAEEventNotPermitted), OSStatus(errAEEventWouldRequireUserConsent):
+            throw DriverError("the program running this (a terminal app) lacks the Automation permission for the app; grant it in "
+                + "System Settings > Privacy & Security > Automation, or run scripts/update-homepage-screenshots --this-mac "
+                + "from this terminal to get the prompt (status \(permission))")
+        default:
+            throw DriverError("macOS does not let this program send the event (status \(permission))")
         }
         let event = NSAppleEventDescriptor(eventClass: AEEventClass(kCoreEventClass), eventID: eventID,
                                            targetDescriptor: target, returnID: AEReturnID(kAutoGenerateReturnID),

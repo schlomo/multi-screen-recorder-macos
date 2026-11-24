@@ -78,7 +78,9 @@ repository, and the requirements.
      the owner before each run. It refuses while the app runs (quit it
      first) or in dark mode. The terminal needs
      the Screen & System Audio Recording permission and Automation for the
-     app, System Events and Finder; a missing one is an error naming it.
+     app, System Events and Finder; macOS asks for Automation for the app
+     on the first run, and a missing or refused one is an error naming it
+     and how to get the prompt.
   2. Preview with `hugo server` (below) and check that the arrows still
      start beside Start and Stop and end at the next window. They point at
      fractions of each screenshot (`$startY`, `$stopY` and the others in

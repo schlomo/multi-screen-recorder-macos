@@ -174,7 +174,9 @@ screen connected, no dark appearance, no window moved (no Accessibility
 permission), `HOME`, the recording (about 15 s) and the scratch folder
 deleted afterwards. It needs the Screen & System Audio Recording
 permission and Automation for the app, System Events and Finder for the
-program running it, and says which is missing; it refuses, before
+program running it, and says which is missing; on this Mac the reopen
+event asks for Automation for the app, so macOS shows its prompt (in
+the VM the driver never asks); it refuses, before
 building, while the app runs (quit it first) or the Mac is in dark mode,
 sends the reopen event to the app's process it started, and removes its
 restore file after a clean run. The screenshots then show this Mac's
@@ -275,6 +277,8 @@ The named scenarios, each about 10 to 25 s of recording:
 | `virtual-screen-stress` | a virtual screen of 1280 × 720 connects, its mode is switched ten times, 1280 × 720 ↔ 1600 × 900, about 2 s apart (the next switch waits for the screen to settle, so at least that), and it disconnects; stopped by SIGINT | as `virtual-screen`, as strictly: no failure event, a `screen frame size changed` per switch, no lost content. Added to make the writer failure of `OSStatus -19092` happen often enough to study (D66); it passed on the hosted runner, and no frame of the new size reached the old file (D67) |
 | `tone` | the test tone in BlackHole, BlackHole the default microphone for the run (the original put back after it, and by the restore), all audio inputs recorded, no system audio | the tone's level, no silent stretch and a click every second in each of BlackHole's tracks; the clicks at the same time of day, by timecode, in every screen file's guide track "Audio inputs" |
 | `system-audio` | as `tone`, with the system audio | the system audio's file: one stereo track, its length |
+| `stop-by-ctrl-c` | auto mode, SIGINT | exit 0, finalized |
+| `stop-by-kill` | auto mode, `kill -9` | no `ended`, every file `recording` and readable up to its last fragment, less 0.5 s of slack (`killSlack`); a screen file's less the guide tracks' delay of 1 s too, as its fragment is written only once its guide samples arrive (`EndToEndValues.guideTrackDelay`, D80) |
 
 BlackHole is the default microphone while the tone plays, so it is the
 reference and in the guide track "Audio inputs" from the start (D80): the
@@ -282,8 +286,6 @@ VM's default, the Apple Virtual Sound Device, hears the tone 300 to 400 ms
 late, and BlackHole, measured against it, got no audio delay within the
 10 s of the run (the run of 2026-11-24 at 2628b9d), so it never joined the
 guide and the clicks were missing there.
-| `stop-by-ctrl-c` | auto mode, SIGINT | exit 0, finalized |
-| `stop-by-kill` | auto mode, `kill -9` | no `ended`, every file `recording` and readable up to its last fragment, less 0.5 s of slack (`killSlack`); a screen file's less the guide tracks' delay of 1 s too, as its fragment is written only once its guide samples arrive (`EndToEndValues.guideTrackDelay`, D80) |
 
 Every scenario's checks: `msr record`'s exit status, the recording
 folder's path alone on standard output, `recording.log` present next to `recording.json`, the timeline file (D68) in the folder not counted as a recorded file (its content is not checked here), `recording.json` exactly

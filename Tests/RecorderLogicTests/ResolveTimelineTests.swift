@@ -273,20 +273,33 @@ private extension Dictionary where Key == String, Value == Any {
             == (1_080_000, 300))
     }
 
-    /// Audio delays are against the recording's anchor, negative when earlier: the recording's smallest is
-    /// subtracted once, so the earliest input is at 0 and the anchor's files, which list none, are placed by
-    /// it too; the system audio stays at its own time (D80).
+    /// Audio delays are against the recording's anchor, negative when earlier: the smallest of the files'
+    /// latest is subtracted once, so the earliest input is at 0 and the anchor's files, at 0, are placed by it
+    /// too; a file never measured and the system audio stay at their own time (D80).
     @Test func theRecordingsSmallestAudioDelayIsSubtractedOnce() throws {
         let result = try timeline(manifest(files: [
             screen("10.00.00", "Screen 1 - A", timecode: "10:00:00:00", end: 20),
             audio("10.00.00", "Audio 0 - System", channels: "\"stereo\"", timecode: "10:00:01:00", start: 1, end: 11),
-            audio("10.00.01", "Audio 1 - Razer", channels: "1", timecode: "10:00:01:00", start: 1, end: 11, uid: "R"),
+            audio("10.00.01", "Audio 1 - Razer", channels: "1", timecode: "10:00:01:00", start: 1, end: 11, uid: "R", delay: 0),
             audio("10.00.01", "Audio 2 - Osmo", channels: "1", timecode: "10:00:01:00", start: 1, end: 11, uid: "O", delay: 0.5),
             audio("10.00.01", "Audio 3 - BRIO", channels: "1", timecode: "10:00:01:00", start: 1, end: 11, uid: "B", delay: -0.2),
+            audio("10.00.01", "Audio 4 - Mic", channels: "1", timecode: "10:00:01:00", start: 1, end: 11, uid: "M"),
         ]))
-        #expect(result.trackNames == ["Screen 1 - A", "Audio 0 - System", "Audio 1 - Razer", "Audio 2 - Osmo", "Audio 3 - BRIO"])
-        // 0.2 s is 6 frames, 0.7 s 21: from frame 30, Razer at 24, Osmo at 9, BRIO and the system audio at 30.
-        #expect(result.tracks.dropFirst().map { $0.children[0].frames.duration } == [30, 24, 9, 30])
+        #expect(result.trackNames == ["Screen 1 - A", "Audio 0 - System", "Audio 1 - Razer", "Audio 2 - Osmo", "Audio 3 - BRIO", "Audio 4 - Mic"])
+        // 0.2 s is 6 frames, 0.7 s 21: from frame 30, Razer at 24, Osmo at 9; BRIO, Mic and the system audio at 30.
+        #expect(result.tracks.dropFirst().map { $0.children[0].frames.duration } == [30, 24, 9, 30, 30])
+    }
+
+    /// Only each file's latest audio delay counts for the smallest: an early value it moved on from places
+    /// no other file (D80).
+    @Test func aSupersededSmallestAudioDelayMovesNoOtherFile() throws {
+        let result = try timeline(manifest(files: [
+            screen("10.00.00", "Screen 1 - A", timecode: "10:00:00:00", end: 70),
+            audio("10.00.01", "Audio 1 - Razer", channels: "1", timecode: "10:00:01:00", start: 1, end: 61, uid: "R", delay: 0),
+            audio("10.00.01", "Audio 2 - Osmo", channels: "1", timecode: "10:00:01:00", start: 1, end: 61, uid: "O",
+                  delays: [(at: 20, delay: -0.9), (at: 40, delay: 0.02)]),
+        ]))
+        #expect(result.tracks[1].children[0].frames.duration == 30)
     }
 
     /// A file whose audio delay changed is split at each change, each stretch placed by its own entry; the

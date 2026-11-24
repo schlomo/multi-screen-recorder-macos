@@ -113,7 +113,7 @@ extension Driver {
         let reopenBy = Date().addingTimeInterval(10)
         while true {
             do {
-                try Screenshots.send(AEEventID(kAEReopenApplication), to: recorder.pid)
+                try Screenshots.send(AEEventID(kAEReopenApplication), to: recorder.pid, askingIfNeeded: onThisMac)
                 break
             } catch {
                 guard Date() < reopenBy else { throw error }

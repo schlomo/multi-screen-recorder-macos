@@ -29,7 +29,7 @@ public struct AudioDelays: Sendable {
         /// Each file that is not out of the guide track: the seconds it is placed earlier, its audio delay less
         /// the smallest of those mixed; nil while it is not in the guide track yet.
         public var earlierBy: [String: Double?] = [:]
-        /// Each file with an audio delay against the anchor, the anchor's own files left out.
+        /// Each file with an audio delay against the anchor, the anchor's own files at 0.
         public var delays: [String: Entry] = [:]
         /// A file mixed before is placed elsewhere now: the mix crossfades.
         public var isMoved = false
@@ -83,17 +83,26 @@ public struct AudioDelays: Sendable {
         if anchor == nil { anchor = referenceUID }
         if delay(of: reference) == nil {
             lines.append("reference \(self.reference ?? "none") → \(reference): it has no audio delay, so it is the new anchor and every input starts over")
-            // shortcut: its delay against the old anchor is taken as 0, so every input starts over; measure it
-            // against the old anchor first if starting over loses too much.
+            // shortcut: only when no input being written has an audio delay (the recorder picks such a reference
+            // first), the new anchor's audio delay against the old one is unknown and taken as 0, so every input
+            // starts over; keep the old anchor's last known delays if a lost reference proves common.
             anchor = referenceUID
             for name in files.keys { files[name]!.applied = AudioDelay.Applied() }
         }
+        // shortcut: the reference is not measured, so its audio delay against the anchor, the base, stays as it
+        // was when it became the reference (the default microphone changed while the old one records); measure
+        // it against the anchor while that records if a drifting reference matters.
         let base = delay(of: reference)!
         if let previous, previous.uid != referenceUID, !lines.contains(where: { $0.hasPrefix("reference ") }) {
             lines.append("reference \(self.reference!) → \(reference): lags re-based onto the anchor by \(AudioDelay.text(base))")
         }
         self.reference = reference
-        for (name, lag) in lags.sorted(by: { $0.key < $1.key }) where name != reference && newest[name] != nil && files[name]?.uid != anchor {
+        for (name, lag) in lags.sorted(by: { $0.key < $1.key }) {
+            guard name != reference, newest[name] != nil, files[name]?.uid != anchor else {
+                let why = name == reference ? "the reference's own" : newest[name] == nil ? "not a device's newest file" : "the anchor's, always 0"
+                lines.append("\(name): lag \(AudioDelay.text(lag)) dropped, \(why)")
+                continue
+            }
             files[name]!.applied.add(lag + base, at: at)
             if let decision = files[name]!.applied.decision { lines.append("\(name): audio delay \(decision)") }
         }
@@ -130,7 +139,7 @@ public struct AudioDelays: Sendable {
             }
         }
         self.placed = placed
-        for (uid, name) in self.newest where uid != anchor {
+        for (uid, name) in self.newest {
             guard let delay = delays[uid] else { continue }
             outcome.delays[name] = Entry(delay: delay)
         }
@@ -139,12 +148,22 @@ public struct AudioDelays: Sendable {
     }
 
     /// What the status window shows for a device's newest file: nothing for one out of the guide track (its
-    /// problem line says so) nor for one the mix places at 0.
+    /// problem line says so) nor for one the mix places at 0 ms, rounded.
     public func shown(_ name: String) -> Shown? {
         guard let file = files[name], newest[file.uid] == name, !membership.isOut(file.uid), let placed = earlierBy[name] else { return nil }
         guard let placed else { return .notInTheGuideTrackYet }
-        return placed == 0 ? nil : .synced(placed, carriedOver: file.applied.isCarriedOver)
+        return (placed * 1000).rounded() == 0 ? nil : .synced(placed, carriedOver: file.applied.isCarriedOver)
     }
+
+    /// Whether the file has an audio delay, or will carry one over once known: the reference the recorder
+    /// picks first (D80). The anchor's files have one, 0.
+    public func hasAudioDelay(_ name: String, device uid: String) -> Bool {
+        guard uid != anchor else { return true }
+        if let file = files[name] { return file.applied.delay != nil }
+        return files.values.filter { $0.uid == uid }.max { $0.order < $1.order }?.applied.delay != nil
+    }
+
+    public var hasAnchor: Bool { anchor != nil }
 
     private static func milliseconds(_ seconds: Double) -> String { "\(Int((seconds * 1000).rounded())) ms" }
 
