@@ -524,6 +524,14 @@ Still open from D34: what AGC does and whether it is on in auto mode;
      file of the recording has a `measuredDelay`, as no file reached 3
      counted windows in 61 s, so Resolve got no shift for the Osmo
      (the owner moved it 15 frames by hand).
+   - **The status window shows sync that is applied** (the owner,
+     2026-11-24: "It must show so in the status, e.g. with a uncolored
+     line indicating active sync via clapping applied or so"): an
+     uncoloured statement per synced source, with its value and where
+     it came from (measured, carried over, and for item 22 a clap or
+     Calibrate). The architect's recommendation, for sign-off with the
+     design: in the source's row, not an extra line, given the vertical
+     space (item 39).
 39. **Compact source rows** (the owner, 2026-11-23: "with the cameras
    on my system and the lots of devices vertical space starts to be a
    problem"): sources not recorded (virtual, suspended, no audio)
