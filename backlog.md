@@ -42,7 +42,15 @@ Still open from D34: what AGC does and whether it is on in auto mode;
 
 ## In flight
 
-- Nothing.
+- Branch `call-to-action-alerts-and-anchor-measured` (one PR, the
+  owner, 2026-11-24): items 49, 50 with 43, and from 52 the duplicate
+  no-audio set, the missing test, the long doc line and a 30 s
+  end-to-end scenario. Designs signed off as text on 2026-11-24
+  (D84, D85 in the branch): alerts (Dock bounce, badge, count, the
+  next launch's notice, `Report it:`) only for a problem with a call
+  to action; a reconnected anchor is measured against the reference
+  in use. The end-to-end run waits for an idle Mac (the owner,
+  2026-11-24: "don't use the local e2e VM, system is busy").
 
 ## Queued
 
