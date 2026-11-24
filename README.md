@@ -185,8 +185,8 @@ recording's files: drag its `recording.json` and `recording.log` from
 its recording folder into the issue: `recording.log` is the recording
 log, every event and problem of the recording with the full error
 macOS gave, and what the app did and read meanwhile, one line each.
-Issues are public: the form says what `recording.json` contains, and `recording.log` names the same screens,
-cameras and audio inputs; a camera's name can hold a person's name (a
+Issues are public: the form says what `recording.json` contains, and
+`recording.log` names the same screens, cameras and audio inputs; a camera's name can hold a person's name (a
 Continuity Camera's often does), and `cameraUniqueID` identifies the
 camera. Open both in TextEdit and remove what you don't want to share.
 The recordings themselves show what the cameras saw; attach none. Nothing is sent automatically: you see the files and attach
