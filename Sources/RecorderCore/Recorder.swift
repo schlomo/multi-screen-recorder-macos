@@ -102,9 +102,6 @@ public final class Recorder {
     let audioDelayFeed = AudioDelayFeed()
     /// The audio input files' audio delays and their places in the "Audio inputs" guide track (D80).
     private var audioDelays = AudioDelays()
-    /// The audio inputs in no audio now, by UID: only such a file end (or its capture's) hands the anchor's
-    /// reference on (D80).
-    private var audioInputsWithNoAudio: Set<String> = []
     /// Each audio input's events, by its device's UID, so its gaps are found by device, not by name (D81).
     private var audioInputEvents: [String: [RecordingEvent]] = [:]
     /// The camera captures whose end was reported to the camera tracker.
@@ -1167,19 +1164,19 @@ public final class Recorder {
     /// others (D79, D80).
     private func audioInputCaptureEnded(_ id: AudioTracker.SourceID) {
         guard case .input(let uid) = id else { return }
-        audioInputsWithNoAudio.remove(uid)
         problemsTold.cleared(.audioInputOutOfTheGuideTrack(uid), at: context.now())
         applyAudioDelays()
     }
 
-    /// The reference and its file among `files` (D80): the anchor while its file is being written, or ended
-    /// otherwise than on no audio (a gap or a channel change, its next file following), else the
-    /// lowest-numbered input being written that has an audio delay; with none such, the lowest-numbered input
-    /// being written, which becomes the new anchor. With no file being written, the same among them all.
+    /// The reference and its file among `files` (D80, D85): the reference in use, the anchor at first, while its
+    /// file is being written, or ended otherwise than on no audio (a gap or a channel change, its next file
+    /// following), else the lowest-numbered input being written that has an audio delay; with none such, the
+    /// lowest-numbered input being written, which becomes the new anchor. With no file being written, the same
+    /// among them all.
     private func delayReference(among files: [String: String]) -> (uid: String, file: String)? {
         let ended = Set(manifest.audioFiles.filter { $0.end != nil }.map(\.name))
         let writing = files.filter { name, uid in
-            !ended.contains(name) || (uid == audioDelays.anchor && !audioInputsWithNoAudio.contains(uid))
+            !ended.contains(name) || (uid == audioDelays.referenceDevice && !audioTracker.hasNoAudio(.input(uid)))
         }
         let candidates = writing.isEmpty ? files : writing
         func file(of uid: String) -> String? { candidates.first { $0.value == uid }?.key }
@@ -1187,7 +1184,7 @@ public final class Recorder {
             guard case .input(let uid) = source.id, file(of: uid) != nil else { return nil }
             return (source.number, uid)
         }.sorted { $0.0 < $1.0 }.map(\.1)
-        let uid = audioDelays.anchor.flatMap { file(of: $0) != nil ? $0 : nil }
+        let uid = audioDelays.referenceDevice.flatMap { file(of: $0) != nil ? $0 : nil }
             ?? byNumber.first { audioDelays.hasAudioDelay(file(of: $0)!, device: $0) }
             ?? byNumber.first
         return uid.flatMap { uid in file(of: uid).map { (uid, $0) } }
@@ -1333,7 +1330,6 @@ public final class Recorder {
     /// sound returns (D81).
     private func noAudio(_ id: AudioTracker.SourceID, _ isNoAudio: Bool) {
         guard case .input(let uid) = id else { return }
-        if isNoAudio { audioInputsWithNoAudio.insert(uid) } else { audioInputsWithNoAudio.remove(uid) }
         applyAudioDelays()
         guard isNoAudio else {
             problemsTold.cleared(.audioInputSilentAfterGaps(uid), at: context.now())

@@ -106,8 +106,7 @@ import Testing
     }
 
     /// The reference's capture ending makes another input the reference: every lag is re-based onto the anchor
-    /// through its audio delay, the mix keeps every input, and no listed delay changes; the anchor's return
-    /// changes none either.
+    /// through its audio delay, the mix keeps every input, and no listed delay changes.
     @Test func anotherReferenceWithAnAudioDelayReBasesOntoTheAnchor() {
         var delays = AudioDelays()
         _ = delays.update(files: recorded(["a.mov", "b.mov"]), reference: "r.mov", lags: ["a.mov": 0.5, "b.mov": 0.2], at: 20)
@@ -116,9 +115,51 @@ import Testing
         #expect(rounded(without.earlierBy) == ["a.mov": 0.3, "b.mov": 0])
         #expect(rounded(without.delays) == ["a.mov": 0.5, "b.mov": 0.2])
         #expect(without.leaving.isEmpty)
-        let back = delays.update(files: recorded(["a.mov", "b.mov"], reference: "r2.mov"), reference: "r2.mov")
-        #expect(rounded(back.earlierBy) == ["r2.mov": 0, "a.mov": 0.5, "b.mov": 0.2])
-        #expect(rounded(back.delays) == ["a.mov": 0.5, "b.mov": 0.2, "r2.mov": 0])
+        #expect(delays.referenceDevice == "A")
+    }
+
+    /// The owner's recording 2026-11-24 20.55.08 (D85): the Osmo "O" sounds first, the anchor, the Razer "Z"
+    /// 550 ms early against it; the Osmo unplugged, the Razer is the reference; the Osmo's new file, back
+    /// 100 ms less late, is measured against the Razer like any other input, from its earlier file's 0
+    /// carried over, and the Razer keeps its audio delay.
+    @Test func theAnchorsNewFileIsMeasuredAgainstTheReferenceInUse() {
+        var delays = AudioDelays()
+        for at in [10.0, 20, 30] { _ = delays.update(files: ["o1.mov": "O", "z.mov": "Z"], reference: "o1.mov", lags: ["z.mov": -0.55], at: at) }
+        #expect(delays.anchor == "O")
+        _ = delays.update(files: ["z.mov": "Z"], reference: "z.mov")
+        let back = delays.update(files: ["o2.mov": "O", "z.mov": "Z"], reference: "z.mov")
+        #expect(back.lines.first == "o2.mov: carries over 0 ms from o1.mov")
+        #expect(rounded(back.delays) == ["o2.mov": 0, "z.mov": -0.55])
+        #expect(delays.shown("o2.mov") == .synced(0.55, carriedOver: true))
+        #expect(delays.hasAudioDelay("o2.mov", device: "O"))
+        let measured = delays.update(files: ["o2.mov": "O", "z.mov": "Z"], reference: "z.mov", lags: ["o2.mov": 0.45], at: 130)
+        #expect(measured.lines.first == "o2.mov: audio delay its first counted window on the carried-over: 0 ms → 100 ms early, replaced")
+        #expect(rounded(measured.delays) == ["o2.mov": -0.1, "z.mov": -0.55])
+        guard case .synced(let placed, carriedOver: false) = delays.shown("o2.mov") else {
+            Issue.record("o2.mov is not shown measured: \(String(describing: delays.shown("o2.mov")))")
+            return
+        }
+        #expect(abs(placed - 0.45) < 1e-9)
+        #expect(delays.referenceDevice == "Z")
+        #expect(delays.hindsight(of: "o1.mov", fileStart: 0) == nil)
+        #expect(delays.hindsight(of: "o2.mov", fileStart: 117) == [.init(at: 0, delay: -0.1)])
+    }
+
+    /// A file measured against one reference and then another (D85): Stop's hindsight never merges the windows
+    /// of the two into one median, the second stretch starting at the first window against the second; the
+    /// new reference's own file, measured no more, gets no new entry.
+    @Test func hindsightSplitsAFileAtAChangeOfReference() {
+        var delays = AudioDelays()
+        for at in [10.0, 20, 30] {
+            _ = delays.update(files: recorded(["a.mov", "b.mov"]), reference: "r.mov", lags: ["a.mov": 0.5, "b.mov": 0.2], at: at)
+        }
+        for at in [40.0, 50] { _ = delays.update(files: ["a.mov": "A", "b.mov": "B"], reference: "a.mov", lags: ["b.mov": -0.2], at: at) }
+        let stretches = delays.hindsight(of: "b.mov", fileStart: 5)
+        #expect(stretches?.count == 2)
+        #expect(stretches?.first == .init(at: 0, delay: 0.2))
+        #expect(stretches?.last.map { ($0.at * 1000).rounded() / 1000 } == 35)
+        #expect(stretches?.last.map { ($0.delay * 1000).rounded() / 1000 } == 0.3)
+        #expect(delays.hindsight(of: "a.mov", fileStart: 5) == [.init(at: 0, delay: 0.5)])
     }
 
     /// A reference without an audio delay becomes the anchor: every input starts over, carrying nothing over.

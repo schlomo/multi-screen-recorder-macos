@@ -568,8 +568,8 @@ extension GlobalRecordingLog {
         }
 
         /// The reference's capture ending makes the next input the reference: the others are re-based onto the
-        /// anchor through its audio delay, so the mix keeps every input and no listed delay changes; the anchor
-        /// back as the reference changes none either (D80).
+        /// anchor through its audio delay, so the mix keeps every input and no listed delay changes; the anchor's
+        /// new file, measured against the reference in use, changes none either (D80, D85).
         @Test func theReferencesCaptureEndingAndReturningKeepsTheGuideTrackAndTheDelays() async throws {
             try await startInputs(["R", "A", "B"])
             let (a, b) = (SourceLabel.audioInput(2, name: "Mic A"), SourceLabel.audioInput(3, name: "Mic B"))
@@ -599,6 +599,31 @@ extension GlobalRecordingLog {
             await recorder.measureAudioDelays()
             #expect(try delays() == measured)
             #expect(leavesOfTheGuideTrack() == 0)
+            _ = await stop()
+        }
+
+        /// The owner's recording 2026-11-24 20.55.08 (D85): the Osmo "O" sounds first, the anchor, the Razer "Z"
+        /// 550 ms early against it; the Osmo's capture ends and starts again, its new file 100 ms less late. The
+        /// Razer stays the reference and keeps its audio delay; the Osmo's new file carries over its 0 and is
+        /// measured against the Razer.
+        @Test func theAnchorsNewFileIsMeasuredAgainstTheReferenceInUse() async throws {
+            try await startInputs(["O", "Z"])
+            try feedDelayedNoise(["O": 0, "Z": -0.55])
+            for _ in 0..<3 { await recorder.measureAudioDelays() }
+            try #require(sources.last(of: "O")).lose(.captureFailed("the stand-in was unplugged"))
+            try await wait("O's restart") { sources.byUID.withLock { $0["O"]?.count } == 2 }
+            try await startAudioFiles(["O"], "O's new file", count: 3)
+            try feedDelayedNoise(["O": -0.1, "Z": -0.55])
+            await recorder.measureAudioDelays()
+            let files = try manifestOnDisk().audioFiles
+            let osmo = files.filter { $0.audioSource == "Mic O" }
+            #expect(osmo.count == 2)
+            #expect(osmo.first?.delays.map(\.delay) == [0])
+            let carriedAndMeasured = try #require(osmo.last?.delays.map(\.delay))
+            #expect(carriedAndMeasured.count == 2 && carriedAndMeasured.first == 0 && abs((carriedAndMeasured.last ?? 0) + 0.1) < 0.002,
+                    "\(carriedAndMeasured)")
+            let razer = try #require(files.first { $0.audioSource == "Mic Z" }?.delays.map(\.delay))
+            #expect(razer.count == 1 && abs((razer.first ?? 0) + 0.55) < 0.002, "\(razer)")
             _ = await stop()
         }
 
@@ -1558,6 +1583,29 @@ extension GlobalRecordingLog {
             _ = await stop()
             let log = try String(contentsOf: recorder.folder.appending(path: RecordingNames.recordingLog), encoding: .utf8)
             #expect(log.contains("Audio 1 \(name): no audio since 0:00, right after its gap at 0:00: a red problem (D81)"))
+        }
+
+        /// A capture ending while its input has no audio ends that no audio with it: its line turns to the past,
+        /// stopped, and its next capture records its sound (D69, D81).
+        @Test func aCaptureEndingWhileItsInputHasNoAudioEndsItsNoAudio() async throws {
+            try start()
+            let buffersOfNoAudio = Int(RecorderValues.noAudioTime.nanoseconds * Int64(RecorderValues.audioSampleRate) / 1_000_000_000)
+                / samplesPerBuffer
+            let origin = Int64(readClocks().host)
+            try send(0.25, buffers: 3, from: origin)
+            try send(0, buffers: buffersOfNoAudio + 10, after: 13, from: origin)
+            try await wait("the problem") { !observer.problems.isEmpty }
+            #expect(recorder.status().rows.first?.state == "no audio")
+            source.lose(.captureFailed("the stand-in failed"))
+            try await wait("the restart") { sources.count == 2 }
+            try await wait("the sound") {
+                try? sendNext(0.25, buffers: 1, to: sources.last)
+                return recorder.status().rows.first?.state == "recording"
+            }
+            let past = try #require(recorder.problemLines().first { $0.text.hasPrefix("Audio 1") })
+            #expect(!past.isRed)
+            #expect(past.text.wholeMatch(of: /Audio 1 .+ sent only silence for .+ after its gaps at 0:00, stopped/) != nil, "\(past.text)")
+            _ = await stop()
         }
 
         /// Another input's gaps are no gaps of this one, even under the same name: they are found by its

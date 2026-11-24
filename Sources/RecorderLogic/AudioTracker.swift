@@ -267,6 +267,12 @@ public struct AudioTracker: Sendable {
         sources[id]?.isNoAudio = isNoAudio
     }
 
+    /// Whether the source's running capture has no audio now (D69): only such a file end of the reference hands
+    /// the reference on (D80).
+    public func hasNoAudio(_ id: SourceID) -> Bool {
+        sources[id].map { $0.phase == .recording && $0.isNoAudio } ?? false
+    }
+
     /// A capture ended by itself.
     public mutating func captureEnded(_ id: SourceID, _ end: CaptureEnd, at now: Int64) -> Step {
         guard let tracked = sources[id], tracked.phase == .recording else { return Step() }
