@@ -165,6 +165,19 @@ status is the driver's. All 7 scenarios and the start window's
 screenshot took 2 minutes 10 seconds with the build. Nothing records or
 plays sound on the Mac itself.
 
+**On the owner's Mac:** `scripts/update-homepage-screenshots --this-mac
+[--app <path>]` (D82) builds the driver from the checkout and runs only
+its `app-windows` subcommand, the app's window step of the scenarios'
+run (`Driver.startWindow` and `recordingWindows`, told `onThisMac`), on
+this Mac with the installed app or the given one: light only, no virtual
+screen connected, no dark appearance, no window moved (no Accessibility
+permission), `HOME`, the recording (about 15 s) and the scratch folder
+deleted afterwards. It needs the Screen & System Audio Recording
+permission and Automation for the app, System Events and Finder for the
+program running it, and says which is missing. The screenshots then show
+this Mac's real screens, cameras and microphones; the VM run stays the
+gate for marking a PR ready.
+
 **When:** before a PR that touches the recorder or the driver is marked
 ready, the architect runs it on the PR's head and records the commit and
 the result in the PR description (`AGENTS.md`). The owner (2026-11-19):
@@ -430,7 +443,8 @@ video from the e2e runs"):
   captured active, in `review/app/`, named
   `app-<window>-<appearance>.<png|mov>`; `scripts/update-homepage-screenshots`
   puts the three light PNGs of a published app's run onto the homepage's
-  screenshots (D72, [homepage/README.md](../../homepage/README.md)):
+  screenshots (D72, [homepage/README.md](../../homepage/README.md));
+  `--this-mac` (D82) takes the same three on the owner's Mac:
   - `app-start-window-light.png`, `app-start-window-dark.png`: the real
     start window, the built app started as `msr` without arguments, with
     a scratch `HOME` (its ready check, `state.json` and crash report

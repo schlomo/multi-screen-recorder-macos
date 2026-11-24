@@ -275,7 +275,8 @@ records the commit and the result in the PR description. The
 homepage's screenshots come from a published app's run, as a
 homepage-only follow-up that `scripts/update-homepage-screenshots
 --release` (or `--snapshot <n>`) commits, pushes and, for a release,
-opens as a draft PR (D72).
+opens as a draft PR (D72); `--this-mac` takes them on the owner's Mac
+instead and only copies them into the checkout (D82).
 
 ## Facts that bite
 
