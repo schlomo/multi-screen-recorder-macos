@@ -27,7 +27,7 @@ import Testing
     /// The form ids the link fills are the ones `.github/ISSUE_TEMPLATE/problem-report.yml` has.
     @Test func theFieldsExistInTheForm() throws {
         let form = try repositoryFile(".github/ISSUE_TEMPLATE/problem-report.yml")
-        for id in [ProblemReport.versionField, ProblemReport.whatHappenedField, "recording-json", "recording-log"] {
+        for id in [ProblemReport.versionField, ProblemReport.whatHappenedField, "files"] {
             #expect(form.contains("id: \(id)\n"), "\(id)")
         }
         #expect(form.contains("title: \"\(ProblemReport.title)\""))

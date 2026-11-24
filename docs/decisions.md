@@ -2887,3 +2887,19 @@ architect's reading.
   microphones; the first run asks for Automation and possibly Screen
   Recording for the terminal.
 - **Evidence:** backlog item 48; [homepage/README.md](../homepage/README.md).
+
+## D83: The problem report form has one field for the recording's files (2026-11-24)
+
+- **Status:** in force. Amends D64's `recording-log` field.
+- **Context:** The owner, 2026-11-24: "I'd merge the recording.json
+  and recording.log fields into one field that accepts all file
+  uploads, for simplicity. And only ask for a file upload".
+- **Decision:** `problem-report.yml` replaces its `recording-json` and
+  `recording-log` fields with one optional field `files`, "Files from
+  the recording folder", asking to drag `recording.json` and
+  `recording.log` into it; nothing asks to paste a file's content. It
+  stays a text field, the architect's reading: GitHub's issue forms
+  take dropped files in a text field [ASSUMED].
+- **Consequences:** None for the app: its link fills only `version` and
+  `what-happened`.
+- **Evidence:** [design/recorder.md](design/recorder.md).
