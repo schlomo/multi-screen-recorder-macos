@@ -2906,3 +2906,108 @@ architect's reading.
 - **Consequences:** None for the app: its link fills only `version` and
   `what-happened`.
 - **Evidence:** [design/recorder.md](design/recorder.md).
+
+## D84: Alerts only with a call to action (2026-11-24)
+
+- **Status:** in force. Amends D46, D47 and D79 (every problem bounced
+  the Dock icon, set the badge and counted in the status line, D79's
+  kind exempt) and D64 (the notice and `Report it:` for every recording
+  that exits 3).
+- **Context:** The owner, 2026-11-24, of a "camera stalled" notice
+  after a screen switch: "TBH I don't think that this warrants a bug
+  report, do you? What would we do with that info?"; "I won't open a
+  popup for past recordings if there is no clear action". Then the
+  rule: "bouncing dock and alerts or a popup on next launch are all
+  governed by the same rule: Is there something the human has to do
+  about it? is there an actual real call to action? If not, then we
+  stay quiet." On the architect's table of problem kinds: "table is
+  right and yes, alert for those".
+- **Decision:** Each problem kind has a call to action or none
+  (`ProblemKind.callToAction`): free up disk space (a full disk, the
+  recording manifest, the timeline file or the recording log not
+  written; low disk space keeps alerting); grant the permission (the
+  Camera permission missing); unplug and plug in the device again (an
+  audio input silent right after its gaps, D81); report it (a file
+  incomplete); stop and start the recording again, or replug, and
+  report it, for a source that fails and does not come back (a screen,
+  camera, audio source or audio file not captured or failed, an audio
+  input not recordable) once it lasted 10 s (`unrecoveredAfter`,
+  *data*) without ending, and for the audio inputs' changes not
+  followed at once. None: a camera stall, an audio input out of the
+  "Audio inputs" guide track, guide tracks cut, the Dock icon not
+  shown, an input volume not set or not followed, the screens, the
+  audio inputs or the free space not read, and a screen showing another
+  screen's picture as a badge of its own. Only a call to action bounces
+  the Dock icon, sets the badge and counts in `msr record`'s status
+  line; every problem is still told on standard error, listed in the
+  status window, `recording.json` and the recording log.
+- **The architect's reading (after the recording):** the app's notice
+  "The last recording had problems" and `msr record`'s `Report it:` and
+  `Attach:` lines appear only when a call to action that includes
+  "report it" was given, or data was lost (a file not finalized, or the
+  final manifest not written). Disk full, the permission and a replug
+  are live only: nothing is left to do afterwards. `recording.json`'s
+  `result` and exit status 3 still report the facts (D47); a camera
+  stall stays a failure event.
+- **Decided while building (the builder's reading, for the architect
+  to confirm):** `state.json`'s `lastRecording` holds `noticeWanted`
+  instead of `result`; a state file of an earlier release decodes and
+  wants no notice. A call to action given later than its problem adds
+  no line on standard error, and the problem lines say nothing new: the
+  call to action governs only the alerts (D78 stays). A screen showing
+  another screen's picture ends its file as the screen not captured,
+  which calls to action once it lasted 10 s, as it is recorded again
+  only after its next change. An audio source ended by a full disk is
+  told as that source failed (unchanged), so it too calls to "stop and
+  start again and report it" after 10 s.
+- **Consequences:** A recording with only hiccups that recovered, a
+  stall or an input out of the guide track is quiet: no bounce, no
+  badge, no notice at the next start, no `Report it:` line, though it
+  may still exit 3.
+- **Evidence:** backlog items 43 and 50;
+  [design/recorder.md](design/recorder.md), "The app" and "Problem
+  report offer".
+
+## D85: A reconnected anchor is measured against the reference in use (2026-11-24)
+
+- **Status:** in force. Amends D80's reference rule ("Amended after the
+  delta review") and its hindsight ("Amended after the owner's
+  try-out").
+- **Context:** The owner's try-out of PR #30, 2026-11-24: "it feels
+  like there is a slight echo after the osmo reconnect that then gets
+  less, but stays more than before the disconnect". In the owner's
+  recording `2026-11-24 20.55.08` the Osmo was the anchor; after its
+  unplug (86.5 to 117.2 s) its new file was the reference again at 0 ms
+  and never measured, though it had become about 100 ms less late; the
+  Razer measured 548 to 581 ms early before and 444 to 475 ms after,
+  and Stop's hindsight merged the Razer's windows from before and after
+  into one 548 ms. On the architect's design, the owner, 2026-11-24:
+  "yes, good suggestion".
+- **Decision:** Once the reference has moved away from the anchor (its
+  file ended), it stays with the input it moved to; the anchor's
+  returning file does not take it back, and the reference moves again
+  only when its own file ends (then, as before, the lowest-numbered
+  input being written that has an audio delay; with none, a new anchor
+  and every input starts over). The anchor's new file is measured
+  against the reference in use like any other input, starting from its
+  earlier file's 0, carried over. Stop's hindsight also ends a file's
+  stretches at a change of reference, so windows measured against
+  different references are never merged into one median.
+- **Decided while building (the builder's reading, for the architect
+  to confirm):** the reference in use keeps D80's rule for the anchor:
+  it stays the reference while its capture runs and its newest file did
+  not end on no audio, so a gap or a channel change of it moves
+  nothing. The anchor's files, 0 by definition, are those of its device
+  that start while it is the reference. A file's stretch after a change
+  of reference starts at its first window against the new reference,
+  and two such neighbours are never merged, also within a frame. The
+  reference other than the anchor is still not measured, its audio
+  delay against the anchor kept from when it became the reference (the
+  shortcut of D80).
+- **Consequences:** An Osmo replugged mid-recording is placed by its
+  new audio delay within about 10 s; a microphone it was the reference
+  for keeps its audio delay instead of being moved by the 60 s rule.
+- **Evidence:** backlog item 49; the owner's recording
+  `2026-11-24 20.55.08`; `AudioDelaysTests`
+  and `RecorderTests.theAnchorsNewFileIsMeasuredAgainstTheReferenceInUse`;
+  [design/recorder.md](design/recorder.md), "Audio delay".

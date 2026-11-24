@@ -101,10 +101,24 @@ printed already (D64).
 ## Problem
 
 Something that went wrong in a recording and that the person is told:
-the Dock badge's "!", a line in the status window (red when something
+a line in the status window (red when something
 is broken, orange for a hiccup, D78), a line on standard
 error in `msr record`, a line in the recording log, and an entry in the
-recording manifest's `problems` with its time and full error (D46, D64).
+recording manifest's `problems` with its time and full error (D46, D64);
+the Dock badge's "!" and a bounce only with a call to action (D84).
+
+## Call to action
+
+What a person has to do about a problem, by its kind (`CallToAction`,
+D84): free up disk space, grant the permission, unplug and plug in the
+device again, report it, or stop and start the recording again (or
+replug) and report it; a kind without one is told but never bounces the
+Dock icon, sets the badge or counts in the status line. A source that
+fails gets its call to action only once it lasted 10 s without coming
+back. Only a call to action that includes "report it", or lost data,
+makes the recording ask to report it: `msr record`'s `Report it:` line
+and the app's notice at its next start. Not "action", which is a step a
+tracker asks the recorder to carry out.
 
 ## Ended
 
@@ -139,7 +153,7 @@ input volume (D69), the problems, and Stop and Continue (D46).
 ## Status line
 
 The one line `msr record` redraws once a second on standard error when
-that is a terminal: the count of problems when there are any, then the
+that is a terminal: the count of problems with a call to action when there are any, then the
 recording time, the size written, the files and the free space, the CPU
 use and the sources being recorded, in that order. Not the window's own
 line below its table.
@@ -158,8 +172,8 @@ the state file, because GitHub refuses `.ips` attachments.
 `~/Library/Application Support/Multi Screen Recorder/state.json`: what
 the app remembers between starts, written by the app and, at Stop, by
 `msr record` too (the last offered crash report, and
-the last recording's folder, how it ended and whether its problems
-were told, D64), kept
+the last recording's folder, whether its problems are to be told and
+whether they were, D64, D84), kept
 apart from the settings file because the person never edits it (D40).
 
 ## Restore file
@@ -404,15 +418,17 @@ whole file) and the sound the correction added as
 How much later an audio input's sound arrives than the anchor's,
 negative when earlier, beyond what its clock drift explains; measured
 while recording by cross-correlation against the reference: the anchor
-while its capture runs and it is not in no audio, else the
-lowest-numbered input being written that has an audio delay, whose own audio delay turns the lags
-into ones against the anchor (D77, D80). A file's audio delay is set by its first
+at first, the reference in use while its capture runs and it is not in
+no audio, else the lowest-numbered input being written that has an
+audio delay, whose own audio delay turns the lags into ones against the
+anchor; the reference stays with the input it moved to (D77, D80, D85). A file's audio delay is set by its first
 counted window, once more by the median of its first 3, then only by the
 median of the latest 60 s, each time only beyond a frame (D80); a new
 file of the same input starts with the earlier file's, carried over.
 Written as the audio file's `delays`, one entry per change of its own,
-rewritten with hindsight at Stop (one entry per stretch between the 60 s rule's changes);
-the anchor's files list 0. The "Audio inputs" guide track places the
+rewritten with hindsight at Stop (one entry per stretch between the
+changes of the 60 s rule and of the reference); the anchor's files list
+0. The "Audio inputs" guide track places the
 file's sound earlier by it less the smallest of the inputs it mixes, the
 timeline file by it less the smallest of the files' latest; the audio file itself
 is unchanged.
@@ -420,10 +436,12 @@ is unchanged.
 ## Anchor
 
 The device every audio delay of a recording is against: the first
-audio input whose file is written, its own audio delay 0, the default
-microphone or not. Only when no input being written has an audio delay
-does the lowest-numbered input being written become the new anchor,
-every input then starting over (D80).
+audio input whose file is written, its files' audio delay 0 while it is
+the reference, the default microphone or not; a new file of it after
+the reference moved away is measured like any other input (D85). Only
+when no input being written has an audio delay does the lowest-numbered
+input being written become the new anchor, every input then starting
+over (D80).
 
 ## Lag
 

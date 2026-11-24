@@ -26,7 +26,7 @@ signature); if that fails it exits 71 (`EX_OSERR`).
 |---|---|---|
 | `msr list` | Prints "What will be recorded" as `msr check` does, from the settings and the devices, without the ready check and without asking for any permission, then whether the program running `msr` may record the system audio | 0, 1 when the screens, the audio inputs or an audio input the settings record cannot be read |
 | `msr check [flags] [--debug]` | Prints the banner and "What will be recorded", then runs the ready check and prints each item; `--debug` also prints the detail lines on standard error (and at `.debug` in the unified log) | 0 ready, 1 not ready |
-| `msr record [flags] [--duration 1h30m] [--debug \| --quiet]` | Records the screens, the cameras and the audio sources (the recording core, D45, D49, D74). Without flags it does what Start in the window does, with the same settings file; it prints the banner (as `msr check`) and "What will be recorded" at its start, then runs the ready check, records until Ctrl-C, SIGTERM, SIGHUP, the duration or Stop in the status window (below), and prints the recording folder at the start and a summary at the end (the summary: every file with its state, the screens' by number, then the cameras' by number, then the audio sources' by number with the system audio first, and our process's CPU use, average and peak, and, when it exits 3, the link to report it and the files to attach, see "Problem report offer"). It runs as a full AppKit app without a Dock icon (the `accessory` activation policy) until the ready check passed and the recording starts, then shows the icon; a run that is not ready shows none, and an icon macOS refuses is a problem, and the recording goes on (Ctrl-C stops it); while it records, the icon shows with its badge, and clicking it or Quit opens the status window as in the app (D45, D46). When it stops, for any reason, it first prints `Stopping the recording and finalizing the files…` on standard error, then finalizes and prints the summary; a Ctrl-C while it finalizes prints `Still finalizing the files…` and does nothing more. It prints every event of the recording manifest as one line on standard error, a failure's repeats counted instead (see "Logging"). `--debug` also prints the detail lines on standard error (and at `.debug` in the unified log); the recording log has them always (see "Logging"). **Output split:** standard output carries exactly one line, the recording folder's bare path, when recording starts; everything for people goes to standard error (the banner, "What will be recorded", the ready check, `Recording into <path>`, events, the status line, the summary, detail lines), all of it, and every other line this code writes on standard error (the settings file note, `Error:` lines, detail lines; ArgumentParser writes its own usage errors, before any status line exists), through one writer so nothing prints into the middle of the status line; a failed write to standard error, SIGPIPE included, is ignored, as there is nowhere left to report it, and `msr record` ignores SIGPIPE for the whole process from its start, before it writes anything, so a closed reader of standard output does not end it. **Status line:** only when standard error is a terminal whose `TERM` is set, not empty and not `dumb`, with no option: one line redrawn once a second (`\r`, the text, `ESC[K`). Its text, joined by ` · ` as the window's line is: `<n> problems` (`1 problem`) first when there are any, counting every time a problem was told in the run (one that comes back after it ended counts again, though the window shows a kind's repeats on one line; an audio input out of the guide track is not counted, D79; low disk space and a screen showing another screen's picture are not problems, though they set the Dock badge), nothing when there are none; then the text of the window's line (time with seconds, size written, files, free space), the CPU use when known, and `<n> screens, <m> audio` for the sources being recorded (`1 screen`; a stalled camera counts, as its file is still written), with `<k> cameras` between them when cameras are recorded (`2 screens, 1 camera, 5 audio`), such as `1 problem · Recording 0:12:34 · 1.2 GB in 7 files · 143.8 GB free · CPU 23 % · 2 screens, 5 audio`. It is cut to the terminal's width minus 1, taking 80 columns when the width is unknown, so it does not wrap. An event or detail line clears it, prints, and it is drawn again, all in one write; at the end it is cleared and the summary follows. Not a terminal: no status line and no escape code. **`--quiet`:** no output for people (no banner, table, passing ready check, events, status line or summary); still written are the path on standard output and, on standard error, a failing ready check, `Error:` lines, the settings file note, each failure and problem as it happens (a failure's event line, or the problem's own line when no event tells it) with the count of a failure's repeats, and the summary of a run that exits 3; exit codes are unchanged; with `--debug` it is a usage error. `--duration` takes hours, minutes and seconds (`1h30m`, `45m`, `90s`); a number without a suffix is minutes (`90` is 90 minutes) | 0 ok (every file finalized, no file ended by a failure, no camera stalled, D47), 1 not ready, 3 when the recording manifest's `result` is `problems`, the finalized manifest could not be written, or the recording could not start |
+| `msr record [flags] [--duration 1h30m] [--debug \| --quiet]` | Records the screens, the cameras and the audio sources (the recording core, D45, D49, D74). Without flags it does what Start in the window does, with the same settings file; it prints the banner (as `msr check`) and "What will be recorded" at its start, then runs the ready check, records until Ctrl-C, SIGTERM, SIGHUP, the duration or Stop in the status window (below), and prints the recording folder at the start and a summary at the end (the summary: every file with its state, the screens' by number, then the cameras' by number, then the audio sources' by number with the system audio first, and our process's CPU use, average and peak, and, when the recording asks to report it, the link to report it and the files to attach, see "Problem report offer"). It runs as a full AppKit app without a Dock icon (the `accessory` activation policy) until the ready check passed and the recording starts, then shows the icon; a run that is not ready shows none, and an icon macOS refuses is a problem, and the recording goes on (Ctrl-C stops it); while it records, the icon shows with its badge, and clicking it or Quit opens the status window as in the app (D45, D46). When it stops, for any reason, it first prints `Stopping the recording and finalizing the files…` on standard error, then finalizes and prints the summary; a Ctrl-C while it finalizes prints `Still finalizing the files…` and does nothing more. It prints every event of the recording manifest as one line on standard error, a failure's repeats counted instead (see "Logging"). `--debug` also prints the detail lines on standard error (and at `.debug` in the unified log); the recording log has them always (see "Logging"). **Output split:** standard output carries exactly one line, the recording folder's bare path, when recording starts; everything for people goes to standard error (the banner, "What will be recorded", the ready check, `Recording into <path>`, events, the status line, the summary, detail lines), all of it, and every other line this code writes on standard error (the settings file note, `Error:` lines, detail lines; ArgumentParser writes its own usage errors, before any status line exists), through one writer so nothing prints into the middle of the status line; a failed write to standard error, SIGPIPE included, is ignored, as there is nowhere left to report it, and `msr record` ignores SIGPIPE for the whole process from its start, before it writes anything, so a closed reader of standard output does not end it. **Status line:** only when standard error is a terminal whose `TERM` is set, not empty and not `dumb`, with no option: one line redrawn once a second (`\r`, the text, `ESC[K`). Its text, joined by ` · ` as the window's line is: `<n> problems` (`1 problem`) first when there are any, counting every time a problem's call to action was given in the run (D84: only a problem a person has to do something about counts, a source that fails only once it lasted 10 s without coming back; one that comes back after it ended counts again, though the window shows a kind's repeats on one line; low disk space is not a problem, though it sets the Dock badge), nothing when there are none; then the text of the window's line (time with seconds, size written, files, free space), the CPU use when known, and `<n> screens, <m> audio` for the sources being recorded (`1 screen`; a stalled camera counts, as its file is still written), with `<k> cameras` between them when cameras are recorded (`2 screens, 1 camera, 5 audio`), such as `1 problem · Recording 0:12:34 · 1.2 GB in 7 files · 143.8 GB free · CPU 23 % · 2 screens, 5 audio`. It is cut to the terminal's width minus 1, taking 80 columns when the width is unknown, so it does not wrap. An event or detail line clears it, prints, and it is drawn again, all in one write; at the end it is cleared and the summary follows. Not a terminal: no status line and no escape code. **`--quiet`:** no output for people (no banner, table, passing ready check, events, status line or summary); still written are the path on standard output and, on standard error, a failing ready check, `Error:` lines, the settings file note, each failure and problem as it happens (a failure's event line, or the problem's own line when no event tells it) with the count of a failure's repeats, and the summary of a run that exits 3; exit codes are unchanged; with `--debug` it is a usage error. `--duration` takes hours, minutes and seconds (`1h30m`, `45m`, `90s`); a number without a suffix is minutes (`90` is 90 minutes) | 0 ok (every file finalized, no file ended by a failure, no camera stalled, D47), 1 not ready, 3 when the recording manifest's `result` is `problems`, the finalized manifest could not be written, or the recording could not start |
 | `msr settings [flags]` | Without flags prints the effective settings as JSON (show); with any settings flag, `--auto` included, saves the run's effective settings into the settings file and prints them (change). The only command that writes the file; the window also writes it | 0, 1 when it cannot write the file |
 | `msr timeline <folder>` | Writes the recording folder's timeline file (see "Output on disk") from its `recording.json`, replacing an older one, and prints its path. Reads no settings. Writes nothing else and deletes nothing. A file without an end gets its length from the media file | 0, 1 with the error on standard error when `recording.json` or a file's length cannot be read, or the file cannot be written |
 | `msr version` | Prints the version and commit | 0 |
@@ -687,12 +687,14 @@ to line the audio inputs up: a list of `{at, delay}`, in order; empty
 only when the file was never measured (it is then placed as recorded).
 While recording, and after a crash, it holds the live entries, one per
 change of the value; at Stop, before the timeline file is written, each
-file's list is rewritten with hindsight: its stretches are bounded only
-by the changes of the 60 s rule, each with the median of the
-counted windows ending within it, one with fewer than 2 keeping its
-live value (the better estimate then), neighbours within a frame
-merged, the first at 0, so a file whose audio delay the 60 s rule never
-changed has one entry; the anchor's files and a file without own counted windows
+file's list is rewritten with hindsight: its stretches are bounded
+only by the changes of the 60 s rule and of the reference its windows
+were measured against (D85), each with the median of the counted
+windows ending within it, one with fewer than 2 keeping its live value
+(the better estimate then), neighbours within a frame merged, but never
+across a change of the reference, the first at 0, so a file whose audio
+delay the 60 s rule never changed, measured against one reference, has
+one entry; the anchor's files and a file without own counted windows
 keep theirs (see "Audio delay", D80). `at` is the
 seconds into the file from which the entry holds (to the millisecond,
 never below 0; the first entry also holds before its `at`, as the best
@@ -704,13 +706,14 @@ the smallest of the files' latest `delay` (taken as 0 when that is
 above 0); a file with an empty list and the system audio are not moved;
 the timeline file does exactly this. The anchor's files list
 `{at: 0, delay: 0}` (a device that becomes the anchor later gets that
-entry from then on); the system audio's list is always empty; a new
+entry from then on; a new file of the anchor's device after the
+reference moved away is measured like any other, D85); the system audio's list is always empty; a new
 file of an input starts with its earlier file's value as its first
 entry at 0. How a
 value came about (the measurements, the rules, a carry-over) is in the
 detail lines of `recording.log` only (see "Logging"). The list is
-written for files being written, and an ended file keeps it. Earlier recordings' `measuredDelay` is not read
-(D80). `files` lists the screen
+written for files being written, and an ended file keeps it. Earlier
+recordings' `measuredDelay` is not read (D80). `files` lists the screen
 files, the camera files and the audio files in the order of their start.
 
 **Names in a file name (D49, D55).** In a file name, `/` and `:` in a
@@ -928,8 +931,25 @@ checked, reported or rewritten at the next start (D47).
   permission and is hidden by Focus modes. A recording problem (the
   recording manifest or the recording log cannot be written, the screens or the free space
   cannot be read, a screen file's or an audio file's writer fails, an
-  audio source's capture fails) shows the same way,
-  and the status window lists it (red when broken, orange for a hiccup, D78); `msr record` also names each
+  audio source's capture fails) shows the same way only when it has a
+  **call to action** (D84, the owner's rule: "Is there something the
+  human has to do about it?"): free up disk space (a full disk, the
+  recording manifest, the timeline file or the recording log not
+  written), grant the permission (the Camera permission missing),
+  unplug and plug in the device again (an audio input silent right
+  after its gaps), report it (a file incomplete), and stop and start
+  the recording again, or replug, and report it (the audio inputs'
+  changes not followed, and a screen, camera, audio source or audio
+  file that failed or an audio input not recordable, only once it
+  lasted 10 s, `unrecoveredAfter` (*data*), without coming back; one
+  back before stays quiet). Every other problem (a camera stall, an
+  audio input out of the "Audio inputs" guide track, guide tracks cut,
+  the Dock icon not shown, an input volume not set or not followed, the
+  screens, the audio inputs or the free space not read) bounces nothing
+  and sets no badge, as a screen showing another screen's picture does
+  not by itself. Every problem, with a call to action or not, is in the
+  status window (red when broken, orange for a hiccup, D78), in
+  `recording.json` and `recording.log`; `msr record` also names each
   on standard error.
 - **Status window (D46):** clicking the Dock icon while recording opens
   a small window, and Quit opens it too: a table with a row per screen,
@@ -1008,7 +1028,8 @@ checked, reported or rewritten at the next start (D47).
   the recording manifest, which is written at once (unless writing it is
   the problem); one that repeats, such as the free space that cannot be
   read on every check, is told once (one manifest entry, one line in
-  the window, one line on standard error, one bounce) until it clears,
+  the window, one line on standard error, one bounce if it has a call
+  to action) until it clears,
   and again if it comes back. **Problem lines (D78):** red marks something
   broken that a person must fix, or a recording not usable as it is;
   orange a hiccup in a recording that worked. Red while it lasts: the
@@ -1033,8 +1054,8 @@ checked, reported or rewritten at the next start (D47).
   input volume not set or not followed, a video file's guide tracks cut
   before its video (the video is intact) and the timeline file not
   written (the media are intact), and an audio input out of the
-  "Audio inputs" guide track (D79), which also neither bounces the
-  Dock icon nor sets the badge nor counts in the status line. A failure of a file whose source has
+  "Audio inputs" guide track (D79), which has no call to action (D84).
+  A failure of a file whose source has
   started a newer file is over when told, so it is orange at once; a
   full disk, guide tracks cut or a file lost in part never is. A line
   only shown, as a video file's end the manifest lists already, never
@@ -1125,15 +1146,20 @@ checked, reported or rewritten at the next start (D47).
   an alert with the address.
 - **Problem report offer (D64):** at Stop, in the app and in `msr
   record`, the state file's `lastRecording` remembers the recording
-  folder's path and how the recording ended: `result` `problems` when
-  `msr record` exits 3 for it (the manifest's `result` is `problems`
-  or the final manifest could not be written), otherwise `ok`, with
-  `noticeShown` false. A state file that cannot be read or written
+  folder's path and whether the recording asks to report it,
+  `noticeWanted` (D84): a problem whose call to action includes
+  "report it" was given it (a file incomplete, a failing source not
+  back within 10 s, the audio inputs' changes not followed), or data
+  was lost (a file not finalized, or the final manifest not written);
+  a disk full, a permission or a replug asks nothing once the recording
+  ended, and a recording that exits 3 for a camera stall or a failure
+  that recovered asks nothing either. `noticeShown` is false. A state
+  file of an earlier release, with `result` instead, wants no notice. A state file that cannot be read or written
   there leaves the recording unremembered: an `Error:` line in `msr
   record`, an alert "The recording is not remembered" after the
   person's Stop in the app, the unified log at logout. When the app
-  starts, after the crash report offer, a last recording with
-  `problems`, not shown yet, whose folder is still there, gets the
+  starts, after the crash report offer, a last recording that wants
+  the notice, not shown yet, whose folder is still there, gets the
   notice "The last recording had problems" with its folder, [Report a
   problem] [Dismiss]; `noticeShown` is stored before it shows, so it
   shows once. Report a problem opens the browser on a new issue with
@@ -1147,8 +1173,9 @@ checked, reported or rewritten at the next start (D47).
   that recording's `recording.json` and `recording.log` in Finder for
   the person to drag into the issue (the form's `files` field).
   Errors as in the crash report offer: "Cannot offer to report the
-  last recording", or the address when the browser cannot be opened. `msr record` whose summary says it exits 3
-  ends it, also with `--quiet`, with `Report it: <the same link,
+  last recording", or the address when the browser cannot be opened.
+  `msr record` whose recording asks to report it ends the summary, also
+  with `--quiet`, with `Report it: <the same link,
   built from the summary's lines>` and `Attach: <recording
   folder>/recording.log and recording.json`. Both the crash report and
   the problem report build their links in one place (`IssueFormLink`).
@@ -1546,18 +1573,22 @@ the metadata items (see "Output on disk").
   cross-correlated (`AudioDelay`, Accelerate's FFT) with the reference's
   over their latest common 10 s, searching ±1 s. Every
   audio delay is against the recording's **anchor**, the first input
-  whose file is written, its own 0. The reference is the anchor while
-  its capture runs and its newest file did not end on no audio, so every
-  input is measured against the anchor, the anchor's own changing audio
-  delay included; a
-  file of it ending on a gap or a channel change, its next file
-  following, neither changes the reference nor starts anything over,
-  and while it has no file open nothing is measured that cycle. Once it
-  is in no audio (muted, D69) or its capture ended (unplugged), the input with the lowest number whose file is being
-  written and has an audio delay, a fallback whose own audio delay turns
-  its lags into ones against the anchor; with none such, the input with
-  the lowest number whose file is being written becomes the new anchor
-  (see below). So a silent anchor never stalls measuring. The default
+  whose file is written, its own 0. The reference is the anchor at
+  first, and the reference in use stays the reference while its capture
+  runs and its newest file did not end on no audio, so every input is
+  measured against the anchor while it sounds, the anchor's own changing
+  audio delay included; a file of it ending on a gap or a channel
+  change, its next file following, neither changes the reference nor
+  starts anything over, and while it has no file open nothing is
+  measured that cycle. Once it is in no audio (muted, D69) or its
+  capture ended (unplugged), the reference moves to the input with the
+  lowest number whose file is being written and has an audio delay,
+  whose own audio delay turns its lags into ones against the anchor;
+  with none such, the input with the lowest number whose file is being
+  written becomes the new anchor (see below). The reference stays with
+  the input it moved to: the anchor's returning file does not take it
+  back, and it moves again only when its own file ends so (D85). So a
+  silent anchor never stalls measuring. The default
   microphone plays no part (D80, amending D77). The system audio is
   neither measured nor the reference. A window counts
   only when its match is clear, the peak of |correlation| at least 12
@@ -1582,12 +1613,16 @@ the metadata items (see "Output on disk").
   replug. A device's newest file stays its file while its capture runs,
   also once it ended (as on no audio), until the next one starts, so a
   new file that starts before the earlier one's end is told still
-  carries it over. The anchor's own files are 0, listed as such.
-  A fallback reference keeps every audio delay: the lags against it are
+  carries it over. The anchor's files, those of its device that start
+  while it is the reference, are 0, listed as such; once the reference
+  moved away, a new file of the anchor's device carries over its earlier
+  file's 0 and is measured against the reference in use like any other
+  input, so an Osmo that comes back about 100 ms less late after a
+  replug is followed (D85, the owner's recording `2026-11-24 20.55.08`).
+  Another reference keeps every audio delay: the lags against it are
   re-based onto the anchor through its own audio delay, which stays as
-  it was while it is the reference (a shortcut: it is not measured then;
-  the anchor is the reference again once its file is written), and the
-  mix keeps every input. Only when no input being written has an audio
+  it was while it is the reference (a shortcut: it is not measured
+  then), and the mix keeps every input. Only when no input being written has an audio
   delay does the lowest-numbered one become the new anchor, and every
   input starts over (no audio delay holds, nothing is carried over), its
   audio delay against the old anchor taken as 0 and the entries written
@@ -1802,9 +1837,10 @@ it (the experiments of 2026-11-13 and 2026-11-15 with virtual screens,
 the recorder"); a frame then carries the other screen's rectangle.
 After 30 failing frames in a row (*data*), not counting those within
 the settle time after a screen change, the screen file ends with the
-event `screen shows another screen's picture`, the Dock badge shows
-"!", `msr record` names the screen on standard error, and the screen
-is tried again only after its next change. Its limit: a frame whose
+event `screen shows another screen's picture`, `msr record` names the
+screen on standard error, and the screen is tried again only after its
+next change; its problem, the screen not captured, calls to action
+only once it lasted 10 s (D84). Its limit: a frame whose
 rectangle is right can still be black (seen once, cause unknown); the
 check cannot see that. That `screenRect` and `CGDisplayBounds` are
 comparable as they are, in points and the same coordinates, is
@@ -2047,7 +2083,7 @@ them:
   against <reference file>, clarity 31, counted` (or `not counted`), or
   why it was not measured: `<file>: not measured, it or the reference
   <file> is silent`, `… has less than a window of sound`, `… the
-  reference <file> has no file open` (the anchor between two files).
+  reference <file> has no file open` (the reference between two files).
 - Each audio delay rule that was evaluated, with its outcome:
   `<file>: audio delay set by its first counted window: 552 ms late`;
   `<file>: audio delay the median of its first 3 counted windows:
@@ -2090,6 +2126,9 @@ them:
 - No audio (D81): `Audio 2 Razer Seiren: no audio since 0:25, right
   after its gap at 0:24: a red problem (D81)`, or `Audio 2 Razer Seiren:
   no audio since 0:25, no gap within 10 s before: no problem (D81)`.
+
+A problem's call to action, when it is given (D84), is the detail line
+`call to action: <problem>` of category `recorder`.
 
 **Capture detail (D66).** The detail lines of category `capture` say
 what a screen capture and its writer saw, to root-cause a writer that
@@ -2212,7 +2251,8 @@ log show --last 2h --predicate 'subsystem == "org.schapiro.multiscreenrecorder" 
 The crash report form has an optional field for its output, and the
 README names the command for a crash outside a recording. The crash
 report dialog, the status window (with a problem), the problem report
-offer, the end of `msr record`'s summary when it exits 3, and the
+offer, the end of `msr record`'s summary when the recording asks to
+report it (D84), and the
 README name the recording's `recording.json` and `recording.log` for a
 report.
 
@@ -2296,7 +2336,7 @@ fields they fill; the problem report's cut to its length), the end of
 `msr record`'s summary that offers a report, Report a problem with a
 stand-in for the browser and Finder, the name of a crash report's text copy,
 the text of the examples in this document, which the tests hold to
-the code, the status line's text and cut (it counts the problems), the badge ("!" or none), that no
+the code, the status line's text and cut (it counts the problems with a call to action), the badge ("!" or none), each problem kind's call to action and when it is given (D84), that no
 source file writes on standard error but the one writer, the error
 detail (nested and multiple underlying errors, four-character codes,
 the depth guard, a Swift error's own text, its JSON), that no source
@@ -2351,7 +2391,9 @@ also one Core Audio does not report, the slider's set, a refused set as
 a problem, no slider where it cannot be set; the level meters; no audio
 in the window and the manifest, not a problem, unless right after a gap
 (D81); an input joining the guide track at its audio delay, leaving it,
-rejoining, and a new file carrying its audio delay over, D79, D80), a stream stopped while it starts, that an action waiting for
+rejoining, and a new file carrying its audio delay over, D79, D80; the
+anchor's new file measured against the reference in use, D85; calls
+to action, D84), a stream stopped while it starts, that an action waiting for
 the main run loop's default mode runs only there, the classification of
 Core Audio's transport types, and the ready check's probes with
 stand-ins (the output folder's file access is off the main thread). The

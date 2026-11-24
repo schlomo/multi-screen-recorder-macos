@@ -171,8 +171,9 @@ also report it as below.
 
 ### Reporting a problem
 
-When a recording had problems, the app says so the next time it
-starts: **Report a problem** opens the problem report form in your
+When a recording had a problem worth reporting (a lost or incomplete
+file, or a source that failed and did not come back), the app says so
+the next time it starts: **Report a problem** opens the problem report form in your
 browser with the version and what went wrong filled in, and shows that
 recording's `recording.json` and `recording.log` in Finder. `msr record`
 ends such a recording's summary with the same link (`Report it:`) and
@@ -222,9 +223,10 @@ or changed, when an audio device is plugged in or removed, when the
 default audio input changes, and on "Check again". Cancel, in the
 lower right corner beside Start, quits without recording.
 
-Click Start: the window closes; the Dock icon shows a "!" badge when
-the disk runs low, a screen shows another screen's picture or
-something went wrong. Click the Dock icon or quit to open the status
+Click Start: the window closes; the Dock icon shows a "!" badge and
+bounces when the disk runs low or something went wrong that you have
+to do something about, such as free up disk space or plug a microphone
+in again; anything else is only listed in the status window. Click the Dock icon or quit to open the status
 window: each screen, camera and audio source with its files, the data written
 and its state (hold the mouse over a row for its details and, while it
 records, its late frames, stall or clock drift), each audio source's level meter (red from −1 dBFS) and,
