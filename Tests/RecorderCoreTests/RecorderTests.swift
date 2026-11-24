@@ -1627,9 +1627,9 @@ extension GlobalRecordingLog {
             #expect(!summary.asksToReportIt)
         }
 
-        /// A source still failing at Stop calls to action then, without waiting for `unrecoveredAfter`, and the
-        /// recording asks to report it (D84).
-        @Test func aSourceStillFailingAtStopCallsToActionThen() async throws {
+        /// A source still failing at Stop makes the recording ask to report it, without waiting for
+        /// `unrecoveredAfter`; at Stop that bounces nothing and sets no badge (D84).
+        @Test func aSourceStillFailingAtStopAsksToReportIt() async throws {
             try start(unrecoveredAfter: .seconds(60))
             try send(0.25, buffers: 2)
             try await wait("the file") { (try? manifestOnDisk().audioFiles.count) == 1 }
@@ -1637,7 +1637,7 @@ extension GlobalRecordingLog {
             try await wait("the problem") { !observer.problems.isEmpty }
             #expect(observer.callsToAction.isEmpty)
             let summary = await stop()
-            #expect(observer.callsToAction.map(\.problem) == ["The audio input \(name) failed"])
+            #expect(observer.callsToAction.isEmpty)
             #expect(summary.asksToReportIt)
         }
 
@@ -1666,10 +1666,13 @@ extension GlobalRecordingLog {
             var file = try #require(try manifestOnDisk().audioFiles.first)
             file.end = file.end ?? file.start + 0.5
             file.state = .notFinalized
-            recorder.audioFileEnded(AudioFileEnd(
-                file: file, error: AudioFileWriterError(POSIXError(.ENOSPC), while: "cannot write \(file.name)")))
+            var end = AudioFileEnd(file: file, error: AudioFileWriterError(POSIXError(.ENOSPC), while: "cannot write \(file.name)"))
+            end.lost = "its last 0.5 s were not written"
+            recorder.audioFileEnded(end)
+            // Its lost tail is still a red line, but the full disk is the one call to action (D84).
             #expect(observer.callsToAction.map(\.problem) == ["The audio file of \(name) ended"])
-            #expect(recorder.problemLines().map(\.text).allSatisfy { !$0.hasPrefix("File ") })
+            #expect(recorder.problemLines().map(\.text).filter { $0.hasPrefix("File ") }.map { $0.hasPrefix("File \(file.name) incomplete") }
+                == [true])
             let summary = await stop()
             #expect(summary.manifest.audioFiles.map(\.state) == [.notFinalized])
             #expect(!summary.asksToReportIt)

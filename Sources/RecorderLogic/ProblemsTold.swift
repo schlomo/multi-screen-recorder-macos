@@ -216,7 +216,8 @@ public struct ProblemsTold: Sendable {
     /// shown does not keep it from the manifest. `source` names the screen or camera of a kind keyed by its ID;
     /// `endedAt`: already over when told, for a failure that ends with a new file (`endsWithANewFile`) after a
     /// newer file of its source started, or after its source went away (`ending`); `withoutCallToAction` for a
-    /// screen that showed another screen's picture (D84); a tell without it replaces a lasting line that has
+    /// problem whose call to action another one gives, such as a screen that showed another screen's picture or a
+    /// file a full disk cut short (D84); a tell without it replaces a lasting line that has
     /// it, told or only shown, its wait starting then.
     public mutating func add(
         _ problem: RecordingProblem, kind: ProblemKind, source: String? = nil, note: String? = nil, endedAt: Int64? = nil,

@@ -115,9 +115,10 @@ device again, report it, or stop and start the recording again (or
 replug) and report it; a kind without one is told but never bounces the
 Dock icon, sets the badge or counts in the status line. A source that
 fails gets its call to action only once it lasted 10 s without coming
-back, or at Stop while it still fails. Only a call to action that includes "report it", or lost data,
-makes the recording ask to report it: `msr record`'s `Report it:` line
-and the app's notice at its next start. Not "action", which is a step a
+back; one still failing at Stop makes the recording ask to report it.
+Only a call to action that includes "report it", or lost data, makes
+the recording ask to report it: `msr record`'s `Report it:` line and
+the app's notice at its next start. Not "action", which is a step a
 tracker asks the recorder to carry out.
 
 ## Ended

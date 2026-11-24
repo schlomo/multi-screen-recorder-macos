@@ -2951,20 +2951,24 @@ architect's reading.
     told as the screen not captured, calls to no action, also past
     10 s; a failure of that screen for another reason afterwards calls
     to action from its own tell.
-  - At Stop, a source still failing is called to action then, without
-    its 10 s: it does not come back in this recording.
+  - At Stop, a source still failing makes the recording ask to report
+    it, without its 10 s: it does not come back in this recording.
+    That decides the report only: nothing bounces the Dock or sets the
+    badge at Stop.
   - An audio source or audio file ended by a full disk is the full
     disk: free up disk space, never "report it"; told as the full disk,
     one already told stands and no second call follows. A file a full
-    disk left not finalized does not ask to report the recording.
+    disk left not finalized does not ask to report the recording; the
+    tail it lacks is still told as the file incomplete, a red line, but
+    without a call to action, so it asks for no report either.
   - The timeline file not written has no call to action: it is told
     only after the manifest is final, and `msr timeline` writes it from
     the manifest.
   - After the recording, the app's notice "The last recording had
     problems" and `msr record`'s `Report it:` and `Attach:` lines appear
     only when a call to action that includes "report it" was given, or
-    data was lost (a file not finalized, or the final manifest not
-    written). Disk full, the permission and a replug are live only:
+    data was lost (a file not finalized, unless a full disk ended it,
+    or the final manifest not written). Disk full, the permission and a replug are live only:
     nothing is left to do afterwards. `recording.json`'s `result` and
     exit status 3 still report the facts (D47); a camera stall stays a
     failure event. `msr record --quiet` prints the summary of a

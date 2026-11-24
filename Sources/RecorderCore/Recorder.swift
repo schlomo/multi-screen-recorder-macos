@@ -453,8 +453,10 @@ public final class Recorder {
             if let logFailure {
                 tell("Cannot write the recording log \(RecordingNames.recordingLog)", error: logFailure, kind: .recordingLogNotWritten)
             }
-            // A source still failing does not come back in this recording: its call to action is due now (D84).
-            callToAction(atStop: true)
+            // A source still failing does not come back in this recording: it decides the report, nothing live (D84).
+            for problem in problemsTold.callsToAction(now: context.now(), unrecoveredAfter: unrecoveredAfter, atStop: true) {
+                RecorderLog.detail("call to action at Stop: \(problem.text)", category: "recorder")
+            }
             manifest.finalize(
                 ended: Date(), timeZone: context.timeZone, cpu: cpu.manifestEntry, recordingLogWritten: logFailure == nil)
             do {
@@ -707,7 +709,7 @@ public final class Recorder {
             told(problem, ofAnEvent: report.event != nil)
         }
         if let report, let lost = report.lostProblem {
-            problemsTold.show(lost, kind: report.lostKind)
+            problemsTold.show(lost, kind: report.lostKind, withoutCallToAction: report.event?.event == .diskFull)
             told(lost)
         }
         // Both end paths may report the same end: said once.
@@ -1336,7 +1338,7 @@ public final class Recorder {
                  ofAnEvent: end.toldByAnEvent)
             if let lost = end.lost {
                 tell(RecordingProblem(at: at, problem: "Audio file \(end.file.name)", error: ErrorDetail(message: lost)),
-                     kind: .audioFileLost(end.file.name))
+                     kind: .audioFileLost(end.file.name), withoutCallToAction: end.error?.isDiskFull == true)
             }
         }
     }
@@ -1573,9 +1575,9 @@ public final class Recorder {
 
     /// Each problem whose call to action is due to the observer, and a wait for the next one of a failing
     /// source (D84).
-    private func callToAction(atStop: Bool = false) {
+    private func callToAction() {
         let now = context.now()
-        for problem in problemsTold.callsToAction(now: now, unrecoveredAfter: unrecoveredAfter, atStop: atStop) {
+        for problem in problemsTold.callsToAction(now: now, unrecoveredAfter: unrecoveredAfter) {
             RecorderLog.detail("call to action: \(problem.text)", category: "recorder")
             observer?.recorder(self, callToAction: problem)
         }
