@@ -1633,6 +1633,26 @@ extension GlobalRecordingLog {
             #expect(!summary.problemsAskToReportIt)
         }
 
+        /// An audio file whose writer failed because the disk is full is the full disk, free up disk space, told
+        /// once with its capture's end; left not finalized by it, the recording asks for no report (D84).
+        @Test func anAudioFileAFullDiskLeftNotFinalizedAsksForNoReport() async throws {
+            try start()
+            try send(0.25, buffers: 2)
+            try await wait("the file") { (try? manifestOnDisk().audioFiles.count) == 1 }
+            source.lose(.diskFull)
+            try await wait("the capture's end") { (try? manifestOnDisk().events.contains { $0.event == .diskFull }) == true }
+            var file = try #require(try manifestOnDisk().audioFiles.first)
+            file.end = file.end ?? file.start + 0.5
+            file.state = .notFinalized
+            recorder.audioFileEnded(AudioFileEnd(
+                file: file, error: AudioFileWriterError(POSIXError(.ENOSPC), while: "cannot write \(file.name)")))
+            #expect(observer.callsToAction.map(\.problem) == ["The audio file of \(name) ended"])
+            #expect(recorder.problemLines().map(\.text).allSatisfy { !$0.hasPrefix("File ") })
+            let summary = await stop()
+            #expect(summary.manifest.audioFiles.map(\.state) == [.notFinalized])
+            #expect(!summary.asksToReportIt)
+        }
+
         /// A capture ending while its input has no audio ends that no audio with it: its line turns to the past,
         /// stopped, and its next capture records its sound (D69, D81).
         @Test func aCaptureEndingWhileItsInputHasNoAudioEndsItsNoAudio() async throws {

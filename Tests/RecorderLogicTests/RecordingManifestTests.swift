@@ -634,6 +634,9 @@ import Testing
         let stalled = summary([.finalized], events: [RecordingEvent(at: 1_000_000_000, event: .cameraStalled, camera: "C")])
         #expect(stalled.endedWithError && !stalled.asksToReportIt)
         #expect(summary([.notFinalized]).asksToReportIt)
+        // A file a full disk left not finalized: the person was asked to free up disk space.
+        #expect(!summary([.notFinalized], events: [RecordingEvent(at: 0, event: .diskFull, screen: "D")]).asksToReportIt)
+        #expect(summary([.notFinalized], events: [RecordingEvent(at: 0, event: .diskFull, screen: "E")]).asksToReportIt)
         #expect(summary([.finalized], written: false).asksToReportIt)
         #expect(summary([.finalized], problems: true).asksToReportIt)
     }

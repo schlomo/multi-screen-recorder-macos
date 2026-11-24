@@ -1325,7 +1325,8 @@ public final class Recorder {
                 .map { Int64(($0.start * 1_000_000_000).rounded()) }.min()
             tell(RecordingProblem(at: at, problem: "Audio file \(end.file.name)",
                                   error: end.error?.detail ?? "its writer fell behind"),
-                 kind: .audioFileFailed(end.file.name), endedAt: newer, ofAnEvent: end.toldByAnEvent)
+                 kind: end.error?.isDiskFull == true ? .diskFull : .audioFileFailed(end.file.name), endedAt: newer,
+                 ofAnEvent: end.toldByAnEvent)
             if let lost = end.lost {
                 tell(RecordingProblem(at: at, problem: "Audio file \(end.file.name)", error: ErrorDetail(message: lost)),
                      kind: .audioFileLost(end.file.name))
