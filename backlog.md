@@ -3,9 +3,8 @@
 ## Next session starts here
 
 PR #27 merged on 2026-11-23 (cameras, audio delay, guide-track
-membership, problem lines). Left from it: item 46 (the release fails
-the end-to-end tests at a screen's mode switch; it blocks the homepage
-screenshots), first. Next: item 38 (each microphone placed by its measured delay
+membership, problem lines). Left from it: PR #29 (the homepage
+screenshots, and the end-to-end tests need an idle Mac). Next: item 38 (each microphone placed by its measured delay
 in the "Audio inputs" guide track, about 1 s of hindsight), then item
 22 (camera picture sync from claps, a Calibrate button); each needs
 its design signed off by the owner as text first (the owner,
@@ -569,37 +568,6 @@ Still open from D34: what AGC does and whether it is on in auto mode;
    - a way to run the recorder's tests under CPU load locally, as the
      PR #27 builder did by hand (36 `yes` processes).
    Moot for the compiler once item 2 lands.
-46. **The release fails the end-to-end tests at a screen's mode
-   switch** (found 2026-11-23 by `update-homepage-screenshots
-   --release` on v0.20261123.93; blocks the homepage screenshots of
-   PR #27). Runs in the VM on 2026-11-23:
-   - **The release (built by CI):** 3 runs, `virtual-screen` failed in
-     all 3. In 2 of them both screen file writers failed with
-     `-11800` from `-19092` at +6.6 to +7.3 s, the failure D67 saw only
-     on the hosted runner. The rest were file ends 0.1 to 1.1 s after
-     the settle window.
-   - **Local builds:** b35bce7 passed 2 of 2; f5e8e09 (same code as the
-     release) passed 1 of 2, the other failing by a 0.01 s timing miss.
-     Neither had the encoder error.
-   [CONJECTURE] Two things: the CI build (Xcode 26.6, signed) makes
-   the encoder error likelier, and the timing window is tighter than
-   the VM now keeps, perhaps from PR #27's added work while recording
-   (the audio delay measurement, the camera watch). Next: about 5 runs
-   each of the release and a local build of the same commit, compared,
-   and the previous release v0.20261122.89 as a baseline. Settled before
-   item 38 starts, as it touches what every recording ships.
-   **Update 2026-11-24:** the previous release v0.20261122.89, which
-   passed when it was released, now fails the same way: 3 runs,
-   `virtual-screen` failed in all 3, the encoder error in 2 of them,
-   and in 2 runs the app's window was not on screen within 20 s. So
-   this is not a regression of PR #27 but this Mac or the VM today. No
-   macOS update since 2026-11-22 (macOS 27.2.1, tart 2.42.0); a Wacom
-   driver was installed on 2026-11-22. [CONJECTURE] Load on the host's
-   GPU and media engine, as DaVinci Resolve was open, starves the VM's
-   paravirtualized encoder, the same kind of contention as on the
-   hosted runner (D67). Next: 3 runs with Resolve and other GPU-heavy
-   apps closed. The owner also saw resolution changes of the Wacom
-   on the release make new files without interrupting anything.
 47. **A microphone that sends only zeros after a USB hiccup** (the
    owner's recording `2026-11-24 06.30.02`): the BRIO's microphone had
    gaps from 25.7 to 30.9 s, then exact zeros from about 28.8 s to
@@ -751,6 +719,12 @@ Still open from D34: what AGC does and whether it is on in auto mode;
   the README (D46). Revisit when people struggle with it.
 
 ## Done (recent)
+
+- 2026-11-24: item 46 resolved, not a regression: the end-to-end
+  tests failed 9 of 10 runs on a busy Mac (a Lima VM, ClamXAV, a
+  backup, DaVinci Resolve; load 10 to 15) for the release, the previous
+  release and local builds alike, and passed on the idle Mac. Recorded
+  in PR #29 (`docs/design/end-to-end-tests.md`, `docs/troubleshooting.md`).
 
 - 2026-11-23: PR #27 merged by the owner: item 12 (cameras, D74, D76),
   items 36 and 37 (D73), the wake bug, the homepage's claim, story and
