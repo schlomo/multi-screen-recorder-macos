@@ -38,14 +38,15 @@ private func screen(
 
 private func audio(
     _ stamp: String = "10.00.00", _ label: String, channels: String, timecode: String = "10:00:00:00", start: Double = 0,
-    end: Double? = 10, suffix: String = "", delay: Double? = nil
+    end: Double? = 10, suffix: String = "", uid: String? = nil, delay: Double? = nil, delays: [(at: Double, delay: Double)] = []
 ) -> String {
     let source = label.components(separatedBy: " - ").dropFirst().joined(separator: " - ")
     let endText = end.map { String($0) } ?? "null"
-    let delayText = delay.map { String($0) } ?? "null"
+    let entries = (delay.map { [(at: 0.0, delay: $0)] } ?? []) + delays
+    let delaysText = entries.map { #"{"at": \#($0.at), "delay": \#($0.delay)}"# }.joined(separator: ", ")
     return """
-        {"name": "2026-11-20 \(stamp) \(label)\(suffix).mov", "audioSource": "\(source)", "channels": \(channels), "start": \(start),
-         "end": \(endText), "timecode": "\(timecode)", "state": "finalized", "measuredDelay": \(delayText)}
+        {"name": "2026-11-20 \(stamp) \(label)\(suffix).mov", "audioSource": "\(source)", \(uid.map { #""audioSourceUID": "\#($0)", "# } ?? "")"channels": \(channels), "start": \(start),
+         "end": \(endText), "timecode": "\(timecode)", "state": "finalized", "delays": [\(delaysText)]}
         """
 }
 
@@ -251,9 +252,9 @@ private extension Dictionary where Key == String, Value == Any {
         #expect(result.stack.markers[1].frames == (300, 1))
     }
 
-    /// A measured delay places the audio clip that much earlier, to the nearest frame; one that would start
-    /// before the timeline is trimmed at its start instead (D77).
-    @Test func aMeasuredDelayPlacesTheAudioClipEarlier() throws {
+    /// An audio delay places the audio clip that much earlier, to the nearest frame; one that would start
+    /// before the timeline is trimmed at its start instead (D80).
+    @Test func anAudioDelayPlacesTheAudioClipEarlier() throws {
         let result = try timeline(manifest(files: [
             screen("10.00.00", "Screen 1 - A", timecode: "10:00:00:00", end: 20),
             audio("10.00.01", "Audio 1 - Razer", channels: "1", timecode: "10:00:01:00", start: 1, end: 11),
@@ -270,6 +271,58 @@ private extension Dictionary where Key == String, Value == Any {
         let available = ((trimmed["media_references"] as! JSON)["DEFAULT_MEDIA"] as! JSON)["available_range"] as! JSON
         #expect(((available["start_time"] as! JSON)["value"] as! Double, (available["duration"] as! JSON)["value"] as! Double)
             == (1_080_000, 300))
+    }
+
+    /// Audio delays are against the recording's anchor, negative when earlier: the smallest of the files'
+    /// latest is subtracted once, so the earliest input is at 0 and the anchor's files, at 0, are placed by it
+    /// too; a file never measured and the system audio stay at their own time (D80).
+    @Test func theRecordingsSmallestAudioDelayIsSubtractedOnce() throws {
+        let result = try timeline(manifest(files: [
+            screen("10.00.00", "Screen 1 - A", timecode: "10:00:00:00", end: 20),
+            audio("10.00.00", "Audio 0 - System", channels: "\"stereo\"", timecode: "10:00:01:00", start: 1, end: 11),
+            audio("10.00.01", "Audio 1 - Razer", channels: "1", timecode: "10:00:01:00", start: 1, end: 11, uid: "R", delay: 0),
+            audio("10.00.01", "Audio 2 - Osmo", channels: "1", timecode: "10:00:01:00", start: 1, end: 11, uid: "O", delay: 0.5),
+            audio("10.00.01", "Audio 3 - BRIO", channels: "1", timecode: "10:00:01:00", start: 1, end: 11, uid: "B", delay: -0.2),
+            audio("10.00.01", "Audio 4 - Mic", channels: "1", timecode: "10:00:01:00", start: 1, end: 11, uid: "M"),
+        ]))
+        #expect(result.trackNames == ["Screen 1 - A", "Audio 0 - System", "Audio 1 - Razer", "Audio 2 - Osmo", "Audio 3 - BRIO", "Audio 4 - Mic"])
+        // 0.2 s is 6 frames, 0.7 s 21: from frame 30, Razer at 24, Osmo at 9; BRIO, Mic and the system audio at 30.
+        #expect(result.tracks.dropFirst().map { $0.children[0].frames.duration } == [30, 24, 9, 30, 30])
+    }
+
+    /// Only each file's latest audio delay counts for the smallest: an early value it moved on from places
+    /// no other file (D80).
+    @Test func aSupersededSmallestAudioDelayMovesNoOtherFile() throws {
+        let result = try timeline(manifest(files: [
+            screen("10.00.00", "Screen 1 - A", timecode: "10:00:00:00", end: 70),
+            audio("10.00.01", "Audio 1 - Razer", channels: "1", timecode: "10:00:01:00", start: 1, end: 61, uid: "R", delay: 0),
+            audio("10.00.01", "Audio 2 - Osmo", channels: "1", timecode: "10:00:01:00", start: 1, end: 61, uid: "O",
+                  delays: [(at: 20, delay: -0.9), (at: 40, delay: 0.02)]),
+        ]))
+        #expect(result.tracks[1].children[0].frames.duration == 30)
+    }
+
+    /// A file whose audio delay changed is split at each change, each stretch placed by its own entry; the
+    /// stretch before the first entry by the first; a stretch placed later leaves a gap, one placed earlier
+    /// leaves out its head (D80).
+    @Test func aFileIsSplitWhereItsAudioDelayChanges() throws {
+        let result = try timeline(manifest(files: [
+            screen("10.00.00", "Screen 1 - A", timecode: "10:00:00:00", end: 30),
+            audio("10.00.00", "Audio 2 - Osmo", channels: "2", timecode: "10:00:00:00", start: 0, end: 30,
+                  delays: [(at: 5, delay: 0.5), (at: 12, delay: 0.4), (at: 20, delay: 0.6)]),
+        ]))
+        #expect(result.trackNames == ["Screen 1 - A", "Audio 2 - Osmo, channel 1", "Audio 2 - Osmo, channel 2"])
+        for track in result.tracks.dropFirst() {
+            let children = track.children
+            #expect(children.map { $0["OTIO_SCHEMA"] as! String } == ["Clip.2", "Gap.1", "Clip.2", "Clip.2"])
+            // 0.5 s is 15 frames: trimmed at the timeline's start; 0.4 s is 12 frames, 3 later; 0.6 s is 18, 6 earlier.
+            #expect(children[0].frames == (1_080_015, 345))
+            #expect(children[1].frames == (0, 3))
+            #expect(children[2].frames == (1_080_360, 240))
+            #expect(children[3].frames == (1_080_606, 294))
+        }
+        let groups = result.tracks.dropFirst().map { $0.clips.map { $0.resolve["Link Group ID"] as! Int } }
+        #expect(groups[0] == groups[1] && Set(groups[0]).count == 3)
     }
 
     /// A delayed file that would overlap its source's previous one leaves out its head, so what

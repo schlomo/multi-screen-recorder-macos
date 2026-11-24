@@ -14,7 +14,8 @@ public enum RecorderValues {
     /// writer, a screen file's last mix for its sources' sound up to the
     /// video's end, and an audio file's samples for its writer, also at its end.
     public static let audioWaitBoundSeconds = 2
-    /// The fragment length of every file: a crash loses at most this much.
+    /// The fragment length of every file: a crash loses at most this much of an audio file, and up to
+    /// `guideTrackDelay` more of a video file, its fragment waiting for its guide samples (D80).
     public static let fragmentSeconds = 2
     /// How long a screen must stay unchanged before its stream starts or
     /// starts again.
@@ -33,9 +34,9 @@ public enum RecorderValues {
     public static let continuityCameraFirstFrameLimit = Duration.seconds(10)
     public static let cameraFrameGapLimit = Duration.seconds(10)
     public static let cameraStallLimit = Duration.seconds(2)
-    /// The seconds within which the values of the audio inputs the "Audio inputs" guide track mixes lie of
-    /// each other, early or late; an input outside the largest such group leaves it (D79).
-    public static let guideTrackSyncLimit = 0.1
+    /// The seconds within which the audio delays of the audio inputs the "Audio inputs" guide track mixes lie
+    /// of each other, early or late; an input outside the largest such group leaves it (D79, D80).
+    public static let guideTrackSyncLimit = 0.8
     /// The largest a camera file is: a camera's box is the recording
     /// resolution's limited to this, turned upright for a portrait format (D74).
     public static let cameraLargestSize = FrameSize(width: 1920, height: 1080)

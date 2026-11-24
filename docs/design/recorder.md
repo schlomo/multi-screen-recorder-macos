@@ -421,16 +421,22 @@ Media are linked by file name only, relative to the timeline file.
   <k>` for more. The channels of one file are a linked group in Resolve.
   A gap fills each space before a clip, none follows the last clip. A
   clip that starts before its track's previous clip ends, by a frame's
-  rounding or a measured delay, leaves out its overlapping head, so what
+  rounding or an audio delay, leaves out its overlapping head, so what
   it plays stays at its own time.
-- **Audio delay (D77):** an audio file with a `measuredDelay` is placed
-  that much earlier, rounded to the nearest frame, as the timeline
+- **Audio delay (D77, D80):** an audio file with `delays` is split at
+  each entry's `at` into one clip per stretch, each placed earlier by
+  its entry's `delay` less the smallest of the files' latest `delay`
+  (never above 0, the anchor's; a file never measured and the system
+  audio are not moved), so the earliest input is at 0, the
+  stretch before the first entry by the first
+  (the best known), rounded to the nearest frame, as the timeline
   places every clip at a whole frame, so up to 17 ms remain; a clip that
   would then start before the timeline's start, or before its source's
   previous clip ends, begins there instead, its first frames left out
   of its source range (its available range stays the whole file), so
-  what it plays stays at its own time. The audio files and the
-  guide tracks keep their sound as recorded.
+  what it plays stays at its own time; a stretch placed later than the
+  one before leaves a gap. Each stretch of a file with several channels
+  is its own linked group. The audio files keep their sound as recorded.
 - **Markers,** all on the timeline: the first, red, at frame 0, says in its
   name the resolution to set (the largest video file's frame size, which
   Resolve's reader has no key for) and in its note when it was recorded, how
@@ -514,7 +520,7 @@ every change:
       "clockDriftCorrection": null,
       "clockDriftPpm": null,
       "inputVolume": 0.757,
-      "measuredDelay": null
+      "delays": []
     },
     {
       "name": "2026-11-12 14.03.05 Audio 0 - System.mov",
@@ -526,7 +532,7 @@ every change:
       "state": "recording",
       "clockDriftCorrection": null,
       "clockDriftPpm": null,
-      "measuredDelay": null
+      "delays": []
     },
     {
       "name": "2026-11-12 14.27.41 Screen 2 - LG HDR 4K.mov",
@@ -676,12 +682,35 @@ as shown at the file's end (see "Audio"), to 0.1 ppm, null until the
 file ends and if it was not measured by then; `inputVolume` an audio
 input's input volume at the file's start, 0 to 1 to the thousandth,
 null when it cannot be read, absent for the system audio (D69);
-`measuredDelay` the seconds its sound is later than the earliest
-measured audio input's, measured while recording, to 0.0001 s, never
-negative, null when not measured: for the system audio, the reference
-when it is the earliest, and a file with fewer than 3 counted windows
-against the current reference's file; once measured it stays, unless
-the reference's file changes (see "Audio delay", D77). `files` lists the screen
+`delays` the file's audio delays (D80), for a processor of the files
+to line the audio inputs up: a list of `{at, delay}`, in order; empty
+only when the file was never measured (it is then placed as recorded).
+While recording, and after a crash, it holds the live entries, one per
+change of the value; at Stop, before the timeline file is written, each
+file's list is rewritten with hindsight: its stretches are bounded only
+by the changes of the 60 s rule, each with the median of the
+counted windows ending within it, one with fewer than 2 keeping its
+live value (the better estimate then), neighbours within a frame
+merged, the first at 0, so a file whose audio delay the 60 s rule never
+changed has one entry; the anchor's files and a file without own counted windows
+keep theirs (see "Audio delay", D80). `at` is the
+seconds into the file from which the entry holds (to the millisecond,
+never below 0; the first entry also holds before its `at`, as the best
+known); `delay` is the seconds by which the file's sound there is later
+than the recording's anchor's, the first input whose file is written (to
+0.0001 s, negative when earlier). To line up the recording's audio
+inputs, place each file's stretch from `at` on earlier by `delay` less
+the smallest of the files' latest `delay` (taken as 0 when that is
+above 0); a file with an empty list and the system audio are not moved;
+the timeline file does exactly this. The anchor's files list
+`{at: 0, delay: 0}` (a device that becomes the anchor later gets that
+entry from then on); the system audio's list is always empty; a new
+file of an input starts with its earlier file's value as its first
+entry at 0. How a
+value came about (the measurements, the rules, a carry-over) is in the
+detail lines of `recording.log` only (see "Logging"). The list is
+written for files being written, and an ended file keeps it. Earlier recordings' `measuredDelay` is not read
+(D80). `files` lists the screen
 files, the camera files and the audio files in the order of their start.
 
 **Names in a file name (D49, D55).** In a file name, `/` and `:` in a
@@ -922,8 +951,26 @@ checked, reported or rewritten at the next start (D47).
   drift while it records, with the sound the correction added so far,
   `-116 ppm (+34.9 ms)`; `measuring (+0.3 ms)` until the clock drift is
   known, `measuring` before any correction; zero is `0`, never `+0` or
-  `-0`; empty for a screen; once its file's delay is measured, followed
-  by `· 550 ms late`, see "Audio delay", D77), then, drawn for an audio source only,
+  `-0`; empty for a screen; for an audio input's file being written,
+  uncoloured and short, `· synced 553 ms`, how much earlier the
+  "Audio inputs" mix places the file, once its audio delay is set or
+  confirmed by its own windows, `· synced 533 ms (carried)` while it
+  holds its earlier file's, `· not synced yet` before it has one,
+  `· no clear sound` once its file had sound in 3 measurements
+  (`audioDelayUnclearMeasurements`, *data*) without a counted window
+  (it is still recorded and joins once a window counts); the row's
+  mouse-over adds the full reason as its last line: `Placed 553 ms
+  earlier in the guide track, in line with the earliest microphone;
+  measured` (or `; carried over from its previous file until
+  measured`; for the anchor's own file, which an earlier input moves,
+  the placement alone, as its audio delay is 0 by definition),
+  `Not in the guide track until its audio
+  delay is measured; its own audio track is recorded`, `Not in the
+  guide track: no clear sound to measure its audio delay against; its
+  own audio track is recorded`;
+  nothing where the mix places it at 0 (to the millisecond), the
+  reference's file or any other, and nothing for a file out of the guide
+  track, which its problem line tells; see "Audio delay", D80), then, drawn for an audio source only,
   "Level" (its level meter) and "Input volume" (an audio input's
   slider, where its input volume can be set; see "Audio", D69). Each
   row's mouse-over shows the source's details as the start window's
@@ -933,7 +980,8 @@ checked, reported or rewritten at the next start (D47).
   reading during the recording counts the recording's own use), then
   what is known while it records: a video file's frames repeated for
   lateness and placed late so far (`This file so far: …`), a camera's
-  `Stalled: yes` or `no`, an audio source's clock drift; under
+  `Stalled: yes` or `no`, an audio source's clock drift and an audio
+  input's audio delay (above); under
   it the line "Recording 1:07:00 ·
   1.3 GB in 3 files · 120.4 GB free", the elapsed time as `h:mm:ss`
   (D47) and the sizes as in Written; then "CPU 23 %", our process's CPU
@@ -973,7 +1021,13 @@ checked, reported or rewritten at the next start (D47).
   until the next read works (a new source might go unrecorded). Red
   always: a screen, camera or audio file lost in part (it lacks
   content), an audio input that cannot be recorded, the audio inputs'
-  changes that cannot be followed. Orange: everything else once it is
+  changes that cannot be followed. Red while it lasts, its own line: an
+  audio input silent right after its gaps (D81, see "No audio"), `Audio
+  <n> <name> sends only silence since its gaps at 0:25; unplug and plug
+  it in again`, and once its sound returns or it disconnects `Audio <n>
+  <name> sent only silence for 1:05 after its gaps at 0:25, recovered`
+  (or `, then disconnected`, `, stopped` when its capture ended
+  otherwise), orange. Orange: everything else once it is
   over, a failure followed by a new file of its source included, and
   always a camera stall (its file goes on), the Dock icon not shown, an
   input volume not set or not followed, a video file's guide tracks cut
@@ -1196,8 +1250,10 @@ it writes a variable frame rate with its own track layout.
 
 **Crash safety (D14, D21).** Files are written in fragments of 2 s
 (*data*; independent of the keyframe interval), so a crash loses at
-most the last 2 s; a camera file up to 0.5 s more, its ticks waiting
-for late frames (see "Cameras").
+most the last 2 s; a video file up to 1 s more, as its fragment is
+written only once its guide samples, mixed 1 s behind, arrive (D80),
+and a camera file up to 0.5 s more again, its ticks waiting for late
+frames (see "Cameras").
 
 **Frame size (D11, D30, D44).** A screen file's frame size is the
 screen's looks-like size (what macOS shows as "looks like", in points)
@@ -1319,7 +1375,16 @@ the metadata items (see "Output on disk").
   system audio is excluded: silence is normal there. No audio is no
   problem and no failure: nothing red, no problem entry, `result`
   unchanged. 2 s would have split the speech pauses of a noise-gated
-  microphone into many files.
+  microphone into many files. **Silent after gaps (D81):** no audio
+  whose zeros began within 10 s (`silenceAfterGapsTime`, *data*) after
+  one of the input's own `audio input gap` events (any of them from
+  10 s before the zeros began up to the no audio; the input's own: found
+  by its device's UID, not by its name, which two devices can share) is
+  the input broken by those gaps, as a BRIO's microphone was in the owner's recording of
+  2026-11-24 06.30.02: a red problem, `The audio input <name> sends
+  only silence since its gaps at 0:25` with the error `unplug and plug
+  it in again`, told and counted as any broken source, its line in the
+  window red until its sound returns (see "Status window").
 - **Level meters (D69).** Each audio source with a running capture,
   the system audio included, has a level meter: the sample peak of
   each incoming buffer (the largest absolute sample of any channel,
@@ -1478,35 +1543,70 @@ the metadata items (see "Output on disk").
   recording: each audio input's corrected sound also goes, mono at 8
   kHz (each 6 samples averaged), into a ring of its latest 12 s
   (`AudioDelayFeed`); every 10 s, off the capture queues and the main
-  thread, each audio input file being written is cross-correlated
-  (`AudioDelay`, Accelerate's FFT) with the reference microphone over
-  their latest common 10 s, searching ±1 s. The reference is the default
-  microphone when it is recorded, else the recorded audio input with the
-  lowest number; its own delay is taken as 0; the system audio is
+  thread, each audio input's newest file, while it is being written, is
+  cross-correlated (`AudioDelay`, Accelerate's FFT) with the reference's
+  over their latest common 10 s, searching ±1 s. Every
+  audio delay is against the recording's **anchor**, the first input
+  whose file is written, its own 0. The reference is the anchor while
+  its capture runs and its newest file did not end on no audio, so every
+  input is measured against the anchor, the anchor's own changing audio
+  delay included; a
+  file of it ending on a gap or a channel change, its next file
+  following, neither changes the reference nor starts anything over,
+  and while it has no file open nothing is measured that cycle. Once it
+  is in no audio (muted, D69) or its capture ended (unplugged), the input with the lowest number whose file is being
+  written and has an audio delay, a fallback whose own audio delay turns
+  its lags into ones against the anchor; with none such, the input with
+  the lowest number whose file is being written becomes the new anchor
+  (see below). So a silent anchor never stalls measuring. The default
+  microphone plays no part (D80, amending D77). The system audio is
   neither measured nor the reference. A window counts
   only when its match is clear, the peak of |correlation| at least 12
   times its median over the searched lags (the measured windows gave 13
   to 68 when clear, 5 to 9 when not), and not when either side is
-  silent or the window starts before the file. A file's delay is the
-  median of its counted windows' lags (each a lag, the seconds by which
-  the file's sound is later than the reference's) once it has 3; with
-  fewer, none. A file's lags count against the reference's file they
-  were measured with: when it changes (another reference, or the same
-  microphone's new file after it ended, as a reconnect may come back at
-  another latency), the file starts again, and its value goes back to
-  null, the one time a measured value does. The delays are then
-  normalized over every file measured against the reference's file,
-  ended ones included, so the earliest measured input is 0: each less
-  the smallest where that is below 0, the reference counting as 0, so a
-  delayed reference (an Osmo or a Bluetooth microphone as the default)
-  moves itself later, never the others, and its own file gets a
-  `measuredDelay` too (0 once it is the earliest again). Measuring ends at Stop. It goes into `recording.json` as the file's `measuredDelay` (a file
-  that ends before Stop keeps what was measured until then), the status
-  window's Clock drift column (`· 550 ms late`) and the
-  timeline file, which places the file's clip earlier by it; each
-  counted window is a detail line (`<file>: lag 550 ms late, clarity
-  31`). The audio files are not changed; an input out of sync with the
-  others leaves the "Audio inputs" guide track (see "Guide tracks", D79).
+  silent or the window starts before the file. **A file's audio delay
+  (D80)** is set by its first counted window's lag (the seconds by
+  which the file's sound is later than the reference's), set once more
+  at 3 counted windows to their median if that lies more than one frame
+  (1/30 s, `audioDelayTolerance`, *data*) away, and after that changes
+  only when the median of the counted windows of the latest 60 s
+  (`audioDelayChangeWindowSeconds`), at least 5 of them
+  (`audioDelayChangeWindows`, *data*), lies more than a frame away from
+  it: a single stray window never moves it, a lasting change (an Osmo's
+  audio delay moved from 558 ms to about 470 ms within 90 minutes, Rec9)
+  does once it holds. A
+  new file of an input (the same device in the same recording: after a
+  gap, no audio, a replug or a restart) whose earlier file had an audio
+  delay starts with it, carried over, until its own first counted window
+  confirms it (within a frame: nothing changes but its status) or
+  replaces it; the owner wanted the audio delay kept after a gap or a
+  replug. A device's newest file stays its file while its capture runs,
+  also once it ended (as on no audio), until the next one starts, so a
+  new file that starts before the earlier one's end is told still
+  carries it over. The anchor's own files are 0, listed as such.
+  A fallback reference keeps every audio delay: the lags against it are
+  re-based onto the anchor through its own audio delay, which stays as
+  it was while it is the reference (a shortcut: it is not measured then;
+  the anchor is the reference again once its file is written), and the
+  mix keeps every input. Only when no input being written has an audio
+  delay does the lowest-numbered one become the new anchor, and every
+  input starts over (no audio delay holds, nothing is carried over), its
+  audio delay against the old anchor taken as 0 and the entries written
+  before staying against the old anchor (a shortcut). An entry is the
+  file's audio delay against the anchor, negative when earlier, and
+  changes only when the file's own changes: a new earliest input changes
+  no other file's entries. Measuring ends at Stop. Each change goes into
+  `recording.json` as an entry of the file's `delays` (a file that ends
+  keeps its list), rewritten with hindsight at Stop (see "Output on
+  disk"), and the timeline file places each stretch of the
+  file by its entry less the smallest of the files' latest audio delays
+  (never above the anchor's 0), so the earliest input is at 0, a file
+  never measured and the system audio unchanged. The
+  status window's Clock drift column shows how much earlier the mix
+  places the file (`· synced 553 ms`, `· synced 533 ms (carried)`),
+  nothing at 0. The audio files are not changed; the "Audio inputs"
+  guide track places each input by its audio delay (see "Guide tracks",
+  D80); the detail lines say every decision (see "Logging").
 - **Failures.** A failing audio capture or writer and a full disk are
   handled for an audio file as for a screen file (below): the file
   ends, the event (`audio input failed`, `system audio failed`, `audio
@@ -1541,41 +1641,58 @@ the metadata items (see "Output on disk").
   material; in a simulation on that recording the mix decoded to at
   most about 0.78, roughly 2 dB below full scale, but the decoded peak
   is not bounded. A true-peak limiter (a low-pass and lookahead) is
-  deferred. "System audio" is clamped to ±1. **Which audio inputs "Audio inputs" mixes
-  (D79):** each audio input file being written has a value against the
-  reference's file (see "Audio delay"): the median of its counted
-  windows once it has 3, its first counted window's lag before; the
-  reference's own file is 0, and ended files are forgotten. The largest
-  group of them whose values lie within 0.1 s (`guideTrackSyncLimit`,
-  *data*, early or late; compared with a tolerance of a quarter of a
-  sample at 8 kHz, below the half-sample step of a median) of each other stays; on a tie the group holding the files that
-  stayed before, so a newcomer never evicts them, else the group with
-  the earliest input; a file outside it leaves the mix of every video file alike, the
-  reference's included, so an Osmo as the default microphone late after
-  two microphones in sync leaves. The first counted window decides,
-  so the echo lasts about 10 s, not the 30 s of the median of 3;
-  `measuredDelay` and the timeline file keep the median. A file that
-  left rejoins when the median of its counted windows lies within the
-  limit of the staying group; every file with 3 or more counted windows
-  is judged on its median, staying or out, with no hysteresis, so a
-  single late window does not take out a file whose median is in sync,
-  but a median that moves back and forth across the limit moves the file
-  out and in with it; an input's next file (after no
-  audio, a replug or a restart) starts in the guide track until it is
-  measured. A leave is told only once the capture took the file out:
+  deferred. "System audio" is clamped to ±1. **Where "Audio inputs"
+  places each input (D80):** the mix runs 1 s (`guideTrackDelay`,
+  *data*) behind real time, so every source's buffers have arrived, also
+  those of an input placed up to 0.8 s earlier; the video file's frames
+  are still written live, its guide samples carry their own time. The
+  anchor is in the mix from the start; any other input joins only
+  once its file has an audio delay (see "Audio delay"; before that it
+  is received but not mixed, `· not synced yet`, or `· no clear
+  sound`), and a
+  file carrying its earlier file's audio delay over joins, or stays
+  out, at once. Each input is placed earlier by its audio delay less
+  the smallest latest audio delay of the inputs staying in the mix, the
+  mix's zero, so the earliest input in the mix is not moved and none
+  moves more than 0.8 s; an input whose file ended (no audio) keeps its
+  audio delay and its place in or out of the mix until its capture ends,
+  so a noise-gated earliest microphone falling silent moves no other. An input that moves
+  crossfades from the next sample to mix: over 20 ms
+  (`guideTrackCrossfade`, *data*) where it was placed fades out
+  linearly while where it is placed now fades in, then only the latter
+  plays; a move repeats or skips its size of sound in the guide once.
+  The mix keeps each source's samples from the next position to mix on,
+  so an input moved later finds them still there. **Which audio inputs
+  "Audio inputs" mixes (D79, D80):** of the audio inputs whose capture
+  runs that have an audio delay (by their newest files; an input whose
+  capture ended is forgotten), the largest group whose audio delays lie within
+  0.8 s (`guideTrackSyncLimit`, *data*, early or late; compared with a
+  tolerance of a quarter of a sample at 8 kHz, below the half-sample
+  step of a median) of each other stays; on a tie the group holding
+  the files that stayed before, so a newcomer never evicts them, else
+  the group with the earliest input; a file outside it leaves the mix
+  of every video file alike, the anchor's included, so an Osmo as the
+  anchor more than 0.8 s late against two microphones in sync with each
+  other leaves. A file that left rejoins when its audio delay lies
+  within the limit of the staying group, or, out of it, when it no
+  longer has one (a new anchor), then not in the guide
+  track yet; the audio delay's own rules keep it from moving back and
+  forth. An input that is out stays out with its next files while its
+  capture runs, no new leave told; a new capture's file carrying its
+  audio delay over is out at once, told again. A leave is told only once the capture took
+  the file out:
   the event `audio input left the guide track` with its `offset` (from
   the staying group's earliest input), and a problem whose line reads,
-  while out, `Audio <n> <name> 553 ms late, not in the guide track; its
-  own audio track is recorded` (or `400 ms early` for an early input),
-  and once it rejoins, its file ends or it disconnects, `Audio <n>
-  <name> was not in the guide track from 0:50 to 1:40 (553 ms late);
-  its own audio track is recorded` (or `(400 ms early)`); always
+  while out, `Audio <n> <name> 953 ms late, not in the guide track; its
+  own audio track is recorded` (or `900 ms early` for an early input),
+  and once it rejoins or its capture ends, `Audio <n>
+  <name> was not in the guide track from 0:50 to 1:40 (953 ms late);
+  its own audio track is recorded` (or `(900 ms early)`); always
   orange, and by design neither a Dock bounce nor the badge nor the
   status line's count. A leaving source is cut, its samples not mixed
   yet dropped. Its own audio file is unchanged and the timeline file
-  still places it by its measured delay. Each source is placed by
-  its own timestamps, the mix runs 200 ms (*data*) behind real time so
-  every source's buffers have arrived, and a source that is missing is
+  still places it by its audio delays. Each source is placed by its own
+  timestamps, placed earlier as above, and a source that is missing is
   silence in its guide track. The mix is handed to every open screen
   file every 100 ms (*data*); a video file's guide tracks cover
   exactly its own time, so a frame size change gives them the same gap
@@ -1584,8 +1701,9 @@ the metadata items (see "Output on disk").
   takes, from the samples the sources delivered and not mixed yet, the
   rest up to the end of its video, without taking them from the other
   video files. Before it takes its last mix, a video file waits
-  until every source in each guide track has delivered its samples up
-  to the end of its video, for at most 2 s (`audioWaitBoundSeconds`,
+  until every source mixed in each guide track has delivered its
+  samples up to the end of its video (and an input placed earlier that
+  much beyond it), for at most 2 s (`audioWaitBoundSeconds`,
   *data*); if the wait runs out, it mixes what is there, and a source's
   samples that have not come are silence in it. At Stop the audio
   sources stop only after every video file's last mix. Its last mix
@@ -1920,6 +2038,60 @@ recording runs, each line on standard error carries the time since its
 start as the event lines do, such as `detail recorder: +27.9s start
 Screen 3 - LG`.
 
+**Audio delay detail (D80, D81).** The detail lines of category
+`recorder` let every sync decision be rebuilt from `recording.log`
+alone, one line per decision, never per buffer, each with the log's own
+`+<s>` time; files by name, audio delays as `AudioDelay.text` writes
+them:
+
+- Each measurement, every 10 s, per file: `<file>: lag 552 ms late
+  against <reference file>, clarity 31, counted` (or `not counted`), or
+  why it was not measured: `<file>: not measured, it or the reference
+  <file> is silent`, `… has less than a window of sound`, `… the
+  reference <file> has no file open` (the anchor between two files).
+- Each audio delay rule that was evaluated, with its outcome:
+  `<file>: audio delay set by its first counted window: 552 ms late`;
+  `<file>: audio delay the median of its first 3 counted windows:
+  552 ms late → 540 ms late`; `<file>: audio delay the median of its 6
+  counted windows of the latest 60 s: 555 ms late → 600 ms late`;
+  `… kept at 500 ms late, 10.0 ms off, within a frame` when a rule
+  declined; on a carried-over audio delay `<file>: audio delay its first
+  counted window on the carried-over: kept at 500 ms late, 10.0 ms off,
+  within a frame, confirmed` (or `…, replaced`); a counted window no rule
+  takes, `<file>: audio delay no rule: 2 of 3 counted windows for the
+  median` or `… no rule: 4 of 5 counted windows in the latest 60 s`.
+- A lag dropped: `<file>: lag 100 ms late dropped, the anchor's, always
+  0` (or `the reference's own`, `not a device's newest file`), and
+  `counted lags of <files> dropped: measured against <file>, the
+  reference is now <file>` when the reference changed during a
+  measurement.
+- No clear sound: `<file>: no clear sound to sync, 3 measurements with
+  sound and no counted window`, once, while the file has no audio delay.
+- At Stop, each file whose list hindsight changes: `<file>: audio delays
+  with hindsight [0.0 s: 533 ms late, 41.2 s: 472 ms late] → [0.0 s:
+  472 ms late]`.
+- A carry-over: `<file>: carries over 500 ms late from <earlier file>`
+  and `<file>: in the guide track with the carried-over audio delay` (or
+  `out of the guide track`).
+- A reference change: `reference <old file> → <new file>: lags re-based
+  onto the anchor by 500 ms late`, or `…: it has no audio delay, so it
+  is the new anchor and every input starts over`.
+- The mix: `<file>: joins the guide track placed earlier by 500 ms (the
+  mix's zero: <file>)`, `<file>: placed earlier by 555 ms → 600 ms (the
+  mix's zero: <file>)` followed by `the Audio inputs guide track
+  crossfades from its sample 1440000`, `<file>: leaves the guide track,
+  953 ms late from the staying group's earliest`, `<file>: rejoins the
+  guide track`; a new file of a device placed before is no new join. A
+  leave, rejoin or placement its capture did not take: `<file>: its
+  capture did not take the placement, the file no longer its current
+  one`, or `<file>: its capture did not take the leave, the file no
+  longer its current one`, or `<file>: its capture did not take the
+  rejoin, the file no longer its current one or not out`; none is
+  retried.
+- No audio (D81): `Audio 2 Razer Seiren: no audio since 0:25, right
+  after its gap at 0:24: a red problem (D81)`, or `Audio 2 Razer Seiren:
+  no audio since 0:25, no gap within 10 s before: no problem (D81)`.
+
 **Capture detail (D66).** The detail lines of category `capture` say
 what a screen capture and its writer saw, to root-cause a writer that
 fails on some Macs only (the hosted runner, about 2 of 7 runs, with
@@ -2178,7 +2350,9 @@ audio inputs) (`RecorderTests`: a failure told once by its event and its repeats
 counted at Stop, D65; `inputVolume`, a change told once it held still,
 also one Core Audio does not report, the slider's set, a refused set as
 a problem, no slider where it cannot be set; the level meters; no audio
-in the window and the manifest, not a problem), a stream stopped while it starts, that an action waiting for
+in the window and the manifest, not a problem, unless right after a gap
+(D81); an input joining the guide track at its audio delay, leaving it,
+rejoining, and a new file carrying its audio delay over, D79, D80), a stream stopped while it starts, that an action waiting for
 the main run loop's default mode runs only there, the classification of
 Core Audio's transport types, and the ready check's probes with
 stand-ins (the output folder's file access is off the main thread). The

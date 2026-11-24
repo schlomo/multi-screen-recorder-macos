@@ -29,6 +29,8 @@ public enum RecordingStatusTable {
         public var audioSource: AudioTracker.SourceID?
         /// The mouse-over: the source's details and its live facts (`SourceDetails`), its label first.
         public var details: String
+        /// What an audio input's file being written shows of its audio delay, for its mouse-over line (D80).
+        public var audioDelay: AudioDelays.Shown?
 
         public init(
             source: SourceCell, recordsAt: String, files: Int, written: String, state: String, clockDrift: String = "",
@@ -98,10 +100,11 @@ public enum RecordingStatusTable {
     /// The audio sources' rows, below the cameras': Records at is the
     /// channels of the source's newest audio file; `clockDrift` the latest
     /// clock drift correction status of each source's running capture; Clock
-    /// drift adds the delay measured for its file being written (D77): "-116 ppm (+34.9 ms) · 550 ms late".
+    /// drift adds what `audioDelays` shows for its file being written (D80):
+    /// "-116 ppm (+34.9 ms) · synced 550 ms".
     public static func audioRows(
         sources: [AudioTracker.Source], files: [RecordingManifest.AudioFile], bytes: [String: Int64],
-        clockDrift: [AudioTracker.SourceID: ClockDriftCorrection.Status]
+        clockDrift: [AudioTracker.SourceID: ClockDriftCorrection.Status], audioDelays: [String: AudioDelays.Shown] = [:]
     ) -> [Row] {
         sources.map { source in
             let own = files.filter { file in
@@ -120,10 +123,40 @@ public enum RecordingStatusTable {
             let cell: SourceCell = source.id == .systemAudio
                 ? .systemAudio(isRecorded: true) : .audioInput(source.number, name: source.name)
             let drift = source.state == .recording || source.state == .noAudio ? clockDriftText(clockDrift[source.id]) : ""
-            let delay = own.last { $0.end == nil }?.measuredDelay.map(AudioDelay.text)
-            return Row(
+            let shown = own.last { $0.end == nil }.flatMap { audioDelays[$0.name] }
+            var row = Row(
                 source: cell, recordsAt: channels, files: own.count, written: written, state: text(source.state),
-                clockDrift: [drift, delay ?? ""].filter { !$0.isEmpty }.joined(separator: " · "), audioSource: source.id)
+                clockDrift: [drift, shown.map(audioDelayText) ?? ""].filter { !$0.isEmpty }.joined(separator: " · "),
+                audioSource: source.id)
+            row.audioDelay = shown
+            return row
+        }
+    }
+
+    /// Short, as the column is narrow: "synced 553 ms", "synced 533 ms (carried)", "not synced yet", "no clear
+    /// sound"; the mouse-over says why (`audioDelayDetail`).
+    static func audioDelayText(_ shown: AudioDelays.Shown) -> String {
+        switch shown {
+        case .notInTheGuideTrackYet: "not synced yet"
+        case .noClearSoundToSync: "no clear sound"
+        case .synced(let placed, let carriedOver): "synced \(Int((abs(placed) * 1000).rounded())) ms" + (carriedOver ? " (carried)" : "")
+        case .anchor(let placed): "synced \(Int((abs(placed) * 1000).rounded())) ms"
+        }
+    }
+
+    /// The mouse-over's line for what a row shows of its audio delay: where the guide track places the file, and
+    /// how its audio delay came about, or why it is not in the guide track.
+    public static func audioDelayDetail(_ shown: AudioDelays.Shown) -> String {
+        func placed(_ seconds: Double) -> String {
+            "Placed \(Int((abs(seconds) * 1000).rounded())) ms earlier in the guide track, in line with the earliest microphone"
+        }
+        return switch shown {
+        case .notInTheGuideTrackYet: "Not in the guide track until its audio delay is measured; its own audio track is recorded"
+        case .noClearSoundToSync:
+            "Not in the guide track: no clear sound to measure its audio delay against; its own audio track is recorded"
+        case .synced(let seconds, carriedOver: false): "\(placed(seconds)); measured"
+        case .synced(let seconds, carriedOver: true): "\(placed(seconds)); carried over from its previous file until measured"
+        case .anchor(let seconds): placed(seconds)
         }
     }
 

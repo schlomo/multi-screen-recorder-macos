@@ -23,6 +23,12 @@ public enum EndToEndValues {
     /// How much less than everything up to the kill's last fragment a
     /// killed file may hold, in seconds.
     public static let killSlack = 0.5
+    /// How far behind real time the recorder mixes the guide tracks, in
+    /// seconds: a screen file's fragment is written only once its guide
+    /// samples arrive, so a killed one holds that much less. The recorder's
+    /// `RecorderValues.guideTrackDelay` (recorder.md, D80), restated here,
+    /// not read from the recorder's code.
+    public static let guideTrackDelay = 1.0
     /// How much of a recording's start the review artifact keeps of one
     /// screen file per scenario and of the loopback device's audio file, in
     /// seconds, cut without re-encoding.

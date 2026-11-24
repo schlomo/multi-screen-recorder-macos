@@ -69,8 +69,13 @@ public enum ResolveTimeline {
         }.filter { $0.frames > 0 }
         let earliest = (screens + cameras + audiosAsRecorded).min { $0.startFrame < $1.startFrame }
         let timelineStart = earliest?.startFrame ?? 0
-        let delays = Dictionary(manifest.audioFiles.compactMap { file in file.measuredDelay.map { (file.name, $0) } }) { $1 }
-        let audios = audiosAsRecorded.map { file in delays[file.name].map { file.placed(earlierBy: $0, notBefore: timelineStart) } ?? file }
+        // Against the anchor, its own 0; the smallest of the files' latest, never above 0, is subtracted once, so
+        // the earliest input ends at 0; a file without one, never measured, stays as recorded (D80).
+        let delays = Dictionary(manifest.audioFiles.map { ($0.name, $0.delays) }) { $1 }
+        let smallest = min(0, manifest.audioFiles.compactMap(\.delays.last?.delay).min() ?? 0)
+        let audios = audiosAsRecorded.flatMap { file in
+            file.stretches((delays[file.name] ?? []).map { .init(at: $0.at, delay: $0.delay - smallest) }, notBefore: timelineStart)
+        }
             .filter { $0.frames > 0 }
         let videoTracks = Self.videoTracks(screens, timelineStart: timelineStart)
             + Self.videoTracks(cameras, timelineStart: timelineStart)
@@ -100,10 +105,12 @@ public enum ResolveTimeline {
     private struct Placed {
         let name: String
         /// Where the file goes on the timeline: its timecode in frames, a day
-        /// later for a file after midnight, earlier by its measured delay (D77).
+        /// later for a file after midnight, earlier by its audio delay (D77, D80).
         var startFrame: Int
         /// The file's own timecode in frames, which its clip's source range keeps.
         let timecodeFrame: Int
+        /// The file's frames.
+        let length: Int
         /// The frames the clip plays, from `trimmed` on.
         var frames: Int
         /// The file's first frames the clip leaves out: where it would start before the timeline or overlap its source's previous clip.
@@ -111,6 +118,8 @@ public enum ResolveTimeline {
         let channels: RecordingManifest.AudioFile.Channels?
         let label: String
         let number: Int
+        /// The stretch of its file, from 0: a file is split where its audio delay changes (D80).
+        var stretch = 0
 
         init(
             name: String, source: String, timecode: String, start: Double, end: Double?, mediaSeconds: Double?,
@@ -126,21 +135,38 @@ public enum ResolveTimeline {
             // starts after the recording's start is on the next day.
             let expected = recordingStart + Int((start * ResolveTimeline.rate).rounded())
             startFrame = timecodeFrame + (timecodeFrame + framesPerDay / 2 <= expected ? framesPerDay : 0)
-            guard let length = end.map({ $0 - start }) ?? mediaSeconds else { throw Failure.lengthMissing(file: name) }
-            self.frames = ResolveTimeline.frames(seconds: length)
+            guard let seconds = end.map({ $0 - start }) ?? mediaSeconds else { throw Failure.lengthMissing(file: name) }
+            length = ResolveTimeline.frames(seconds: seconds)
+            self.frames = length
             self.channels = channels
             label = Self.label(ofFileName: name, source: source)
             number = SourceLabel.listPosition(ofFileName: name).number
         }
 
-        /// The file placed `delay` seconds earlier, to the nearest frame (negative: later); what would
+        /// The file split at each change of its audio delay, each stretch placed by its entry, the one before
+        /// the first entry by the first; unchanged without one.
+        func stretches(_ delays: [RecordingManifest.AudioFile.Delay], notBefore timelineStart: Int) -> [Placed] {
+            guard !delays.isEmpty else { return [self] }
+            let starts = [0] + delays.dropFirst().map { ResolveTimeline.frames(seconds: $0.at) }
+            return delays.indices.map { index in
+                var stretch = self
+                stretch.stretch = index
+                stretch.trimmed = min(starts[index], frames)
+                stretch.frames = min(index + 1 < starts.count ? starts[index + 1] : frames, frames) - stretch.trimmed
+                stretch.startFrame += stretch.trimmed
+                return stretch.placed(earlierBy: delays[index].delay, notBefore: timelineStart)
+            }
+        }
+
+        /// The clip placed `delay` seconds earlier, to the nearest frame (negative: later); what would
         /// start before `timelineStart` is trimmed off, so the clip starts there.
         func placed(earlierBy delay: Double, notBefore timelineStart: Int) -> Placed {
             var placed = self
             placed.startFrame -= Int((delay * ResolveTimeline.rate).rounded())
             if placed.startFrame < timelineStart {
-                placed.trimmed = timelineStart - placed.startFrame
-                placed.frames -= placed.trimmed
+                let before = timelineStart - placed.startFrame
+                placed.trimmed += before
+                placed.frames -= before
                 placed.startFrame = timelineStart
             }
             return placed
@@ -196,8 +222,9 @@ public enum ResolveTimeline {
                 let children = trackChildren(onTrack, timelineStart: timelineStart) { file in
                     var resolve: [(String, Node)] = [("Channels", .array(file.channelEntries(channel)))]
                     if file.channelCount > 1 {
-                        if linkGroups[file.name] == nil { linkGroups[file.name] = linkGroups.count + 1 }
-                        resolve.append(("Link Group ID", .int(linkGroups[file.name]!)))
+                        let clip = "\(file.name)#\(file.stretch)"
+                        if linkGroups[clip] == nil { linkGroups[clip] = linkGroups.count + 1 }
+                        resolve.append(("Link Group ID", .int(linkGroups[clip]!)))
                     }
                     return .object([("Resolve_OTIO", .object(resolve))])
                 }
@@ -257,7 +284,7 @@ public enum ResolveTimeline {
     }
 
     private static func clip(_ file: Placed, metadata: Node) -> Node {
-        let available = range(start: file.timecodeFrame, frames: file.trimmed + file.frames)
+        let available = range(start: file.timecodeFrame, frames: file.length)
         return .object([
             ("OTIO_SCHEMA", "Clip.2"),
             ("name", .string(file.name)),

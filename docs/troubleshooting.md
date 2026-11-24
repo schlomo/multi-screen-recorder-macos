@@ -32,8 +32,11 @@ One row per entry, the error text exactly as in the entry.
 | `the virtual screen 122787BA-50AA-4A5A-B00C-3F98867665AF has no mode 1600x900: []` | [A long-running process sees no modes of a new screen](#a-long-running-process-sees-no-modes-of-a-new-screen) |
 | `the program running this (a terminal app) lacks the Microphone permission; run msr check once from this terminal to get the prompt` | [The VM's Microphone permission reads as denied before its login](#the-vms-microphone-permission-reads-as-denied-before-its-login) |
 | `timed out waiting for A out of the guide track again` | [A stand-in audio input's file ends after a pause of a slow runner](#a-stand-in-audio-inputs-file-ends-after-a-pause-of-a-slow-runner) |
+| `Audio 2 Mic A sent only silence for 1.6 s after its gaps at 0:00, recovered` (an extra problem line in a test) | [A slow runner's pause gives a stand-in input a gap before its no audio](#a-slow-runners-pause-gives-a-stand-in-input-a-gap-before-its-no-audio) |
 | `sending 'self' risks causing data races [#SendingRisksDataRace]` | [Swift 6.3 rejects self in a later argument after callbacks capture it](#swift-63-rejects-self-in-a-later-argument-after-callbacks-capture-it) |
 | `AVFoundationErrorDomain -11800; reason: An unknown error occurred (-19092)` | [The end-to-end tests fail at a mode switch on a busy Mac](#the-end-to-end-tests-fail-at-a-mode-switch-on-a-busy-mac) |
+| `The job was not acquired by Runner of type hosted even after multiple attempts` | [No macOS runner: the pipeline job is cancelled](#no-macos-runner-the-pipeline-job-is-cancelled) |
+| `Multi Screen Recorder quit unexpectedly` (the app's crash dialog) after running the tests, with no crash of the app | [Crash dialog for crash reports the tests wrote](#crash-dialog-for-crash-reports-the-tests-wrote) |
 
 ## Format
 
@@ -279,7 +282,8 @@ One row per entry, the error text exactly as in the entry.
   (`feedDelayedNoise`, `measureAudioDelays`). [KNOWN:
   `AudioFileTimeline`, `RecorderValues.longestFilledAudioGap`] a gap
   longer than 1 s ends the file, and the input's next sound starts a
-  new file, in the guide track and not yet measured. [KNOWN: reproduced
+  new file, in the guide track and not yet measured (before D80; a new
+  file now carries its input's audio delay over). [KNOWN: reproduced
   locally, 2026-11-23] with 36 `yes` processes on 12 cores, the second
   test failed 5 of 5 runs, A's first file ending at 0.09 s and the next
   starting at 1.1 s; a 1.5 s sleep after the measurement gave the first
@@ -297,6 +301,30 @@ One row per entry, the error text exactly as in the entry.
   pushed head.
 - **Observed:** 2026-11-23, PR #27, runner Xcode 26.6; resolved
   (the pipeline on abc1953 passed).
+
+## A slow runner's pause gives a stand-in input a gap before its no audio
+
+- **Error:** `Expectation failed: (recorder.problemLines().map(\.text) → ["Audio 2 Mic A sent only silence for 1.6 s after its gaps at 0:00, recovered", "Audio 2 Mic A 900 ms late, not in the guide track; its own audio track is recorded"])`
+- **Symptom:** in CI's `scripts/test` (run 45427807337 on a5682a7 of
+  PR #30), `RecorderTests.anAudioInputThatLeftTheGuideTrackStaysOutWithItsNextFile`
+  has an extra D81 line; it passes locally. Locally under load (three
+  `yes` processes per core, 2026-11-24) the same test failed 4 of 11
+  runs, there with another extra line, `camera stream failed: the camera
+  delivered no frame within 5 s of its start`.
+- **Why:** [KNOWN: the test code] `startAudioFiles` sent each try's
+  buffer timestamped at the host clock's now, so a runner's pause
+  between two tries became a gap in the input's audio at 0:00; the
+  test's no audio then began within 10 s of it, which D81 rightly tells
+  as an input broken by its gaps. [KNOWN: recording.log of a local
+  failing run] the stand-in camera of `startInputs`, there only so the
+  guide tracks exist, sends no frame, and a test slower than 5 s hits
+  its first-frame limit. The recorder is right in both.
+- **Fix:** `startAudioFiles` sends each try on from the source's latest
+  buffer (`sendNext`), as the fix of "A stand-in audio input's file ends
+  after a pause of a slow runner" did for the later buffers; `startInputs`
+  gives its camera a first-frame limit of 600 s.
+- **Verify:** the guide-track tests pass 10 of 10 runs under the same
+  load; CI's `scripts/test` passes on the pushed head.
 
 ## Swift 6.3 rejects self in a later argument after callbacks capture it
 
@@ -344,3 +372,44 @@ One row per entry, the error text exactly as in the entry.
   the number of cores.
 - **Observed:** 2026-11-23 and 2026-11-24, macOS 27.2.1, tart 2.42.0;
   open (no fix in the project; the Mac is kept idle).
+## No macOS runner: the pipeline job is cancelled
+
+- **Error:** `The job was not acquired by Runner of type hosted even after multiple attempts`,
+  next to `Due to capacity constraints, jobs targeting macOS arm64 runners may experience longer queue times.`
+- **Symptom:** `test-and-build` ends as cancelled after about 15
+  minutes with no runner name and no log; the jobs after it are
+  skipped, so a merge to `main` makes no release.
+- **Why:** [KNOWN: the run's annotations] GitHub had no hosted
+  Apple-silicon macOS runner free for the job; nothing in the
+  repository caused it.
+- **Fix:** re-run the run (`gh run rerun <run id>`), never a new push:
+  the code is unchanged, and on `main` the re-run makes the release the
+  merge asked for.
+- **Verify:** the re-run's `test-and-build` gets a runner and passes,
+  and on `main` the release job publishes `v0.<DATE>.<N>`.
+- **Observed:** 2026-11-17, twice: the release run of PR #19's merge,
+  and run 44167197917 of PR #20's merge; both re-run.
+
+## Crash dialog for crash reports the tests wrote
+
+- **Error:** the app's dialog `Multi Screen Recorder quit unexpectedly`
+  on start, after `scripts/test` ran on the same Mac, while the app
+  itself had not crashed.
+- **Symptom:** `~/Library/Logs/DiagnosticReports` holds `msr-*.ips`
+  reports whose `procPath` is a temporary folder, with
+  `SIGKILL (Code Signature Invalid)` and `Launch Constraint Violation`.
+- **Why:** [KNOWN: the reports' `codeSigningID com.apple.sleep`] the
+  `scripts/install-app` tests used a copy of `/bin/sleep` named `msr`
+  as their stand-in app; macOS sometimes kills such a copy of a system
+  program at launch and writes a crash report named after it, and the
+  app offers every `msr` crash report it finds. The same kill made a
+  test's `waitUntilExit()` hang one run in eight.
+- **Fix:** the stand-in is a program the tests compile with `cc`, and
+  the test waits for it through its termination handler (PR #20).
+  Delete the reports left over:
+  `rm ~/Library/Logs/DiagnosticReports/msr-<date>-<time>.ips` for each
+  one with a temporary `procPath`. Since D70 the app offers only its
+  own reports, so these no longer show.
+- **Verify:** 20 runs of `InstallAppScriptTests` write no new
+  `msr-*.ips`.
+- **Observed:** 2026-11-17, PR #20; resolved.

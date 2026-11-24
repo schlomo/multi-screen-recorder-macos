@@ -98,13 +98,18 @@ public final class Recorder {
     private var camerasWithoutPermission: [CameraInfo] = []
     /// The screens and audio inputs as last read, for the status window's details.
     private var screensRead: [ConnectedScreen] = []
-    /// The audio inputs' latest sound and the lags counted so far per audio file, for their delays (D77).
-    let audioDelays = AudioDelayFeed()
-    private var delayLags = AudioDelay.Lags()
+    /// The audio inputs' latest sound, for measuring their audio delays (D77).
+    let audioDelayFeed = AudioDelayFeed()
+    /// The audio input files' audio delays and their places in the "Audio inputs" guide track (D80).
+    private var audioDelays = AudioDelays()
+    /// The audio inputs in no audio now, by UID: only such a file end (or its capture's) hands the anchor's
+    /// reference on (D80).
+    private var audioInputsWithNoAudio: Set<String> = []
+    /// Each audio input's events, by its device's UID, so its gaps are found by device, not by name (D81).
+    private var audioInputEvents: [String: [RecordingEvent]] = [:]
     /// The camera captures whose end was reported to the camera tracker.
     private var cameraCapturesGone: Set<Int> = []
     private var delayTask: Task<Void, Never>?
-    private var guideTrackMembership = GuideTrackMembership()
     private var audioInputsRead: [AudioInputInfo] = []
     private var endReports = CaptureEndReports()
     private var problemsTold = ProblemsTold()
@@ -139,6 +144,8 @@ public final class Recorder {
     private var cpuTask: Task<Void, Never>?
     private let devices: RecorderDevices
     private let cameraFrameWatch: CameraFrameWatch
+    /// How often the audio delays are measured.
+    private let audioDelayInterval: Duration
     /// The input volume of each audio input with a running capture, by its UID (D69).
     private var inputVolumes: [String: InputVolumeFollow] = [:]
     private var inputVolumeTask: Task<Void, Never>?
@@ -169,10 +176,12 @@ public final class Recorder {
 
     init(
         settings: Settings, homeFolder: URL, app: String, readyCheckFacts: ReadyCheckFacts, observer: any RecorderObserver,
-        devices: RecorderDevices, cameraFrameWatch: CameraFrameWatch = CameraFrameWatch()
+        devices: RecorderDevices, cameraFrameWatch: CameraFrameWatch = CameraFrameWatch(),
+        audioDelayInterval: Duration = AudioDelay.interval
     ) throws(RecorderStartError) {
         self.devices = devices
         self.cameraFrameWatch = cameraFrameWatch
+        self.audioDelayInterval = audioDelayInterval
         let readsScreens = ReadyCheck.needsScreenRecording(settings)
         let screens: [ConnectedScreen]
         do {
@@ -232,7 +241,7 @@ public final class Recorder {
         }
         delayTask = Task { [weak self] in
             while !Task.isCancelled {
-                try? await Task.sleep(for: AudioDelay.interval)
+                try? await Task.sleep(for: audioDelayInterval)
                 guard !Task.isCancelled else { return }
                 await self?.measureAudioDelays()
             }
@@ -298,7 +307,10 @@ public final class Recorder {
                     return row
                 }
                 + statusDetails(audioRows: RecordingStatusTable.audioRows(
-                    sources: audioTracker.sourcesShown, files: manifest.audioFiles, bytes: bytes, clockDrift: clockDrift),
+                    sources: audioTracker.sourcesShown, files: manifest.audioFiles, bytes: bytes, clockDrift: clockDrift,
+                    audioDelays: Dictionary(uniqueKeysWithValues: manifest.audioFiles.compactMap { file in
+                        audioDelays.shown(file.name).map { (file.name, $0) }
+                    })),
                     clockDrift: clockDrift),
             RecordingStatusTable.line(
                 elapsedSeconds: elapsedSeconds, bytesWritten: bytesWritten, files: names.count,
@@ -335,7 +347,8 @@ public final class Recorder {
         }
     }
 
-    /// The audio rows with their details: the input as last read, its input volume as followed, the clock drift.
+    /// The audio rows with their details: the input as last read, its input volume as followed, the clock drift,
+    /// the audio delay.
     private func statusDetails(
         audioRows rows: [RecordingStatusTable.Row], clockDrift: [AudioTracker.SourceID: ClockDriftCorrection.Status]
     ) -> [RecordingStatusTable.Row] {
@@ -353,7 +366,8 @@ public final class Recorder {
                     return SourceDetails.audioInput(label: row.source.text, input)
                 } ?? row.source.text
             }
-            row.details = ([details] + SourceDetails.live(clockDrift: clockDrift[id])).joined(separator: "\n")
+            row.details = ([details] + SourceDetails.live(clockDrift: clockDrift[id])
+                + [row.audioDelay.map(RecordingStatusTable.audioDelayDetail)].compactMap { $0 }).joined(separator: "\n")
             return row
         }
     }
@@ -420,6 +434,7 @@ public final class Recorder {
             for action in audioTracker.stopAll() { performAudio(action) }
             await waitForStops()
             takeAudioReports()
+            rewriteAudioDelaysWithHindsight()
             for line in repeats.stop(at: elapsedSeconds, started: context.started, timeZone: context.timeZone) {
                 observer?.recorder(self, eventLine: line, isFailure: true)
             }
@@ -972,6 +987,7 @@ public final class Recorder {
             guard let (number, capture) = audioCaptures.removeValue(forKey: id) else { return }
             unfollowInputVolume(id, captureNumber: number)
             stopInProgress { await capture.stop() }
+            audioInputCaptureEnded(id)
         }
     }
 
@@ -991,7 +1007,7 @@ public final class Recorder {
         let reports = AudioCaptureReports(
             fileStarted: { file in post(.fileStarted(file, id, name: name)) },
             fileEnded: { end in post(.fileEnded(end)) },
-            event: { event in post(.event(event)) },
+            event: { event in post(.event(event, id)) },
             clockDrift: { status in post(.clockDrift(id, number: number, status)) },
             noAudio: { isNoAudio in post(.noAudio(id, number: number, isNoAudio)) },
             ended: { reason in post(.ended(id, number: number, name: name, reason)) })
@@ -1002,54 +1018,117 @@ public final class Recorder {
         }
         let capture = AudioCapture(
             id: id, number: sourceNumber, name: name, source: source, context: context, guides: guides, reports: reports,
-            inputVolume: { [control] in control?.read() }, delays: audioDelays)
+            inputVolume: { [control] in control?.read() }, delays: audioDelayFeed)
         audioCaptures[id] = (number, capture)
         capture.start()
     }
 
     // MARK: Audio delay
 
-    /// Measures each audio input file being written against the reference
-    /// microphone over their latest common window, off the main thread, and
-    /// keeps the counted windows' lags; a file's delay is their median, normalized (D77). Nothing after Stop.
+    /// Measures each audio input file being written against the reference's
+    /// over their latest common window, off the main thread, and
+    /// hands the counted windows' lags to the audio delays (D77, D80). Nothing after Stop.
     func measureAudioDelays() async {
         guard !isStopped else { return }
-        let writing = manifest.audioFiles.filter { $0.end == nil && $0.audioSourceUID != nil }
-        guard let reference = delayReference(among: Set(writing.compactMap(\.audioSourceUID))),
-              let referenceEnd = audioDelays.endIndex(of: reference) else { return }
+        let ended = Set(manifest.audioFiles.filter { $0.end != nil }.map(\.name))
+        let writing = audioInputFiles().filter { !ended.contains($0.key) }
+        guard let (reference, referenceFile) = delayReference(among: audioInputFiles()) else { return }
+        let others = writing.filter { $0.value != reference }.keys.sorted()
+        guard writing[referenceFile] != nil, let referenceEnd = audioDelayFeed.endIndex(of: reference) else {
+            for file in others { RecorderLog.detail("\(file): not measured, the reference \(referenceFile) has no file open", category: "recorder") }
+            return
+        }
         let count = AudioDelay.windowSeconds * AudioDelay.sampleRate
-        let jobs = writing.compactMap { file -> (file: String, reference: [Float], other: [Float])? in
-            guard let uid = file.audioSourceUID, uid != reference, let end = audioDelays.endIndex(of: uid).map({ min($0, referenceEnd) }),
-                  Double(end - Int64(count)) / Double(AudioDelay.sampleRate) >= file.start,
-                  let other = audioDelays.window(of: uid, endingAt: end, count: count),
-                  let referenceWindow = audioDelays.window(of: reference, endingAt: end, count: count) else { return nil }
-            return (file.name, referenceWindow, other)
+        var jobs: [(file: String, reference: [Float], other: [Float])] = []
+        for file in others {
+            let uid = writing[file]!
+            guard let end = audioDelayFeed.endIndex(of: uid).map({ min($0, referenceEnd) }),
+                  let start = manifest.audioFiles.first(where: { $0.name == file })?.start,
+                  Double(end - Int64(count)) / Double(AudioDelay.sampleRate) >= start,
+                  let other = audioDelayFeed.window(of: uid, endingAt: end, count: count),
+                  let referenceWindow = audioDelayFeed.window(of: reference, endingAt: end, count: count) else {
+                RecorderLog.detail("\(file): not measured, it or the reference \(referenceFile) has less than a window of sound", category: "recorder")
+                continue
+            }
+            jobs.append((file, referenceWindow, other))
         }
         guard !jobs.isEmpty else { return }
         let windows = await Task.detached(priority: .utility) {
             jobs.map { ($0.file, AudioDelay.window(reference: $0.reference, other: $0.other)) }
         }.value
-        guard !isStopped, let referenceFile = writing.first(where: { $0.audioSourceUID == reference })?.name else { return }
-        let before = manifest.audioFiles.map(\.measuredDelay)
-        for case let (file, window?) in windows where window.counts {
-            RecorderLog.detail("\(file): lag \(AudioDelay.text(window.lag)), clarity \(Int(window.clarity.rounded()))", category: "recorder")
-            // Against another reference's file its delay no longer holds: the one time a measured value goes back to null.
-            if let measuredAgainst = delayLags.reference(of: file), measuredAgainst != referenceFile {
-                _ = manifest.audioDelayMeasured(nil, file: file)
+        guard !isStopped else { return }
+        var lags: [String: Double] = [:]
+        var unclear: Set<String> = []
+        for (file, window) in windows {
+            guard let window else {
+                RecorderLog.detail("\(file): not measured, it or the reference \(referenceFile) is silent", category: "recorder")
+                continue
             }
-            delayLags.add(window.lag, file: file, reference: referenceFile)
-            guideTrackMembership.add(window.lag, file: file, reference: referenceFile)
+            RecorderLog.detail(
+                "\(file): lag \(AudioDelay.text(window.lag)) against \(referenceFile), clarity \(Int(window.clarity.rounded())), "
+                    + (window.counts ? "counted" : "not counted"), category: "recorder")
+            if window.counts { lags[file] = window.lag } else { unclear.insert(file) }
         }
-        let membership = guideTrackMembership.update(writing: Set(writing.map(\.name)), reference: referenceFile)
-        for (file, offset) in membership.leaving.sorted(by: { $0.key < $1.key }) { leaveTheGuideTrack(file: file, offset: offset) }
-        for file in membership.rejoining.sorted() { rejoinTheGuideTrack(file: file) }
-        var delays = delayLags.delays(reference: referenceFile)
-        // The reference's file once shifted keeps a value: 0 when it is the earliest again.
-        if delays[referenceFile] == nil, manifest.audioFiles.first(where: { $0.name == referenceFile })?.measuredDelay != nil {
-            delays[referenceFile] = 0
+        applyAudioDelays(lags: lags, unclear: unclear, measuredAgainst: referenceFile, at: Double(referenceEnd) / Double(AudioDelay.sampleRate))
+    }
+
+    /// Each audio input's newest file while its capture runs, by name, with its device's UID (D80).
+    private func audioInputFiles() -> [String: String] {
+        manifest.newestAudioInputFiles(of: Set(audioCaptures.keys.compactMap { id in
+            if case .input(let uid) = id { uid } else { nil }
+        }))
+    }
+
+    /// The audio delays after a measurement (`lags` against `measuredAgainst`, the windows ending at `at` seconds)
+    /// or a file's start or end: files leave and rejoin the guide track, every file being written is placed in
+    /// it, and changed delays go into the manifest, from where the mix is now (D79, D80). Nothing after Stop.
+    private func applyAudioDelays(
+        lags: [String: Double] = [:], unclear: Set<String> = [], measuredAgainst: String? = nil, at: Double = 0
+    ) {
+        guard !isStopped else { return }
+        let files = audioInputFiles()
+        guard let (_, reference) = delayReference(among: files) else { return }
+        if !lags.isEmpty, measuredAgainst != reference {
+            RecorderLog.detail("counted lags of \(lags.keys.sorted().joined(separator: ", ")) dropped: measured against "
+                + "\(measuredAgainst ?? "none"), the reference is now \(reference)", category: "recorder")
         }
-        for (file, delay) in delays { _ = manifest.audioDelayMeasured(delay, file: file) }
-        if manifest.audioFiles.map(\.measuredDelay) != before { try? writeManifest() }
+        let isCurrent = measuredAgainst == reference
+        let outcome = audioDelays.update(
+            files: files, reference: reference, lags: isCurrent ? lags : [:], unclear: isCurrent ? unclear : [], at: at)
+        for line in outcome.lines { RecorderLog.detail(line, category: "recorder") }
+        for (file, offset) in outcome.leaving.sorted(by: { $0.key < $1.key }) { leaveTheGuideTrack(file: file, offset: offset) }
+        for file in outcome.rejoining.sorted() { rejoinTheGuideTrack(file: file) }
+        let rate = Double(RecorderValues.audioSampleRate)
+        for (file, earlierBy) in outcome.earlierBy {
+            guard let uid = files[file] else { continue }
+            if audioCaptures[.input(uid)]?.1.placeInTheGuideTrack(file: file, earlierBy: earlierBy.map { Int64(($0 * rate).rounded()) }) != true {
+                RecorderLog.detail("\(file): its capture did not take the placement, the file no longer its current one", category: "recorder")
+            }
+        }
+        let mixedPosition = guides.mixedUpTo(.audioInputs)
+        if outcome.isMoved, let mixedPosition {
+            RecorderLog.detail("the \(GuideTrack.audioInputs.name) guide track crossfades from its sample \(mixedPosition)", category: "recorder")
+        }
+        let mixedUpTo = mixedPosition.map { Double($0) / rate }
+            ?? Double(context.now() - RecorderValues.guideTrackDelay.nanoseconds) / 1e9
+        var changed = false
+        for (file, entry) in outcome.delays.sorted(by: { $0.key < $1.key }) {
+            changed = manifest.audioDelaySet(entry, at: mixedUpTo, file: file) || changed
+        }
+        if changed { try? writeManifest() }
+    }
+
+    /// At Stop, before the timeline file, each audio input file's audio delays with hindsight replace the live
+    /// entries (D80); written with the final manifest.
+    private func rewriteAudioDelaysWithHindsight() {
+        func text(_ delays: [RecordingManifest.AudioFile.Delay]) -> String {
+            delays.map { "\($0.at) s: \(AudioDelay.text($0.delay))" }.joined(separator: ", ")
+        }
+        for file in manifest.audioFiles {
+            guard let hindsight = audioDelays.hindsight(of: file.name, fileStart: file.start),
+                  let live = manifest.audioDelaysReplaced(hindsight, file: file.name) else { continue }
+            RecorderLog.detail("\(file.name): audio delays with hindsight [\(text(live))] → [\(text(hindsight))]", category: "recorder")
+        }
     }
 
     /// An audio input's file out of sync with the staying group leaves the "Audio inputs" guide track, its own
@@ -1057,7 +1136,10 @@ public final class Recorder {
     /// badge or count. Internal, so a test can ask for a leave its capture does not carry out.
     func leaveTheGuideTrack(file name: String, offset: Double) {
         guard let file = manifest.audioFiles.first(where: { $0.name == name }), let uid = file.audioSourceUID,
-              audioCaptures[.input(uid)]?.1.leaveTheGuideTrack(file: name) == true else { return }
+              audioCaptures[.input(uid)]?.1.leaveTheGuideTrack(file: name) == true else {
+            RecorderLog.detail("\(name): its capture did not take the leave, the file no longer its current one", category: "recorder")
+            return
+        }
         var event = RecordingEvent(at: context.now(), event: .audioInputLeftTheGuideTrack, audioSource: file.audioSource)
         event.offset = (offset * 10_000).rounded() / 10_000
         guard manifest.record([event]) else { return }
@@ -1074,19 +1156,41 @@ public final class Recorder {
     /// A file that left the guide track rejoins it; its line turns to the past (D79).
     private func rejoinTheGuideTrack(file name: String) {
         guard let file = manifest.audioFiles.first(where: { $0.name == name }), let uid = file.audioSourceUID,
-              audioCaptures[.input(uid)]?.1.rejoinTheGuideTrack(file: name) == true else { return }
+              audioCaptures[.input(uid)]?.1.rejoinTheGuideTrack(file: name) == true else {
+            RecorderLog.detail("\(name): its capture did not take the rejoin, the file no longer its current one or not out", category: "recorder")
+            return
+        }
         problemsTold.cleared(.audioInputOutOfTheGuideTrack(uid), at: context.now())
     }
 
-    /// The default microphone when it is recorded, else the recorded audio input with the lowest number (D77).
-    private func delayReference(among recorded: Set<String>) -> String? {
-        if let defaultMicrophone = audioInputsRead.first(where: \.isDefault)?.uid, recorded.contains(defaultMicrophone) {
-            return defaultMicrophone
+    /// An audio input whose capture ended is out of the guide track no more, and no longer places the
+    /// others (D79, D80).
+    private func audioInputCaptureEnded(_ id: AudioTracker.SourceID) {
+        guard case .input(let uid) = id else { return }
+        audioInputsWithNoAudio.remove(uid)
+        problemsTold.cleared(.audioInputOutOfTheGuideTrack(uid), at: context.now())
+        applyAudioDelays()
+    }
+
+    /// The reference and its file among `files` (D80): the anchor while its file is being written, or ended
+    /// otherwise than on no audio (a gap or a channel change, its next file following), else the
+    /// lowest-numbered input being written that has an audio delay; with none such, the lowest-numbered input
+    /// being written, which becomes the new anchor. With no file being written, the same among them all.
+    private func delayReference(among files: [String: String]) -> (uid: String, file: String)? {
+        let ended = Set(manifest.audioFiles.filter { $0.end != nil }.map(\.name))
+        let writing = files.filter { name, uid in
+            !ended.contains(name) || (uid == audioDelays.anchor && !audioInputsWithNoAudio.contains(uid))
         }
-        return audioTracker.sourcesShown.compactMap { source -> (Int, String)? in
-            guard case .input(let uid) = source.id, recorded.contains(uid) else { return nil }
+        let candidates = writing.isEmpty ? files : writing
+        func file(of uid: String) -> String? { candidates.first { $0.value == uid }?.key }
+        let byNumber = audioTracker.sourcesShown.compactMap { source -> (Int, String)? in
+            guard case .input(let uid) = source.id, file(of: uid) != nil else { return nil }
             return (source.number, uid)
-        }.min { $0.0 < $1.0 }?.1
+        }.sorted { $0.0 < $1.0 }.map(\.1)
+        let uid = audioDelays.anchor.flatMap { file(of: $0) != nil ? $0 : nil }
+            ?? byNumber.first { audioDelays.hasAudioDelay(file(of: $0)!, device: $0) }
+            ?? byNumber.first
+        return uid.flatMap { uid in file(of: uid).map { (uid, $0) } }
     }
 
     // MARK: Input volume
@@ -1138,7 +1242,7 @@ public final class Recorder {
         follow.control.cancel()
         follow.dueTask?.cancel()
         var changes = follow.changes
-        if let event = changes.flush(audioSource: follow.name) { audioEvent(event) }
+        if let event = changes.flush(audioSource: follow.name) { audioEvent(event, id) }
     }
 
     private func readInputVolume(_ uid: String) {
@@ -1161,7 +1265,7 @@ public final class Recorder {
         guard var follow = inputVolumes[uid], let event = follow.changes.due(at: context.now(), audioSource: follow.name) else { return }
         follow.dueTask = nil
         inputVolumes[uid] = follow
-        audioEvent(event)
+        audioEvent(event, .input(uid))
     }
 
     /// The audio captures' reports, in order, the one route by which they
@@ -1172,11 +1276,13 @@ public final class Recorder {
             switch report {
             case .fileStarted(let file, let id, let name): audioFileStarted(file, id: id, name: name)
             case .fileEnded(let end): audioFileEnded(end)
-            case .event(let event): audioEvent(event)
+            case .event(let event, let id): audioEvent(event, id)
             case .clockDrift(let id, let number, let status): audioClockDrift[id] = (number, status)
             case .noAudio(let id, let number, let isNoAudio):
                 // Only its running capture's: one that ended says nothing more.
-                if audioCaptures[id]?.0 == number { audioTracker.noAudio(id, isNoAudio) }
+                guard audioCaptures[id]?.0 == number else { continue }
+                audioTracker.noAudio(id, isNoAudio)
+                noAudio(id, isNoAudio)
             case .ended(let id, let number, let name, let reason):
                 audioCaptureEnded(id, number: number, name: name, reason: reason)
             }
@@ -1196,16 +1302,17 @@ public final class Recorder {
         if !started.isEmpty { _ = manifest.record(started) }
         if listed || !started.isEmpty { try? writeManifest() }
         told(started)
+        if file.audioSourceUID != nil { applyAudioDelays() }
     }
 
     /// Internal, so a test can deliver a failed file's end, as the stand-in audio sources cannot fail a writer.
     func audioFileEnded(_ end: AudioFileEnd) {
         guard manifest.audioFileEnded(end.file) else { return }
-        if let uid = end.file.audioSourceUID { problemsTold.cleared(.audioInputOutOfTheGuideTrack(uid), at: context.now()) }
         RecorderLog.detail("file ended: \(end.file.name), \(end.file.state.rawValue)", category: "recorder")
         _ = manifest.record(end.events)
         try? writeManifest()
         told(end.events)
+        if end.file.audioSourceUID != nil { applyAudioDelays() }
         // At the file's end, so a lost end (`audio file writer fell behind`) is told once (D47).
         if end.error != nil || !end.events.isEmpty {
             let at = Int64((end.failureSeconds * 1_000_000_000).rounded())
@@ -1222,8 +1329,37 @@ public final class Recorder {
         }
     }
 
-    private func audioEvent(_ event: RecordingEvent) {
+    /// An audio input whose no audio began right after its gaps is broken by them: a red problem until its
+    /// sound returns (D81).
+    private func noAudio(_ id: AudioTracker.SourceID, _ isNoAudio: Bool) {
+        guard case .input(let uid) = id else { return }
+        if isNoAudio { audioInputsWithNoAudio.insert(uid) } else { audioInputsWithNoAudio.remove(uid) }
+        applyAudioDelays()
+        guard isNoAudio else {
+            problemsTold.cleared(.audioInputSilentAfterGaps(uid), at: context.now())
+            return
+        }
+        let events = audioInputEvents[uid] ?? []
+        guard let source = audioTracker.sourcesShown.first(where: { $0.id == id }),
+              let started = events.last(where: { $0.event == .noAudioStarted }) else { return }
+        let silentSince = started.at - Double(RecorderValues.noAudioTime.nanoseconds) / 1e9
+        guard let gaps = ProblemsTold.gapsBefore(started, in: events) else {
+            RecorderLog.detail("Audio \(source.number) \(source.name): no audio since \(ProblemsTold.time(Int64((silentSince * 1e9).rounded()))), no gap within "
+                + "\(Int(RecorderValues.silenceAfterGapsTime.nanoseconds / 1_000_000_000)) s before: no problem (D81)", category: "recorder")
+            return
+        }
+        RecorderLog.detail("Audio \(source.number) \(source.name): no audio since \(ProblemsTold.time(Int64((silentSince * 1e9).rounded()))), right after its gap at "
+            + "\(ProblemsTold.time(Int64((gaps * 1e9).rounded()))): a red problem (D81)", category: "recorder")
+        let gapsAt = ProblemsTold.time(Int64((gaps * 1e9).rounded()))
+        tell(RecordingProblem(
+                atSeconds: silentSince, problem: "The audio input \(source.name) sends only silence since its gaps at \(gapsAt)",
+                error: ErrorDetail(message: "unplug and plug it in again")),
+             kind: .audioInputSilentAfterGaps(uid), source: "Audio \(source.number) \(source.name)", note: gapsAt)
+    }
+
+    private func audioEvent(_ event: RecordingEvent, _ id: AudioTracker.SourceID) {
         guard manifest.record([event]) else { return }
+        if case .input(let uid) = id { audioInputEvents[uid, default: []].append(event) }
         try? writeManifest()
         told([event])
     }
@@ -1234,6 +1370,10 @@ public final class Recorder {
         guard !isStopped, let (current, _) = audioCaptures[id], current == number else { return }
         audioCaptures[id] = nil
         unfollowInputVolume(id, captureNumber: number)
+        audioInputCaptureEnded(id)
+        if case .input(let uid) = id {
+            problemsTold.cleared(.audioInputSilentAfterGaps(uid), at: context.now(), ending: reason == .disconnected ? .disconnected : .stopped)
+        }
         // Told at the time of the failure's event, so the recording manifest lists it once (D47).
         let now = context.now()
         switch reason {

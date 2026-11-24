@@ -229,4 +229,37 @@ import Testing
         #expect(told.lines(now: 7 * second).last
             == ProblemLine(text: "Changes of the audio inputs not followed since 0:00: denied", isRed: true))
     }
+
+    /// An audio input silent right after its gaps: red with what to do while it lasts, orange in the past once
+    /// its sound returns or it disconnects; counted as any broken source (D81).
+    @Test func anAudioInputSilentAfterItsGapsIsRedUntilItsSoundReturns() {
+        var told = ProblemsTold()
+        var manifest = manifest()
+        let kind = ProblemKind.audioInputSilentAfterGaps("B")
+        let silent = RecordingProblem(at: 31 * second, problem: "The audio input BRIO sends only silence after its gaps", error: nil)
+        #expect(told.add(silent, kind: kind, source: "Audio 3 BRIO", note: "0:25", to: &manifest) == .tell(writeManifest: true))
+        #expect(told.lines(now: 45 * second) == [ProblemLine(
+            text: "Audio 3 BRIO sends only silence since its gaps at 0:25; unplug and plug it in again", isRed: true)])
+        told.cleared(kind, at: 96 * second)
+        #expect(told.lines(now: 100 * second) == [ProblemLine(
+            text: "Audio 3 BRIO sent only silence for 1:05 after its gaps at 0:25, recovered", isRed: false)])
+        _ = told.add(silent, kind: kind, source: "Audio 3 BRIO", note: "0:25", to: &manifest)
+        told.cleared(kind, at: 40 * second, ending: .disconnected)
+        #expect(told.lines(now: 100 * second).first?.text == "Audio 3 BRIO sent only silence for 9.0 s after its gaps at 0:25, then disconnected")
+    }
+
+    /// The gaps no audio follows: the first gap of the input from `silenceAfterGapsTime` before its zeros
+    /// began up to when no audio started; none without such a gap (D81).
+    @Test func noAudioRightAfterGapsFindsTheFirstOfThem() {
+        #expect(RecorderValues.silenceAfterGapsTime == .seconds(10))
+        func gap(_ seconds: Double, _ source: String = "BRIO") -> RecordingEvent {
+            RecordingEvent(at: Int64((seconds * 1e9).rounded()), event: .audioInputGap, audioSource: source)
+        }
+        let noAudio = RecordingEvent(at: 40_900_000_000, event: .noAudioStarted, audioSource: "BRIO")
+        let events = [gap(5), gap(25.7), gap(27), gap(30.5, "Razer"), noAudio]
+        #expect(ProblemsTold.gapsBefore(noAudio, in: events) == 25.7)
+        #expect(ProblemsTold.gapsBefore(noAudio, in: [gap(20.8), noAudio]) == nil)
+        #expect(ProblemsTold.gapsBefore(noAudio, in: [gap(20.9), noAudio]) == 20.9)
+        #expect(ProblemsTold.gapsBefore(noAudio, in: [noAudio, gap(41)]) == nil)
+    }
 }

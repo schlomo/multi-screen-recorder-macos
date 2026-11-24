@@ -71,7 +71,7 @@ public struct Scenario: Sendable {
     public var flags: [String]
     /// The settings the manifest must name for these flags.
     public var settings: ManifestExpectation.Settings
-    /// Whether the driver plays the test tone into the loopback device.
+    /// Whether the driver plays the test tone into the loopback device, the default microphone for the run.
     public var playsTone: Bool
     /// The events, at seconds after the recording started.
     public var events: [(at: Double, event: Event)]
@@ -123,6 +123,9 @@ extension Scenario {
     /// How often the stress scenario switches the screen's mode.
     static let stressSwitches = 10
     static let fixedFlags = ["--resolution", "1080p", "--audio-mode", "all-inputs"]
+    /// The tone scenarios record only the default microphone, which the driver makes the loopback device: the
+    /// anchor is the first input whose file starts, a race between the VM's two inputs (D80).
+    static let toneFlags = ["--resolution", "1080p", "--audio-mode", "default-microphone"]
 
     /// The stress scenario: its events built step by step, so no type inference has to solve them at once.
     static let stress: Scenario = {
@@ -164,13 +167,13 @@ extension Scenario {
         stress,
         Scenario(
             name: "tone", summary: "the test tone in the loopback device: level, silent stretches, timing by timecode",
-            flags: fixedFlags + ["--system-audio", "off"],
-            settings: .init(resolution: "1080p", audioMode: "all-inputs", systemAudio: false),
+            flags: toneFlags + ["--system-audio", "off"],
+            settings: .init(resolution: "1080p", audioMode: "default-microphone", systemAudio: false),
             playsTone: true, stop: .interrupt, stopAt: 10),
         Scenario(
             name: "system-audio", summary: "the system audio recorded beside the test tone",
-            flags: fixedFlags + ["--system-audio", "on"],
-            settings: .init(resolution: "1080p", audioMode: "all-inputs", systemAudio: true),
+            flags: toneFlags + ["--system-audio", "on"],
+            settings: .init(resolution: "1080p", audioMode: "default-microphone", systemAudio: true),
             playsTone: true, stop: .interrupt, stopAt: 10),
         Scenario(
             name: "stop-by-ctrl-c", summary: "Ctrl-C (SIGINT) finalizes the recording",

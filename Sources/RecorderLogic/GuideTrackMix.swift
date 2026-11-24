@@ -2,7 +2,11 @@ import Foundation
 
 /// A guide track's samples (D31, D49, D52), mixed `delay` behind real time
 /// so every source's buffers have arrived; each source is placed by its own
-/// timestamps, and a source with no samples for a stretch is silence there.
+/// timestamps, placed earlier by an audio input's audio delay less the
+/// smallest of those mixed (D80), and a source with no samples for a
+/// stretch is silence there. A source not placed is received but not
+/// mixed: not in the guide track yet. A source moved crossfades over
+/// `crossfade`.
 /// "Audio inputs" is one mono mix: each recorded audio input averaged to
 /// mono, the inputs summed at unity gain, through a soft limiter
 /// (`limit`) with its knee at −12 dBFS and its ceiling at −6 dBFS (D75). "System audio" carries the system audio's two channels as
@@ -13,13 +17,20 @@ public struct GuideTrackMix: Sendable {
     public let track: GuideTrack
     public let sampleRate: Int
     public let delay: Int64
+    /// In samples.
+    public let crossfade: Int64
     /// Every sample before this position is mixed; the next mix starts here.
     public private(set) var mixedUpTo: Int64
 
     private struct Source: Sendable {
         let channelCount: Int
-        /// From `mixedUpTo` on, per output channel.
+        /// Per output channel, the source's own samples from the position `mixedUpTo` on: placed earlier
+        /// it reads ahead in them, and moved back later it finds them still there.
         var queued: [[Float]]
+        /// The samples it is placed earlier by; nil while it is not mixed.
+        var earlierBy: Int64?
+        /// While a move fades: how much earlier it was placed before and the position the fade starts at.
+        var fade: (earlierBy: Int64, from: Int64)?
     }
 
     private var sources: [String: Source] = [:]
@@ -33,6 +44,7 @@ public struct GuideTrackMix: Sendable {
         mixedUpTo = start
         self.sampleRate = sampleRate
         self.delay = delay.nanoseconds
+        crossfade = RecorderValues.guideTrackCrossfade.nanoseconds * Int64(sampleRate) / 1_000_000_000
     }
 
     /// Up to this level, the "Audio inputs" mix passes unchanged: −12 dBFS, 6 dB below the ceiling (D52, D75).
@@ -55,13 +67,26 @@ public struct GuideTrackMix: Sendable {
         return sample < 0 ? -limited : limited
     }
 
-    /// A source joins the mix under a name unique in the recording: an audio input's label.
-    public mutating func add(source name: String, channelCount: Int) {
+    /// A source joins under a name unique in the recording, an audio input's label, placed `earlierBy`
+    /// samples earlier; nil: received, not mixed until it is placed.
+    public mutating func add(source name: String, channelCount: Int, earlierBy: Int64? = 0) {
         precondition(sources[name] == nil, "\(name) is already in the guide track \(track.name)")
         precondition(channelCount > 0, "\(name) has no channels")
         precondition(track == .audioInputs || channelCount == track.channelCount,
                      "the guide track \(track.name) takes \(track.channelCount) channels, not \(channelCount)")
-        sources[name] = Source(channelCount: channelCount, queued: Array(repeating: [], count: track.channelCount))
+        precondition(earlierBy ?? 0 >= 0, "\(name) cannot be placed later")
+        sources[name] = Source(channelCount: channelCount, queued: Array(repeating: [], count: track.channelCount), earlierBy: earlierBy)
+    }
+
+    /// A source moves: from not mixed it starts at once, to not mixed it is cut, and from one place to
+    /// another it crossfades from `mixedUpTo` on.
+    public mutating func place(source name: String, earlierBy: Int64?) {
+        guard var source = sources[name] else { preconditionFailure("\(name) is not in the guide track \(track.name)") }
+        precondition(earlierBy ?? 0 >= 0, "\(name) cannot be placed later")
+        guard source.earlierBy != earlierBy else { return }
+        source.fade = source.earlierBy.flatMap { old in earlierBy.map { _ in (old, mixedUpTo) } }
+        source.earlierBy = earlierBy
+        sources[name] = source
     }
 
     /// A source leaves the mix; its samples not mixed yet are dropped.
@@ -71,10 +96,16 @@ public struct GuideTrackMix: Sendable {
 
     public func contains(source name: String) -> Bool { sources[name] != nil }
 
-    /// Whether every source has delivered its samples up to the sample
-    /// position `end`; true without sources.
+    /// Whether the source is mixed: it is placed.
+    public func isMixed(source name: String) -> Bool { sources[name]?.earlierBy != nil }
+
+    /// Whether every mixed source has delivered its samples for the mix up
+    /// to the sample position `end`; true without sources.
     public func hasReceived(upTo end: Int64) -> Bool {
-        sources.values.allSatisfy { mixedUpTo + Int64($0.queued.first?.count ?? 0) >= end }
+        sources.values.allSatisfy { source in
+            guard let earlierBy = source.earlierBy else { return true }
+            return mixedUpTo + Int64(source.queued.first?.count ?? 0) >= end + max(earlierBy, source.fade?.earlierBy ?? 0)
+        }
     }
 
     /// A buffer of a source, one array per channel, its first sample at
@@ -118,6 +149,9 @@ public struct GuideTrackMix: Sendable {
             }
         }
         mixedUpTo = end
+        for name in sources.keys where sources[name]!.fade.map({ $0.from + crossfade <= end }) == true {
+            sources[name]!.fade = nil
+        }
         return mixed
     }
 
@@ -132,9 +166,17 @@ public struct GuideTrackMix: Sendable {
     private func mixed(count: Int) -> [[Float]] {
         var mixed = Array(repeating: [Float](repeating: 0, count: count), count: track.channelCount)
         for source in sources.values {
+            guard let earlierBy = source.earlierBy.map(Int.init) else { continue }
             for output in mixed.indices {
                 let queued = source.queued[output]
-                for index in 0..<min(count, queued.count) { mixed[output][index] += queued[index] }
+                let sample = { (index: Int) in index < queued.count ? queued[index] : 0 }
+                for index in 0..<count { mixed[output][index] += sample(index + earlierBy) }
+                guard let fade = source.fade else { continue }
+                let fadeStart = Int(fade.from - mixedUpTo), length = Int(crossfade)
+                for index in stride(from: max(0, fadeStart), to: min(count, fadeStart + length), by: 1) {
+                    let weight = Float(index - fadeStart) / Float(length)
+                    mixed[output][index] += (1 - weight) * (sample(index + Int(fade.earlierBy)) - sample(index + earlierBy))
+                }
             }
         }
         return switch track {

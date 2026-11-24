@@ -36,10 +36,14 @@ final class Driver {
     /// Told by scripts/end-to-end-test: the throwaway VM, where the system appearance may be
     /// switched and the status and Finder windows are driven.
     let inThrowawayVM: Bool
+    /// Told by `msr-end-to-end app-windows`: the person's own Mac, where only the app's windows are taken,
+    /// in light, with no virtual screen and no window moved (D82).
+    let onThisMac: Bool
     var appearances: [Appearance] { Appearance.taken(inThrowawayVM: inThrowawayVM) }
 
-    init(app: URL, scratch: URL, restorer: Restorer, media: Media, inThrowawayVM: Bool) throws {
+    init(app: URL, scratch: URL, restorer: Restorer, media: Media, inThrowawayVM: Bool, onThisMac: Bool = false) throws {
         self.inThrowawayVM = inThrowawayVM
+        self.onThisMac = onThisMac
         msr = app.appending(path: "Contents/MacOS/msr")
         guard FileManager.default.isExecutableFile(atPath: msr.path) else {
             throw DriverError("\(msr.path) does not exist; run scripts/build-app first")
@@ -64,9 +68,7 @@ final class Driver {
     /// The preconditions, checked before anything changes: both permissions,
     /// asked without a prompt; the loopback device; the private interface.
     static func requirePreconditions() throws {
-        guard CGPreflightScreenCaptureAccess() else {
-            throw DriverError("the program running this (a terminal app) lacks the Screen & System Audio Recording permission; run msr check once from this terminal to get the prompt")
-        }
+        try requireScreenRecording()
         guard AVCaptureDevice.authorizationStatus(for: .audio) == .authorized else {
             throw DriverError("the program running this (a terminal app) lacks the Microphone permission; run msr check once from this terminal to get the prompt")
         }
@@ -75,6 +77,12 @@ final class Driver {
         }
         guard MSRVirtualScreen.isAvailable else {
             throw DriverError("this macOS has no CGVirtualDisplay, the private interface virtual screens need")
+        }
+    }
+
+    static func requireScreenRecording() throws {
+        guard CGPreflightScreenCaptureAccess() else {
+            throw DriverError("the program running this (a terminal app) lacks the Screen & System Audio Recording permission; grant it in System Settings > Privacy & Security > Screen & System Audio Recording, or run msr check once from this terminal to get the prompt")
         }
     }
 
@@ -126,7 +134,12 @@ final class Driver {
 
         var tone: TonePlayer?
         defer { tone?.stop() }
+        // The loopback device is the default microphone while the tone plays, the only input recorded, so it is
+        // the anchor (D80); put back after the scenario, and by the restore should the driver be killed.
+        let defaultInput = CoreAudioDevices.defaultDevice(input: true).flatMap(CoreAudioDevices.uid)
+        defer { if scenario.playsTone, let defaultInput { try? CoreAudioDevices.setDefaultDevice(input: true, uid: defaultInput) } }
         if scenario.playsTone {
+            try CoreAudioDevices.setDefaultDevice(input: true, uid: Machine.loopbackUID)
             tone = try TonePlayer(deviceUID: Machine.loopbackUID)
             try tone?.start()
         }

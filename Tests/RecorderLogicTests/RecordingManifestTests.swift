@@ -266,22 +266,58 @@ import Testing
         #expect(systemObject.keys.contains("inputVolume") == false)
     }
 
-    /// An audio file's measured delay is null until measured, and its end keeps it (D77).
-    @Test func anAudioFileKeepsItsMeasuredDelayAtItsEnd() throws {
+    /// Each recorded audio input's newest file, whether the new file starts before or after its earlier one's
+    /// end is told, a file that ended staying its device's newest until the next starts (D80).
+    @Test(arguments: [true, false]) func eachAudioInputsNewestFileIsTheLatestToStart(endFirst: Bool) {
+        var manifest = RecordingManifest(app: "a", started: Date(), timeZone: .gmt, settings: .manual)
+        func file(_ name: String, _ uid: String?, start: Double) -> RecordingManifest.AudioFile {
+            RecordingManifest.AudioFile(name: name, audioSource: name, audioSourceUID: uid, channels: .mono(1), start: start, timecode: "t")
+        }
+        for started in [file("a1.mov", "A", start: 0), file("b.mov", "B", start: 0), file("s.mov", nil, start: 0), file("c.mov", "C", start: 0)] {
+            _ = manifest.audioFileStarted(started)
+        }
+        var ended = file("a1.mov", "A", start: 0)
+        ended.end = 10
+        var endedB = file("b.mov", "B", start: 0)
+        endedB.end = 5
+        _ = manifest.audioFileEnded(endedB)
+        #expect(manifest.newestAudioInputFiles(of: ["A", "B"]) == ["a1.mov": "A", "b.mov": "B"])
+        if endFirst { _ = manifest.audioFileEnded(ended) }
+        _ = manifest.audioFileStarted(file("a2.mov", "A", start: 10))
+        if !endFirst { _ = manifest.audioFileEnded(ended) }
+        #expect(manifest.newestAudioInputFiles(of: ["A", "B"]) == ["a2.mov": "A", "b.mov": "B"])
+    }
+
+    /// An audio file lists its audio delays, one entry of `at` and `delay` alone per change of the value, an
+    /// empty list until set; its end keeps them; a file listed before them reads with none (D80).
+    @Test func anAudioFileListsItsAudioDelaysAndKeepsThemAtItsEnd() throws {
         var manifest = RecordingManifest(app: "a", started: Date(), timeZone: .gmt, settings: .manual)
         let file = RecordingManifest.AudioFile(
-            name: "a.mov", audioSource: "OsmoPocket4P", audioSourceUID: "O", channels: .mono(1), start: 0, timecode: "t")
-        let unmeasured = try #require(try JSONSerialization.jsonObject(with: try JSONEncoder().encode(file)) as? [String: Any])
-        #expect(unmeasured["measuredDelay"] is NSNull)
+            name: "a.mov", audioSource: "OsmoPocket4P", audioSourceUID: "O", channels: .mono(1), start: 10, timecode: "t")
+        let unset = try #require(try JSONSerialization.jsonObject(with: try JSONEncoder().encode(file)) as? [String: Any])
+        #expect((unset["delays"] as? [Any])?.isEmpty == true)
+        #expect(unset["measuredDelay"] == nil)
         _ = manifest.audioFileStarted(file)
-        let measured = manifest.audioDelayMeasured(0.553_24, file: "a.mov")
-        let unlisted = manifest.audioDelayMeasured(0.5, file: "other.mov")
-        #expect(measured && !unlisted)
+        let set = manifest.audioDelaySet(AudioDelays.Entry(delay: 0.553_24), at: 10, file: "a.mov")
+        // The same delay confirmed is no change; a change is a new entry, at seconds from the file's start.
+        let confirmed = manifest.audioDelaySet(AudioDelays.Entry(delay: 0.553_21), at: 20, file: "a.mov")
+        let changed = manifest.audioDelaySet(AudioDelays.Entry(delay: 0.47), at: 72.345_67, file: "a.mov")
+        let unlisted = manifest.audioDelaySet(AudioDelays.Entry(delay: 0.5), at: 80, file: "other.mov")
+        #expect(set && !confirmed && changed && !unlisted)
         var ended = file
-        ended.end = 12
+        ended.end = 120
         _ = manifest.audioFileEnded(ended)
-        #expect(manifest.audioFiles.first?.measuredDelay == 0.5532)
-        #expect(manifest.audioFiles.first?.end == 12)
+        let delays = try #require(manifest.audioFiles.first?.delays)
+        #expect(delays == [
+            .init(at: 0, delay: 0.5532),
+            .init(at: 62.346, delay: 0.47),
+        ])
+        #expect(manifest.audioFiles.first?.end == 120)
+        let written = try #require(try JSONSerialization.jsonObject(with: try JSONEncoder().encode(manifest.audioFiles[0])) as? [String: Any])
+        let entries = try #require(written["delays"] as? [[String: Any]])
+        #expect(entries.map { $0.keys.sorted() } == [["at", "delay"], ["at", "delay"]])
+        let earlier = #"{"name": "b.mov", "audioSource": "Mic", "channels": 1, "start": 0, "end": 1, "timecode": "t", "state": "finalized", "measuredDelay": 0.5}"#
+        #expect(try JSONDecoder().decode(RecordingManifest.AudioFile.self, from: Data(earlier.utf8)).delays.isEmpty)
     }
 
     @Test func anInputVolumeChangeCarriesTheVolumesFrom0To1() throws {

@@ -177,13 +177,99 @@ import Testing
         #expect(guide.mix(until: 1 * millisecond)[0] == [0.25])
     }
 
+    /// An input placed earlier by its audio delay: its sample at time t is mixed that much before t (D80).
+    @Test func anInputPlacedEarlierIsMixedThatMuchEarlier() {
+        var guide = mix()
+        guide.add(source: "A", channelCount: 1)
+        guide.add(source: "Late", channelCount: 1, earlierBy: 2)
+        guide.receive([[0.1, 0.1, 0.1, 0.1, 0.1, 0.1]], from: "A", at: 0)
+        guide.receive([[0, 0, 0.05, 0.05, 0.05, 0.05]], from: "Late", at: 0)
+        // Until the late input has delivered 2 samples beyond, the mix has not received up to a position.
+        #expect(!guide.hasReceived(upTo: 6))
+        #expect(guide.hasReceived(upTo: 4))
+        let mixed = guide.mix(until: 4 * millisecond)[0]
+        for (sample, want) in zip(mixed, [Float](repeating: 0.15, count: 4)) { #expect(abs(sample - want) < 1e-6, "\(mixed)") }
+        #expect(mixed.count == 4)
+    }
+
+    /// An input not in the guide track yet is received but not mixed, and not waited for; placed, its
+    /// samples kept from the next position to mix on are mixed (D80).
+    @Test func anInputNotPlacedYetIsKeptButNotMixed() {
+        var guide = mix()
+        guide.add(source: "A", channelCount: 1, earlierBy: nil)
+        #expect(guide.contains(source: "A") && !guide.isMixed(source: "A"))
+        guide.receive([[0.01, 0.02, 0.03, 0.04, 0.05, 0.06]], from: "A", at: 0)
+        #expect(guide.hasReceived(upTo: 100))
+        #expect(guide.mix(until: 2 * millisecond)[0] == [0, 0])
+        guide.place(source: "A", earlierBy: 1)
+        #expect(guide.isMixed(source: "A"))
+        #expect(guide.mix(until: 4 * millisecond)[0] == [0.04, 0.05])
+        guide.place(source: "A", earlierBy: nil)
+        #expect(guide.mix(until: 5 * millisecond)[0] == [0])
+    }
+
+    /// An input moved fades over the crossfade from where it was placed to where it is placed now, from the
+    /// next position to mix on; then only the new one plays (D80).
+    @Test func anInputMovedCrossfades() {
+        let fade = Int(RecorderValues.guideTrackCrossfade.nanoseconds / millisecond)
+        var guide = mix()
+        guide.add(source: "A", channelCount: 1)
+        // Sample n is n / 1000: where it is placed shows in the values.
+        guide.receive([(0..<200).map { Float($0) / 1000 }], from: "A", at: 0)
+        #expect(guide.mix(until: 10 * millisecond)[0].last == 0.009)
+        guide.place(source: "A", earlierBy: 50)
+        let mixed = guide.mix(until: Int64(10 + fade + 5) * millisecond)[0]
+        for index in 0..<(fade + 5) {
+            let weight = Float(min(index, fade)) / Float(fade)
+            let position = Float(10 + index)
+            let want = ((1 - weight) * position + weight * (position + 50)) / 1000
+            #expect(abs(mixed[index] - want) < 1e-6, "at \(index): \(mixed[index]), expected \(want)")
+        }
+        // Moving later again needs samples already mixed where it was placed before: they are kept.
+        guide.place(source: "A", earlierBy: 0)
+        let back = guide.mix(until: Int64(10 + 2 * fade + 10) * millisecond)[0]
+        #expect(abs(back.last! - Float(10 + 2 * fade + 9) / 1000) < 1e-6)
+    }
+
+    /// While a move crossfades, the mix needs the samples of both placements: the earlier one's until the fade
+    /// is over (D80).
+    @Test func duringACrossfadeTheMixWaitsForTheEarlierPlacementsSamples() {
+        let fade = Int64(RecorderValues.guideTrackCrossfade.nanoseconds / millisecond)
+        var guide = mix()
+        guide.add(source: "A", channelCount: 1, earlierBy: 50)
+        guide.receive([[Float](repeating: 0.01, count: 100)], from: "A", at: 0)
+        _ = guide.mix(upTo: 10)
+        guide.place(source: "A", earlierBy: 0)
+        // 100 samples received: placed 50 earlier, up to 50; placed at 0 alone it would be up to 100.
+        #expect(guide.hasReceived(upTo: 50))
+        #expect(!guide.hasReceived(upTo: 51))
+        _ = guide.mix(upTo: 10 + fade)
+        #expect(guide.hasReceived(upTo: 100))
+        #expect(!guide.hasReceived(upTo: 101))
+    }
+
+    /// A peek during a crossfade gives what the mix then gives, and takes nothing (D80).
+    @Test func aPeekDuringACrossfadeIsWhatTheMixGives() {
+        let fade = Int64(RecorderValues.guideTrackCrossfade.nanoseconds / millisecond)
+        var guide = mix()
+        guide.add(source: "A", channelCount: 1)
+        guide.receive([(0..<200).map { Float($0) / 1000 }], from: "A", at: 0)
+        _ = guide.mix(upTo: 10)
+        guide.place(source: "A", earlierBy: 50)
+        let peeked = guide.peek(upTo: 10 + fade + 5)
+        #expect(peeked.start == 10)
+        #expect(guide.peek(upTo: 10 + fade + 5).channels == peeked.channels)
+        #expect(guide.mix(upTo: 10 + fade + 5) == peeked.channels)
+    }
+
     @Test func withNoInputTheMixIsSilence() {
         var guide = mix()
         #expect(guide.mix(until: 3 * millisecond)[0] == [0, 0, 0])
     }
 
     @Test func theDelayIsTheDesignsStartingPoint() {
-        #expect(GuideTrackMix(.audioInputs).delay == 200 * millisecond)
+        #expect(GuideTrackMix(.audioInputs).delay == 1000 * millisecond)
+        #expect(RecorderValues.guideTrackCrossfade == .milliseconds(20))
         #expect(GuideTrackMix(.audioInputs).sampleRate == RecorderValues.audioSampleRate)
     }
 

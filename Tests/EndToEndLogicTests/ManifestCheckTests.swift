@@ -25,7 +25,7 @@ struct SampleRecording {
         func audio(_ name: String, source: String, uid: String?, channels: Any, start: Double, end: Double, timecode: String) -> [String: Any] {
             var entry = file(name, start: start, end: end, timecode: timecode).merging([
                 "audioSource": source, "channels": channels,
-                "clockDriftCorrection": killed ? NSNull() : 0.0, "clockDriftPpm": NSNull(), "measuredDelay": NSNull(),
+                "clockDriftCorrection": killed ? NSNull() : 0.0, "clockDriftPpm": NSNull(), "delays": [Any](),
             ]) { first, _ in first }
             if let uid {
                 entry["audioSourceUID"] = uid

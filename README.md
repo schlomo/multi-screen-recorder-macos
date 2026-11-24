@@ -55,9 +55,13 @@ own clock is resampled continuously to stay with the screen files
     marker per screen or audio change. The OTIO file can be imported in DaVinci Resolve, [Kdenlive](https://docs.kdenlive.org/en/user_interface/menu/file_menu.html#opentimelineio-import) and others.
   - Two guide tracks in every video file (screen and camera), the audio inputs and the
     system audio, for playback and for syncing by waveform with a
-    separate recording. A microphone measured out of sync with the others
-    leaves the audio inputs' guide track rather than echo in it; its own audio
-    track is still recorded.
+    separate recording. Each microphone is placed in the audio inputs' guide
+    track by its measured delay, so a late one is in sync there. A
+    microphone joins it only once measured: for the first 10 to 20 s only
+    the anchor microphone (the first to sound) is in it, and one never
+    measured never joins;
+    one more than 0.8 s off the others leaves it rather than echo in it;
+    its own audio track is still recorded.
 - **Scriptable.** Everything also works from the command line.
 - **Nothing leaves your Mac.** The app makes no network connections.
 

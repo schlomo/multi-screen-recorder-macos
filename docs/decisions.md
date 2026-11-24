@@ -2703,3 +2703,187 @@ architect's reading.
 - **Evidence:** [design/recorder.md](design/recorder.md), "Guide
   tracks"; `Sources/RecorderLogic/GuideTrackMembership.swift`,
   `Sources/RecorderCore/Recorder.swift` (`leaveTheGuideTrack`).
+
+## D80: The "Audio inputs" guide track places each audio input by its audio delay (2026-11-24)
+
+- **Status:** in force. Amends D77 (`measuredDelay`, when a delay is
+  set) and D79 (the limit, when an input joins); D52's mix otherwise.
+- **Context:** The owner, 2026-11-23: late microphones "should stay if
+  we can compensate for them"; the guide track is "primary artifact for
+  easy users ... the quality there matters"; "1s crash lost is totally
+  fine, 2-3s would be also totally fine". 2026-11-24: "I think 2s file
+  chunks are also totally fine if it helps"; "Maybe better to add mics
+  only after synchronizing them? ... nobody can use the garbles audio in
+  any case"; on `recording.json`, "we don't care about the past as this
+  is not a defined interface (it will be once we settle on a v1)" and
+  "msr timeline can ignore the past"; "data design always from the end
+  result and not from the process"; after a hiccup, "would be good to
+  continue with the same offset as before"; the status "must show so in
+  the status, e.g. with a uncolored line indicating active sync ...
+  applied". Rec9 (2026-11-23): an Osmo's delay moved from 558 ms to
+  about 470 ms within 90 min.
+- **Decision:** The architect's design, signed off by the owner as text
+  on 2026-11-24 ("keep working"):
+  - The guide tracks are mixed `RecorderValues.guideTrackDelay`, now
+    1 s (*data*), behind live; the video file's frames are still
+    written live, the guide samples carry their own time. Fragments
+    stay 2 s.
+  - An audio input file's **audio delay** is set at its first counted
+    window (D77's clarity), set once more at 3 counted windows to their
+    median if that differs by more than one frame (1/30 s), and after
+    that changes only when the median of the counted windows of the
+    latest 60 s, at least 5 of them, differs from it by more than one
+    frame (*data*: 60 s, 5, one frame). Audio delays are normalized as
+    D77's, the earliest 0.
+  - The "Audio inputs" mix places each input earlier by its audio
+    delay less the smallest of those staying in the mix, so the
+    earliest staying input is not moved; a change is crossfaded over
+    20 ms (*data*). The reference is in the mix from the start; any
+    other input joins only once it has an audio delay. D79's groups
+    stay, compared by audio delays, its limit
+    `guideTrackSyncLimit` now 0.8 s (*data*).
+  - A new file of an audio input (the same device in the same
+    recording) whose earlier file had an audio delay starts with that
+    delay, and in or out of the mix as that file was, until its own
+    windows set one by the rules above.
+  - `recording.json`: each audio file has `delays`, a list of
+    `{at, delay}` (seconds from the file's start, seconds late),
+    one entry per change, empty when never set; an entry started from
+    an earlier file also names it as `carriedOverFrom`. It replaces
+    `measuredDelay`; earlier recordings' files are not read. The
+    timeline file places each stretch by its entry, splitting the clip
+    at a change; a stretch that would overlap the one before leaves out
+    its head, as D77's clips do.
+  - The status window's audio input row says `· synced 550 ms late
+    (measured)`, `(carried over)` until the file's own windows set or
+    confirm it, and `· not in the guide track yet` before; uncoloured.
+- **Decided while building (the architect's reading):** an entry's
+  `at` is the mix's first sample not mixed yet less the file's start,
+  never below 0, so a carried-over entry is at 0; the timeline file
+  places a file's stretch before its first entry by that entry; a new
+  file of the same reference device keeps every input's audio delay and
+  counted windows, while another reference device starts every input
+  over ("not in the guide track yet"), the entries written so far kept;
+  the normalization spans every file measured against the current
+  reference device, ended ones at their last value; the row shows
+  nothing for a file out of the guide track (its problem line says so)
+  or for the reference while it is the earliest; how much earlier an
+  input is placed is "placed earlier by" (`earlierBy`), as "placement"
+  is an audio file's place on the tick grid.
+- **Amended after review (2026-11-24):** the review found that
+  normalizing each entry as D77's makes every file's delay change when
+  a new earliest input appears, splitting every clip in the timeline
+  file. The owner, asked which data design: "I'm not sure I fully
+  grasp the impact ... What works better with Resolve in the end? ...
+  I really don't know"; the architect's decision, after explaining
+  that it decides how often a clip is cut in Resolve: a `delays`
+  entry is the file's delay against the recording's **anchor**, the
+  first reference device, negative when earlier, and changes only when
+  that file's own delay changes; the timeline file subtracts the
+  smallest delay of the recording once, so the earliest input is at 0.
+  When the reference device changes, every delay is re-based onto the
+  anchor through the new reference's own delay, and the mix keeps every
+  input; only when the new reference has none, it becomes the anchor
+  and every input starts over (shortcut: its delay against the old
+  anchor is taken as 0). The mix's zero is the smallest latest delay of
+  the devices staying in it, a device whose file ended keeping its last
+  delay and its place in or out of the mix until its capture ends. The
+  status row shows how much earlier the mix places the file, nothing
+  at 0. The writing files of a device are only its newest.
+- **Amended, `recording.json` for its readers (2026-11-24):** the owner:
+  "make sure that the json doesn't explode, we still have the log file
+  for the detailed log for debugging something. That is why IMHO the
+  JSON should be designed from the perspective of somebody processing
+  the files". `delays` has an entry only where the file's delay value
+  changes; `carriedOverFrom` is dropped; how a value came about
+  (windows, rules, carry-over) is told only in the recording log's
+  detail lines, one per decision ("make sure that the --debug output
+  remains super useful", the owner).
+- **Amended after the delta review (the architect's reading,
+  2026-11-24):** the anchor is the first input whose file is written,
+  and the reference is the anchor while its file is being written,
+  otherwise the lowest-numbered input being written that has a delay;
+  only when none has one, the lowest-numbered input being written
+  becomes the new anchor and every input starts over. The default
+  microphone plays no part (amends D77's choice of the reference), so
+  every input is measured against the anchor while it sounds, a change
+  of the anchor's audio delay included, and a silent anchor never stalls measuring; the anchor
+  counts as written while its capture runs and its newest file did not
+  end on no audio, so a gap or a channel change never starts over; the
+  timeline file's smallest delay is over each file's last entry, so a
+  corrected false window moves nothing; the anchor's file lists
+  `{at: 0, delay: 0}`, so an empty `delays` means only "never
+  measured, placed as recorded".
+- **Amended after the owner's try-out (2026-11-24):** the owner, on
+  `pr-30`: "in general it worked very well ... the osmo audio track is
+  split and indeed left of the split there is a slight echo and right
+  of it not ... It also showed first 533ms carry over and then 472
+  measured"; on the CalDigit's empty jack, "the info on the caldigit
+  audio is misleading ... I think we don't use it because there is no
+  audio"; asked where the improvements go: "Fold both into PR #30".
+  The architect's design: at Stop, each audio file's `delays` are
+  rewritten with hindsight: its stretches are bounded only by the
+  live changes of the 60 s rule, each takes the median of
+  the counted windows within it, one with fewer than 2 keeps its live
+  value, and neighbours within one frame merge, so a file the
+  60 s rule never changed has one entry at 0; a crash leaves the live
+  entries, which mean the same. An input whose file has had sound for
+  3 measurements (*data*) without a counted window reads `· not in the
+  guide track, no clear sound to sync`; it is still recorded and joins
+  once a window counts.
+- **Consequences:** The guide is in sync to within a frame for every
+  input within 0.8 s of the earliest; an input never measured stays
+  out of it. A crash loses up to about 3 s of a video file instead of 2,
+  as its fragment waits for its guide samples (the end-to-end run of
+  2026-11-24); the audio files still lose up to 2 s. Stop waits up to
+  0.8 s longer for the last mix (the most any input is placed earlier),
+  and an input whose capture ends loses up to 1 s of its last sound in
+  the guide instead of 0.2 s. A change repeats or skips its size
+  of sound in the guide once.
+- **Evidence:** backlog item 38; [design/recorder.md](design/recorder.md),
+  "Audio delay" and "Guide tracks".
+
+## D81: An audio input silent right after gaps is a problem (2026-11-24)
+
+- **Status:** in force. Amends D69's "no audio … it is no problem".
+- **Context:** In the owner's recording `2026-11-24 06.30.02`, a BRIO's
+  microphone had gaps from 25.7 to 30.9 s, then exact zeros to Stop,
+  told as plain no audio. The owner, 2026-11-24, asked whether that is
+  a problem: "yes".
+- **Decision:** The architect's design, signed off on 2026-11-24: an
+  audio input whose no audio (D69) starts with zeros that began within
+  10 s (*data*) after one of its `audio input gap` events is a red
+  problem, `Audio <n> <name> sends only silence since its gaps at 0:25;
+  unplug and plug it in again`, until its sound returns; no audio
+  without gaps before stays no problem.
+- **Decided while building (the architect's reading):** the trigger is
+  any of the input's gaps from 10 s before its zeros began up to when
+  no audio is told, as gaps can fall inside the zeros; the problem
+  begins where the zeros began; once the sound returns the line reads
+  `Audio <n> <name> sent only silence for 1:05 after its gaps at 0:25,
+  recovered`, orange.
+- **Consequences:** A microphone broken by a USB hiccup is told within
+  about 10 s instead of never.
+- **Evidence:** backlog item 47; [design/recorder.md](design/recorder.md).
+
+## D82: Homepage screenshots can come from the owner's Mac (2026-11-24)
+
+- **Status:** in force. Amends D72 (screenshots only from the VM).
+- **Context:** The owner, 2026-11-24: "Maybe worth creating the
+  screenshots from my Mac from time to time?"; "the screenshot tool
+  should just use the installed main app or --app a specific one and
+  report the version, keep separation of concerns clean here"; "OK to
+  show my device names".
+- **Decision:** `scripts/update-homepage-screenshots --this-mac
+  [--app <path>]` runs the end-to-end driver's app window step on this
+  Mac with `/Applications/Multi Screen Recorder.app` or the given app,
+  prints its version, light appearance only, without virtual screens or
+  window moves, `HOME` and the recording in a scratch folder deleted
+  afterwards, and only copies the three light captures into the
+  checkout; committing them is the usual flow. The agent tells the
+  owner before each run (D56). The VM run stays the gate for marking a
+  PR ready.
+- **Consequences:** The homepage can show real screens, cameras and
+  microphones; the first run asks for Automation and possibly Screen
+  Recording for the terminal.
+- **Evidence:** backlog item 48; [homepage/README.md](../homepage/README.md).

@@ -193,10 +193,21 @@ public struct RecordingManifest: Codable, Equatable, Sendable {
         /// An audio input's input volume at the file's start, 0 to 1; nil
         /// when it cannot be read, and for the system audio, which has none (D69).
         public var inputVolume: Double?
-        /// Seconds the file's sound is later than the reference microphone's,
-        /// measured while recording (D77; negative: earlier); nil when not
-        /// measured, as for the system audio and the reference itself.
-        public var measuredDelay: Double?
+        /// The file's audio delays (D80), one entry per change; empty when
+        /// never set, as for the system audio.
+        public var delays: [Delay]
+
+        /// From `at` seconds of the file on, its sound is `delay` seconds
+        /// later than the recording's anchor's, negative when earlier (D77, D80).
+        public struct Delay: Codable, Equatable, Sendable {
+            public var at: Double
+            public var delay: Double
+
+            public init(at: Double, delay: Double) {
+                self.at = at
+                self.delay = delay
+            }
+        }
 
         public init(
             name: String, audioSource: String, audioSourceUID: String?, channels: Channels, start: Double, timecode: String
@@ -212,7 +223,7 @@ public struct RecordingManifest: Codable, Equatable, Sendable {
             clockDriftPpm = nil
             clockDriftCorrection = nil
             inputVolume = nil
-            measuredDelay = nil
+            delays = []
         }
 
         /// The file ended with `correction` seconds of sound added and the
@@ -227,10 +238,27 @@ public struct RecordingManifest: Codable, Equatable, Sendable {
 
         private enum CodingKeys: String, CodingKey {
             case name, audioSource, audioSourceUID, channels, start, end, timecode, state, clockDriftPpm, clockDriftCorrection,
-                 inputVolume, measuredDelay
+                 inputVolume, delays
         }
 
-        /// `end`, `clockDriftPpm`, `clockDriftCorrection` and `measuredDelay` are written as null until known;
+        /// A file listed before `delays` existed reads with none: earlier recordings' delays are not read (D80).
+        public init(from decoder: any Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            name = try container.decode(String.self, forKey: .name)
+            audioSource = try container.decode(String.self, forKey: .audioSource)
+            audioSourceUID = try container.decodeIfPresent(String.self, forKey: .audioSourceUID)
+            channels = try container.decode(Channels.self, forKey: .channels)
+            start = try container.decode(Double.self, forKey: .start)
+            end = try container.decodeIfPresent(Double.self, forKey: .end)
+            timecode = try container.decode(String.self, forKey: .timecode)
+            state = try container.decode(State.self, forKey: .state)
+            clockDriftPpm = try container.decodeIfPresent(Double.self, forKey: .clockDriftPpm)
+            clockDriftCorrection = try container.decodeIfPresent(Double.self, forKey: .clockDriftCorrection)
+            inputVolume = try container.decodeIfPresent(Double.self, forKey: .inputVolume)
+            delays = try container.decodeIfPresent([Delay].self, forKey: .delays) ?? []
+        }
+
+        /// `end`, `clockDriftPpm` and `clockDriftCorrection` are written as null until known;
         /// `audioSourceUID` and `inputVolume`, null when it cannot be read, only for an audio input.
         public func encode(to encoder: any Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
@@ -245,7 +273,7 @@ public struct RecordingManifest: Codable, Equatable, Sendable {
             try container.encode(clockDriftPpm, forKey: .clockDriftPpm)
             try container.encode(clockDriftCorrection, forKey: .clockDriftCorrection)
             if audioSourceUID != nil { try container.encode(inputVolume, forKey: .inputVolume) }
-            try container.encode(measuredDelay, forKey: .measuredDelay)
+            try container.encode(delays, forKey: .delays)
         }
     }
 
@@ -401,13 +429,13 @@ public struct RecordingManifest: Codable, Equatable, Sendable {
         return true
     }
 
-    /// An audio file ended: its entry as it ended, keeping the delay measured
-    /// while it was written; false once finalized.
+    /// An audio file ended: its entry as it ended, keeping the audio delays
+    /// set while it was written; false once finalized.
     public mutating func audioFileEnded(_ file: AudioFile) -> Bool {
         guard state != .finalized else { return false }
         if let index = audioFiles.firstIndex(where: { $0.name == file.name }) {
             var file = file
-            file.measuredDelay = audioFiles[index].measuredDelay
+            file.delays = audioFiles[index].delays
             audioFiles[index] = file
         } else {
             audioFiles.append(file)
@@ -415,11 +443,33 @@ public struct RecordingManifest: Codable, Equatable, Sendable {
         return true
     }
 
-    /// The delay measured for an audio file so far (D77), to 0.1 ms; false once finalized or for a file not listed.
-    public mutating func audioDelayMeasured(_ delay: Double?, file name: String) -> Bool {
+    /// The newest file, the latest to start, of each audio input among `uids`, by name, with its device's UID;
+    /// a file that ended stays its device's newest until the next one starts (D80).
+    public func newestAudioInputFiles(of uids: Set<String>) -> [String: String] {
+        let newest = Dictionary(audioFiles.filter { $0.audioSourceUID.map(uids.contains) == true }.map { ($0.audioSourceUID!, $0) }) {
+            $1.start >= $0.start ? $1 : $0
+        }
+        return Dictionary(uniqueKeysWithValues: newest.map { ($0.value.name, $0.key) })
+    }
+
+    /// An audio file's audio delay from `at` seconds of the recording on (D80), to 0.1 ms, at a millisecond of
+    /// the file, not before its start: a new entry when it differs from the latest; false when it does not,
+    /// once finalized and for a file not listed.
+    public mutating func audioDelaySet(_ entry: AudioDelays.Entry, at: Double, file name: String) -> Bool {
         guard state != .finalized, let index = audioFiles.firstIndex(where: { $0.name == name }) else { return false }
-        audioFiles[index].measuredDelay = delay.map { ($0 * 10_000).rounded() / 10_000 }
+        let delay = (entry.delay * 10_000).rounded() / 10_000
+        guard audioFiles[index].delays.last?.delay != delay else { return false }
+        let since = (max(0, at - audioFiles[index].start) * 1000).rounded() / 1000
+        audioFiles[index].delays.append(.init(at: since, delay: delay == 0 ? 0 : delay))
         return true
+    }
+
+    /// The file's audio delays replaced, with hindsight at Stop (D80); the entries before, nil when unchanged.
+    public mutating func audioDelaysReplaced(_ delays: [AudioFile.Delay], file name: String) -> [AudioFile.Delay]? {
+        guard state != .finalized, let index = audioFiles.firstIndex(where: { $0.name == name }),
+              audioFiles[index].delays != delays else { return nil }
+        defer { audioFiles[index].delays = delays.map { .init(at: $0.at, delay: $0.delay == 0 ? 0 : $0.delay) } }
+        return audioFiles[index].delays
     }
 
     /// Events reported by a capture; false once finalized.

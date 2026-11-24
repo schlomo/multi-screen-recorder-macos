@@ -21,8 +21,13 @@ enum AppleScript {
         let message = String(decoding: errors.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
         let text = String(decoding: printed.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
         process.waitUntilExit()
+        let reason = message.trimmingCharacters(in: .whitespacesAndNewlines)
         guard process.terminationStatus == 0 else {
-            throw DriverError("osascript failed (exit \(process.terminationStatus)): \(message.trimmingCharacters(in: .whitespacesAndNewlines))")
+            // -1743: macOS refused to let this program send Apple events to the target.
+            throw DriverError(reason.contains("-1743")
+                ? "the program running this (a terminal app) lacks the Automation permission for the program the script drives; "
+                    + "grant it in System Settings > Privacy & Security > Automation (\(reason))"
+                : "osascript failed (exit \(process.terminationStatus)): \(reason)")
         }
         return text.trimmingCharacters(in: .whitespacesAndNewlines)
     }
@@ -46,15 +51,16 @@ enum AppleScript {
 /// The app's own recording, as a person sees it: the status window while it records, with more screens
 /// connected and one of them back after a disconnect, and the Finder window of the finished recording
 /// folder, in each appearance, each window brought to the front before its capture. Only in the throwaway VM, which grants the
-/// driver the Automation and Accessibility permissions this needs (scripts/end-to-end-vm/guest-configure-tcc).
+/// driver the Automation and Accessibility permissions this needs (scripts/end-to-end-vm/guest-configure-tcc), or
+/// on the person's Mac (`onThisMac`, D82): light only, no virtual screen and no window moved, so no Accessibility permission.
 extension Driver {
     /// How long the status window's video is, ending just before Stop.
     static let statusVideoSeconds = 5
 
     func recordingWindows() throws {
-        guard inThrowawayVM else {
+        guard inThrowawayVM || onThisMac else {
             RunLog.out("      the status window, its video and the Finder window are not taken, nor the dark appearance: "
-                + "only a run told it is in the throwaway VM (--throwaway-vm) drives them")
+                + "only a run told it is in the throwaway VM (--throwaway-vm) or on this Mac (app-windows) drives them")
             return
         }
         for appearance in appearances {
@@ -99,16 +105,28 @@ extension Driver {
                 try? restorer.ended(screen.process)
             }
         }
-        try connectStatusWindowScreens(into: &screens, logs: folder)
+        if !onThisMac { try connectStatusWindowScreens(into: &screens, logs: folder) }
         try interruption.sleep(until: Date().addingTimeInterval(8))
 
-        // The app's own reopen event, as a click on its Dock icon, opens the status window.
-        try AppleScript.run("tell application id \"org.schapiro.multiscreenrecorder\" to reopen", retryingFor: 10)
+        // The app's own reopen event, as a click on its Dock icon, opens the status window; sent to its pid, so
+        // no other copy of the app gets it. Retried, as the app may not take events yet.
+        let reopenBy = Date().addingTimeInterval(10)
+        while true {
+            do {
+                try Screenshots.send(AEEventID(kAEReopenApplication), to: recorder.pid, askingIfNeeded: onThisMac)
+                break
+            } catch {
+                guard Date() < reopenBy else { throw error }
+                try interruption.sleep(until: Date().addingTimeInterval(1))
+            }
+        }
         let status = try Screenshots.windowID(of: recorder.pid, seconds: 20, interruption: interruption)
-        // Its first position can lie partly off the VM's small screen, where a video of it would be cut off.
-        try AppleScript.run(
-            "tell application \"System Events\" to set position of window 1 of (first process whose unix id is \(recorder.pid)) to {30, 40}",
-            retryingFor: 10)
+        if !onThisMac {
+            // Its first position can lie partly off the VM's small screen, where a video of it would be cut off.
+            try AppleScript.run(
+                "tell application \"System Events\" to set position of window 1 of (first process whose unix id is \(recorder.pid)) to {30, 40}",
+                retryingFor: 10)
+        }
         try Screenshots.bringToFront(recorder.pid)
         try interruption.sleep(until: Date().addingTimeInterval(2))
 

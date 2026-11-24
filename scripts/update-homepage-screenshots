@@ -4,7 +4,19 @@ collage's pictures in homepage/assets/images/ (homepage/README.md,
 "Screenshots", D72); the PNG diff is the review boundary. Every capture and
 picture is checked before any picture is replaced.
 
-With a scratch folder it only copies, into this checkout. With --release or
+With a scratch folder it only copies, into this checkout. With --this-mac
+[--app <path>] (D82) it builds the end-to-end driver from this checkout and runs
+only its app-window step on this Mac with the app (default: the installed
+/Applications/Multi Screen Recorder.app), light appearance only, with no virtual
+screen and no window moved: it starts the app, records about 15 s and takes the
+start, status and Finder windows, with HOME and the recording in a scratch folder
+deleted afterwards, then copies the three captures into this checkout; no
+commit, no push. It prints the app's version and compares it with no release;
+it refuses while the app runs or this Mac is in dark mode, before building.
+The terminal needs the Screen & System Audio Recording permission and the
+Automation permission for the app (macOS asks on the first run), System Events
+and Finder; the recording
+shows this Mac's real screens, cameras and microphones. With --release or
 --snapshot <n> it takes the screenshots from the published app: in a
 temporary worktree at the commit the screenshots go onto (origin/main, or PR
 <n>'s head), it runs that commit's scripts/end-to-end-test with the same flag
@@ -17,6 +29,7 @@ their own credentials.
 
 import argparse
 import json
+import plistlib
 import re
 import shutil
 import subprocess
@@ -38,6 +51,8 @@ CAPTURES_TO_PICTURES = {
     "app-status-window-light.png": "status-window.png",
     "app-finder-window-light.png": "recording-folder.png",
 }
+DEFAULT_APP = Path("/Applications/Multi Screen Recorder.app")
+BUNDLE_ID = "org.schapiro.multiscreenrecorder"
 TRUNK = "main"
 BRANCH_PREFIX = "homepage-screenshots-v"
 # The driver's first line in run.log names the app it ran: its version and the commit it was built from.
@@ -157,6 +172,44 @@ def commit_and_publish(target: Target, worktree: Path, version: str) -> None:
                         f" ({ME} --release). Homepage only, so it makes no release.", cwd=worktree))
 
 
+def app_version(app: Path) -> str:
+    try:
+        return plistlib.loads((app / "Contents/Info.plist").read_bytes())["CFBundleShortVersionString"]
+    except (OSError, plistlib.InvalidFileException, KeyError) as error:
+        raise Refused(f"{app} is not the app: cannot read its version from Contents/Info.plist ({error!r})") from None
+
+
+def apple_script(source: str, checkout: Path) -> str:
+    return run("osascript", "-e", source, cwd=checkout)
+
+
+def this_mac_screenshots(app: Path, checkout: Path) -> None:
+    """Takes the app's windows on this Mac with the driver built from this checkout; copies the captures."""
+    if not (app / "Contents/MacOS/msr").is_file():
+        raise Refused(f"{app} is not the app: {app / 'Contents/MacOS/msr'} is missing")
+    print(f"{ME}: the app is {app}, version {app_version(app)}")
+    if shutil.which("osascript") is None:
+        raise Refused("osascript is not on the PATH")
+    if apple_script(f'application id "{BUNDLE_ID}" is running', checkout) == "true":
+        raise Refused("the app is running; quit it first, so the windows taken are those of the app started for them")
+    if apple_script('tell application "System Events" to tell appearance preferences to get dark mode', checkout) == "true":
+        raise Refused("this Mac is in dark mode; switch it to light first, as the homepage shows the light windows")
+    for tool in ("swift", "ffmpeg", "ffprobe"):
+        if shutil.which(tool) is None:
+            raise Refused(f"{tool} is not on the PATH")
+    run("swift", "build", "-c", "release", "--product", "msr-end-to-end", cwd=checkout)
+    driver = Path(run("swift", "build", "-c", "release", "--show-bin-path", cwd=checkout)) / "msr-end-to-end"
+    scratch = Path(tempfile.mkdtemp(prefix="update-homepage-screenshots-"))
+    try:
+        status = subprocess.run([str(driver), "app-windows", "--app", str(app), "--scratch-folder", str(scratch)],
+                                cwd=checkout).returncode
+        if status != 0:
+            raise Refused(f"msr-end-to-end app-windows ended with exit status {status}; no screenshot was replaced")
+        copy_screenshots(scratch, checkout)
+    finally:
+        shutil.rmtree(scratch)
+
+
 def publish_screenshots(target: Target, checkout: Path) -> None:
     folder = Path(tempfile.mkdtemp(prefix="update-homepage-screenshots-"))
     worktree, scratch = folder / "checkout", folder / "end-to-end"
@@ -178,17 +231,26 @@ def main() -> None:
     source = parser.add_mutually_exclusive_group(required=True)
     source.add_argument("scratch_folder", type=Path, nargs="?",
                         help="the --scratch-folder of a passing scripts/end-to-end-test run; copies only")
+    source.add_argument("--this-mac", action="store_true",
+                        help="takes the app's windows on this Mac and copies them into this checkout; no commit")
     source.add_argument("--release", action="store_true",
                         help="the latest release's app; pushes a new branch off origin/main and opens a draft PR")
     source.add_argument("--snapshot", type=int, metavar="N",
                         help="PR N's snapshot release's app (tag pr-N); pushes onto PR N's head branch")
+    parser.add_argument("--app", type=Path,
+                        help=f"with --this-mac, the app bundle to take the windows of (default: {DEFAULT_APP})")
     arguments = parser.parse_args()
+    if arguments.app is not None and not arguments.this_mac:
+        parser.error("--app only goes with --this-mac")
     if arguments.snapshot is not None and arguments.snapshot < 1:
         parser.error(f"--snapshot takes a PR number, such as 20, not {arguments.snapshot}")
     checkout = Path(__file__).resolve().parent.parent
     try:
         if arguments.scratch_folder is not None:
             copy_screenshots(arguments.scratch_folder.absolute(), checkout)
+            return
+        if arguments.this_mac:
+            this_mac_screenshots((arguments.app or DEFAULT_APP).absolute(), checkout)
             return
         for tool in ("git", "gh"):
             if shutil.which(tool) is None:

@@ -119,10 +119,11 @@ D28).
   soft limiter approaching −6 dBFS (D52, D75); guide tracks end with
   the video (D51). Each input's delay is measured while recording by
   cross-correlation, and the timeline file shifts its audio by it
-  (D77); an input more than 0.1 s out of sync with the largest group
-  leaves the "Audio inputs" guide track until it is back in sync, its
-  own audio file still recorded (D79). Placing each input by its delay
-  in the guide track is queued (backlog item 38).
+  (D77, D80); the guide tracks are mixed 1 s behind live, and "Audio
+  inputs" places each input earlier by its audio delay, an input
+  joining once it has one and more than 0.8 s out of sync with the
+  largest group leaving it, its own audio file still recorded (D79,
+  D80); a new file of an input carries its audio delay over (D80).
 - Audio: none, the default microphone, wired (the default microphone
   plus every built-in and wired input) or all inputs, with system audio
   and AGC as separate switches (D12, D44); one audio file per source, every

@@ -16,7 +16,7 @@ import Testing
         #expect(RecorderValues.audioSampleRate == 48_000)
         #expect(RecorderValues.audioGapTolerance == .milliseconds(32))
         #expect(RecorderValues.longestFilledAudioGap == .seconds(1))
-        #expect(RecorderValues.guideTrackDelay == .milliseconds(200))
+        #expect(RecorderValues.guideTrackDelay == .seconds(1))
     }
 
     @Test func theFileStartsAtTheFirstTickAfterItsFirstBufferAndTrimsTheSamplesBefore() {
