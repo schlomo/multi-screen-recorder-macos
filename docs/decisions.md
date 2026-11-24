@@ -2890,7 +2890,9 @@ architect's reading.
 
 ## D83: The problem report form has one field for the recording's files (2026-11-24)
 
-- **Status:** in force. Amends D64's `recording-log` field.
+- **Status:** in force. Amends D64's `recording-log` field and the
+  `recording-json` field from the first tester release (PR #13, no
+  entry).
 - **Context:** The owner, 2026-11-24: "I'd merge the recording.json
   and recording.log fields into one field that accepts all file
   uploads, for simplicity. And only ask for a file upload".
@@ -2899,7 +2901,8 @@ architect's reading.
   the recording folder", asking to drag `recording.json` and
   `recording.log` into it; nothing asks to paste a file's content. It
   stays a text field, the architect's reading: GitHub's issue forms
-  take dropped files in a text field [ASSUMED].
+  take dropped files in a text field, and accept a `.json` file
+  [ASSUMED]; D60 found that GitHub refuses some file types.
 - **Consequences:** None for the app: its link fills only `version` and
   `what-happened`.
 - **Evidence:** [design/recorder.md](design/recorder.md).

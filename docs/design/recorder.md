@@ -1145,8 +1145,8 @@ checked, reported or rewritten at the next start (D47).
   characters (*data*; GitHub's limit is about 8 kB [ASSUMED]), then `…
   and <n> more, in recording.log and recording.json.`; and it shows
   that recording's `recording.json` and `recording.log` in Finder for
-  the person to drag into the issue (the form's `files` field). Errors as in the crash report offer:
-  "Cannot offer to report the last recording", or the address when the
+  the person to drag into the issue (the form's `files` field).
+  Errors as in the crash report offer: "Cannot offer to report the last recording", or the address when the
   browser cannot be opened. `msr record` whose summary says it exits 3
   ends it, also with `--quiet`, with `Report it: <the same link,
   built from the summary's lines>` and `Attach: <recording
