@@ -320,8 +320,9 @@ final class AudioCapture: @unchecked Sendable {
         }
     }
 
-    /// The file `name`, if still the current one or the last while none is open, leaves its guide track with
-    /// the input's next files until it rejoins; whether it did (D79, D80).
+    /// The file `name`, if the current one, or any name while none is open (the recorder names its device's
+    /// newest file, and the next file carries on), leaves its guide track with the input's next files until
+    /// it rejoins; whether it did (D79, D80).
     func leaveTheGuideTrack(file name: String) -> Bool {
         queue.sync {
             guard open.map({ $0.entry.name == name }) ?? true else { return false }
@@ -331,8 +332,8 @@ final class AudioCapture: @unchecked Sendable {
         }
     }
 
-    /// The file `name`, if still the current one or the last while none is open, is placed `earlierBy`
-    /// samples earlier in its guide track, nil: not in it yet; whether it is (D80).
+    /// The file `name`, if the current one, or any name while none is open (as for a leave), is placed
+    /// `earlierBy` samples earlier in its guide track, nil: not in it yet; whether it is (D80).
     func placeInTheGuideTrack(file name: String, earlierBy: Int64?) -> Bool {
         queue.sync {
             guard open.map({ $0.entry.name == name }) ?? true else { return false }
@@ -342,8 +343,8 @@ final class AudioCapture: @unchecked Sendable {
         }
     }
 
-    /// The file `name`, if still the current one or the last while none is open, and out of its guide track,
-    /// joins it again with its next buffer; whether it did (D79).
+    /// The file `name`, if the current one, or any name while none is open (as for a leave), and out of its
+    /// guide track, joins it again with its next buffer; whether it did (D79).
     func rejoinTheGuideTrack(file name: String) -> Bool {
         queue.sync {
             guard open.map({ $0.entry.name == name }) ?? true, isOutOfTheGuideTrack else { return false }

@@ -506,7 +506,7 @@ extension GlobalRecordingLog {
             }
         }
 
-        /// The audio delays in the manifest are against the anchor, the first reference, which lists none, and
+        /// The audio delays in the manifest are against the anchor, the first input whose file is written, listing its own 0, and
         /// change only with a file's own: the earliest input's file ending and its next file, carrying its
         /// audio delay over, leave the others' as they were (D80).
         @Test func theDelaysAreAgainstTheAnchorAndStayWhenTheEarliestInputsFileEnds() async throws {
@@ -575,9 +575,9 @@ extension GlobalRecordingLog {
             _ = await stop()
         }
 
-        /// A default microphone silent at Start leaves the reference and the anchor to the next input; once it
-        /// sounds it is measured against that before it becomes the reference, so nothing starts over (D80).
-        @Test func aDefaultMicrophoneSilentAtStartIsMeasuredBeforeItBecomesTheReference() async throws {
+        /// The anchor is the first input whose file is written, the default microphone or not: one whose file
+        /// starts later is measured against it, and nothing starts over (D80).
+        @Test func anInputWhoseFileStartsLaterIsMeasuredAgainstTheAnchor() async throws {
             cameras.connected.withLock { $0 = [Self.camera] }
             let inputs = ["R", "A"].map { AudioInputInfo(name: "Mic \($0)", channelCount: 1, isDefault: $0 == "R", transport: .usb, uid: $0) }
             try start(cameraMode: .real, inputs: inputs)
@@ -602,9 +602,9 @@ extension GlobalRecordingLog {
             _ = await stop()
         }
 
-        /// The default microphone muted mid-recording, its file ended on no audio, hands the reference to the
-        /// next input with an audio delay, so an input waiting to join is measured and joins (D80).
-        @Test func aMutedDefaultMicrophoneDoesNotStallAnInputWaitingToJoin() async throws {
+        /// The anchor muted mid-recording, its file ended on no audio, hands the reference to the next input
+        /// with an audio delay, so an input waiting to join is measured and joins (D80).
+        @Test func aMutedAnchorHandsTheReferenceToAnInputWithAnAudioDelay() async throws {
             try await startInputs(["R", "A", "B"])
             let b = SourceLabel.audioInput(3, name: "Mic B")
             feedDelayedNoise(["R": 0, "A": 0.5])
@@ -621,6 +621,47 @@ extension GlobalRecordingLog {
             }
             let delays = try #require(try manifestOnDisk().audioFiles.first { $0.audioSource == "Mic B" }?.delays)
             #expect(delays.count == 1 && abs((delays.first?.delay ?? 0) - 0.2) < 0.002)
+            _ = await stop()
+        }
+
+        /// The anchor muted while the only other input has no audio delay yet: that input becomes the new
+        /// anchor and every input starts over, so measuring never stalls (D80).
+        @Test func aMutedAnchorWithOnlyAnInputWaitingMakesThatTheNewAnchor() async throws {
+            try await startInputs(["D", "B"])
+            let b = SourceLabel.audioInput(2, name: "Mic B")
+            #expect(!isInTheGuideTrack(b))
+            let buffersOfNoAudio = Int(RecorderValues.noAudioTime.nanoseconds * Int64(RecorderValues.audioSampleRate) / 1_000_000_000)
+                / samplesPerBuffer
+            try sendNext(0, buffers: buffersOfNoAudio + 10, to: sources.last(of: "D"))
+            try await wait("D's file's end") { (try? manifestOnDisk().audioFiles.first { $0.audioSource == "Mic D" }?.end) != nil }
+            try await wait("B in the guide track") {
+                try? sendNext(0.1, buffers: 1, to: sources.last(of: "B"))
+                return isInTheGuideTrack(b)
+            }
+            #expect(try manifestOnDisk().audioFiles.first { $0.audioSource == "Mic B" }?.delays.map(\.delay) == [0])
+            _ = await stop()
+        }
+
+        /// The anchor first, an Osmo-like late microphone, and a later input, the default microphone, measured
+        /// against it: the anchor's drift from 558 ms to 470 ms later is followed by the 60 s rule, and the mix
+        /// places the anchor by it (D80, rec9).
+        @Test func theAnchorsDriftIsFollowedThoughAnotherInputIsTheDefault() async throws {
+            cameras.connected.withLock { $0 = [Self.camera] }
+            let inputs = ["O", "M"].map { AudioInputInfo(name: "Mic \($0)", channelCount: 1, isDefault: $0 == "M", transport: .usb, uid: $0) }
+            try start(cameraMode: .real, inputs: inputs)
+            try await wait("the audio inputs' captures") { sources.byUID.withLock { $0.count } == 2 }
+            try await startAudioFiles(["O"], "O's file", count: 1)
+            try await startAudioFiles(["M"], "M's file", count: 2)
+            feedDelayedNoise(["O": 0, "M": -0.558])
+            for _ in 0..<3 { await recorder.measureAudioDelays() }
+            feedDelayedNoise(["O": 0, "M": -0.470])
+            for _ in 0..<4 { await recorder.measureAudioDelays() }
+            let files = try manifestOnDisk().audioFiles
+            #expect(files.first { $0.audioSource == "Mic O" }?.delays.map(\.delay) == [0])
+            let m = try #require(files.first { $0.audioSource == "Mic M" }?.delays.map(\.delay))
+            #expect(abs((m.first ?? 0) + 0.558) < 0.002)
+            #expect(abs((m.last ?? 0) + 0.470) < 0.002)
+            #expect(recorder.status().rows.dropLast().last?.clockDrift.hasSuffix("synced 470 ms late (measured)") == true)
             _ = await stop()
         }
 
@@ -773,7 +814,7 @@ extension GlobalRecordingLog {
         }
 
         /// A leave its capture did not carry out, as for a file no longer its current one, is neither an event
-        /// nor a problem (D79).
+        /// nor a problem, only a detail line (D79).
         @Test func aLeaveTheCaptureDidNotCarryOutIsNotTold() async throws {
             _ = try await startTwoInputs()
             try #require(sources.last(of: "A")).lose(.captureFailed("the stand-in failed"))
@@ -784,6 +825,8 @@ extension GlobalRecordingLog {
             #expect(try manifestOnDisk().events.filter { $0.event == .audioInputLeftTheGuideTrack }.isEmpty)
             #expect(!recorder.problemLines().contains { $0.text.hasPrefix("Audio 2 Mic A") })
             _ = await stop()
+            let log = try String(contentsOf: recorder.folder.appending(path: RecordingNames.recordingLog), encoding: .utf8)
+            #expect(log.contains("\(first.name): its capture did not take the leave, the file no longer its current one"))
         }
 
         /// An input placed in the guide track that left it stays out with its next file while its capture goes
@@ -1440,6 +1483,8 @@ extension GlobalRecordingLog {
             #expect(!past.isRed)
             #expect(past.text.wholeMatch(of: /Audio 1 .+ sent only silence for .+ after its gaps at 0:00, recovered/) != nil, "\(past.text)")
             _ = await stop()
+            let log = try String(contentsOf: recorder.folder.appending(path: RecordingNames.recordingLog), encoding: .utf8)
+            #expect(log.contains("Audio 1 \(name): no audio since 0:00, right after its gap at 0:00: a red problem (D81)"))
         }
 
         /// Another input's gaps are no gaps of this one, even under the same name: they are found by its
@@ -1479,6 +1524,8 @@ extension GlobalRecordingLog {
             #expect(summary.manifest.result == .ok)
             #expect(observer.problems.isEmpty)
             #expect(observer.eventLines.allSatisfy { !$0.isFailure })
+            let log = try String(contentsOf: recorder.folder.appending(path: RecordingNames.recordingLog), encoding: .utf8)
+            #expect(log.contains("Audio 1 \(name): no audio since 0:00, no gap within 10 s before: no problem (D81)"))
         }
     }
 }

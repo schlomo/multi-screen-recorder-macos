@@ -134,12 +134,7 @@ final class Driver {
 
         var tone: TonePlayer?
         defer { tone?.stop() }
-        // The loopback device is the default microphone while the tone plays: the reference from the start, as
-        // another input joins the guide track only once measured against it (D80); put back after the scenario.
-        let defaultInput = CoreAudioDevices.defaultDevice(input: true).flatMap(CoreAudioDevices.uid)
-        defer { if scenario.playsTone, let defaultInput { try? CoreAudioDevices.setDefaultDevice(input: true, uid: defaultInput) } }
         if scenario.playsTone {
-            try CoreAudioDevices.setDefaultDevice(input: true, uid: Machine.loopbackUID)
             tone = try TonePlayer(deviceUID: Machine.loopbackUID)
             try tone?.start()
         }

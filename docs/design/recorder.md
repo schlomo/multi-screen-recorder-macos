@@ -689,7 +689,7 @@ measured (it is then placed as recorded). `at` is the
 seconds into the file from which the entry holds (to the millisecond,
 never below 0; the first entry also holds before its `at`, as the best
 known); `delay` is the seconds by which the file's sound there is later
-than the recording's anchor's, the first reference microphone (to
+than the recording's anchor's, the first input whose file is written (to
 0.0001 s, negative when earlier). To line up the recording's audio
 inputs, place each file's stretch from `at` on earlier by `delay` less
 the smallest of the files' latest `delay` (taken as 0 when that is
@@ -1524,18 +1524,18 @@ the metadata items (see "Output on disk").
   (`AudioDelayFeed`); every 10 s, off the capture queues and the main
   thread, each audio input's newest file, while it is being written, is
   cross-correlated (`AudioDelay`, Accelerate's FFT) with the reference
-  microphone's over their latest common 10 s, searching ±1 s. The
-  reference is the default microphone while its file is being written
-  and it has an audio delay or there is no anchor yet, else the input
-  with the lowest number whose file is being written and has an audio
-  delay (the anchor's has, 0); with none such, the default microphone
-  when recorded, else the lowest number. So a default microphone silent
-  or muted never stalls measuring, and one that starts sounding later is
-  measured against the current reference before it becomes it. The
-  system audio is neither measured nor the reference. Every audio delay is against the
-  recording's **anchor**, the first reference device, its own 0: a lag
-  against another reference is turned into one against the anchor by
-  adding that reference's own audio delay. A window counts
+  microphone's over their latest common 10 s, searching ±1 s. Every
+  audio delay is against the recording's **anchor**, the first input
+  whose file is written, its own 0. The reference is the anchor while
+  its file is being written, so every input is measured against the
+  anchor, the anchor's drift included; while it is not (muted, no audio,
+  unplugged), the input with the lowest number whose file is being
+  written and has an audio delay, a fallback whose own audio delay turns
+  its lags into ones against the anchor; with none such, the input with
+  the lowest number whose file is being written becomes the new anchor
+  (see below). So a silent anchor never stalls measuring. The default
+  microphone plays no part (D80, amending D77). The system audio is
+  neither measured nor the reference. A window counts
   only when its match is clear, the peak of |correlation| at least 12
   times its median over the searched lags (the measured windows gave 13
   to 68 when clear, 5 to 9 when not), and not when either side is
@@ -1558,15 +1558,15 @@ the metadata items (see "Output on disk").
   also once it ended (as on no audio), until the next one starts, so a
   new file that starts before the earlier one's end is told still
   carries it over. The anchor's own files are 0, listed as such.
-  Another reference device (the default microphone changed, or the
-  reference's capture ended and another input became it) with an audio
-  delay keeps every audio delay: the lags against it are re-based onto
-  the anchor through its own, which stays as it was when it became the
-  reference (a shortcut: it is not measured while it is the reference),
-  and the mix keeps every input. Only when no input being written has an
-  audio delay does a reference without one become the anchor, and every
+  A fallback reference keeps every audio delay: the lags against it are
+  re-based onto the anchor through its own audio delay, which stays as
+  it was while it is the reference (a shortcut: it is not measured then;
+  the anchor is the reference again once its file is written), and the
+  mix keeps every input. Only when no input being written has an audio
+  delay does the lowest-numbered one become the new anchor, and every
   input starts over (no audio delay holds, nothing is carried over), its
-  audio delay against the old anchor taken as 0 (a shortcut). An entry is the
+  audio delay against the old anchor taken as 0 and the entries written
+  before staying against the old anchor (a shortcut). An entry is the
   file's audio delay against the anchor, negative when earlier, and
   changes only when the file's own changes: a new earliest input changes
   no other file's entries. Measuring ends at Stop. Each change goes into
@@ -1619,7 +1619,7 @@ the metadata items (see "Output on disk").
   *data*) behind real time, so every source's buffers have arrived, also
   those of an input placed up to 0.8 s earlier; the video file's frames
   are still written live, its guide samples carry their own time. The
-  reference is in the mix from the start; any other input joins only
+  anchor is in the mix from the start; any other input joins only
   once its file has an audio delay (see "Audio delay"; before that it
   is received but not mixed, `· not in the guide track yet`), and a
   file carrying its earlier file's audio delay over joins, or stays
@@ -1643,11 +1643,11 @@ the metadata items (see "Output on disk").
   step of a median) of each other stays; on a tie the group holding
   the files that stayed before, so a newcomer never evicts them, else
   the group with the earliest input; a file outside it leaves the mix
-  of every video file alike, the reference's included, so an Osmo as
-  the default microphone more than 0.8 s late after two microphones in
-  sync leaves. A file that left rejoins when its audio delay lies
+  of every video file alike, the anchor's included, so an Osmo as the
+  anchor more than 0.8 s late against two microphones in sync with each
+  other leaves. A file that left rejoins when its audio delay lies
   within the limit of the staying group, or, out of it, when it no
-  longer has one (another reference device), then not in the guide
+  longer has one (a new anchor), then not in the guide
   track yet; the audio delay's own rules keep it from moving back and
   forth. An input that is out stays out with its next files while its
   capture runs, no new leave told; a new capture's file carrying its
@@ -2051,7 +2051,10 @@ them:
   guide track`; a new file of a device placed before is no new join. A
   leave, rejoin or placement its capture did not take: `<file>: its
   capture did not take the placement, the file no longer its current
-  one` (or `the leave`, `the rejoin`), not retried.
+  one`, or `<file>: its capture did not take the leave, the file no
+  longer its current one`, or `<file>: its capture did not take the
+  rejoin, the file no longer its current one or not out`; none is
+  retried.
 - No audio (D81): `Audio 2 Razer Seiren: no audio since 0:25, right
   after its gap at 0:24: a red problem (D81)`, or `Audio 2 Razer Seiren:
   no audio since 0:25, no gap within 10 s before: no problem (D81)`.

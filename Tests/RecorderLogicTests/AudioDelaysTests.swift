@@ -181,9 +181,9 @@ import Testing
     /// measured device by its carry-over before it is known, an unmeasured one not.
     @Test func whetherAFileHasAnAudioDelayCountsTheAnchorAndTheCarryOver() {
         var delays = AudioDelays()
-        #expect(!delays.hasAnchor)
+        #expect(delays.anchor == nil)
         _ = delays.update(files: recorded(["a1.mov", "b.mov"]), reference: "r.mov", lags: ["a1.mov": 0.5], at: 10)
-        #expect(delays.hasAnchor)
+        #expect(delays.anchor == "R")
         #expect(delays.hasAudioDelay("r2.mov", device: "R"))
         #expect(delays.hasAudioDelay("a2.mov", device: "A"))
         #expect(!delays.hasAudioDelay("b.mov", device: "B"))

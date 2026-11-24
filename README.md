@@ -58,7 +58,8 @@ own clock is resampled continuously to stay with the screen files
     separate recording. Each microphone is placed in the audio inputs' guide
     track by its measured delay, so a late one is in sync there. A
     microphone joins it only once measured: for the first 10 to 20 s only
-    the default microphone is in it, and one never measured never joins;
+    the anchor microphone (the first to sound) is in it, and one never
+    measured never joins;
     one more than 0.8 s off the others leaves it rather than echo in it;
     its own audio track is still recorded.
 - **Scriptable.** Everything also works from the command line.

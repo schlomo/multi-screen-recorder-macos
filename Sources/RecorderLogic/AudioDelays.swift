@@ -47,7 +47,8 @@ public struct AudioDelays: Sendable {
     private var files: [String: File] = [:]
     /// Each device's newest file, by the device's UID, while its capture runs.
     private var newest: [String: String] = [:]
-    private var anchor: String?
+    /// The device every audio delay is against: the first reference (D80).
+    public private(set) var anchor: String?
     /// By device UID, so an input out of the guide track stays out with its next file.
     private var membership = GuideTrackMembership()
     private var earlierBy: [String: Double?] = [:]
@@ -85,13 +86,14 @@ public struct AudioDelays: Sendable {
             lines.append("reference \(self.reference ?? "none") → \(reference): it has no audio delay, so it is the new anchor and every input starts over")
             // shortcut: only when no input being written has an audio delay (the recorder picks such a reference
             // first), the new anchor's audio delay against the old one is unknown and taken as 0, so every input
-            // starts over; keep the old anchor's last known delays if a lost reference proves common.
+            // starts over and the entries written so far stay against the old anchor; keep the old anchor's last
+            // known delays if a lost anchor proves common.
             anchor = referenceUID
             for name in files.keys { files[name]!.applied = AudioDelay.Applied() }
         }
-        // shortcut: the reference is not measured, so its audio delay against the anchor, the base, stays as it
-        // was when it became the reference (the default microphone changed while the old one records); measure
-        // it against the anchor while that records if a drifting reference matters.
+        // shortcut: a fallback reference, while the anchor is silent, is not measured, so its audio delay against
+        // the anchor, the base, stays as it was when it became the reference; the anchor is the reference again
+        // as soon as its file is written, so this only matters for a long silent anchor.
         let base = delay(of: reference)!
         if let previous, previous.uid != referenceUID, !lines.contains(where: { $0.hasPrefix("reference ") }) {
             lines.append("reference \(self.reference!) → \(reference): lags re-based onto the anchor by \(AudioDelay.text(base))")
@@ -163,7 +165,6 @@ public struct AudioDelays: Sendable {
         return files.values.filter { $0.uid == uid }.max { $0.order < $1.order }?.applied.delay != nil
     }
 
-    public var hasAnchor: Bool { anchor != nil }
 
     private static func milliseconds(_ seconds: Double) -> String { "\(Int((seconds * 1000).rounded())) ms" }
 

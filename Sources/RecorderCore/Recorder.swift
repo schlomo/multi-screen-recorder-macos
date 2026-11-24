@@ -1143,29 +1143,21 @@ public final class Recorder {
         applyAudioDelays()
     }
 
-    /// The reference and its file among `files` (D77, D80): the default microphone while its file is being
-    /// written and it has an audio delay or there is no anchor yet, else the input with the lowest number
-    /// whose file is being written and has one (the anchor's has); with none such, the default microphone
-    /// when recorded, else the lowest number, and the audio delays start over. So a silent default never
-    /// stalls measuring, and one that starts sounding is measured before it becomes the reference.
+    /// The reference and its file among `files` (D80): the anchor while its file is being written, else the
+    /// lowest-numbered input being written that has an audio delay; with none such, the lowest-numbered input
+    /// being written, which becomes the new anchor. With no file being written, the same among them all.
     private func delayReference(among files: [String: String]) -> (uid: String, file: String)? {
         let ended = Set(manifest.audioFiles.filter { $0.end != nil }.map(\.name))
-        func file(of uid: String) -> String? { files.first { $0.value == uid }?.key }
-        func usable(_ uid: String) -> Bool {
-            guard let name = file(of: uid), !ended.contains(name) else { return false }
-            return audioDelays.hasAudioDelay(name, device: uid)
-        }
+        let writing = files.filter { !ended.contains($0.key) }
+        let candidates = writing.isEmpty ? files : writing
+        func file(of uid: String) -> String? { candidates.first { $0.value == uid }?.key }
         let byNumber = audioTracker.sourcesShown.compactMap { source -> (Int, String)? in
             guard case .input(let uid) = source.id, file(of: uid) != nil else { return nil }
             return (source.number, uid)
         }.sorted { $0.0 < $1.0 }.map(\.1)
-        let defaultMicrophone = audioInputsRead.first(where: \.isDefault)?.uid.flatMap { file(of: $0) != nil ? $0 : nil }
-        let uid: String? = if let defaultMicrophone, file(of: defaultMicrophone).map({ !ended.contains($0) }) == true,
-                                  !audioDelays.hasAnchor || usable(defaultMicrophone) {
-            defaultMicrophone
-        } else {
-            byNumber.first(where: usable) ?? defaultMicrophone ?? byNumber.first
-        }
+        let uid = audioDelays.anchor.flatMap { file(of: $0) != nil ? $0 : nil }
+            ?? byNumber.first { audioDelays.hasAudioDelay(file(of: $0)!, device: $0) }
+            ?? byNumber.first
         return uid.flatMap { uid in file(of: uid).map { (uid, $0) } }
     }
 
