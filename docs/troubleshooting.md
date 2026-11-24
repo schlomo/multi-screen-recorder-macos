@@ -34,6 +34,8 @@ One row per entry, the error text exactly as in the entry.
 | `timed out waiting for A out of the guide track again` | [A stand-in audio input's file ends after a pause of a slow runner](#a-stand-in-audio-inputs-file-ends-after-a-pause-of-a-slow-runner) |
 | `sending 'self' risks causing data races [#SendingRisksDataRace]` | [Swift 6.3 rejects self in a later argument after callbacks capture it](#swift-63-rejects-self-in-a-later-argument-after-callbacks-capture-it) |
 | `AVFoundationErrorDomain -11800; reason: An unknown error occurred (-19092)` | [The end-to-end tests fail at a mode switch on a busy Mac](#the-end-to-end-tests-fail-at-a-mode-switch-on-a-busy-mac) |
+| `The job was not acquired by Runner of type hosted even after multiple attempts` | [No macOS runner: the pipeline job is cancelled](#no-macos-runner-the-pipeline-job-is-cancelled) |
+| `Multi Screen Recorder quit unexpectedly` (the app's crash dialog) after running the tests, with no crash of the app | [Crash dialog for crash reports the tests wrote](#crash-dialog-for-crash-reports-the-tests-wrote) |
 
 ## Format
 
@@ -344,3 +346,44 @@ One row per entry, the error text exactly as in the entry.
   the number of cores.
 - **Observed:** 2026-11-23 and 2026-11-24, macOS 27.2.1, tart 2.42.0;
   open (no fix in the project; the Mac is kept idle).
+## No macOS runner: the pipeline job is cancelled
+
+- **Error:** `The job was not acquired by Runner of type hosted even after multiple attempts`,
+  next to `Due to capacity constraints, jobs targeting macOS arm64 runners may experience longer queue times.`
+- **Symptom:** `test-and-build` ends as cancelled after about 15
+  minutes with no runner name and no log; the jobs after it are
+  skipped, so a merge to `main` makes no release.
+- **Why:** [KNOWN: the run's annotations] GitHub had no hosted
+  Apple-silicon macOS runner free for the job; nothing in the
+  repository caused it.
+- **Fix:** re-run the run (`gh run rerun <run id>`), never a new push:
+  the code is unchanged, and on `main` the re-run makes the release the
+  merge asked for.
+- **Verify:** the re-run's `test-and-build` gets a runner and passes,
+  and on `main` the release job publishes `v0.<DATE>.<N>`.
+- **Observed:** 2026-11-17, twice: the release run of PR #19's merge,
+  and run 44167197917 of PR #20's merge; both re-run.
+
+## Crash dialog for crash reports the tests wrote
+
+- **Error:** the app's dialog `Multi Screen Recorder quit unexpectedly`
+  on start, after `scripts/test` ran on the same Mac, while the app
+  itself had not crashed.
+- **Symptom:** `~/Library/Logs/DiagnosticReports` holds `msr-*.ips`
+  reports whose `procPath` is a temporary folder, with
+  `SIGKILL (Code Signature Invalid)` and `Launch Constraint Violation`.
+- **Why:** [KNOWN: the reports' `codeSigningID com.apple.sleep`] the
+  `scripts/install-app` tests used a copy of `/bin/sleep` named `msr`
+  as their stand-in app; macOS sometimes kills such a copy of a system
+  program at launch and writes a crash report named after it, and the
+  app offers every `msr` crash report it finds. The same kill made a
+  test's `waitUntilExit()` hang one run in eight.
+- **Fix:** the stand-in is a program the tests compile with `cc`, and
+  the test waits for it through its termination handler (PR #20).
+  Delete the reports left over:
+  `rm ~/Library/Logs/DiagnosticReports/msr-<date>-<time>.ips` for each
+  one with a temporary `procPath`. Since D70 the app offers only its
+  own reports, so these no longer show.
+- **Verify:** 20 runs of `InstallAppScriptTests` write no new
+  `msr-*.ips`.
+- **Observed:** 2026-11-17, PR #20; resolved.
