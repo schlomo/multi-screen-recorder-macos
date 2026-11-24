@@ -281,7 +281,8 @@ One row per entry, the error text exactly as in the entry.
   (`feedDelayedNoise`, `measureAudioDelays`). [KNOWN:
   `AudioFileTimeline`, `RecorderValues.longestFilledAudioGap`] a gap
   longer than 1 s ends the file, and the input's next sound starts a
-  new file, in the guide track and not yet measured. [KNOWN: reproduced
+  new file, in the guide track and not yet measured (before D80; a new
+  file now carries its input's audio delay over). [KNOWN: reproduced
   locally, 2026-11-23] with 36 `yes` processes on 12 cores, the second
   test failed 5 of 5 runs, A's first file ending at 0.09 s and the next
   starting at 1.1 s; a 1.5 s sleep after the measurement gave the first

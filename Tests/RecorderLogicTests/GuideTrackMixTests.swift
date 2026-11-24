@@ -177,7 +177,7 @@ import Testing
         #expect(guide.mix(until: 1 * millisecond)[0] == [0.25])
     }
 
-    /// An input placed earlier by its audio delay: its sample at time t is mixed at t less the placement (D80).
+    /// An input placed earlier by its audio delay: its sample at time t is mixed that much before t (D80).
     @Test func anInputPlacedEarlierIsMixedThatMuchEarlier() {
         var guide = mix()
         guide.add(source: "A", channelCount: 1)
@@ -208,13 +208,13 @@ import Testing
         #expect(guide.mix(until: 5 * millisecond)[0] == [0])
     }
 
-    /// A change of placement fades over the crossfade from the earlier placement to the new one, from the
+    /// An input moved fades over the crossfade from where it was placed to where it is placed now, from the
     /// next position to mix on; then only the new one plays (D80).
-    @Test func aChangeOfPlacementCrossfades() {
+    @Test func anInputMovedCrossfades() {
         let fade = Int(RecorderValues.guideTrackCrossfade.nanoseconds / millisecond)
         var guide = mix()
         guide.add(source: "A", channelCount: 1)
-        // Sample n is n / 1000: the placement shows in the values.
+        // Sample n is n / 1000: where it is placed shows in the values.
         guide.receive([(0..<200).map { Float($0) / 1000 }], from: "A", at: 0)
         #expect(guide.mix(until: 10 * millisecond)[0].last == 0.009)
         guide.place(source: "A", earlierBy: 50)
@@ -225,7 +225,7 @@ import Testing
             let want = ((1 - weight) * position + weight * (position + 50)) / 1000
             #expect(abs(mixed[index] - want) < 1e-6, "at \(index): \(mixed[index]), expected \(want)")
         }
-        // Moving later again needs samples already mixed at the earlier placement: they are kept.
+        // Moving later again needs samples already mixed where it was placed before: they are kept.
         guide.place(source: "A", earlierBy: 0)
         let back = guide.mix(until: Int64(10 + 2 * fade + 10) * millisecond)[0]
         #expect(abs(back.last! - Float(10 + 2 * fade + 9) / 1000) < 1e-6)

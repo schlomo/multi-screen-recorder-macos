@@ -1058,9 +1058,9 @@ public final class Recorder {
         for (file, offset) in outcome.leaving.sorted(by: { $0.key < $1.key }) { leaveTheGuideTrack(file: file, offset: offset) }
         for file in outcome.rejoining.sorted() { rejoinTheGuideTrack(file: file) }
         let rate = Double(RecorderValues.audioSampleRate)
-        for (file, placement) in outcome.placements {
+        for (file, earlierBy) in outcome.earlierBy {
             guard let uid = writing[file] else { continue }
-            _ = audioCaptures[.input(uid)]?.1.placeInTheGuideTrack(file: file, earlierBy: placement.map { Int64(($0 * rate).rounded()) })
+            _ = audioCaptures[.input(uid)]?.1.placeInTheGuideTrack(file: file, earlierBy: earlierBy.map { Int64(($0 * rate).rounded()) })
         }
         let mixedUpTo = guides.mixedUpTo(.audioInputs).map { Double($0) / rate }
             ?? Double(context.now() - RecorderValues.guideTrackDelay.nanoseconds) / 1e9

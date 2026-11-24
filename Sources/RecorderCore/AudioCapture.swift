@@ -155,7 +155,7 @@ final class AudioCapture: @unchecked Sendable {
     private var isOutOfTheGuideTrack = false
     /// The samples its sound is placed earlier in its guide track (D80); nil while an audio input is not in it
     /// yet, which the recorder decides for each file. The system audio's is 0.
-    private var guidePlacement: Int64?
+    private var guideEarlierBy: Int64?
     private var correction = ClockDriftCorrection()
     /// The correction applied up to the current file's start and up to the
     /// end of what was placed in it, in seconds.
@@ -257,7 +257,7 @@ final class AudioCapture: @unchecked Sendable {
         self.context = context
         self.guides = guides
         guide = id == .systemAudio ? .systemAudio : .audioInputs
-        guidePlacement = id == .systemAudio ? 0 : nil
+        guideEarlierBy = id == .systemAudio ? 0 : nil
         self.reports = reports
         self.drainTimeout = drainTimeout
         self.now = now ?? { [context] in context.now() }
@@ -337,7 +337,7 @@ final class AudioCapture: @unchecked Sendable {
     func placeInTheGuideTrack(file name: String, earlierBy: Int64?) -> Bool {
         queue.sync {
             guard open?.entry.name == name else { return false }
-            guidePlacement = earlierBy
+            guideEarlierBy = earlierBy
             if guideChannels != nil { guides.place(source: label, earlierBy: earlierBy, in: guide) }
             return true
         }
@@ -610,7 +610,7 @@ final class AudioCapture: @unchecked Sendable {
     private func joinGuide(channelCount: Int) {
         guard !isOutOfTheGuideTrack, guideChannels != channelCount else { return }
         if guideChannels != nil { guides.remove(source: label, from: guide) }
-        guides.add(source: label, channelCount: channelCount, earlierBy: guidePlacement, to: guide)
+        guides.add(source: label, channelCount: channelCount, earlierBy: guideEarlierBy, to: guide)
         guideChannels = channelCount
     }
 

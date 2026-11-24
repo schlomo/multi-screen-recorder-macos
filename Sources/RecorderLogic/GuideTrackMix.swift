@@ -2,11 +2,11 @@ import Foundation
 
 /// A guide track's samples (D31, D49, D52), mixed `delay` behind real time
 /// so every source's buffers have arrived; each source is placed by its own
-/// timestamps, earlier by its placement (an audio input's audio delay less
-/// the smallest of those mixed, D80), and a source with no samples for a
-/// stretch is silence there. A source without a placement is received but
-/// not mixed: not in the guide track yet. A change of placement crossfades
-/// over `crossfade`.
+/// timestamps, placed earlier by an audio input's audio delay less the
+/// smallest of those mixed (D80), and a source with no samples for a
+/// stretch is silence there. A source not placed is received but not
+/// mixed: not in the guide track yet. A source moved crossfades over
+/// `crossfade`.
 /// "Audio inputs" is one mono mix: each recorded audio input averaged to
 /// mono, the inputs summed at unity gain, through a soft limiter
 /// (`limit`) with its knee at −12 dBFS and its ceiling at −6 dBFS (D75). "System audio" carries the system audio's two channels as
@@ -24,12 +24,12 @@ public struct GuideTrackMix: Sendable {
 
     private struct Source: Sendable {
         let channelCount: Int
-        /// Per output channel, the source's own samples from the position `mixedUpTo` on: a placement
-        /// earlier reads ahead in them, and one moved back later finds them still there.
+        /// Per output channel, the source's own samples from the position `mixedUpTo` on: placed earlier
+        /// it reads ahead in them, and moved back later it finds them still there.
         var queued: [[Float]]
         /// The samples it is placed earlier by; nil while it is not mixed.
         var earlierBy: Int64?
-        /// While a change of placement fades: the placement before and the position the fade starts at.
+        /// While a move fades: how much earlier it was placed before and the position the fade starts at.
         var fade: (earlierBy: Int64, from: Int64)?
     }
 
@@ -78,8 +78,8 @@ public struct GuideTrackMix: Sendable {
         sources[name] = Source(channelCount: channelCount, queued: Array(repeating: [], count: track.channelCount), earlierBy: earlierBy)
     }
 
-    /// A source's placement changes: from not mixed it starts at once, to not mixed it is cut, and from
-    /// one placement to another it crossfades from `mixedUpTo` on.
+    /// A source moves: from not mixed it starts at once, to not mixed it is cut, and from one place to
+    /// another it crossfades from `mixedUpTo` on.
     public mutating func place(source name: String, earlierBy: Int64?) {
         guard var source = sources[name] else { preconditionFailure("\(name) is not in the guide track \(track.name)") }
         precondition(earlierBy ?? 0 >= 0, "\(name) cannot be placed later")
@@ -96,7 +96,7 @@ public struct GuideTrackMix: Sendable {
 
     public func contains(source name: String) -> Bool { sources[name] != nil }
 
-    /// Whether the source is mixed: it has a placement.
+    /// Whether the source is mixed: it is placed.
     public func isMixed(source name: String) -> Bool { sources[name]?.earlierBy != nil }
 
     /// Whether every mixed source has delivered its samples for the mix up

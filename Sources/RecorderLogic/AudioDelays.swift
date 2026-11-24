@@ -28,7 +28,7 @@ public struct AudioDelays: Sendable {
         public var rejoining: Set<String> = []
         /// Each file being written that is not out of the guide track: the seconds it is placed earlier,
         /// its audio delay less the smallest of those mixed; nil while it is not in the guide track yet.
-        public var placements: [String: Double?] = [:]
+        public var earlierBy: [String: Double?] = [:]
         /// Each file being written with an audio delay, normalized so the earliest of the recording's
         /// files measured against the reference is 0; the reference's own file once that moves it.
         public var delays: [String: Entry] = [:]
@@ -82,7 +82,7 @@ public struct AudioDelays: Sendable {
         shift = min(0, files.keys.compactMap(delay(of:)).min() ?? 0)
         var outcome = Outcome(leaving: change.leaving, rejoining: change.rejoining)
         for name in writing.keys where !membership.isOut(name) {
-            outcome.placements[name] = .some(raw[name].map { $0 - earliestMixed })
+            outcome.earlierBy[name] = .some(raw[name].map { $0 - earliestMixed })
         }
         for (name, delay) in raw where name != reference || shift < 0 {
             let file = files[name]!

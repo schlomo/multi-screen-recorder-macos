@@ -93,7 +93,7 @@ public final class GuideTrackFeed: Sendable {
         }
     }
 
-    /// A source's placement in its guide track changes (`GuideTrackMix.place`), if it is in it.
+    /// A source moves in its guide track (`GuideTrackMix.place`), if it is in it.
     func place(source name: String, earlierBy: Int64?, in guide: GuideTrack) {
         state.withLock { state in
             guard state.mixes[guide]?.contains(source: name) == true else { return }
@@ -101,7 +101,7 @@ public final class GuideTrackFeed: Sendable {
         }
     }
 
-    /// Whether the source is mixed: in its guide track with a placement.
+    /// Whether the source is mixed: in its guide track and placed.
     func isMixed(source name: String, in guide: GuideTrack) -> Bool {
         state.withLock { $0.mixes[guide]?.isMixed(source: name) == true }
     }

@@ -15,8 +15,8 @@ extension RecorderValues {
     /// source's buffers have arrived, also those of an input placed up to
     /// `guideTrackSyncLimit` earlier by its audio delay (D80).
     public static let guideTrackDelay = Duration.seconds(1)
-    /// How long a change of an input's placement in "Audio inputs" fades
-    /// from the earlier placement to the new one (D80).
+    /// How long an input moved in "Audio inputs" fades from where it was
+    /// placed to where it is placed now (D80).
     public static let guideTrackCrossfade = Duration.milliseconds(20)
     /// How often the guide tracks are mixed and handed to the screen files.
     public static let guideTrackInterval = Duration.milliseconds(100)
