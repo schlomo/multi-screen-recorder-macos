@@ -2806,8 +2806,8 @@ architect's reading.
   only when none has one, the lowest-numbered input being written
   becomes the new anchor and every input starts over. The default
   microphone plays no part (amends D77's choice of the reference), so
-  every input is measured against the anchor while it sounds, its drift
-  included, and a silent anchor never stalls measuring; the anchor
+  every input is measured against the anchor while it sounds, a change
+  of the anchor's audio delay included, and a silent anchor never stalls measuring; the anchor
   counts as written while its capture runs and its newest file did not
   end on no audio, so a gap or a channel change never starts over; the
   timeline file's smallest delay is over each file's last entry, so a
