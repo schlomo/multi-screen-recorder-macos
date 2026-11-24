@@ -148,6 +148,8 @@ public final class Recorder {
     /// How long a failing source's problem waits for its call to action (D84).
     private let unrecoveredAfter: Duration
     private var callToActionTask: Task<Void, Never>?
+    /// The files whose writer failed on a full disk: not finalized, they ask for no report (D84).
+    private var filesEndedByAFullDisk: Set<String> = []
     /// The input volume of each audio input with a running capture, by its UID (D69).
     private var inputVolumes: [String: InputVolumeFollow] = [:]
     private var inputVolumeTask: Task<Void, Never>?
@@ -467,7 +469,8 @@ public final class Recorder {
         }
         return RecordingSummary(
             manifest: manifest, recordingFolder: folder.path(percentEncoded: false), seconds: elapsedSeconds,
-            manifestWritten: finalManifestWritten, problemsAskToReportIt: problemsTold.asksToReportIt)
+            manifestWritten: finalManifestWritten, problemsAskToReportIt: problemsTold.asksToReportIt,
+            filesEndedByAFullDisk: filesEndedByAFullDisk)
     }
 
     // MARK: Screen changes
@@ -695,6 +698,7 @@ public final class Recorder {
             captureNumber: captureNumber, reason: reason, end: end, source: source, at: context.now(), into: &manifest)
         if manifest != before { try? writeManifest() }
         told(Array(manifest.events.dropFirst(before.events.count)))
+        if let end, report?.event?.event == .diskFull { filesEndedByAFullDisk.insert(end.file.name) }
         if let report, let problem = report.problem {
             let kind = report.problemKind(notCaptured: notCaptured)
             let over = gone(kind) ?? newerFileStart.map { (Int64(($0 * 1_000_000_000).rounded()), .recovered) }
@@ -1314,6 +1318,7 @@ public final class Recorder {
     /// Internal, so a test can deliver a failed file's end, as the stand-in audio sources cannot fail a writer.
     func audioFileEnded(_ end: AudioFileEnd) {
         guard manifest.audioFileEnded(end.file) else { return }
+        if end.error?.isDiskFull == true { filesEndedByAFullDisk.insert(end.file.name) }
         RecorderLog.detail("file ended: \(end.file.name), \(end.file.state.rawValue)", category: "recorder")
         _ = manifest.record(end.events)
         try? writeManifest()

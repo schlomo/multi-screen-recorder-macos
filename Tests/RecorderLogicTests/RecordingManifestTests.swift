@@ -635,13 +635,11 @@ import Testing
         #expect(stalled.endedWithError && !stalled.asksToReportIt)
         #expect(summary([.notFinalized]).asksToReportIt)
         // A file a full disk left not finalized: the person was asked to free up disk space.
-        #expect(!summary([.notFinalized], events: [RecordingEvent(at: 0, event: .diskFull, screen: "D")]).asksToReportIt)
-        #expect(summary([.notFinalized], events: [RecordingEvent(at: 0, event: .diskFull, screen: "E")]).asksToReportIt)
-        var ended = summary([.notFinalized]).manifest
-        ended.files[0].end = 1
-        ended.events = [RecordingEvent(at: 2_000_000_000, event: .diskFull, screen: "D")]
-        #expect(RecordingSummary(manifest: ended, recordingFolder: "/r", seconds: 3, manifestWritten: true, problemsAskToReportIt: false)
-            .asksToReportIt)
+        let fullDisk = RecordingSummary(manifest: manifest([.notFinalized]), recordingFolder: "/r", seconds: 1, manifestWritten: true,
+                                        problemsAskToReportIt: false, filesEndedByAFullDisk: ["f0.mov"])
+        #expect(!fullDisk.asksToReportIt)
+        #expect(RecordingSummary(manifest: manifest([.notFinalized, .notFinalized]), recordingFolder: "/r", seconds: 1, manifestWritten: true,
+                                 problemsAskToReportIt: false, filesEndedByAFullDisk: ["f0.mov"]).asksToReportIt)
         #expect(summary([.finalized], written: false).asksToReportIt)
         #expect(summary([.finalized], problems: true).asksToReportIt)
     }
