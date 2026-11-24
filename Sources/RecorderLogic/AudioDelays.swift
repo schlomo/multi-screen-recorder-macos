@@ -96,7 +96,7 @@ public struct AudioDelays: Sendable {
             // starts over and the entries written so far stay against the old anchor; keep the old anchor's last
             // known delays if a lost anchor proves common.
             anchor = referenceUID
-            for name in files.keys { files[name]!.applied = AudioDelay.Applied() }
+            for name in files.keys { (files[name]!.applied, files[name]!.unclear) = (AudioDelay.Applied(), 0) }
         }
         // shortcut: a fallback reference, while the anchor is silent, is not measured, so its audio delay against
         // the anchor, the base, stays as it was when it became the reference; the anchor is the reference again

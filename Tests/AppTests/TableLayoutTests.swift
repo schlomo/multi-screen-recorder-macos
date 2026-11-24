@@ -32,10 +32,10 @@ import Testing
     @Test func eachFixedStatusColumnHoldsItsWidestContent() {
         let widest = [["8888×8888", "2 channels", "stereo"], ["888"], ["888.8 GB", "999 MB", "?"],
                       RecordingStatusTable.StateText.allCases.map(\.rawValue), [
-                          "-1000 ppm (-9999.9 ms) · synced 9999 ms early (carried over)",
-                          "measuring (-9999.9 ms) · synced 9999 ms early (carried over)",
-                          "measuring (-9999.9 ms) · not in the guide track yet",
-                          "measuring (-9999.9 ms) · not in the guide track, no clear sound to sync",
+                          "-1000 ppm (-9999.9 ms) · synced 9999 ms (carried)",
+                          "measuring (-9999.9 ms) · synced 9999 ms (carried)",
+                          "measuring (-9999.9 ms) · not synced yet",
+                          "measuring (-9999.9 ms) · no clear sound",
                       ]]
         #expect(TableLayout.statusColumnWidths.count == RecordingStatusTable.columns.count - 1)
         for (width, texts) in zip(TableLayout.statusColumnWidths, widest) {

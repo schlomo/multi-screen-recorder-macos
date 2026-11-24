@@ -29,6 +29,8 @@ public enum RecordingStatusTable {
         public var audioSource: AudioTracker.SourceID?
         /// The mouse-over: the source's details and its live facts (`SourceDetails`), its label first.
         public var details: String
+        /// What an audio input's file being written shows of its audio delay, for its mouse-over line (D80).
+        public var audioDelay: AudioDelays.Shown?
 
         public init(
             source: SourceCell, recordsAt: String, files: Int, written: String, state: String, clockDrift: String = "",
@@ -99,7 +101,7 @@ public enum RecordingStatusTable {
     /// channels of the source's newest audio file; `clockDrift` the latest
     /// clock drift correction status of each source's running capture; Clock
     /// drift adds what `audioDelays` shows for its file being written (D80):
-    /// "-116 ppm (+34.9 ms) · synced 550 ms late (measured)".
+    /// "-116 ppm (+34.9 ms) · synced 550 ms".
     public static func audioRows(
         sources: [AudioTracker.Source], files: [RecordingManifest.AudioFile], bytes: [String: Int64],
         clockDrift: [AudioTracker.SourceID: ClockDriftCorrection.Status], audioDelays: [String: AudioDelays.Shown] = [:]
@@ -121,20 +123,36 @@ public enum RecordingStatusTable {
             let cell: SourceCell = source.id == .systemAudio
                 ? .systemAudio(isRecorded: true) : .audioInput(source.number, name: source.name)
             let drift = source.state == .recording || source.state == .noAudio ? clockDriftText(clockDrift[source.id]) : ""
-            let delay = own.last { $0.end == nil }.flatMap { audioDelays[$0.name] }.map(audioDelayText)
-            return Row(
+            let shown = own.last { $0.end == nil }.flatMap { audioDelays[$0.name] }
+            var row = Row(
                 source: cell, recordsAt: channels, files: own.count, written: written, state: text(source.state),
-                clockDrift: [drift, delay ?? ""].filter { !$0.isEmpty }.joined(separator: " · "), audioSource: source.id)
+                clockDrift: [drift, shown.map(audioDelayText) ?? ""].filter { !$0.isEmpty }.joined(separator: " · "),
+                audioSource: source.id)
+            row.audioDelay = shown
+            return row
         }
     }
 
-    /// "synced 550 ms late (measured)", "synced 550 ms late (carried over)", "not in the guide track yet",
-    /// "not in the guide track, no clear sound to sync".
+    /// Short, as the column is narrow: "synced 553 ms", "synced 533 ms (carried)", "not synced yet", "no clear
+    /// sound"; the mouse-over says why (`audioDelayDetail`).
     static func audioDelayText(_ shown: AudioDelays.Shown) -> String {
         switch shown {
-        case .notInTheGuideTrackYet: "not in the guide track yet"
-        case .noClearSoundToSync: "not in the guide track, no clear sound to sync"
-        case .synced(let delay, let carriedOver): "synced \(AudioDelay.text(delay)) (\(carriedOver ? "carried over" : "measured"))"
+        case .notInTheGuideTrackYet: "not synced yet"
+        case .noClearSoundToSync: "no clear sound"
+        case .synced(let delay, let carriedOver): "synced \(Int((abs(delay) * 1000).rounded())) ms" + (carriedOver ? " (carried)" : "")
+        }
+    }
+
+    /// The mouse-over's line for the audio delay a row shows, with the full reason.
+    public static func audioDelayDetail(_ shown: AudioDelays.Shown) -> String {
+        let placed = "the guide track and the timeline file place it earlier by that"
+        return switch shown {
+        case .notInTheGuideTrackYet: "Not in the guide track until its audio delay is measured; its own audio track is recorded"
+        case .noClearSoundToSync:
+            "Not in the guide track: no clear sound to measure its audio delay against; its own audio track is recorded"
+        case .synced(let delay, carriedOver: false): "Audio delay: \(AudioDelay.text(delay)), measured; \(placed)"
+        case .synced(let delay, carriedOver: true):
+            "Audio delay: \(AudioDelay.text(delay)), carried over from its previous file until measured; \(placed)"
         }
     }
 

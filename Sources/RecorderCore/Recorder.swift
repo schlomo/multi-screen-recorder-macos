@@ -144,6 +144,8 @@ public final class Recorder {
     private var cpuTask: Task<Void, Never>?
     private let devices: RecorderDevices
     private let cameraFrameWatch: CameraFrameWatch
+    /// How often the audio delays are measured.
+    private let audioDelayInterval: Duration
     /// The input volume of each audio input with a running capture, by its UID (D69).
     private var inputVolumes: [String: InputVolumeFollow] = [:]
     private var inputVolumeTask: Task<Void, Never>?
@@ -174,10 +176,12 @@ public final class Recorder {
 
     init(
         settings: Settings, homeFolder: URL, app: String, readyCheckFacts: ReadyCheckFacts, observer: any RecorderObserver,
-        devices: RecorderDevices, cameraFrameWatch: CameraFrameWatch = CameraFrameWatch()
+        devices: RecorderDevices, cameraFrameWatch: CameraFrameWatch = CameraFrameWatch(),
+        audioDelayInterval: Duration = AudioDelay.interval
     ) throws(RecorderStartError) {
         self.devices = devices
         self.cameraFrameWatch = cameraFrameWatch
+        self.audioDelayInterval = audioDelayInterval
         let readsScreens = ReadyCheck.needsScreenRecording(settings)
         let screens: [ConnectedScreen]
         do {
@@ -237,7 +241,7 @@ public final class Recorder {
         }
         delayTask = Task { [weak self] in
             while !Task.isCancelled {
-                try? await Task.sleep(for: AudioDelay.interval)
+                try? await Task.sleep(for: audioDelayInterval)
                 guard !Task.isCancelled else { return }
                 await self?.measureAudioDelays()
             }
@@ -343,7 +347,8 @@ public final class Recorder {
         }
     }
 
-    /// The audio rows with their details: the input as last read, its input volume as followed, the clock drift.
+    /// The audio rows with their details: the input as last read, its input volume as followed, the clock drift,
+    /// the audio delay.
     private func statusDetails(
         audioRows rows: [RecordingStatusTable.Row], clockDrift: [AudioTracker.SourceID: ClockDriftCorrection.Status]
     ) -> [RecordingStatusTable.Row] {
@@ -361,7 +366,8 @@ public final class Recorder {
                     return SourceDetails.audioInput(label: row.source.text, input)
                 } ?? row.source.text
             }
-            row.details = ([details] + SourceDetails.live(clockDrift: clockDrift[id])).joined(separator: "\n")
+            row.details = ([details] + SourceDetails.live(clockDrift: clockDrift[id])
+                + [row.audioDelay.map(RecordingStatusTable.audioDelayDetail)].compactMap { $0 }).joined(separator: "\n")
             return row
         }
     }

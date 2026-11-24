@@ -273,7 +273,8 @@ extension GlobalRecordingLog {
                 outputFolder: .unusable("not probed by the tests"))
             recorder = try Recorder(
                 settings: settings, homeFolder: home, app: "Multi Screen Recorder (tests)", readyCheckFacts: facts, observer: observer,
-                devices: devicesUsed, cameraFrameWatch: cameraFrameWatch)
+                // Measured only when a test calls `measureAudioDelays`, never by the timer mid-test.
+                devices: devicesUsed, cameraFrameWatch: cameraFrameWatch, audioDelayInterval: .seconds(3600))
         }
 
         private var source: AudioCaptureTests.StandInSource { sources.last }
@@ -489,10 +490,15 @@ extension GlobalRecordingLog {
             _ = await stop()
         }
 
-        /// Three microphones' sound, the reference R and A 0.5 s earlier, B 0.2 s later, placed straight into the
-        /// delay measurement's rings from 1 s to 13 s of the recording, so every window is there at once.
+        /// The microphones' sound, each later by its lag, placed straight into the delay measurement's rings from
+        /// 1 s to 13 s after the latest start of their newest files, so every window is there at once and within
+        /// each file however late a slow runner started it.
         private func feedDelayedNoise(_ uids: [String: Double]) {
             let rate = RecorderValues.audioSampleRate
+            let newest = Dictionary((try? manifestOnDisk().audioFiles.compactMap { file in
+                file.audioSourceUID.map { ($0, file.start) }
+            }) ?? []) { $1 }
+            let base = Int((uids.keys.compactMap { newest[$0] }.max() ?? 0).rounded(.up))
             var seed: UInt64 = 7
             let noise = (0..<(15 * rate)).map { _ -> Float in
                 seed = seed &* 6_364_136_223_846_793_005 &+ 1_442_695_040_888_963_407
@@ -502,7 +508,7 @@ extension GlobalRecordingLog {
                 for chunk in stride(from: rate, to: 13 * rate, by: rate / 10) {
                     let shift = Int((lag * Double(rate)).rounded())
                     let samples = Array(noise[(chunk - shift + rate)..<(chunk - shift + rate + rate / 10)])
-                    recorder.audioDelayFeed.receive([samples], from: uid, at: Int64(chunk) * 1_000_000_000 / Int64(rate))
+                    recorder.audioDelayFeed.receive([samples], from: uid, at: Int64(base * rate + chunk) * 1_000_000_000 / Int64(rate))
                 }
             }
         }
@@ -664,12 +670,14 @@ extension GlobalRecordingLog {
         }
 
         /// The anchor first, an Osmo-like late microphone, and a later input, the default microphone, measured
-        /// against it: the anchor's drift from 558 ms to 470 ms later is followed by the 60 s rule, and the mix
+        /// against it: the anchor's audio delay changing from 558 ms to 470 ms later is followed by the 60 s rule, and the mix
         /// places the anchor by it (D80, rec9).
-        @Test func theAnchorsDriftIsFollowedThoughAnotherInputIsTheDefault() async throws {
+        @Test func theAnchorsChangingAudioDelayIsFollowedThoughAnotherInputIsTheDefault() async throws {
             cameras.connected.withLock { $0 = [Self.camera] }
             let inputs = ["O", "M"].map { AudioInputInfo(name: "Mic \($0)", channelCount: 1, isDefault: $0 == "M", transport: .usb, uid: $0) }
-            try start(cameraMode: .real, inputs: inputs)
+            var watch = CameraFrameWatch()
+            watch.firstFrameLimit = .seconds(600)
+            try start(cameraMode: .real, cameraFrameWatch: watch, inputs: inputs)
             try await wait("the audio inputs' captures") { sources.byUID.withLock { $0.count } == 2 }
             try await startAudioFiles(["O"], "O's file", count: 1)
             try await startAudioFiles(["M"], "M's file", count: 2)
@@ -682,7 +690,7 @@ extension GlobalRecordingLog {
             let m = try #require(files.first { $0.audioSource == "Mic M" }?.delays.map(\.delay))
             #expect(abs((m.first ?? 0) + 0.558) < 0.002)
             #expect(abs((m.last ?? 0) + 0.470) < 0.002)
-            #expect(recorder.status().rows.dropLast().last?.clockDrift.hasSuffix("synced 470 ms late (measured)") == true)
+            #expect(recorder.status().rows.dropLast().last?.clockDrift.hasSuffix("synced 470 ms") == true)
             _ = await stop()
         }
 
@@ -715,12 +723,12 @@ extension GlobalRecordingLog {
             feedDelayedNoise(["R": 0, "A": -0.5])
             await recorder.measureAudioDelays()
             func referenceRow() -> String? { recorder.status().rows.dropLast().last?.clockDrift }
-            try await wait("R placed later") { referenceRow()?.hasSuffix("synced 500 ms late (measured)") == true }
+            try await wait("R placed later") { referenceRow()?.hasSuffix("synced 500 ms") == true }
             let buffersOfNoAudio = Int(RecorderValues.noAudioTime.nanoseconds * Int64(RecorderValues.audioSampleRate) / 1_000_000_000)
                 / samplesPerBuffer
             try sendNext(0, buffers: buffersOfNoAudio + 10, to: sources.last(of: "A"))
             try await wait("A's file's end") { (try? manifestOnDisk().audioFiles.first { $0.audioSource == "Mic A" }?.end) != nil }
-            #expect(referenceRow()?.hasSuffix("synced 500 ms late (measured)") == true)
+            #expect(referenceRow()?.hasSuffix("synced 500 ms") == true)
             _ = await stop()
         }
 
@@ -759,14 +767,16 @@ extension GlobalRecordingLog {
             let (r, a) = try await startTwoInputs()
             #expect(isInTheGuideTrack(r))
             #expect(!isInTheGuideTrack(a))
-            #expect(recorder.status().rows.map(\.clockDrift).last?.hasSuffix("not in the guide track yet") == true)
+            #expect(recorder.status().rows.map(\.clockDrift).last?.hasSuffix("not synced yet") == true)
             feedDelayedNoise(["R": 0, "A": 0.5])
             await recorder.measureAudioDelays()
             try await wait("A in the guide track") {
                 try? sendNext(0.1, buffers: 1, to: sources.last(of: "A"))
                 return isInTheGuideTrack(a)
             }
-            #expect(recorder.status().rows.map(\.clockDrift).last?.hasSuffix("synced 500 ms late (measured)") == true)
+            #expect(recorder.status().rows.map(\.clockDrift).last?.hasSuffix("synced 500 ms") == true)
+            #expect(recorder.status().rows.last?.details.hasSuffix(
+                "\nAudio delay: 500 ms late, measured; the guide track and the timeline file place it earlier by that") == true)
             let delays = try #require(try manifestOnDisk().audioFiles.first { $0.audioSource == "Mic A" }?.delays)
             #expect(delays.count == 1)
             #expect(abs((delays.first?.delay ?? 0) - 0.5) < 0.002)

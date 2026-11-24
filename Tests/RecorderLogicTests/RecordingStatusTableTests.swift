@@ -153,7 +153,7 @@ import Testing
     }
 
     /// The audio delay of the file being written follows the clock drift, uncoloured: synced, measured or
-    /// carried over, not in the guide track yet, or not with no clear sound to sync (D80).
+    /// carried over, not synced yet, or no clear sound, the mouse-over saying why (D80).
     @Test func anAudioInputShowsItsAudioDelay() {
         var settings = Settings.defaults
         settings.auto = false
@@ -179,8 +179,15 @@ import Testing
                 "R.mov": .noClearSoundToSync,
             ])
         #expect(rows.map(\.clockDrift) == [
-            "-116 ppm (+34.9 ms) · synced 550 ms late (measured)", "measuring · not in the guide track, no clear sound to sync",
-            "measuring · synced 30 ms late (carried over)", "measuring · not in the guide track yet",
+            "-116 ppm (+34.9 ms) · synced 550 ms", "measuring · no clear sound",
+            "measuring · synced 30 ms (carried)", "measuring · not synced yet",
+        ])
+        #expect(rows.map { $0.audioDelay.map(RecordingStatusTable.audioDelayDetail) } == [
+            "Audio delay: 550 ms late, measured; the guide track and the timeline file place it earlier by that",
+            "Not in the guide track: no clear sound to measure its audio delay against; its own audio track is recorded",
+            "Audio delay: 30 ms late, carried over from its previous file until measured; the guide track and the timeline "
+                + "file place it earlier by that",
+            "Not in the guide track until its audio delay is measured; its own audio track is recorded",
         ])
     }
 
