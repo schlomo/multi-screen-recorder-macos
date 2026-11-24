@@ -2,17 +2,26 @@
 
 ## Next session starts here
 
-PR #27 merged on 2026-11-23 (cameras, audio delay, guide-track
-membership, problem lines). Left from it: PR #29 (the homepage
-screenshots, and the end-to-end tests need an idle Mac). Next: item 38 (each microphone placed by its measured delay
-in the "Audio inputs" guide track, about 1 s of hindsight), then item
-22 (camera picture sync from claps, a Calibrate button); each needs
-its design signed off by the owner as text first (the owner,
+PRs #27, #28 and #29 are merged or with the owner (2026-11-24). The
+next PR is one PR (the owner, 2026-11-24: "I want less PRs as I feel
+that each PR takes forever"; "the screenshot script should then be
+part of the next PR too"): item 38 (each microphone placed by its
+measured delay in the "Audio inputs" guide track, about 1 s of
+hindsight) with its fold-ins (a device's delay and guide-track state
+carried over a hiccup, the timeline file's shift from the first
+counted window, applied sync shown in the status window), item 48
+(homepage screenshots from the owner's Mac), and item 47 if the owner
+says yes. Its design goes to the owner as text first. Then item 22
+(camera picture sync from claps, a Calibrate button). The owner,
 2026-11-23: "Noticeable lip sync is my goal"; "Iterative improvement,
-every shipment is better"). Test recordings of 2026-11-23 (rec7 to
+every shipment is better". The end-to-end tests need an idle Mac
+(`docs/troubleshooting.md`). Test recordings of 2026-11-23 (rec7 to
 rec12) sit in `$TMPDIR/camcheck` on the owner's Mac for the sync
-design; the owner's kept one is `keep/2026-11-23 10.56.18`; delete
-the rest once item 38 is built.
+design, with the owner's `2026-11-24 06.30.02` in
+`~/Movies/Multi Screen Recorder` (read only) as the hiccup case; the
+owner's kept one is `keep/2026-11-23 10.56.18`; delete the rest once
+item 38 is built. Waiting on the owner: a go-ahead to delete the
+leftover `pr-27` snapshot release and 14 stale remote branches.
 
 Agents may run `msr record` on the owner's Mac (D48), with `HOME` set
 to a scratch folder (`AGENTS.md`, "Facts that bite"), and BetterDisplay's command
