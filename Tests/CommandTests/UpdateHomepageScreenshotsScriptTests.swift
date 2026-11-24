@@ -93,3 +93,73 @@ import Testing
         #expect(outcome.output.contains("scratch_folder"), "\(outcome.output)")
     }
 }
+
+/// The argument handling of --this-mac, which never reaches a recording: the app is checked and its
+/// version printed before anything is built, and the scratch checkout has nothing to build.
+@Suite struct UpdateHomepageScreenshotsThisMacTests {
+    private let scratch: ScratchFolder
+    private let checkout: URL
+
+    init() throws {
+        scratch = try ScratchFolder("UpdateHomepageScreenshotsThisMacTests")
+        checkout = scratch.url.appending(path: "checkout", directoryHint: .isDirectory)
+        let scripts = checkout.appending(path: "scripts", directoryHint: .isDirectory)
+        try FileManager.default.createDirectory(at: scripts, withIntermediateDirectories: true)
+        try FileManager.default.copyItem(
+            at: repositoryRoot.appending(path: "scripts/update-homepage-screenshots"),
+            to: scripts.appending(path: "update-homepage-screenshots"))
+    }
+
+    private func update(_ arguments: [String]) async throws -> CommandOutcome {
+        try await run(checkout.appending(path: "scripts/update-homepage-screenshots"), arguments, in: scratch.url)
+    }
+
+    private func fakeApp(version: String?) throws -> URL {
+        let app = scratch.url.appending(path: "Fake.app", directoryHint: .isDirectory)
+        let contents = app.appending(path: "Contents", directoryHint: .isDirectory)
+        try FileManager.default.createDirectory(at: contents.appending(path: "MacOS"), withIntermediateDirectories: true)
+        try Data().write(to: contents.appending(path: "MacOS/msr"))
+        if let version {
+            try PropertyListSerialization.data(fromPropertyList: ["CFBundleShortVersionString": version], format: .xml, options: 0)
+                .write(to: contents.appending(path: "Info.plist"))
+        }
+        return app
+    }
+
+    @Test(arguments: [["--release"], ["--snapshot", "3"], ["somewhere"]])
+    func thisMacExcludesTheOtherSources(other: [String]) async throws {
+        defer { scratch.remove() }
+        let outcome = try await update(["--this-mac"] + other)
+        #expect(outcome.status == 1)
+        #expect(outcome.errors.contains("not allowed with"), "\(outcome.errors)")
+    }
+
+    @Test func appWithoutThisMacIsRefused() async throws {
+        defer { scratch.remove() }
+        let outcome = try await update(["--release", "--app", "/nonexistent.app"])
+        #expect(outcome.status == 1)
+        #expect(outcome.errors.contains("--app only goes with --this-mac"), "\(outcome.errors)")
+    }
+
+    @Test func aMissingAppIsRefused() async throws {
+        defer { scratch.remove() }
+        let outcome = try await update(["--this-mac", "--app", "/nonexistent.app"])
+        #expect(outcome.status == 1)
+        #expect(outcome.errors.contains("/nonexistent.app is not the app"), "\(outcome.errors)")
+    }
+
+    @Test func anAppWithoutAVersionIsRefused() async throws {
+        defer { scratch.remove() }
+        let outcome = try await update(["--this-mac", "--app", try fakeApp(version: nil).path(percentEncoded: false)])
+        #expect(outcome.status == 1)
+        #expect(outcome.errors.contains("cannot read its version"), "\(outcome.errors)")
+    }
+
+    @Test func theAppsVersionIsPrintedBeforeAnythingIsBuilt() async throws {
+        defer { scratch.remove() }
+        let outcome = try await update(["--this-mac", "--app", try fakeApp(version: "0.20261124.7").path(percentEncoded: false)])
+        #expect(outcome.output.contains("version 0.20261124.7"), "\(outcome.output)")
+        #expect(outcome.status == 1, "the scratch checkout has no package to build")
+        #expect(outcome.errors.contains("swift build"), "\(outcome.errors)")
+    }
+}

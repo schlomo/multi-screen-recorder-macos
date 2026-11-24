@@ -68,6 +68,15 @@ repository, and the requirements.
      commit carries no skip-ci marker, so the preview is built.
      `scripts/update-homepage-screenshots <folder>` only copies from the
      scratch folder of a passing run into this checkout.
+     `scripts/update-homepage-screenshots --this-mac [--app <path>]` (D82)
+     takes the three light windows on the owner's Mac instead, with
+     `/Applications/Multi Screen Recorder.app` or the given app, prints
+     the app's version (the owner chooses the app; nothing is compared
+     with a release), and copies them into this checkout, with no commit
+     and no push (commit them as the usual flow); the pictures then show
+     this Mac's real screens, cameras and microphones. The terminal needs
+     the Screen & System Audio Recording permission and Automation for the
+     app, System Events and Finder; a missing one is an error naming it.
   2. Preview with `hugo server` (below) and check that the arrows still
      start beside Start and Stop and end at the next window. They point at
      fractions of each screenshot (`$startY`, `$stopY` and the others in

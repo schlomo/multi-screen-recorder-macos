@@ -12,7 +12,7 @@ struct EndToEndCommand: ParsableCommand {
             used meanwhile. It needs ffmpeg and ffprobe on the PATH, BlackHole 2ch, and both permissions for \
             the program running it. See docs/design/end-to-end-tests.md.
             """,
-        subcommands: [Run.self, Restore.self, State.self, VirtualScreenCommand.self, SwitchMode.self],
+        subcommands: [Run.self, AppWindowsCommand.self, Restore.self, State.self, VirtualScreenCommand.self, SwitchMode.self],
         defaultSubcommand: Run.self)
 
     static func scratchFolder(_ given: String?) throws -> URL {
@@ -161,6 +161,41 @@ struct Run: ParsableCommand {
         }
         if process.terminationStatus != 0 { RunLog.error("restore: FAILED; run msr-end-to-end restore --scratch-folder \(driver.scratch.path)") }
         return process.terminationStatus == 0
+    }
+}
+
+struct AppWindowsCommand: ParsableCommand {
+    static let configuration = CommandConfiguration(
+        commandName: "app-windows",
+        abstract: "Takes the app's windows on this Mac, in light, for scripts/update-homepage-screenshots --this-mac (D82).",
+        discussion: """
+            Starts the app and records about 15 s with it, with HOME and the recording in the scratch folder: no \
+            virtual screen, no dark appearance, no window moved. Needs the Screen & System Audio Recording and the \
+            Automation permissions for the program running it. The captures are in review/app/ of the scratch folder.
+            """)
+
+    @Option(help: "The app bundle to take the windows of.")
+    var app: String
+
+    @OptionGroup var scratch: ScratchOption
+
+    func run() throws {
+        try EndToEndCommand.logged(scratch: scratch.scratchFolder, fresh: true, run(in:))
+    }
+
+    private func run(in scratchFolder: URL) throws {
+        try Driver.requireScreenRecording()
+        let restorer = Restorer(scratch: scratchFolder)
+        let driver = try Driver(app: URL(filePath: app), scratch: scratchFolder, restorer: restorer,
+                                media: Media(scratch: scratchFolder), inThrowawayVM: false, onThisMac: true)
+        _ = try restorer.save()
+        Interruption.shared.watch()
+        Review.clear(scratch: scratchFolder)
+        RunLog.out("msr-end-to-end: \(driver.version), the app's windows on this Mac")
+        try driver.startWindow()
+        RunLog.out("ok    \(ReviewNames.appStep): the start window's screenshot")
+        try driver.recordingWindows()
+        RunLog.out("ok    \(ReviewNames.appStep): the status window's screenshot and video and the Finder window's screenshot")
     }
 }
 
