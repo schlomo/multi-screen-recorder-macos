@@ -33,6 +33,7 @@ One row per entry, the error text exactly as in the entry.
 | `the program running this (a terminal app) lacks the Microphone permission; run msr check once from this terminal to get the prompt` | [The VM's Microphone permission reads as denied before its login](#the-vms-microphone-permission-reads-as-denied-before-its-login) |
 | `timed out waiting for A out of the guide track again` | [A stand-in audio input's file ends after a pause of a slow runner](#a-stand-in-audio-inputs-file-ends-after-a-pause-of-a-slow-runner) |
 | `sending 'self' risks causing data races [#SendingRisksDataRace]` | [Swift 6.3 rejects self in a later argument after callbacks capture it](#swift-63-rejects-self-in-a-later-argument-after-callbacks-capture-it) |
+| `screen file writer failed` with `-11800` from `-19092`, or a screen file ending a second or more after the settle time, in `virtual-screen` | [The end-to-end tests fail at a mode switch on a busy Mac](#the-end-to-end-tests-fail-at-a-mode-switch-on-a-busy-mac) |
 
 ## Format
 
@@ -315,3 +316,26 @@ One row per entry, the error text exactly as in the entry.
   45242373454 on 4115a17 got past the build to the tests).
 - **Observed:** 2026-11-23, PR #27, runner Xcode 26.6; resolved
   (the pipeline on abc1953 passed).
+
+## The end-to-end tests fail at a mode switch on a busy Mac
+
+- **Error:** `screen file writer failed` with `AVFoundationErrorDomain
+  -11800` from `OSStatus -19092`, or `ends at 8.33 s, expected 6.59 s to
+  7.59 s, the settle time after the screen's last change`
+- **Symptom:** `scripts/end-to-end-test` (and
+  `scripts/update-homepage-screenshots`) fail `virtual-screen`, often
+  `virtual-screen-stress`, sometimes the app's window captures ("no
+  window of process … on screen within 20 s").
+- **Why:** [KNOWN: 9 of 10 runs on 2026-11-23 and 2026-11-24, of the
+  release v0.20261123.93, the previous release v0.20261122.89 and local
+  builds] they failed while a Lima VM (up for 11 hours), ClamXAV,
+  Synology Active Backup and DaVinci Resolve ran on the Mac, a load of
+  10 to 15 on 12 cores; the encoder error stopped once Resolve was
+  closed, the late file ends once the Lima VM was stopped too.
+  [CONJECTURE] the VM's paravirtualized encoder and its processors wait
+  behind the Mac's other work, as on GitHub's hosted runner (D67).
+- **Fix:** run the end-to-end tests on an idle Mac: no other virtual
+  machine, no video editing, no scan or backup running.
+- **Verify:** the run passes; `uptime` shows a load of a few, not 10.
+- **Observed:** 2026-11-23 and 2026-11-24, macOS 27.2.1, tart 2.42.0;
+  resolved by the idle Mac (all 7 scenarios passed on v0.20261123.93).

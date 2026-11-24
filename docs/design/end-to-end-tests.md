@@ -129,6 +129,15 @@ the `PATH` and installs neither. Every SSH login to the VM, the setup's
 and each run's, uses the image's published default login, `admin` with
 the password `admin`, no secret (`scripts/end-to-end-vm/askpass`, D67).
 
+Run them on an idle Mac: the VM's screens and encoder share the Mac's
+processor, graphics and media engine, and its timing checks have about
+a second of slack. On 2026-11-23 and 2026-11-24 they failed 9 of 10
+runs, the released app and the one before it alike, while another
+virtual machine (Lima), a virus scan, a backup and DaVinci Resolve ran
+on the Mac (a load of 10 to 15 on 12 cores); they passed once those were
+stopped (`docs/troubleshooting.md`, "The end-to-end tests fail at a
+mode switch on a busy Mac").
+
 Per run, `scripts/end-to-end-test --scratch-folder <folder>`: builds the
 app and the driver on the Mac, clones a throwaway VM from
 `msr-end-to-end` (a copy-on-write clone, so every run starts clean),
