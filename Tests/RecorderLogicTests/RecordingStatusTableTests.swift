@@ -153,7 +153,7 @@ import Testing
     }
 
     /// The audio delay of the file being written follows the clock drift, uncoloured: synced, measured or
-    /// carried over, or not in the guide track yet (D80).
+    /// carried over, not in the guide track yet, or not with no clear sound to sync (D80).
     @Test func anAudioInputShowsItsAudioDelay() {
         var settings = Settings.defaults
         settings.auto = false
@@ -176,9 +176,10 @@ import Testing
             clockDrift: [.input("O"): ClockDriftCorrection.Status(clockDriftPpm: -116.12, applied: 0.03494, remaining: 0.00004)],
             audioDelays: [
                 "O.mov": .synced(0.5504, carriedOver: false), "B.mov": .synced(0.03, carriedOver: true), "C.mov": .notInTheGuideTrackYet,
+                "R.mov": .noClearSoundToSync,
             ])
         #expect(rows.map(\.clockDrift) == [
-            "-116 ppm (+34.9 ms) · synced 550 ms late (measured)", "measuring",
+            "-116 ppm (+34.9 ms) · synced 550 ms late (measured)", "measuring · not in the guide track, no clear sound to sync",
             "measuring · synced 30 ms late (carried over)", "measuring · not in the guide track yet",
         ])
     }

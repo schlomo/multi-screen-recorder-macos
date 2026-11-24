@@ -410,7 +410,8 @@ into ones against the anchor (D77, D80). A file's audio delay is set by its firs
 counted window, once more by the median of its first 3, then only by the
 median of the latest 60 s, each time only beyond a frame (D80); a new
 file of the same input starts with the earlier file's, carried over.
-Written as the audio file's `delays`, one entry per change of its own;
+Written as the audio file's `delays`, one entry per change of its own,
+rewritten with hindsight at Stop (one entry per stretch between the 60 s rule's changes);
 the anchor's files list 0. The "Audio inputs" guide track places the
 file's sound earlier by it less the smallest of the inputs it mixes, the
 timeline file by it less the smallest of the files' latest; the audio file itself

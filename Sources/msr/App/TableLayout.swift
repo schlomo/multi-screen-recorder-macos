@@ -52,7 +52,8 @@ enum TableLayout {
         RecordingStatusTable.StateText.allCases.map(\.rawValue),
         ["-1000 ppm (-9999.9 ms) · synced 9999 ms early (carried over)",
          "\(RecordingStatusTable.measuring) (-9999.9 ms) · synced 9999 ms early (carried over)",
-         "\(RecordingStatusTable.measuring) (-9999.9 ms) · not in the guide track yet"],
+         "\(RecordingStatusTable.measuring) (-9999.9 ms) · not in the guide track yet",
+         "\(RecordingStatusTable.measuring) (-9999.9 ms) · not in the guide track, no clear sound to sync"],
     ]
 
     /// The status window's columns after Source; its headers, in a bolder

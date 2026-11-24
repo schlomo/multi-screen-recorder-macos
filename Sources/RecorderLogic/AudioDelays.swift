@@ -7,6 +7,9 @@
 public struct AudioDelays: Sendable {
     public enum Shown: Equatable, Sendable {
         case notInTheGuideTrackYet
+        /// Not in the guide track yet, its file had sound in `audioDelayUnclearMeasurements` measurements
+        /// without a counted window.
+        case noClearSoundToSync
         /// How much earlier the mix places the file; carried over from the input's earlier file until its own
         /// windows set or confirm its audio delay.
         case synced(Double, carriedOver: Bool)
@@ -42,6 +45,8 @@ public struct AudioDelays: Sendable {
         /// The order the files became known in.
         let order: Int
         var applied: AudioDelay.Applied
+        /// Measurements whose window had sound but did not count.
+        var unclear = 0
     }
 
     private var files: [String: File] = [:]
@@ -61,10 +66,11 @@ public struct AudioDelays: Sendable {
     public init() {}
 
     /// `files` maps each audio input's newest file, while its capture runs, to its device's UID, `reference`
-    /// among them; `lags` are counted windows' lags against it, the windows ending at `at` seconds of the
-    /// recording.
+    /// among them; `lags` are counted windows' lags against it, `unclear` the files whose window had sound but
+    /// did not count, the windows ending at `at` seconds of the recording.
     public mutating func update(
-        files newest: [String: String], reference: String, lags: [String: Double] = [:], at: Double = 0
+        files newest: [String: String], reference: String, lags: [String: Double] = [:], unclear: Set<String> = [],
+        at: Double = 0
     ) -> Outcome {
         guard let referenceUID = newest[reference] else { preconditionFailure("the reference \(reference) is not recorded") }
         var lines: [String] = []
@@ -100,6 +106,12 @@ public struct AudioDelays: Sendable {
             lines.append("reference \(self.reference!) → \(reference): lags re-based onto the anchor by \(AudioDelay.text(base))")
         }
         self.reference = reference
+        for name in unclear.sorted() where files[name] != nil {
+            files[name]!.unclear += 1
+            if files[name]!.unclear == RecorderValues.audioDelayUnclearMeasurements, delay(of: name) == nil {
+                lines.append("\(name): no clear sound to sync, \(files[name]!.unclear) measurements with sound and no counted window")
+            }
+        }
         for (name, lag) in lags.sorted(by: { $0.key < $1.key }) {
             guard name != reference, newest[name] != nil, files[name]?.uid != anchor else {
                 let why = name == reference ? "the reference's own" : newest[name] == nil ? "not a device's newest file" : "the anchor's, always 0"
@@ -154,7 +166,9 @@ public struct AudioDelays: Sendable {
     /// problem line says so) nor for one the mix places at 0 ms, rounded.
     public func shown(_ name: String) -> Shown? {
         guard let file = files[name], newest[file.uid] == name, !membership.isOut(file.uid), let placed = earlierBy[name] else { return nil }
-        guard let placed else { return .notInTheGuideTrackYet }
+        guard let placed else {
+            return file.unclear >= RecorderValues.audioDelayUnclearMeasurements ? .noClearSoundToSync : .notInTheGuideTrackYet
+        }
         return (placed * 1000).rounded() == 0 ? nil : .synced(placed, carriedOver: file.applied.isCarriedOver)
     }
 
@@ -164,6 +178,13 @@ public struct AudioDelays: Sendable {
         guard uid != anchor else { return true }
         if let file = files[name] { return file.applied.delay != nil }
         return files.values.filter { $0.uid == uid }.max { $0.order < $1.order }?.applied.delay != nil
+    }
+
+    /// The file's audio delays with hindsight, for Stop (D80): nil for the anchor's files and a file without own
+    /// counted windows, whose live entries stay.
+    public func hindsight(of name: String, fileStart: Double) -> [RecordingManifest.AudioFile.Delay]? {
+        guard let file = files[name], file.uid != anchor else { return nil }
+        return file.applied.hindsight(fileStart: fileStart)
     }
 
     private static func milliseconds(_ seconds: Double) -> String { "\(Int((seconds * 1000).rounded())) ms" }

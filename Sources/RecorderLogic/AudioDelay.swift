@@ -55,8 +55,11 @@ public enum AudioDelay {
         public private(set) var delay: Double?
         /// Carried over from the input's earlier file and not yet confirmed or replaced by an own window.
         public private(set) var isCarriedOver = false
-        /// The own counted windows: when each ended, in seconds of the recording, and its lag.
+        /// The own counted windows: when each ended, in seconds of the recording, and its lag. About 58 KB a
+        /// file for 10 hours, one every 10 s.
         private var windows: [(at: Double, lag: Double)] = []
+        /// When the 60 s rule changed the audio delay: the only places hindsight splits a file.
+        private var ruleChanges: [Double] = []
 
         public init() {}
 
@@ -98,8 +101,38 @@ public enum AudioDelay {
             }
             decision = delay.map { "\(rule): \(AudioDelay.text($0)) → \(AudioDelay.text(candidate))" + (wasCarriedOver ? ", replaced" : "") }
                 ?? "\(rule): \(AudioDelay.text(candidate))"
+            if windows.count > windowsNeeded { ruleChanges.append(at) }
             delay = candidate
             return true
+        }
+
+        /// The file's audio delays with hindsight, as `recording.json` lists them at Stop (D80); nil without
+        /// own counted windows, when the live entries stay.
+        public func hindsight(fileStart: Double) -> [RecordingManifest.AudioFile.Delay]? {
+            windows.isEmpty ? nil : Self.stretches(windows: windows, ruleChanges: ruleChanges, fileStart: fileStart)
+        }
+
+        /// The stretches split at each change of the 60 s rule, each with the median of the windows ending within it, one without
+        /// any with its neighbour's, the following one first; neighbours within a frame merge; the first at 0.
+        static func stretches(
+            windows: [(at: Double, lag: Double)], ruleChanges: [Double], fileStart: Double = 0
+        ) -> [RecordingManifest.AudioFile.Delay] {
+            let bounds = ruleChanges.sorted()
+            var lags: [[Double]] = Array(repeating: [], count: bounds.count + 1)
+            for window in windows { lags[bounds.firstIndex { window.at < $0 } ?? bounds.count].append(window.lag) }
+            let filled = lags.indices.map { index in
+                (lags[index...] + lags[..<index].reversed()).first { !$0.isEmpty }!
+            }
+            var merged: [(start: Double, lags: [Double])] = []
+            for (index, stretchLags) in filled.enumerated() {
+                let start = index == 0 ? 0 : max(0, bounds[index - 1] - fileStart)
+                if let last = merged.last, abs(median(stretchLags)! - median(last.lags)!) <= RecorderValues.audioDelayTolerance {
+                    merged[merged.count - 1].lags += lags[index]
+                } else {
+                    merged.append((start, lags[index].isEmpty ? stretchLags : lags[index]))
+                }
+            }
+            return merged.map { .init(at: ($0.start * 1000).rounded() / 1000, delay: (median($0.lags)! * 10_000).rounded() / 10_000) }
         }
 
         private static func milliseconds(_ seconds: Double) -> String { String(format: "%.1f ms", abs(seconds) * 1000) }

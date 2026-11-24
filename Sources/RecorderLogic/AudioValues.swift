@@ -57,8 +57,12 @@ extension RecorderValues {
 /// window, set once more at `AudioDelay.windowsNeeded` to their median,
 /// then changed only by the median of the counted windows of the latest
 /// `audioDelayChangeWindowSeconds`, at least `audioDelayChangeWindows` of
-/// them, each time only beyond `audioDelayTolerance`.
+/// them, each time only beyond `audioDelayTolerance`. A file not in the
+/// guide track yet whose window had sound in
+/// `audioDelayUnclearMeasurements` measurements without counting has no
+/// clear sound to sync.
 extension RecorderValues {
+    public static let audioDelayUnclearMeasurements = 3
     public static let audioDelayChangeWindowSeconds = 60.0
     public static let audioDelayChangeWindows = 5
     /// One frame at 30 fps: closer than this, a new median changes nothing.

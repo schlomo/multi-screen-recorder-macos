@@ -428,6 +428,7 @@ public final class Recorder {
             for action in audioTracker.stopAll() { performAudio(action) }
             await waitForStops()
             takeAudioReports()
+            rewriteAudioDelaysWithHindsight()
             for line in repeats.stop(at: elapsedSeconds, started: context.started, timeZone: context.timeZone) {
                 observer?.recorder(self, eventLine: line, isFailure: true)
             }
@@ -1051,6 +1052,7 @@ public final class Recorder {
         }.value
         guard !isStopped else { return }
         var lags: [String: Double] = [:]
+        var unclear: Set<String> = []
         for (file, window) in windows {
             guard let window else {
                 RecorderLog.detail("\(file): not measured, it or the reference \(referenceFile) is silent", category: "recorder")
@@ -1059,9 +1061,9 @@ public final class Recorder {
             RecorderLog.detail(
                 "\(file): lag \(AudioDelay.text(window.lag)) against \(referenceFile), clarity \(Int(window.clarity.rounded())), "
                     + (window.counts ? "counted" : "not counted"), category: "recorder")
-            if window.counts { lags[file] = window.lag }
+            if window.counts { lags[file] = window.lag } else { unclear.insert(file) }
         }
-        applyAudioDelays(lags: lags, measuredAgainst: referenceFile, at: Double(referenceEnd) / Double(AudioDelay.sampleRate))
+        applyAudioDelays(lags: lags, unclear: unclear, measuredAgainst: referenceFile, at: Double(referenceEnd) / Double(AudioDelay.sampleRate))
     }
 
     /// Each audio input's newest file while its capture runs, by name, with its device's UID (D80).
@@ -1074,7 +1076,9 @@ public final class Recorder {
     /// The audio delays after a measurement (`lags` against `measuredAgainst`, the windows ending at `at` seconds)
     /// or a file's start or end: files leave and rejoin the guide track, every file being written is placed in
     /// it, and changed delays go into the manifest, from where the mix is now (D79, D80). Nothing after Stop.
-    private func applyAudioDelays(lags: [String: Double] = [:], measuredAgainst: String? = nil, at: Double = 0) {
+    private func applyAudioDelays(
+        lags: [String: Double] = [:], unclear: Set<String> = [], measuredAgainst: String? = nil, at: Double = 0
+    ) {
         guard !isStopped else { return }
         let files = audioInputFiles()
         guard let (_, reference) = delayReference(among: files) else { return }
@@ -1082,7 +1086,9 @@ public final class Recorder {
             RecorderLog.detail("counted lags of \(lags.keys.sorted().joined(separator: ", ")) dropped: measured against "
                 + "\(measuredAgainst ?? "none"), the reference is now \(reference)", category: "recorder")
         }
-        let outcome = audioDelays.update(files: files, reference: reference, lags: measuredAgainst == reference ? lags : [:], at: at)
+        let isCurrent = measuredAgainst == reference
+        let outcome = audioDelays.update(
+            files: files, reference: reference, lags: isCurrent ? lags : [:], unclear: isCurrent ? unclear : [], at: at)
         for line in outcome.lines { RecorderLog.detail(line, category: "recorder") }
         for (file, offset) in outcome.leaving.sorted(by: { $0.key < $1.key }) { leaveTheGuideTrack(file: file, offset: offset) }
         for file in outcome.rejoining.sorted() { rejoinTheGuideTrack(file: file) }
@@ -1104,6 +1110,19 @@ public final class Recorder {
             changed = manifest.audioDelaySet(entry, at: mixedUpTo, file: file) || changed
         }
         if changed { try? writeManifest() }
+    }
+
+    /// At Stop, before the timeline file, each audio input file's audio delays with hindsight replace the live
+    /// entries (D80); written with the final manifest.
+    private func rewriteAudioDelaysWithHindsight() {
+        func text(_ delays: [RecordingManifest.AudioFile.Delay]) -> String {
+            delays.map { "\($0.at) s: \(AudioDelay.text($0.delay))" }.joined(separator: ", ")
+        }
+        for file in manifest.audioFiles {
+            guard let hindsight = audioDelays.hindsight(of: file.name, fileStart: file.start),
+                  let live = manifest.audioDelaysReplaced(hindsight, file: file.name) else { continue }
+            RecorderLog.detail("\(file.name): audio delays with hindsight [\(text(live))] → [\(text(hindsight))]", category: "recorder")
+        }
     }
 
     /// An audio input's file out of sync with the staying group leaves the "Audio inputs" guide track, its own

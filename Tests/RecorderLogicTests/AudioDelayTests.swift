@@ -108,4 +108,54 @@ import Testing
         #expect(second == [0.5])
         #expect(carry.isEmpty)
     }
+
+    /// With hindsight at Stop (D80): the stretches of a file split only at the changes of the 60 s rule, each with the median of its
+    /// own counted windows, the first at 0, as `recording.json` lists them.
+    private func hindsight(_ applied: AudioDelay.Applied, fileStart: Double = 0) -> [RecordingManifest.AudioFile.Delay]? {
+        applied.hindsight(fileStart: fileStart)
+    }
+
+    /// The owner's case: carried over at 533 ms, its own windows saying about 472 ms, ends with one entry.
+    @Test func aCarriedOverFileEndsWithItsOwnWindowsMedian() {
+        var applied = AudioDelay.Applied(carriedOver: 0.533)
+        for (at, lag) in [(20.0, 0.471), (30, 0.473), (40, 0.472), (50, 0.472)] { applied.add(lag, at: at) }
+        #expect(hindsight(applied, fileStart: 10) == [.init(at: 0, delay: 0.472)])
+    }
+
+    /// A false first window corrected at 3 leaves one entry.
+    @Test func aFalseFirstWindowCorrectedAt3LeavesOneEntry() {
+        var applied = AudioDelay.Applied()
+        for (at, lag) in [(10.0, 0.9), (20, 0.5), (30, 0.5), (40, 0.5)] { applied.add(lag, at: at) }
+        #expect(hindsight(applied) == [.init(at: 0, delay: 0.5)])
+    }
+
+    /// A change by the 60 s rule keeps two stretches, each with its own windows' median.
+    @Test func aChangeByThe60sRuleKeepsTwoStretchesWithTheirOwnMedians() throws {
+        var applied = AudioDelay.Applied()
+        let lags = [0.558, 0.556, 0.558, 0.560, 0.558, 0.47, 0.47, 0.47, 0.47, 0.47, 0.47]
+        var ruleChanges: [Double] = []
+        for (index, lag) in lags.enumerated() where applied.add(lag, at: Double(index + 1) * 10) && index >= 3 {
+            ruleChanges.append(Double(index + 1) * 10)
+        }
+        let at = try #require(ruleChanges.first)
+        #expect(hindsight(applied, fileStart: 5) == [.init(at: 0, delay: 0.558), .init(at: at - 5, delay: 0.47)])
+    }
+
+    /// A stretch without windows takes its neighbour's, the following one first, and then merges with it.
+    @Test func aStretchWithoutWindowsTakesItsNeighbours() {
+        #expect(AudioDelay.Applied.stretches(windows: [(40, 0.5), (50, 0.5)], ruleChanges: [30]) == [.init(at: 0, delay: 0.5)])
+        #expect(AudioDelay.Applied.stretches(windows: [(10, 0.5), (20, 0.6), (40, 0.4)], ruleChanges: [15, 30]) == [
+            .init(at: 0, delay: 0.5), .init(at: 15, delay: 0.6), .init(at: 30, delay: 0.4),
+        ])
+        #expect(AudioDelay.Applied.stretches(windows: [(10, 0.5), (40, 0.4)], ruleChanges: [15, 30]) == [
+            .init(at: 0, delay: 0.5), .init(at: 15, delay: 0.4),
+        ])
+    }
+
+    /// Without own windows nothing changes: a carried-over file keeps its live entries, as does one never measured.
+    @Test func withoutOwnWindowsThereIsNoHindsight() {
+        #expect(hindsight(AudioDelay.Applied(carriedOver: 0.5)) == nil)
+        #expect(hindsight(AudioDelay.Applied()) == nil)
+    }
 }
+

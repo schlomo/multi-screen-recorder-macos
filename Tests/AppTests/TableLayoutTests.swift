@@ -35,6 +35,7 @@ import Testing
                           "-1000 ppm (-9999.9 ms) · synced 9999 ms early (carried over)",
                           "measuring (-9999.9 ms) · synced 9999 ms early (carried over)",
                           "measuring (-9999.9 ms) · not in the guide track yet",
+                          "measuring (-9999.9 ms) · not in the guide track, no clear sound to sync",
                       ]]
         #expect(TableLayout.statusColumnWidths.count == RecordingStatusTable.columns.count - 1)
         for (width, texts) in zip(TableLayout.statusColumnWidths, widest) {

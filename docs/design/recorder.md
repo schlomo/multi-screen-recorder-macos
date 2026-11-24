@@ -683,9 +683,17 @@ file ends and if it was not measured by then; `inputVolume` an audio
 input's input volume at the file's start, 0 to 1 to the thousandth,
 null when it cannot be read, absent for the system audio (D69);
 `delays` the file's audio delays (D80), for a processor of the files
-to line the audio inputs up: a list of `{at, delay}`, one entry per
-change of the value, in order; empty only when the file was never
-measured (it is then placed as recorded). `at` is the
+to line the audio inputs up: a list of `{at, delay}`, in order; empty
+only when the file was never measured (it is then placed as recorded).
+While recording, and after a crash, it holds the live entries, one per
+change of the value; at Stop, before the timeline file is written, each
+file's list is rewritten with hindsight: its stretches are bounded only
+by the changes of the 60 s rule, each with the median of the
+counted windows ending within it, one without any taking its
+neighbour's (the following one first), neighbours within a frame
+merged, the first at 0, so a file whose audio delay the 60 s rule never
+changed has one entry; the anchor's files and a file without own counted windows
+keep theirs (see "Audio delay", D80). `at` is the
 seconds into the file from which the entry holds (to the millisecond,
 never below 0; the first entry also holds before its `at`, as the best
 known); `delay` is the seconds by which the file's sound there is later
@@ -947,7 +955,11 @@ checked, reported or rewritten at the next start (D47).
   uncoloured, `· synced 550 ms late (measured)`, how much earlier the
   "Audio inputs" mix places the file, once its audio delay is set or
   confirmed by its own windows, `(carried over)` while it holds its
-  earlier file's, `· not in the guide track yet` before it has one;
+  earlier file's, `· not in the guide track yet` before it has one,
+  `· not in the guide track, no clear sound to sync` once its file had
+  sound in 3 measurements (`audioDelayUnclearMeasurements`, *data*)
+  without a counted window (it is still recorded and joins once a
+  window counts);
   nothing where the mix places it at 0 (to the millisecond), the
   reference's file or any other, and nothing for a file out of the guide
   track, which its problem line tells; see "Audio delay", D80), then, drawn for an audio source only,
@@ -1574,7 +1586,8 @@ the metadata items (see "Output on disk").
   changes only when the file's own changes: a new earliest input changes
   no other file's entries. Measuring ends at Stop. Each change goes into
   `recording.json` as an entry of the file's `delays` (a file that ends
-  keeps its list), and the timeline file places each stretch of the
+  keeps its list), rewritten with hindsight at Stop (see "Output on
+  disk"), and the timeline file places each stretch of the
   file by its entry less the smallest of the files' latest audio delays
   (never above the anchor's 0), so the earliest input is at 0, a file
   never measured and the system audio unchanged. The
@@ -1624,7 +1637,8 @@ the metadata items (see "Output on disk").
   are still written live, its guide samples carry their own time. The
   anchor is in the mix from the start; any other input joins only
   once its file has an audio delay (see "Audio delay"; before that it
-  is received but not mixed, `· not in the guide track yet`), and a
+  is received but not mixed, `· not in the guide track yet`, or `· not
+  in the guide track, no clear sound to sync`), and a
   file carrying its earlier file's audio delay over joins, or stays
   out, at once. Each input is placed earlier by its audio delay less
   the smallest latest audio delay of the inputs staying in the mix, the
@@ -2040,6 +2054,11 @@ them:
   `counted lags of <files> dropped: measured against <file>, the
   reference is now <file>` when the reference changed during a
   measurement.
+- No clear sound: `<file>: no clear sound to sync, 3 measurements with
+  sound and no counted window`, once, while the file has no audio delay.
+- At Stop, each file whose list hindsight changes: `<file>: audio delays
+  with hindsight [0.0 s: 533 ms late, 41.2 s: 472 ms late] → [0.0 s:
+  472 ms late]`.
 - A carry-over: `<file>: carries over 500 ms late from <earlier file>`
   and `<file>: in the guide track with the carried-over audio delay` (or
   `out of the guide track`).

@@ -541,6 +541,26 @@ extension GlobalRecordingLog {
             _ = await stop()
         }
 
+        /// At Stop each file's audio delays are rewritten with hindsight: a false first window, corrected at 3
+        /// windows, leaves one entry; until then, as after a crash, the live entries stay on disk (D80).
+        @Test func stopRewritesTheDelaysWithHindsightAndACrashKeepsTheLiveOnes() async throws {
+            try await startInputs(["R", "A"])
+            func delaysOfA() throws -> [Double]? {
+                try manifestOnDisk().audioFiles.first { $0.audioSource == "Mic A" }?.delays.map(\.delay)
+            }
+            feedDelayedNoise(["R": 0, "A": 0.3])
+            await recorder.measureAudioDelays()
+            feedDelayedNoise(["R": 0, "A": 0.2])
+            for _ in 0..<3 { await recorder.measureAudioDelays() }
+            let live = try #require(try delaysOfA())
+            #expect(live.count == 2 && abs(live[0] - 0.3) < 0.002 && abs(live[1] - 0.2) < 0.002)
+            _ = await stop()
+            let delays = try #require(try manifestOnDisk().audioFiles.first { $0.audioSource == "Mic A" }?.delays)
+            #expect(delays.map(\.at) == [0])
+            #expect(abs((delays.first?.delay ?? 0) - 0.2) < 0.002)
+            #expect(try manifestOnDisk().audioFiles.first { $0.audioSource == "Mic R" }?.delays.map(\.delay) == [0])
+        }
+
         /// The reference's capture ending makes the next input the reference: the others are re-based onto the
         /// anchor through its audio delay, so the mix keeps every input and no listed delay changes; the anchor
         /// back as the reference changes none either (D80).

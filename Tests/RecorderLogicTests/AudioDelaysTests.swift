@@ -29,6 +29,20 @@ import Testing
         #expect(delays.shown("b.mov") == .notInTheGuideTrackYet)
     }
 
+    /// An input whose file had sound in 3 measurements without a counted window has no clear sound to sync; it
+    /// joins the guide track once a window counts (D80).
+    @Test func anInputWithSoundButNoCountedWindowHasNoClearSoundToSync() {
+        var delays = AudioDelays()
+        for at in [10.0, 20] {
+            _ = delays.update(files: recorded(["a.mov"]), reference: "r.mov", unclear: ["a.mov"], at: at)
+            #expect(delays.shown("a.mov") == .notInTheGuideTrackYet)
+        }
+        _ = delays.update(files: recorded(["a.mov"]), reference: "r.mov", unclear: ["a.mov"], at: 30)
+        #expect(delays.shown("a.mov") == .noClearSoundToSync)
+        _ = delays.update(files: recorded(["a.mov"]), reference: "r.mov", lags: ["a.mov": 0.5], at: 40)
+        #expect(delays.shown("a.mov") == .synced(0.5, carriedOver: false))
+    }
+
     /// Rounded to a nanosecond, as the sums of lags and audio delays are not exact.
     private func rounded(_ values: [String: Double?]) -> [String: Double?] { values.mapValues { $0.map { ($0 * 1e9).rounded() / 1e9 } } }
     private func rounded(_ entries: [String: Entry]) -> [String: Double] { entries.mapValues { ($0.delay * 1e9).rounded() / 1e9 } }

@@ -464,6 +464,14 @@ public struct RecordingManifest: Codable, Equatable, Sendable {
         return true
     }
 
+    /// The file's audio delays replaced, with hindsight at Stop (D80); the entries before, nil when unchanged.
+    public mutating func audioDelaysReplaced(_ delays: [AudioFile.Delay], file name: String) -> [AudioFile.Delay]? {
+        guard state != .finalized, let index = audioFiles.firstIndex(where: { $0.name == name }),
+              audioFiles[index].delays != delays else { return nil }
+        defer { audioFiles[index].delays = delays.map { .init(at: $0.at, delay: $0.delay == 0 ? 0 : $0.delay) } }
+        return audioFiles[index].delays
+    }
+
     /// Events reported by a capture; false once finalized.
     public mutating func record(_ new: [RecordingEvent]) -> Bool {
         guard state != .finalized else { return false }

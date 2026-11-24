@@ -128,10 +128,12 @@ public enum RecordingStatusTable {
         }
     }
 
-    /// "synced 550 ms late (measured)", "synced 550 ms late (carried over)", "not in the guide track yet".
+    /// "synced 550 ms late (measured)", "synced 550 ms late (carried over)", "not in the guide track yet",
+    /// "not in the guide track, no clear sound to sync".
     static func audioDelayText(_ shown: AudioDelays.Shown) -> String {
         switch shown {
         case .notInTheGuideTrackYet: "not in the guide track yet"
+        case .noClearSoundToSync: "not in the guide track, no clear sound to sync"
         case .synced(let delay, let carriedOver): "synced \(AudioDelay.text(delay)) (\(carriedOver ? "carried over" : "measured"))"
         }
     }
