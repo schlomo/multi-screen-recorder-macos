@@ -19,7 +19,7 @@ extension GlobalRecordingLog {
             var callsToAction: [RecordingProblem] = []
 
             func recorder(_ recorder: Recorder, lowDiskSpace: Bool) {}
-            func recorder(_ recorder: Recorder, screenShowsAnotherScreensPicture screen: String?) {}
+            func recorder(_ recorder: Recorder, screenShowsAnotherScreensPicture screen: String) {}
             func recorder(_ recorder: Recorder, problem: RecordingProblem, ofAnEvent: Bool) {
                 problems.append((problem, ofAnEvent))
             }
@@ -1617,6 +1617,20 @@ extension GlobalRecordingLog {
             #expect(observer.callsToAction.map(\.problem) == ["The audio input \(name) failed"])
             let summary = await stop()
             #expect(summary.asksToReportIt)
+        }
+
+        /// An audio source ended by a full disk falls under the disk-full call to action, free up disk space, at
+        /// once, and asks for no report (D84).
+        @Test func anAudioSourceEndedByAFullDiskCallsToFreeUpDiskSpace() async throws {
+            try start()
+            try send(0.25, buffers: 2)
+            try await wait("the file") { (try? manifestOnDisk().audioFiles.count) == 1 }
+            source.lose(.diskFull)
+            try await wait("the problem") { !observer.problems.isEmpty }
+            #expect(observer.callsToAction.map(\.problem) == ["The audio file of \(name) ended"])
+            #expect(recorder.problemLines().first?.text.hasPrefix("Disk full since ") == true)
+            let summary = await stop()
+            #expect(!summary.problemsAskToReportIt)
         }
 
         /// A capture ending while its input has no audio ends that no audio with it: its line turns to the past,

@@ -12,9 +12,8 @@ public protocol RecorderObserver: AnyObject {
     func recorder(_ recorder: Recorder, callToAction problem: RecordingProblem)
     /// Free space below the low disk warning threshold, or back above it.
     func recorder(_ recorder: Recorder, lowDiskSpace: Bool)
-    /// A screen's file ended because it showed another screen's picture,
-    /// or (nil) no screen is in that state any more.
-    func recorder(_ recorder: Recorder, screenShowsAnotherScreensPicture screen: String?)
+    /// A screen's file ended because it showed another screen's picture: `msr record` says so on standard error.
+    func recorder(_ recorder: Recorder, screenShowsAnotherScreensPicture screen: String)
     /// A problem, also listed in the recording manifest's `problems`, for `msr record`'s standard error;
     /// `ofAnEvent` when an event's line tells the same failure (D65).
     func recorder(_ recorder: Recorder, problem: RecordingProblem, ofAnEvent: Bool)
@@ -637,7 +636,6 @@ public final class Recorder {
                 })
             captures[uuid] = (captureNumber, capture)
             capture.start()
-            if tracker.showsAnotherScreensPicture == false { observer?.recorder(self, screenShowsAnotherScreensPicture: nil) }
         case .stop(let uuid, _):
             guard let (captureNumber, capture) = captures.removeValue(forKey: uuid) else { return }
             stopInProgress { [weak self] in
@@ -698,7 +696,8 @@ public final class Recorder {
         if let report, let problem = report.problem {
             let kind = report.problemKind(notCaptured: notCaptured)
             let over = gone(kind) ?? newerFileStart.map { (Int64(($0 * 1_000_000_000).rounded()), .recovered) }
-            problemsTold.show(problem, kind: kind, source: label, endedAt: over?.at, ending: over?.ending ?? .recovered)
+            problemsTold.show(problem, kind: kind, source: label, endedAt: over?.at, ending: over?.ending ?? .recovered,
+                              withoutCallToAction: reason == .showsAnotherScreen)
             told(problem, ofAnEvent: report.event != nil)
         }
         if let report, let lost = report.lostProblem {
@@ -736,7 +735,7 @@ public final class Recorder {
             }
             let over = gone(.screenNotCaptured(uuid))
             tell(problem, kind: .screenNotCaptured(uuid), source: "\(number) \(screen)", endedAt: over?.at,
-                 ending: over?.ending ?? .recovered, ofAnEvent: true)
+                 ending: over?.ending ?? .recovered, ofAnEvent: true, withoutCallToAction: reason == .showsAnotherScreen)
         }
     }
 
@@ -1390,8 +1389,8 @@ public final class Recorder {
             tell("The audio file of \(name) ended", error: "its writer fell behind", kind: .audioSourceFailed(name), at: now,
                  ofAnEvent: true)
         case .diskFull:
-            tell("The audio file of \(name) ended", error: "the disk is full", kind: .audioSourceFailed(name), at: now,
-                 ofAnEvent: true)
+            // Free up disk space, as a video file a full disk ended: one problem of the full disk, told once (D84).
+            tell("The audio file of \(name) ended", error: "the disk is full", kind: .diskFull, at: now, ofAnEvent: true)
         case .disconnected:
             break
         }
@@ -1538,9 +1537,11 @@ public final class Recorder {
 
     private func tell(
         _ problem: RecordingProblem, kind: ProblemKind, source: String? = nil, note: String? = nil, endedAt: Int64? = nil,
-        ending: ProblemsTold.Ending = .recovered, ofAnEvent: Bool = false, notifies: Bool = true
+        ending: ProblemsTold.Ending = .recovered, ofAnEvent: Bool = false, notifies: Bool = true, withoutCallToAction: Bool = false
     ) {
-        switch problemsTold.add(problem, kind: kind, source: source, note: note, endedAt: endedAt, ending: ending, to: &manifest) {
+        switch problemsTold.add(
+            problem, kind: kind, source: source, note: note, endedAt: endedAt, ending: ending, withoutCallToAction: withoutCallToAction,
+            to: &manifest) {
         case .tell(let writesManifest):
             if writesManifest { try? writeManifest() }
             told(problem, ofAnEvent: ofAnEvent, notifies: notifies)

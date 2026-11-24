@@ -946,8 +946,10 @@ checked, reported or rewritten at the next start (D47).
   audio input out of the "Audio inputs" guide track, guide tracks cut,
   the Dock icon not shown, an input volume not set or not followed, the
   screens, the audio inputs or the free space not read) bounces nothing
-  and sets no badge, as a screen showing another screen's picture does
-  not by itself. Every problem, with a call to action or not, is in the
+  and sets no badge, nor does a screen showing another screen's picture:
+  its file ending by that fault calls to no action, also past 10 s.
+  An audio source ended by a full disk is told as the full disk, free
+  up disk space, one call for the full disk. Every problem, with a call to action or not, is in the
   status window (red when broken, orange for a hiccup, D78), in
   `recording.json` and `recording.log`; `msr record` also names each
   on standard error.
@@ -1839,8 +1841,8 @@ After 30 failing frames in a row (*data*), not counting those within
 the settle time after a screen change, the screen file ends with the
 event `screen shows another screen's picture`, `msr record` names the
 screen on standard error, and the screen is tried again only after its
-next change; its problem, the screen not captured, calls to action
-only once it lasted 10 s (D84). Its limit: a frame whose
+next change; its problem, the screen not captured, calls to no action,
+also past 10 s (D84, the owner's table). Its limit: a frame whose
 rectangle is right can still be black (seen once, cause unknown); the
 check cannot see that. That `screenRect` and `CGDisplayBounds` are
 comparable as they are, in points and the same coordinates, is

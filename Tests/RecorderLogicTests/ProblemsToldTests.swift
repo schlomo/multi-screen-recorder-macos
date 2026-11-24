@@ -347,5 +347,18 @@ import Testing
         #expect(changes.callsToAction(now: 0).count == 1)
         #expect(changes.asksToReportIt)
     }
+
+    /// A screen whose file ended because it showed another screen's picture: in the owner's table under none, so
+    /// its problem never calls to action, also past `unrecoveredAfter`, shown first or told first (D84).
+    @Test func aScreenShowingAnotherScreensPictureNeverCallsToAction() {
+        var told = ProblemsTold()
+        var manifest = manifest()
+        told.show(problem(1 * second, "Screen file s.mov"), kind: .screenNotCaptured("U"), withoutCallToAction: true)
+        _ = told.add(problem(1 * second, "Screen 1 LG"), kind: .screenNotCaptured("U"), to: &manifest)
+        _ = told.add(problem(1 * second, "Screen 2 DELL"), kind: .screenNotCaptured("V"), withoutCallToAction: true, to: &manifest)
+        #expect(told.nextCallToAction() == nil)
+        #expect(told.callsToAction(now: 100 * second).isEmpty)
+        #expect(!told.asksToReportIt)
+    }
 }
 

@@ -171,7 +171,6 @@ import Testing
         _ = screens.begin([Self.builtIn, Self.lg], at: 0)
         let step = screens.streamEnded(Self.lg.uuid, .showsAnotherScreen, connected: [Self.builtIn, Self.lg], at: second)
         #expect(step.events == [RecordingEvent(at: second, event: .screenShowsAnotherScreensPicture, screen: "LG HDR 4K")])
-        #expect(screens.showsAnotherScreensPicture)
         #expect(screens.due(at: 100 * second).actions.isEmpty)
         // The other screen changing is not this one's change.
         var builtIn = Self.builtIn
@@ -182,7 +181,6 @@ import Testing
         moved.bounds.y = 100
         _ = screens.observe([builtIn, moved], at: 300 * second)
         #expect(starts(screens.due(at: 301 * second)) == [Self.lg.uuid])
-        #expect(!screens.showsAnotherScreensPicture)
     }
 
     /// An unplug: the stream ends because its screen is gone, seconds

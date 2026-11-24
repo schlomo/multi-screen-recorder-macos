@@ -2928,19 +2928,20 @@ architect's reading.
   written; low disk space keeps alerting); grant the permission (the
   Camera permission missing); unplug and plug in the device again (an
   audio input silent right after its gaps, D81); report it (a file
-  incomplete); stop and start the recording again, or replug, and
-  report it, for a source that fails and does not come back (a screen,
-  camera, audio source or audio file not captured or failed, an audio
-  input not recordable) once it lasted 10 s (`unrecoveredAfter`,
-  *data*) without ending, and for the audio inputs' changes not
-  followed at once. None: a camera stall, an audio input out of the
-  "Audio inputs" guide track, guide tracks cut, the Dock icon not
-  shown, an input volume not set or not followed, the screens, the
-  audio inputs or the free space not read, and a screen showing another
-  screen's picture as a badge of its own. Only a call to action bounces
-  the Dock icon, sets the badge and counts in `msr record`'s status
-  line; every problem is still told on standard error, listed in the
-  status window, `recording.json` and the recording log.
+  incomplete); stop and start the recording again, or replug, and report
+  it, for a source that fails and does not come back (a screen, camera,
+  audio source or audio file not captured or failed, an audio input not
+  recordable) once it lasted 10 s (`unrecoveredAfter`, *data*) without
+  ending, and for the audio inputs' changes not followed at once. None:
+  a camera stall, an audio input out of the "Audio inputs" guide track,
+  guide tracks cut, the Dock icon not shown, an input volume not set or
+  not followed, the screens, the audio inputs or the free space not
+  read, and a screen showing another screen's picture: its file ending
+  by that fault, told as the screen not captured, calls to no action,
+  also past 10 s. Only a call to action bounces the Dock icon, sets the
+  badge and counts in `msr record`'s status line; every problem is still
+  told on standard error, listed in the status window, `recording.json`
+  and the recording log.
 - **The architect's reading (after the recording):** the app's notice
   "The last recording had problems" and `msr record`'s `Report it:` and
   `Attach:` lines appear only when a call to action that includes
@@ -2949,17 +2950,15 @@ architect's reading.
   are live only: nothing is left to do afterwards. `recording.json`'s
   `result` and exit status 3 still report the facts (D47); a camera
   stall stays a failure event.
-- **Decided while building (the builder's reading, for the architect
-  to confirm):** `state.json`'s `lastRecording` holds `noticeWanted`
-  instead of `result`; a state file of an earlier release decodes and
-  wants no notice. A call to action given later than its problem adds
-  no line on standard error, and the problem lines say nothing new: the
-  call to action governs only the alerts (D78 stays). A screen showing
-  another screen's picture ends its file as the screen not captured,
-  which calls to action once it lasted 10 s, as it is recorded again
-  only after its next change. An audio source ended by a full disk is
-  told as that source failed (unchanged), so it too calls to "stop and
-  start again and report it" after 10 s.
+- **Decided while building (the architect's reading):** `state.json`'s
+  `lastRecording` holds `noticeWanted` instead of `result`; a state file
+  of an earlier release decodes and wants no notice. A call to action
+  given later than its problem adds no line on standard error, and the
+  problem lines say nothing new: the call to action governs only the
+  alerts (D78 stays). An audio source ended by a full disk falls under
+  the disk-full call to action, free up disk space, never "report it":
+  it is told as the full disk, so one already told stands and no second
+  call follows.
 - **Consequences:** A recording with only hiccups that recovered, a
   stall or an input out of the guide track is quiet: no bounce, no
   badge, no notice at the next start, no `Report it:` line, though it
@@ -2993,17 +2992,16 @@ architect's reading.
   earlier file's 0, carried over. Stop's hindsight also ends a file's
   stretches at a change of reference, so windows measured against
   different references are never merged into one median.
-- **Decided while building (the builder's reading, for the architect
-  to confirm):** the reference in use keeps D80's rule for the anchor:
-  it stays the reference while its capture runs and its newest file did
-  not end on no audio, so a gap or a channel change of it moves
-  nothing. The anchor's files, 0 by definition, are those of its device
-  that start while it is the reference. A file's stretch after a change
-  of reference starts at its first window against the new reference,
-  and two such neighbours are never merged, also within a frame. The
-  reference other than the anchor is still not measured, its audio
-  delay against the anchor kept from when it became the reference (the
-  shortcut of D80).
+- **Decided while building (the architect's reading):** the reference in
+  use keeps D80's rule for the anchor: it stays the reference while its
+  capture runs and its newest file did not end on no audio, so a gap or
+  a channel change of it moves nothing. The anchor's files, 0 by
+  definition, are those of its device that start while it is the
+  reference. A file's stretch after a change of reference starts at its
+  first window against the new reference, and two such neighbours are
+  never merged, also within a frame. The reference other than the anchor
+  is still not measured, its audio delay against the anchor kept from
+  when it became the reference (the shortcut of D80).
 - **Consequences:** An Osmo replugged mid-recording is placed by its
   new audio delay within about 10 s; a microphone it was the reference
   for keeps its audio delay instead of being moved by the 60 s rule.

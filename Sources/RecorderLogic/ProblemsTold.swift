@@ -204,6 +204,8 @@ public struct ProblemsTold: Sendable {
         var note: String?
         /// Its call to action was given (D84).
         var calledToAction = false
+        /// None whatever its kind: a screen's file ended because it showed another screen's picture (D84).
+        var withoutCallToAction = false
     }
 
     private var told: [Told] = []
@@ -213,10 +215,11 @@ public struct ProblemsTold: Sendable {
     /// Into the manifest and the window's lines, unless one of its kind told before has not ended; a line only
     /// shown does not keep it from the manifest. `source` names the screen or camera of a kind keyed by its ID;
     /// `endedAt`: already over when told, for a failure that ends with a new file (`endsWithANewFile`) after a
-    /// newer file of its source started, or after its source went away (`ending`).
+    /// newer file of its source started, or after its source went away (`ending`); `withoutCallToAction` for a
+    /// screen that showed another screen's picture (D84).
     public mutating func add(
         _ problem: RecordingProblem, kind: ProblemKind, source: String? = nil, note: String? = nil, endedAt: Int64? = nil,
-        ending: Ending = .recovered, to manifest: inout RecordingManifest
+        ending: Ending = .recovered, withoutCallToAction: Bool = false, to manifest: inout RecordingManifest
     ) -> Outcome {
         guard manifest.state != .finalized else { return .afterTheEnd }
         guard !told.contains(where: { $0.kind == kind && $0.ended == nil && $0.isTold }) else { return .alreadyTold }
@@ -224,8 +227,9 @@ public struct ProblemsTold: Sendable {
         if let shown = told.lastIndex(where: { $0.kind == kind && $0.ended == nil }) {
             told[shown].problem = problem
             told[shown].isTold = true
+            told[shown].withoutCallToAction = told[shown].withoutCallToAction || withoutCallToAction
         } else {
-            show(problem, kind: kind, source: source, endedAt: endedAt, ending: ending)
+            show(problem, kind: kind, source: source, endedAt: endedAt, ending: ending, withoutCallToAction: withoutCallToAction)
             told[told.count - 1].isTold = true
             told[told.count - 1].note = note
         }
@@ -235,14 +239,16 @@ public struct ProblemsTold: Sendable {
     /// Into the window's lines only, for a problem the manifest already lists (a video file's end); none while
     /// one of its kind lasts. `endedAt` as for `add`.
     public mutating func show(
-        _ problem: RecordingProblem, kind: ProblemKind, source: String? = nil, endedAt: Int64? = nil, ending: Ending = .recovered
+        _ problem: RecordingProblem, kind: ProblemKind, source: String? = nil, endedAt: Int64? = nil, ending: Ending = .recovered,
+        withoutCallToAction: Bool = false
     ) {
         guard !told.contains(where: { $0.kind == kind && $0.ended == nil }) else { return }
         let at = Int64((problem.at * 1_000_000_000).rounded())
         // A stall is told once the camera delivered no frame for the stall limit: it began that much earlier.
         let began = if case .cameraStalled = kind { max(0, at - RecorderValues.cameraStallLimit.nanoseconds) } else { at }
         let ended = kind.endsWithANewFile ? endedAt.map { max($0, began) } : nil
-        told.append(Told(kind: kind, problem: problem, source: source, began: began, ended: ended, ending: ending))
+        told.append(Told(
+            kind: kind, problem: problem, source: source, began: began, ended: ended, ending: ending, withoutCallToAction: withoutCallToAction))
     }
 
     /// The kind went away at `now`: it is told again when it comes back. A
@@ -258,7 +264,7 @@ public struct ProblemsTold: Sendable {
     /// fails once it lasted `unrecoveredAfter` without ending.
     public mutating func callsToAction(now: Int64, unrecoveredAfter: Duration = RecorderValues.unrecoveredAfter) -> [RecordingProblem] {
         var due: [RecordingProblem] = []
-        for index in told.indices where !told[index].calledToAction && told[index].kind.callToAction != nil {
+        for index in told.indices where !told[index].calledToAction && !told[index].withoutCallToAction && told[index].kind.callToAction != nil {
             let entry = told[index]
             if entry.kind.callsToActionOnlyUnrecovered, entry.ended != nil || now - entry.began < unrecoveredAfter.nanoseconds { continue }
             told[index].calledToAction = true
@@ -269,7 +275,7 @@ public struct ProblemsTold: Sendable {
 
     /// When the next call to action of a failing source falls due, if it lasts that long (D84).
     public func nextCallToAction(unrecoveredAfter: Duration = RecorderValues.unrecoveredAfter) -> Int64? {
-        told.filter { !$0.calledToAction && $0.ended == nil && $0.kind.callsToActionOnlyUnrecovered }
+        told.filter { !$0.calledToAction && !$0.withoutCallToAction && $0.ended == nil && $0.kind.callsToActionOnlyUnrecovered }
             .map { $0.began + unrecoveredAfter.nanoseconds }.min()
     }
 

@@ -138,11 +138,9 @@ final class RecordingSession: RecorderObserver {
         if lowDiskSpace { needsAttention() } else { updateBadge() }
     }
 
-    func recorder(_ recorder: Recorder, screenShowsAnotherScreensPicture screen: String?) {
-        if let screen {
-            output?.tell(.event, "The screen \(screen) shows another screen's picture: its screen file ended,"
-                + " and it is recorded again after its next change.\n")
-        }
+    func recorder(_ recorder: Recorder, screenShowsAnotherScreensPicture screen: String) {
+        output?.tell(.event, "The screen \(screen) shows another screen's picture: its screen file ended,"
+            + " and it is recorded again after its next change.\n")
     }
 
     func recorder(_ recorder: Recorder, eventLine: String, isFailure: Bool) {

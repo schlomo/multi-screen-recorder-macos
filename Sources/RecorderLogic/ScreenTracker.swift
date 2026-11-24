@@ -319,11 +319,6 @@ public struct ScreenTracker: Sendable {
         return actions
     }
 
-    /// Whether a screen's file ended because it showed another screen's picture and it was not tried again since.
-    public var showsAnotherScreensPicture: Bool {
-        screens.values.contains { if case .showsAnotherScreen = $0.phase { true } else { false } }
-    }
-
     // MARK: -
 
     /// The screens the tracker follows: none at the recording resolution None.
