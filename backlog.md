@@ -588,6 +588,18 @@ Still open from D34: what AGC does and whether it is on in auto mode;
    each of the release and a local build of the same commit, compared,
    and the previous release v0.20261122.89 as a baseline. Settled before
    item 38 starts, as it touches what every recording ships.
+   **Update 2026-11-24:** the previous release v0.20261122.89, which
+   passed when it was released, now fails the same way: 3 runs,
+   `virtual-screen` failed in all 3, the encoder error in 2 of them,
+   and in 2 runs the app's window was not on screen within 20 s. So
+   this is not a regression of PR #27 but this Mac or the VM today. No
+   macOS update since 2026-11-22 (macOS 27.2.1, tart 2.42.0); a Wacom
+   driver was installed on 2026-11-22. [CONJECTURE] Load on the host's
+   GPU and media engine, as DaVinci Resolve was open, starves the VM's
+   paravirtualized encoder, the same kind of contention as on the
+   hosted runner (D67). Next: 3 runs with Resolve and other GPU-heavy
+   apps closed. The owner also saw resolution changes of the Wacom
+   on the release make new files without interrupting anything.
 47. **A microphone that sends only zeros after a USB hiccup** (the
    owner's recording `2026-11-24 06.30.02`): the BRIO's microphone had
    gaps from 25.7 to 30.9 s, then exact zeros from about 28.8 s to
