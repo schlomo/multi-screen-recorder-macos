@@ -2790,6 +2790,15 @@ architect's reading.
   delay and its place in or out of the mix until its capture ends. The
   status row shows how much earlier the mix places the file, nothing
   at 0. The writing files of a device are only its newest.
+- **Amended, `recording.json` for its readers (2026-11-24):** the owner:
+  "make sure that the json doesn't explode, we still have the log file
+  for the detailed log for debugging something. That is why IMHO the
+  JSON should be designed from the perspective of somebody processing
+  the files". `delays` has an entry only where the file's delay value
+  changes; `carriedOverFrom` is dropped; how a value came about
+  (windows, rules, carry-over) is told only in the recording log's
+  detail lines, one per decision ("make sure that the --debug output
+  remains super useful", the owner).
 - **Consequences:** The guide is in sync to within a frame for every
   input within 0.8 s of the earliest; an input never measured stays
   out of it. A crash loses up to about 3 s of a video file instead of 2,
