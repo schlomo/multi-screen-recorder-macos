@@ -216,15 +216,18 @@ public struct ProblemsTold: Sendable {
     /// shown does not keep it from the manifest. `source` names the screen or camera of a kind keyed by its ID;
     /// `endedAt`: already over when told, for a failure that ends with a new file (`endsWithANewFile`) after a
     /// newer file of its source started, or after its source went away (`ending`); `withoutCallToAction` for a
-    /// screen that showed another screen's picture (D84); told on a line only shown, it replaces that line's.
+    /// screen that showed another screen's picture (D84); a tell without it replaces a lasting line that has
+    /// it, told or only shown, its wait starting then.
     public mutating func add(
         _ problem: RecordingProblem, kind: ProblemKind, source: String? = nil, note: String? = nil, endedAt: Int64? = nil,
         ending: Ending = .recovered, withoutCallToAction: Bool = false, to manifest: inout RecordingManifest
     ) -> Outcome {
         guard manifest.state != .finalized else { return .afterTheEnd }
-        guard !told.contains(where: { $0.kind == kind && $0.ended == nil && $0.isTold }) else { return .alreadyTold }
+        let lasting = told.lastIndex(where: { $0.kind == kind && $0.ended == nil })
+        // A failure of its own after another screen's picture replaces that told line.
+        if let lasting, told[lasting].isTold, !(told[lasting].withoutCallToAction && !withoutCallToAction) { return .alreadyTold }
         manifest.problems.append(problem)
-        if let shown = told.lastIndex(where: { $0.kind == kind && $0.ended == nil }) {
+        if let shown = lasting {
             told[shown].problem = problem
             told[shown].isTold = true
             if told[shown].withoutCallToAction && !withoutCallToAction {

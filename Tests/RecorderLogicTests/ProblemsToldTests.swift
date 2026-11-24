@@ -390,5 +390,18 @@ import Testing
         #expect(told.callsToAction(now: 15 * second).map(\.problem) == ["Screen 1 LG"])
         #expect(told.asksToReportIt)
     }
+    /// As the Recorder does it: another screen's picture told with the flag, then a failure of its own told.
+    @Test func aFailureToldAfterAnotherScreensPictureToldCallsToAction() {
+        var told = ProblemsTold()
+        var manifest = manifest()
+        _ = told.add(problem(1 * second, "Screen 1 LG"), kind: .screenNotCaptured("U"), withoutCallToAction: true, to: &manifest)
+        #expect(told.add(problem(3 * second, "Screen 1 LG again"), kind: .screenNotCaptured("U"), withoutCallToAction: true, to: &manifest)
+            == .alreadyTold)
+        #expect(told.add(problem(5 * second, "Screen 1 LG failed"), kind: .screenNotCaptured("U"), to: &manifest)
+            == .tell(writeManifest: true))
+        #expect(told.add(problem(6 * second, "Screen 1 LG failed again"), kind: .screenNotCaptured("U"), to: &manifest) == .alreadyTold)
+        #expect(manifest.problems.map(\.problem) == ["Screen 1 LG", "Screen 1 LG failed"])
+        #expect(told.nextCallToAction() == 15 * second)
+        #expect(told.callsToAction(now: 15 * second).map(\.problem) == ["Screen 1 LG failed"])
+    }
 }
-
