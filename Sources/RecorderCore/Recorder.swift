@@ -451,6 +451,8 @@ public final class Recorder {
             if let logFailure {
                 tell("Cannot write the recording log \(RecordingNames.recordingLog)", error: logFailure, kind: .recordingLogNotWritten)
             }
+            // A source still failing does not come back in this recording: its call to action is due now (D84).
+            callToAction(atStop: true)
             manifest.finalize(
                 ended: Date(), timeZone: context.timeZone, cpu: cpu.manifestEntry, recordingLogWritten: logFailure == nil)
             do {
@@ -1566,9 +1568,9 @@ public final class Recorder {
 
     /// Each problem whose call to action is due to the observer, and a wait for the next one of a failing
     /// source (D84).
-    private func callToAction() {
+    private func callToAction(atStop: Bool = false) {
         let now = context.now()
-        for problem in problemsTold.callsToAction(now: now, unrecoveredAfter: unrecoveredAfter) {
+        for problem in problemsTold.callsToAction(now: now, unrecoveredAfter: unrecoveredAfter, atStop: atStop) {
             RecorderLog.detail("call to action: \(problem.text)", category: "recorder")
             observer?.recorder(self, callToAction: problem)
         }

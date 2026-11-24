@@ -637,6 +637,11 @@ import Testing
         // A file a full disk left not finalized: the person was asked to free up disk space.
         #expect(!summary([.notFinalized], events: [RecordingEvent(at: 0, event: .diskFull, screen: "D")]).asksToReportIt)
         #expect(summary([.notFinalized], events: [RecordingEvent(at: 0, event: .diskFull, screen: "E")]).asksToReportIt)
+        var ended = summary([.notFinalized]).manifest
+        ended.files[0].end = 1
+        ended.events = [RecordingEvent(at: 2_000_000_000, event: .diskFull, screen: "D")]
+        #expect(RecordingSummary(manifest: ended, recordingFolder: "/r", seconds: 3, manifestWritten: true, problemsAskToReportIt: false)
+            .asksToReportIt)
         #expect(summary([.finalized], written: false).asksToReportIt)
         #expect(summary([.finalized], problems: true).asksToReportIt)
     }

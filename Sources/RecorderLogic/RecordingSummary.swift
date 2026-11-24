@@ -26,11 +26,11 @@ public struct RecordingSummary: Equatable, Sendable {
     /// next start (D84): a problem asked to report it, or data was lost, a file not finalized or the manifest
     /// without its end. A file a full disk left not finalized does not: the person was asked to free up disk space.
     public var asksToReportIt: Bool {
-        let files = manifest.files.map { ($0.screen, $0.start, $0.state) } + manifest.cameraFiles.map { ($0.camera, $0.start, $0.state) }
-            + manifest.audioFiles.map { ($0.audioSource, $0.start, $0.state) }
+        let files = manifest.files.map { ($0.screen, $0.end, $0.state) } + manifest.cameraFiles.map { ($0.camera, $0.end, $0.state) }
+            + manifest.audioFiles.map { ($0.audioSource, $0.end, $0.state) }
         let fullDisks = manifest.events.filter { $0.event == .diskFull }
-        return problemsAskToReportIt || !manifestWritten || files.contains { source, start, state in
-            state != .finalized && !fullDisks.contains { $0.subject == source && $0.at >= start }
+        return problemsAskToReportIt || !manifestWritten || files.contains { source, end, state in
+            state != .finalized && !fullDisks.contains { $0.subject == source && $0.at <= end ?? .infinity }
         }
     }
 

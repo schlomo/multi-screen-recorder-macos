@@ -362,6 +362,22 @@ import Testing
         #expect(!told.asksToReportIt)
     }
 
+    /// A failing source whose wait was over is called to action even when it ended before the call ran; at Stop,
+    /// one still failing is called at once (D84).
+    @Test func aCallDueIsNeverDroppedAndStopCallsTheOngoing() {
+        var told = ProblemsTold()
+        var manifest = manifest()
+        _ = told.add(problem(1 * second, "Mic"), kind: .audioSourceFailed("Mic"), to: &manifest)
+        _ = told.add(problem(2 * second, "Cam"), kind: .cameraNotCaptured("C"), to: &manifest)
+        _ = told.add(problem(3 * second, "Short"), kind: .screenNotCaptured("U"), to: &manifest)
+        told.cleared(.audioSourceFailed("Mic"), at: 12 * second)
+        told.cleared(.screenNotCaptured("U"), at: 4 * second)
+        #expect(told.callsToAction(now: 12 * second).map(\.problem) == ["Mic", "Cam"])
+        _ = told.add(problem(20 * second, "Mic again"), kind: .audioSourceFailed("Mic"), to: &manifest)
+        #expect(told.callsToAction(now: 21 * second).isEmpty)
+        #expect(told.callsToAction(now: 21 * second, atStop: true).map(\.problem) == ["Mic again"])
+    }
+
     /// The screen's capture failing for another reason after its file showed another screen's picture is a
     /// failure like any other: it calls to action once unrecovered for the wait, counted from its tell.
     @Test func aFailureToldAfterAnotherScreensPictureCallsToAction() {

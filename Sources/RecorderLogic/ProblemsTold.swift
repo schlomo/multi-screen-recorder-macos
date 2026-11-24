@@ -265,12 +265,15 @@ public struct ProblemsTold: Sendable {
     }
 
     /// The problems whose call to action falls due at `now`, each given once (D84): at once, or for a source that
-    /// fails once it lasted `unrecoveredAfter` without ending.
-    public mutating func callsToAction(now: Int64, unrecoveredAfter: Duration = RecorderValues.unrecoveredAfter) -> [RecordingProblem] {
+    /// fails once it lasted `unrecoveredAfter`, though it ended since; `atStop`, also once it is still failing.
+    public mutating func callsToAction(
+        now: Int64, unrecoveredAfter: Duration = RecorderValues.unrecoveredAfter, atStop: Bool = false
+    ) -> [RecordingProblem] {
         var due: [RecordingProblem] = []
         for index in told.indices where !told[index].calledToAction && !told[index].withoutCallToAction && told[index].kind.callToAction != nil {
             let entry = told[index]
-            if entry.kind.callsToActionOnlyUnrecovered, entry.ended != nil || now - entry.began < unrecoveredAfter.nanoseconds { continue }
+            let lasted = (entry.ended ?? now) - entry.began >= unrecoveredAfter.nanoseconds || (atStop && entry.ended == nil)
+            if entry.kind.callsToActionOnlyUnrecovered, !lasted { continue }
             told[index].calledToAction = true
             due.append(entry.problem)
         }

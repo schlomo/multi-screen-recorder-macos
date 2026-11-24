@@ -1598,9 +1598,21 @@ extension GlobalRecordingLog {
         }
 
         /// A source that fails and does not come back calls to action once it lasted `unrecoveredAfter`, and the
-        /// recording then asks to report it; one that is captured again before stays quiet (D84).
+        /// recording then asks to report it (D84). The stand-in's restart takes 1 s, longer than the wait here.
         @Test func aSourceFailingUnrecoveredCallsToActionAndAsksToReportIt() async throws {
-            try start(unrecoveredAfter: .seconds(3))
+            try start(unrecoveredAfter: .milliseconds(300))
+            try send(0.25, buffers: 2)
+            try await wait("the file") { (try? manifestOnDisk().audioFiles.count) == 1 }
+            source.lose(.captureFailed("the stand-in failed"))
+            try await wait("the call to action", seconds: 10) { !observer.callsToAction.isEmpty }
+            #expect(observer.callsToAction.map(\.problem) == ["The audio input \(name) failed"])
+            let summary = await stop()
+            #expect(summary.asksToReportIt)
+        }
+
+        /// A source captured again before `unrecoveredAfter` stays quiet, at Stop too (D84).
+        @Test func aSourceCapturedAgainBeforeTheWaitStaysQuiet() async throws {
+            try start(unrecoveredAfter: .seconds(60))
             try send(0.25, buffers: 2)
             try await wait("the file") { (try? manifestOnDisk().audioFiles.count) == 1 }
             source.lose(.captureFailed("the stand-in failed"))
@@ -1610,12 +1622,22 @@ extension GlobalRecordingLog {
                 try? sendNext(0.25, buffers: 1, to: sources.last)
                 return (try? manifestOnDisk().audioFiles.count) == 2
             }
-            try await Task.sleep(for: .milliseconds(3100))
-            #expect(observer.callsToAction.isEmpty)
-            sources.last.lose(.captureFailed("the stand-in failed again"))
-            try await wait("the call to action", seconds: 10) { !observer.callsToAction.isEmpty }
-            #expect(observer.callsToAction.map(\.problem) == ["The audio input \(name) failed"])
             let summary = await stop()
+            #expect(observer.callsToAction.isEmpty)
+            #expect(!summary.asksToReportIt)
+        }
+
+        /// A source still failing at Stop calls to action then, without waiting for `unrecoveredAfter`, and the
+        /// recording asks to report it (D84).
+        @Test func aSourceStillFailingAtStopCallsToActionThen() async throws {
+            try start(unrecoveredAfter: .seconds(60))
+            try send(0.25, buffers: 2)
+            try await wait("the file") { (try? manifestOnDisk().audioFiles.count) == 1 }
+            source.lose(.captureFailed("the stand-in failed"))
+            try await wait("the problem") { !observer.problems.isEmpty }
+            #expect(observer.callsToAction.isEmpty)
+            let summary = await stop()
+            #expect(observer.callsToAction.map(\.problem) == ["The audio input \(name) failed"])
             #expect(summary.asksToReportIt)
         }
 
