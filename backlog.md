@@ -2,32 +2,30 @@
 
 ## Next session starts here
 
-PRs #27, #28 and #29 are merged or with the owner (2026-11-24). The
-next PR is one PR (the owner, 2026-11-24: "I want less PRs as I feel
-that each PR takes forever"; "the screenshot script should then be
-part of the next PR too"): item 38 (each microphone placed by its
-measured delay in the "Audio inputs" guide track, about 1 s of
-hindsight) with its fold-ins (a device's delay and guide-track state
-carried over a hiccup, the timeline file's shift from the first
-counted window, applied sync shown in the status window), item 48
-(homepage screenshots from the owner's Mac) and item 47 (the owner,
-2026-11-24: yes, a microphone sending only zeros right after a burst
-of gaps is a problem). Its design goes to the owner as text first. Then item 22
-(camera picture sync from claps, a Calibrate button). The owner,
-2026-11-23: "Noticeable lip sync is my goal"; "Iterative improvement,
-every shipment is better". The end-to-end tests need an idle Mac
-(`docs/troubleshooting.md`). Test recordings of 2026-11-23 (rec7 to
-rec12) sit in `$TMPDIR/camcheck` on the owner's Mac for the sync
-design, with the owner's `2026-11-24 06.30.02` in
-`~/Movies/Multi Screen Recorder` (read only) as the hiccup case; the
-owner's kept one is `keep/2026-11-23 10.56.18`; delete the rest once
-item 38 is built. The remote branch `troubleshooting-ci-runner` (2026-11-17, no PR)
-holds two troubleshooting entries never merged ("No macOS runner: the
-pipeline job is cancelled", "Crash dialog for crash reports the tests
-wrote"); check whether D67 and the crash report filter superseded
-them, then fold what still holds into the next PR or ask the owner to
-drop the branch. The other stale branches and the `pr-27` release
-were deleted on 2026-11-24 with the owner's go-ahead.
+PR #30 is merged (2026-11-24, release 0.20261124.108: items 38, 47
+and 48, D80 to D82). PR #31 is with the owner: homepage screenshots
+from that release on the owner's Mac, and the problem report form's
+one file field (D83). The next PR is one PR (the owner, 2026-11-24:
+"I want less PRs"): item 49 (a reconnected first microphone measured
+again) and item 50 (no notice for problems without a clear action),
+with what fits from item 52. Both designs go to the owner as text
+first. Item 51 (the runner VM, its concept signed off) is its own PR,
+as the owner registers the runner. Then item 22 (camera picture sync
+from claps, a Calibrate button). The owner, 2026-11-23: "Noticeable
+lip sync is my goal"; "Iterative improvement, every shipment is
+better". The end-to-end tests need an idle Mac
+(`docs/troubleshooting.md`).
+
+The owner's signing certificate is trusted for code signing in the
+login keychain since 2026-11-24, so a try-out can be built and signed
+locally (`scripts/build-app`, then `scripts/sign-app` with
+`SIGNING_IDENTITY` set to it) instead of waiting for a snapshot
+release; not tried yet. Installing it in `/Applications` still needs
+the owner's go-ahead. The owner's try-out recordings of PR #30 are in
+`~/Movies/Multi Screen Recorder` (read only): `2026-11-24 17.40.03`
+and `2026-11-24 20.55.08` (item 49). Of the test recordings in
+`$TMPDIR/camcheck`, only `keep/` and rec9 (item 42's evidence) are
+left; the rest was deleted on 2026-11-24 as planned.
 
 Agents may run `msr record` on the owner's Mac (D48), with `HOME` set
 to a scratch folder (`AGENTS.md`, "Facts that bite"), and BetterDisplay's command
@@ -426,10 +424,9 @@ Still open from D34: what AGC does and whether it is on in auto mode;
    `gh`), which re-runs the failed jobs only when the run's annotations
    say "not acquired by Runner", up to the third attempt; on a Linux
    runner, with `actions: write` for that workflow only and no checkout
-   of PR code. Needs the owner's sign-off of the design. The pushed
-   branch `troubleshooting-ci-runner` holds two troubleshooting entries
-   (no macOS runner; a crash dialog for crash reports the tests wrote):
-   they ship with this item.
+   of PR code. Needs the owner's sign-off of the design. Its
+   troubleshooting entry shipped with PR #30. Still wanted for the
+   hosted runners once item 51 makes them the fallback.
 22. **A/V sync, cameras** (the owner, 2026-11-23: "Noticeable lip
    sync is my goal"; claps "something we encourage without requiring
    them"; a Calibrate button "highlight[ed] if recommended and ...
@@ -500,52 +497,6 @@ Still open from D34: what AGC does and whether it is on in auto mode;
    PR #26's runs (2026-11-22): once more 1.37 to 1.50 s in the first
    recording of the session, within 0.8 s in the later ones.
 
-38. **A/V sync, microphones in the guide track** (next after PR #27;
-   the owner, 2026-11-23: late microphones "should stay if we can
-   compensate for them"; the guide track is "primary artifact for easy
-   users ... the quality there matters"; "1s crash lost is totally
-   fine, 2-3s would be also totally fine"). The architect's design,
-   reviewed by a top-tier analyst, to be signed off as text: zero stays
-   the earliest microphone (D77); the guide mix runs about 1 s behind
-   live with each microphone placed by its audio delay, a change
-   crossfaded; D79's limit rises to about 0.8 s; fragments go from 2 s
-   to 1 s so a crash still costs about 2 to 3 s (to be measured with
-   the project's writer); a microphone that leaves keeps its last
-   second in the mix. An audio delay changes only when at least 5
-   counted windows over at least 60 s agree on a change of more than a
-   frame; `recording.json` lists each change and the timeline file
-   splits an audio clip at it. Evidence: rec9 (90 min, 2026-11-23) the
-   Osmo's delay moved from 558 ms (minutes 0 to 30) to 450 to 485 ms
-   (minutes 40 to 90), so one value per file was about 90 ms off for
-   an hour; the BRIO held 14 ms. Not doing: the Mac's own sound as the
-   zero (fails with headphones, Bluetooth, echo cancellation).
-   Folded in (the owner, 2026-11-24: "we fold the improvement into the
-   fix for 38, I want less PRs"), from the owner's recording
-   `2026-11-24 06.30.02` on v0.20261123.93 (a Wacom unplugged; a USB
-   hiccup stopped the Osmo and the CalDigit for about 1.5 s; each got a
-   new audio file at 25.7 s):
-   - **A device's delay carries over to its next file** ("would be good
-     to continue with the same offset as before after a hiccup", the
-     owner): a new file of a known audio input starts with the
-     device's last delay and guide-track state, marked as carried over
-     in `recording.json`, until its own windows count. [KNOWN, the
-     recording] The Osmo's first file was measured 556 ms late only at
-     25.5 s, after it had ended at 23.4 s; its leave went to the ended
-     file. Its new file joined the guide track and stayed in, echo
-     included, until 45.6 s (518 ms).
-   - **The timeline file's shift comes from the first counted window**,
-     as the guide track's membership already does. [KNOWN] No audio
-     file of the recording has a `measuredDelay`, as no file reached 3
-     counted windows in 61 s, so Resolve got no shift for the Osmo
-     (the owner moved it 15 frames by hand).
-   - **The status window shows sync that is applied** (the owner,
-     2026-11-24: "It must show so in the status, e.g. with a uncolored
-     line indicating active sync via clapping applied or so"): an
-     uncoloured statement per synced source, with its value and where
-     it came from (measured, carried over, and for item 22 a clap or
-     Calibrate). The architect's recommendation, for sign-off with the
-     design: in the source's row, not an extra line, given the vertical
-     space (item 39).
 39. **Compact source rows** (the owner, 2026-11-23: "with the cameras
    on my system and the lots of devices vertical space starts to be a
    problem"): sources not recorded (virtual, suspended, no audio)
@@ -583,29 +534,56 @@ Still open from D34: what AGC does and whether it is on in auto mode;
    - a way to run the recorder's tests under CPU load locally, as the
      PR #27 builder did by hand (36 `yes` processes).
    Moot for the compiler once item 2 lands.
-47. **A microphone that sends only zeros after a USB hiccup** (in the
-   next PR, the owner said yes on 2026-11-24; the
-   owner's recording `2026-11-24 06.30.02`): the BRIO's microphone had
-   gaps from 25.7 to 30.9 s, then exact zeros from about 28.8 s to
-   Stop. By D69 that is "no audio", not a problem, so it showed no
-   problem line while 22 s of its sound were missing (its camera kept
-   going). Owner's call: should "no audio" right after a burst of gaps
-   be a problem, as the device likely broke rather than went quiet?
-48. **Homepage screenshots from the owner's Mac** (the owner,
-   2026-11-24: "how do we get nicer screenshots with more devices? Maybe
-   worth creating the screenshots from my Mac from time to time?"). The
-   VM shows one virtual microphone, virtual screens and no camera; the
-   owner's Mac has real screens, cameras and microphones. The
-   architect's proposal, for sign-off as text: a mode of
-   `scripts/update-homepage-screenshots` that runs the end-to-end
-   driver's window captures on this Mac against the published app
-   (`HOME` and the output folder in a scratch folder, D48), announced
-   before each run (D56), recording about 30 s; the owner sets up the
-   devices first. It amends D72 (screenshots only from the VM's run).
-   The VM run stays the gate for marking a PR ready. Open: the device
-   names shown are the owner's own (no serial numbers in the windows);
-   dark captures stay unused, light only (the owner, 2026-11-24: "OK to
-   stay on light mode only for now").
+49. **A reconnected first microphone is measured again** (the owner's
+   try-out of PR #30, 2026-11-24: "it feels like there is a slight echo
+   after the osmo reconnect that then gets less, but stays more than
+   before the disconnect"; "I'd fix it only in a follow up round").
+   [KNOWN, `2026-11-24 20.55.08`] The Osmo sounded first, so it was the
+   anchor; the Razer measured 548 to 581 ms early against it. After
+   its unplug (86.5 to 117.2 s) its new file became the anchor again at
+   0 ms and was never measured, while the Razer now measured 444 to 475
+   ms early: the Osmo had become about 100 ms less late. The Razer's
+   delay could change only by the 60 s rule (3 of 5 windows by Stop),
+   and hindsight merged its windows from before and after into one
+   548 ms, so its last 40 s are about 100 ms off. The architect's
+   proposal, for sign-off as text: an anchor device's new file is not
+   the anchor; it carries over and is measured against the reference
+   like any other input; hindsight's stretches also end at a change of
+   reference.
+50. **No notice for problems without a clear action** (the owner,
+   2026-11-24, of a "camera stalled" notice after a screen switch: "TBH
+   I don't think that this warrants a bug report, do you? What would we
+   do with that info?"; "I won't open a popup for past recordings if
+   there is no clear action"). The notice "The last recording had
+   problems" shows only for a recording with a problem that has a clear
+   action (a report we can act on, or something the person must do);
+   the others stay in the status window, `recording.json` and
+   `recording.log`. Design first: which problem kinds have a clear
+   action (`ProblemKind` in `Sources/RecorderLogic/ProblemsTold.swift`),
+   and whether `msr record`'s `Report it:` line follows the same rule.
+51. **A self-hosted runner in a VM on the owner's Mac, hosted as the
+   fallback** (the owner, 2026-11-24: "Only I develop, can we put the
+   private runner first and use GH hosted runner as fallback?"; "I
+   expect very irregular development spouts so that starting the runner
+   VM for those is feasible"; "I agree with your concept for the
+   on-demand local runner via actions variable including the isolation
+   you propose"). The concept: `scripts/runner-vm start|stop` runs
+   throwaway tart clones as one-job (just-in-time) runners; a
+   repository variable names the runner label for `runs-on`, unset
+   means GitHub's hosted runners; PRs from forks and Dependabot always
+   run hosted; tart's network isolation; `gh` reads its own
+   credential; the owner registers the runner (`AGENTS.md`,
+   "Pipeline"). Open for the design: what happens to queued jobs when
+   the VM stops with the variable still set. Usage 2026-11-12 to 24:
+   399 macOS jobs, about 1,165 billed minutes, free for this public
+   repository.
+52. **Follow-ups from PR #30**: the recorder's no-audio set duplicates
+   the audio tracker's state; no test for a capture ending during no
+   audio; one long doc line; an end-to-end scenario of 30 s or more
+   that checks a late microphone being placed (the VM's tone
+   recordings are 10 s, shorter than the first measurement); a
+   `recording.json` spec at v1 (the owner, 2026-11-24: "maybe time to
+   write a proper spec for the json? Or not yet").
 
 ## Deliberately deferred
 
@@ -750,6 +728,15 @@ Still open from D34: what AGC does and whether it is on in auto mode;
   the README (D46). Revisit when people struggle with it.
 
 ## Done (recent)
+
+- 2026-11-24: PR #30 merged by the owner, release 0.20261124.108: item
+  38 (microphones placed by their audio delay in the guide track, D80,
+  with hindsight at Stop and short sync texts after the owner's first
+  try-out), item 47 (silence after gaps is a problem, D81), item 48
+  (homepage screenshots from the owner's Mac, D82) and the unmerged
+  troubleshooting branch's entries. Reviews: one top-tier review and
+  six delta reviews; end-to-end tests passed on bca6763; two try-outs
+  on the owner's Mac (the second found item 49).
 
 - 2026-11-24: item 46 resolved, not a regression: the end-to-end
   tests failed 9 of 10 runs on a busy Mac (a Lima VM, ClamXAV, a
