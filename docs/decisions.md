@@ -2759,7 +2759,9 @@ architect's reading.
     confirm it, and `· not in the guide track yet` before; uncoloured.
 - **Consequences:** The guide is in sync to within a frame for every
   input within 0.8 s of the earliest; an input never measured stays
-  out of it. A crash loses up to about 3 s of the guide; Stop waits
+  out of it. A crash loses up to about 3 s of a video file instead of 2,
+  as its fragment waits for its guide samples (the end-to-end run of
+  2026-11-24); the audio files still lose up to 2 s. Stop waits
   about 1 s longer for the last mix. A change repeats or skips its size
   of sound in the guide once.
 - **Evidence:** backlog item 38; [design/recorder.md](design/recorder.md),
