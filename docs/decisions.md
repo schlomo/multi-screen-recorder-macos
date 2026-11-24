@@ -2824,9 +2824,8 @@ architect's reading.
   The architect's design: at Stop, each audio file's `delays` are
   rewritten with hindsight: its stretches are bounded only by the
   live changes of the 60 s rule, each takes the median of
-  the counted windows within it, one without any takes its
-  neighbour's, one with fewer than 2 keeps its live value, and
-  neighbours within one frame merge, so a file the
+  the counted windows within it, one with fewer than 2 keeps its live
+  value, and neighbours within one frame merge, so a file the
   60 s rule never changed has one entry at 0; a crash leaves the live
   entries, which mean the same. An input whose file has had sound for
   3 measurements (*data*) without a counted window reads `· not in the
