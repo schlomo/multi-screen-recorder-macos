@@ -319,7 +319,8 @@ extension GlobalRecordingLog {
         /// has `count` audio files, as a single buffer now and then starts none.
         private func startAudioFiles(_ uids: [String], _ what: String = "the audio files", count: Int? = nil) async throws {
             try await wait(what) {
-                for uid in uids { try? send(0.1, buffers: 1, to: sources.last(of: uid)) }
+                // On from each source's latest buffer, so a slow runner's pause between tries is no gap (D81).
+                for uid in uids { try? sendNext(0.1, buffers: 1, to: sources.last(of: uid)) }
                 return (try? manifestOnDisk().audioFiles.count) == count ?? uids.count
             }
         }
@@ -709,11 +710,14 @@ extension GlobalRecordingLog {
             return (SourceLabel.audioInput(1, name: "Mic R"), SourceLabel.audioInput(2, name: "Mic A"))
         }
 
-        /// `uids`, the first the reference, named "Mic <uid>", recorded with a camera, their files started.
+        /// `uids`, the first the reference, named "Mic <uid>", recorded with a camera, their files started. The
+        /// camera sends no frame, so its first-frame limit is out of reach of a slow runner's test.
         private func startInputs(_ uids: [String]) async throws {
             cameras.connected.withLock { $0 = [Self.camera] }
             let inputs = uids.map { AudioInputInfo(name: "Mic \($0)", channelCount: 1, isDefault: $0 == uids[0], transport: .usb, uid: $0) }
-            try start(cameraMode: .real, inputs: inputs)
+            var watch = CameraFrameWatch()
+            watch.firstFrameLimit = .seconds(600)
+            try start(cameraMode: .real, cameraFrameWatch: watch, inputs: inputs)
             try await wait("the audio inputs' captures") { sources.byUID.withLock { $0.count } == uids.count }
             try await startAudioFiles(uids)
         }

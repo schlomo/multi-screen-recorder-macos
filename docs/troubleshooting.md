@@ -32,6 +32,7 @@ One row per entry, the error text exactly as in the entry.
 | `the virtual screen 122787BA-50AA-4A5A-B00C-3F98867665AF has no mode 1600x900: []` | [A long-running process sees no modes of a new screen](#a-long-running-process-sees-no-modes-of-a-new-screen) |
 | `the program running this (a terminal app) lacks the Microphone permission; run msr check once from this terminal to get the prompt` | [The VM's Microphone permission reads as denied before its login](#the-vms-microphone-permission-reads-as-denied-before-its-login) |
 | `timed out waiting for A out of the guide track again` | [A stand-in audio input's file ends after a pause of a slow runner](#a-stand-in-audio-inputs-file-ends-after-a-pause-of-a-slow-runner) |
+| `Audio 2 Mic A sent only silence for 1.6 s after its gaps at 0:00, recovered` (an extra problem line in a test) | [A slow runner's pause gives a stand-in input a gap before its no audio](#a-slow-runners-pause-gives-a-stand-in-input-a-gap-before-its-no-audio) |
 | `sending 'self' risks causing data races [#SendingRisksDataRace]` | [Swift 6.3 rejects self in a later argument after callbacks capture it](#swift-63-rejects-self-in-a-later-argument-after-callbacks-capture-it) |
 | `AVFoundationErrorDomain -11800; reason: An unknown error occurred (-19092)` | [The end-to-end tests fail at a mode switch on a busy Mac](#the-end-to-end-tests-fail-at-a-mode-switch-on-a-busy-mac) |
 | `The job was not acquired by Runner of type hosted even after multiple attempts` | [No macOS runner: the pipeline job is cancelled](#no-macos-runner-the-pipeline-job-is-cancelled) |
@@ -300,6 +301,30 @@ One row per entry, the error text exactly as in the entry.
   pushed head.
 - **Observed:** 2026-11-23, PR #27, runner Xcode 26.6; resolved
   (the pipeline on abc1953 passed).
+
+## A slow runner's pause gives a stand-in input a gap before its no audio
+
+- **Error:** `Expectation failed: (recorder.problemLines().map(\.text) → ["Audio 2 Mic A sent only silence for 1.6 s after its gaps at 0:00, recovered", "Audio 2 Mic A 900 ms late, not in the guide track; its own audio track is recorded"])`
+- **Symptom:** in CI's `scripts/test` (run 45427807337 on a5682a7 of
+  PR #30), `RecorderTests.anAudioInputThatLeftTheGuideTrackStaysOutWithItsNextFile`
+  has an extra D81 line; it passes locally. Locally under load (three
+  `yes` processes per core, 2026-11-24) the same test failed 4 of 11
+  runs, there with another extra line, `camera stream failed: the camera
+  delivered no frame within 5 s of its start`.
+- **Why:** [KNOWN: the test code] `startAudioFiles` sent each try's
+  buffer timestamped at the host clock's now, so a runner's pause
+  between two tries became a gap in the input's audio at 0:00; the
+  test's no audio then began within 10 s of it, which D81 rightly tells
+  as an input broken by its gaps. [KNOWN: recording.log of a local
+  failing run] the stand-in camera of `startInputs`, there only so the
+  guide tracks exist, sends no frame, and a test slower than 5 s hits
+  its first-frame limit. The recorder is right in both.
+- **Fix:** `startAudioFiles` sends each try on from the source's latest
+  buffer (`sendNext`), as the fix of "A stand-in audio input's file ends
+  after a pause of a slow runner" did for the later buffers; `startInputs`
+  gives its camera a first-frame limit of 600 s.
+- **Verify:** the guide-track tests pass 10 of 10 runs under the same
+  load; CI's `scripts/test` passes on the pushed head.
 
 ## Swift 6.3 rejects self in a later argument after callbacks capture it
 

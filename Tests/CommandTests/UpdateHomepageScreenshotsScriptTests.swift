@@ -115,7 +115,8 @@ import Testing
     }
 
     /// A PATH whose osascript answers whether the app runs and whether this Mac is in dark mode, and nothing
-    /// else, so no test asks the real Mac.
+    /// else, so no test asks the real Mac; with stand-in ffmpeg and ffprobe, which the runner lacks and the
+    /// script only checks for before building.
     private func osascript(running: Bool, dark: Bool) throws -> [String: String] {
         let bin = scratch.url.appending(path: "bin", directoryHint: .isDirectory)
         try FileManager.default.createDirectory(at: bin, withIntermediateDirectories: true)
@@ -129,6 +130,11 @@ import Testing
             esac
             """.utf8).write(to: script)
         try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: script.path)
+        for tool in ["ffmpeg", "ffprobe"] {
+            let standIn = bin.appending(path: tool)
+            try Data("#!/bin/sh\nexit 1\n".utf8).write(to: standIn)
+            try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: standIn.path)
+        }
         return ["PATH": bin.path + ":" + (try #require(ProcessInfo.processInfo.environment["PATH"]))]
     }
 
