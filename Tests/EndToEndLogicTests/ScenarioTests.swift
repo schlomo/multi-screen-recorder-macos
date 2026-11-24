@@ -33,9 +33,18 @@ import Testing
         #expect(plain.arguments(outputFolder: "/s") == ["record", "--output-folder", "/s", "--duration", "8s"])
         let tone = Scenario.named.first { $0.name == "tone" }!
         #expect(tone.arguments(outputFolder: "/s") == [
-            "record", "--output-folder", "/s", "--resolution", "1080p", "--audio-mode", "all-inputs", "--system-audio", "off",
+            "record", "--output-folder", "/s", "--resolution", "1080p", "--audio-mode", "default-microphone", "--system-audio", "off",
             "--duration", "130s",
         ])
+    }
+
+    /// The tone scenarios record only the default microphone, BlackHole, so it is the anchor (D80).
+    @Test func theToneScenariosRecordOnlyTheDefaultMicrophone() {
+        for name in ["tone", "system-audio"] {
+            let scenario = Scenario.named.first { $0.name == name }!
+            #expect(scenario.settings.audioMode == "default-microphone")
+            #expect(scenario.playsTone)
+        }
     }
 
     @Test func onlyTheVirtualScreenScenariosRecordWithDebugDetail() {

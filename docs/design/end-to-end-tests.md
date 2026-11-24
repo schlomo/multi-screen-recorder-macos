@@ -275,20 +275,23 @@ The named scenarios, each about 10 to 25 s of recording:
 | `plain-recording` | auto mode, ended by `--duration` | exit 0 |
 | `virtual-screen` | a virtual screen of 1280 × 720 connects, switches to 1600 × 900 and back, disconnects; stopped by SIGINT | the screen's three files, frame sizes, number and times, and its events in order at their times |
 | `virtual-screen-stress` | a virtual screen of 1280 × 720 connects, its mode is switched ten times, 1280 × 720 ↔ 1600 × 900, about 2 s apart (the next switch waits for the screen to settle, so at least that), and it disconnects; stopped by SIGINT | as `virtual-screen`, as strictly: no failure event, a `screen frame size changed` per switch, no lost content. Added to make the writer failure of `OSStatus -19092` happen often enough to study (D66); it passed on the hosted runner, and no frame of the new size reached the old file (D67) |
-| `tone` | the test tone in BlackHole, all audio inputs recorded, no system audio | the tone's level, no silent stretch and a click every second in each of BlackHole's tracks; the clicks at the same time of day, by timecode, in every screen file's guide track "Audio inputs" |
+| `tone` | the test tone in BlackHole, BlackHole the default microphone for the run (the original put back after it, and by the restore) and the only input recorded (`default-microphone`), no system audio | the tone's level, no silent stretch and a click every second in each of BlackHole's tracks; the clicks at the same time of day, by timecode, in every screen file's guide track "Audio inputs" |
 | `system-audio` | as `tone`, with the system audio | the system audio's file: one stereo track, its length |
 | `stop-by-ctrl-c` | auto mode, SIGINT | exit 0, finalized |
 | `stop-by-kill` | auto mode, `kill -9` | no `ended`, every file `recording` and readable up to its last fragment, less 0.5 s of slack (`killSlack`); a screen file's less the guide tracks' delay of 1 s too, as its fragment is written only once its guide samples arrive (`EndToEndValues.guideTrackDelay`, D80) |
 
-The clicks are in the guide track "Audio inputs" from the start only if
-BlackHole is in it from the start, that is if it is the anchor: the first
-input whose file is written (D80). Any other input joins only once
-measured, and a measurement needs 10 s of sound, as long as the run:
-the VM's other input, the Apple Virtual Sound Device, hears the tone 300
-to 400 ms late, and in the run of 2026-11-24 at 2628b9d, when the default
-microphone (that device) was the reference, BlackHole got no audio delay
-within the run, so the clicks were missing there. Which of the two
-inputs' files starts first is not set by the driver.
+The tone scenarios record only BlackHole, made the default microphone
+for the run, so it is the anchor and in the guide track "Audio inputs"
+from the start (D80). The anchor is the first input whose file starts,
+and with every input recorded that is a race between the VM's two:
+BlackHole's file started at 0.133 s and the Apple Virtual Sound
+Device's at 0.167 s in the run of 2026-11-24 at 2628b9d. Any other
+input joins the guide only once measured, which needs 10 s of sound, as
+long as the run, and the Apple Virtual Sound Device hears the tone 300
+to 400 ms late; with it as the anchor, BlackHole got no audio delay
+within the run and the clicks were missing from the guide.
+The virtual-screen scenarios still record every input (`all-inputs`),
+and `plain-recording` and the stop scenarios run in auto mode (Wired).
 
 Every scenario's checks: `msr record`'s exit status, the recording
 folder's path alone on standard output, `recording.log` present next to `recording.json`, the timeline file (D68) in the folder not counted as a recorded file (its content is not checked here), `recording.json` exactly
