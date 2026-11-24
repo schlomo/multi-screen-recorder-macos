@@ -267,8 +267,8 @@ window) and copies its scratch folder back; its exit status is the
 driver's
 ([end-to-end-tests.md](docs/design/end-to-end-tests.md)); with
 `--release` or `--snapshot <n>` it runs that published app instead of
-the built one. They need an idle Mac: another VM, video editing, a virus scan or
-a backup running makes them fail. Before a PR
+the built one. They need an idle Mac: another VM, video editing, a
+virus scan or a backup running can make them fail. Before a PR
 that touches the recorder or the end-to-end driver is marked ready,
 the architect runs `scripts/end-to-end-test` on the PR's head and
 records the commit and the result in the PR description. The
