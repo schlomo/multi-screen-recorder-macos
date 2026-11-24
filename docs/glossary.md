@@ -115,7 +115,7 @@ device again, report it, or stop and start the recording again (or
 replug) and report it; a kind without one is told but never bounces the
 Dock icon, sets the badge or counts in the status line. A source that
 fails gets its call to action only once it lasted 10 s without coming
-back. Only a call to action that includes "report it", or lost data,
+back, or at Stop while it still fails. Only a call to action that includes "report it", or lost data,
 makes the recording ask to report it: `msr record`'s `Report it:` line
 and the app's notice at its next start. Not "action", which is a step a
 tracker asks the recorder to carry out.
@@ -421,7 +421,8 @@ while recording by cross-correlation against the reference: the anchor
 at first, the reference in use while its capture runs and it is not in
 no audio, else the lowest-numbered input being written that has an
 audio delay, whose own audio delay turns the lags into ones against the
-anchor; the reference stays with the input it moved to (D77, D80, D85). A file's audio delay is set by its first
+anchor; the reference stays with the input it moved to (D77, D80, D85).
+A file's audio delay is set by its first
 counted window, once more by the median of its first 3, then only by the
 median of the latest 60 s, each time only beyond a frame (D80); a new
 file of the same input starts with the earlier file's, carried over.
@@ -442,6 +443,16 @@ the reference moved away is measured like any other input (D85). Only
 when no input being written has an audio delay does the lowest-numbered
 input being written become the new anchor, every input then starting
 over (D80).
+
+## Reference
+
+The audio input whose newest file every other input's sound is
+measured against for its audio delay (`AudioDelays.referenceDevice`):
+the anchor at first, kept while its capture runs and its newest file
+did not end on no audio; then the lowest-numbered input being written
+that has an audio delay, which it stays with until its own file ends,
+the anchor's returning file not taking it back (D80, D85). Not the
+"Reference implementation" above.
 
 ## Lag
 

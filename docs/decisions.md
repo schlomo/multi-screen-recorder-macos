@@ -2907,7 +2907,7 @@ architect's reading.
   `what-happened`.
 - **Evidence:** [design/recorder.md](design/recorder.md).
 
-## D84: Alerts only with a call to action (2026-11-24)
+## D84: Only a call to action bounces the Dock, sets the badge or asks to report it (2026-11-24)
 
 - **Status:** in force. Amends D46, D47 and D79 (every problem bounced
   the Dock icon, set the badge and counted in the status line, D79's
@@ -2923,42 +2923,60 @@ architect's reading.
   stay quiet." On the architect's table of problem kinds: "table is
   right and yes, alert for those".
 - **Decision:** Each problem kind has a call to action or none
-  (`ProblemKind.callToAction`): free up disk space (a full disk, the
-  recording manifest, the timeline file or the recording log not
-  written; low disk space keeps alerting); grant the permission (the
-  Camera permission missing); unplug and plug in the device again (an
-  audio input silent right after its gaps, D81); report it (a file
-  incomplete); stop and start the recording again, or replug, and report
-  it, for a source that fails and does not come back (a screen, camera,
-  audio source or audio file not captured or failed, an audio input not
-  recordable) once it lasted 10 s (`unrecoveredAfter`, *data*) without
-  ending, and for the audio inputs' changes not followed at once. None:
-  a camera stall, an audio input out of the "Audio inputs" guide track,
-  guide tracks cut, the Dock icon not shown, an input volume not set or
-  not followed, the screens, the audio inputs or the free space not
-  read, and a screen showing another screen's picture: its file ending
-  by that fault, told as the screen not captured, calls to no action,
-  also past 10 s. Only a call to action bounces the Dock icon, sets the
-  badge and counts in `msr record`'s status line; every problem is still
-  told on standard error, listed in the status window, `recording.json`
-  and the recording log.
-- **The architect's reading (after the recording):** the app's notice
-  "The last recording had problems" and `msr record`'s `Report it:` and
-  `Attach:` lines appear only when a call to action that includes
-  "report it" was given, or data was lost (a file not finalized, or the
-  final manifest not written). Disk full, the permission and a replug
-  are live only: nothing is left to do afterwards. `recording.json`'s
-  `result` and exit status 3 still report the facts (D47); a camera
-  stall stays a failure event.
+  (`ProblemKind.callToAction`), by the table the owner signed:
+  - free up disk space: disk full, low disk space, manifest/recording
+    log not written;
+  - grant the permission: camera permission missing;
+  - unplug and plug in again: audio input silent after gaps;
+  - report it: file incomplete;
+  - none: camera stalled, a screen/camera/microphone not captured and
+    recovered, out of the guide track, guide tracks cut, a screen
+    showing another screen's picture, Dock icon not shown, input volume
+    not set or not followed, screens/audio inputs/free space not read;
+  - the owner's "yes, alert for those" (stop and start the recording
+    again, or replug, and report it): a source that fails and does not
+    come back, audio input changes not followed.
+
+  Only a call to action bounces the Dock icon, sets the badge and
+  counts in `msr record`'s status line; low disk space is not a problem
+  and keeps setting the badge. Every problem is still told on standard
+  error, listed in the status window, `recording.json` and the
+  recording log.
+- **The architect's readings:**
+  - A source that does not come back: a screen, camera, audio source or
+    audio file not captured or failed, or an audio input not
+    recordable, once it lasted 10 s (`unrecoveredAfter`, *data*)
+    without ending; a call that fell due is given even if the source
+    came back before it ran. A screen showing another screen's picture,
+    told as the screen not captured, calls to no action, also past
+    10 s; a failure of that screen for another reason afterwards calls
+    to action from its own tell.
+  - At Stop, a source still failing is called to action then, without
+    its 10 s: it does not come back in this recording.
+  - An audio source or audio file ended by a full disk is the full
+    disk: free up disk space, never "report it"; told as the full disk,
+    one already told stands and no second call follows. A file a full
+    disk left not finalized does not ask to report the recording.
+  - The timeline file not written has no call to action: it is told
+    only after the manifest is final, and `msr timeline` writes it from
+    the manifest.
+  - After the recording, the app's notice "The last recording had
+    problems" and `msr record`'s `Report it:` and `Attach:` lines appear
+    only when a call to action that includes "report it" was given, or
+    data was lost (a file not finalized, or the final manifest not
+    written). Disk full, the permission and a replug are live only:
+    nothing is left to do afterwards. `recording.json`'s `result` and
+    exit status 3 still report the facts (D47); a camera stall stays a
+    failure event. `msr record --quiet` prints the summary of a
+    recording that asks to report it, also when it exits 0.
 - **Decided while building (the architect's reading):** `state.json`'s
-  `lastRecording` holds `noticeWanted` instead of `result`; a state file
-  of an earlier release decodes and wants no notice. A call to action
-  given later than its problem adds no line on standard error, and the
-  problem lines say nothing new: the call to action governs only the
-  alerts (D78 stays). An audio source ended by a full disk falls under
-  the disk-full call to action, free up disk space, never "report it":
-  it is told as the full disk, so one already told stands and no second
-  call follows.
+  `lastRecording` holds `noticeWanted` beside `result`, which an
+  earlier release reads; a state file of an earlier release, with
+  `result` only, decodes and wants no notice, and one without `result`
+  is an error. A call to action given later than its problem adds no
+  line on standard error, and the problem lines say nothing new: the
+  call to action governs only the Dock bounce, the badge, the count and
+  the notice (D78 stays).
 - **Consequences:** A recording with only hiccups that recovered, a
   stall or an input out of the guide track is quiet: no bounce, no
   badge, no notice at the next start, no `Report it:` line, though it
@@ -2998,12 +3016,14 @@ architect's reading.
   a channel change of it moves nothing. The anchor's files, 0 by
   definition, are those of its device that start while it is the
   reference. A file's stretch after a change of reference starts at its
-  first window against the new reference, and two such neighbours are
-  never merged, also within a frame. The reference other than the anchor
+  first window against the new reference; windows against different
+  references are never merged, and a stretch within a frame of the one
+  before it adds no entry, so a file is not split where the two agree.
+  The reference other than the anchor
   is still not measured, its audio delay against the anchor kept from
   when it became the reference (the shortcut of D80).
 - **Consequences:** An Osmo replugged mid-recording is placed by its
-  new audio delay within about 10 s; a microphone it was the reference
+  new audio delay within 10 to 20 s; a microphone it was the reference
   for keeps its audio delay instead of being moved by the 60 s rule.
 - **Evidence:** backlog item 49; the owner's recording
   `2026-11-24 20.55.08`; `AudioDelaysTests`
