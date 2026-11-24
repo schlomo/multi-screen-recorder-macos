@@ -2814,6 +2814,23 @@ architect's reading.
   corrected false window moves nothing; the anchor's file lists
   `{at: 0, delay: 0}`, so an empty `delays` means only "never
   measured, placed as recorded".
+- **Amended after the owner's try-out (2026-11-24):** the owner, on
+  `pr-30`: "in general it worked very well ... the osmo audio track is
+  split and indeed left of the split there is a slight echo and right
+  of it not ... It also showed first 533ms carry over and then 472
+  measured"; on the CalDigit's empty jack, "the info on the caldigit
+  audio is misleading ... I think we don't use it because there is no
+  audio"; asked where the improvements go: "Fold both into PR #30".
+  The architect's design: at Stop, each audio file's `delays` are
+  rewritten with hindsight: its stretches are bounded only by the
+  live changes of the 60 s rule (a drift), each takes the median of
+  the counted windows within it, one without any takes its
+  neighbour's, and neighbours within one frame merge, so a file whose
+  delay never drifted has one entry at 0; a crash leaves the live
+  entries, which mean the same. An input whose file has had sound for
+  3 measurements (*data*) without a counted window reads `· not in the
+  guide track, no clear sound to sync`; it is still recorded and joins
+  once a window counts.
 - **Consequences:** The guide is in sync to within a frame for every
   input within 0.8 s of the earliest; an input never measured stays
   out of it. A crash loses up to about 3 s of a video file instead of 2,
