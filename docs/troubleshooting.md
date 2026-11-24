@@ -33,6 +33,7 @@ One row per entry, the error text exactly as in the entry.
 | `the program running this (a terminal app) lacks the Microphone permission; run msr check once from this terminal to get the prompt` | [The VM's Microphone permission reads as denied before its login](#the-vms-microphone-permission-reads-as-denied-before-its-login) |
 | `timed out waiting for A out of the guide track again` | [A stand-in audio input's file ends after a pause of a slow runner](#a-stand-in-audio-inputs-file-ends-after-a-pause-of-a-slow-runner) |
 | `sending 'self' risks causing data races [#SendingRisksDataRace]` | [Swift 6.3 rejects self in a later argument after callbacks capture it](#swift-63-rejects-self-in-a-later-argument-after-callbacks-capture-it) |
+| `AVFoundationErrorDomain -11800; reason: An unknown error occurred (-19092)` | [The end-to-end tests fail at a mode switch on a busy Mac](#the-end-to-end-tests-fail-at-a-mode-switch-on-a-busy-mac) |
 
 ## Format
 
@@ -315,3 +316,31 @@ One row per entry, the error text exactly as in the entry.
   45242373454 on 4115a17 got past the build to the tests).
 - **Observed:** 2026-11-23, PR #27, runner Xcode 26.6; resolved
   (the pipeline on abc1953 passed).
+
+## The end-to-end tests fail at a mode switch on a busy Mac
+
+- **Error:** `AVFoundationErrorDomain -11800; reason: An unknown error occurred (-19092)`
+- **Symptom:** `scripts/end-to-end-test` (and
+  `scripts/update-homepage-screenshots`) fail `virtual-screen`, often
+  `virtual-screen-stress` too: a `screen file writer failed` event with
+  this error, or, without it, lines such as `ends at 8.33 s, expected
+  6.59 s to 7.59 s, the settle time after the screen's last change at
+  6.09 s` (the driver's output); sometimes the app's window captures
+  fail with `no window of process 522 on screen within 20 s`.
+- **Why:** [KNOWN: the runs of 2026-11-23 from about 19:45 and of
+  2026-11-24, Europe/Berlin] 9 of 10 runs failed while a Lima VM, ClamXAV,
+  Synology Active Backup and DaVinci Resolve ran on the Mac (a load of 10
+  to 15 on 12 cores): the release v0.20261123.93 5 of 5 (the encoder
+  error in 2 of the 3 with Resolve open, in neither of the 2 with it
+  closed), the previous release v0.20261122.89 3 of 3, a local build of
+  the release's code 1 of 2. With all of them stopped (a load of 3 to 6),
+  the release passed 3 runs of 3; local builds had passed 2 of 2 earlier
+  on 2026-11-23, before the Lima VM ran. [CONJECTURE] the VM's
+  paravirtualized encoder and its processors wait behind the Mac's other
+  work, as on GitHub's hosted runner (D67).
+- **Fix:** run the end-to-end tests on an idle Mac: no other virtual
+  machine, no video editing, no virus scan or backup running.
+- **Verify:** 3 runs in a row pass; `uptime` shows a load well below
+  the number of cores.
+- **Observed:** 2026-11-23 and 2026-11-24, macOS 27.2.1, tart 2.42.0;
+  open (no fix in the project; the Mac is kept idle).
