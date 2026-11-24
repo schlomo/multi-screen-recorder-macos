@@ -64,7 +64,9 @@ final class RecordingSession: RecorderObserver {
     private func remember(_ summary: RecordingSummary) {
         do {
             try StateFile(homeFolder: homeFolder).update {
-                $0.recorded(folder: summary.recordingFolder, noticeWanted: summary.asksToReportIt)
+                $0.recorded(
+                    folder: summary.recordingFolder, result: summary.endedWithError ? .problems : .ok,
+                    noticeWanted: summary.asksToReportIt)
             }
         } catch {
             notRemembered = error

@@ -40,10 +40,13 @@ import Testing
     }
 
     @Test func theLastRecordingIsKeptInTheFile() throws {
-        let state = AppState.empty.recorded(folder: "/Users/a/Movies/r", noticeWanted: true)
-        #expect(state.lastRecording == AppState.LastRecording(folder: "/Users/a/Movies/r", noticeWanted: true, noticeShown: false))
+        let state = AppState.empty.recorded(folder: "/Users/a/Movies/r", result: .problems, noticeWanted: true)
+        #expect(state.lastRecording == AppState.LastRecording(
+            folder: "/Users/a/Movies/r", result: .problems, noticeWanted: true, noticeShown: false))
         #expect(try AppState(json: state.jsonData()) == state)
+        // `result` stays beside `noticeWanted`, for a release before D84 that reads the file.
         #expect(String(decoding: try state.jsonData(), as: UTF8.self).contains(#""noticeWanted" : true"#))
+        #expect(String(decoding: try state.jsonData(), as: UTF8.self).contains(#""result" : "problems""#))
         let shown = state.showingProblemsNotice()
         #expect(try AppState(json: shown.jsonData()) == shown)
     }
@@ -51,22 +54,29 @@ import Testing
     /// A state file the release before D84 wrote, with the recording's `result`, decodes: it wants no notice.
     @Test func aStateFileWithTheResultWantsNoNotice() throws {
         let state = try AppState(json: Data(#"{"lastRecording": {"folder": "/r", "result": "problems", "noticeShown": false}}"#.utf8))
-        #expect(state.lastRecording == AppState.LastRecording(folder: "/r", noticeWanted: false))
+        #expect(state.lastRecording == AppState.LastRecording(folder: "/r", result: .problems, noticeWanted: false))
         #expect(state.problemsNoticeFolder { _ in true } == nil)
     }
 
+    /// A last recording with neither `noticeWanted` nor `result` is a broken state file.
+    @Test func aLastRecordingWithoutResultIsAnError() {
+        #expect(throws: DecodingError.self) {
+            try AppState(json: Data(#"{"lastRecording": {"folder": "/r", "noticeShown": false}}"#.utf8))
+        }
+    }
+
     @Test func theNoticeShowsOnceForARecordingThatWantsItWhoseFolderIsThere() {
-        let wanted = AppState.empty.recorded(folder: "/r", noticeWanted: true)
+        let wanted = AppState.empty.recorded(folder: "/r", result: .problems, noticeWanted: true)
         #expect(wanted.problemsNoticeFolder { _ in true } == "/r")
         #expect(wanted.problemsNoticeFolder { _ in false } == nil)
         #expect(wanted.showingProblemsNotice().problemsNoticeFolder { _ in true } == nil)
-        #expect(AppState.empty.recorded(folder: "/r", noticeWanted: false).problemsNoticeFolder { _ in true } == nil)
+        #expect(AppState.empty.recorded(folder: "/r", result: .ok, noticeWanted: false).problemsNoticeFolder { _ in true } == nil)
         #expect(AppState.empty.problemsNoticeFolder { _ in true } == nil)
     }
 
     @Test func aNewRecordingReplacesTheLastOneAndItsNotice() {
-        let shown = AppState.empty.recorded(folder: "/r1", noticeWanted: true).showingProblemsNotice()
-        #expect(shown.recorded(folder: "/r2", noticeWanted: true).problemsNoticeFolder { _ in true } == "/r2")
-        #expect(shown.recorded(folder: "/r2", noticeWanted: false).offering("c").lastRecording?.folder == "/r2")
+        let shown = AppState.empty.recorded(folder: "/r1", result: .problems, noticeWanted: true).showingProblemsNotice()
+        #expect(shown.recorded(folder: "/r2", result: .problems, noticeWanted: true).problemsNoticeFolder { _ in true } == "/r2")
+        #expect(shown.recorded(folder: "/r2", result: .ok, noticeWanted: false).offering("c").lastRecording?.folder == "/r2")
     }
 }
