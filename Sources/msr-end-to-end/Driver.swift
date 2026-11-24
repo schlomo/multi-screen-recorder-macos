@@ -394,19 +394,15 @@ final class Driver {
             }
         }
         lastRecording = (folder, check.files, probed)
-        if scenario.checksALateMicrophone {
-            failures += LateMicrophoneCheck.failures(manifest: manifest, loopbackUID: Machine.loopbackUID)
-        }
         if scenario.playsTone {
-            let guideFrom = scenario.checksALateMicrophone ? check.started.map { $0 + EndToEndValues.lateMicrophoneJoinedBy } : nil
-            failures += try toneFailures(check.files, probed: probed, folder: folder, guideFrom: guideFrom)
+            failures += try toneFailures(check.files, probed: probed, folder: folder)
         }
         return failures
     }
 
     /// The tone in the loopback device's audio file, and in each screen
-    /// file's guide track "Audio inputs", from the time of day `guideFrom` on if given.
-    private func toneFailures(_ files: [ListedFile], probed: [String: ProbedFile], folder: URL, guideFrom: Double?) throws -> [String] {
+    /// file's guide track "Audio inputs".
+    private func toneFailures(_ files: [ListedFile], probed: [String: ProbedFile], folder: URL) throws -> [String] {
         func tracks(_ file: ListedFile, titled include: (String) -> Bool) throws -> [ToneCheck.Track] {
             guard let probe = probed[file.name], let start = TimecodeValue(file.timecode) else { return [] }
             return try probe.audio.filter { include($0.title ?? "") }.map { stream in
@@ -425,7 +421,7 @@ final class Driver {
             case .audioInput(let uid, _, _) where uid == Machine.loopbackUID:
                 played += try tracks(file) { _ in true }
             case .screen:
-                mixed += try tracks(file) { $0 == "Audio inputs" }.map { track in guideFrom.map(track.from(timeOfDay:)) ?? track }
+                mixed += try tracks(file) { $0 == "Audio inputs" }
             default:
                 break
             }

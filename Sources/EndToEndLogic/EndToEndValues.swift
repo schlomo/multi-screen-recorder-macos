@@ -48,11 +48,4 @@ public enum EndToEndValues {
     public static let holeBelowTonePeak = 0.05
     /// The shortest quiet run counted as a hole: one period of the tone.
     public static let holeSeconds = 0.001
-    /// The size of the audio delay between the loopback device and the VM's other input, the Apple Virtual
-    /// Sound Device, which hears the test tone 300 to 400 ms late (the runs of 2026-11-24, D80), in seconds.
-    public static let lateMicrophoneDelay = 0.2...0.6
-    /// When, in seconds after the recording started, the late microphone has joined the "Audio inputs"
-    /// guide track at the latest: its first counted window ends 10 to 20 s in, and the guide is mixed 1 s
-    /// behind live (D80); from then on the guide's clicks are the loopback device's.
-    public static let lateMicrophoneJoinedBy = 25.0
 }
