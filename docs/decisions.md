@@ -2757,6 +2757,19 @@ architect's reading.
   - The status window's audio input row says `· synced 550 ms late
     (measured)`, `(carried over)` until the file's own windows set or
     confirm it, and `· not in the guide track yet` before; uncoloured.
+- **Decided while building (the architect's reading):** an entry's
+  `at` is the mix's first sample not mixed yet less the file's start,
+  never below 0, so a carried-over entry is at 0; the timeline file
+  places a file's stretch before its first entry by that entry; a new
+  file of the same reference device keeps every input's audio delay and
+  counted windows, while another reference device starts every input
+  over ("not in the guide track yet"), the entries written so far kept;
+  the normalization spans every file measured against the current
+  reference device, ended ones at their last value; the row shows
+  nothing for a file out of the guide track (its problem line says so)
+  or for the reference while it is the earliest; how much earlier an
+  input is placed is "placed earlier by" (`earlierBy`), as "placement"
+  is an audio file's place on the tick grid.
 - **Consequences:** The guide is in sync to within a frame for every
   input within 0.8 s of the earliest; an input never measured stays
   out of it. A crash loses up to about 3 s of a video file instead of 2,
@@ -2780,6 +2793,12 @@ architect's reading.
   problem, `Audio <n> <name> sends only silence since its gaps at 0:25;
   unplug and plug it in again`, until its sound returns; no audio
   without gaps before stays no problem.
+- **Decided while building (the architect's reading):** the trigger is
+  any of the input's gaps from 10 s before its zeros began up to when
+  no audio is told, as gaps can fall inside the zeros; the problem
+  begins where the zeros began; once the sound returns the line reads
+  `Audio <n> <name> sent only silence for 1:05 after its gaps at 0:25,
+  recovered`, orange.
 - **Consequences:** A microphone broken by a USB hiccup is told within
   about 10 s instead of never.
 - **Evidence:** backlog item 47; [design/recorder.md](design/recorder.md).
