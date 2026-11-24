@@ -2703,3 +2703,103 @@ architect's reading.
 - **Evidence:** [design/recorder.md](design/recorder.md), "Guide
   tracks"; `Sources/RecorderLogic/GuideTrackMembership.swift`,
   `Sources/RecorderCore/Recorder.swift` (`leaveTheGuideTrack`).
+
+## D80: The "Audio inputs" guide track places each audio input by its audio delay (2026-11-24)
+
+- **Status:** in force. Amends D77 (`measuredDelay`, when a delay is
+  set) and D79 (the limit, when an input joins); D52's mix otherwise.
+- **Context:** The owner, 2026-11-23: late microphones "should stay if
+  we can compensate for them"; the guide track is "primary artifact for
+  easy users ... the quality there matters"; "1s crash lost is totally
+  fine, 2-3s would be also totally fine". 2026-11-24: "I think 2s file
+  chunks are also totally fine if it helps"; "Maybe better to add mics
+  only after synchronizing them? ... nobody can use the garbles audio in
+  any case"; on `recording.json`, "we don't care about the past as this
+  is not a defined interface (it will be once we settle on a v1)" and
+  "msr timeline can ignore the past"; "data design always from the end
+  result and not from the process"; after a hiccup, "would be good to
+  continue with the same offset as before"; the status "must show so in
+  the status, e.g. with a uncolored line indicating active sync ...
+  applied". Rec9 (2026-11-23): an Osmo's delay moved from 558 ms to
+  about 470 ms within 90 min.
+- **Decision:** The architect's design, signed off by the owner as text
+  on 2026-11-24 ("keep working"):
+  - The guide tracks are mixed `RecorderValues.guideTrackDelay`, now
+    1 s (*data*), behind live; the video file's frames are still
+    written live, the guide samples carry their own time. Fragments
+    stay 2 s.
+  - An audio input file's **audio delay** is set at its first counted
+    window (D77's clarity), set once more at 3 counted windows to their
+    median if that differs by more than one frame (1/30 s), and after
+    that changes only when the median of the counted windows of the
+    latest 60 s, at least 5 of them, differs from it by more than one
+    frame (*data*: 60 s, 5, one frame). Audio delays are normalized as
+    D77's, the earliest 0.
+  - The "Audio inputs" mix places each input earlier by its audio
+    delay less the smallest of those staying in the mix, so the
+    earliest staying input is not moved; a change is crossfaded over
+    20 ms (*data*). The reference is in the mix from the start; any
+    other input joins only once it has an audio delay. D79's groups
+    stay, compared by audio delays, its limit
+    `guideTrackSyncLimit` now 0.8 s (*data*).
+  - A new file of an audio input (the same device in the same
+    recording) whose earlier file had an audio delay starts with that
+    delay, and in or out of the mix as that file was, until its own
+    windows set one by the rules above.
+  - `recording.json`: each audio file has `delays`, a list of
+    `{at, delay}` (seconds from the file's start, seconds late),
+    one entry per change, empty when never set; an entry started from
+    an earlier file also names it as `carriedOverFrom`. It replaces
+    `measuredDelay`; earlier recordings' files are not read. The
+    timeline file places each stretch by its entry, splitting the clip
+    at a change; a stretch that would overlap the one before leaves out
+    its head, as D77's clips do.
+  - The status window's audio input row says `· synced 550 ms late
+    (measured)`, `(carried over)` until the file's own windows set or
+    confirm it, and `· not in the guide track yet` before; uncoloured.
+- **Consequences:** The guide is in sync to within a frame for every
+  input within 0.8 s of the earliest; an input never measured stays
+  out of it. A crash loses up to about 3 s of the guide; Stop waits
+  about 1 s longer for the last mix. A change repeats or skips its size
+  of sound in the guide once.
+- **Evidence:** backlog item 38; [design/recorder.md](design/recorder.md),
+  "Audio delay" and "Guide tracks".
+
+## D81: An audio input silent right after gaps is a problem (2026-11-24)
+
+- **Status:** in force. Amends D69's "no audio … it is no problem".
+- **Context:** In the owner's recording `2026-11-24 06.30.02`, a BRIO's
+  microphone had gaps from 25.7 to 30.9 s, then exact zeros to Stop,
+  told as plain no audio. The owner, 2026-11-24, asked whether that is
+  a problem: "yes".
+- **Decision:** The architect's design, signed off on 2026-11-24: an
+  audio input whose no audio (D69) starts with zeros that began within
+  10 s (*data*) after one of its `audio input gap` events is a red
+  problem, `Audio <n> <name> sends only silence since its gaps at 0:25;
+  unplug and plug it in again`, until its sound returns; no audio
+  without gaps before stays no problem.
+- **Consequences:** A microphone broken by a USB hiccup is told within
+  about 10 s instead of never.
+- **Evidence:** backlog item 47; [design/recorder.md](design/recorder.md).
+
+## D82: Homepage screenshots can come from the owner's Mac (2026-11-24)
+
+- **Status:** in force. Amends D72 (screenshots only from the VM).
+- **Context:** The owner, 2026-11-24: "Maybe worth creating the
+  screenshots from my Mac from time to time?"; "the screenshot tool
+  should just use the installed main app or --app a specific one and
+  report the version, keep separation of concerns clean here"; "OK to
+  show my device names".
+- **Decision:** `scripts/update-homepage-screenshots --this-mac
+  [--app <path>]` runs the end-to-end driver's app window step on this
+  Mac with `/Applications/Multi Screen Recorder.app` or the given app,
+  prints its version, light appearance only, without virtual screens or
+  window moves, `HOME` and the recording in a scratch folder deleted
+  afterwards, and only copies the three light captures into the
+  checkout; committing them is the usual flow. The agent tells the
+  owner before each run (D56). The VM run stays the gate for marking a
+  PR ready.
+- **Consequences:** The homepage can show real screens, cameras and
+  microphones; the first run asks for Automation and possibly Screen
+  Recording for the terminal.
+- **Evidence:** backlog item 48; [homepage/README.md](../homepage/README.md).
