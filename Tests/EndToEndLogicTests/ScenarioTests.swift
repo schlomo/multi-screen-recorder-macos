@@ -6,7 +6,10 @@ import Testing
     @Test func theNamedScenariosHaveUniqueNamesAndTheirEventsInOrder() {
         let names = Scenario.named.map(\.name)
         #expect(Set(names).count == names.count)
-        #expect(names == ["plain-recording", "virtual-screen", "virtual-screen-stress", "tone", "system-audio", "stop-by-ctrl-c", "stop-by-kill"])
+        #expect(names == [
+            "plain-recording", "virtual-screen", "virtual-screen-stress", "tone", "system-audio", "late-microphone", "stop-by-ctrl-c",
+            "stop-by-kill",
+        ])
         for scenario in Scenario.named {
             #expect(scenario.events.map(\.at) == scenario.events.map(\.at).sorted())
             #expect(scenario.events.allSatisfy { $0.at < scenario.stopAt })
@@ -45,6 +48,18 @@ import Testing
             #expect(scenario.settings.audioMode == "default-microphone")
             #expect(scenario.playsTone)
         }
+    }
+
+    /// A late microphone is placed only after its first counted window, 10 to 20 s in: the scenario that checks it
+    /// records every input with the tone for 30 s or more, and checks the guide track from when it joined.
+    @Test func theLateMicrophoneScenarioRecordsEveryInputLongEnough() throws {
+        let late = try #require(Scenario.named.first { $0.name == "late-microphone" })
+        #expect(late.settings.audioMode == "all-inputs")
+        #expect(late.flags.contains("all-inputs"))
+        #expect(late.playsTone)
+        #expect(late.stopAt >= 30)
+        #expect(late.stopAt - EndToEndValues.lateMicrophoneJoinedBy >= 10)
+        #expect(Scenario.named.filter(\.checksALateMicrophone).map(\.name) == ["late-microphone"])
     }
 
     @Test func onlyTheVirtualScreenScenariosRecordWithDebugDetail() {

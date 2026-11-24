@@ -174,4 +174,17 @@ import Testing
         #expect(clock.render(sampleTime: 6_636, frames: 512) == .init(firstIndex: 1_636, skipped: 612))
         #expect(clock.render(sampleTime: 7_148, frames: 512) == .init(firstIndex: 2_148, skipped: nil))
     }
+
+    /// A track from a time of day on: the samples before it dropped, its start moved there.
+    @Test func aTrackFromATimeOfDayKeepsOnlyWhatFollows() {
+        let whole = track("Screen 1, Audio inputs", Self.recorded(seconds: 4), startsAt: 1000)
+        let later = whole.from(timeOfDay: 1002.5)
+        #expect(later.samples.count == Int(1.5 * Self.rate))
+        #expect(later.startsAt == 1002.5)
+        let kept = whole.clicks.filter { $0 >= 1002.5 }
+        #expect(later.clicks.count == kept.count && zip(later.clicks, kept).allSatisfy { abs($0 - $1) < 1e-9 })
+        #expect(whole.from(timeOfDay: 999).samples.count == whole.samples.count)
+        #expect(whole.from(timeOfDay: 1010).samples.isEmpty)
+    }
 }
+

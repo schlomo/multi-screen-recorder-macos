@@ -22,6 +22,14 @@ public enum ToneCheck {
 
         /// Each click's time of day.
         public var clicks: [Double] { SignalAnalysis.clicks(samples, sampleRate: sampleRate).map { startsAt + $0 } }
+
+        /// The track from `timeOfDay` on: what comes before it dropped.
+        public func from(timeOfDay: Double) -> Track {
+            let dropped = min(samples.count, max(0, Int(((timeOfDay - startsAt) * sampleRate).rounded(.up))))
+            guard dropped > 0 else { return self }
+            return Track(name: name, samples: Array(samples.dropFirst(dropped)), sampleRate: sampleRate,
+                         startsAt: startsAt + Double(dropped) / sampleRate)
+        }
     }
 
     /// A playback break this close to a failing click spacing is named in

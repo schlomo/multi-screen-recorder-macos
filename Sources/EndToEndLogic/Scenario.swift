@@ -73,6 +73,10 @@ public struct Scenario: Sendable {
     public var settings: ManifestExpectation.Settings
     /// Whether the driver plays the test tone into the loopback device, the default microphone for the run.
     public var playsTone: Bool
+    /// Whether the recording's other audio input, which hears the tone late, is checked as measured and placed
+    /// in the "Audio inputs" guide track (`LateMicrophoneCheck`), the guide's clicks only from
+    /// `EndToEndValues.lateMicrophoneJoinedBy` on.
+    public var checksALateMicrophone: Bool
     /// The events, at seconds after the recording started.
     public var events: [(at: Double, event: Event)]
     public var stop: Stop
@@ -80,12 +84,14 @@ public struct Scenario: Sendable {
     public var stopAt: Double
 
     public init(name: String, summary: String, flags: [String], settings: ManifestExpectation.Settings,
-                playsTone: Bool = false, events: [(at: Double, event: Event)] = [], stop: Stop, stopAt: Double) {
+                playsTone: Bool = false, checksALateMicrophone: Bool = false, events: [(at: Double, event: Event)] = [],
+                stop: Stop, stopAt: Double) {
         self.name = name
         self.summary = summary
         self.flags = flags
         self.settings = settings
         self.playsTone = playsTone
+        self.checksALateMicrophone = checksALateMicrophone
         self.events = events
         self.stop = stop
         self.stopAt = stopAt
@@ -175,6 +181,12 @@ extension Scenario {
             flags: toneFlags + ["--system-audio", "on"],
             settings: .init(resolution: "1080p", audioMode: "default-microphone", systemAudio: true),
             playsTone: true, stop: .interrupt, stopAt: 10),
+        Scenario(
+            name: "late-microphone",
+            summary: "every input recorded with the test tone: the one that hears it late is measured and placed in the guide track",
+            flags: ["--resolution", "1080p", "--audio-mode", "all-inputs", "--system-audio", "off"],
+            settings: .init(resolution: "1080p", audioMode: "all-inputs", systemAudio: false),
+            playsTone: true, checksALateMicrophone: true, stop: .interrupt, stopAt: 35),
         Scenario(
             name: "stop-by-ctrl-c", summary: "Ctrl-C (SIGINT) finalizes the recording",
             flags: [], settings: auto, stop: .interrupt, stopAt: 6),

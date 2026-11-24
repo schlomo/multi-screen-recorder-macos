@@ -161,8 +161,9 @@ path and bundle id with no code requirement, hold for it too (a
 `--release` run of 0.20261122.79 on 2026-11-22 passed, no prompt; D72).
 Arguments other than `--scratch-folder`, `--release` and `--snapshot`
 go to the driver (`--scenario <name>`). The exit
-status is the driver's. All 7 scenarios and the start window's
-screenshot took 2 minutes 10 seconds with the build. Nothing records or
+status is the driver's. The 7 scenarios of then and the start window's
+screenshot took 2 minutes 10 seconds with the build; `late-microphone`,
+added since, records 35 s more. Nothing records or
 plays sound on the Mac itself.
 
 **On the owner's Mac:** `scripts/update-homepage-screenshots --this-mac
@@ -268,7 +269,7 @@ scenario stopped by a signal its stop plus 120 s, a ceiling, so a
 driver killed or crashed before it sends the signal never leaves the
 recorder recording the person's session.
 
-The named scenarios, each about 10 to 25 s of recording:
+The named scenarios, each about 10 to 25 s of recording, `late-microphone` 35 s:
 
 | Scenario | What happens | What it asserts beyond every scenario's checks |
 |---|---|---|
@@ -277,6 +278,7 @@ The named scenarios, each about 10 to 25 s of recording:
 | `virtual-screen-stress` | a virtual screen of 1280 × 720 connects, its mode is switched ten times, 1280 × 720 ↔ 1600 × 900, about 2 s apart (the next switch waits for the screen to settle, so at least that), and it disconnects; stopped by SIGINT | as `virtual-screen`, as strictly: no failure event, a `screen frame size changed` per switch, no lost content. Added to make the writer failure of `OSStatus -19092` happen often enough to study (D66); it passed on the hosted runner, and no frame of the new size reached the old file (D67) |
 | `tone` | the test tone in BlackHole, BlackHole the default microphone for the run (the original put back after it, and by the restore) and the only input recorded (`default-microphone`), no system audio | the tone's level, no silent stretch and a click every second in each of BlackHole's tracks; the clicks at the same time of day, by timecode, in every screen file's guide track "Audio inputs" |
 | `system-audio` | as `tone`, with the system audio | the system audio's file: one stereo track, its length |
+| `late-microphone` | as `tone`, with every input recorded (`all-inputs`): BlackHole and the Apple Virtual Sound Device, which hears the tone 300 to 400 ms late; stopped by SIGINT at 35 s | whichever of the two is the anchor lists `delays` `[{at: 0, delay: 0}]`, the other's latest audio delay is 200 to 600 ms in size (`EndToEndValues.lateMicrophoneDelay`) and no input leaves the guide track (`LateMicrophoneCheck`); the guide track "Audio inputs" carries BlackHole's clicks at their time of day from 25 s on (`lateMicrophoneJoinedBy`: the first counted window ends 10 to 20 s in, the guide is mixed 1 s behind live), so the late input is placed in line (D80, backlog item 52) |
 | `stop-by-ctrl-c` | auto mode, SIGINT | exit 0, finalized |
 | `stop-by-kill` | auto mode, `kill -9` | no `ended`, every file `recording` and readable up to its last fragment, less 0.5 s of slack (`killSlack`); a screen file's less the guide tracks' delay of 1 s too, as its fragment is written only once its guide samples arrive (`EndToEndValues.guideTrackDelay`, D80) |
 
@@ -291,6 +293,9 @@ input joins the guide only once measured, which needs 10 s of sound, as
 long as the run, and the Apple Virtual Sound Device hears the tone 300
 to 400 ms late; with it as the anchor, BlackHole got no audio delay
 within the run and the clicks were missing from the guide.
+`late-microphone` records both on purpose and checks the guide only
+from when the measured input has joined: before that, with the Apple
+Virtual Sound Device as the anchor, the guide carries the tone late.
 The virtual-screen scenarios still record every input (`all-inputs`),
 and `plain-recording` and the stop scenarios run in auto mode (Wired).
 
