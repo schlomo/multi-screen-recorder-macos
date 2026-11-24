@@ -505,6 +505,25 @@ Still open from D34: what AGC does and whether it is on in auto mode;
    (minutes 40 to 90), so one value per file was about 90 ms off for
    an hour; the BRIO held 14 ms. Not doing: the Mac's own sound as the
    zero (fails with headphones, Bluetooth, echo cancellation).
+   Folded in (the owner, 2026-11-24: "we fold the improvement into the
+   fix for 38, I want less PRs"), from the owner's recording
+   `2026-11-24 06.30.02` on v0.20261123.93 (a Wacom unplugged; a USB
+   hiccup stopped the Osmo and the CalDigit for about 1.5 s; each got a
+   new audio file at 25.7 s):
+   - **A device's delay carries over to its next file** ("would be good
+     to continue with the same offset as before after a hiccup", the
+     owner): a new file of a known audio input starts with the
+     device's last delay and guide-track state, marked as carried over
+     in `recording.json`, until its own windows count. [KNOWN, the
+     recording] The Osmo's first file was measured 556 ms late only at
+     25.5 s, after it had ended at 23.4 s; its leave went to the ended
+     file. Its new file joined the guide track and stayed in, echo
+     included, until 45.6 s (518 ms).
+   - **The timeline file's shift comes from the first counted window**,
+     as the guide track's membership already does. [KNOWN] No audio
+     file of the recording has a `measuredDelay`, as no file reached 3
+     counted windows in 61 s, so Resolve got no shift for the Osmo
+     (the owner moved it 15 frames by hand).
 39. **Compact source rows** (the owner, 2026-11-23: "with the cameras
    on my system and the lots of devices vertical space starts to be a
    problem"): sources not recorded (virtual, suspended, no audio)
@@ -561,6 +580,13 @@ Still open from D34: what AGC does and whether it is on in auto mode;
    each of the release and a local build of the same commit, compared,
    and the previous release v0.20261122.89 as a baseline. Settled before
    item 38 starts, as it touches what every recording ships.
+47. **A microphone that sends only zeros after a USB hiccup** (the
+   owner's recording `2026-11-24 06.30.02`): the BRIO's microphone had
+   gaps from 25.7 to 30.9 s, then exact zeros from about 28.8 s to
+   Stop. By D69 that is "no audio", not a problem, so it showed no
+   problem line while 22 s of its sound were missing (its camera kept
+   going). Owner's call: should "no audio" right after a burst of gaps
+   be a problem, as the device likely broke rather than went quiet?
 
 ## Deliberately deferred
 
