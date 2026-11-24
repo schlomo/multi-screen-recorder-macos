@@ -108,8 +108,18 @@ extension Driver {
         if !onThisMac { try connectStatusWindowScreens(into: &screens, logs: folder) }
         try interruption.sleep(until: Date().addingTimeInterval(8))
 
-        // The app's own reopen event, as a click on its Dock icon, opens the status window.
-        try AppleScript.run("tell application id \"org.schapiro.multiscreenrecorder\" to reopen", retryingFor: 10)
+        // The app's own reopen event, as a click on its Dock icon, opens the status window; sent to its pid, so
+        // no other copy of the app gets it. Retried, as the app may not take events yet.
+        let reopenBy = Date().addingTimeInterval(10)
+        while true {
+            do {
+                try Screenshots.send(AEEventID(kAEReopenApplication), to: recorder.pid)
+                break
+            } catch {
+                guard Date() < reopenBy else { throw error }
+                try interruption.sleep(until: Date().addingTimeInterval(1))
+            }
+        }
         let status = try Screenshots.windowID(of: recorder.pid, seconds: 20, interruption: interruption)
         if !onThisMac {
             // Its first position can lie partly off the VM's small screen, where a video of it would be cut off.

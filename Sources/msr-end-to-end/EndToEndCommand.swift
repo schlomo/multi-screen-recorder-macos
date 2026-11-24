@@ -196,6 +196,8 @@ struct AppWindowsCommand: ParsableCommand {
         RunLog.out("ok    \(ReviewNames.appStep): the start window's screenshot")
         try driver.recordingWindows()
         RunLog.out("ok    \(ReviewNames.appStep): the status window's screenshot and video and the Finder window's screenshot")
+        // Clean: every process it started ended, and it changed nothing else to put back.
+        try FileManager.default.removeItem(at: restorer.file)
     }
 }
 

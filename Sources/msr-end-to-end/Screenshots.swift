@@ -83,7 +83,7 @@ enum Screenshots {
         }
     }
 
-    /// Sends a core Apple event (quit) to the process, as Quit does;
+    /// Sends a core Apple event to the process, quit as Quit does, reopen as a click on its Dock icon;
     /// refuses, rather than asks, should macOS want the person's consent.
     static func send(_ eventID: AEEventID, to pid: pid_t) throws {
         let target = NSAppleEventDescriptor(processIdentifier: pid)

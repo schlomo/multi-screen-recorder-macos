@@ -110,8 +110,26 @@ import Testing
             to: scripts.appending(path: "update-homepage-screenshots"))
     }
 
-    private func update(_ arguments: [String]) async throws -> CommandOutcome {
-        try await run(checkout.appending(path: "scripts/update-homepage-screenshots"), arguments, in: scratch.url)
+    private func update(_ arguments: [String], environment: [String: String] = [:]) async throws -> CommandOutcome {
+        try await run(checkout.appending(path: "scripts/update-homepage-screenshots"), arguments, environment: environment, in: scratch.url)
+    }
+
+    /// A PATH whose osascript answers whether the app runs and whether this Mac is in dark mode, and nothing
+    /// else, so no test asks the real Mac.
+    private func osascript(running: Bool, dark: Bool) throws -> [String: String] {
+        let bin = scratch.url.appending(path: "bin", directoryHint: .isDirectory)
+        try FileManager.default.createDirectory(at: bin, withIntermediateDirectories: true)
+        let script = bin.appending(path: "osascript")
+        try Data("""
+            #!/bin/sh
+            case "$*" in
+              *"is running"*) echo \(running) ;;
+              *"dark mode"*) echo \(dark) ;;
+              *) echo "unexpected osascript $*" >&2; exit 1 ;;
+            esac
+            """.utf8).write(to: script)
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: script.path)
+        return ["PATH": bin.path + ":" + (try #require(ProcessInfo.processInfo.environment["PATH"]))]
     }
 
     private func fakeApp(version: String?) throws -> URL {
@@ -157,9 +175,31 @@ import Testing
 
     @Test func theAppsVersionIsPrintedBeforeAnythingIsBuilt() async throws {
         defer { scratch.remove() }
-        let outcome = try await update(["--this-mac", "--app", try fakeApp(version: "0.20261124.7").path(percentEncoded: false)])
+        let outcome = try await update(
+            ["--this-mac", "--app", try fakeApp(version: "0.20261124.7").path(percentEncoded: false)],
+            environment: try osascript(running: false, dark: false))
         #expect(outcome.output.contains("version 0.20261124.7"), "\(outcome.output)")
         #expect(outcome.status == 1, "the scratch checkout has no package to build")
         #expect(outcome.errors.contains("swift build"), "\(outcome.errors)")
+    }
+
+    @Test func theAppRunningIsRefusedBeforeAnythingIsBuilt() async throws {
+        defer { scratch.remove() }
+        let outcome = try await update(
+            ["--this-mac", "--app", try fakeApp(version: "0.20261124.7").path(percentEncoded: false)],
+            environment: try osascript(running: true, dark: false))
+        #expect(outcome.status == 1)
+        #expect(outcome.errors.contains("the app is running; quit it first"), "\(outcome.errors)")
+        #expect(!outcome.errors.contains("swift build"), "\(outcome.errors)")
+    }
+
+    @Test func darkModeIsRefusedBeforeAnythingIsBuilt() async throws {
+        defer { scratch.remove() }
+        let outcome = try await update(
+            ["--this-mac", "--app", try fakeApp(version: "0.20261124.7").path(percentEncoded: false)],
+            environment: try osascript(running: false, dark: true))
+        #expect(outcome.status == 1)
+        #expect(outcome.errors.contains("this Mac is in dark mode; switch it to light first"), "\(outcome.errors)")
+        #expect(!outcome.errors.contains("swift build"), "\(outcome.errors)")
     }
 }

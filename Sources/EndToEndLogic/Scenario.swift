@@ -71,7 +71,8 @@ public struct Scenario: Sendable {
     public var flags: [String]
     /// The settings the manifest must name for these flags.
     public var settings: ManifestExpectation.Settings
-    /// Whether the driver plays the test tone into the loopback device.
+    /// Whether the driver plays the test tone into the loopback device, the default microphone for the run so
+    /// it is the reference and in the guide track from the start (D80).
     public var playsTone: Bool
     /// The events, at seconds after the recording started.
     public var events: [(at: Double, event: Event)]

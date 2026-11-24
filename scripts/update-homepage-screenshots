@@ -11,7 +11,8 @@ only its app-window step on this Mac with the app (default: the installed
 screen and no window moved: it starts the app, records about 15 s and takes the
 start, status and Finder windows, with HOME and the recording in a scratch folder
 deleted afterwards, then copies the three captures into this checkout; no
-commit, no push. It prints the app's version and compares it with no release.
+commit, no push. It prints the app's version and compares it with no release;
+it refuses while the app runs or this Mac is in dark mode, before building.
 The terminal needs the Screen & System Audio Recording permission and the
 Automation permission for the app, System Events and Finder; the recording
 shows this Mac's real screens, cameras and microphones. With --release or
@@ -50,6 +51,7 @@ CAPTURES_TO_PICTURES = {
     "app-finder-window-light.png": "recording-folder.png",
 }
 DEFAULT_APP = Path("/Applications/Multi Screen Recorder.app")
+BUNDLE_ID = "org.schapiro.multiscreenrecorder"
 TRUNK = "main"
 BRANCH_PREFIX = "homepage-screenshots-v"
 # The driver's first line in run.log names the app it ran: its version and the commit it was built from.
@@ -176,11 +178,21 @@ def app_version(app: Path) -> str:
         raise Refused(f"{app} is not the app: cannot read its version from Contents/Info.plist ({error!r})") from None
 
 
+def apple_script(source: str, checkout: Path) -> str:
+    return run("osascript", "-e", source, cwd=checkout)
+
+
 def this_mac_screenshots(app: Path, checkout: Path) -> None:
     """Takes the app's windows on this Mac with the driver built from this checkout; copies the captures."""
     if not (app / "Contents/MacOS/msr").is_file():
         raise Refused(f"{app} is not the app: {app / 'Contents/MacOS/msr'} is missing")
     print(f"{ME}: the app is {app}, version {app_version(app)}")
+    if shutil.which("osascript") is None:
+        raise Refused("osascript is not on the PATH")
+    if apple_script(f'application id "{BUNDLE_ID}" is running', checkout) == "true":
+        raise Refused("the app is running; quit it first, so the windows taken are those of the app started for them")
+    if apple_script('tell application "System Events" to tell appearance preferences to get dark mode', checkout) == "true":
+        raise Refused("this Mac is in dark mode; switch it to light first, as the homepage shows the light windows")
     for tool in ("swift", "ffmpeg", "ffprobe"):
         if shutil.which(tool) is None:
             raise Refused(f"{tool} is not on the PATH")
