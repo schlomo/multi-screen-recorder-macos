@@ -2799,6 +2799,16 @@ architect's reading.
   (windows, rules, carry-over) is told only in the recording log's
   detail lines, one per decision ("make sure that the --debug output
   remains super useful", the owner).
+- **Amended after the delta review (the architect's reading,
+  2026-11-24):** the reference is the default microphone only while its
+  file is being written and it has a delay or no anchor exists yet,
+  otherwise the lowest-numbered input being written that has one, so a
+  muted default never stalls measuring and is measured before it
+  becomes the reference (amends D77's choice of the reference); the
+  timeline file's smallest delay is over each file's last entry, so a
+  corrected false window moves nothing; the anchor's file lists
+  `{at: 0, delay: 0}`, so an empty `delays` means only "never
+  measured, placed as recorded".
 - **Consequences:** The guide is in sync to within a frame for every
   input within 0.8 s of the earliest; an input never measured stays
   out of it. A crash loses up to about 3 s of a video file instead of 2,
