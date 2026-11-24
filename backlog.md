@@ -10,8 +10,9 @@ measured delay in the "Audio inputs" guide track, about 1 s of
 hindsight) with its fold-ins (a device's delay and guide-track state
 carried over a hiccup, the timeline file's shift from the first
 counted window, applied sync shown in the status window), item 48
-(homepage screenshots from the owner's Mac), and item 47 if the owner
-says yes. Its design goes to the owner as text first. Then item 22
+(homepage screenshots from the owner's Mac) and item 47 (the owner,
+2026-11-24: yes, a microphone sending only zeros right after a burst
+of gaps is a problem). Its design goes to the owner as text first. Then item 22
 (camera picture sync from claps, a Calibrate button). The owner,
 2026-11-23: "Noticeable lip sync is my goal"; "Iterative improvement,
 every shipment is better". The end-to-end tests need an idle Mac
@@ -20,8 +21,13 @@ rec12) sit in `$TMPDIR/camcheck` on the owner's Mac for the sync
 design, with the owner's `2026-11-24 06.30.02` in
 `~/Movies/Multi Screen Recorder` (read only) as the hiccup case; the
 owner's kept one is `keep/2026-11-23 10.56.18`; delete the rest once
-item 38 is built. Waiting on the owner: a go-ahead to delete the
-leftover `pr-27` snapshot release and 14 stale remote branches.
+item 38 is built. The remote branch `troubleshooting-ci-runner` (2026-11-17, no PR)
+holds two troubleshooting entries never merged ("No macOS runner: the
+pipeline job is cancelled", "Crash dialog for crash reports the tests
+wrote"); check whether D67 and the crash report filter superseded
+them, then fold what still holds into the next PR or ask the owner to
+drop the branch. The other stale branches and the `pr-27` release
+were deleted on 2026-11-24 with the owner's go-ahead.
 
 Agents may run `msr record` on the owner's Mac (D48), with `HOME` set
 to a scratch folder (`AGENTS.md`, "Facts that bite"), and BetterDisplay's command
@@ -577,7 +583,8 @@ Still open from D34: what AGC does and whether it is on in auto mode;
    - a way to run the recorder's tests under CPU load locally, as the
      PR #27 builder did by hand (36 `yes` processes).
    Moot for the compiler once item 2 lands.
-47. **A microphone that sends only zeros after a USB hiccup** (the
+47. **A microphone that sends only zeros after a USB hiccup** (in the
+   next PR, the owner said yes on 2026-11-24; the
    owner's recording `2026-11-24 06.30.02`): the BRIO's microphone had
    gaps from 25.7 to 30.9 s, then exact zeros from about 28.8 s to
    Stop. By D69 that is "no audio", not a problem, so it showed no
