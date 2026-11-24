@@ -26,19 +26,11 @@ body:
   - type: markdown
     attributes:
       value: |
-        **Issues are public.** The recording's `recording.json` and `recording.log` below name your screens, cameras and audio devices (in the file names, `screen`, `camera`, `audioSource` and the events; a camera's name can hold a person's name, as a Continuity Camera's often does), and the identifiers macOS gives them (`screenUUID`, `cameraUniqueID`, and `audioSourceUID`, which can hold a device's serial number). The recordings themselves show what the cameras saw; attach none. They also hold the date and time the recording started and ended, with your time zone's offset, and its problems, whose text can name a folder with your Mac's user name in its path. `recording.log` also names your Mac's model and macOS version, your settings and the recording folder's path. Remove or replace anything you don't want to share before you submit.
+        **Issues are public.** The recording's `recording.json` and `recording.log` below name your screens, cameras and audio devices (in the file names, `screen`, `camera`, `audioSource` and the events; a camera's name can hold a person's name, as a Continuity Camera's often does), and the identifiers macOS gives them (`screenUUID`, `cameraUniqueID`, and `audioSourceUID`, which can hold a device's serial number). The recordings themselves show what the cameras saw; attach none. They also hold the date and time the recording started and ended, with your time zone's offset, and its problems, whose text can name a folder with your Mac's user name in its path. `recording.log` also names your Mac's model and macOS version, your settings and the recording folder's path. Open them in TextEdit and remove or replace anything you don't want to share before you drag them in: an uploaded file cannot be edited.
   - type: textarea
-    id: recording-json
+    id: files
     attributes:
-      label: recording.json
-      description: "The recording folder's recording.json: open it in TextEdit, copy its content and paste it here."
-      render: json
-    validations:
-      required: false
-  - type: textarea
-    id: recording-log
-    attributes:
-      label: recording.log
-      description: "The recording folder's recording.log, the recording log: drag the file here. It is too long to paste for a recording of more than a few minutes."
+      label: Files from the recording folder
+      description: "Drag the recording folder's recording.json and recording.log here."
     validations:
       required: false
