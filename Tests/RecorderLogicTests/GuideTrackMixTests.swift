@@ -231,6 +231,37 @@ import Testing
         #expect(abs(back.last! - Float(10 + 2 * fade + 9) / 1000) < 1e-6)
     }
 
+    /// While a move crossfades, the mix needs the samples of both placements: the earlier one's until the fade
+    /// is over (D80).
+    @Test func duringACrossfadeTheMixWaitsForTheEarlierPlacementsSamples() {
+        let fade = Int64(RecorderValues.guideTrackCrossfade.nanoseconds / millisecond)
+        var guide = mix()
+        guide.add(source: "A", channelCount: 1, earlierBy: 50)
+        guide.receive([[Float](repeating: 0.01, count: 100)], from: "A", at: 0)
+        _ = guide.mix(upTo: 10)
+        guide.place(source: "A", earlierBy: 0)
+        // 100 samples received: placed 50 earlier, up to 50; placed at 0 alone it would be up to 100.
+        #expect(guide.hasReceived(upTo: 50))
+        #expect(!guide.hasReceived(upTo: 51))
+        _ = guide.mix(upTo: 10 + fade)
+        #expect(guide.hasReceived(upTo: 100))
+        #expect(!guide.hasReceived(upTo: 101))
+    }
+
+    /// A peek during a crossfade gives what the mix then gives, and takes nothing (D80).
+    @Test func aPeekDuringACrossfadeIsWhatTheMixGives() {
+        let fade = Int64(RecorderValues.guideTrackCrossfade.nanoseconds / millisecond)
+        var guide = mix()
+        guide.add(source: "A", channelCount: 1)
+        guide.receive([(0..<200).map { Float($0) / 1000 }], from: "A", at: 0)
+        _ = guide.mix(upTo: 10)
+        guide.place(source: "A", earlierBy: 50)
+        let peeked = guide.peek(upTo: 10 + fade + 5)
+        #expect(peeked.start == 10)
+        #expect(guide.peek(upTo: 10 + fade + 5).channels == peeked.channels)
+        #expect(guide.mix(upTo: 10 + fade + 5) == peeked.channels)
+    }
+
     @Test func withNoInputTheMixIsSilence() {
         var guide = mix()
         #expect(guide.mix(until: 3 * millisecond)[0] == [0, 0, 0])

@@ -69,8 +69,15 @@ public enum ResolveTimeline {
         }.filter { $0.frames > 0 }
         let earliest = (screens + cameras + audiosAsRecorded).min { $0.startFrame < $1.startFrame }
         let timelineStart = earliest?.startFrame ?? 0
-        let delays = Dictionary(manifest.audioFiles.map { ($0.name, $0.delays) }) { $1 }
-        let audios = audiosAsRecorded.flatMap { file in file.stretches(delays[file.name] ?? [], notBefore: timelineStart) }
+        // Against the anchor, which lists none, so an audio input's file without one is at 0; the smallest,
+        // never above the anchor's 0, is subtracted once, so the earliest input is at 0 (D80).
+        let delays = Dictionary(manifest.audioFiles.map { file in
+            (file.name, file.delays.isEmpty && file.audioSourceUID != nil ? [.init(at: 0, delay: 0)] : file.delays)
+        }) { $1 }
+        let smallest = min(0, manifest.audioFiles.flatMap(\.delays).map(\.delay).min() ?? 0)
+        let audios = audiosAsRecorded.flatMap { file in
+            file.stretches((delays[file.name] ?? []).map { .init(at: $0.at, delay: $0.delay - smallest) }, notBefore: timelineStart)
+        }
             .filter { $0.frames > 0 }
         let videoTracks = Self.videoTracks(screens, timelineStart: timelineStart)
             + Self.videoTracks(cameras, timelineStart: timelineStart)

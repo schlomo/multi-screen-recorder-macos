@@ -447,6 +447,15 @@ public struct RecordingManifest: Codable, Equatable, Sendable {
         return true
     }
 
+    /// The newest file, the latest to start, of each audio input among `uids`, by name, with its device's UID;
+    /// a file that ended stays its device's newest until the next one starts (D80).
+    public func newestAudioInputFiles(of uids: Set<String>) -> [String: String] {
+        let newest = Dictionary(audioFiles.filter { $0.audioSourceUID.map(uids.contains) == true }.map { ($0.audioSourceUID!, $0) }) {
+            $1.start >= $0.start ? $1 : $0
+        }
+        return Dictionary(uniqueKeysWithValues: newest.map { ($0.value.name, $0.key) })
+    }
+
     /// An audio file's audio delay from `at` seconds of the recording on (D80), to 0.1 ms, at a millisecond of
     /// the file, not before its start: a new entry when it differs from the latest; false when it does not,
     /// once finalized and for a file not listed.

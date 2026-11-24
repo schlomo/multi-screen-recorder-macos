@@ -14,7 +14,8 @@ public enum RecorderValues {
     /// writer, a screen file's last mix for its sources' sound up to the
     /// video's end, and an audio file's samples for its writer, also at its end.
     public static let audioWaitBoundSeconds = 2
-    /// The fragment length of every file: a crash loses at most this much.
+    /// The fragment length of every file: a crash loses at most this much of an audio file, and up to
+    /// `guideTrackDelay` more of a video file, its fragment waiting for its guide samples (D80).
     public static let fragmentSeconds = 2
     /// How long a screen must stay unchanged before its stream starts or
     /// starts again.

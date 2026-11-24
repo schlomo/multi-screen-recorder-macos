@@ -46,7 +46,7 @@ public enum AudioDelay {
         return Window(lag: Double(lags[best]) / Double(sampleRate), clarity: Float(Double(magnitudes[best]) / median))
     }
 
-    /// An audio input file's audio delay against the reference's file (D80): set by its first counted
+    /// An audio input file's audio delay against the recording's anchor (D80): set by its first counted
     /// window, once more at `windowsNeeded` to their median if that lies more than `audioDelayTolerance`
     /// away, then only when the median of the counted windows of the latest `audioDelayChangeWindowSeconds`,
     /// at least `audioDelayChangeWindows`, does. One carried over from the input's earlier file holds until

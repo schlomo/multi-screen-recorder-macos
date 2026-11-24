@@ -1,13 +1,14 @@
-/// A recording's audio delays (D77, D80): each audio input file's against the reference's file
-/// (`AudioDelay.Applied`, the reference's own 0), which files the "Audio inputs" guide track mixes
-/// (`GuideTrackMembership`, D79) and how much earlier it places each, what `recording.json` lists, and what
-/// the status window shows. A new file of an input whose earlier file had an audio delay starts with it,
-/// carried over; another reference device starts everything over, the same one's new file keeps it all.
+/// A recording's audio delays (D77, D80): each audio input file's against the recording's anchor, the first
+/// reference device (`AudioDelay.Applied`, the anchor's own 0), which inputs the "Audio inputs" guide track
+/// mixes (`GuideTrackMembership`, D79) and how much earlier it places each, what `recording.json` lists, and
+/// what the status window shows. A new file of an input whose earlier file had an audio delay starts with it,
+/// carried over. Another reference device re-bases every lag onto the anchor through its own audio delay; one
+/// without an audio delay becomes the anchor, and every input starts over.
 public struct AudioDelays: Sendable {
     public enum Shown: Equatable, Sendable {
         case notInTheGuideTrackYet
-        /// Its audio delay, normalized as listed; carried over from the input's earlier file until its own
-        /// windows set or confirm it.
+        /// How much earlier the mix places the file; carried over from the input's earlier file until its own
+        /// windows set or confirm its audio delay.
         case synced(Double, carriedOver: Bool)
     }
 
@@ -26,11 +27,10 @@ public struct AudioDelays: Sendable {
         /// The files that leave the guide track, each with its offset from the staying group's earliest input.
         public var leaving: [String: Double] = [:]
         public var rejoining: Set<String> = []
-        /// Each file being written that is not out of the guide track: the seconds it is placed earlier,
-        /// its audio delay less the smallest of those mixed; nil while it is not in the guide track yet.
+        /// Each file that is not out of the guide track: the seconds it is placed earlier, its audio delay less
+        /// the smallest of those mixed; nil while it is not in the guide track yet.
         public var earlierBy: [String: Double?] = [:]
-        /// Each file being written with an audio delay, normalized so the earliest of the recording's
-        /// files measured against the reference is 0; the reference's own file once that moves it.
+        /// Each file with an audio delay against the anchor, the anchor's own files left out.
         public var delays: [String: Entry] = [:]
     }
 
@@ -39,70 +39,80 @@ public struct AudioDelays: Sendable {
         /// The order the files became known in.
         let order: Int
         var applied: AudioDelay.Applied
-        let carriedOverFrom: String?
-        var isWriting = true
+        var carriedOverFrom: String?
     }
 
     private var files: [String: File] = [:]
-    private var referenceUID: String?
-    private var reference: String?
+    /// Each device's newest file, by the device's UID, while its capture runs.
+    private var newest: [String: String] = [:]
+    private var anchor: String?
+    /// By device UID, so an input out of the guide track stays out with its next file.
     private var membership = GuideTrackMembership()
+    private var earlierBy: [String: Double?] = [:]
     private var known = 0
-    /// What the listed delays are less than the raw ones against the reference: min(0, the smallest).
-    private var shift = 0.0
 
     public init() {}
 
-    /// `writing` maps the audio input files being written to their devices' UIDs, `reference` among them;
-    /// `lags` are counted windows' lags against it, the windows ending at `at` seconds of the recording.
+    /// `files` maps each audio input's newest file, while its capture runs, to its device's UID, `reference`
+    /// among them; `lags` are counted windows' lags against it, the windows ending at `at` seconds of the
+    /// recording.
     public mutating func update(
-        writing: [String: String], reference: String, lags: [String: Double] = [:], at: Double = 0
+        files newest: [String: String], reference: String, lags: [String: Double] = [:], at: Double = 0
     ) -> Outcome {
-        guard let referenceUID = writing[reference] else { preconditionFailure("the reference \(reference) is not being written") }
-        if referenceUID != self.referenceUID {
-            files = [:]
-            self.referenceUID = referenceUID
-        }
-        self.reference = reference
-        for name in files.keys where writing[name] == nil { files[name]!.isWriting = false }
-        for (name, uid) in writing.sorted(by: { $0.key < $1.key }) where files[name] == nil {
-            let earlier = files.filter { $0.value.uid == uid && !$0.value.isWriting }.max { $0.value.order < $1.value.order }
+        guard let referenceUID = newest[reference] else { preconditionFailure("the reference \(reference) is not recorded") }
+        for (name, uid) in newest.sorted(by: { $0.key < $1.key }) where files[name] == nil {
+            let earlier = files.filter { $0.value.uid == uid }.max { $0.value.order < $1.value.order }
             let carried = earlier.flatMap { file in file.value.applied.delay.map { (file.key, $0) } }
             known += 1
             files[name] = File(
                 uid: uid, order: known, applied: carried.map { AudioDelay.Applied(carriedOver: $0.1) } ?? AudioDelay.Applied(),
                 carriedOverFrom: carried?.0)
         }
-        for (name, lag) in lags where name != reference && files[name]?.isWriting == true { files[name]!.applied.add(lag, at: at) }
-
-        let raw = Dictionary(uniqueKeysWithValues: writing.keys.compactMap { name in delay(of: name).map { (name, $0) } })
-        let change = membership.update(delays: raw, writing: Set(writing.keys))
-        let mixed = raw.filter { !membership.isOut($0.key) }
-        let earliestMixed = mixed.values.min() ?? 0
-        shift = min(0, files.keys.compactMap(delay(of:)).min() ?? 0)
-        var outcome = Outcome(leaving: change.leaving, rejoining: change.rejoining)
-        for name in writing.keys where !membership.isOut(name) {
-            outcome.earlierBy[name] = .some(raw[name].map { $0 - earliestMixed })
+        self.newest = Dictionary(newest.map { ($0.value, $0.key) }) { $1 }
+        if anchor == nil { anchor = referenceUID }
+        if delay(of: reference) == nil {
+            // shortcut: its delay against the old anchor is taken as 0, so every input starts over; measure it
+            // against the old anchor first if starting over loses too much.
+            anchor = referenceUID
+            for name in files.keys {
+                files[name]!.applied = AudioDelay.Applied()
+                files[name]!.carriedOverFrom = nil
+            }
         }
-        for (name, delay) in raw where name != reference || shift < 0 {
+        let base = delay(of: reference)!
+        for (name, lag) in lags where name != reference && newest[name] != nil && files[name]?.uid != anchor {
+            files[name]!.applied.add(lag + base, at: at)
+        }
+
+        let delays = Dictionary(uniqueKeysWithValues: self.newest.compactMap { uid, name in delay(of: name).map { (uid, $0) } })
+        let change = membership.update(delays: delays, writing: Set(self.newest.keys))
+        let zero = delays.filter { !membership.isOut($0.key) }.values.min() ?? 0
+        var outcome = Outcome(
+            leaving: Dictionary(uniqueKeysWithValues: change.leaving.map { (self.newest[$0.key]!, $0.value) }),
+            rejoining: Set(change.rejoining.map { self.newest[$0]! }))
+        for (uid, name) in self.newest where !membership.isOut(uid) {
+            outcome.earlierBy[name] = .some(delays[uid].map { $0 - zero })
+        }
+        earlierBy = outcome.earlierBy
+        for (uid, name) in self.newest where uid != anchor {
+            guard let delay = delays[uid] else { continue }
             let file = files[name]!
-            outcome.delays[name] = Entry(delay: delay - shift, carriedOverFrom: file.applied.isCarriedOver ? file.carriedOverFrom : nil)
+            outcome.delays[name] = Entry(delay: delay, carriedOverFrom: file.applied.isCarriedOver ? file.carriedOverFrom : nil)
         }
         return outcome
     }
 
-    /// What the status window shows for a file being written: nothing for one out of the guide track, nor for
-    /// the reference's while it is the earliest.
+    /// What the status window shows for a device's newest file: nothing for one out of the guide track (its
+    /// problem line says so) nor for one the mix places at 0.
     public func shown(_ name: String) -> Shown? {
-        guard let file = files[name], file.isWriting, !membership.isOut(name) else { return nil }
-        guard let delay = delay(of: name) else { return .notInTheGuideTrackYet }
-        if name == reference, shift == 0 { return nil }
-        return .synced(delay - shift, carriedOver: file.applied.isCarriedOver)
+        guard let file = files[name], newest[file.uid] == name, !membership.isOut(file.uid), let placed = earlierBy[name] else { return nil }
+        guard let placed else { return .notInTheGuideTrackYet }
+        return placed == 0 ? nil : .synced(placed, carriedOver: file.applied.isCarriedOver)
     }
 
-    /// The raw audio delay against the reference's file: 0 for a file of the reference device.
+    /// The audio delay against the anchor: 0 for a file of the anchor device.
     private func delay(of name: String) -> Double? {
         guard let file = files[name] else { return nil }
-        return file.uid == referenceUID ? 0 : file.applied.delay
+        return file.uid == anchor ? 0 : file.applied.delay
     }
 }

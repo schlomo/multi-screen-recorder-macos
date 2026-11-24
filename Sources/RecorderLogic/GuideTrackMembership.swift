@@ -1,11 +1,11 @@
-/// Which audio inputs' files the "Audio inputs" guide track mixes (D79, D80), by their audio delays against
-/// the reference's file, the reference's own 0. The largest group whose audio delays lie within
-/// `RecorderValues.guideTrackSyncLimit` of each other stays; on a tie the group holding the files that stayed
-/// before, else the one with the earliest input. A file outside it leaves; a file that left rejoins when its
-/// audio delay lies within the group, or when it no longer has one (it is then not in the guide track yet).
+/// Which audio inputs the "Audio inputs" guide track mixes (D79, D80), by their audio delays against the
+/// recording's anchor. The largest group whose audio delays lie within `RecorderValues.guideTrackSyncLimit` of
+/// each other stays; on a tie the group holding the inputs that stayed before, else the one with the earliest
+/// input. An input outside it leaves; one that left rejoins when its audio delay lies within the group, or when
+/// it no longer has one (it is then not in the guide track yet).
 public struct GuideTrackMembership: Sendable {
     public struct Change: Equatable, Sendable {
-        /// The files that leave, each with its offset from the staying group's earliest input.
+        /// The inputs that leave, each with its offset from the staying group's earliest input.
         public var leaving: [String: Double] = [:]
         public var rejoining: Set<String> = []
 
@@ -23,10 +23,10 @@ public struct GuideTrackMembership: Sendable {
 
     public init() {}
 
-    public func isOut(_ file: String) -> Bool { out.contains(file) }
+    public func isOut(_ input: String) -> Bool { out.contains(input) }
 
-    /// The files that leave and rejoin now; `delays` are the audio delays of the files being written that
-    /// have one, `writing` all files being written: every other file is forgotten.
+    /// The inputs that leave and rejoin now; `delays` are the audio delays of the inputs that have one,
+    /// `writing` all inputs recorded: every other input is forgotten.
     public mutating func update(
         delays: [String: Double], writing: Set<String>, limit: Double = RecorderValues.guideTrackSyncLimit
     ) -> Change {
@@ -35,8 +35,8 @@ public struct GuideTrackMembership: Sendable {
         self.staying = staying
         let earliest = staying.compactMap { delays[$0] }.min() ?? 0
         var change = Change()
-        for (file, delay) in delays where !staying.contains(file) && !out.contains(file) {
-            change.leaving[file] = delay - earliest
+        for (input, delay) in delays where !staying.contains(input) && !out.contains(input) {
+            change.leaving[input] = delay - earliest
         }
         change.rejoining = out.filter { staying.contains($0) || delays[$0] == nil }
         out.formUnion(change.leaving.keys)

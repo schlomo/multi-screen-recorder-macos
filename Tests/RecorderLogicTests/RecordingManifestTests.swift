@@ -266,6 +266,28 @@ import Testing
         #expect(systemObject.keys.contains("inputVolume") == false)
     }
 
+    /// Each recorded audio input's newest file, whether the new file starts before or after its earlier one's
+    /// end is told, a file that ended staying its device's newest until the next starts (D80).
+    @Test(arguments: [true, false]) func eachAudioInputsNewestFileIsTheLatestToStart(endFirst: Bool) {
+        var manifest = RecordingManifest(app: "a", started: Date(), timeZone: .gmt, settings: .manual)
+        func file(_ name: String, _ uid: String?, start: Double) -> RecordingManifest.AudioFile {
+            RecordingManifest.AudioFile(name: name, audioSource: name, audioSourceUID: uid, channels: .mono(1), start: start, timecode: "t")
+        }
+        for started in [file("a1.mov", "A", start: 0), file("b.mov", "B", start: 0), file("s.mov", nil, start: 0), file("c.mov", "C", start: 0)] {
+            _ = manifest.audioFileStarted(started)
+        }
+        var ended = file("a1.mov", "A", start: 0)
+        ended.end = 10
+        var endedB = file("b.mov", "B", start: 0)
+        endedB.end = 5
+        _ = manifest.audioFileEnded(endedB)
+        #expect(manifest.newestAudioInputFiles(of: ["A", "B"]) == ["a1.mov": "A", "b.mov": "B"])
+        if endFirst { _ = manifest.audioFileEnded(ended) }
+        _ = manifest.audioFileStarted(file("a2.mov", "A", start: 10))
+        if !endFirst { _ = manifest.audioFileEnded(ended) }
+        #expect(manifest.newestAudioInputFiles(of: ["A", "B"]) == ["a2.mov": "A", "b.mov": "B"])
+    }
+
     /// An audio file lists its audio delays, one entry per change, an empty list until set, the earlier file
     /// an entry was carried over from; its end keeps them; a file listed before them reads with none (D80).
     @Test func anAudioFileListsItsAudioDelaysAndKeepsThemAtItsEnd() throws {

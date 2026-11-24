@@ -263,10 +263,10 @@ import Testing
 
     @Test func theInboxGivesTheReportsInOrderOnce() {
         let inbox = AudioReportInbox()
-        inbox.post(.event(RecordingEvent(at: 0, event: .audioInputGap, audioSource: "A")))
-        inbox.post(.event(RecordingEvent(at: 1_000_000, event: .audioInputGap, audioSource: "B")))
+        inbox.post(.event(RecordingEvent(at: 0, event: .audioInputGap, audioSource: "A"), .input("A")))
+        inbox.post(.event(RecordingEvent(at: 1_000_000, event: .audioInputGap, audioSource: "B"), .input("B")))
         let taken = inbox.take().map { report -> String? in
-            if case .event(let event) = report { event.audioSource } else { nil }
+            if case .event(let event, _) = report { event.audioSource } else { nil }
         }
         #expect(taken == ["A", "B"])
         #expect(inbox.take().isEmpty)
