@@ -354,7 +354,7 @@ silence in its guide track (D31). It ends with its screen file's video
 mix were no longer there or the writer did not take them in time,
 which is told as a problem. "Audio inputs" is mixed 1 s behind and
 places each audio input earlier by its audio delay, less the smallest
-of those it mixes; the reference is in it from the start, another input
+of those it mixes; the anchor is in it from the start, another input
 only once its file has an audio delay, an input whose file ended keeping
 its place until its capture ends (D80). An audio input out of sync
 with the others leaves it (D79): the largest group of inputs whose
@@ -404,8 +404,8 @@ whole file) and the sound the correction added as
 How much later an audio input's sound arrives than the anchor's,
 negative when earlier, beyond what its clock drift explains; measured
 while recording by cross-correlation against the reference: the anchor
-while its file is being written, else the lowest-numbered input being
-written that has an audio delay, whose own audio delay turns the lags
+while its capture runs and it is not in no audio, else the
+lowest-numbered input being written that has an audio delay, whose own audio delay turns the lags
 into ones against the anchor (D77, D80). A file's audio delay is set by its first
 counted window, once more by the median of its first 3, then only by the
 median of the latest 60 s, each time only beyond a frame (D80); a new

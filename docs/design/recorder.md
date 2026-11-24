@@ -1523,13 +1523,16 @@ the metadata items (see "Output on disk").
   kHz (each 6 samples averaged), into a ring of its latest 12 s
   (`AudioDelayFeed`); every 10 s, off the capture queues and the main
   thread, each audio input's newest file, while it is being written, is
-  cross-correlated (`AudioDelay`, Accelerate's FFT) with the reference
-  microphone's over their latest common 10 s, searching ±1 s. Every
+  cross-correlated (`AudioDelay`, Accelerate's FFT) with the reference's
+  over their latest common 10 s, searching ±1 s. Every
   audio delay is against the recording's **anchor**, the first input
   whose file is written, its own 0. The reference is the anchor while
-  its file is being written, so every input is measured against the
-  anchor, the anchor's drift included; while it is not (muted, no audio,
-  unplugged), the input with the lowest number whose file is being
+  its capture runs and its newest file did not end on no audio, so every
+  input is measured against the anchor, the anchor's drift included; a
+  file of it ending on a gap or a channel change, its next file
+  following, neither changes the reference nor starts anything over,
+  and while it has no file open nothing is measured that cycle. Once it
+  is in no audio (muted, D69) or its capture ended (unplugged), the input with the lowest number whose file is being
   written and has an audio delay, a fallback whose own audio delay turns
   its lags into ones against the anchor; with none such, the input with
   the lowest number whose file is being written becomes the new anchor
@@ -2020,7 +2023,7 @@ them:
   against <reference file>, clarity 31, counted` (or `not counted`), or
   why it was not measured: `<file>: not measured, it or the reference
   <file> is silent`, `… has less than a window of sound`, `… the
-  reference <file> has no sound being written`.
+  reference <file> has no file open` (the anchor between two files).
 - Each audio delay rule that was evaluated, with its outcome:
   `<file>: audio delay set by its first counted window: 552 ms late`;
   `<file>: audio delay the median of its first 3 counted windows:

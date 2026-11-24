@@ -665,6 +665,28 @@ extension GlobalRecordingLog {
             _ = await stop()
         }
 
+        /// The anchor's file ending on a gap, its end told before its next file starts and no other input
+        /// holding an audio delay, keeps the anchor the reference: nothing starts over, and it stays in the mix
+        /// (D80). Only no audio or its capture ending hands the reference on.
+        @Test func theAnchorsFileEndingOnAGapStartsNothingOver() async throws {
+            let (r, _) = try await startTwoInputs()
+            #expect(isInTheGuideTrack(r))
+            var end = try #require(try manifestOnDisk().audioFiles.first { $0.audioSource == "Mic R" })
+            end.end = end.start + 0.5
+            end.state = .finalized
+            recorder.audioFileEnded(AudioFileEnd(file: end, error: nil))
+            await recorder.measureAudioDelays()
+            try sendNext(0.1, buffers: 2, to: sources.last(of: "R"))
+            try await Task.sleep(for: .milliseconds(50))
+            #expect(isInTheGuideTrack(r))
+            let files = try manifestOnDisk().audioFiles
+            #expect(files.first { $0.audioSource == "Mic R" }?.delays.map(\.delay) == [0])
+            #expect(files.first { $0.audioSource == "Mic A" }?.delays.isEmpty == true)
+            _ = await stop()
+            let log = try String(contentsOf: recorder.folder.appending(path: RecordingNames.recordingLog), encoding: .utf8)
+            #expect(log.contains("not measured, the reference \(end.name) has no file open"))
+        }
+
         /// The earliest input's file ending on no audio, its capture going on, leaves the others where the mix
         /// placed them (D80).
         @Test func theEarliestInputsFileEndingOnNoAudioMovesNoOtherInput() async throws {

@@ -47,7 +47,8 @@ public struct AudioDelays: Sendable {
     private var files: [String: File] = [:]
     /// Each device's newest file, by the device's UID, while its capture runs.
     private var newest: [String: String] = [:]
-    /// The device every audio delay is against: the first reference (D80).
+    /// The device every audio delay is against: the first input whose file is written, or the new one after a
+    /// start-over (D80).
     public private(set) var anchor: String?
     /// By device UID, so an input out of the guide track stays out with its next file.
     private var membership = GuideTrackMembership()
@@ -157,14 +158,13 @@ public struct AudioDelays: Sendable {
         return (placed * 1000).rounded() == 0 ? nil : .synced(placed, carriedOver: file.applied.isCarriedOver)
     }
 
-    /// Whether the file has an audio delay, or will carry one over once known: the reference the recorder
-    /// picks first (D80). The anchor's files have one, 0.
+    /// Whether the file has an audio delay, or will carry one over once known, so the recorder can pick a
+    /// fallback reference while the anchor has no file being written (D80). The anchor's files have one, 0.
     public func hasAudioDelay(_ name: String, device uid: String) -> Bool {
         guard uid != anchor else { return true }
         if let file = files[name] { return file.applied.delay != nil }
         return files.values.filter { $0.uid == uid }.max { $0.order < $1.order }?.applied.delay != nil
     }
-
 
     private static func milliseconds(_ seconds: Double) -> String { "\(Int((seconds * 1000).rounded())) ms" }
 

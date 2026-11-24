@@ -1,7 +1,7 @@
 import Accelerate
 
-/// How much later an audio input's sound arrives than the reference
-/// microphone's (D77): measured while recording by cross-correlating the
+/// How much later an audio input's sound arrives than the reference's
+/// (D77, D80): measured while recording by cross-correlating the
 /// two over windows of `windowSeconds` at `sampleRate` mono, searching
 /// ±`searchSeconds`; a window counts only when its match is clear, and a
 /// file's audio delay follows its counted windows by D80's rules (`Applied`).

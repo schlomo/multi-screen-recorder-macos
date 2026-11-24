@@ -284,8 +284,9 @@ The tone scenarios record only BlackHole, made the default microphone
 for the run, so it is the anchor and in the guide track "Audio inputs"
 from the start (D80). The anchor is the first input whose file starts,
 and with every input recorded that is a race between the VM's two:
-BlackHole's file started at 0.133 s and the Apple Virtual Sound
-Device's at 0.167 s in the run of 2026-11-24 at 2628b9d. Any other
+in the run of 2026-11-24 at 2628b9d, the two files' starts in the tone
+scenario's `recording.json` were 0.1333 s for BlackHole and 0.1667 s
+for the Apple Virtual Sound Device. Any other
 input joins the guide only once measured, which needs 10 s of sound, as
 long as the run, and the Apple Virtual Sound Device hears the tone 300
 to 400 ms late; with it as the anchor, BlackHole got no audio delay
