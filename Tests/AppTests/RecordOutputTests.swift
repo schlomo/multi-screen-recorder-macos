@@ -32,12 +32,12 @@ import Testing
     }
 
     @Test(arguments: [RecordOutput.Kind.banner, .whatWillBeRecorded, .readyCheckPassed, .recordingFolderNotice,
-                      .stopMessage, .event, .failureEvent, .problem, .summary, .summaryOfFailedRun, .readyCheckFailed, .error])
+                      .stopMessage, .event, .failureEvent, .problem, .summary, .summaryAlwaysTold, .readyCheckFailed, .error])
     func everythingForPeopleGoesToStandardErrorUnlessQuiet(kind: RecordOutput.Kind) {
         #expect(destination(kind, quiet: false) == .standardError)
     }
 
-    @Test(arguments: [RecordOutput.Kind.readyCheckFailed, .failureEvent, .problem, .summaryOfFailedRun, .error])
+    @Test(arguments: [RecordOutput.Kind.readyCheckFailed, .failureEvent, .problem, .summaryAlwaysTold, .error])
     func quietStillWritesFailuresAndProblems(kind: RecordOutput.Kind) {
         #expect(destination(kind, quiet: true) == .standardError)
     }
@@ -63,8 +63,10 @@ import Testing
     @Test func theReadyCheckAndTheSummaryAreToldByTheirResult() {
         #expect(RecordOutput.Kind.readyCheck(isReady: true) == .readyCheckPassed)
         #expect(RecordOutput.Kind.readyCheck(isReady: false) == .readyCheckFailed)
-        #expect(RecordOutput.Kind.summary(endedWithError: false) == .summary)
-        #expect(RecordOutput.Kind.summary(endedWithError: true) == .summaryOfFailedRun)
+        #expect(RecordOutput.Kind.summary(endedWithError: false, asksToReportIt: false) == .summary)
+        #expect(RecordOutput.Kind.summary(endedWithError: true, asksToReportIt: false) == .summaryAlwaysTold)
+        // Its `Report it:` line reaches a `--quiet` run that exits 0 too (D84).
+        #expect(RecordOutput.Kind.summary(endedWithError: false, asksToReportIt: true) == .summaryAlwaysTold)
     }
 
     @Test func theCommandsQuietFlagDecides() throws {
