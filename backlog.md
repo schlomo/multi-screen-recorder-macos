@@ -575,6 +575,21 @@ Still open from D34: what AGC does and whether it is on in auto mode;
    problem line while 22 s of its sound were missing (its camera kept
    going). Owner's call: should "no audio" right after a burst of gaps
    be a problem, as the device likely broke rather than went quiet?
+48. **Homepage screenshots from the owner's Mac** (the owner,
+   2026-11-24: "how do we get nicer screenshots with more devices? Maybe
+   worth creating the screenshots from my Mac from time to time?"). The
+   VM shows one virtual microphone, virtual screens and no camera; the
+   owner's Mac has real screens, cameras and microphones. The
+   architect's proposal, for sign-off as text: a mode of
+   `scripts/update-homepage-screenshots` that runs the end-to-end
+   driver's window captures on this Mac against the published app
+   (`HOME` and the output folder in a scratch folder, D48), announced
+   before each run (D56), recording about 30 s; the owner sets up the
+   devices first. It amends D72 (screenshots only from the VM's run).
+   The VM run stays the gate for marking a PR ready. Open: the device
+   names shown are the owner's own (no serial numbers in the windows);
+   dark captures stay unused, light only (the owner, 2026-11-24: "OK to
+   stay on light mode only for now").
 
 ## Deliberately deferred
 
