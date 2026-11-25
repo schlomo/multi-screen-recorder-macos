@@ -2,13 +2,18 @@
 
 ## Next session starts here
 
-PR #32 (items 49, 50 with 43, parts of 52; D84 to D86) is ready on
-c6f66d2 and waits for the owner's try-out and merge. Then item 51
-(the runner VM, its own PR, the owner registers the runner), then
-item 22 (camera picture sync from claps). The owner, 2026-11-23:
-"Noticeable lip sync is my goal"; "Iterative improvement, every
-shipment is better". The end-to-end tests need an idle Mac: a video
-call is enough to fail `virtual-screen` (`docs/troubleshooting.md`).
+PR #32 (items 49, 50 with 43, parts of 52; D84 to D88) is ready on
+9336a12 and waits for the owner's merge: reviewed, pipeline green,
+end-to-end 7 of 7 on an idle Mac. At merge the owner confirms two
+readings: audio writers get D88's restart rule, and the badge and
+count show a call to action only while its problem lasts (the Dock
+bounce goes on until the app is clicked). Then item 51 (the runner
+VM, its own PR, the owner registers the runner; GitHub's hosted macOS
+runners stalled PR #32's pipeline twice on 2026-11-25), then item 22
+(camera picture sync from claps). The owner, 2026-11-23: "Noticeable
+lip sync is my goal"; "Iterative improvement, every shipment is
+better". The end-to-end tests need an idle Mac: a video call is
+enough to fail `virtual-screen` (`docs/troubleshooting.md`).
 
 The owner's signing certificate is trusted for code signing in the
 login keychain since 2026-11-24, so a try-out can be built and signed
@@ -37,13 +42,10 @@ Still open from D34: what AGC does and whether it is on in auto mode;
 ## In flight
 
 - PR #32 (branch `call-to-action-alerts-and-anchor-measured`): items
-  49, 50 with 43, parts of 52; D84, D85, and D86 (every synced audio
-  input shows its sync, 0 ms included, from the owner's try-out).
-  Ready on c6f66d2: reviewed, pipeline green, end-to-end tested
-  (`virtual-screen` failed once with the busy-Mac encoder error during
-  the owner's video call, passed 2 of 2 re-run alone). Snapshot
-  0.20261125.114 installed in `/Applications`. Waiting for the owner's
-  try-out and merge.
+  49, 50 with 43, parts of 52; D84 to D88. Ready on 9336a12: reviewed,
+  pipeline green, end-to-end 7 of 7. The owner's try-out runs a local
+  build of 0af3768 (the app is unchanged since). Waiting for the
+  owner's merge.
 
 ## Queued
 
@@ -579,8 +581,7 @@ Still open from D34: what AGC does and whether it is on in auto mode;
    399 macOS jobs, about 1,165 billed minutes, free for this public
    repository.
 53. **Follow-ups from PR #32**: the status window's line could name
-   the call to action's words; the "!" badge stays after a call to
-   action's problem ended (older than PR #32); a reference that is
+   the call to action's words; a reference that is
    not the anchor is never measured and shows "(carried)" on each new
    file (D80's shortcut); an end-to-end scenario for a late or
    reconnected microphone needs a broadband test signal (the 1 kHz
