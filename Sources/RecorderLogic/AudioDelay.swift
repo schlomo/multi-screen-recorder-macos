@@ -232,15 +232,15 @@ public enum AudioDelay {
     /// Whether a window is silent, not measured.
     public static func isSilent(_ samples: [Float]) -> Bool { rms(samples) < silence }
 
-    /// How much a window's level moves (D89), at `sampleRate`: speech scores high, a steady hum or noise near 0,
-    /// however loud.
+    /// How much a window's level moves (D89), at `sampleRate`, over its slices with sound: speech scores high, a
+    /// steady hum or noise near 0, however loud; digital silence between sounds does not count.
     public static func actionScore(_ samples: [Float]) -> Double {
         let length = Int(RecorderValues.actionScoreSlice.nanoseconds * Int64(sampleRate) / 1_000_000_000)
-        let floor = 20 * log10(Double(silence))
-        var levels = stride(from: 0, to: samples.count - length + 1, by: length).map { start in
-            max(floor, 20 * log10(Double(vDSP.rootMeanSquare(samples[start..<(start + length)]))))
+        var levels = stride(from: 0, to: samples.count - length + 1, by: length).compactMap { start in
+            let rms = vDSP.rootMeanSquare(samples[start..<(start + length)])
+            return rms < silence ? nil : 20 * log10(Double(rms))
         }
-        guard !levels.isEmpty else { return 0 }
+        guard levels.count >= RecorderValues.actionScoreMinimumSlices else { return 0 }
         levels.sort()
         func level(at percentile: Double) -> Double { levels[Int((Double(levels.count - 1) * percentile).rounded())] }
         return level(at: RecorderValues.actionScoreHighPercentile) - level(at: RecorderValues.actionScoreLowPercentile)

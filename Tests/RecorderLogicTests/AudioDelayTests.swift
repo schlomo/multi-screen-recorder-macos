@@ -42,7 +42,7 @@ import Testing
     }
 
     /// The action score (D89): speech-like bursts move a lot, at any level; a steady hum or noise hardly at all,
-    /// however loud; silence not at all.
+    /// however loud; silence not at all; digital silence between sounds does not count.
     @Test func theActionScoreFollowsTheLevelsMotionNotItsHeight() {
         let count = AudioDelay.windowSeconds * AudioDelay.sampleRate
         let (speech, _) = Self.pair(shift: 0)
@@ -56,9 +56,13 @@ import Testing
         #expect(AudioDelay.actionScore(hum) < 1)
         #expect(AudioDelay.actionScore(noise) < 1)
         #expect(AudioDelay.actionScore([Float](repeating: 0, count: count)) == 0)
-        // A slice below the silence counts at it: speech in digital silence scores its level over -100 dBFS.
-        let gated = speech.enumerated().map { ($0.offset / 1600) % 3 == 0 ? $0.element : 0 }
-        #expect(AudioDelay.actionScore(gated) > 60)
+        // Only the slices with sound count: speech behind a noise gate scores as the speech, not by its zeros,
+        // and less than a second with sound scores 0.
+        let gated = speech.enumerated().map { ($0.offset / 4000) % 2 == 0 ? $0.element : 0 }
+        #expect(abs(AudioDelay.actionScore(gated) - AudioDelay.actionScore(speech)) < 6,
+                "\(AudioDelay.actionScore(gated)) against \(AudioDelay.actionScore(speech))")
+        let brief = speech.enumerated().map { $0.offset < 9 * 800 ? $0.element : 0 }
+        #expect(AudioDelay.actionScore(brief) == 0)
     }
 
     @Test func theAudioDelaysValuesAreData() {
