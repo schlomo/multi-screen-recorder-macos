@@ -1041,16 +1041,16 @@ public final class Recorder {
 
     // MARK: Audio delay
 
-    /// Measures each audio input file being written against the reference's
-    /// over their latest common window, off the main thread, and
-    /// hands the counted windows' lags to the audio delays (D77, D80). Nothing after Stop.
+    /// Measures each audio input file being written against the reference's over their latest common window,
+    /// off the main thread, and hands the measurement to the audio delays (D77, D80). Nothing after Stop.
     func measureAudioDelays() async {
         guard !isStopped else { return }
         let ended = Set(manifest.audioFiles.filter { $0.end != nil }.map(\.name))
         let writing = audioInputFiles().filter { !ended.contains($0.key) }
-        guard let (reference, referenceFile) = delayReference(among: audioInputFiles()) else { return }
-        let others = writing.filter { $0.value != reference }.keys.sorted()
-        guard writing[referenceFile] != nil, let referenceEnd = audioDelayFeed.endIndex(of: reference) else {
+        guard let reference = audioDelays.reference(among: delayCandidates(among: audioInputFiles())) else { return }
+        let referenceFile = reference.file
+        let others = writing.filter { $0.value != reference.uid }.keys.sorted()
+        guard writing[referenceFile] != nil, let referenceEnd = audioDelayFeed.endIndex(of: reference.uid) else {
             for file in others { RecorderLog.detail("\(file): not measured, the reference \(referenceFile) has no file open", category: "recorder") }
             return
         }
@@ -1062,45 +1062,18 @@ public final class Recorder {
                   let start = manifest.audioFiles.first(where: { $0.name == file })?.start,
                   Double(end - Int64(count)) / Double(AudioDelay.sampleRate) >= start,
                   let other = audioDelayFeed.window(of: uid, endingAt: end, count: count),
-                  let referenceWindow = audioDelayFeed.window(of: reference, endingAt: end, count: count) else {
+                  let referenceWindow = audioDelayFeed.window(of: reference.uid, endingAt: end, count: count) else {
                 RecorderLog.detail("\(file): not measured, it or the reference \(referenceFile) has less than a window of sound", category: "recorder")
                 continue
             }
             jobs.append((file, referenceWindow, other))
         }
         guard !jobs.isEmpty else { return }
-        let windows = await Task.detached(priority: .utility) {
-            jobs.map { job in
-                (file: job.file, window: AudioDelay.window(reference: job.reference, other: job.other),
-                 isSilent: AudioDelay.isSilent(job.other), isReferenceSilent: AudioDelay.isSilent(job.reference))
-            }
+        let measurement = await Task.detached(priority: .utility) {
+            AudioDelays.measure(reference: referenceFile, others: jobs)
         }.value
         guard !isStopped else { return }
-        let sounding = Set(windows.filter { !$0.isSilent }.map { writing[$0.file]! })
-        if windows.allSatisfy(\.isReferenceSilent), !sounding.isEmpty {
-            for (file, _, isSilent, _) in windows {
-                RecorderLog.detail("\(file): not measured, " + (isSilent ? "it is silent" : "the reference \(referenceFile) is silent"),
-                                   category: "recorder")
-            }
-            // As in no audio, the reference moves to an input with sound in this measurement (D89).
-            RecorderLog.detail("the reference \(referenceFile) is silent, the reference moves", category: "recorder")
-            applyAudioDelays(sounding: sounding)
-            return
-        }
-        var lags: [String: Double] = [:]
-        var unclear: Set<String> = []
-        for (file, window, isSilent, _) in windows {
-            guard let window else {
-                RecorderLog.detail("\(file): not measured, " + (isSilent ? "it is silent" : "the reference \(referenceFile) is silent"),
-                                   category: "recorder")
-                continue
-            }
-            RecorderLog.detail(
-                "\(file): lag \(AudioDelay.text(window.lag)) against \(referenceFile), clarity \(Int(window.clarity.rounded())), "
-                    + (window.counts ? "counted" : "not counted"), category: "recorder")
-            if window.counts { lags[file] = window.lag } else { unclear.insert(file) }
-        }
-        applyAudioDelays(lags: lags, unclear: unclear, measuredAgainst: referenceFile, at: Double(referenceEnd) / Double(AudioDelay.sampleRate))
+        applyAudioDelays(measurement: measurement, at: Double(referenceEnd) / Double(AudioDelay.sampleRate))
     }
 
     /// Each audio input's newest file while its capture runs, by name, with its device's UID (D80).
@@ -1110,24 +1083,20 @@ public final class Recorder {
         }))
     }
 
-    /// The audio delays after a measurement (`lags` against `measuredAgainst`, the windows ending at `at` seconds;
-    /// `sounding`, the devices with sound, when the reference was silent) or a file's start or end: files leave
-    /// and rejoin the guide track, every file being written is placed in it, and changed delays go into the
-    /// manifest, from where the mix is now (D79, D80, D89). Nothing after Stop.
-    private func applyAudioDelays(
-        lags: [String: Double] = [:], unclear: Set<String> = [], measuredAgainst: String? = nil, at: Double = 0,
-        sounding: Set<String>? = nil
-    ) {
+    /// The audio delays after a measurement (its windows ending at `at` seconds) or a file's start or end: files
+    /// leave and rejoin the guide track, every file being written is placed in it, and changed delays go into the
+    /// manifest, from where the mix is now (D79, D80). Nothing after Stop.
+    private func applyAudioDelays(measurement: AudioDelays.Measurement? = nil, at: Double = 0) {
         guard !isStopped else { return }
         let files = audioInputFiles()
-        guard let (_, reference) = delayReference(among: files, sounding: sounding) else { return }
-        if !lags.isEmpty, measuredAgainst != reference {
-            RecorderLog.detail("counted lags of \(lags.keys.sorted().joined(separator: ", ")) dropped: measured against "
-                + "\(measuredAgainst ?? "none"), the reference is now \(reference)", category: "recorder")
+        let candidates = delayCandidates(among: files)
+        let outcome: AudioDelays.Outcome
+        if let measurement {
+            outcome = audioDelays.measured(measurement, files: files, candidates: candidates, at: at)
+        } else {
+            guard let reference = audioDelays.reference(among: candidates) else { return }
+            outcome = audioDelays.update(files: files, reference: reference.file)
         }
-        let isCurrent = measuredAgainst == reference
-        let outcome = audioDelays.update(
-            files: files, reference: reference, lags: isCurrent ? lags : [:], unclear: isCurrent ? unclear : [], at: at)
         for line in outcome.lines { RecorderLog.detail(line, category: "recorder") }
         for (file, offset) in outcome.leaving.sorted(by: { $0.key < $1.key }) { leaveTheGuideTrack(file: file, offset: offset) }
         for file in outcome.rejoining.sorted() { rejoinTheGuideTrack(file: file) }
@@ -1204,26 +1173,19 @@ public final class Recorder {
         applyAudioDelays()
     }
 
-    /// The reference and its file among `files` (D80, D85): the reference in use, the anchor at first, while its
-    /// file is being written, or ended otherwise than on no audio (a gap or a channel change, its next file
-    /// following), else the lowest-numbered input being written that has an audio delay; with none such, the
-    /// lowest-numbered input being written, which becomes the new anchor. With no file being written, the same
-    /// among them all. With `sounding`, the reference in use was silent: only those devices are candidates (D89).
-    private func delayReference(among files: [String: String], sounding: Set<String>? = nil) -> (uid: String, file: String)? {
+    /// The files among `files` that may be the reference (D80, D85): those being written, and the reference's
+    /// file ended otherwise than on no audio (a gap or a channel change, its next file following); with none
+    /// being written, them all. The audio delays pick the reference among them.
+    private func delayCandidates(among files: [String: String]) -> [AudioDelays.Candidate] {
         let ended = Set(manifest.audioFiles.filter { $0.end != nil }.map(\.name))
         let writing = files.filter { name, uid in
             !ended.contains(name) || (uid == audioDelays.referenceDevice && !audioTracker.hasNoAudio(.input(uid)))
         }
-        let candidates = (writing.isEmpty ? files : writing).filter { sounding?.contains($0.value) ?? true }
-        func file(of uid: String) -> String? { candidates.first { $0.value == uid }?.key }
-        let byNumber = audioTracker.sourcesShown.compactMap { source -> (Int, String)? in
-            guard case .input(let uid) = source.id, file(of: uid) != nil else { return nil }
-            return (source.number, uid)
-        }.sorted { $0.0 < $1.0 }.map(\.1)
-        let uid = audioDelays.referenceDevice.flatMap { file(of: $0) != nil ? $0 : nil }
-            ?? byNumber.first { audioDelays.hasAudioDelay(file(of: $0)!, device: $0) }
-            ?? byNumber.first
-        return uid.flatMap { uid in file(of: uid).map { (uid, $0) } }
+        let candidates = writing.isEmpty ? files : writing
+        return audioTracker.sourcesShown.compactMap { source in
+            guard case .input(let uid) = source.id, let file = candidates.first(where: { $0.value == uid })?.key else { return nil }
+            return AudioDelays.Candidate(file: file, uid: uid, number: source.number)
+        }
     }
 
     // MARK: Input volume

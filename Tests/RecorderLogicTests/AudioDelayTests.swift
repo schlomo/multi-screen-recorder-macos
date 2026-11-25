@@ -41,21 +41,6 @@ import Testing
         #expect(AudioDelay.window(reference: reference, other: [Float](repeating: 0, count: count)) == nil)
     }
 
-    /// Silent means below the level meter's floor, -60 dBFS rms, where the level bar shows nothing (D89): a dock's
-    /// line-in with nothing connected, at -70 dBFS, is not measured; a quiet microphone at -50 dBFS is.
-    @Test func aWindowBelowTheLevelMetersFloorIsSilent() throws {
-        let (reference, other) = Self.pair(shift: 0)
-        func scaled(_ samples: [Float], toDBFS level: Double) -> [Float] {
-            let rms = (samples.map { $0 * $0 }.reduce(0, +) / Float(samples.count)).squareRoot()
-            return samples.map { $0 * Float(pow(10, level / 20)) / rms }
-        }
-        #expect(AudioDelay.window(reference: scaled(reference, toDBFS: -70), other: other) == nil)
-        #expect(AudioDelay.window(reference: reference, other: scaled(other, toDBFS: -70)) == nil)
-        #expect(AudioDelay.isSilent(scaled(reference, toDBFS: -61)))
-        #expect(!AudioDelay.isSilent(scaled(reference, toDBFS: -59)))
-        #expect(try #require(AudioDelay.window(reference: scaled(reference, toDBFS: -50), other: other)).counts)
-    }
-
     @Test func theAudioDelaysValuesAreData() {
         #expect(AudioDelay.windowsNeeded == 3)
         #expect(RecorderValues.audioDelayChangeWindowSeconds == 60)

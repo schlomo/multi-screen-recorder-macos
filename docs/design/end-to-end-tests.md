@@ -514,10 +514,7 @@ video from the e2e runs"):
     every input but the new anchor, which show "not synced yet" again
     until they join. A source in no audio (a `no audio started` event
     naming it, with no `no audio stopped` after it) is not waited for:
-    its clock drift shows "measuring" for as long as it is silent.
-    Neither is an audio input whose latest measurement line for its
-    file is `not measured, it is silent` (below the level meter's floor,
-    never synced, D89) rather than a `lag` line. The
+    its clock drift shows "measuring" for as long as it is silent. The
     event names only the device, so silence is keyed by the device name
     and two devices of the same name share it. Past 90 s
     (`audioRowsFinalLimit`, *data*) the step fails, naming the files

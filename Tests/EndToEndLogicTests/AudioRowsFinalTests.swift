@@ -129,18 +129,6 @@ import Testing
         #expect(notFinal(final + [startOver, micJoinsAgain]).isEmpty)
     }
 
-    /// Synthetic, from the recorder's format: an input silent below the level meter's floor is never synced, so
-    /// it is not waited for while its latest measurement found it silent (D89).
-    @Test func aSilentInputIsNotWaitedForUntilItIsMeasured() {
-        let started = Self.anchorFinal + [Self.brioStartInput, Self.brioStarted, Self.brioDrift]
-        let silent = "13:25:04 +70.1s detail recorder: \(Self.brio): not measured, it is silent"
-        let measured = "13:25:14 +80.1s detail recorder: \(Self.brio): lag 3 ms late against 2026-11-25 13.23.54 Audio 1 - MacBook Pro Microphone.mov, clarity 5, not counted"
-        let referenceSilent = "13:25:04 +70.1s detail recorder: \(Self.brio): not measured, the reference 2026-11-25 13.23.54 Audio 1 - MacBook Pro Microphone.mov is silent"
-        #expect(notFinal(started + [silent]).isEmpty)
-        #expect(notFinal(started + [silent, measured]) == [Self.brio])
-        #expect(notFinal(started + [referenceSilent]) == [Self.brio])
-    }
-
     /// Synthetic: no log has the system audio in no audio yet; its event names it "System audio".
     @Test func theSystemAudioInNoAudioIsNotWaitedFor() {
         let early = [Self.micStartInput, Self.systemStart, Self.micStarted, Self.micJoins, Self.systemStarted, Self.systemDriftNotYet, Self.micDrift]

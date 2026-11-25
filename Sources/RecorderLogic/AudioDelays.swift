@@ -53,6 +53,31 @@ public struct AudioDelays: Sendable {
         var unclear = 0
     }
 
+    /// An audio input's newest file that may be the reference: being written, or the reference's own while
+    /// its next file follows (the recorder decides which, D80, D85); `number` is the input's in the window.
+    public struct Candidate: Equatable, Sendable {
+        public var file: String
+        public var uid: String
+        public var number: Int
+
+        public init(file: String, uid: String, number: Int) {
+            (self.file, self.uid, self.number) = (file, uid, number)
+        }
+    }
+
+    /// One measurement (D77): each other file's window against the reference's file over their latest common
+    /// window.
+    public struct Measurement: Sendable {
+        public struct Measured: Sendable {
+            public var file: String
+            /// Nil when either side is silent.
+            public var window: AudioDelay.Window?
+        }
+
+        public var reference: String
+        public var files: [Measured]
+    }
+
     private var files: [String: File] = [:]
     /// Each device's newest file, by the device's UID, while its capture runs.
     private var newest: [String: String] = [:]
@@ -174,6 +199,52 @@ public struct AudioDelays: Sendable {
             outcome.delays[name] = Entry(delay: delay)
         }
         outcome.lines = lines
+        return outcome
+    }
+
+    /// Measures each other file's window against the reference's (`others`: each file with its own window and
+    /// the reference's over the same span); pure, so the recorder runs it off the main thread.
+    public static func measure(reference: String, others: [(file: String, reference: [Float], other: [Float])]) -> Measurement {
+        Measurement(reference: reference, files: others.map { .init(file: $0.file, window: AudioDelay.window(reference: $0.reference, other: $0.other)) })
+    }
+
+    /// The reference among `candidates` (D80, D85): the reference in use while it is one of them, else the
+    /// lowest-numbered that has an audio delay; with none such, the lowest-numbered, which becomes the new
+    /// anchor.
+    public func reference(among candidates: [Candidate]) -> Candidate? {
+        let byNumber = candidates.sorted { $0.number < $1.number }
+        return referenceDevice.flatMap { uid in byNumber.first { $0.uid == uid } }
+            ?? byNumber.first { hasAudioDelay($0.file, device: $0.uid) }
+            ?? byNumber.first
+    }
+
+    /// The audio delays after `measurement`: its counted windows' lags and unclear files, each window's line,
+    /// the reference among `candidates` (`files` as for `update`); a measurement against another reference
+    /// than the one in use now counts nothing (D80, D85).
+    public mutating func measured(
+        _ measurement: Measurement, files newest: [String: String], candidates: [Candidate], at: Double
+    ) -> Outcome {
+        var lines: [String] = []
+        var lags: [String: Double] = [:]
+        var unclear: Set<String> = []
+        for measured in measurement.files {
+            guard let window = measured.window else {
+                lines.append("\(measured.file): not measured, it or the reference \(measurement.reference) is silent")
+                continue
+            }
+            lines.append("\(measured.file): lag \(AudioDelay.text(window.lag)) against \(measurement.reference), "
+                + "clarity \(Int(window.clarity.rounded())), " + (window.counts ? "counted" : "not counted"))
+            if window.counts { lags[measured.file] = window.lag } else { unclear.insert(measured.file) }
+        }
+        guard let reference = reference(among: candidates) else { return Outcome(lines: lines) }
+        let isCurrent = measurement.reference == reference.file
+        if !lags.isEmpty, !isCurrent {
+            lines.append("counted lags of \(lags.keys.sorted().joined(separator: ", ")) dropped: measured against "
+                + "\(measurement.reference), the reference is now \(reference.file)")
+        }
+        var outcome = update(
+            files: newest, reference: reference.file, lags: isCurrent ? lags : [:], unclear: isCurrent ? unclear : [], at: at)
+        outcome.lines = lines + outcome.lines
         return outcome
     }
 

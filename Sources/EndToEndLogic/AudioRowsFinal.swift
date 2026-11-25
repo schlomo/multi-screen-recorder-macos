@@ -2,8 +2,7 @@
 /// source whose newest file is being written shows its clock drift (its latest `Audio N - …: clock drift`
 /// line is not `not measured yet`) and, for an audio input (N ≥ 1), its sync (one of `AudioDelays`' lines
 /// that ends "not synced yet" for a file of that source; a source's newer file keeps it, and a start-over
-/// clears it for all but the new anchor). A source in no audio shows "measuring" for ever, and an input whose
-/// latest measurement found it silent (`… not measured, it is silent`) is never synced (D89), so neither is
+/// clears it for all but the new anchor). A source in no audio shows "measuring" for ever, so it is not
 /// waited for; its event names only the device, so two devices of the same name share it. Everything is keyed by the source's number N,
 /// as device names repeat and a file name changes the name's `/` and `:`.
 public enum AudioRowsFinal {
@@ -12,7 +11,6 @@ public enum AudioRowsFinal {
         var isWritten = false
         var showsClockDrift = false
         var showsSync = false
-        var isSilent = false
     }
 
     private static let syncShown = [
@@ -46,8 +44,6 @@ public enum AudioRowsFinal {
                 of: #/^reference .* → (.*? Audio (\d+) - .*?\.mov): it has no audio delay, so it is the new anchor and every input starts over$/#) {
                 for number in sources.keys { sources[number]!.showsSync = false }
                 sources[Int(startOver.2)!, default: Source()].showsSync = true
-            } else if let measured = detail.firstMatch(of: #/^.*? Audio (\d+) - .*?\.mov: (not measured, it is silent|lag )/#) {
-                sources[Int(measured.1)!, default: Source()].isSilent = measured.2 != "lag "
             } else if !detail.hasPrefix("reference "), let delay = detail.firstMatch(of: #/^.*? Audio (\d+) - .*?\.mov: (.*)$/#),
                       syncShown.contains(where: { delay.2.hasPrefix($0) }) {
                 sources[Int(delay.1)!, default: Source()].showsSync = true
@@ -55,7 +51,7 @@ public enum AudioRowsFinal {
         }
         return sources.sorted { $0.key < $1.key }.compactMap { number, source in
             guard source.isWritten, !silent.contains(number) else { return nil }
-            return source.showsClockDrift && (number == 0 || source.showsSync || source.isSilent) ? nil : source.newestFile
+            return source.showsClockDrift && (number == 0 || source.showsSync) ? nil : source.newestFile
         }
     }
 }

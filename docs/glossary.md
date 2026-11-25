@@ -421,12 +421,9 @@ How much later an audio input's sound arrives than the anchor's,
 negative when earlier, beyond what its clock drift explains; measured
 while recording by cross-correlation against the reference: the anchor
 at first, the reference in use while its capture runs and it is not in
-no audio or silent while another input has sound, else the
-lowest-numbered input being written (and with sound, when it moved for
-silence) that has an audio delay, whose own audio delay turns the lags
-into ones against the anchor; the reference stays with the input it
-moved to (D77, D80, D85, D89). A window is silent below the level
-meter's floor, -60 dBFS rms, and is not measured.
+no audio, else the lowest-numbered input being written that has an
+audio delay, whose own audio delay turns the lags into ones against the
+anchor; the reference stays with the input it moved to (D77, D80, D85).
 A file's audio delay is set by its first
 counted window, once more by the median of its first 3, then only by the
 median of the latest 60 s, each time only beyond a frame (D80); a new
@@ -446,19 +443,17 @@ audio input whose file is written, its files' audio delay 0 while it is
 the reference, the default microphone or not; a new file of it after
 the reference moved away is measured like any other input (D85). Only
 when no input being written has an audio delay does the lowest-numbered
-input being written (with sound, when a silent reference moved; D89)
-become the new anchor, every input then starting over (D80).
+input being written become the new anchor, every input then starting
+over (D80).
 
 ## Reference
 
 The audio input whose newest file every other input's sound is
 measured against for its audio delay (`AudioDelays.referenceDevice`):
 the anchor at first, kept while its capture runs and its newest file
-did not end on no audio and it is not silent while another input has
-sound; then the lowest-numbered input being written (with sound, when
-it moved for silence) that has an audio delay, which it stays with
-until its own file ends, the anchor's returning file not taking it back
-(D80, D85, D89). Not the
+did not end on no audio; then the lowest-numbered input being written
+that has an audio delay, which it stays with until its own file ends,
+the anchor's returning file not taking it back (D80, D85). Not the
 "Reference implementation" above.
 
 ## Lag

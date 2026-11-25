@@ -500,14 +500,13 @@ extension GlobalRecordingLog {
 
         /// The microphones' sound, each later by its lag, placed straight into the delay measurement's rings from
         /// 1 s to 13 s after the latest start of their newest files, so every window is there at once and within
-        /// each file however late a slow runner started it. `quiet` ones get other noise at about -71 dBFS rms, below
-        /// the level meter's floor but not digital zero, as a dock's line-in with nothing connected.
-        private func feedDelayedNoise(_ uids: [String: Double], quiet: [String] = []) throws {
+        /// each file however late a slow runner started it.
+        private func feedDelayedNoise(_ uids: [String: Double]) throws {
             let rate = RecorderValues.audioSampleRate
             let newest = Dictionary(try manifestOnDisk().audioFiles.compactMap { file in
                 file.audioSourceUID.map { ($0, file.start) }
             }) { $1 }
-            let base = Int(((Array(uids.keys) + quiet).compactMap { newest[$0] }.max() ?? 0).rounded(.up))
+            let base = Int((uids.keys.compactMap { newest[$0] }.max() ?? 0).rounded(.up))
             var seed: UInt64 = 7
             let noise = (0..<(15 * rate)).map { _ -> Float in
                 seed = seed &* 6_364_136_223_846_793_005 &+ 1_442_695_040_888_963_407
@@ -520,77 +519,6 @@ extension GlobalRecordingLog {
                     recorder.audioDelayFeed.receive([samples], from: uid, at: Int64(base * rate + chunk) * 1_000_000_000 / Int64(rate))
                 }
             }
-            for uid in quiet {
-                for chunk in stride(from: rate, to: 13 * rate, by: rate / 10) {
-                    let samples = noise[(chunk + rate)..<(chunk + rate + rate / 10)].reversed().map { $0 / 1000 }
-                    recorder.audioDelayFeed.receive([samples], from: uid, at: Int64(base * rate + chunk) * 1_000_000_000 / Int64(rate))
-                }
-            }
-        }
-
-        private func recordingLog() throws -> String {
-            try String(contentsOf: recorder.folder.appending(path: RecordingNames.recordingLog), encoding: .utf8)
-        }
-
-        /// The owner's recording on 0.20261125.116 (D89): the anchor, a dock's line-in with nothing connected,
-        /// delivers near-silence, above digital zero but below the level meter's floor; the others have clear
-        /// sound. The reference moves off it, the lowest-numbered input with sound becomes the new anchor, as none
-        /// has an audio delay, and the others are synced against it; none counts as without clear sound.
-        @Test func aNearSilentAnchorHandsTheReferenceToTheFirstInputWithSound() async throws {
-            try await startInputs(["Q", "A", "B"])
-            try feedDelayedNoise(["A": 0, "B": 0.2], quiet: ["Q"])
-            for _ in 0..<2 { await recorder.measureAudioDelays() }
-            let files = try manifestOnDisk().audioFiles
-            #expect(files.first { $0.audioSource == "Mic A" }?.delays.map(\.delay) == [0])
-            let b = try #require(files.first { $0.audioSource == "Mic B" }?.delays.map(\.delay))
-            #expect(b.count == 1 && abs((b.first ?? 0) - 0.2) < 0.002, "\(b)")
-            _ = await stop()
-            let log = try recordingLog()
-            let (q, a) = try (#require(files.first { $0.audioSource == "Mic Q" }?.name), #require(files.first { $0.audioSource == "Mic A" }?.name))
-            #expect(log.contains("the reference \(q) is silent, the reference moves"), "\(log)")
-            #expect(log.contains("reference \(q) → \(a): it has no audio delay, so it is the new anchor and every input starts over"))
-            #expect(log.contains("\(q): not measured, it is silent"))
-            #expect(!log.contains("no clear sound to sync"))
-        }
-
-        /// A silent reference hands the reference on as one in no audio does (D80, D89): to an input with an
-        /// audio delay, the others re-based through it; the silent input does not take it back once it sounds
-        /// (D85).
-        @Test func aSilentReferenceHandsTheReferenceToAnInputWithAnAudioDelay() async throws {
-            try await startInputs(["R", "A", "B"])
-            try feedDelayedNoise(["R": 0, "A": 0.5])
-            await recorder.measureAudioDelays()
-            try feedDelayedNoise(["A": 0.5, "B": 0.2], quiet: ["R"])
-            for _ in 0..<2 { await recorder.measureAudioDelays() }
-            let files = try manifestOnDisk().audioFiles
-            let b = try #require(files.first { $0.audioSource == "Mic B" }?.delays.map(\.delay))
-            #expect(b.count == 1 && abs((b.first ?? 0) - 0.2) < 0.002, "\(b)")
-            let a = try #require(files.first { $0.audioSource == "Mic A" }?.delays.map(\.delay))
-            #expect(a.count == 1 && abs((a.first ?? 0) - 0.5) < 0.002, "\(a)")
-            try feedDelayedNoise(["R": 0, "A": 0.5, "B": 0.2])
-            await recorder.measureAudioDelays()
-            _ = await stop()
-            let (rFile, aFile) = try (#require(files.first { $0.audioSource == "Mic R" }?.name), #require(files.first { $0.audioSource == "Mic A" }?.name))
-            let log = try recordingLog()
-            #expect(log.contains("reference \(rFile) → \(aFile): lags re-based onto the anchor by 500 ms late"), "\(log)")
-            #expect(log.contains("\(rFile): lag 500 ms early against \(aFile)"), "\(log)")
-        }
-
-        /// Every input silent: the reference stays, nothing is measured and nothing starts over (D89).
-        @Test func everyInputSilentMovesNothing() async throws {
-            try await startInputs(["R", "A"])
-            try feedDelayedNoise([:], quiet: ["R", "A"])
-            await recorder.measureAudioDelays()
-            try feedDelayedNoise(["R": 0, "A": 0.3])
-            await recorder.measureAudioDelays()
-            let files = try manifestOnDisk().audioFiles
-            #expect(files.first { $0.audioSource == "Mic R" }?.delays.map(\.delay) == [0])
-            let a = try #require(files.first { $0.audioSource == "Mic A" }?.delays.map(\.delay))
-            #expect(a.count == 1 && abs((a.first ?? 0) - 0.3) < 0.002, "\(a)")
-            _ = await stop()
-            let log = try recordingLog()
-            #expect(!log.contains("the reference moves"))
-            #expect(!log.contains("starts over"))
         }
 
         /// The audio delays in the manifest are against the anchor, the first input whose file is written, listing its own 0, and
