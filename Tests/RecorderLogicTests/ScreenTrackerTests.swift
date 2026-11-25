@@ -210,6 +210,17 @@ import Testing
         #expect(due.actions.count == 1)
     }
 
+    /// A stream ending while the screens cannot be read keeps the screens as last read: no screen is ended as
+    /// gone, and the failed one starts again with the back-off.
+    @Test func aStreamEndingWhileTheScreensCannotBeReadKeepsTheScreensAsLastRead() {
+        var screens = tracker()
+        _ = screens.begin([Self.builtIn, Self.lg], at: 0)
+        let step = screens.streamEnded(Self.lg.uuid, .streamFailed("-3811"), connected: nil, at: second)
+        #expect(step.events.map(\.event) == [.screenStreamFailed])
+        #expect(step.actions.isEmpty)
+        #expect(starts(screens.due(at: 2 * second)) == [Self.lg.uuid])
+    }
+
     @Test func aStreamThatFailsBecauseItsScreenWentIsADisconnection() {
         var screens = tracker()
         _ = screens.begin([Self.builtIn, Self.lg], at: 0)

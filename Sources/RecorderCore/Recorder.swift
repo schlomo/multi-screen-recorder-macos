@@ -730,11 +730,12 @@ public final class Recorder {
         guard !isStopped, let (current, capture) = captures[uuid], current == captureNumber else { return }
         captures[uuid] = nil
         if reason == .showsAnotherScreen { observer?.recorder(self, screenShowsAnotherScreensPicture: capture.name) }
-        let screens = readScreens() ?? []
+        // Screens that cannot be read stay as last read; their problem tells it.
+        let screens = readScreens()
         let step = tracker.streamEnded(uuid, reason, connected: screens, at: context.now())
-        context.update(screens, lastScreenChange: tracker.lastScreenChange)
+        if let screens { context.update(screens, lastScreenChange: tracker.lastScreenChange) }
         apply(step)
-        screensForAudio(screens)
+        if let screens { screensForAudio(screens) }
         // A screen file ended by a failure is told at the failure's time (D47); a file whose writer also
         // reported an error is a second problem, the file's (`fileEnded`); a screen that
         // stays listed but cannot be captured is never left unrecorded silently (N-A).

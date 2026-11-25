@@ -242,13 +242,13 @@ public struct ScreenTracker: Sendable {
         }.min()
     }
 
-    /// A stream ended by itself; `connected` is the screens as read now.
-    /// A failing writer and a full disk have their event from the recorder,
+    /// A stream ended by itself; `connected` is the screens as read now, nil when they cannot be read: then
+    /// the screens stay as last read. A failing writer and a full disk have their event from the recorder,
     /// once per capture end, also when the tracker no longer follows it.
-    public mutating func streamEnded(_ uuid: String, _ end: VideoStreamEnd, connected: [ConnectedScreen], at now: Int64) -> Step {
+    public mutating func streamEnded(_ uuid: String, _ end: VideoStreamEnd, connected: [ConnectedScreen]?, at now: Int64) -> Step {
         guard let tracked = screens[uuid], case .recording = tracked.phase else { return Step() }
         var step = Step()
-        let isPresent = connected.contains { $0.uuid == uuid && !$0.isMirroring }
+        let isPresent = (connected ?? screens.values.compactMap(\.reading)).contains { $0.uuid == uuid && !$0.isMirroring }
         switch end {
         case .showsAnotherScreen:
             step.events.append(event(.screenShowsAnotherScreensPicture, uuid, at: now))
@@ -280,7 +280,7 @@ public struct ScreenTracker: Sendable {
         case .streamFailed(let error):
             step.append(streamFailed(uuid, error: error, isPresent: isPresent, at: now))
         }
-        step.append(observe(connected, at: now))
+        if let connected { step.append(observe(connected, at: now)) }
         return step
     }
 
