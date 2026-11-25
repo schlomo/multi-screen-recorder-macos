@@ -54,7 +54,7 @@ verifying agent output are in the principles (linked from
   instead of two Terminal commands).
 - **An MR/PR keeps its feature scope.** A bug a human's test or a
   review finds is fixed in it ([Fix bugs where you find
-  them](../../../docs/principles/ai-working-process.md#fix-bugs-where-you-find-them)),
+  them](../../../../docs/principles/ai-working-process.md#fix-bugs-where-you-find-them)),
   test first. Something new rather than a fix is proposed as the next
   MR/PR: say what the current one lacks without it and let the human
   decide. In PR #27 the late microphone leaving the guide track was a
