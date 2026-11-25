@@ -1607,14 +1607,23 @@ the metadata items (see "Output on disk").
   with none such, the input with the lowest number whose file is being
   written becomes the new anchor (see below). The reference stays with
   the input it moved to: the anchor's returning file does not take it
-  back, and it moves again only when its own file ends so (D85). So a
+  back, and it moves again only when its own file ends so (D85). A
+  reference whose window is silent in a measurement while another
+  input's is not moves the same way, among the inputs with sound in
+  that measurement only, the move logged as `the reference <file> is
+  silent, the reference moves`; a silent input never becomes the
+  reference, and when every input is silent nothing moves (D89). So a
   silent anchor never stalls measuring. The default
   microphone plays no part (D80, amending D77). The system audio is
   neither measured nor the reference. A window counts
   only when its match is clear, the peak of |correlation| at least 12
   times its median over the searched lags (the measured windows gave 13
   to 68 when clear, 5 to 9 when not), and not when either side is
-  silent or the window starts before the file. **A file's audio delay
+  silent, its rms below the level meter's floor, -60 dBFS
+  (`levelMeterFloorDBFS`, where the level bar shows nothing; D89), or
+  the window starts before the file. A silent window never counts
+  toward "no clear sound", so an input silent for good, such as a
+  dock's line-in with nothing connected, stays "not synced yet". **A file's audio delay
   (D80)** is set by its first counted window's lag (the seconds by
   which the file's sound is later than the reference's), set once more
   at 3 counted windows to their median if that lies more than one frame
@@ -2119,9 +2128,10 @@ them:
 
 - Each measurement, every 10 s, per file: `<file>: lag 552 ms late
   against <reference file>, clarity 31, counted` (or `not counted`), or
-  why it was not measured: `<file>: not measured, it or the reference
-  <file> is silent`, `… has less than a window of sound`, `… the
-  reference <file> has no file open` (the reference between two files).
+  why it was not measured: `<file>: not measured, it is silent`, `…, the
+  reference <file> is silent` (D89), `… it or the reference <file> has
+  less than a window of sound`, `… the reference <file> has no file
+  open` (the reference between two files).
 - Each audio delay rule that was evaluated, with its outcome:
   `<file>: audio delay set by its first counted window: 552 ms late`;
   `<file>: audio delay the median of its first 3 counted windows:
@@ -2146,7 +2156,9 @@ them:
 - A carry-over: `<file>: carries over 500 ms late from <earlier file>`
   and `<file>: in the guide track with the carried-over audio delay` (or
   `out of the guide track`).
-- A reference change: `reference <old file> → <new file>: lags re-based
+- A reference change: `the reference <file> is silent, the reference
+  moves` first when a silent reference moves it (D89), then `reference
+  <old file> → <new file>: lags re-based
   onto the anchor by 500 ms late`, or `…: it has no audio delay, so it
   is the new anchor and every input starts over`.
 - The mix: `<file>: joins the guide track placed earlier by 500 ms (the

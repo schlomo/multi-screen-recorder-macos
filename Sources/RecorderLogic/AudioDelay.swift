@@ -18,8 +18,9 @@ public enum AudioDelay {
     public static let clarityNeeded: Float = 12
     /// The counted windows at which an audio delay is set once more, to their median (D80).
     public static let windowsNeeded = 3
-    /// The RMS below which a window is silent and not measured.
-    static let silence: Float = 1e-5
+    /// The RMS below which a window is silent and not measured: the level meter's floor, where its bar shows
+    /// nothing (D89).
+    static let silence = Float(pow(10, RecorderValues.levelMeterFloorDBFS / 20))
 
     /// One window's measurement.
     public struct Window: Equatable, Sendable {
@@ -34,7 +35,7 @@ public enum AudioDelay {
     /// span and length at `sampleRate`; nil when either is silent.
     public static func window(reference: [Float], other: [Float], searchSamples: Int = searchSeconds * sampleRate) -> Window? {
         precondition(reference.count == other.count && !reference.isEmpty, "the windows differ in length or are empty")
-        guard rms(reference) >= silence, rms(other) >= silence else { return nil }
+        guard !isSilent(reference), !isSilent(other) else { return nil }
         let correlation = crossCorrelation(reference, other)
         let n = correlation.count
         let reach = min(searchSamples, reference.count - 1)
@@ -224,5 +225,6 @@ public enum AudioDelay {
         return sorted.count.isMultiple(of: 2) ? (sorted[middle - 1] + sorted[middle]) / 2 : sorted[middle]
     }
 
-    private static func rms(_ samples: [Float]) -> Float { vDSP.rootMeanSquare(samples) }
+    /// Whether a window is silent, not measured.
+    public static func isSilent(_ samples: [Float]) -> Bool { vDSP.rootMeanSquare(samples) < silence }
 }
