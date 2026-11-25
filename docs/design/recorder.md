@@ -1655,7 +1655,8 @@ the metadata items (see "Output on disk").
   never measured and the system audio unchanged. The
   status window's Clock drift column shows how much earlier the mix
   places the file (`· synced 553 ms`, `· synced 533 ms (carried)`),
-  `· synced 0 ms` for the earliest, the anchor included (D86). The audio files are not changed; the "Audio inputs"
+  `· synced 0 ms` for the earliest, the anchor included (D86). The
+  audio files are not changed; the "Audio inputs"
   guide track places each input by its audio delay (see "Guide tracks",
   D80); the detail lines say every decision (see "Logging").
 - **Failures.** A failing audio capture or writer and a full disk are
