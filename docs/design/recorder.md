@@ -1780,7 +1780,12 @@ at all ends at its start, and the problem says so with the read error.
 The failure's event and its problem stay at the failure's time, the end
 the writer was given. A file that is finalized, or ended without a
 writer failure (such as samples lost at the end of an audio file), keeps
-the end it had.
+the end it had. A file whose writer failed ends at once: no waiting
+ticks, guide samples or last mix are waited for, as the writer takes
+nothing more (D88). The failure is known only once the writer reports
+it: in the end-to-end run of 2026-11-25 the virtual machine's encoder
+stopped taking frames at 6.6 s and reported its failure about 3 s later
+(its own reply timeout); the recorder ended the file 0.1 s after that.
 
 **Screen identity.** A screen is known by the UUID macOS gives it
 (`CGDisplayCreateUUIDFromDisplayID`), never by its display ID, which
@@ -1812,7 +1817,13 @@ no screen-change notice for that screen in between, it is a failure
 (`screen stream failed` with its error, back-off, and a problem told),
 so a screen that stays listed but cannot be captured never goes
 unrecorded silently. Any other stream error is a failure: a stream that fails finalizes its file and is restarted after 1 s,
-backing off to 10 s (*data*), for as long as the screen exists. Each
+backing off to 10 s (*data*), for as long as the screen exists. A
+screen file whose writer failed is different (D88): a failed
+`AVAssetWriter`'s status is final, so its file ends at once and a new
+stream and file start at once, no settle time and no back-off; only
+a writer that fails again within 10 s (`writerFailedAgainWithin`,
+*data*) of that restart backs off, 1 s rising to 10 s, so a broken
+encoder cannot loop. Each
 gap is an event in the manifest. A screen's stream starts, or starts
 again, only once the screen has been unchanged for the settle time,
 1 s (*data*): a mode change that macOS reports as a disconnect and a
@@ -2024,9 +2035,10 @@ no audio of the camera's own.
   disconnected`.
 - **Coming and going.** As screens: a camera that appears (event
   `camera connected`) starts its file after the settle time; one that
-  vanishes ends it (`camera disconnected`); a failing stream or writer
-  ends the file with its event and the capture starts again after the
-  restart delay; disk full, sleep and wake as for screens (the camera
+  vanishes ends it (`camera disconnected`); a failing stream ends the
+  file with its event and the capture starts again after the restart
+  delay, a failing writer at once, backing off only when it fails again
+  within 10 s of that restart (D88); disk full, sleep and wake as for screens (the camera
   list never fails to be read, so a wake always restarts the cameras). Under Default
   camera a change of the default camera is the event `default camera
   changed`. A camera keeps its number by its unique ID. There is no

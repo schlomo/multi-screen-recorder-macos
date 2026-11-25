@@ -3087,3 +3087,49 @@ architect's reading.
 - **Evidence:** this change;
   [principles/ai-working-process.md](principles/ai-working-process.md),
   "Fix bugs where you find them".
+
+## D88: A failed screen or camera writer starts a new file at once (2026-11-25)
+
+- **Status:** in force. Amends D14's and D74's restart after a failed
+  writer (after the restart delay, 1 s rising to 10 s).
+- **Context:** PR #32's end-to-end run on c6f66d2 (`virtual-screen`
+  scenario): Screen 1's writer took its last frame at 6.60 s (the file
+  ends at 6.148 s, the writer was given up to 6.633 s); the encoder's
+  own reply timeout fired at +9.5 s, when the writer reported `screen
+  file writer failed` (AVFoundationErrorDomain -11800 from -19092),
+  dated 6.6 s; the file ended `not finalized` at +9.6 s; `start Screen
+  1` came at +10.6 s, after the 1 s back-off. The owner, 2026-11-25:
+  "a failed writer means it won't recover magically, right? So of
+  course we need to try again fast".
+- **Decision:** When a screen's or a camera's writer fails, its file
+  ends at once (no waiting for late ticks, guide samples or a last
+  mix); what it lost is told as before (D66). A new stream and file
+  start at once, with no settle time and no back-off. The back-off, 1 s
+  rising to 10 s, applies to a writer of the same source that fails
+  again within 10 s of that restart (`writerFailedAgainWithin`, *data*),
+  and to failing streams as before.
+- **The architect's reasoning:** a failed writer's status is final, so
+  waiting gains nothing; a fresh writer worked in the same run (Screen
+  1's next file at +10.6 s finalized; Screen 2's files after its
+  switches finalized); the back-off only guards a loop.
+- **Decided while building (the architect's reading):** the 3 s were
+  not the recorder's: the file already ended without waiting for ticks
+  or guide samples once its writer failed (`VideoFileTicker.finish`
+  skips them after a writer error); the encoder took about 3 s to
+  report its failure (`VTParavirtualizationReplyClerkWaitForReply:
+  timeout` at +9.5 s in the run's system log). So what this saves is
+  the back-off. The new file comes from a new stream: a file's end
+  stops its stream (`VideoFileFeed`), so the restart starts a stream at
+  once rather than keeping the old one. "Fails again within 10 s"
+  counts from the restart; the first failure of a writer that ran
+  longer is restarted at once.
+- **Consequences:** an encoder that fails once costs the time it takes
+  to report its failure and a stream's start, not a further second; an
+  encoder that keeps failing backs off as a failing stream does. The
+  end-to-end scenarios stay strict: an encoder failure still fails them.
+- **Evidence:** the run's `recording.log` and system log (PR #32,
+  c6f66d2, `virtual-screen`); `ScreenTrackerTests`,
+  `CameraTrackerTests`, `VideoFileTickerTests` and `RecorderTests`
+  (`aCameraWhoseWriterFailedStartsAgainAtOnceThenBacksOff`);
+  [design/recorder.md](design/recorder.md), "Screens coming and going"
+  and "A failed file's end".
