@@ -1308,10 +1308,33 @@ extension GlobalRecordingLog {
         }
 
         /// A failed end of a camera's file, `lost` part of it, as `CameraCapture` reports it late.
-        private func failedEnd(of file: RecordingManifest.CameraFile, lost: String? = nil) -> VideoFileEnd<RecordingManifest.CameraFile> {
+        private func failedEnd(
+            of file: RecordingManifest.CameraFile, lost: String? = nil, isDiskFull: Bool = false
+        ) -> VideoFileEnd<RecordingManifest.CameraFile> {
             var file = file
             file.state = .notFinalized
-            return VideoFileEnd(file: file, error: VideoFileWriterError(description: "cannot write \(file.name)", isDiskFull: false), lost: lost)
+            return VideoFileEnd(
+                file: file, error: VideoFileWriterError(description: "cannot write \(file.name)", isDiskFull: isDiskFull), lost: lost)
+        }
+
+        /// A camera file a full disk cut short: its lost tail is a red line without a call to action of its own, and
+        /// the recording asks for no report (D84).
+        @Test func aCameraFileAFullDiskCutShortAsksForNoReport() async throws {
+            cameras.connected.withLock { $0 = [Self.camera] }
+            try start(cameraMode: .real)
+            let camera = try #require(cameras.last)
+            try await sendFrames(camera, until: "the camera file") { (try? manifestOnDisk().cameraFiles.count) == 1 }
+            let file = try #require(try manifestOnDisk().cameraFiles.first)
+            recorder.cameraCaptureEnded(
+                uniqueID: "StandInCamera", captureNumber: 1, camera: "Stand-in camera", reason: .diskFull,
+                file: failedEnd(of: file, lost: "its last 2 s", isDiskFull: true))
+            let lost = try #require(recorder.problemLines().first { $0.text.hasPrefix("File \(file.name) incomplete") })
+            #expect(lost.isRed)
+            #expect(observer.callsToAction.allSatisfy { !$0.problem.contains("incomplete") && !$0.problem.contains("its last 2 s") })
+            #expect(observer.callsToAction.count == 1)
+            let summary = await stop()
+            #expect(summary.manifest.cameraFiles.first?.state == .notFinalized)
+            #expect(!summary.asksToReportIt)
         }
 
         /// A failure of a camera's file, reported after a newer file of the camera started, is over when
