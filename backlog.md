@@ -2,19 +2,13 @@
 
 ## Next session starts here
 
-PR #30 is merged (2026-11-24, release 0.20261124.108: items 38, 47
-and 48, D80 to D82). PR #31 is with the owner: homepage screenshots
-from that release on the owner's Mac, and the problem report form's
-one file field (D83). The next PR is one PR (the owner, 2026-11-24:
-"I want less PRs"): item 49 (a reconnected first microphone measured
-again) and item 50 (no notice for problems without a clear action),
-with what fits from item 52. Both designs go to the owner as text
-first. Item 51 (the runner VM, its concept signed off) is its own PR,
-as the owner registers the runner. Then item 22 (camera picture sync
-from claps, a Calibrate button). The owner, 2026-11-23: "Noticeable
-lip sync is my goal"; "Iterative improvement, every shipment is
-better". The end-to-end tests need an idle Mac
-(`docs/troubleshooting.md`).
+PR #32 (items 49, 50 with 43, parts of 52; D84 to D86) is ready on
+c6f66d2 and waits for the owner's try-out and merge. Then item 51
+(the runner VM, its own PR, the owner registers the runner), then
+item 22 (camera picture sync from claps). The owner, 2026-11-23:
+"Noticeable lip sync is my goal"; "Iterative improvement, every
+shipment is better". The end-to-end tests need an idle Mac: a video
+call is enough to fail `virtual-screen` (`docs/troubleshooting.md`).
 
 The owner's signing certificate is trusted for code signing in the
 login keychain since 2026-11-24, so a try-out can be built and signed
@@ -42,7 +36,14 @@ Still open from D34: what AGC does and whether it is on in auto mode;
 
 ## In flight
 
-- Nothing.
+- PR #32 (branch `call-to-action-alerts-and-anchor-measured`): items
+  49, 50 with 43, parts of 52; D84, D85, and D86 (every synced audio
+  input shows its sync, 0 ms included, from the owner's try-out).
+  Ready on c6f66d2: reviewed, pipeline green, end-to-end tested
+  (`virtual-screen` failed once with the busy-Mac encoder error during
+  the owner's video call, passed 2 of 2 re-run alone). Snapshot
+  0.20261125.114 installed in `/Applications`. Waiting for the owner's
+  try-out and merge.
 
 ## Queued
 
@@ -577,6 +578,15 @@ Still open from D34: what AGC does and whether it is on in auto mode;
    the VM stops with the variable still set. Usage 2026-11-12 to 24:
    399 macOS jobs, about 1,165 billed minutes, free for this public
    repository.
+53. **Follow-ups from PR #32**: the status window's line could name
+   the call to action's words; the "!" badge stays after a call to
+   action's problem ended (older than PR #32); a reference that is
+   not the anchor is never measured and shows "(carried)" on each new
+   file (D80's shortcut); an end-to-end scenario for a late or
+   reconnected microphone needs a broadband test signal (the 1 kHz
+   tone gives clarity about 1.6 against 12, so no window counts);
+   whether a gap of the anchor's device (no unplug) should also start
+   a measured file (D85 measures it only once the reference moved).
 52. **Follow-ups from PR #30**: the recorder's no-audio set duplicates
    the audio tracker's state; no test for a capture ending during no
    audio; one long doc line; an end-to-end scenario of 30 s or more
