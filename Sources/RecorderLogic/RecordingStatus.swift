@@ -2,7 +2,7 @@
 /// "!" when something needs them; the status window lists the problems (recorder.md, "The app").
 public struct RecordingStatus: Equatable, Sendable {
     public var isLowOnDisk = false
-    /// The problems whose call to action was given (D84): something the person has to do.
+    /// The problems whose call to action was given and that have not ended (D84): something the person has to do.
     public var problemsCalledToAction: [String] = []
 
     public init() {}

@@ -404,4 +404,19 @@ import Testing
         #expect(told.nextCallToAction() == 15 * second)
         #expect(told.callsToAction(now: 15 * second).map(\.problem) == ["Screen 1 LG failed"])
     }
+
+    /// The badge and the count show a call to action only while its problem lasts: once it ended, nothing is left
+    /// to do (D84).
+    @Test func aCallToActionCountsOnlyWhileItsProblemLasts() {
+        var told = ProblemsTold()
+        var manifest = manifest()
+        _ = told.add(problem(1 * second, "Disk full"), kind: .diskFull, to: &manifest)
+        _ = told.add(problem(2 * second, "Mic"), kind: .audioSourceFailed("Mic"), to: &manifest)
+        _ = told.callsToAction(now: 15 * second)
+        #expect(told.callsToActionOngoing.map(\.problem) == ["Disk full", "Mic"])
+        told.cleared(.diskFull, at: 20 * second)
+        #expect(told.callsToActionOngoing.map(\.problem) == ["Mic"])
+        told.cleared(.audioSourceFailed("Mic"), at: 21 * second)
+        #expect(told.callsToActionOngoing.isEmpty)
+    }
 }

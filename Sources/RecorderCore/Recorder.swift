@@ -293,6 +293,9 @@ public final class Recorder {
 
     /// The status window's table, line and CPU use, read now: each file's
     /// size on disk and the free space in the recording folder.
+    /// The problems whose call to action was given and that have not ended (D84).
+    public func problemsCalledToAction() -> [RecordingProblem] { problemsTold.callsToActionOngoing }
+
     public func status() -> (rows: [RecordingStatusTable.Row], line: String, cpu: String?) {
         let clockDrift = Dictionary(uniqueKeysWithValues: clockDriftShown().map { ($0.source.id, $0.status) })
         let names = manifest.files.map(\.name) + manifest.cameraFiles.map(\.name) + manifest.audioFiles.map(\.name)

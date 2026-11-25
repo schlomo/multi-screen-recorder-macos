@@ -291,6 +291,12 @@ public struct ProblemsTold: Sendable {
             .map { $0.began + unrecoveredAfter.nanoseconds }.min()
     }
 
+    /// The problems whose call to action was given and that have not ended: what the badge and `msr record`'s
+    /// count show; once a problem ended, nothing is left to do (D84).
+    public var callsToActionOngoing: [RecordingProblem] {
+        told.filter { $0.calledToAction && $0.ended == nil }.map(\.problem)
+    }
+
     /// A call to action given that includes "report it": the recording asks to report it once it ended (D84).
     public var asksToReportIt: Bool {
         told.contains { $0.calledToAction && $0.kind.callToAction?.includesReportIt == true }

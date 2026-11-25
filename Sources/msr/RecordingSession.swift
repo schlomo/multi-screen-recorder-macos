@@ -107,13 +107,15 @@ final class RecordingSession: RecorderObserver {
     }
 
     private func updateBadge() {
-        guard recorder != nil, !isStopping else { return }
+        guard let recorder, !isStopping else { return }
+        status.problemsCalledToAction = recorder.problemsCalledToAction().map(\.text)
         NSApp.dockTile.badgeLabel = status.badge
         if statusWindow.isOpen { refreshStatusWindow() }
     }
 
     private func drawStatusLine() {
         guard let recorder else { return }
+        status.problemsCalledToAction = recorder.problemsCalledToAction().map(\.text)
         output?.drawStatusLine(isStopping: isStopping) {
             let (rows, line, cpu) = recorder.status()
             return StatusLine.text(line: line, cpu: cpu, rows: rows, status: status)
@@ -154,7 +156,6 @@ final class RecordingSession: RecorderObserver {
     }
 
     func recorder(_ recorder: Recorder, callToAction problem: RecordingProblem) {
-        status.problemsCalledToAction.append(problem.text)
         needsAttention()
     }
 }
