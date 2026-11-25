@@ -90,7 +90,7 @@ public struct AudioDelays: Sendable {
     /// Each device's newest file, by the device's UID, while its capture runs.
     private var newest: [String: String] = [:]
     /// The device every audio delay is against: the first input whose file is written, or the new one after a
-    /// start-over (D80), as when another input has more action at the first measurement with sound (D89).
+    /// start-over (D80), as when a stall tries an input without an audio delay (D89).
     public private(set) var anchor: String?
     /// The anchor's files, its audio delay 0 by definition: those of its device that became known while it was
     /// the reference, as its first file or after another of them (D85).
