@@ -59,6 +59,9 @@ public struct ScreenTracker: Sendable {
         /// When it last appeared, went or changed.
         var changedAt: Int64
         var restartDelay: Duration
+        /// When it was last started again after its writer failed, and the back-off should it fail again soon (D88).
+        var writerRestartedAt: Int64?
+        var writerRestartDelay = RecorderValues.firstRestartDelay
         /// Whether its stream may end once with the capture source gone
         /// without a failure: until it does, and again after each
         /// screen-change notice for it (N-A).
@@ -262,7 +265,21 @@ public struct ScreenTracker: Sendable {
             step.events.append(event(.screenFileWriterFellBehind, uuid, at: now))
             scheduleRestart(uuid, at: now)
         case .writerFailed:
-            if isPresent { scheduleRestart(uuid, at: now) } else { screens[uuid]?.phase = .idle }
+            guard isPresent else {
+                screens[uuid]?.phase = .idle
+                break
+            }
+            // A failed writer's status is final: a new one at once, backing off only when it fails again soon (D88).
+            if let restarted = tracked.writerRestartedAt, now - restarted < RecorderValues.writerFailedAgainWithin.nanoseconds {
+                let delay = tracked.writerRestartDelay
+                screens[uuid]?.phase = .waitingToRestart(notBefore: now + delay.nanoseconds)
+                screens[uuid]?.writerRestartedAt = now + delay.nanoseconds
+                screens[uuid]?.writerRestartDelay = min(delay * 2, longestRestartDelay)
+            } else {
+                step.actions.append(start(uuid, at: now))
+                screens[uuid]?.writerRestartedAt = now
+                screens[uuid]?.writerRestartDelay = firstRestartDelay
+            }
         case .streamFailed(let error):
             step.append(streamFailed(uuid, error: error, isPresent: isPresent, at: now))
         }

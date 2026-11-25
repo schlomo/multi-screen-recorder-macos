@@ -70,7 +70,7 @@ import Testing
         let lg = screen("B", "LG", x: 1920)
         let wacom = screen("C", "Wacom", x: 3840)
         _ = tracker.begin([built, lg, wacom], at: 0)
-        _ = tracker.streamEnded("A", .writerFailed("x"), connected: [built, lg, wacom], at: 1)
+        _ = tracker.streamEnded("A", .streamFailed("x"), connected: [built, lg, wacom], at: 1)
         _ = tracker.observe([built, wacom], at: 2)
         _ = tracker.streamEnded("C", .showsAnotherScreen, connected: [built, wacom], at: 3)
         let states = RecordingStatusTable.rows(sources: tracker.sources, files: [], bytes: [:]).map(\.state)

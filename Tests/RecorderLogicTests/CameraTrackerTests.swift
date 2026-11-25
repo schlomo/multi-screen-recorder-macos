@@ -356,6 +356,25 @@ import Testing
         #expect(starts(cameras.due(at: 3 * second + RecorderValues.firstRestartDelay.nanoseconds)) == ["A"])
     }
 
+    /// A failed writer's camera starts again at once; failing again within `writerFailedAgainWithin` of that
+    /// restart, it backs off (D88).
+    @Test func aFailedWriterStartsAgainAtOnceAndBacksOffWhenItFailsAgainSoon() {
+        var cameras = tracker()
+        _ = cameras.begin([Self.builtIn], at: 0)
+        cameras.fileStarted("A")
+        let first = cameras.streamEnded("A", .writerFailed("-11800"), connected: [Self.builtIn], at: 30 * second)
+        #expect(starts(first) == ["A"])
+        #expect(first.events.isEmpty)
+        cameras.fileStarted("A")
+        let again = cameras.streamEnded("A", .writerFailed("-11800"), connected: [Self.builtIn], at: 31 * second)
+        #expect(starts(again).isEmpty)
+        #expect(cameras.due(at: 32 * second - 1).actions.isEmpty)
+        #expect(starts(cameras.due(at: 32 * second)) == ["A"])
+        cameras.fileStarted("A")
+        _ = cameras.streamEnded("A", .writerFailed("-11800"), connected: [Self.builtIn], at: 33 * second)
+        #expect(cameras.nextDueTime() == 35 * second)
+    }
+
     @Test func aCameraGoneEndsItsStreamOnceWithoutAFailureThenAgainAsOne() {
         var cameras = tracker()
         _ = cameras.begin([Self.builtIn], at: 0)

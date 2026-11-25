@@ -1319,6 +1319,30 @@ extension GlobalRecordingLog {
                 file: file, error: VideoFileWriterError(description: "cannot write \(file.name)", isDiskFull: isDiskFull), lost: lost)
         }
 
+        /// A camera whose writer failed starts its new capture at once, no back-off: its row never waits to
+        /// retry; failing again within `writerFailedAgainWithin` of that, it backs off (D88).
+        @Test func aCameraWhoseWriterFailedStartsAgainAtOnceThenBacksOff() async throws {
+            cameras.connected.withLock { $0 = [Self.camera] }
+            try start(cameraMode: .real)
+            let first = try #require(cameras.last)
+            try await sendFrames(first, until: "the camera file") { (try? manifestOnDisk().cameraFiles.count) == 1 }
+            let file = try #require(try manifestOnDisk().cameraFiles.first)
+            func cameraState() -> String? { recorder.status().rows.first { $0.source == .camera(1, name: "Stand-in camera") }?.state }
+            recorder.cameraCaptureEnded(
+                uniqueID: "StandInCamera", captureNumber: 1, camera: "Stand-in camera", reason: .writerFailed("cannot write"),
+                file: failedEnd(of: file))
+            #expect(cameraState() != "failed, retrying")
+            try await wait("the camera's new capture") { cameras.opened.withLock { $0.count } == 2 }
+            let second = try #require(cameras.last)
+            try await sendFrames(second, until: "the second camera file") { (try? manifestOnDisk().cameraFiles.count) == 2 }
+            let newer = try #require(try manifestOnDisk().cameraFiles.last)
+            recorder.cameraCaptureEnded(
+                uniqueID: "StandInCamera", captureNumber: 2, camera: "Stand-in camera", reason: .writerFailed("cannot write"),
+                file: failedEnd(of: newer))
+            #expect(cameraState() == "failed, retrying")
+            _ = await stop()
+        }
+
         /// A camera file a full disk cut short: its lost tail is a red line without a call to action of its own, and
         /// the recording asks for no report (D84).
         @Test func aCameraFileAFullDiskCutShortAsksForNoReport() async throws {

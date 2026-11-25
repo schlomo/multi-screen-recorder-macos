@@ -29,6 +29,9 @@ public enum RecorderValues {
     /// The wait before a failed stream is started again, doubling up to the longest.
     public static let firstRestartDelay = Duration.seconds(1)
     public static let longestRestartDelay = Duration.seconds(10)
+    /// A screen's or camera's writer that fails starts a new file at once, unless it fails again within this
+    /// long of that restart: then it backs off as a failed stream does, so a broken encoder cannot loop (D88).
+    public static let writerFailedAgainWithin = Duration.seconds(10)
     /// How long a camera's capture may wait for its first frame, an iPhone's
     /// (Continuity Camera) longer, and then between frames, before its
     /// stream counts as failing; no frame for `cameraStallLimit` is a stall,

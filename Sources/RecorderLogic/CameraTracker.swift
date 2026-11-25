@@ -56,6 +56,9 @@ public struct CameraTracker: Sendable {
         /// When it last appeared, went, or became wanted.
         var changedAt: Int64
         var restartDelay: Duration
+        /// When it was last started again after its writer failed, and the back-off should it fail again soon (D88).
+        var writerRestartedAt: Int64?
+        var writerRestartDelay = RecorderValues.firstRestartDelay
         /// Whether its stream may end once with the camera gone without a
         /// failure: until it does, and again after each change of the cameras.
         var mayLoseCaptureSource = true
@@ -311,6 +314,18 @@ public struct CameraTracker: Sendable {
         case .writerFellBehind:
             step.events.append(event(.cameraFileWriterFellBehind, uniqueID, at: now))
             scheduleRestart(uniqueID, at: now)
+        case .writerFailed where isPresent && tracked.isWanted:
+            // A failed writer's status is final: a new one at once, backing off only when it fails again soon (D88).
+            if let restarted = tracked.writerRestartedAt, now - restarted < RecorderValues.writerFailedAgainWithin.nanoseconds {
+                let delay = tracked.writerRestartDelay
+                cameras[uniqueID]?.phase = .waitingToRestart(notBefore: now + delay.nanoseconds)
+                cameras[uniqueID]?.writerRestartedAt = now + delay.nanoseconds
+                cameras[uniqueID]?.writerRestartDelay = min(delay * 2, longestRestartDelay)
+            } else {
+                step.actions.append(start(uniqueID))
+                cameras[uniqueID]?.writerRestartedAt = now
+                cameras[uniqueID]?.writerRestartDelay = firstRestartDelay
+            }
         case .writerFailed, .showsAnotherScreen:
             if isPresent { scheduleRestart(uniqueID, at: now) } else { cameras[uniqueID]?.phase = .idle }
         case .streamFailed(let error):

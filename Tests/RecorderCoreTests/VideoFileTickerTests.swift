@@ -278,6 +278,31 @@ import Testing
         #expect(end.error == VideoFileWriterError(description: "cannot write f.mov: no luck", isDiskFull: false))
     }
 
+    /// A failed writer's status is final: its file ends at once, at the tick after the last one it took, with no
+    /// wait for waiting ticks, guide samples or the last mix, though the end asks to write them (D88).
+    @Test func aFailedWritersFileEndsAtOnceAfterItsLastTick() async throws {
+        let (ticker, writer) = ticker(drainTimeout: .seconds(120))
+        _ = ticker.receive(frame, capturedAt: 0, arrivedAt: 0)
+        #expect(ticker.tick(now: grid.time(ofTick: 9)) == nil)
+        let made = try #require(writer())
+        made.isGuideReady = false
+        _ = ticker.receiveGuide(.audioInputs, [[Float](repeating: 0.25, count: 4800)], positionFromStart: 0)
+        made.appendError = VideoFileWriterError(description: "cannot write f.mov: -11800", isDiskFull: false)
+        #expect(ticker.tick(now: grid.time(ofTick: 12)) == .writerFailed("cannot write f.mov: -11800"))
+        let clock = ContinuousClock()
+        let started = clock.now
+        nonisolated(unsafe) var askedForTheLastMix = false
+        let end = try #require(await ticker.finish(now: grid.time(ofTick: 12), writeWaitingTicks: true) { _ in
+            askedForTheLastMix = true
+            return GuideLastMix(pending: [], peeks: [:])
+        })
+        #expect(clock.now - started < .seconds(60))
+        #expect(!askedForTheLastMix)
+        #expect(made.written == Array(0...9))
+        #expect(end.file.end == grid.seconds(ofTick: 10))
+        #expect(end.error == VideoFileWriterError(description: "cannot write f.mov: -11800", isDiskFull: false))
+    }
+
     @Test func aFullDiskEndsAsDiskFull() {
         let (ticker, writer) = ticker()
         _ = ticker.receive(frame, capturedAt: 0, arrivedAt: 0)
