@@ -72,8 +72,8 @@ repository, and the requirements.
      takes the three light windows on the owner's Mac instead, with
      `/Applications/Multi Screen Recorder.app` or the given app, prints
      the app's version (the owner chooses the app; nothing is compared
-     with a release), takes the status window only once every audio
-     input is synced (at most 90 s), and copies them into this checkout, with no commit
+     with a release), takes the status window only once its audio
+     rows show every audio source's clock drift and sync (at most 90 s), and copies them into this checkout, with no commit
      and no push (commit them as the usual flow); the pictures then show
      this Mac's real screens, cameras and microphones, so an agent tells
      the owner before each run. It refuses while the app runs (quit it

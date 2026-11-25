@@ -65,7 +65,8 @@ import Testing
     }
 
     @Test func aSourcesNewFileAfterAGapKeepsItsJoinAndAGapLineIsNoClockDrift() {
-        let first = Self.anchorFinal + [Self.calDigitStartInput, Self.calDigitStarted]
+        // R2's own source 1, so none of R1's lines, whose numbers overlap.
+        let first = [Self.calDigitStartInput, Self.calDigitStarted]
         let again = [Self.calDigitEnded, Self.calDigitStartedAgain, Self.calDigitGap]
         #expect(notFinal(first + again + [Self.calDigitDrift]) == [Self.calDigitAgain])
         #expect(notFinal(first + [Self.calDigitJoins] + again) == [Self.calDigitAgain])

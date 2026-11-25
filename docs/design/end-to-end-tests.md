@@ -171,8 +171,9 @@ its `app-windows` subcommand, the app's window step of the scenarios'
 run (`Driver.startWindow` and `recordingWindows`, told `onThisMac`), on
 this Mac with the installed app or the given one: light only, no virtual
 screen connected, no dark appearance, no window moved (no Accessibility
-permission), `HOME`, the recording (about 15 s, longer while an audio
-input is still measuring, see the status window below) and the scratch folder
+permission), `HOME`, the recording (until the status window's audio
+rows are final, about 25 s or more, see the status window below) and the
+scratch folder
 deleted afterwards. It needs the Screen & System Audio Recording
 permission and Automation for the app, System Events and Finder for the
 program running it, and says which is missing; on this Mac the reopen
@@ -487,24 +488,35 @@ video from the e2e runs"):
     sends the app its reopen event (what a click on the Dock icon does),
     moves the window to the screen's corner with System Events (the VM's
     screen is small and the window first opens partly off it), makes the
-    app the frontmost one, waits until every audio input file of the
-    recording is out of measuring, so the window shows them synced, and
-    takes
+    app the frontmost one, waits until the window's audio rows are final
+    (below), and takes
     a 5 s video of that window with `screencapture -V` (H.264, 5.000 s,
     one frame per change, so about one a second), then the PNG right
     after it, then sends Stop (SIGINT) and waits for the recording's
     files. The video shows macOS's sharing indicator over the window's
     traffic lights and the pointer; the video has no shadow, its margin is
-    black. Out of measuring is read from the recording's
-    `recording.log`, polled once a second (`AudioMeasuring`): an audio
-    input file is out of it once its `recorder` detail line says it
-    `joins the guide track` (the anchor's own file has that line at its
-    start) or has `no clear sound to sync`, and while its input is in no
+    black. The audio rows are final when every audio source whose newest
+    file is being written shows its clock drift (no longer "measuring")
+    and, for an audio input, its sync (no longer "not synced yet"); the
+    system audio's sync is not shown, so only its clock drift is waited
+    for. It is read from the recording's `recording.log`, polled once a
+    second (`AudioRowsFinal`), keyed by the source's number N of its
+    `Audio N` label (device names repeat, and a file name changes a
+    name's `/` and `:`; a `startInput` detail line maps a device name to
+    N): the clock drift from the source's latest `clock drift` detail
+    line, not `not measured yet`; the sync from a detail line of one of
+    its files that `joins the guide track`, `rejoins the guide track`,
+    `carries over` a delay, is `in` or `out of the guide track with` the
+    carried-over audio delay, or has `no clear sound to sync`, which the
+    source's newer files keep (the anchor's own file joins at its start,
+    and a new file of the anchor's device logs nothing). A source in no
     audio (a `no audio started` event naming it, with no `no audio
-    stopped` after it), as the window shows no sync for a silent input
-    either way; the system audio is not measured. Past 90 s
-    (`audioMeasuringLimit`, *data*) the step fails, naming the files
-    still measuring.
+    stopped` after it) is not waited for: its clock drift shows
+    "measuring" for as long as it is silent. Past 90 s
+    (`audioRowsFinalLimit`, *data*) the step fails, naming the files
+    whose rows are not final. In the owner's run of 2026-11-25 the clock
+    drift showed at 21 s, and a Logitech BRIO's row was final about 28 s
+    after its file started.
   - `app-finder-window-<appearance>.png`: a Finder window of the finished
     recording folder, driven through AppleScript: list view, no sidebar,
     no toolbar or status bar, Name, Date Modified, Size and Kind as wide

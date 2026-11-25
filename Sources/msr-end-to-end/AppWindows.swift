@@ -130,7 +130,7 @@ extension Driver {
         try Screenshots.bringToFront(recorder.pid)
         try interruption.sleep(until: Date().addingTimeInterval(2))
 
-        try waitForAudioMeasured(in: recording)
+        try waitForAudioRowsFinal(in: recording)
 
         let review = scratch.appending(path: ReviewNames.folder).appending(path: ReviewNames.appStep)
         try FileManager.default.createDirectory(at: review, withIntermediateDirectories: true)
@@ -146,17 +146,18 @@ extension Driver {
         try finderWindow(of: recording, appearance: appearance, review: review)
     }
 
-    /// Waits, polling once a second, until every audio input file of the recording is out of measuring, so
-    /// the status window shows them synced; past `EndToEndValues.audioRowsFinalLimit` it fails naming those still measuring.
-    private func waitForAudioMeasured(in recording: URL) throws {
+    /// Waits, polling once a second, until the status window's audio rows are final (`AudioRowsFinal`): each
+    /// audio source being written shows its clock drift and, for an input, its sync; past
+    /// `EndToEndValues.audioRowsFinalLimit` it fails naming the files whose rows are not final.
+    private func waitForAudioRowsFinal(in recording: URL) throws {
         let log = recording.appending(path: "recording.log")
         let deadline = Date().addingTimeInterval(EndToEndValues.audioRowsFinalLimit)
         while true {
-            let measuring = AudioRowsFinal.filesNotFinal(log: try String(contentsOf: log, encoding: .utf8))
-            if measuring.isEmpty { return }
+            let notFinal = AudioRowsFinal.filesNotFinal(log: try String(contentsOf: log, encoding: .utf8))
+            if notFinal.isEmpty { return }
             guard Date() < deadline else {
-                throw DriverError("audio files still measuring after \(Int(EndToEndValues.audioRowsFinalLimit)) s: "
-                    + measuring.joined(separator: ", ") + "; see \(log.path)")
+                throw DriverError("the status window's audio rows are not final after \(Int(EndToEndValues.audioRowsFinalLimit)) s: "
+                    + notFinal.joined(separator: ", ") + "; see \(log.path)")
             }
             try interruption.sleep(until: Date().addingTimeInterval(1))
         }
