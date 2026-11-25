@@ -154,7 +154,8 @@ input volume (D69), the problems, and Stop and Continue (D46).
 ## Status line
 
 The one line `msr record` redraws once a second on standard error when
-that is a terminal: the count of problems with a call to action when there are any, then the
+that is a terminal: the count of problems whose call to action was given
+and that have not ended, when there are any, then the
 recording time, the size written, the files and the free space, the CPU
 use and the sources being recorded, in that order. Not the window's own
 line below its table.

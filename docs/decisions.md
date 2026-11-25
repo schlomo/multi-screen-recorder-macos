@@ -3070,9 +3070,10 @@ architect's reading.
   them. wrong?" Then, after the proposal and its check question (the
   runner VM PR waits while a `msr timeline` bug the review found is
   fixed and tested): "yes, that is what I wanted. We walk the path of
-  quality". The trigger: PR #32's end-to-end run exposed a screen file
-  writer whose failed end blocked its restart for 3 s, which would
-  otherwise have become another backlog item.
+  quality". The trigger: in PR #32's end-to-end run a screen writer's
+  failure cost 4.5 s of the screen (3 s the encoder took to report its
+  own failure, 1 s the recorder's back-off), which would otherwise have
+  become another backlog item.
 - **Decision:** One job per session or brief, and a job is a feature
   delivery. A bug found while doing it (wrong behaviour, a flaky test, a
   stale doc, wherever it sits in the code) is fixed in the same change,
@@ -3088,10 +3089,13 @@ architect's reading.
   [principles/ai-working-process.md](principles/ai-working-process.md),
   "Fix bugs where you find them".
 
-## D88: A failed screen or camera writer starts a new file at once (2026-11-25)
+## D88: A failed writer starts a new file at once (2026-11-25)
 
-- **Status:** in force. Amends D14's and D74's restart after a failed
-  writer (after the restart delay, 1 s rising to 10 s).
+- **Status:** in force. Changes the restart of a source whose writer
+  failed, which `design/recorder.md` gave as after the restart delay,
+  1 s, as for a failing stream (D14 and D74 named no delay for a
+  writer); a back-off that rises for a writer failing again soon is
+  new (before, a new file reset the delay to 1 s).
 - **Context:** PR #32's end-to-end run on c6f66d2 (`virtual-screen`
   scenario): Screen 1's writer took its last frame at 6.60 s (the file
   ends at 6.148 s, the writer was given up to 6.633 s); the encoder's
@@ -3104,14 +3108,25 @@ architect's reading.
 - **Decision:** When a screen's or a camera's writer fails, its file
   ends at once (no waiting for late ticks, guide samples or a last
   mix); what it lost is told as before (D66). A new stream and file
-  start at once, with no settle time and no back-off. The back-off, 1 s
-  rising to 10 s, applies to a writer of the same source that fails
-  again within 10 s of that restart (`writerFailedAgainWithin`, *data*),
-  and to failing streams as before.
+  start with no back-off, as soon as the source, as read then, may
+  start: the settle time after a screen's change and a camera's being
+  recorded apply as to any start. The back-off, 1 s rising to 10 s,
+  applies to a writer of the same source that fails again within 10 s
+  of that restart (`writerFailedAgainWithin`, *data*), and to failing
+  streams as before.
 - **The architect's reasoning:** a failed writer's status is final, so
   waiting gains nothing; a fresh writer worked in the same run (Screen
   1's next file at +10.6 s finalized; Screen 2's files after its
   switches finalized); the back-off only guards a loop.
+- **The architect's readings:**
+  - Audio writers follow the same rule: the owner's reason, "a failed
+    writer means it won't recover magically", applies equally. A
+    failed audio file writer's source starts again with no back-off,
+    the same 10 s rule after that.
+  - The restart goes through the trackers' `due`, so it uses the
+    sources as read at the end (a screen's frame size, a camera's use
+    by another app and whether it is still recorded), never the reading
+    from before.
 - **Decided while building (the architect's reading):** the 3 s were
   not the recorder's: the file already ended without waiting for ticks
   or guide samples once its writer failed (`VideoFileTicker.finish`
@@ -3119,9 +3134,9 @@ architect's reading.
   report its failure (`VTParavirtualizationReplyClerkWaitForReply:
   timeout` at +9.5 s in the run's system log). So what this saves is
   the back-off. The new file comes from a new stream: a file's end
-  stops its stream (`VideoFileFeed`), so the restart starts a stream at
-  once rather than keeping the old one. "Fails again within 10 s"
-  counts from the restart; the first failure of a writer that ran
+  stops its stream (`VideoFileFeed`), so the restart starts a stream
+  rather than keeping the old one. "Fails again within 10 s" counts
+  from the restart's start; the first failure of a writer that ran
   longer is restarted at once.
 - **Consequences:** an encoder that fails once costs the time it takes
   to report its failure and a stream's start, not a further second; an
@@ -3129,7 +3144,7 @@ architect's reading.
   end-to-end scenarios stay strict: an encoder failure still fails them.
 - **Evidence:** the run's `recording.log` and system log (PR #32,
   c6f66d2, `virtual-screen`); `ScreenTrackerTests`,
-  `CameraTrackerTests`, `VideoFileTickerTests` and `RecorderTests`
-  (`aCameraWhoseWriterFailedStartsAgainAtOnceThenBacksOff`);
-  [design/recorder.md](design/recorder.md), "Screens coming and going"
-  and "A failed file's end".
+  `CameraTrackerTests`, `AudioTrackerTests`, `VideoFileTickerTests` and
+  `RecorderTests` (`aCameraWhoseWriterFailedStartsAgainAtOnceThenBacksOff`);
+  [design/recorder.md](design/recorder.md), "Screens coming and going",
+  "A failed file's end" and the audio "Failures".
