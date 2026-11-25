@@ -147,15 +147,15 @@ extension Driver {
     }
 
     /// Waits, polling once a second, until every audio input file of the recording is out of measuring, so
-    /// the status window shows them synced; past `EndToEndValues.audioMeasuringLimit` it fails naming those still measuring.
+    /// the status window shows them synced; past `EndToEndValues.audioRowsFinalLimit` it fails naming those still measuring.
     private func waitForAudioMeasured(in recording: URL) throws {
         let log = recording.appending(path: "recording.log")
-        let deadline = Date().addingTimeInterval(EndToEndValues.audioMeasuringLimit)
+        let deadline = Date().addingTimeInterval(EndToEndValues.audioRowsFinalLimit)
         while true {
-            let measuring = AudioMeasuring.filesMeasuring(log: try String(contentsOf: log, encoding: .utf8))
+            let measuring = AudioRowsFinal.filesNotFinal(log: try String(contentsOf: log, encoding: .utf8))
             if measuring.isEmpty { return }
             guard Date() < deadline else {
-                throw DriverError("audio files still measuring after \(Int(EndToEndValues.audioMeasuringLimit)) s: "
+                throw DriverError("audio files still measuring after \(Int(EndToEndValues.audioRowsFinalLimit)) s: "
                     + measuring.joined(separator: ", ") + "; see \(log.path)")
             }
             try interruption.sleep(until: Date().addingTimeInterval(1))
