@@ -2951,6 +2951,9 @@ architect's reading.
     told as the screen not captured, calls to no action, also past
     10 s; a failure of that screen for another reason afterwards calls
     to action from its own tell.
+  - The badge and the status line's count show a call to action while
+    its problem lasts and drop it once it ended; the recording still
+    asks to report it at the end (unchanged).
   - At Stop, a source still failing makes the recording ask to report
     it, without its 10 s: it does not come back in this recording.
     That evaluation decides the report only: it bounces nothing and sets
@@ -3074,8 +3077,8 @@ architect's reading.
   failure cost 4.5 s of the screen (3 s the encoder took to report its
   own failure, 1 s the recorder's back-off), which would otherwise have
   become another backlog item.
-- **Decision:** One job per session or brief, and a job is a feature
-  delivery. A bug found while doing it (wrong behaviour, a flaky test, a
+- **Decision:** One job per session or brief, and the change (MR/PR)
+  is the feature delivery. A bug found while doing it (wrong behaviour, a flaky test, a
   stale doc, wherever it sits in the code) is fixed in the same change,
   test first, and named in the change's description; a fix that needs a
   design still gets a human's sign-off as text before it is built. Only
@@ -3088,8 +3091,8 @@ architect's reading.
 - **The architect's readings of the owner's rule:**
   - The change (MR/PR) is the feature delivery; the session that owns
     it has a found bug fixed in it. A read-only or narrow-lane agent
-    (locator, reviewer, analyst, and a builder past its brief) reports
-    the bug to the session that briefed it.
+    (locator, reviewer, analyst, scribe, and a builder past its brief)
+    reports the bug to the session that briefed it.
   - The architect-maintained docs are the exception: a work branch
     flags what is stale in them instead of editing them ("Docs
     completeness is part of being done").

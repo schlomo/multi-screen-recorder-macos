@@ -93,13 +93,9 @@ standard (below).
   an open decision stays open until a human closes it, and a
   deliberate pattern is tightened, not replaced unasked.
   [Open decisions](docs/principles/engineering.md#respect-deliberate-patterns-open-decisions-stay-open)
-- The change is the feature delivery: a bug found in it (behaviour
-  against the docs or decisions in force, a crash, data loss, a flaky
-  test, a stale doc) is fixed in it, test first, by the session that
-  owns it; a read-only or narrow-lane agent reports it to the session
-  that briefed it; an architect-maintained doc is flagged, not edited;
-  changing documented behaviour is a design; any other finding becomes
-  a backlog item, not a detour.
+- The change is the feature delivery: a bug found, wherever it sits in
+  the code, is fixed in it, test first; a narrow-lane agent reports it;
+  any other finding becomes a backlog item.
   [Fix bugs where you find them](docs/principles/ai-working-process.md#fix-bugs-where-you-find-them)
 - Every human is equal and decides; assume no role or skill level and
   explain in plain words, naming a decision by what it says, never by

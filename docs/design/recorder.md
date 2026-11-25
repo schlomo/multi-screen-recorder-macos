@@ -957,9 +957,10 @@ checked, reported or rewritten at the next start (D47).
   from its own tell. An audio source or an audio file ended by a full
   disk is told as the full disk, free up disk space, one call for the
   full disk; the file it cut short is still a red "File … incomplete"
-  line, without a call to action of its own. The badge stays while a
-  problem whose call to action was given lasts, and goes once it ended
-  (nothing is left to do); low disk space keeps its own badge. Every
+  line, without a call to action of its own. The badge and the status
+  line's count show a call to action while its problem lasts and drop
+  it once it ended; the recording still asks to report it at the end
+  when the call was to report it; low disk space keeps its own badge. Every
   problem, with a call to action or not, is in the
   status window (red when broken, orange for a hiccup, D78), in
   `recording.json` and `recording.log`; `msr record` also names each
@@ -1106,8 +1107,8 @@ checked, reported or rewritten at the next start (D47).
   past that for problems; the line naming the files for a report stays
   below it. The recording manifest's `problems`, the result, the exit
   code and the lines on standard error are unchanged; the status line
-  counts every time a problem was told, except an audio input out of the
-  guide track.
+  counts the problems whose call to action was given and that have not
+  ended (D84).
 - **Stop:** Stop in the status window finalizes, opens the recording folder itself
   in Finder (D46) and quits the app: a recording is typically one shot (D45).
   Logout, restart and shutdown finalize without asking, told apart from
@@ -1821,7 +1822,9 @@ such end is free: if the stream ends with `noCaptureSource` again with
 no screen-change notice for that screen in between, it is a failure
 (`screen stream failed` with its error, back-off, and a problem told),
 so a screen that stays listed but cannot be captured never goes
-unrecorded silently. Any other stream error is a failure: a stream that fails finalizes its file and is restarted after 1 s,
+unrecorded silently. A stream that ends while the screens cannot be
+read keeps the screens as last read: no screen counts as gone or
+changed until a reading succeeds. Any other stream error is a failure: a stream that fails finalizes its file and is restarted after 1 s,
 backing off to 10 s (*data*), for as long as the screen exists. A
 screen file whose writer failed is different (D88): a failed
 `AVAssetWriter`'s status is final, so its file ends at once and a new

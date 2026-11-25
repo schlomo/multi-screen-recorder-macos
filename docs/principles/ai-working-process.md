@@ -434,20 +434,22 @@ rather than using abbreviations only their author knows.
 
 ## Fix bugs where you find them
 
-One job per session or brief, and a job is a feature delivery: the
-change (MR/PR) delivers the feature. A bug found while doing it is
-fixed in that change, test first, and named in the change's
-description; the session that owns the change has it fixed there. A
-read-only or narrow-lane agent (a locator, a reviewer, an analyst, or
-a builder past its brief) does not fix it itself: it reports the bug
-to the session that briefed it. An architect-maintained doc is the
-exception: a work branch flags what is stale in it instead of editing
-it (see "Docs completeness is part of being done").
+One job per session or brief, and the change (MR/PR) is the feature
+delivery. A bug found while doing it is fixed in that change, test
+first, and named in the change's description; the session that owns
+the change has it fixed there. A read-only or narrow-lane agent (a
+locator, a reviewer, an analyst, a scribe, or a builder past its
+brief) does not fix it itself: it reports the bug to the session that
+briefed it. A stale doc the change touches or needs is fixed in it;
+one unrelated to the change gets its own change. An
+architect-maintained doc is the exception: a work branch flags what is
+stale in it instead of editing it (see "Docs completeness is part of
+being done").
 
 A bug is behaviour against the docs or the decisions in force, a
-crash, data loss, a flaky test or a stale doc, wherever it sits in the
-code. Changing documented behaviour is a design: it gets a human's
-sign-off as text before it is built. Any other finding (a refactoring,
+crash, data loss, a flaky test or a stale doc. It is fixed wherever it
+sits in the code. Changing documented behaviour is a design: it gets a
+human's sign-off as text before it is built. Any other finding (a refactoring,
 a missing test that guards no bug, an open question), and a new
 feature or design, becomes one backlog item and a one-line mention,
 never a detour.
