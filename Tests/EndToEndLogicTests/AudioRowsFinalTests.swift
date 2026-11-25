@@ -79,6 +79,7 @@ import Testing
             "rejoins the guide track", "carries over 12 ms from 2026-11-25 13.20.00 Audio 2 - Logitech BRIO.mov",
             "in the guide track with the carried-over audio delay", "out of the guide track with the carried-over audio delay",
             "no clear sound to sync, 6 measurements with sound and no counted window",
+            "leaves the guide track, +2.6 s from the staying group's earliest",
         ] {
             #expect(notFinal(started + ["13:25:04 +70.1s detail recorder: \(Self.brio): \(ending)"]).isEmpty, "\(ending)")
         }
@@ -114,6 +115,39 @@ import Testing
             "13:25:16 +82.3s detail recorder: Audio 3 - USB Audio: clock drift +4.1 ppm, corrected -0.09 ms so far, 0.01 ms off",
         ]
         #expect(notFinal(lines) == ["2026-11-25 13.24.48 Audio 3 - USB Audio.mov"])
+    }
+
+    /// Synthetic, from `AudioDelays`' format: a start-over shows every input "not synced yet" again, the new
+    /// anchor excepted, until each joins again.
+    @Test func aStartOverWaitsForEveryInputToJoinAgain() {
+        let final = Self.anchorFinal + [Self.brioStartInput, Self.brioStarted, Self.brioJoins, Self.brioDrift]
+        #expect(notFinal(final).isEmpty)
+        let startOver = "13:25:20 +86.0s detail recorder: reference 2026-11-25 13.23.54 Audio 1 - MacBook Pro Microphone.mov → \(Self.brio): "
+            + "it has no audio delay, so it is the new anchor and every input starts over"
+        let micJoinsAgain = "13:25:30 +96.0s detail recorder: 2026-11-25 13.23.54 Audio 1 - MacBook Pro Microphone.mov: joins the guide track placed earlier by 0 ms (the mix's zero: \(Self.brio))"
+        #expect(notFinal(final + [startOver]) == ["2026-11-25 13.23.54 Audio 1 - MacBook Pro Microphone.mov"])
+        #expect(notFinal(final + [startOver, micJoinsAgain]).isEmpty)
+    }
+
+    /// Synthetic: no log has the system audio in no audio yet; its event names it "System audio".
+    @Test func theSystemAudioInNoAudioIsNotWaitedFor() {
+        let early = [Self.micStartInput, Self.systemStart, Self.micStarted, Self.micJoins, Self.systemStarted, Self.systemDriftNotYet, Self.micDrift]
+        #expect(notFinal(early) == ["2026-11-25 13.23.54 Audio 0 - System.mov"])
+        #expect(notFinal(early + ["13:24:05 +11.0s no audio started: System audio"]).isEmpty)
+    }
+
+    /// Synthetic: the label's number is the first " Audio N - " of the file name.
+    @Test func aDeviceNameContainingAnAudioLabelKeepsItsOwnNumber() {
+        let file = "2026-11-25 13.24.48 Audio 2 - Rack Audio 7 - Out.mov"
+        let lines = Self.anchorFinal + [
+            #"13:24:48 +54.3s detail recorder: audio: startInput(uid: "RACK", number: 2, name: "Rack Audio 7 - Out")"#,
+            "13:24:48 +54.7s detail recorder: file started: \(file)",
+            "13:25:04 +70.1s detail recorder: \(file): joins the guide track placed earlier by 0 ms (the mix's zero: \(file))",
+            "13:25:16 +82.3s detail recorder: Audio 2 - Rack Audio 7 - Out: clock drift not measured yet, corrected 0 ms so far",
+        ]
+        #expect(notFinal(lines) == [file])
+        #expect(notFinal(lines + ["13:25:26 +92.4s detail recorder: Audio 2 - Rack Audio 7 - Out: clock drift +4.0 ppm, corrected -0.11 ms so far, 0.01 ms off"]).isEmpty)
+        #expect(notFinal(lines + ["13:25:20 +86.0s detail recorder: file ended: \(file), finalized"]).isEmpty)
     }
 
     @Test func noLogYetMeansNoAudioRowToWaitFor() {
