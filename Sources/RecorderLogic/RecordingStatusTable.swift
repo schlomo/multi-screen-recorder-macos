@@ -150,7 +150,7 @@ public enum RecordingStatusTable {
         func placed(_ seconds: Double) -> String {
             let milliseconds = Int((abs(seconds) * 1000).rounded())
             return milliseconds == 0
-                ? "The earliest microphone in the guide track, the others placed in line with it"
+                ? "The guide track's zero: not moved"
                 : "Placed \(milliseconds) ms earlier in the guide track, in line with the earliest microphone"
         }
         return switch shown {

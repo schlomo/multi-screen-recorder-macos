@@ -724,6 +724,8 @@ extension GlobalRecordingLog {
             #expect(abs((m.first ?? 0) + 0.558) < 0.002)
             #expect(abs((m.last ?? 0) + 0.470) < 0.002)
             #expect(recorder.status().rows.dropLast().last?.clockDrift.hasSuffix("synced 470 ms") == true)
+            // The earliest input, the mix's zero, shows its sync too (D86).
+            #expect(recorder.status().rows.filter { $0.clockDrift.hasSuffix("synced 0 ms") }.count == 1)
             _ = await stop()
         }
 

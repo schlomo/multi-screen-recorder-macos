@@ -3039,18 +3039,22 @@ architect's reading.
 - **Status:** in force. Amends D80's "nothing at 0" for the status
   window's Clock drift column.
 - **Context:** The owner's try-out of the snapshot release `pr-32`,
-  2026-11-25: a BRIO connected mid-recording was measured 14 ms early
-  at +70 s and became the mix's zero, so its row went from "not synced
+  2026-11-25: a BRIO connected mid-recording (+53.3 s) was measured
+  14 ms early at +70.1 s and became the mix's zero, so its row went from "not synced
   yet" to nothing. On the proposal that a measured microphone at 0 ms
   shows "synced 0 ms" instead, the owner: "yes, all synced mics should
   show that for consistency".
 - **Decision:** Every audio input's file in the "Audio inputs" guide
   track with a known placement shows `synced <n> ms` (with ` (carried)`
-  where it applies), 0 ms included, the anchor's own file included; at
-  0 ms the mouse-over says `The earliest microphone in the guide track,
-  the others placed in line with it`. Nothing changes for a file out of
+  where it applies), 0 ms included, the anchor's own file included.
+  Nothing changes for a file out of
   the guide track, one never measured (`not synced yet`, `no clear
   sound`) or the system audio.
+- **Decided while building (the architect's reading):** the anchor's
+  file shows `synced 0 ms` from the start, also with one microphone
+  only, as it is in sync by definition. At 0 ms the mouse-over reads
+  `The guide track's zero: not moved`, then `; measured` or the
+  carried-over ending where they apply.
 - **Evidence:** the owner's recording `2026-11-25 13.23.54`;
   `AudioDelaysTests` and `RecordingStatusTableTests`;
   [design/recorder.md](design/recorder.md), "The app" and "Audio delay".

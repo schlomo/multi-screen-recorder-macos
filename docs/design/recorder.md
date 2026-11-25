@@ -995,15 +995,14 @@ checked, reported or rewritten at the next start (D47).
   measured` (or `; carried over from its previous file until
   measured`; for the anchor's own file, which an earlier input moves,
   the placement alone, as its audio delay is 0 by definition; at 0 ms,
-  `The earliest microphone in the guide track, the others placed in
-  line with it` instead of the placement),
+  `The guide track's zero: not moved` instead of the placement, with
+  the same ending),
   `Not in the guide track until its audio
   delay is measured; its own audio track is recorded`, `Not in the
   guide track: no clear sound to measure its audio delay against; its
   own audio track is recorded`;
-  nothing where the mix places it at 0 (to the millisecond), the
-  reference's file or any other, and nothing for a file out of the guide
-  track, which its problem line tells; see "Audio delay", D80), then, drawn for an audio source only,
+  nothing for a file out of the guide track, which its problem line
+  tells; see "Audio delay", D80), then, drawn for an audio source only,
   "Level" (its level meter) and "Input volume" (an audio input's
   slider, where its input volume can be set; see "Audio", D69). Each
   row's mouse-over shows the source's details as the start window's
