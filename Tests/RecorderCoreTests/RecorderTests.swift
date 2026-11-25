@@ -1343,6 +1343,20 @@ extension GlobalRecordingLog {
             _ = await stop()
         }
 
+        /// An audio source whose writer failed starts again at once; failing again within
+        /// `writerFailedAgainWithin` of that, it waits its back-off, 1 s (D88).
+        @Test func anAudioSourceWhoseWriterFailedStartsAgainAtOnceThenBacksOff() async throws {
+            try start()
+            try await wait("the audio input's capture") { sources.byUID.withLock { $0[uid]?.count } == 1 }
+            try #require(sources.last(of: uid)).lose(.writerFailed("cannot write"))
+            try await wait("the restart", seconds: 1) { sources.byUID.withLock { $0[uid]?.count } == 2 }
+            try #require(sources.last(of: uid)).lose(.writerFailed("cannot write"))
+            try await Task.sleep(for: .milliseconds(500))
+            #expect(sources.byUID.withLock { $0[uid]?.count } == 2)
+            try await wait("the restart after the back-off") { sources.byUID.withLock { $0[uid]?.count } == 3 }
+            _ = await stop()
+        }
+
         /// A camera file a full disk cut short: its lost tail is a red line without a call to action of its own, and
         /// the recording asks for no report (D84).
         @Test func aCameraFileAFullDiskCutShortAsksForNoReport() async throws {

@@ -115,7 +115,6 @@ final class RecordingSession: RecorderObserver {
 
     private func drawStatusLine() {
         guard let recorder else { return }
-        status.problemsCalledToAction = recorder.problemsCalledToAction().map(\.text)
         output?.drawStatusLine(isStopping: isStopping) {
             let (rows, line, cpu) = recorder.status()
             return StatusLine.text(line: line, cpu: cpu, rows: rows, status: status)
