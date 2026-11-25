@@ -499,10 +499,12 @@ video from the e2e runs"):
     `recording.log`, polled once a second (`AudioMeasuring`): an audio
     input file is out of it once its `recorder` detail line says it
     `joins the guide track` (the anchor's own file has that line at its
-    start) or has `no clear sound to sync`; the system audio is not
-    measured. Past 90 s (`audioMeasuringLimit`, *data*) the step fails,
-    naming the files still measuring; an input that hears no sound at all
-    stays measuring, so a muted or silent second input fails it.
+    start) or has `no clear sound to sync`, and while its input is in no
+    audio (a `no audio started` event naming it, with no `no audio
+    stopped` after it), as the window shows no sync for a silent input
+    either way; the system audio is not measured. Past 90 s
+    (`audioMeasuringLimit`, *data*) the step fails, naming the files
+    still measuring.
   - `app-finder-window-<appearance>.png`: a Finder window of the finished
     recording folder, driven through AppleScript: list view, no sidebar,
     no toolbar or status bar, Name, Date Modified, Size and Kind as wide

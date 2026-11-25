@@ -30,6 +30,21 @@ import Testing
         #expect(measuring([Self.anchorStarted, Self.anchorJoins, Self.brioStarted, Self.brioUnclear]).isEmpty)
     }
 
+    /// From the owner's recording.log of 2026-11-24 06.30.02; the "no audio stopped" line, which no log has yet,
+    /// is written from the event's name.
+    static let silentStarted = "06:30:03 +1.1s detail recorder: file started: 2026-11-24 06.30.03 Audio 4 - Logitech BRIO.mov"
+    static let otherNoAudio = "06:30:12 +10.2s no audio started: MacBook Pro Microphone"
+    static let silentNoAudio = "06:30:41 +38.8s no audio started: Logitech BRIO"
+    static let silentSoundAgain = "06:30:50 +47.8s no audio stopped: Logitech BRIO"
+    static let silent = "2026-11-24 06.30.03 Audio 4 - Logitech BRIO.mov"
+
+    @Test func anInputFileInNoAudioIsOutOfMeasuringUntilItsSoundComesBack() {
+        #expect(measuring([Self.anchorStarted, Self.anchorJoins, Self.silentStarted, Self.otherNoAudio]) == [Self.silent])
+        let silent = [Self.anchorStarted, Self.anchorJoins, Self.silentStarted, Self.silentNoAudio]
+        #expect(measuring(silent).isEmpty)
+        #expect(measuring(silent + [Self.silentSoundAgain]) == [Self.silent])
+    }
+
     @Test func noLogYetMeansNothingKnownToMeasure() {
         #expect(measuring([]).isEmpty)
     }
