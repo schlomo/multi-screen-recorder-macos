@@ -1055,7 +1055,7 @@ public final class Recorder {
             return
         }
         let count = AudioDelay.windowSeconds * AudioDelay.sampleRate
-        var jobs: [(file: String, reference: [Float], other: [Float])] = []
+        var jobs: [(file: String, uid: String, reference: [Float], other: [Float])] = []
         for file in others {
             let uid = writing[file]!
             guard let end = audioDelayFeed.endIndex(of: uid).map({ min($0, referenceEnd) }),
@@ -1066,11 +1066,11 @@ public final class Recorder {
                 RecorderLog.detail("\(file): not measured, it or the reference \(referenceFile) has less than a window of sound", category: "recorder")
                 continue
             }
-            jobs.append((file, referenceWindow, other))
+            jobs.append((file, uid, referenceWindow, other))
         }
         guard !jobs.isEmpty else { return }
         let measurement = await Task.detached(priority: .utility) {
-            AudioDelays.measure(reference: referenceFile, others: jobs)
+            AudioDelays.measure(reference: (referenceFile, reference.uid), others: jobs)
         }.value
         guard !isStopped else { return }
         applyAudioDelays(measurement: measurement, at: Double(referenceEnd) / Double(AudioDelay.sampleRate))

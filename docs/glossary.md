@@ -421,9 +421,10 @@ How much later an audio input's sound arrives than the anchor's,
 negative when earlier, beyond what its clock drift explains; measured
 while recording by cross-correlation against the reference: the anchor
 at first, the reference in use while its capture runs and it is not in
-no audio, else the lowest-numbered input being written that has an
-audio delay, whose own audio delay turns the lags into ones against the
-anchor; the reference stays with the input it moved to (D77, D80, D85).
+no audio, else the input being written that has an audio delay and the
+most action score, whose own audio delay turns the lags into ones
+against the anchor; the reference stays with the input it moved to
+(D77, D80, D85, D89).
 A file's audio delay is set by its first
 counted window, once more by the median of its first 3, then only by the
 median of the latest 60 s, each time only beyond a frame (D80); a new
@@ -442,19 +443,33 @@ The device every audio delay of a recording is against: the first
 audio input whose file is written, its files' audio delay 0 while it is
 the reference, the default microphone or not; a new file of it after
 the reference moved away is measured like any other input (D85). Only
-when no input being written has an audio delay does the lowest-numbered
-input being written become the new anchor, every input then starting
-over (D80).
+when the reference moves and no input being written has an audio delay
+does the input being written with the most action score become the new
+anchor, every input then starting over (D80, D89); so at the first
+measurement with sound, an input with more action than the first one
+becomes the anchor.
 
 ## Reference
 
 The audio input whose newest file every other input's sound is
 measured against for its audio delay (`AudioDelays.referenceDevice`):
 the anchor at first, kept while its capture runs and its newest file
-did not end on no audio; then the lowest-numbered input being written
-that has an audio delay, which it stays with until its own file ends,
-the anchor's returning file not taking it back (D80, D85). Not the
+did not end on no audio and it is not moved for sound; then the input
+being written that has an audio delay and the most action score, which
+it stays with, the anchor's returning file not taking it back (D80,
+D85). It moves for sound (D89) at the first measurement with sound to
+an input with more action, and after 3 measurements in a row without a
+counted window against it while another input had sound, if another
+input has more action. Not the
 "Reference implementation" above.
+
+## Action score
+
+How much an audio input's level moves in a measurement's 10 s window
+(`AudioDelay.actionScore`, D89): the window's 100 ms slices' rms in dB,
+the 90th percentile less the 10th. Speech scores about 20 to 30 dB; a
+steady hum, a loopback of noise or an empty line-in under 1 dB however
+loud. It picks the reference; within 3 dB is a tie.
 
 ## Lag
 

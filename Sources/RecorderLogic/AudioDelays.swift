@@ -1,5 +1,6 @@
 /// A recording's audio delays (D77, D80): each audio input file's against the recording's anchor, the first
-/// reference device (`AudioDelay.Applied`, the anchor's files 0), which inputs the "Audio inputs" guide track
+/// reference device (`AudioDelay.Applied`, the anchor's files 0), which input is the reference (D85, D89), which
+/// inputs the "Audio inputs" guide track
 /// mixes (`GuideTrackMembership`, D79) and how much earlier it places each, what `recording.json` lists, and
 /// what the status window shows. A new file of an input whose earlier file had an audio delay starts with it,
 /// carried over. Another reference device re-bases every lag onto the anchor through its own audio delay; one
@@ -70,11 +71,18 @@ public struct AudioDelays: Sendable {
     public struct Measurement: Sendable {
         public struct Measured: Sendable {
             public var file: String
+            public var uid: String
             /// Nil when either side is silent.
             public var window: AudioDelay.Window?
+            /// Its own window is not silent.
+            public var hasSound: Bool
+            public var actionScore: Double
         }
 
         public var reference: String
+        public var referenceUID: String
+        public var referenceHasSound: Bool
+        public var referenceActionScore: Double
         public var files: [Measured]
     }
 
@@ -82,7 +90,7 @@ public struct AudioDelays: Sendable {
     /// Each device's newest file, by the device's UID, while its capture runs.
     private var newest: [String: String] = [:]
     /// The device every audio delay is against: the first input whose file is written, or the new one after a
-    /// start-over (D80).
+    /// start-over (D80), as when another input has more action at the first measurement with sound (D89).
     public private(set) var anchor: String?
     /// The anchor's files, its audio delay 0 by definition: those of its device that became known while it was
     /// the reference, as its first file or after another of them (D85).
@@ -95,6 +103,14 @@ public struct AudioDelays: Sendable {
     /// The reference's file, by name.
     private var referenceFile: String?
     private var known = 0
+    /// Each device's action score in the latest measurement (D89).
+    private var actionScores: [String: Double] = [:]
+    /// The reference was chosen by action score, at the first measurement with sound (D89).
+    private var isReferenceChosen = false
+    /// The measurements in a row without a counted window against `unsyncedReference` while another input had
+    /// sound (D89).
+    private var unsynced = 0
+    private var unsyncedReference: String?
 
     public init() {}
 
@@ -130,8 +146,8 @@ public struct AudioDelays: Sendable {
         let previous = referenceFile.flatMap { files[$0] }
         if delay(of: reference) == nil {
             lines.append("reference \(referenceFile ?? "none") → \(reference): it has no audio delay, so it is the new anchor and every input starts over")
-            // shortcut: only when no input being written has an audio delay (the recorder picks such a reference
-            // first), the new anchor's audio delay against the old one is unknown and taken as 0, so every input
+            // shortcut: only when no input being written has an audio delay (`reference(among:)` picks such a
+            // reference first), the new anchor's audio delay against the old one is unknown and taken as 0, so every input
             // starts over and the entries written so far stay against the old anchor; keep the old anchor's last
             // known delays if a lost anchor proves common.
             anchor = referenceUID
@@ -204,23 +220,46 @@ public struct AudioDelays: Sendable {
 
     /// Measures each other file's window against the reference's (`others`: each file with its own window and
     /// the reference's over the same span); pure, so the recorder runs it off the main thread.
-    public static func measure(reference: String, others: [(file: String, reference: [Float], other: [Float])]) -> Measurement {
-        Measurement(reference: reference, files: others.map { .init(file: $0.file, window: AudioDelay.window(reference: $0.reference, other: $0.other)) })
+    public static func measure(
+        reference: (file: String, uid: String), others: [(file: String, uid: String, reference: [Float], other: [Float])]
+    ) -> Measurement {
+        let referenceWindow = others.first?.reference ?? []
+        return Measurement(
+            reference: reference.file, referenceUID: reference.uid,
+            referenceHasSound: !referenceWindow.isEmpty && !AudioDelay.isSilent(referenceWindow),
+            referenceActionScore: AudioDelay.actionScore(referenceWindow),
+            files: others.map {
+                .init(file: $0.file, uid: $0.uid, window: AudioDelay.window(reference: $0.reference, other: $0.other),
+                      hasSound: !AudioDelay.isSilent($0.other), actionScore: AudioDelay.actionScore($0.other))
+            })
     }
 
-    /// The reference among `candidates` (D80, D85): the reference in use while it is one of them, else the
-    /// lowest-numbered that has an audio delay; with none such, the lowest-numbered, which becomes the new
-    /// anchor.
-    public func reference(among candidates: [Candidate]) -> Candidate? {
-        let byNumber = candidates.sorted { $0.number < $1.number }
-        return referenceDevice.flatMap { uid in byNumber.first { $0.uid == uid } }
-            ?? byNumber.first { hasAudioDelay($0.file, device: $0.uid) }
-            ?? byNumber.first
+    /// The reference among `candidates` (D80, D85, D89): the reference in use while it is one of them and not
+    /// `movingAway`, else among the others the one with the most action in the latest measurement that has an
+    /// audio delay; with none such, the one with the most action, which becomes the new anchor. A tie goes to the
+    /// lowest number.
+    public func reference(among candidates: [Candidate], movingAway: Bool = false) -> Candidate? {
+        let current = referenceDevice.flatMap { uid in candidates.first { $0.uid == uid } }
+        if !movingAway, let current { return current }
+        let others = candidates.filter { $0.uid != referenceDevice }
+        return mostAction(others.filter { hasAudioDelay($0.file, device: $0.uid) }) ?? mostAction(others) ?? current
+    }
+
+    /// The candidate with the highest action score, unscored ones at 0; within `actionScoreTie` of it, `keeping`
+    /// if among them, else the lowest number.
+    private func mostAction(_ candidates: [Candidate], keeping: String? = nil) -> Candidate? {
+        func score(_ candidate: Candidate) -> Double { actionScores[candidate.uid] ?? 0 }
+        guard let top = candidates.map(score).max() else { return nil }
+        let tied = candidates.filter { score($0) >= top - RecorderValues.actionScoreTie }.sorted { $0.number < $1.number }
+        return tied.first { $0.uid == keeping } ?? tied.first
     }
 
     /// The audio delays after `measurement`: its counted windows' lags and unclear files, each window's line,
     /// the reference among `candidates` (`files` as for `update`); a measurement against another reference
-    /// than the one in use now counts nothing (D80, D85).
+    /// than the one in use now counts nothing (D80, D85). At the first measurement with sound the input with the
+    /// most action becomes the reference, and after `referenceUnsyncedMeasurements` in a row without a counted
+    /// window while another input had sound the reference moves, if another has more action (D89); either drops
+    /// the measurement's lags.
     public mutating func measured(
         _ measurement: Measurement, files newest: [String: String], candidates: [Candidate], at: Double
     ) -> Outcome {
@@ -236,14 +275,46 @@ public struct AudioDelays: Sendable {
                 + "clarity \(Int(window.clarity.rounded())), " + (window.counts ? "counted" : "not counted"))
             if window.counts { lags[measured.file] = window.lag } else { unclear.insert(measured.file) }
         }
-        guard let reference = reference(among: candidates) else { return Outcome(lines: lines) }
+        actionScores = Dictionary(
+            measurement.files.map { ($0.uid, $0.actionScore) } + [(measurement.referenceUID, measurement.referenceActionScore)]) { $1 }
+        guard var reference = reference(among: candidates) else { return Outcome(lines: lines) }
         let isCurrent = measurement.reference == reference.file
         if !lags.isEmpty, !isCurrent {
             lines.append("counted lags of \(lags.keys.sorted().joined(separator: ", ")) dropped: measured against "
                 + "\(measurement.reference), the reference is now \(reference.file)")
         }
-        var outcome = update(
-            files: newest, reference: reference.file, lags: isCurrent ? lags : [:], unclear: isCurrent ? unclear : [], at: at)
+        var movesAway = false
+        if isCurrent {
+            if unsyncedReference != reference.uid { (unsynced, unsyncedReference) = (0, reference.uid) }
+            let scores = candidates.filter { actionScores[$0.uid] != nil }.sorted { $0.number < $1.number }
+                .map { "\($0.file) \(String(format: "%.1f", actionScores[$0.uid]!)) dB" }.joined(separator: ", ")
+            if !isReferenceChosen, measurement.referenceHasSound || measurement.files.contains(where: \.hasSound) {
+                isReferenceChosen = true
+                if mostAction(candidates.filter { actionScores[$0.uid] != nil }, keeping: reference.uid)?.uid != reference.uid {
+                    lines.append("reference \(reference.file) moves: another input has more action at the first measurement with sound; action scores: \(scores)")
+                    movesAway = true
+                }
+            }
+            if !movesAway, !lags.isEmpty {
+                unsynced = 0
+            } else if !movesAway, measurement.files.contains(where: \.hasSound) {
+                unsynced += 1
+                // Only to more action: a reference with speech that a hum or a loopback cannot sync to stays.
+                let hasMoreAction = candidates.contains {
+                    $0.uid != reference.uid && (actionScores[$0.uid] ?? 0) > (actionScores[reference.uid] ?? 0) + RecorderValues.actionScoreTie
+                }
+                if unsynced >= RecorderValues.referenceUnsyncedMeasurements, hasMoreAction {
+                    lines.append("reference \(reference.file) moves: no counted window against it in \(unsynced) measurements while "
+                        + "another input had sound; action scores: \(scores)")
+                    movesAway = true
+                }
+            }
+            if movesAway, let moved = self.reference(among: candidates, movingAway: true) {
+                (reference, unsynced, unsyncedReference) = (moved, 0, nil)
+            }
+        }
+        let counts = isCurrent && !movesAway
+        var outcome = update(files: newest, reference: reference.file, lags: counts ? lags : [:], unclear: counts ? unclear : [], at: at)
         outcome.lines = lines + outcome.lines
         return outcome
     }

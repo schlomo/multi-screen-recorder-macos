@@ -129,6 +129,27 @@ import Testing
         #expect(notFinal(final + [startOver, micJoinsAgain]).isEmpty)
     }
 
+    /// Synthetic, from `AudioDelays`' format (D89): the reference moving for more action starts over and waits
+    /// for every input to join again, the old anchor that cannot sync ends at "no clear sound"; a reference
+    /// moving with a re-base changes no row.
+    @Test func aReferenceMovedForActionWaitsForTheStartOverAndARebaseChangesNothing() {
+        let mic = "2026-11-25 13.23.54 Audio 1 - MacBook Pro Microphone.mov"
+        let final = Self.anchorFinal + [Self.brioStartInput, Self.brioStarted, Self.brioJoins, Self.brioDrift]
+        let moves = "13:25:04 +70.1s detail recorder: reference \(mic) moves: another input has more action at the first "
+            + "measurement with sound; action scores: \(mic) 0.3 dB, \(Self.brio) 27.9 dB"
+        let startOver = "13:25:04 +70.1s detail recorder: reference \(mic) → \(Self.brio): it has no audio delay, so it is the new "
+            + "anchor and every input starts over"
+        let noClearSound = "13:25:34 +100.1s detail recorder: \(mic): no clear sound to sync, 3 measurements with sound and no counted window"
+        #expect(notFinal(final + [moves, startOver]) == [mic])
+        #expect(notFinal(final + [moves, startOver, noClearSound]).isEmpty)
+        let rebase = [
+            "13:25:04 +70.1s detail recorder: reference \(mic) moves: no counted window against it in 3 measurements while another "
+                + "input had sound; action scores: \(mic) 0.3 dB, \(Self.brio) 27.9 dB",
+            "13:25:04 +70.1s detail recorder: reference \(mic) → \(Self.brio): lags re-based onto the anchor by 14 ms early",
+        ]
+        #expect(notFinal(final + rebase).isEmpty)
+    }
+
     /// Synthetic: no log has the system audio in no audio yet; its event names it "System audio".
     @Test func theSystemAudioInNoAudioIsNotWaitedFor() {
         let early = [Self.micStartInput, Self.systemStart, Self.micStarted, Self.micJoins, Self.systemStarted, Self.systemDriftNotYet, Self.micDrift]

@@ -63,6 +63,16 @@ extension RecorderValues {
 /// clear sound to sync.
 extension RecorderValues {
     public static let audioDelayUnclearMeasurements = 3
+    /// The measurements in a row without a counted window against the reference, while another input has
+    /// sound, after which the reference moves (D89).
+    public static let referenceUnsyncedMeasurements = 3
+    /// An action score (D89) is the spread of a window's slices' levels, each slice this long: the level of
+    /// `actionScoreHighPercentile` of them less that of `actionScoreLowPercentile`, in dB.
+    public static let actionScoreSlice = Duration.milliseconds(100)
+    public static let actionScoreLowPercentile = 0.1
+    public static let actionScoreHighPercentile = 0.9
+    /// Action scores this close to the highest are a tie: the reference in use stays, else the lowest number.
+    public static let actionScoreTie = 3.0
     public static let audioDelayChangeWindowSeconds = 60.0
     public static let audioDelayChangeWindows = 5
     /// One frame at 30 fps: closer than this, a new median changes nothing.

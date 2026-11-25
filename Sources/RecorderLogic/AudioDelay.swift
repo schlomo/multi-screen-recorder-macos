@@ -38,12 +38,14 @@ public enum AudioDelay {
         let correlation = crossCorrelation(reference, other)
         let n = correlation.count
         let reach = min(searchSamples, reference.count - 1)
-        let lags = Array(-reach...reach)
-        let magnitudes = lags.map { abs(correlation[($0 + n) % n]) }
-        let best = magnitudes.indices.max { magnitudes[$0] < magnitudes[$1] }!
-        let median = Self.median(magnitudes.map(Double.init))!
+        // From lag -reach to +reach: the negative lags are at the end.
+        let magnitudes = vDSP.absolute(Array(correlation[(n - reach)...]) + correlation[...reach])
+        let (best, peak) = vDSP.indexOfMaximum(magnitudes)
+        var sorted = magnitudes
+        vDSP.sort(&sorted, sortOrder: .ascending)
+        let median = Double(sorted[sorted.count / 2])
         guard median > 0 else { return nil }
-        return Window(lag: Double(lags[best]) / Double(sampleRate), clarity: Float(Double(magnitudes[best]) / median))
+        return Window(lag: Double(Int(best) - reach) / Double(sampleRate), clarity: Float(Double(peak) / median))
     }
 
     /// An audio input file's audio delay against the recording's anchor (D80): set by its first counted
@@ -189,7 +191,8 @@ public enum AudioDelay {
             preconditionFailure("vDSP cannot set up an FFT of \(n) points")
         }
         func spectrum(_ signal: [Float]) -> (real: [Float], imaginary: [Float]) {
-            let padded = signal + [Float](repeating: 0, count: n - signal.count)
+            var padded = [Float](repeating: 0, count: n)
+            padded.replaceSubrange(0..<signal.count, with: signal)
             var real = [Float](repeating: 0, count: half), imaginary = [Float](repeating: 0, count: half)
             real.withUnsafeMutableBufferPointer { re in
                 imaginary.withUnsafeMutableBufferPointer { im in
@@ -202,8 +205,8 @@ public enum AudioDelay {
         }
         let (ar, ai) = spectrum(a), (br, bi) = spectrum(b)
         // conj(A)·B; bin 0 packs the DC in its real part and the Nyquist in its imaginary part.
-        var real = (0..<half).map { ar[$0] * br[$0] + ai[$0] * bi[$0] }
-        var imaginary = (0..<half).map { ar[$0] * bi[$0] - ai[$0] * br[$0] }
+        var real = vDSP.add(vDSP.multiply(ar, br), vDSP.multiply(ai, bi))
+        var imaginary = vDSP.subtract(vDSP.multiply(ar, bi), vDSP.multiply(ai, br))
         real[0] = ar[0] * br[0]
         imaginary[0] = ai[0] * bi[0]
         var result = [Float](repeating: 0, count: n)
@@ -225,4 +228,21 @@ public enum AudioDelay {
     }
 
     private static func rms(_ samples: [Float]) -> Float { vDSP.rootMeanSquare(samples) }
+
+    /// Whether a window is silent, not measured.
+    public static func isSilent(_ samples: [Float]) -> Bool { rms(samples) < silence }
+
+    /// How much a window's level moves (D89), at `sampleRate`: speech scores high, a steady hum or noise near 0,
+    /// however loud.
+    public static func actionScore(_ samples: [Float]) -> Double {
+        let length = Int(RecorderValues.actionScoreSlice.nanoseconds * Int64(sampleRate) / 1_000_000_000)
+        let floor = 20 * log10(Double(silence))
+        var levels = stride(from: 0, to: samples.count - length + 1, by: length).map { start in
+            max(floor, 20 * log10(Double(vDSP.rootMeanSquare(samples[start..<(start + length)]))))
+        }
+        guard !levels.isEmpty else { return 0 }
+        levels.sort()
+        func level(at percentile: Double) -> Double { levels[Int((Double(levels.count - 1) * percentile).rounded())] }
+        return level(at: RecorderValues.actionScoreHighPercentile) - level(at: RecorderValues.actionScoreLowPercentile)
+    }
 }
