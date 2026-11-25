@@ -507,12 +507,16 @@ video from the e2e runs"):
     line, not `not measured yet`; the sync from a detail line of one of
     its files that `joins the guide track`, `rejoins the guide track`,
     `carries over` a delay, is `in` or `out of the guide track with` the
-    carried-over audio delay, or has `no clear sound to sync`, which the
-    source's newer files keep (the anchor's own file joins at its start,
-    and a new file of the anchor's device logs nothing). A source in no
-    audio (a `no audio started` event naming it, with no `no audio
-    stopped` after it) is not waited for: its clock drift shows
-    "measuring" for as long as it is silent. Past 90 s
+    carried-over audio delay, `leaves the guide track` or has `no clear
+    sound to sync`, which the source's newer files keep (the anchor's own
+    file joins at its start, and a new file of the anchor's device logs
+    nothing); a `reference … every input starts over` line clears it for
+    every input but the new anchor, which show "not synced yet" again
+    until they join. A source in no audio (a `no audio started` event
+    naming it, with no `no audio stopped` after it) is not waited for:
+    its clock drift shows "measuring" for as long as it is silent. The
+    event names only the device, so silence is keyed by the device name
+    and two devices of the same name share it. Past 90 s
     (`audioRowsFinalLimit`, *data*) the step fails, naming the files
     whose rows are not final. In the owner's run of 2026-11-25 the clock
     drift showed at 21 s, and a Logitech BRIO's row was final about 28 s
