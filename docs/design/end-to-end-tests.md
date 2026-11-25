@@ -171,7 +171,9 @@ its `app-windows` subcommand, the app's window step of the scenarios'
 run (`Driver.startWindow` and `recordingWindows`, told `onThisMac`), on
 this Mac with the installed app or the given one: light only, no virtual
 screen connected, no dark appearance, no window moved (no Accessibility
-permission), `HOME`, the recording (about 15 s) and the scratch folder
+permission), `HOME`, the recording (until the status window's audio
+rows are final, about 25 s or more, see the status window below) and the
+scratch folder
 deleted afterwards. It needs the Screen & System Audio Recording
 permission and Automation for the app, System Events and Finder for the
 program running it, and says which is missing; on this Mac the reopen
@@ -287,10 +289,15 @@ and with every input recorded that is a race between the VM's two:
 in the run of 2026-11-24 at 2628b9d, the two files' starts in the tone
 scenario's `recording.json` were 0.1333 s for BlackHole and 0.1667 s
 for the Apple Virtual Sound Device. Any other
-input joins the guide only once measured, which needs 10 s of sound, as
-long as the run, and the Apple Virtual Sound Device hears the tone 300
-to 400 ms late; with it as the anchor, BlackHole got no audio delay
-within the run and the clicks were missing from the guide.
+input joins the guide only once measured, and the test tone never
+yields a counted window: a steady 1 kHz sine with a 1 ms click each
+second correlates about as well at many lags, a clarity of about 1.6
+against the 12 needed (`AudioDelay.clarityNeeded`, D80), so no input is
+ever measured on it, however long the run. The Apple Virtual Sound
+Device hears the tone 300 to 400 ms late; with it as the anchor,
+BlackHole got no audio delay and the clicks were missing from the
+guide. So no scenario checks a late input's placement: that is
+`RecorderTests`' (backlog item 52).
 The virtual-screen scenarios still record every input (`all-inputs`),
 and `plain-recording` and the stop scenarios run in auto mode (Wired).
 
@@ -481,13 +488,39 @@ video from the e2e runs"):
     sends the app its reopen event (what a click on the Dock icon does),
     moves the window to the screen's corner with System Events (the VM's
     screen is small and the window first opens partly off it), makes the
-    app the frontmost one, and takes
+    app the frontmost one, waits until the window's audio rows are final
+    (below), and takes
     a 5 s video of that window with `screencapture -V` (H.264, 5.000 s,
     one frame per change, so about one a second), then the PNG right
     after it, then sends Stop (SIGINT) and waits for the recording's
     files. The video shows macOS's sharing indicator over the window's
     traffic lights and the pointer; the video has no shadow, its margin is
-    black.
+    black. The audio rows are final when every audio source whose newest
+    file is being written shows its clock drift (no longer "measuring")
+    and, for an audio input, its sync (no longer "not synced yet"); the
+    system audio's sync is not shown, so only its clock drift is waited
+    for. It is read from the recording's `recording.log`, polled once a
+    second (`AudioRowsFinal`), keyed by the source's number N of its
+    `Audio N` label (device names repeat, and a file name changes a
+    name's `/` and `:`; a `startInput` detail line maps a device name to
+    N): the clock drift from the source's latest `clock drift` detail
+    line, not `not measured yet`; the sync from a detail line of one of
+    its files that `joins the guide track`, `rejoins the guide track`,
+    `carries over` a delay, is `in` or `out of the guide track with` the
+    carried-over audio delay, `leaves the guide track` or has `no clear
+    sound to sync`, which the source's newer files keep (the anchor's own
+    file joins at its start, and a new file of the anchor's device logs
+    nothing); a `reference … every input starts over` line clears it for
+    every input but the new anchor, which show "not synced yet" again
+    until they join. A source in no audio (a `no audio started` event
+    naming it, with no `no audio stopped` after it) is not waited for:
+    its clock drift shows "measuring" for as long as it is silent. The
+    event names only the device, so silence is keyed by the device name
+    and two devices of the same name share it. Past 90 s
+    (`audioRowsFinalLimit`, *data*) the step fails, naming the files
+    whose rows are not final. In the owner's run of 2026-11-25 the clock
+    drift showed at 21 s, and a Logitech BRIO's row was final about 28 s
+    after its file started.
   - `app-finder-window-<appearance>.png`: a Finder window of the finished
     recording folder, driven through AppleScript: list view, no sidebar,
     no toolbar or status bar, Name, Date Modified, Size and Kind as wide

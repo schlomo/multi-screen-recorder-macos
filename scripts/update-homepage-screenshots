@@ -8,8 +8,9 @@ With a scratch folder it only copies, into this checkout. With --this-mac
 [--app <path>] (D82) it builds the end-to-end driver from this checkout and runs
 only its app-window step on this Mac with the app (default: the installed
 /Applications/Multi Screen Recorder.app), light appearance only, with no virtual
-screen and no window moved: it starts the app, records about 15 s and takes the
-start, status and Finder windows, with HOME and the recording in a scratch folder
+screen and no window moved: it starts the app, records until the status
+window's audio rows show every audio source's clock drift and sync (about 25 s
+or more, at most 90 s, then it fails), and takes the start, status and Finder windows, with HOME and the recording in a scratch folder
 deleted afterwards, then copies the three captures into this checkout; no
 commit, no push. It prints the app's version and compares it with no release;
 it refuses while the app runs or this Mac is in dark mode, before building.

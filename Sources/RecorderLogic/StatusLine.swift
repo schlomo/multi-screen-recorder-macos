@@ -5,14 +5,14 @@ public enum StatusLine {
     /// with a camera being recorded "2 screens, 1 camera, 5 audio";
     /// `line` is the window's line, `rows` its table: the sources being recorded are the rows that say
     /// "recording", and a stalled camera, whose file is still written.
-    /// The problems are the status's `problems`; none are not mentioned.
+    /// The problems are the status's `problems`, those whose call to action was given and that have not ended (D84); none are not mentioned.
     public static func text(line: String, cpu: String?, rows: [RecordingStatusTable.Row], status: RecordingStatus) -> String {
         let written: Set = [RecordingStatusTable.StateText.recording.rawValue, RecordingStatusTable.StateText.stalled.rawValue]
         let recording = rows.filter { written.contains($0.state) }
         let screens = recording.filter { $0.source.kind == .screen }.count
         let cameras = recording.filter { $0.source.kind == .camera }.count
         let audioSources = recording.count - screens - cameras
-        let problems = status.problems.count
+        let problems = status.problemsCalledToAction.count
         let sources = [count(screens, "screen")] + (cameras == 0 ? [] : [count(cameras, "camera")]) + ["\(audioSources) audio"]
         return [problems == 0 ? nil : count(problems, "problem"), line, cpu, sources.joined(separator: ", ")]
             .compactMap(\.self).joined(separator: " · ")

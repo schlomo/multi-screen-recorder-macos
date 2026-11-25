@@ -157,6 +157,70 @@ import Testing
         #expect(screens.nextDueTime() == now + second)
     }
 
+    /// A failed writer's status is final: its screen starts a new stream and file at once, no back-off, as soon
+    /// as it is due; a writer that fails again within `writerFailedAgainWithin` of that restart backs off,
+    /// rising, so a broken encoder cannot loop (D88). The recorder writes its event (FileEndReport).
+    @Test func aFailedWriterStartsAgainAtOnceAndBacksOffWhenItFailsAgainSoon() {
+        var screens = tracker()
+        _ = screens.begin([Self.builtIn], at: 0)
+        screens.fileStarted(Self.builtIn.uuid)
+        let first = screens.streamEnded(Self.builtIn.uuid, .writerFailed("-11800"), connected: [Self.builtIn], at: 6 * second)
+        #expect(first.events.isEmpty)
+        #expect(screens.nextDueTime() == 6 * second)
+        #expect(starts(screens.due(at: 6 * second)) == [Self.builtIn.uuid])
+        screens.fileStarted(Self.builtIn.uuid)
+        var now = 6 * second
+        var restarts: [Int64] = []
+        for _ in 0..<5 {
+            now += second
+            #expect(starts(screens.streamEnded(Self.builtIn.uuid, .writerFailed("-11800"), connected: [Self.builtIn], at: now)).isEmpty)
+            let due = screens.nextDueTime()!
+            #expect(starts(screens.due(at: due)) == [Self.builtIn.uuid])
+            screens.fileStarted(Self.builtIn.uuid)
+            restarts.append((due - now) / second)
+            now = due
+        }
+        #expect(restarts == [1, 2, 4, 8, 10])
+        // Running past the window since its restart: at once again, the back-off starting over.
+        now += RecorderValues.writerFailedAgainWithin.nanoseconds
+        _ = screens.streamEnded(Self.builtIn.uuid, .writerFailed("-11800"), connected: [Self.builtIn], at: now)
+        #expect(starts(screens.due(at: now)) == [Self.builtIn.uuid])
+        now += second
+        _ = screens.streamEnded(Self.builtIn.uuid, .writerFailed("-11800"), connected: [Self.builtIn], at: now)
+        #expect(screens.nextDueTime() == now + second)
+    }
+
+    /// A writer failing within the settle time of its screen's change starts again once the screen settled, at
+    /// the screen's new frame size (D88).
+    @Test func aWriterFailingWithinTheSettleTimeStartsAgainOnceSettledAtTheNewSize() {
+        var screens = tracker()
+        _ = screens.begin([Self.lg], at: 0)
+        screens.fileStarted(Self.lg.uuid)
+        var smaller = Self.lg
+        smaller.pointSize = FrameSize(width: 2560, height: 1440)
+        _ = screens.observe([smaller], at: 10 * second)
+        _ = screens.streamEnded(Self.lg.uuid, .writerFailed("-11800"), connected: [smaller], at: 10 * second + second / 2)
+        #expect(screens.due(at: 10 * second + second / 2).actions.isEmpty)
+        let due = screens.due(at: 10 * second + screens.settleTime.nanoseconds)
+        guard case .start(_, _, let frameSize, _, _)? = due.actions.first else {
+            Issue.record("no start: \(due.actions)")
+            return
+        }
+        #expect(frameSize == screens.resolution.frameSize(forLooksLike: smaller.pointSize))
+        #expect(due.actions.count == 1)
+    }
+
+    /// A stream ending while the screens cannot be read keeps the screens as last read: no screen is ended as
+    /// gone, and the failed one starts again with the back-off.
+    @Test func aStreamEndingWhileTheScreensCannotBeReadKeepsTheScreensAsLastRead() {
+        var screens = tracker()
+        _ = screens.begin([Self.builtIn, Self.lg], at: 0)
+        let step = screens.streamEnded(Self.lg.uuid, .streamFailed("-3811"), connected: nil, at: second)
+        #expect(step.events.map(\.event) == [.screenStreamFailed])
+        #expect(step.actions.isEmpty)
+        #expect(starts(screens.due(at: 2 * second)) == [Self.lg.uuid])
+    }
+
     @Test func aStreamThatFailsBecauseItsScreenWentIsADisconnection() {
         var screens = tracker()
         _ = screens.begin([Self.builtIn, Self.lg], at: 0)
@@ -171,7 +235,6 @@ import Testing
         _ = screens.begin([Self.builtIn, Self.lg], at: 0)
         let step = screens.streamEnded(Self.lg.uuid, .showsAnotherScreen, connected: [Self.builtIn, Self.lg], at: second)
         #expect(step.events == [RecordingEvent(at: second, event: .screenShowsAnotherScreensPicture, screen: "LG HDR 4K")])
-        #expect(screens.showsAnotherScreensPicture)
         #expect(screens.due(at: 100 * second).actions.isEmpty)
         // The other screen changing is not this one's change.
         var builtIn = Self.builtIn
@@ -182,7 +245,6 @@ import Testing
         moved.bounds.y = 100
         _ = screens.observe([builtIn, moved], at: 300 * second)
         #expect(starts(screens.due(at: 301 * second)) == [Self.lg.uuid])
-        #expect(!screens.showsAnotherScreensPicture)
     }
 
     /// An unplug: the stream ends because its screen is gone, seconds
@@ -234,15 +296,6 @@ import Testing
         let due = screens.due(at: 10 * second + screens.settleTime.nanoseconds)
         #expect(starts(due) == [Self.lg.uuid])
         #expect(due.events.isEmpty)
-    }
-
-    @Test func aFailingWriterStartsANewFileAfterTheBackOff() {
-        var screens = tracker()
-        _ = screens.begin([Self.builtIn], at: 0)
-        let step = screens.streamEnded(Self.builtIn.uuid, .writerFailed("cannot write"), connected: [Self.builtIn], at: second)
-        // The recorder writes its event, once per capture end (FileEndReport).
-        #expect(step.events.isEmpty)
-        #expect(screens.nextDueTime() == 2 * second)
     }
 
     @Test func aWriterThatFellBehindStartsANewFileAsAfterAFailingStream() {

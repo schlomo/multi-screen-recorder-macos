@@ -51,6 +51,8 @@ public enum AudioDelay {
     /// away, then only when the median of the counted windows of the latest `audioDelayChangeWindowSeconds`,
     /// at least `audioDelayChangeWindows`, does. One carried over from the input's earlier file holds until
     /// the first own counted window confirms it (within the tolerance) or replaces it.
+    /// One measured against another reference than before still counts, but Stop's hindsight never merges the
+    /// windows of the two (D85).
     public struct Applied: Sendable {
         public private(set) var delay: Double?
         /// Carried over from the input's earlier file and not yet confirmed or replaced by an own window.
@@ -58,9 +60,13 @@ public enum AudioDelay {
         /// The own counted windows: when each ended, in seconds of the recording, and its lag. About 58 KB a
         /// file for 10 hours, one every 10 s.
         private var windows: [(at: Double, lag: Double)] = []
-        /// When the 60 s rule changed the audio delay, and the value before: the only places hindsight splits a
-        /// file.
+        /// When the 60 s rule changed the audio delay, and the value before: places hindsight splits a file.
         private var ruleChanges: [(at: Double, before: Double)] = []
+        /// When its windows began to be measured against another reference, and the value before: hindsight's
+        /// other places to split a file, never merged across (D85).
+        private var referenceChanges: [(at: Double, before: Double)] = []
+        /// The device its latest window was measured against.
+        private var latestReferenceDevice: String?
 
         public init() {}
 
@@ -73,9 +79,12 @@ public enum AudioDelay {
         /// recording log.
         public private(set) var decision: String?
 
-        /// A counted window's lag, the window ending at `at`; whether the audio delay changed.
+        /// A counted window's lag, the window ending at `at`, measured against the device `reference`; whether
+        /// the audio delay changed.
         @discardableResult
-        public mutating func add(_ lag: Double, at: Double) -> Bool {
+        public mutating func add(_ lag: Double, at: Double, against reference: String? = nil) -> Bool {
+            if let delay, let before = latestReferenceDevice, let reference, before != reference { referenceChanges.append((at, delay)) }
+            if let reference { latestReferenceDevice = reference }
             windows.append((at, lag))
             let wasCarriedOver = isCarriedOver
             isCarriedOver = false
@@ -102,7 +111,7 @@ public enum AudioDelay {
             }
             decision = delay.map { "\(rule): \(AudioDelay.text($0)) → \(AudioDelay.text(candidate))" + (wasCarriedOver ? ", replaced" : "") }
                 ?? "\(rule): \(AudioDelay.text(candidate))"
-            if windows.count > windowsNeeded, let delay { ruleChanges.append((at, delay)) }
+            if windows.count > windowsNeeded, let delay, referenceChanges.last?.at != at { ruleChanges.append((at, delay)) }
             delay = candidate
             return true
         }
@@ -111,28 +120,37 @@ public enum AudioDelay {
         /// own counted windows, when the live entries stay.
         public func hindsight(fileStart: Double) -> [RecordingManifest.AudioFile.Delay]? {
             guard let delay, !windows.isEmpty else { return nil }
-            return Self.stretches(windows: windows, ruleChanges: ruleChanges, current: delay, fileStart: fileStart)
+            return Self.stretches(
+                windows: windows, ruleChanges: ruleChanges, referenceChanges: referenceChanges, current: delay, fileStart: fileStart)
         }
 
-        /// The stretches split at each change of the 60 s rule, each with the median of the windows ending within
-        /// it, one with fewer than 2 with its live value (the value before the next change, or `current`);
-        /// neighbours within a frame merge; the first at 0.
+        /// The stretches split at each change of the 60 s rule and of the reference, each with the median of the
+        /// windows ending within it, one with fewer than 2 with its live value (the value before the next change,
+        /// or `current`); neighbours within a frame merge, but across a change of the reference one within a frame of
+        /// the entry before only adds no entry, its windows kept apart (D85); the first at 0.
         static func stretches(
-            windows: [(at: Double, lag: Double)], ruleChanges: [(at: Double, before: Double)], current: Double,
-            fileStart: Double = 0
+            windows: [(at: Double, lag: Double)], ruleChanges: [(at: Double, before: Double)],
+            referenceChanges: [(at: Double, before: Double)] = [], current: Double, fileStart: Double = 0
         ) -> [RecordingManifest.AudioFile.Delay] {
-            let bounds = ruleChanges.map(\.at)
+            let splits = (ruleChanges.map { (at: $0.at, before: $0.before, ofReference: false) }
+                + referenceChanges.map { (at: $0.at, before: $0.before, ofReference: true) }).sorted { $0.at < $1.at }
+            let bounds = splits.map(\.at)
             var lags: [[Double]] = Array(repeating: [], count: bounds.count + 1)
             for window in windows { lags[bounds.firstIndex { window.at < $0 } ?? bounds.count].append(window.lag) }
-            let live = ruleChanges.map(\.before) + [current]
-            var merged: [(start: Double, lags: [Double], delay: Double)] = []
+            let live = splits.map(\.before) + [current]
+            // `sealed`: a stretch after a change of reference was dropped into it, so it takes no more windows.
+            var merged: [(start: Double, lags: [Double], delay: Double, sealed: Bool)] = []
             for index in lags.indices {
                 let delay = lags[index].count >= 2 ? median(lags[index])! : live[index]
                 if let last = merged.last, abs(delay - last.delay) <= RecorderValues.audioDelayTolerance {
-                    let both = last.lags + lags[index]
-                    merged[merged.count - 1] = (last.start, both, both.count >= 2 ? median(both)! : last.delay)
+                    if last.sealed || splits[index - 1].ofReference {
+                        merged[merged.count - 1].sealed = true
+                    } else {
+                        let both = last.lags + lags[index]
+                        merged[merged.count - 1] = (last.start, both, both.count >= 2 ? median(both)! : last.delay, false)
+                    }
                 } else {
-                    merged.append((index == 0 ? 0 : max(0, bounds[index - 1] - fileStart), lags[index], delay))
+                    merged.append((index == 0 ? 0 : max(0, bounds[index - 1] - fileStart), lags[index], delay, false))
                 }
             }
             return merged.map { .init(at: ($0.start * 1000).rounded() / 1000, delay: ($0.delay * 10_000).rounded() / 10_000) }

@@ -59,6 +59,8 @@ public struct ScreenTracker: Sendable {
         /// When it last appeared, went or changed.
         var changedAt: Int64
         var restartDelay: Duration
+        /// Its restarts after its writer failed (D88).
+        var writerRestarts: WriterRestarts?
         /// Whether its stream may end once with the capture source gone
         /// without a failure: until it does, and again after each
         /// screen-change notice for it (N-A).
@@ -69,6 +71,7 @@ public struct ScreenTracker: Sendable {
     public let settleTime: Duration
     public let firstRestartDelay: Duration
     public let longestRestartDelay: Duration
+    public let writerFailedAgainWithin: Duration
 
     private var screens: [String: Tracked] = [:]
     private var nextNumber = 1
@@ -84,12 +87,14 @@ public struct ScreenTracker: Sendable {
         resolution: RecordingResolution,
         settleTime: Duration = RecorderValues.settleTime,
         firstRestartDelay: Duration = RecorderValues.firstRestartDelay,
-        longestRestartDelay: Duration = RecorderValues.longestRestartDelay
+        longestRestartDelay: Duration = RecorderValues.longestRestartDelay,
+        writerFailedAgainWithin: Duration = RecorderValues.writerFailedAgainWithin
     ) {
         self.resolution = resolution
         self.settleTime = settleTime
         self.firstRestartDelay = firstRestartDelay
         self.longestRestartDelay = longestRestartDelay
+        self.writerFailedAgainWithin = writerFailedAgainWithin
     }
 
     /// The screens connected at the start: each gets its stream at once.
@@ -208,6 +213,7 @@ public struct ScreenTracker: Sendable {
                 step.actions.append(start(screen.uuid, at: now))
             case .waitingToRestart(let notBefore) where notBefore <= now:
                 step.actions.append(start(screen.uuid, at: now))
+                if screens[screen.uuid]?.writerRestarts?.startedAt == nil { screens[screen.uuid]?.writerRestarts?.startedAt = now }
             case .waitingToRestart:
                 break
             case .showsAnotherScreen(let since) where tracked.changedAt > since:
@@ -236,13 +242,13 @@ public struct ScreenTracker: Sendable {
         }.min()
     }
 
-    /// A stream ended by itself; `connected` is the screens as read now.
-    /// A failing writer and a full disk have their event from the recorder,
+    /// A stream ended by itself; `connected` is the screens as read now, nil when they cannot be read: then
+    /// the screens stay as last read. A failing writer and a full disk have their event from the recorder,
     /// once per capture end, also when the tracker no longer follows it.
-    public mutating func streamEnded(_ uuid: String, _ end: VideoStreamEnd, connected: [ConnectedScreen], at now: Int64) -> Step {
+    public mutating func streamEnded(_ uuid: String, _ end: VideoStreamEnd, connected: [ConnectedScreen]?, at now: Int64) -> Step {
         guard let tracked = screens[uuid], case .recording = tracked.phase else { return Step() }
         var step = Step()
-        let isPresent = connected.contains { $0.uuid == uuid && !$0.isMirroring }
+        let isPresent = (connected ?? screens.values.compactMap(\.reading)).contains { $0.uuid == uuid && !$0.isMirroring }
         switch end {
         case .showsAnotherScreen:
             step.events.append(event(.screenShowsAnotherScreensPicture, uuid, at: now))
@@ -262,11 +268,19 @@ public struct ScreenTracker: Sendable {
             step.events.append(event(.screenFileWriterFellBehind, uuid, at: now))
             scheduleRestart(uuid, at: now)
         case .writerFailed:
-            if isPresent { scheduleRestart(uuid, at: now) } else { screens[uuid]?.phase = .idle }
+            guard isPresent else {
+                screens[uuid]?.phase = .idle
+                break
+            }
+            // Started by `due`, from the screens as read now and once settled.
+            let (wait, restarts) = WriterRestarts.after(
+                tracked.writerRestarts, at: now, within: writerFailedAgainWithin, first: firstRestartDelay, longest: longestRestartDelay)
+            screens[uuid]?.phase = .waitingToRestart(notBefore: now + wait.nanoseconds)
+            screens[uuid]?.writerRestarts = restarts
         case .streamFailed(let error):
             step.append(streamFailed(uuid, error: error, isPresent: isPresent, at: now))
         }
-        step.append(observe(connected, at: now))
+        if let connected { step.append(observe(connected, at: now)) }
         return step
     }
 
@@ -317,11 +331,6 @@ public struct ScreenTracker: Sendable {
         }
         isAsleep = true
         return actions
-    }
-
-    /// Whether a screen's file ended because it showed another screen's picture and it was not tried again since.
-    public var showsAnotherScreensPicture: Bool {
-        screens.values.contains { if case .showsAnotherScreen = $0.phase { true } else { false } }
     }
 
     // MARK: -

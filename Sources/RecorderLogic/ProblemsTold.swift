@@ -72,6 +72,49 @@ extension ProblemKind {
     }
 }
 
+/// What a person has to do about a problem (D84, the owner's rule): only a problem with one bounces the Dock
+/// icon, sets the badge and counts in `msr record`'s status line; one without stays quiet, listed in the status
+/// window, `recording.json` and the recording log.
+public enum CallToAction: Equatable, Sendable {
+    case freeUpDiskSpace
+    case grantThePermission
+    case unplugAndPlugInAgain
+    /// A file is incomplete.
+    case reportIt
+    /// Stop and start the recording again, or unplug and plug in the device again, and report it.
+    case startAgainAndReportIt
+
+    /// Whether it asks for a report: only then does the recording ask to report it once it ended (D84).
+    public var includesReportIt: Bool { self == .reportIt || self == .startAgainAndReportIt }
+}
+
+extension ProblemKind {
+    /// Its call to action, nil for none (D84).
+    public var callToAction: CallToAction? {
+        switch self {
+        case .diskFull, .manifestNotWritten, .recordingLogNotWritten: .freeUpDiskSpace
+        case .cameraPermissionMissing: .grantThePermission
+        case .audioInputSilentAfterGaps: .unplugAndPlugInAgain
+        case .audioFileLost, .videoFileLost: .reportIt
+        case .screenNotCaptured, .cameraNotCaptured, .audioSourceFailed, .audioFileFailed, .audioInputNotRecordable,
+             .audioInputChangesNotFollowed:
+            .startAgainAndReportIt
+        case .cameraStalled, .audioInputOutOfTheGuideTrack, .guideTracksCut, .dockIconNotShown, .inputVolumeNotSet,
+             .inputVolumeNotFollowed, .screensNotRead, .audioInputsNotRead, .freeSpaceNotRead, .timelineFileNotWritten:
+            nil
+        }
+    }
+
+    /// A source that fails: its call to action only once it lasted `RecorderValues.unrecoveredAfter` without
+    /// ending, as most come back by themselves (D84).
+    var callsToActionOnlyUnrecovered: Bool {
+        switch self {
+        case .screenNotCaptured, .cameraNotCaptured, .audioSourceFailed, .audioFileFailed, .audioInputNotRecordable: true
+        default: false
+        }
+    }
+}
+
 extension ProblemKind {
     /// A failure that ends with a new file of its source: a file's failure told after a newer file of its
     /// source started is over when told (D78).
@@ -159,6 +202,11 @@ public struct ProblemsTold: Sendable {
         var isTold = false
         /// What its line says besides its source, for a kind whose line is its own (D79).
         var note: String?
+        /// Its call to action was given (D84).
+        var calledToAction = false
+        /// None whatever its kind: a problem whose call to action another one gives, another screen's picture or
+        /// the tail of a file a full disk cut short (D84).
+        var withoutCallToAction = false
     }
 
     private var told: [Told] = []
@@ -168,19 +216,29 @@ public struct ProblemsTold: Sendable {
     /// Into the manifest and the window's lines, unless one of its kind told before has not ended; a line only
     /// shown does not keep it from the manifest. `source` names the screen or camera of a kind keyed by its ID;
     /// `endedAt`: already over when told, for a failure that ends with a new file (`endsWithANewFile`) after a
-    /// newer file of its source started, or after its source went away (`ending`).
+    /// newer file of its source started, or after its source went away (`ending`); `withoutCallToAction` for a
+    /// problem whose call to action another one gives, such as a screen that showed another screen's picture or a
+    /// file a full disk cut short (D84); a tell without it replaces a lasting line that has
+    /// it, told or only shown, its wait starting then.
     public mutating func add(
         _ problem: RecordingProblem, kind: ProblemKind, source: String? = nil, note: String? = nil, endedAt: Int64? = nil,
-        ending: Ending = .recovered, to manifest: inout RecordingManifest
+        ending: Ending = .recovered, withoutCallToAction: Bool = false, to manifest: inout RecordingManifest
     ) -> Outcome {
         guard manifest.state != .finalized else { return .afterTheEnd }
-        guard !told.contains(where: { $0.kind == kind && $0.ended == nil && $0.isTold }) else { return .alreadyTold }
+        let lasting = told.lastIndex(where: { $0.kind == kind && $0.ended == nil })
+        // A failure of its own after another screen's picture replaces that told line.
+        if let lasting, told[lasting].isTold, !(told[lasting].withoutCallToAction && !withoutCallToAction) { return .alreadyTold }
         manifest.problems.append(problem)
-        if let shown = told.lastIndex(where: { $0.kind == kind && $0.ended == nil }) {
+        if let shown = lasting {
             told[shown].problem = problem
             told[shown].isTold = true
+            if told[shown].withoutCallToAction && !withoutCallToAction {
+                // A failure of its own after another screen's picture: its wait counts from now.
+                told[shown].began = Int64((problem.at * 1_000_000_000).rounded())
+            }
+            told[shown].withoutCallToAction = withoutCallToAction
         } else {
-            show(problem, kind: kind, source: source, endedAt: endedAt, ending: ending)
+            show(problem, kind: kind, source: source, endedAt: endedAt, ending: ending, withoutCallToAction: withoutCallToAction)
             told[told.count - 1].isTold = true
             told[told.count - 1].note = note
         }
@@ -190,14 +248,16 @@ public struct ProblemsTold: Sendable {
     /// Into the window's lines only, for a problem the manifest already lists (a video file's end); none while
     /// one of its kind lasts. `endedAt` as for `add`.
     public mutating func show(
-        _ problem: RecordingProblem, kind: ProblemKind, source: String? = nil, endedAt: Int64? = nil, ending: Ending = .recovered
+        _ problem: RecordingProblem, kind: ProblemKind, source: String? = nil, endedAt: Int64? = nil, ending: Ending = .recovered,
+        withoutCallToAction: Bool = false
     ) {
         guard !told.contains(where: { $0.kind == kind && $0.ended == nil }) else { return }
         let at = Int64((problem.at * 1_000_000_000).rounded())
         // A stall is told once the camera delivered no frame for the stall limit: it began that much earlier.
         let began = if case .cameraStalled = kind { max(0, at - RecorderValues.cameraStallLimit.nanoseconds) } else { at }
         let ended = kind.endsWithANewFile ? endedAt.map { max($0, began) } : nil
-        told.append(Told(kind: kind, problem: problem, source: source, began: began, ended: ended, ending: ending))
+        told.append(Told(
+            kind: kind, problem: problem, source: source, began: began, ended: ended, ending: ending, withoutCallToAction: withoutCallToAction))
     }
 
     /// The kind went away at `now`: it is told again when it comes back. A
@@ -207,6 +267,39 @@ public struct ProblemsTold: Sendable {
         told[index].ended = now
         told[index].ending = ending
         if let length { told[index].began = max(0, now - length) }
+    }
+
+    /// The problems whose call to action falls due at `now`, each given once (D84): at once, or for a source that
+    /// fails once it lasted `unrecoveredAfter`, though it ended since; `atStop`, also once it is still failing.
+    public mutating func callsToAction(
+        now: Int64, unrecoveredAfter: Duration = RecorderValues.unrecoveredAfter, atStop: Bool = false
+    ) -> [RecordingProblem] {
+        var due: [RecordingProblem] = []
+        for index in told.indices where !told[index].calledToAction && !told[index].withoutCallToAction && told[index].kind.callToAction != nil {
+            let entry = told[index]
+            let lasted = (entry.ended ?? now) - entry.began >= unrecoveredAfter.nanoseconds || (atStop && entry.ended == nil)
+            if entry.kind.callsToActionOnlyUnrecovered, !lasted { continue }
+            told[index].calledToAction = true
+            due.append(entry.problem)
+        }
+        return due
+    }
+
+    /// When the next call to action of a failing source falls due, if it lasts that long (D84).
+    public func nextCallToAction(unrecoveredAfter: Duration = RecorderValues.unrecoveredAfter) -> Int64? {
+        told.filter { !$0.calledToAction && !$0.withoutCallToAction && $0.ended == nil && $0.kind.callsToActionOnlyUnrecovered }
+            .map { $0.began + unrecoveredAfter.nanoseconds }.min()
+    }
+
+    /// The problems whose call to action was given and that have not ended: what the badge and `msr record`'s
+    /// count show; once a problem ended, nothing is left to do (D84).
+    public var callsToActionOngoing: [RecordingProblem] {
+        told.filter { $0.calledToAction && $0.ended == nil }.map(\.problem)
+    }
+
+    /// A call to action given that includes "report it": the recording asks to report it once it ended (D84).
+    public var asksToReportIt: Bool {
+        told.contains { $0.calledToAction && $0.kind.callToAction?.includesReportIt == true }
     }
 
     /// The status window's lines, one per kind (a kind names its source): red first, then

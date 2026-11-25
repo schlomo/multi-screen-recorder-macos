@@ -23,13 +23,15 @@ struct RecordOutput {
         /// A problem whose failure event's line tells it: not printed.
         case problemOfAnEvent
         case summary
-        /// The summary of a run that exits 3.
-        case summaryOfFailedRun
+        /// The summary of a run that exits 3 or asks to report it: `--quiet` still tells it.
+        case summaryAlwaysTold
         case error
 
         static func readyCheck(isReady: Bool) -> Kind { isReady ? .readyCheckPassed : .readyCheckFailed }
 
-        static func summary(endedWithError: Bool) -> Kind { endedWithError ? .summaryOfFailedRun : .summary }
+        static func summary(endedWithError: Bool, asksToReportIt: Bool) -> Kind {
+            endedWithError || asksToReportIt ? .summaryAlwaysTold : .summary
+        }
     }
 
     enum Destination: Equatable {
@@ -60,7 +62,7 @@ struct RecordOutput {
     func destination(of kind: Kind) -> Destination {
         switch kind {
         case .recordingFolder: .standardOutput
-        case .readyCheckFailed, .failureEvent, .problem, .summaryOfFailedRun, .error: .standardError
+        case .readyCheckFailed, .failureEvent, .problem, .summaryAlwaysTold, .error: .standardError
         case .problemOfAnEvent: .nowhere
         case .banner, .whatWillBeRecorded, .readyCheckPassed, .recordingFolderNotice, .stopMessage, .event, .summary:
             quiet ? .nowhere : .standardError

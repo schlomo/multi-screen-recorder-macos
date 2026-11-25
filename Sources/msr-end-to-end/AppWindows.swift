@@ -130,6 +130,8 @@ extension Driver {
         try Screenshots.bringToFront(recorder.pid)
         try interruption.sleep(until: Date().addingTimeInterval(2))
 
+        try waitForAudioRowsFinal(in: recording)
+
         let review = scratch.appending(path: ReviewNames.folder).appending(path: ReviewNames.appStep)
         try FileManager.default.createDirectory(at: review, withIntermediateDirectories: true)
         try Screenshots.video(status, seconds: Self.statusVideoSeconds, to: review.appending(
@@ -142,6 +144,23 @@ extension Driver {
             throw DriverError("msr record did not end with exit 0 after Stop: \(recorder.exit.map { "\($0)" } ?? "still running")")
         }
         try finderWindow(of: recording, appearance: appearance, review: review)
+    }
+
+    /// Waits, polling once a second, until the status window's audio rows are final (`AudioRowsFinal`): each
+    /// audio source being written shows its clock drift and, for an input, its sync; past
+    /// `EndToEndValues.audioRowsFinalLimit` it fails naming the files whose rows are not final.
+    private func waitForAudioRowsFinal(in recording: URL) throws {
+        let log = recording.appending(path: "recording.log")
+        let deadline = Date().addingTimeInterval(EndToEndValues.audioRowsFinalLimit)
+        while true {
+            let notFinal = AudioRowsFinal.filesNotFinal(log: try String(contentsOf: log, encoding: .utf8))
+            if notFinal.isEmpty { return }
+            guard Date() < deadline else {
+                throw DriverError("the status window's audio rows are not final after \(Int(EndToEndValues.audioRowsFinalLimit)) s: "
+                    + notFinal.joined(separator: ", ") + "; see \(log.path)")
+            }
+            try interruption.sleep(until: Date().addingTimeInterval(1))
+        }
     }
 
     /// Connects and disconnects the virtual screens of `Scenario.statusWindowScreenEvents`, timed from

@@ -169,7 +169,8 @@ struct AppWindowsCommand: ParsableCommand {
         commandName: "app-windows",
         abstract: "Takes the app's windows on this Mac, in light, for scripts/update-homepage-screenshots --this-mac (D82).",
         discussion: """
-            Starts the app and records about 15 s with it, with HOME and the recording in the scratch folder: no \
+            Starts the app and records with it until the status window's audio rows show every audio source's \
+            clock drift and sync (about 25 s or more, at most 90 s), with HOME and the recording in the scratch folder: no \
             virtual screen, no dark appearance, no window moved. Needs the Screen & System Audio Recording and the \
             Automation permissions for the program running it. The captures are in review/app/ of the scratch folder.
             """)

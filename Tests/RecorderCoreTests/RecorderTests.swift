@@ -16,14 +16,18 @@ extension GlobalRecordingLog {
         final class Observer: RecorderObserver {
             var problems: [(problem: RecordingProblem, ofAnEvent: Bool)] = []
             var eventLines: [(line: String, isFailure: Bool)] = []
+            var callsToAction: [RecordingProblem] = []
 
             func recorder(_ recorder: Recorder, lowDiskSpace: Bool) {}
-            func recorder(_ recorder: Recorder, screenShowsAnotherScreensPicture screen: String?) {}
+            func recorder(_ recorder: Recorder, screenShowsAnotherScreensPicture screen: String) {}
             func recorder(_ recorder: Recorder, problem: RecordingProblem, ofAnEvent: Bool) {
                 problems.append((problem, ofAnEvent))
             }
             func recorder(_ recorder: Recorder, eventLine: String, isFailure: Bool) {
                 eventLines.append((eventLine, isFailure))
+            }
+            func recorder(_ recorder: Recorder, callToAction problem: RecordingProblem) {
+                callsToAction.append(problem)
             }
         }
 
@@ -220,7 +224,8 @@ extension GlobalRecordingLog {
 
         private func start(
             readsScreens: Bool = false, cameraMode: CameraMode = .none, cameraFrameWatch: CameraFrameWatch = CameraFrameWatch(),
-            inputs: [AudioInputInfo]? = nil, audioInputsFollowed: Bool = true, audioDelayInterval: Duration = .seconds(3600)
+            inputs: [AudioInputInfo]? = nil, audioInputsFollowed: Bool = true, audioDelayInterval: Duration = .seconds(3600),
+            unrecoveredAfter: Duration = RecorderValues.unrecoveredAfter
         ) throws {
             var settings = Settings.defaults
             settings.auto = false
@@ -274,7 +279,8 @@ extension GlobalRecordingLog {
             recorder = try Recorder(
                 settings: settings, homeFolder: home, app: "Multi Screen Recorder (tests)", readyCheckFacts: facts, observer: observer,
                 // By default measured only when a test calls `measureAudioDelays`, never by the timer mid-test.
-                devices: devicesUsed, cameraFrameWatch: cameraFrameWatch, audioDelayInterval: audioDelayInterval)
+                devices: devicesUsed, cameraFrameWatch: cameraFrameWatch, audioDelayInterval: audioDelayInterval,
+                unrecoveredAfter: unrecoveredAfter)
         }
 
         private var source: AudioCaptureTests.StandInSource { sources.last }
@@ -484,6 +490,8 @@ extension GlobalRecordingLog {
         @Test func audioInputChangesThatCannotBeFollowedAreARedLine() async throws {
             try start(audioInputsFollowed: false)
             #expect(observer.problems.map(\.problem.problem) == ["Changes of the audio inputs cannot be followed"])
+            // Stop and start the recording again, and report it, at once (D84).
+            #expect(observer.callsToAction.map(\.problem) == ["Changes of the audio inputs cannot be followed"])
             let line = try #require(recorder.problemLines().first)
             #expect(line.text == "Changes of the audio inputs not followed since 0:00: the stand-in's listener failed")
             #expect(line.isRed)
@@ -568,8 +576,8 @@ extension GlobalRecordingLog {
         }
 
         /// The reference's capture ending makes the next input the reference: the others are re-based onto the
-        /// anchor through its audio delay, so the mix keeps every input and no listed delay changes; the anchor
-        /// back as the reference changes none either (D80).
+        /// anchor through its audio delay, so the mix keeps every input and no listed delay changes; the anchor's
+        /// new file, measured against the reference in use, changes none either (D80, D85).
         @Test func theReferencesCaptureEndingAndReturningKeepsTheGuideTrackAndTheDelays() async throws {
             try await startInputs(["R", "A", "B"])
             let (a, b) = (SourceLabel.audioInput(2, name: "Mic A"), SourceLabel.audioInput(3, name: "Mic B"))
@@ -599,6 +607,31 @@ extension GlobalRecordingLog {
             await recorder.measureAudioDelays()
             #expect(try delays() == measured)
             #expect(leavesOfTheGuideTrack() == 0)
+            _ = await stop()
+        }
+
+        /// The owner's recording 2026-11-24 20.55.08 (D85): the Osmo "O" sounds first, the anchor, the Razer "Z"
+        /// 550 ms early against it; the Osmo's capture ends and starts again, its new file 100 ms less late. The
+        /// Razer stays the reference and keeps its audio delay; the Osmo's new file carries over its 0 and is
+        /// measured against the Razer.
+        @Test func theAnchorsNewFileIsMeasuredAgainstTheReferenceInUse() async throws {
+            try await startInputs(["O", "Z"])
+            try feedDelayedNoise(["O": 0, "Z": -0.55])
+            for _ in 0..<3 { await recorder.measureAudioDelays() }
+            try #require(sources.last(of: "O")).lose(.captureFailed("the stand-in was unplugged"))
+            try await wait("O's restart") { sources.byUID.withLock { $0["O"]?.count } == 2 }
+            try await startAudioFiles(["O"], "O's new file", count: 3)
+            try feedDelayedNoise(["O": -0.1, "Z": -0.55])
+            await recorder.measureAudioDelays()
+            let files = try manifestOnDisk().audioFiles
+            let osmo = files.filter { $0.audioSource == "Mic O" }
+            #expect(osmo.count == 2)
+            #expect(osmo.first?.delays.map(\.delay) == [0])
+            let carriedAndMeasured = try #require(osmo.last?.delays.map(\.delay))
+            #expect(carriedAndMeasured.count == 2 && carriedAndMeasured.first == 0 && abs((carriedAndMeasured.last ?? 0) + 0.1) < 0.002,
+                    "\(carriedAndMeasured)")
+            let razer = try #require(files.first { $0.audioSource == "Mic Z" }?.delays.map(\.delay))
+            #expect(razer.count == 1 && abs((razer.first ?? 0) + 0.55) < 0.002, "\(razer)")
             _ = await stop()
         }
 
@@ -691,6 +724,8 @@ extension GlobalRecordingLog {
             #expect(abs((m.first ?? 0) + 0.558) < 0.002)
             #expect(abs((m.last ?? 0) + 0.470) < 0.002)
             #expect(recorder.status().rows.dropLast().last?.clockDrift.hasSuffix("synced 470 ms") == true)
+            // The earliest input, the mix's zero, shows its sync too (D86).
+            #expect(recorder.status().rows.filter { $0.clockDrift.hasSuffix("synced 0 ms") }.count == 1)
             _ = await stop()
         }
 
@@ -1154,6 +1189,8 @@ extension GlobalRecordingLog {
             #expect(stalledRow.details.contains("\nThis file so far: "))
             #expect(recorder.status().rows.allSatisfy { $0.details.hasPrefix($0.source.text) })
             #expect(observer.problems.map(\.problem.text) == ["Camera Stand-in camera: camera stalled: \(CameraTracker.stalledError.text)"])
+            // Nothing a person can do about a stall: no call to action (D84).
+            #expect(observer.callsToAction.isEmpty)
             try await sendFrames(camera, until: "the stall's end") { (try? manifestOnDisk().events.count) == 2 }
             let ended = try #require(try manifestOnDisk().events.last)
             #expect(ended.event == .cameraStallEnded)
@@ -1163,8 +1200,9 @@ extension GlobalRecordingLog {
             #expect(cameras.opened.withLock { $0.count } == 1)
             #expect(summary.manifest.cameraFiles.map(\.state) == [.finalized])
             #expect(summary.manifest.problems.count == 1)
-            // A stall loses picture (D47).
+            // A stall loses picture (D47), but asks for no report (D84).
             #expect(summary.manifest.result == .problems)
+            #expect(summary.endedWithError && !summary.asksToReportIt)
         }
 
         /// A stalled camera unplugged: its stall ends there, then disconnected, orange (D78).
@@ -1272,10 +1310,71 @@ extension GlobalRecordingLog {
         }
 
         /// A failed end of a camera's file, `lost` part of it, as `CameraCapture` reports it late.
-        private func failedEnd(of file: RecordingManifest.CameraFile, lost: String? = nil) -> VideoFileEnd<RecordingManifest.CameraFile> {
+        private func failedEnd(
+            of file: RecordingManifest.CameraFile, lost: String? = nil, isDiskFull: Bool = false
+        ) -> VideoFileEnd<RecordingManifest.CameraFile> {
             var file = file
             file.state = .notFinalized
-            return VideoFileEnd(file: file, error: VideoFileWriterError(description: "cannot write \(file.name)", isDiskFull: false), lost: lost)
+            return VideoFileEnd(
+                file: file, error: VideoFileWriterError(description: "cannot write \(file.name)", isDiskFull: isDiskFull), lost: lost)
+        }
+
+        /// A camera whose writer failed starts its new capture at once, no back-off: its row never waits to
+        /// retry; failing again within `writerFailedAgainWithin` of that, it backs off (D88).
+        @Test func aCameraWhoseWriterFailedStartsAgainAtOnceThenBacksOff() async throws {
+            cameras.connected.withLock { $0 = [Self.camera] }
+            try start(cameraMode: .real)
+            let first = try #require(cameras.last)
+            try await sendFrames(first, until: "the camera file") { (try? manifestOnDisk().cameraFiles.count) == 1 }
+            let file = try #require(try manifestOnDisk().cameraFiles.first)
+            func cameraState() -> String? { recorder.status().rows.first { $0.source == .camera(1, name: "Stand-in camera") }?.state }
+            recorder.cameraCaptureEnded(
+                uniqueID: "StandInCamera", captureNumber: 1, camera: "Stand-in camera", reason: .writerFailed("cannot write"),
+                file: failedEnd(of: file))
+            #expect(cameraState() != "failed, retrying")
+            try await wait("the camera's new capture") { cameras.opened.withLock { $0.count } == 2 }
+            let second = try #require(cameras.last)
+            try await sendFrames(second, until: "the second camera file") { (try? manifestOnDisk().cameraFiles.count) == 2 }
+            let newer = try #require(try manifestOnDisk().cameraFiles.last)
+            recorder.cameraCaptureEnded(
+                uniqueID: "StandInCamera", captureNumber: 2, camera: "Stand-in camera", reason: .writerFailed("cannot write"),
+                file: failedEnd(of: newer))
+            #expect(cameraState() == "failed, retrying")
+            _ = await stop()
+        }
+
+        /// An audio source whose writer failed starts again at once; failing again within
+        /// `writerFailedAgainWithin` of that, it waits its back-off, 1 s (D88).
+        @Test func anAudioSourceWhoseWriterFailedStartsAgainAtOnceThenBacksOff() async throws {
+            try start()
+            try await wait("the audio input's capture") { sources.byUID.withLock { $0[uid]?.count } == 1 }
+            try #require(sources.last(of: uid)).lose(.writerFailed("cannot write"))
+            try await wait("the restart", seconds: 1) { sources.byUID.withLock { $0[uid]?.count } == 2 }
+            try #require(sources.last(of: uid)).lose(.writerFailed("cannot write"))
+            try await Task.sleep(for: .milliseconds(500))
+            #expect(sources.byUID.withLock { $0[uid]?.count } == 2)
+            try await wait("the restart after the back-off") { sources.byUID.withLock { $0[uid]?.count } == 3 }
+            _ = await stop()
+        }
+
+        /// A camera file a full disk cut short: its lost tail is a red line without a call to action of its own, and
+        /// the recording asks for no report (D84).
+        @Test func aCameraFileAFullDiskCutShortAsksForNoReport() async throws {
+            cameras.connected.withLock { $0 = [Self.camera] }
+            try start(cameraMode: .real)
+            let camera = try #require(cameras.last)
+            try await sendFrames(camera, until: "the camera file") { (try? manifestOnDisk().cameraFiles.count) == 1 }
+            let file = try #require(try manifestOnDisk().cameraFiles.first)
+            recorder.cameraCaptureEnded(
+                uniqueID: "StandInCamera", captureNumber: 1, camera: "Stand-in camera", reason: .diskFull,
+                file: failedEnd(of: file, lost: "its last 2 s", isDiskFull: true))
+            let lost = try #require(recorder.problemLines().first { $0.text.hasPrefix("File \(file.name) incomplete") })
+            #expect(lost.isRed)
+            #expect(observer.callsToAction.allSatisfy { !$0.problem.contains("incomplete") && !$0.problem.contains("its last 2 s") })
+            #expect(observer.callsToAction.count == 1)
+            let summary = await stop()
+            #expect(summary.manifest.cameraFiles.first?.state == .notFinalized)
+            #expect(!summary.asksToReportIt)
         }
 
         /// A failure of a camera's file, reported after a newer file of the camera started, is over when
@@ -1549,6 +1648,7 @@ extension GlobalRecordingLog {
             #expect(try manifestOnDisk().events.map(\.event) == [.audioInputGap, .noAudioStarted])
             #expect(recorder.problemLines() == [ProblemLine(
                 text: "Audio 1 \(name) sends only silence since its gaps at 0:00; unplug and plug it in again", isRed: true)])
+            #expect(observer.callsToAction.map(\.problem) == ["The audio input \(name) sends only silence since its gaps at 0:00"])
             #expect(try manifestOnDisk().problems.map(\.problem) == ["The audio input \(name) sends only silence since its gaps at 0:00"])
             try send(0.25, buffers: 10, after: buffersOfNoAudio + 23, from: origin)
             try await wait("the sound") { recorder.status().rows.first?.state == "recording" }
@@ -1558,6 +1658,110 @@ extension GlobalRecordingLog {
             _ = await stop()
             let log = try String(contentsOf: recorder.folder.appending(path: RecordingNames.recordingLog), encoding: .utf8)
             #expect(log.contains("Audio 1 \(name): no audio since 0:00, right after its gap at 0:00: a red problem (D81)"))
+        }
+
+        /// A source that fails and does not come back calls to action once it lasted `unrecoveredAfter`, and the
+        /// recording then asks to report it (D84). The stand-in's restart takes 1 s, longer than the wait here.
+        @Test func aSourceFailingUnrecoveredCallsToActionAndAsksToReportIt() async throws {
+            try start(unrecoveredAfter: .milliseconds(300))
+            try send(0.25, buffers: 2)
+            try await wait("the file") { (try? manifestOnDisk().audioFiles.count) == 1 }
+            source.lose(.captureFailed("the stand-in failed"))
+            try await wait("the call to action", seconds: 10) { !observer.callsToAction.isEmpty }
+            #expect(observer.callsToAction.map(\.problem) == ["The audio input \(name) failed"])
+            let summary = await stop()
+            #expect(summary.asksToReportIt)
+        }
+
+        /// A source captured again before `unrecoveredAfter` stays quiet, at Stop too (D84).
+        @Test func aSourceCapturedAgainBeforeTheWaitStaysQuiet() async throws {
+            try start(unrecoveredAfter: .seconds(60))
+            try send(0.25, buffers: 2)
+            try await wait("the file") { (try? manifestOnDisk().audioFiles.count) == 1 }
+            source.lose(.captureFailed("the stand-in failed"))
+            try await wait("the problem") { !observer.problems.isEmpty }
+            try await wait("the restart") { sources.count == 2 }
+            try await wait("the new file") {
+                try? sendNext(0.25, buffers: 1, to: sources.last)
+                return (try? manifestOnDisk().audioFiles.count) == 2
+            }
+            let summary = await stop()
+            #expect(observer.callsToAction.isEmpty)
+            #expect(!summary.asksToReportIt)
+        }
+
+        /// A source still failing at Stop makes the recording ask to report it, without waiting for
+        /// `unrecoveredAfter`; at Stop that bounces nothing and sets no badge (D84).
+        @Test func aSourceStillFailingAtStopAsksToReportIt() async throws {
+            try start(unrecoveredAfter: .seconds(60))
+            try send(0.25, buffers: 2)
+            try await wait("the file") { (try? manifestOnDisk().audioFiles.count) == 1 }
+            source.lose(.captureFailed("the stand-in failed"))
+            try await wait("the problem") { !observer.problems.isEmpty }
+            #expect(observer.callsToAction.isEmpty)
+            let summary = await stop()
+            #expect(observer.callsToAction.isEmpty)
+            #expect(summary.asksToReportIt)
+        }
+
+        /// An audio source ended by a full disk falls under the disk-full call to action, free up disk space, at
+        /// once, and asks for no report (D84).
+        @Test func anAudioSourceEndedByAFullDiskCallsToFreeUpDiskSpace() async throws {
+            try start()
+            try send(0.25, buffers: 2)
+            try await wait("the file") { (try? manifestOnDisk().audioFiles.count) == 1 }
+            source.lose(.diskFull)
+            try await wait("the problem") { !observer.problems.isEmpty }
+            #expect(observer.callsToAction.map(\.problem) == ["The audio file of \(name) ended"])
+            #expect(recorder.problemLines().first?.text.hasPrefix("Disk full since ") == true)
+            let summary = await stop()
+            #expect(!summary.problemsAskToReportIt)
+        }
+
+        /// An audio file whose writer failed because the disk is full is the full disk, free up disk space, told
+        /// once with its capture's end; left not finalized by it, the recording asks for no report (D84).
+        @Test func anAudioFileAFullDiskLeftNotFinalizedAsksForNoReport() async throws {
+            try start()
+            try send(0.25, buffers: 2)
+            try await wait("the file") { (try? manifestOnDisk().audioFiles.count) == 1 }
+            source.lose(.diskFull)
+            try await wait("the capture's end") { (try? manifestOnDisk().events.contains { $0.event == .diskFull }) == true }
+            var file = try #require(try manifestOnDisk().audioFiles.first)
+            file.end = file.end ?? file.start + 0.5
+            file.state = .notFinalized
+            var end = AudioFileEnd(file: file, error: AudioFileWriterError(POSIXError(.ENOSPC), while: "cannot write \(file.name)"))
+            end.lost = "its last 0.5 s were not written"
+            recorder.audioFileEnded(end)
+            // Its lost tail is still a red line, but the full disk is the one call to action (D84).
+            #expect(observer.callsToAction.map(\.problem) == ["The audio file of \(name) ended"])
+            #expect(recorder.problemLines().map(\.text).filter { $0.hasPrefix("File ") }.map { $0.hasPrefix("File \(file.name) incomplete") }
+                == [true])
+            let summary = await stop()
+            #expect(summary.manifest.audioFiles.map(\.state) == [.notFinalized])
+            #expect(!summary.asksToReportIt)
+        }
+
+        /// A capture ending while its input has no audio ends that no audio with it: its line turns to the past,
+        /// stopped, and its next capture records its sound (D69, D81).
+        @Test func aCaptureEndingWhileItsInputHasNoAudioEndsItsNoAudio() async throws {
+            try start()
+            let buffersOfNoAudio = Int(RecorderValues.noAudioTime.nanoseconds * Int64(RecorderValues.audioSampleRate) / 1_000_000_000)
+                / samplesPerBuffer
+            let origin = Int64(readClocks().host)
+            try send(0.25, buffers: 3, from: origin)
+            try send(0, buffers: buffersOfNoAudio + 10, after: 13, from: origin)
+            try await wait("the problem") { !observer.problems.isEmpty }
+            #expect(recorder.status().rows.first?.state == "no audio")
+            source.lose(.captureFailed("the stand-in failed"))
+            try await wait("the restart") { sources.count == 2 }
+            try await wait("the sound") {
+                try? sendNext(0.25, buffers: 1, to: sources.last)
+                return recorder.status().rows.first?.state == "recording"
+            }
+            let past = try #require(recorder.problemLines().first { $0.text.hasPrefix("Audio 1") })
+            #expect(!past.isRed)
+            #expect(past.text.wholeMatch(of: /Audio 1 .+ sent only silence for .+ after its gaps at 0:00, stopped/) != nil, "\(past.text)")
+            _ = await stop()
         }
 
         /// Another input's gaps are no gaps of this one, even under the same name: they are found by its
@@ -1595,7 +1799,9 @@ extension GlobalRecordingLog {
             #expect(summary.manifest.audioFiles.count == 1)
             #expect(summary.manifest.problems.isEmpty)
             #expect(summary.manifest.result == .ok)
+            #expect(!summary.asksToReportIt)
             #expect(observer.problems.isEmpty)
+            #expect(observer.callsToAction.isEmpty)
             #expect(observer.eventLines.allSatisfy { !$0.isFailure })
             let log = try String(contentsOf: recorder.folder.appending(path: RecordingNames.recordingLog), encoding: .utf8)
             #expect(log.contains("Audio 1 \(name): no audio since 0:00, no gap within 10 s before: no problem (D81)"))

@@ -5,9 +5,10 @@ import RecorderLogic
 
 /// A running recording as the person sees it, in the app and for `msr
 /// record` alike: the Dock icon's badge "!" and a bouncing icon when
-/// something needs the person, and the status window with the problems
-/// (D45, D46, D47). `msr record` also tells each event and
-/// problem as `RecordOutput` decides and, on a terminal, draws the status line.
+/// something needs the person, a problem's call to action or low disk space,
+/// and the status window with the problems (D45, D46, D47, D84). `msr record`
+/// also tells each event and problem as `RecordOutput` decides and, on a
+/// terminal, draws the status line.
 @MainActor
 final class RecordingSession: RecorderObserver {
     private(set) var recorder: Recorder?
@@ -58,11 +59,14 @@ final class RecordingSession: RecorderObserver {
         return summary
     }
 
-    /// The state file remembers the recording and how it ended, for the app's next start to offer a report (D64).
+    /// The state file remembers the recording and whether it asks to report it, for the app's next start to
+    /// offer a report (D64, D84).
     private func remember(_ summary: RecordingSummary) {
         do {
             try StateFile(homeFolder: homeFolder).update {
-                $0.recorded(folder: summary.recordingFolder, result: summary.endedWithError ? .problems : .ok)
+                $0.recorded(
+                    folder: summary.recordingFolder, result: summary.endedWithError ? .problems : .ok,
+                    noticeWanted: summary.asksToReportIt)
             }
         } catch {
             notRemembered = error
@@ -103,7 +107,8 @@ final class RecordingSession: RecorderObserver {
     }
 
     private func updateBadge() {
-        guard recorder != nil, !isStopping else { return }
+        guard let recorder, !isStopping else { return }
+        status.problemsCalledToAction = recorder.problemsCalledToAction().map(\.text)
         NSApp.dockTile.badgeLabel = status.badge
         if statusWindow.isOpen { refreshStatusWindow() }
     }
@@ -136,13 +141,9 @@ final class RecordingSession: RecorderObserver {
         if lowDiskSpace { needsAttention() } else { updateBadge() }
     }
 
-    func recorder(_ recorder: Recorder, screenShowsAnotherScreensPicture screen: String?) {
-        status.screenShowingAnotherScreensPicture = screen
-        if let screen {
-            output?.tell(.event, "The screen \(screen) shows another screen's picture: its screen file ended,"
-                + " and it is recorded again after its next change.\n")
-        }
-        updateBadge()
+    func recorder(_ recorder: Recorder, screenShowsAnotherScreensPicture screen: String) {
+        output?.tell(.event, "The screen \(screen) shows another screen's picture: its screen file ended,"
+            + " and it is recorded again after its next change.\n")
     }
 
     func recorder(_ recorder: Recorder, eventLine: String, isFailure: Bool) {
@@ -151,7 +152,9 @@ final class RecordingSession: RecorderObserver {
 
     func recorder(_ recorder: Recorder, problem: RecordingProblem, ofAnEvent: Bool) {
         output?.tell(ofAnEvent ? .problemOfAnEvent : .problem, problem.text + "\n")
-        status.problems.append(problem.text)
+    }
+
+    func recorder(_ recorder: Recorder, callToAction problem: RecordingProblem) {
         needsAttention()
     }
 }

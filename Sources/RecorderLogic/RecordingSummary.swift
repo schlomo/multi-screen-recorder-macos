@@ -7,17 +7,36 @@ public struct RecordingSummary: Equatable, Sendable {
     public let seconds: Double
     /// Whether the finalized manifest was written; if not, the file on disk has no `ended`.
     public let manifestWritten: Bool
+    /// A problem whose call to action includes "report it" was told (`ProblemsTold.asksToReportIt`, D84).
+    public let problemsAskToReportIt: Bool
+    /// The names of the files whose writer failed on a full disk: not finalized, they ask for no report (D84).
+    public let filesEndedByAFullDisk: Set<String>
 
-    public init(manifest: RecordingManifest, recordingFolder: String, seconds: Double, manifestWritten: Bool) {
+    public init(
+        manifest: RecordingManifest, recordingFolder: String, seconds: Double, manifestWritten: Bool, problemsAskToReportIt: Bool,
+        filesEndedByAFullDisk: Set<String>
+    ) {
         self.manifest = manifest
         self.recordingFolder = recordingFolder
         self.seconds = seconds
         self.manifestWritten = manifestWritten
+        self.problemsAskToReportIt = problemsAskToReportIt
+        self.filesEndedByAFullDisk = filesEndedByAFullDisk
     }
 
     /// Ended with an error (exit 3): the manifest's result is `problems`
     /// (D47, D64), or the finalized manifest could not be written (F3).
     public var endedWithError: Bool { !manifest.endedWell || manifest.result == .problems || !manifestWritten }
+
+    /// Whether the person is asked to report the recording, by `msr record`'s `Report it:` line and the app's
+    /// next start (D84): a problem asked to report it, or data was lost, a file not finalized or the manifest
+    /// without its end. A file a full disk left not finalized does not: the person was asked to free up disk space.
+    public var asksToReportIt: Bool {
+        let files = manifest.files.map { ($0.name, $0.state) } + manifest.cameraFiles.map { ($0.name, $0.state) }
+            + manifest.audioFiles.map { ($0.name, $0.state) }
+        return problemsAskToReportIt || !manifestWritten
+            || files.contains { name, state in state != .finalized && !filesEndedByAFullDisk.contains(name) }
+    }
 
     public var text: String {
         var lines = ["Recorded \(Self.elapsed(seconds: seconds)) into \(recordingFolder)"]
@@ -60,7 +79,7 @@ public struct RecordingSummary: Equatable, Sendable {
         Self.failureLines(of: manifest, endMissing: !manifestWritten)
     }
 
-    /// The end of the summary of a recording that ended with an error: the
+    /// The end of the summary of a recording that asks to report it (D84): the
     /// link to report it, with what went wrong, and what to attach (D64).
     public func reportText(version: String) -> String {
         "Report it: \(ProblemReport.issueURL(whatWentWrong: whatWentWrong, version: version).absoluteString)\n"

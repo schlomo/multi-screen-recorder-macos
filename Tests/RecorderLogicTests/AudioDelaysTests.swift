@@ -20,7 +20,7 @@ import Testing
         #expect(first.earlierBy == ["r.mov": 0, "a.mov": nil, "b.mov": nil])
         #expect(first.delays == ["r.mov": Entry(delay: 0)])
         #expect(delays.shown("a.mov") == .notInTheGuideTrackYet)
-        #expect(delays.shown("r.mov") == nil)
+        #expect(delays.shown("r.mov") == .anchor(0))
         let measured = delays.update(files: recorded(["a.mov", "b.mov"]), reference: "r.mov", lags: ["a.mov": 0.5], at: 20)
         #expect(measured.earlierBy == ["r.mov": 0, "a.mov": 0.5, "b.mov": nil])
         #expect(measured.delays == ["a.mov": Entry(delay: 0.5), "r.mov": Entry(delay: 0)])
@@ -55,7 +55,7 @@ import Testing
         #expect(rounded(outcome.earlierBy) == ["a.mov": 0, "r.mov": 0.3, "b.mov": 0.5])
         #expect(rounded(outcome.delays) == ["a.mov": -0.3, "b.mov": 0.2, "r.mov": 0])
         #expect(delays.shown("r.mov") == .anchor(0.3))
-        #expect(delays.shown("a.mov") == nil)
+        #expect(delays.shown("a.mov") == .synced(0, carriedOver: false))
     }
 
     /// A new earliest input mid-recording changes no other file's listed audio delay, so no other clip is split.
@@ -106,8 +106,7 @@ import Testing
     }
 
     /// The reference's capture ending makes another input the reference: every lag is re-based onto the anchor
-    /// through its audio delay, the mix keeps every input, and no listed delay changes; the anchor's return
-    /// changes none either.
+    /// through its audio delay, the mix keeps every input, and no listed delay changes.
     @Test func anotherReferenceWithAnAudioDelayReBasesOntoTheAnchor() {
         var delays = AudioDelays()
         _ = delays.update(files: recorded(["a.mov", "b.mov"]), reference: "r.mov", lags: ["a.mov": 0.5, "b.mov": 0.2], at: 20)
@@ -116,9 +115,78 @@ import Testing
         #expect(rounded(without.earlierBy) == ["a.mov": 0.3, "b.mov": 0])
         #expect(rounded(without.delays) == ["a.mov": 0.5, "b.mov": 0.2])
         #expect(without.leaving.isEmpty)
-        let back = delays.update(files: recorded(["a.mov", "b.mov"], reference: "r2.mov"), reference: "r2.mov")
-        #expect(rounded(back.earlierBy) == ["r2.mov": 0, "a.mov": 0.5, "b.mov": 0.2])
-        #expect(rounded(back.delays) == ["a.mov": 0.5, "b.mov": 0.2, "r2.mov": 0])
+        #expect(delays.referenceDevice == "A")
+    }
+
+    /// The owner's recording 2026-11-24 20.55.08 (D85): the Osmo "O" sounds first, the anchor, the Razer "Z"
+    /// 550 ms early against it; the Osmo unplugged, the Razer is the reference; the Osmo's new file, back
+    /// 100 ms less late, is measured against the Razer like any other input, from its earlier file's 0
+    /// carried over, and the Razer keeps its audio delay.
+    @Test func theAnchorsNewFileIsMeasuredAgainstTheReferenceInUse() {
+        var delays = AudioDelays()
+        for at in [10.0, 20, 30] { _ = delays.update(files: ["o1.mov": "O", "z.mov": "Z"], reference: "o1.mov", lags: ["z.mov": -0.55], at: at) }
+        #expect(delays.anchor == "O")
+        _ = delays.update(files: ["z.mov": "Z"], reference: "z.mov")
+        let back = delays.update(files: ["o2.mov": "O", "z.mov": "Z"], reference: "z.mov")
+        #expect(back.lines.first == "o2.mov: carries over 0 ms from o1.mov")
+        #expect(rounded(back.delays) == ["o2.mov": 0, "z.mov": -0.55])
+        #expect(delays.shown("o2.mov") == .synced(0.55, carriedOver: true))
+        #expect(delays.hasAudioDelay("o2.mov", device: "O"))
+        let measured = delays.update(files: ["o2.mov": "O", "z.mov": "Z"], reference: "z.mov", lags: ["o2.mov": 0.45], at: 130)
+        #expect(measured.lines.first == "o2.mov: audio delay its first counted window on the carried-over: 0 ms → 100 ms early, replaced")
+        #expect(rounded(measured.delays) == ["o2.mov": -0.1, "z.mov": -0.55])
+        guard case .synced(let placed, carriedOver: false) = delays.shown("o2.mov") else {
+            Issue.record("o2.mov is not shown measured: \(String(describing: delays.shown("o2.mov")))")
+            return
+        }
+        #expect(abs(placed - 0.45) < 1e-9)
+        #expect(delays.referenceDevice == "Z")
+        #expect(delays.hindsight(of: "o1.mov", fileStart: 0) == nil)
+        #expect(delays.hindsight(of: "o2.mov", fileStart: 117) == [.init(at: 0, delay: -0.1)])
+    }
+
+    /// The reference back on the anchor's device through a measured file (D85): that device's next file, after a
+    /// gap or a channel change, carries over the measured audio delay; it is no anchor file at 0.
+    @Test func theAnchorDevicesFileAfterAMeasuredOneCarriesItsAudioDelayOver() {
+        var delays = AudioDelays()
+        _ = delays.update(files: ["o1.mov": "O", "z.mov": "Z", "a.mov": "A"], reference: "o1.mov", lags: ["z.mov": -0.55], at: 10)
+        _ = delays.update(files: ["z.mov": "Z", "a.mov": "A"], reference: "z.mov")
+        _ = delays.update(files: ["o2.mov": "O", "z.mov": "Z", "a.mov": "A"], reference: "z.mov", lags: ["o2.mov": 0.45], at: 130)
+        _ = delays.update(files: ["o2.mov": "O", "a.mov": "A"], reference: "o2.mov")
+        #expect(delays.referenceDevice == "O")
+        let next = delays.update(files: ["o3.mov": "O", "a.mov": "A"], reference: "o3.mov")
+        #expect(next.lines.first == "o3.mov: carries over 100 ms early from o2.mov")
+        #expect(rounded(next.delays)["o3.mov"] == -0.1)
+        let measured = delays.update(files: ["o3.mov": "O", "a.mov": "A"], reference: "o3.mov", lags: ["a.mov": 0.2], at: 200)
+        #expect(rounded(measured.delays) == ["o3.mov": -0.1, "a.mov": 0.1])
+    }
+
+    /// Across a change of reference, a stretch within a frame of the one before adds no entry, so no clip is split
+    /// where the two agree; its windows are not merged into the earlier median either (D85).
+    @Test func hindsightAddsNoEntryAcrossAChangeOfReferenceWhenTheyAgree() {
+        var delays = AudioDelays()
+        for at in [10.0, 20, 30] {
+            _ = delays.update(files: recorded(["a.mov", "b.mov"]), reference: "r.mov", lags: ["a.mov": 0.5, "b.mov": 0.2], at: at)
+        }
+        for at in [40.0, 50, 60] { _ = delays.update(files: ["a.mov": "A", "b.mov": "B"], reference: "a.mov", lags: ["b.mov": -0.28], at: at) }
+        #expect(delays.hindsight(of: "b.mov", fileStart: 5) == [.init(at: 0, delay: 0.2)])
+    }
+
+    /// A file measured against one reference and then another (D85): Stop's hindsight never merges the windows
+    /// of the two into one median, the second stretch starting at the first window against the second; the
+    /// new reference's own file, measured no more, gets no new entry.
+    @Test func hindsightSplitsAFileAtAChangeOfReference() {
+        var delays = AudioDelays()
+        for at in [10.0, 20, 30] {
+            _ = delays.update(files: recorded(["a.mov", "b.mov"]), reference: "r.mov", lags: ["a.mov": 0.5, "b.mov": 0.2], at: at)
+        }
+        for at in [40.0, 50] { _ = delays.update(files: ["a.mov": "A", "b.mov": "B"], reference: "a.mov", lags: ["b.mov": -0.2], at: at) }
+        let stretches = delays.hindsight(of: "b.mov", fileStart: 5)
+        #expect(stretches?.count == 2)
+        #expect(stretches?.first == .init(at: 0, delay: 0.2))
+        #expect(stretches?.last.map { ($0.at * 1000).rounded() / 1000 } == 35)
+        #expect(stretches?.last.map { ($0.delay * 1000).rounded() / 1000 } == 0.3)
+        #expect(delays.hindsight(of: "a.mov", fileStart: 5) == [.init(at: 0, delay: 0.5)])
     }
 
     /// A reference without an audio delay becomes the anchor: every input starts over, carrying nothing over.
@@ -172,11 +240,12 @@ import Testing
         #expect(changed.isMoved)
     }
 
-    /// A placement that rounds to 0 ms shows nothing, as one at 0 does.
-    @Test func aPlacementRoundingTo0MillisecondsShowsNothing() {
+    /// A placement that rounds to 0 ms shows its sync, 0 ms, as every synced input does (D86).
+    @Test func aPlacementRoundingTo0MillisecondsShowsSynced0Milliseconds() {
         var delays = AudioDelays()
         _ = delays.update(files: recorded(["a.mov"]), reference: "r.mov", lags: ["a.mov": 0.0004], at: 10)
-        #expect(delays.shown("a.mov") == nil)
+        #expect(delays.shown("a.mov").map(RecordingStatusTable.audioDelayText) == "synced 0 ms")
+        #expect(delays.shown("r.mov").map(RecordingStatusTable.audioDelayText) == "synced 0 ms")
     }
 
     /// A counted window no rule takes and a lag dropped say why in the recording log.

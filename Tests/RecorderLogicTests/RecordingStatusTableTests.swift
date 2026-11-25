@@ -70,7 +70,7 @@ import Testing
         let lg = screen("B", "LG", x: 1920)
         let wacom = screen("C", "Wacom", x: 3840)
         _ = tracker.begin([built, lg, wacom], at: 0)
-        _ = tracker.streamEnded("A", .writerFailed("x"), connected: [built, lg, wacom], at: 1)
+        _ = tracker.streamEnded("A", .streamFailed("x"), connected: [built, lg, wacom], at: 1)
         _ = tracker.observe([built, wacom], at: 2)
         _ = tracker.streamEnded("C", .showsAnotherScreen, connected: [built, wacom], at: 3)
         let states = RecordingStatusTable.rows(sources: tracker.sources, files: [], bytes: [:]).map(\.state)
@@ -190,6 +190,12 @@ import Testing
             "Not in the guide track until its audio delay is measured; its own audio track is recorded",
         ])
         #expect(RecordingStatusTable.audioDelayText(.noClearSoundToSync) == "no clear sound")
+        // The mix's zero shows its sync too (D86).
+        #expect(RecordingStatusTable.audioDelayText(.synced(-0.0001, carriedOver: false)) == "synced 0 ms")
+        #expect(RecordingStatusTable.audioDelayDetail(.synced(0, carriedOver: false)) == "The guide track's zero: not moved; measured")
+        #expect(RecordingStatusTable.audioDelayDetail(.synced(0.0004, carriedOver: true))
+            == "The guide track's zero: not moved; carried over from its previous file until measured")
+        #expect(RecordingStatusTable.audioDelayDetail(.anchor(0)) == "The guide track's zero: not moved")
         #expect(RecordingStatusTable.audioDelayDetail(.noClearSoundToSync)
             == "Not in the guide track: no clear sound to measure its audio delay against; its own audio track is recorded")
     }

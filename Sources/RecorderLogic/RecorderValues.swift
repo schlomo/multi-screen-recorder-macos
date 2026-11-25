@@ -17,6 +17,9 @@ public enum RecorderValues {
     /// The fragment length of every file: a crash loses at most this much of an audio file, and up to
     /// `guideTrackDelay` more of a video file, its fragment waiting for its guide samples (D80).
     public static let fragmentSeconds = 2
+    /// How long a source that fails (a screen, a camera, an audio source or file) may stay not captured before
+    /// its problem calls to action: most come back by themselves (D84).
+    public static let unrecoveredAfter = Duration.seconds(10)
     /// How long a screen must stay unchanged before its stream starts or
     /// starts again.
     public static let settleTime = Duration.seconds(1)
@@ -26,6 +29,9 @@ public enum RecorderValues {
     /// The wait before a failed stream is started again, doubling up to the longest.
     public static let firstRestartDelay = Duration.seconds(1)
     public static let longestRestartDelay = Duration.seconds(10)
+    /// A screen's or camera's writer that fails starts a new file at once, unless it fails again within this
+    /// long of that restart: then it backs off as a failed stream does, so a broken encoder cannot loop (D88).
+    public static let writerFailedAgainWithin = Duration.seconds(10)
     /// How long a camera's capture may wait for its first frame, an iPhone's
     /// (Continuity Camera) longer, and then between frames, before its
     /// stream counts as failing; no frame for `cameraStallLimit` is a stall,

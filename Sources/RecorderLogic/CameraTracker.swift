@@ -56,6 +56,8 @@ public struct CameraTracker: Sendable {
         /// When it last appeared, went, or became wanted.
         var changedAt: Int64
         var restartDelay: Duration
+        /// Its restarts after its writer failed (D88).
+        var writerRestarts: WriterRestarts?
         /// Whether its stream may end once with the camera gone without a
         /// failure: until it does, and again after each change of the cameras.
         var mayLoseCaptureSource = true
@@ -86,6 +88,7 @@ public struct CameraTracker: Sendable {
     public let settleTime: Duration
     public let firstRestartDelay: Duration
     public let longestRestartDelay: Duration
+    public let writerFailedAgainWithin: Duration
 
     private var cameras: [String: Tracked] = [:]
     /// The unique IDs in the order the recording first saw them, the default camera first at the start.
@@ -108,12 +111,14 @@ public struct CameraTracker: Sendable {
         settings: Settings,
         settleTime: Duration = RecorderValues.settleTime,
         firstRestartDelay: Duration = RecorderValues.firstRestartDelay,
-        longestRestartDelay: Duration = RecorderValues.longestRestartDelay
+        longestRestartDelay: Duration = RecorderValues.longestRestartDelay,
+        writerFailedAgainWithin: Duration = RecorderValues.writerFailedAgainWithin
     ) {
         self.settings = settings
         self.settleTime = settleTime
         self.firstRestartDelay = firstRestartDelay
         self.longestRestartDelay = longestRestartDelay
+        self.writerFailedAgainWithin = writerFailedAgainWithin
     }
 
     /// The cameras connected at the start: each recorded one starts at once.
@@ -198,7 +203,9 @@ public struct CameraTracker: Sendable {
                   now - tracked.changedAt >= settleTime.nanoseconds else { continue }
             switch tracked.phase {
             case .idle: step.actions.append(start(uniqueID))
-            case .waitingToRestart(let notBefore) where notBefore <= now: step.actions.append(start(uniqueID))
+            case .waitingToRestart(let notBefore) where notBefore <= now:
+                step.actions.append(start(uniqueID))
+                if cameras[uniqueID]?.writerRestarts?.startedAt == nil { cameras[uniqueID]?.writerRestarts?.startedAt = now }
             case .recording(let current) where tracked.turnIsDue:
                 let restart = start(uniqueID)
                 guard case .start(_, _, _, let frameSize, _, _, _) = restart else { break }
@@ -311,6 +318,12 @@ public struct CameraTracker: Sendable {
         case .writerFellBehind:
             step.events.append(event(.cameraFileWriterFellBehind, uniqueID, at: now))
             scheduleRestart(uniqueID, at: now)
+        case .writerFailed where isPresent:
+            // Started by `due`, from the cameras as read now: wanted, settled, and whose captures are ours.
+            let (wait, restarts) = WriterRestarts.after(
+                tracked.writerRestarts, at: now, within: writerFailedAgainWithin, first: firstRestartDelay, longest: longestRestartDelay)
+            cameras[uniqueID]?.phase = .waitingToRestart(notBefore: now + wait.nanoseconds)
+            cameras[uniqueID]?.writerRestarts = restarts
         case .writerFailed, .showsAnotherScreen:
             if isPresent { scheduleRestart(uniqueID, at: now) } else { cameras[uniqueID]?.phase = .idle }
         case .streamFailed(let error):

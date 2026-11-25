@@ -262,4 +262,161 @@ import Testing
         #expect(ProblemsTold.gapsBefore(noAudio, in: [gap(20.9), noAudio]) == 20.9)
         #expect(ProblemsTold.gapsBefore(noAudio, in: [noAudio, gap(41)]) == nil)
     }
+
+    // Calls to action (D84): only a problem a person has to do something about bounces the Dock, sets the
+    // badge and counts.
+
+    @Test func eachKindHasItsCallToActionOrNone() {
+        #expect(ProblemKind.diskFull.callToAction == .freeUpDiskSpace)
+        #expect(ProblemKind.manifestNotWritten.callToAction == .freeUpDiskSpace)
+        // The timeline file is rewritten from the manifest by `msr timeline`: nothing is lost.
+        #expect(ProblemKind.timelineFileNotWritten.callToAction == nil)
+        #expect(ProblemKind.recordingLogNotWritten.callToAction == .freeUpDiskSpace)
+        #expect(ProblemKind.cameraPermissionMissing.callToAction == .grantThePermission)
+        #expect(ProblemKind.audioInputSilentAfterGaps("u").callToAction == .unplugAndPlugInAgain)
+        #expect(ProblemKind.audioFileLost("a.mov").callToAction == .reportIt)
+        #expect(ProblemKind.videoFileLost("v.mov").callToAction == .reportIt)
+        let failing: [ProblemKind] = [
+            .screenNotCaptured("U"), .cameraNotCaptured("C"), .audioSourceFailed("Mic"), .audioFileFailed("a.mov"),
+            .audioInputNotRecordable("Mic"),
+        ]
+        for kind in failing + [.audioInputChangesNotFollowed] { #expect(kind.callToAction == .startAgainAndReportIt) }
+        let none: [ProblemKind] = [
+            .cameraStalled("C"), .audioInputOutOfTheGuideTrack("u"), .guideTracksCut("v.mov"), .dockIconNotShown,
+            .inputVolumeNotSet("Mic"), .inputVolumeNotFollowed("Mic"), .screensNotRead, .audioInputsNotRead, .freeSpaceNotRead,
+        ]
+        for kind in none { #expect(kind.callToAction == nil) }
+        #expect(CallToAction.reportIt.includesReportIt && CallToAction.startAgainAndReportIt.includesReportIt)
+        #expect(![CallToAction.freeUpDiskSpace, .grantThePermission, .unplugAndPlugInAgain].contains { $0.includesReportIt })
+    }
+
+    /// A kind with a call to action gives it once, at once; one without stays quiet.
+    @Test func aCallToActionIsGivenOnceAtOnceAndNoneForAProblemWithout() {
+        var told = ProblemsTold()
+        var manifest = manifest()
+        _ = told.add(problem(1 * second, "Camera stalled"), kind: .cameraStalled("C"), to: &manifest)
+        _ = told.add(problem(2 * second, "Cannot write the recording log"), kind: .recordingLogNotWritten, to: &manifest)
+        #expect(told.callsToAction(now: 2 * second).map(\.problem) == ["Cannot write the recording log"])
+        #expect(told.callsToAction(now: 3 * second).isEmpty)
+        #expect(!told.asksToReportIt)
+    }
+
+    /// A source that fails and does not come back: its call to action once it lasted `unrecoveredAfter`; one that
+    /// ends before stays quiet (D84).
+    @Test func aFailingSourceCallsToActionOnlyOnceItLastedUnrecovered() {
+        var told = ProblemsTold()
+        var manifest = manifest()
+        let after = RecorderValues.unrecoveredAfter.nanoseconds
+        _ = told.add(problem(1 * second, "Screen 1 LG"), kind: .screenNotCaptured("U"), to: &manifest)
+        _ = told.add(problem(2 * second, "Camera FaceTime"), kind: .cameraNotCaptured("C"), to: &manifest)
+        #expect(told.callsToAction(now: 2 * second).isEmpty)
+        #expect(told.nextCallToAction() == 1 * second + after)
+        told.cleared(.cameraNotCaptured("C"), at: 5 * second)
+        #expect(told.callsToAction(now: 1 * second + after - 1).isEmpty)
+        #expect(!told.asksToReportIt)
+        #expect(told.callsToAction(now: 1 * second + after).map(\.problem) == ["Screen 1 LG"])
+        #expect(told.nextCallToAction() == nil)
+        #expect(told.callsToAction(now: 100 * second).isEmpty)
+        #expect(told.asksToReportIt)
+    }
+
+    /// A failure told after a newer file of its source started is over when told: no call to action.
+    @Test func aFailureOverWhenToldCallsToNoAction() {
+        var told = ProblemsTold()
+        var manifest = manifest()
+        _ = told.add(problem(1 * second, "Audio file a.mov"), kind: .audioFileFailed("a.mov"), endedAt: 2 * second, to: &manifest)
+        #expect(told.callsToAction(now: 100 * second).isEmpty)
+        #expect(told.nextCallToAction() == nil)
+    }
+
+    /// A shown problem, such as an incomplete video file, gives its call to action too; only one whose words
+    /// include "report it" asks for a report after the recording.
+    @Test func onlyACallToActionWithReportItAsksForAReport() {
+        var permission = ProblemsTold()
+        var manifest = manifest()
+        _ = permission.add(problem(1 * second, "The Camera permission"), kind: .cameraPermissionMissing, to: &manifest)
+        _ = permission.add(problem(1 * second, "Silence"), kind: .audioInputSilentAfterGaps("u"), to: &manifest)
+        permission.show(problem(1 * second, "Disk full"), kind: .diskFull)
+        #expect(permission.callsToAction(now: 1 * second).count == 3)
+        #expect(!permission.asksToReportIt)
+        var lost = ProblemsTold()
+        lost.show(problem(1 * second, "Screen file s.mov"), kind: .videoFileLost("s.mov"))
+        #expect(lost.callsToAction(now: 1 * second).map(\.problem) == ["Screen file s.mov"])
+        #expect(lost.asksToReportIt)
+        var changes = ProblemsTold()
+        _ = changes.add(problem(0, "Changes of the audio inputs"), kind: .audioInputChangesNotFollowed, to: &manifest)
+        #expect(changes.callsToAction(now: 0).count == 1)
+        #expect(changes.asksToReportIt)
+    }
+
+    /// A screen whose file ended because it showed another screen's picture: in the owner's table under none, so
+    /// its problem never calls to action, also past `unrecoveredAfter`, shown first or told first (D84).
+    @Test func aScreenShowingAnotherScreensPictureNeverCallsToAction() {
+        var told = ProblemsTold()
+        var manifest = manifest()
+        told.show(problem(1 * second, "Screen file s.mov"), kind: .screenNotCaptured("U"), withoutCallToAction: true)
+        _ = told.add(problem(1 * second, "Screen 1 LG"), kind: .screenNotCaptured("U"), withoutCallToAction: true, to: &manifest)
+        _ = told.add(problem(1 * second, "Screen 2 DELL"), kind: .screenNotCaptured("V"), withoutCallToAction: true, to: &manifest)
+        #expect(told.nextCallToAction() == nil)
+        #expect(told.callsToAction(now: 100 * second).isEmpty)
+        #expect(!told.asksToReportIt)
+    }
+
+    /// A failing source whose wait was over is called to action even when it ended before the call ran; at Stop,
+    /// one still failing is called at once (D84).
+    @Test func aCallDueIsNeverDroppedAndStopCallsTheOngoing() {
+        var told = ProblemsTold()
+        var manifest = manifest()
+        _ = told.add(problem(1 * second, "Mic"), kind: .audioSourceFailed("Mic"), to: &manifest)
+        _ = told.add(problem(2 * second, "Cam"), kind: .cameraNotCaptured("C"), to: &manifest)
+        _ = told.add(problem(3 * second, "Short"), kind: .screenNotCaptured("U"), to: &manifest)
+        told.cleared(.audioSourceFailed("Mic"), at: 12 * second)
+        told.cleared(.screenNotCaptured("U"), at: 4 * second)
+        #expect(told.callsToAction(now: 12 * second).map(\.problem) == ["Mic", "Cam"])
+        _ = told.add(problem(20 * second, "Mic again"), kind: .audioSourceFailed("Mic"), to: &manifest)
+        #expect(told.callsToAction(now: 21 * second).isEmpty)
+        #expect(told.callsToAction(now: 21 * second, atStop: true).map(\.problem) == ["Mic again"])
+    }
+
+    /// The screen's capture failing for another reason after its file showed another screen's picture is a
+    /// failure like any other: it calls to action once unrecovered for the wait, counted from its tell.
+    @Test func aFailureToldAfterAnotherScreensPictureCallsToAction() {
+        var told = ProblemsTold()
+        var manifest = manifest()
+        told.show(problem(1 * second, "Screen file s.mov"), kind: .screenNotCaptured("U"), withoutCallToAction: true)
+        _ = told.add(problem(5 * second, "Screen 1 LG"), kind: .screenNotCaptured("U"), to: &manifest)
+        #expect(told.nextCallToAction() == 15 * second)
+        #expect(told.callsToAction(now: 14 * second).isEmpty)
+        #expect(told.callsToAction(now: 15 * second).map(\.problem) == ["Screen 1 LG"])
+        #expect(told.asksToReportIt)
+    }
+    /// As the Recorder does it: another screen's picture told with the flag, then a failure of its own told.
+    @Test func aFailureToldAfterAnotherScreensPictureToldCallsToAction() {
+        var told = ProblemsTold()
+        var manifest = manifest()
+        _ = told.add(problem(1 * second, "Screen 1 LG"), kind: .screenNotCaptured("U"), withoutCallToAction: true, to: &manifest)
+        #expect(told.add(problem(3 * second, "Screen 1 LG again"), kind: .screenNotCaptured("U"), withoutCallToAction: true, to: &manifest)
+            == .alreadyTold)
+        #expect(told.add(problem(5 * second, "Screen 1 LG failed"), kind: .screenNotCaptured("U"), to: &manifest)
+            == .tell(writeManifest: true))
+        #expect(told.add(problem(6 * second, "Screen 1 LG failed again"), kind: .screenNotCaptured("U"), to: &manifest) == .alreadyTold)
+        #expect(manifest.problems.map(\.problem) == ["Screen 1 LG", "Screen 1 LG failed"])
+        #expect(told.nextCallToAction() == 15 * second)
+        #expect(told.callsToAction(now: 15 * second).map(\.problem) == ["Screen 1 LG failed"])
+    }
+
+    /// The badge and the count show a call to action only while its problem lasts: once it ended, nothing is left
+    /// to do (D84).
+    @Test func aCallToActionCountsOnlyWhileItsProblemLasts() {
+        var told = ProblemsTold()
+        var manifest = manifest()
+        _ = told.add(problem(1 * second, "Disk full"), kind: .diskFull, to: &manifest)
+        _ = told.add(problem(2 * second, "Mic"), kind: .audioSourceFailed("Mic"), to: &manifest)
+        _ = told.callsToAction(now: 15 * second)
+        #expect(told.callsToActionOngoing.map(\.problem) == ["Disk full", "Mic"])
+        told.cleared(.diskFull, at: 20 * second)
+        #expect(told.callsToActionOngoing.map(\.problem) == ["Mic"])
+        told.cleared(.audioSourceFailed("Mic"), at: 21 * second)
+        #expect(told.callsToActionOngoing.isEmpty)
+    }
 }

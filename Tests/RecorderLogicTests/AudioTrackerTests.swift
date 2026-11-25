@@ -103,6 +103,28 @@ import Testing
         #expect(tracker.fileStarted(.input("BuiltIn"), at: 6 * second).isEmpty)
     }
 
+    /// A failed audio writer's status is final: its source starts again at once; failing again within
+    /// `writerFailedAgainWithin` of that restart, it backs off, rising (D88).
+    @Test func aFailedWriterStartsAgainAtOnceAndBacksOffWhenItFailsAgainSoon() {
+        var tracker = AudioTracker(settings: settings(.defaultMicrophone))
+        _ = tracker.begin(inputs: [builtIn], mainDisplayID: nil, screens: [], at: 0)
+        _ = tracker.fileStarted(.input("BuiltIn"), at: 0)
+        let failed = tracker.captureEnded(.input("BuiltIn"), .writerFailed("-11800"), at: 30 * second)
+        #expect(names(failed.events) == ["audio file writer failed: MacBook Pro Microphone"])
+        #expect(tracker.due(at: 30 * second).actions.count == 1)
+        _ = tracker.fileStarted(.input("BuiltIn"), at: 30 * second)
+        _ = tracker.captureEnded(.input("BuiltIn"), .writerFailed("-11800"), at: 31 * second)
+        #expect(tracker.nextDueTime() == 32 * second)
+        #expect(tracker.due(at: 32 * second).actions.count == 1)
+        _ = tracker.fileStarted(.input("BuiltIn"), at: 32 * second)
+        _ = tracker.captureEnded(.input("BuiltIn"), .writerFailed("-11800"), at: 33 * second)
+        #expect(tracker.nextDueTime() == 35 * second)
+        #expect(tracker.due(at: 35 * second).actions.count == 1)
+        // Past the window since its restart: at once again.
+        _ = tracker.captureEnded(.input("BuiltIn"), .writerFailed("-11800"), at: 45 * second)
+        #expect(tracker.due(at: 45 * second).actions.count == 1)
+    }
+
     @Test func everyCaptureEndButADisconnectIsAFailure() {
         #expect(!AudioTracker.CaptureEnd.disconnected.isFailure)
         for end: AudioTracker.CaptureEnd in [.captureFailed("x"), .writerFailed("x"), .writerFellBehind, .diskFull] {

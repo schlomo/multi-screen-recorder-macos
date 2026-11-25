@@ -2906,3 +2906,268 @@ architect's reading.
 - **Consequences:** None for the app: its link fills only `version` and
   `what-happened`.
 - **Evidence:** [design/recorder.md](design/recorder.md).
+
+## D84: Only a call to action bounces the Dock, sets the badge or asks to report it (2026-11-24)
+
+- **Status:** in force. Amends D46, D47 and D79 (every problem bounced
+  the Dock icon, set the badge and counted in the status line, D79's
+  kind exempt) and D64 (the notice and `Report it:` for every recording
+  that exits 3).
+- **Context:** The owner, 2026-11-24, of a "camera stalled" notice
+  after a screen switch: "TBH I don't think that this warrants a bug
+  report, do you? What would we do with that info?"; "I won't open a
+  popup for past recordings if there is no clear action". Then the
+  rule: "bouncing dock and alerts or a popup on next launch are all
+  governed by the same rule: Is there something the human has to do
+  about it? is there an actual real call to action? If not, then we
+  stay quiet." On the architect's table of problem kinds: "table is
+  right and yes, alert for those".
+- **Decision:** Each problem kind has a call to action or none
+  (`ProblemKind.callToAction`), by the table the owner signed:
+  - free up disk space: disk full, low disk space, manifest/recording
+    log not written;
+  - grant the permission: camera permission missing;
+  - unplug and plug in again: audio input silent after gaps;
+  - report it: file incomplete;
+  - none: camera stalled, a screen/camera/microphone not captured and
+    recovered, out of the guide track, guide tracks cut, a screen
+    showing another screen's picture, Dock icon not shown, input volume
+    not set or not followed, screens/audio inputs/free space not read;
+  - the owner's "yes, alert for those" (stop and start the recording
+    again, or replug, and report it): a source that fails and does not
+    come back, audio input changes not followed.
+
+  Only a call to action bounces the Dock icon, sets the badge and
+  counts in `msr record`'s status line; low disk space is not a problem
+  and keeps setting the badge. Every problem is still told on standard
+  error, listed in the status window, `recording.json` and the
+  recording log.
+- **The architect's readings:**
+  - A source that does not come back: a screen, camera, audio source or
+    audio file not captured or failed, or an audio input not
+    recordable, once it lasted 10 s (`unrecoveredAfter`, *data*)
+    without ending; a call that fell due is given even if the source
+    came back before it ran. A screen showing another screen's picture,
+    told as the screen not captured, calls to no action, also past
+    10 s; a failure of that screen for another reason afterwards calls
+    to action from its own tell.
+  - The badge and the status line's count show a call to action while
+    its problem lasts and drop it once it ended; the recording still
+    asks to report it at the end (unchanged).
+  - At Stop, a source still failing makes the recording ask to report
+    it, without its 10 s: it does not come back in this recording.
+    That evaluation decides the report only: it bounces nothing and sets
+    no badge (a problem told while stopping still gives its live call).
+  - An audio source or audio file ended by a full disk is the full
+    disk: free up disk space, never "report it"; told as the full disk,
+    one already told stands and no second call follows. A file a full
+    disk left not finalized does not ask to report the recording; the
+    tail it lacks is still told as the file incomplete, a red line, but
+    without a call to action, so it asks for no report either.
+  - The timeline file not written has no call to action: it is told
+    only after the manifest is final, and `msr timeline` writes it from
+    the manifest.
+  - After the recording, the app's notice "The last recording had
+    problems" and `msr record`'s `Report it:` and `Attach:` lines appear
+    only when a call to action that includes "report it" was given, or
+    data was lost (a file not finalized, unless a full disk ended it,
+    or the final manifest not written). Disk full, the permission and a replug are live only:
+    nothing is left to do afterwards. `recording.json`'s `result` and
+    exit status 3 still report the facts (D47); a camera stall stays a
+    failure event. `msr record --quiet` prints the summary of a
+    recording that asks to report it, also when it exits 0.
+- **Decided while building (the architect's reading):** `state.json`'s
+  `lastRecording` holds `noticeWanted` beside `result`, which an
+  earlier release reads; a state file of an earlier release, with
+  `result` only, decodes and wants no notice, and one without `result`
+  is an error. A call to action given later than its problem adds no
+  line on standard error, and the problem lines say nothing new: the
+  call to action governs only the Dock bounce, the badge, the count and
+  the notice (D78 stays).
+- **Consequences:** A recording with only hiccups that recovered, a
+  stall or an input out of the guide track is quiet: no bounce, no
+  badge, no notice at the next start, no `Report it:` line, though it
+  may still exit 3.
+- **Evidence:** backlog items 43 and 50;
+  [design/recorder.md](design/recorder.md), "The app" and "Problem
+  report offer".
+
+## D85: A reconnected anchor is measured against the reference in use (2026-11-24)
+
+- **Status:** in force. Amends D80's reference rule ("Amended after the
+  delta review") and its hindsight ("Amended after the owner's
+  try-out").
+- **Context:** The owner's try-out of PR #30, 2026-11-24: "it feels
+  like there is a slight echo after the osmo reconnect that then gets
+  less, but stays more than before the disconnect". In the owner's
+  recording `2026-11-24 20.55.08` the Osmo was the anchor; after its
+  unplug (86.5 to 117.2 s) its new file was the reference again at 0 ms
+  and never measured, though it had become about 100 ms less late; the
+  Razer measured 548 to 581 ms early before and 444 to 475 ms after,
+  and Stop's hindsight merged the Razer's windows from before and after
+  into one 548 ms. On the architect's design, the owner, 2026-11-24:
+  "yes, good suggestion".
+- **Decision:** Once the reference has moved away from the anchor (its
+  file ended), it stays with the input it moved to; the anchor's
+  returning file does not take it back, and the reference moves again
+  only when its own file ends (then, as before, the lowest-numbered
+  input being written that has an audio delay; with none, a new anchor
+  and every input starts over). The anchor's new file is measured
+  against the reference in use like any other input, starting from its
+  earlier file's 0, carried over. Stop's hindsight also ends a file's
+  stretches at a change of reference, so windows measured against
+  different references are never merged into one median.
+- **Decided while building (the architect's reading):** the reference in
+  use keeps D80's rule for the anchor: it stays the reference while its
+  capture runs and its newest file did not end on no audio, so a gap or
+  a channel change of it moves nothing. The anchor's files, 0 by
+  definition, are those of its device that start while it is the
+  reference. A file's stretch after a change of reference starts at its
+  first window against the new reference; windows against different
+  references are never merged, and a stretch within a frame of the one
+  before it adds no entry, so a file is not split where the two agree.
+  The reference other than the anchor
+  is still not measured, its audio delay against the anchor kept from
+  when it became the reference (the shortcut of D80).
+- **Consequences:** An Osmo replugged mid-recording is placed by its
+  new audio delay within 10 to 20 s; a microphone it was the reference
+  for keeps its audio delay instead of being moved by the 60 s rule.
+- **Evidence:** backlog item 49; the owner's recording
+  `2026-11-24 20.55.08`; `AudioDelaysTests`
+  and `RecorderTests.theAnchorsNewFileIsMeasuredAgainstTheReferenceInUse`;
+  [design/recorder.md](design/recorder.md), "Audio delay".
+
+## D86: Every synced audio input shows its sync, 0 ms included (2026-11-25)
+
+- **Status:** in force. Amends D80's "nothing at 0" for the status
+  window's Clock drift column.
+- **Context:** The owner's try-out of the snapshot release `pr-32`,
+  2026-11-25: a BRIO connected mid-recording (+53.3 s) was measured
+  14 ms early at +70.1 s and became the mix's zero, so its row went from "not synced
+  yet" to nothing. On the proposal that a measured microphone at 0 ms
+  shows "synced 0 ms" instead, the owner: "yes, all synced mics should
+  show that for consistency".
+- **Decision:** Every audio input's file in the "Audio inputs" guide
+  track with a known placement shows `synced <n> ms` (with ` (carried)`
+  where it applies), 0 ms included, the anchor's own file included.
+  Nothing changes for a file out of
+  the guide track, one never measured (`not synced yet`, `no clear
+  sound`) or the system audio.
+- **Decided while building (the architect's reading):** the anchor's
+  file shows `synced 0 ms` from the start, also with one microphone
+  only, as it is in sync by definition. At 0 ms the mouse-over reads
+  `The guide track's zero: not moved`, then `; measured` or the
+  carried-over ending where they apply.
+- **Evidence:** the owner's recording `2026-11-25 13.23.54`;
+  `AudioDelaysTests` and `RecordingStatusTableTests`;
+  [design/recorder.md](design/recorder.md), "The app" and "Audio delay".
+
+## D87: Bugs are fixed where they are found (2026-11-25)
+
+- **Status:** in force. Amends the "Stay on the job" principle (a
+  finding outside the job became a backlog item), now "Fix bugs where
+  you find them".
+- **Context:** The owner, 2026-11-25: "I want to speed up total delivery
+  time, ATM it feels like for every PR we put 2 new ones in the backlog.
+  For me a PR is a feature delivery, and bugs get fixed wherever we find
+  them. wrong?" Then, after the proposal and its check question (the
+  runner VM PR waits while a `msr timeline` bug the review found is
+  fixed and tested): "yes, that is what I wanted. We walk the path of
+  quality". The trigger: in PR #32's end-to-end run a screen writer's
+  failure cost 4.5 s of the screen (3 s the encoder took to report its
+  own failure, 1 s the recorder's back-off), which would otherwise have
+  become another backlog item.
+- **Decision:** One job per session or brief, and the change (MR/PR)
+  is the feature delivery. A bug found while doing it (wrong behaviour, a flaky test, a
+  stale doc, wherever it sits in the code) is fixed in the same change,
+  test first, and named in the change's description; a fix that needs a
+  design still gets a human's sign-off as text before it is built. Only
+  a new feature or a new design becomes a backlog item and a one-line
+  mention, never a detour. Replaces "Stay on the job" in part.
+- **Consequences:** A change grows while it is open, so its review takes
+  longer and it ships later; accepted, as parking bugs made the backlog
+  grow faster than delivery. Backlog items that are bugs get pulled into
+  the next PR that touches their area (the architect's reading).
+- **The architect's readings of the owner's rule:**
+  - The change (MR/PR) is the feature delivery; the session that owns
+    it has a found bug fixed in it. A read-only or narrow-lane agent
+    (locator, reviewer, analyst, scribe, and a builder past its brief)
+    reports the bug to the session that briefed it.
+  - The architect-maintained docs are the exception: a work branch
+    flags what is stale in them instead of editing them ("Docs
+    completeness is part of being done").
+  - A bug is behaviour against the docs or the decisions in force (or a
+    crash, data loss, a flaky test, a stale doc). Changing documented
+    behaviour is a design and needs a human's sign-off as text; any
+    other finding (a refactoring, a missing test that guards no bug, an
+    open question) stays one backlog item.
+  - A docs fix a change needs or touches is made in it; after the green
+    run it is an unmarked commit as before. Only docs unrelated to the
+    change land after the merge in their own MR/PR
+    (`references/operating-rules.md` of the architect skill).
+  - A fix pulled in from outside the change's own area is new content:
+    reviewed and sized by its risk, not only in the standard-tier fix
+    round ("Every change gets an adversarial review").
+- **Evidence:** this change;
+  [principles/ai-working-process.md](principles/ai-working-process.md),
+  "Fix bugs where you find them".
+
+## D88: A failed writer starts a new file at once (2026-11-25)
+
+- **Status:** in force. Changes the restart of a source whose writer
+  failed, which `design/recorder.md` gave as after the restart delay,
+  1 s, as for a failing stream (D14 and D74 named no delay for a
+  writer); a back-off that rises for a writer failing again soon is
+  new (before, a new file reset the delay to 1 s).
+- **Context:** PR #32's end-to-end run on c6f66d2 (`virtual-screen`
+  scenario): Screen 1's writer took its last frame at 6.60 s (the file
+  ends at 6.148 s, the writer was given up to 6.633 s); the encoder's
+  own reply timeout fired at +9.5 s, when the writer reported `screen
+  file writer failed` (AVFoundationErrorDomain -11800 from -19092),
+  dated 6.6 s; the file ended `not finalized` at +9.6 s; `start Screen
+  1` came at +10.6 s, after the 1 s back-off. The owner, 2026-11-25:
+  "a failed writer means it won't recover magically, right? So of
+  course we need to try again fast".
+- **Decision:** When a screen's or a camera's writer fails, its file
+  ends at once (no waiting for late ticks, guide samples or a last
+  mix); what it lost is told as before (D66). A new stream and file
+  start with no back-off, as soon as the source, as read then, may
+  start: the settle time after a screen's change and a camera's being
+  recorded apply as to any start. The back-off, 1 s rising to 10 s,
+  applies to a writer of the same source that fails again within 10 s
+  of that restart (`writerFailedAgainWithin`, *data*), and to failing
+  streams as before.
+- **The architect's reasoning:** a failed writer's status is final, so
+  waiting gains nothing; a fresh writer worked in the same run (Screen
+  1's next file at +10.6 s finalized; Screen 2's files after its
+  switches finalized); the back-off only guards a loop.
+- **The architect's readings:**
+  - Audio writers follow the same rule: the owner's reason, "a failed
+    writer means it won't recover magically", applies equally. A
+    failed audio file writer's source starts again with no back-off,
+    the same 10 s rule after that.
+  - The restart goes through the trackers' `due`, so it uses the
+    sources as read at the end (a screen's frame size, a camera's use
+    by another app and whether it is still recorded), never the reading
+    from before.
+- **Decided while building (the architect's reading):** the 3 s were
+  not the recorder's: the file already ended without waiting for ticks
+  or guide samples once its writer failed (`VideoFileTicker.finish`
+  skips them after a writer error); the encoder took about 3 s to
+  report its failure (`VTParavirtualizationReplyClerkWaitForReply:
+  timeout` at +9.5 s in the run's system log). So what this saves is
+  the back-off. The new file comes from a new stream: a file's end
+  stops its stream (`VideoFileFeed`), so the restart starts a stream
+  rather than keeping the old one. "Fails again within 10 s" counts
+  from the restart's start; the first failure of a writer that ran
+  longer is restarted at once.
+- **Consequences:** an encoder that fails once costs the time it takes
+  to report its failure and a stream's start, not a further second; an
+  encoder that keeps failing backs off as a failing stream does. The
+  end-to-end scenarios stay strict: an encoder failure still fails them.
+- **Evidence:** the run's `recording.log` and system log (PR #32,
+  c6f66d2, `virtual-screen`); `ScreenTrackerTests`,
+  `CameraTrackerTests`, `AudioTrackerTests`, `VideoFileTickerTests` and
+  `RecorderTests` (`aCameraWhoseWriterFailedStartsAgainAtOnceThenBacksOff`);
+  [design/recorder.md](design/recorder.md), "Screens coming and going",
+  "A failed file's end" and the audio "Failures".

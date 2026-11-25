@@ -1,9 +1,11 @@
 /// A recording's audio delays (D77, D80): each audio input file's against the recording's anchor, the first
-/// reference device (`AudioDelay.Applied`, the anchor's own 0), which inputs the "Audio inputs" guide track
+/// reference device (`AudioDelay.Applied`, the anchor's files 0), which inputs the "Audio inputs" guide track
 /// mixes (`GuideTrackMembership`, D79) and how much earlier it places each, what `recording.json` lists, and
 /// what the status window shows. A new file of an input whose earlier file had an audio delay starts with it,
 /// carried over. Another reference device re-bases every lag onto the anchor through its own audio delay; one
-/// without an audio delay becomes the anchor, and every input starts over.
+/// without an audio delay becomes the anchor, and every input starts over. The anchor's files are those of its
+/// device while it is the reference; once the reference moved away, a new file of it is measured like any
+/// other (D85).
 public struct AudioDelays: Sendable {
     public enum Shown: Equatable, Sendable {
         case notInTheGuideTrackYet
@@ -57,12 +59,16 @@ public struct AudioDelays: Sendable {
     /// The device every audio delay is against: the first input whose file is written, or the new one after a
     /// start-over (D80).
     public private(set) var anchor: String?
+    /// The anchor's files, its audio delay 0 by definition: those of its device that became known while it was
+    /// the reference, as its first file or after another of them (D85).
+    private var anchorFiles: Set<String> = []
     /// By device UID, so an input out of the guide track stays out with its next file.
     private var membership = GuideTrackMembership()
     private var earlierBy: [String: Double?] = [:]
     /// How much earlier each device's file was placed, by the device's UID, so a new file is no new join.
     private var placed: [String: Double] = [:]
-    private var reference: String?
+    /// The reference's file, by name.
+    private var referenceFile: String?
     private var known = 0
 
     public init() {}
@@ -77,37 +83,44 @@ public struct AudioDelays: Sendable {
         guard let referenceUID = newest[reference] else { preconditionFailure("the reference \(reference) is not recorded") }
         var lines: [String] = []
         var carriedOver: [String] = []
+        if anchor == nil { anchor = referenceUID }
         for (name, uid) in newest.sorted(by: { $0.key < $1.key }) where files[name] == nil {
             let earlier = files.filter { $0.value.uid == uid }.max { $0.value.order < $1.value.order }
-            let carried = earlier.flatMap { file in file.value.applied.delay.map { (file.key, $0) } }
+            known += 1
+            // Only after an anchor file, or as the device's first: a file after a measured one carries that over.
+            if uid == anchor, referenceUID == anchor, earlier.map({ anchorFiles.contains($0.key) }) ?? true {
+                anchorFiles.insert(name)
+                files[name] = File(uid: uid, order: known, applied: AudioDelay.Applied())
+                continue
+            }
+            let carried = earlier.flatMap { file in delay(of: file.key).map { (file.key, $0) } }
             if let carried {
                 lines.append("\(name): carries over \(AudioDelay.text(carried.1)) from \(carried.0)")
                 carriedOver.append(name)
             }
-            known += 1
             files[name] = File(
                 uid: uid, order: known, applied: carried.map { AudioDelay.Applied(carriedOver: $0.1) } ?? AudioDelay.Applied())
         }
         self.newest = Dictionary(newest.map { ($0.value, $0.key) }) { $1 }
-        let previous = self.reference.flatMap { files[$0] }
-        if anchor == nil { anchor = referenceUID }
+        let previous = referenceFile.flatMap { files[$0] }
         if delay(of: reference) == nil {
-            lines.append("reference \(self.reference ?? "none") → \(reference): it has no audio delay, so it is the new anchor and every input starts over")
+            lines.append("reference \(referenceFile ?? "none") → \(reference): it has no audio delay, so it is the new anchor and every input starts over")
             // shortcut: only when no input being written has an audio delay (the recorder picks such a reference
             // first), the new anchor's audio delay against the old one is unknown and taken as 0, so every input
             // starts over and the entries written so far stay against the old anchor; keep the old anchor's last
             // known delays if a lost anchor proves common.
             anchor = referenceUID
+            anchorFiles = [reference]
             for name in files.keys { (files[name]!.applied, files[name]!.unclear) = (AudioDelay.Applied(), 0) }
         }
-        // shortcut: a fallback reference, while the anchor is silent, is not measured, so its audio delay against
-        // the anchor, the base, stays as it was when it became the reference; the anchor is the reference again
-        // as soon as its file is written, so this only matters for a long silent anchor.
+        // shortcut: a reference other than the anchor is not measured, so its audio delay against the anchor, the
+        // base, stays as it was when it became the reference, for as long as its file is written (D85); measure
+        // the reference against another input with an audio delay if a drifting reference proves common.
         let base = delay(of: reference)!
         if let previous, previous.uid != referenceUID, !lines.contains(where: { $0.hasPrefix("reference ") }) {
-            lines.append("reference \(self.reference!) → \(reference): lags re-based onto the anchor by \(AudioDelay.text(base))")
+            lines.append("reference \(referenceFile!) → \(reference): lags re-based onto the anchor by \(AudioDelay.text(base))")
         }
-        self.reference = reference
+        referenceFile = reference
         for name in unclear.sorted() where files[name] != nil {
             files[name]!.unclear += 1
             if files[name]!.unclear == RecorderValues.audioDelayUnclearMeasurements, delay(of: name) == nil {
@@ -115,12 +128,12 @@ public struct AudioDelays: Sendable {
             }
         }
         for (name, lag) in lags.sorted(by: { $0.key < $1.key }) {
-            guard name != reference, newest[name] != nil, files[name]?.uid != anchor else {
+            guard name != reference, newest[name] != nil, !anchorFiles.contains(name) else {
                 let why = name == reference ? "the reference's own" : newest[name] == nil ? "not a device's newest file" : "the anchor's, always 0"
                 lines.append("\(name): lag \(AudioDelay.text(lag)) dropped, \(why)")
                 continue
             }
-            files[name]!.applied.add(lag + base, at: at)
+            files[name]!.applied.add(lag + base, at: at, against: referenceUID)
             if let decision = files[name]!.applied.decision { lines.append("\(name): audio delay \(decision)") }
         }
 
@@ -165,36 +178,38 @@ public struct AudioDelays: Sendable {
     }
 
     /// What the status window shows for a device's newest file: nothing for one out of the guide track (its
-    /// problem line says so) nor for one the mix places at 0 ms, rounded.
+    /// problem line says so); one the mix places shows it, 0 ms included (D86).
     public func shown(_ name: String) -> Shown? {
         guard let file = files[name], newest[file.uid] == name, !membership.isOut(file.uid), let placed = earlierBy[name] else { return nil }
         guard let placed else {
             return file.unclear >= RecorderValues.audioDelayUnclearMeasurements ? .noClearSoundToSync : .notInTheGuideTrackYet
         }
-        guard (placed * 1000).rounded() != 0 else { return nil }
-        return file.uid == anchor ? .anchor(placed) : .synced(placed, carriedOver: file.applied.isCarriedOver)
+        return anchorFiles.contains(name) ? .anchor(placed) : .synced(placed, carriedOver: file.applied.isCarriedOver)
     }
 
-    /// Whether the file has an audio delay, or will carry one over once known, so the recorder can pick a
-    /// fallback reference while the anchor has no file being written (D80). The anchor's files have one, 0.
+    /// The device of the reference in use: it stays the reference while its file is written (D85).
+    public var referenceDevice: String? { referenceFile.flatMap { files[$0]?.uid } }
+
+    /// Whether the file has an audio delay, or will carry one over once known, so the recorder can pick another
+    /// reference when the reference's file ends (D80, D85). The anchor's files have one, 0.
     public func hasAudioDelay(_ name: String, device uid: String) -> Bool {
-        guard uid != anchor else { return true }
-        if let file = files[name] { return file.applied.delay != nil }
-        return files.values.filter { $0.uid == uid }.max { $0.order < $1.order }?.applied.delay != nil
+        if files[name] != nil { return delay(of: name) != nil }
+        if uid == anchor, referenceDevice == anchor { return true }
+        return files.filter { $0.value.uid == uid }.max { $0.value.order < $1.value.order }.map { delay(of: $0.key) != nil } ?? false
     }
 
     /// The file's audio delays with hindsight, for Stop (D80): nil for the anchor's files and a file without own
     /// counted windows, whose live entries stay.
     public func hindsight(of name: String, fileStart: Double) -> [RecordingManifest.AudioFile.Delay]? {
-        guard let file = files[name], file.uid != anchor else { return nil }
+        guard let file = files[name], !anchorFiles.contains(name) else { return nil }
         return file.applied.hindsight(fileStart: fileStart)
     }
 
     private static func milliseconds(_ seconds: Double) -> String { "\(Int((seconds * 1000).rounded())) ms" }
 
-    /// The audio delay against the anchor: 0 for a file of the anchor device.
+    /// The audio delay against the anchor: 0 for the anchor's files.
     private func delay(of name: String) -> Double? {
         guard let file = files[name] else { return nil }
-        return file.uid == anchor ? 0 : file.applied.delay
+        return anchorFiles.contains(name) ? 0 : file.applied.delay
     }
 }

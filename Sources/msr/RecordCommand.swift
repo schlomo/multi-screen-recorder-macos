@@ -30,7 +30,7 @@ extension CommandLineInterface {
         @Flag(help: "Also prints the detail lines on standard error, and writes them at debug level in the unified log.")
         var debug = false
 
-        @Flag(help: "No output for people: only the recording folder's path on standard output, and on standard error a failing ready check, errors, the settings file note, each failure and problem as it happens with the count of a failure's repeats, and the summary of a run that exits 3. Not with --debug.")
+        @Flag(help: "No output for people: only the recording folder's path on standard output, and on standard error a failing ready check, errors, the settings file note, each failure and problem as it happens with the count of a failure's repeats, and the summary of a run that exits 3 or asks to report it. Not with --debug.")
         var quiet = false
 
         func validate() throws {
@@ -168,9 +168,9 @@ final class RecordCommandDelegate: NSObject, NSApplicationDelegate {
         guard first else { return }
         stopping = Task {
             if let summary = await session.stop() {
-                // The summary is the message of a run that exits 3, so `--quiet` still tells it then.
-                let report = summary.endedWithError ? summary.reportText(version: runningVersion.description) : ""
-                output.tell(.summary(endedWithError: summary.endedWithError), summary.text + report)
+                // The summary is the message of a run that exits 3 or asks to report it, so `--quiet` still tells it then.
+                let report = summary.asksToReportIt ? summary.reportText(version: runningVersion.description) : ""
+                output.tell(.summary(endedWithError: summary.endedWithError, asksToReportIt: summary.asksToReportIt), summary.text + report)
                 if summary.endedWithError { exitStatus = recordingEndedWithErrorExitCode }
             }
             endEventLoop()

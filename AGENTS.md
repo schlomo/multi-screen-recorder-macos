@@ -93,8 +93,10 @@ standard (below).
   an open decision stays open until a human closes it, and a
   deliberate pattern is tightened, not replaced unasked.
   [Open decisions](docs/principles/engineering.md#respect-deliberate-patterns-open-decisions-stay-open)
-- Stay on the job; a finding outside it becomes a backlog item, not a
-  detour. [Stay on the job](docs/principles/ai-working-process.md#stay-on-the-job)
+- The change is the feature delivery: a bug found, wherever it sits in
+  the code, is fixed in it, test first; a narrow-lane agent reports it;
+  any other finding becomes a backlog item.
+  [Fix bugs where you find them](docs/principles/ai-working-process.md#fix-bugs-where-you-find-them)
 - Every human is equal and decides; assume no role or skill level and
   explain in plain words, naming a decision by what it says, never by
   its id alone. Sessions are task-briefed by default, architect when a
