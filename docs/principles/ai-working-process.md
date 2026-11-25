@@ -288,7 +288,10 @@ reviewer never fixes them itself.
   change, a reviewer's question) joins the fix round when it fixes
   something. When it adds something new (a feature, a behaviour, a
   rule), the change is no longer settled: the new content gets its
-  own adversarial review, not only a delta review.
+  own adversarial review, not only a delta review. So does a bug fix
+  pulled in from outside the change's own area ("Fix bugs where you
+  find them"): it is new content, reviewed and sized by its own risk,
+  not only in the standard-tier fix round.
 - The review judges the premise before the details: should this
   change exist at all, is there a simpler or ecosystem-native way,
   does a sibling repo (another repo the team owns) already solve it,
@@ -431,13 +434,23 @@ rather than using abbreviations only their author knows.
 
 ## Fix bugs where you find them
 
-One job per session or brief, and a job is a feature delivery. A bug
-found while doing it (wrong behaviour, a flaky test, a stale doc,
-wherever it sits in the code) is fixed in the same change, test first,
-and named in the change's description. A fix that needs a design still
-gets a human's sign-off as text before it is built. Only a new feature
-or a new design becomes one backlog item and a one-line mention, never
-a detour.
+One job per session or brief, and a job is a feature delivery: the
+change (MR/PR) delivers the feature. A bug found while doing it is
+fixed in that change, test first, and named in the change's
+description; the session that owns the change has it fixed there. A
+read-only or narrow-lane agent (a locator, a reviewer, an analyst, or
+a builder past its brief) does not fix it itself: it reports the bug
+to the session that briefed it. An architect-maintained doc is the
+exception: a work branch flags what is stale in it instead of editing
+it (see "Docs completeness is part of being done").
+
+A bug is behaviour against the docs or the decisions in force, a
+crash, data loss, a flaky test or a stale doc, wherever it sits in the
+code. Changing documented behaviour is a design: it gets a human's
+sign-off as text before it is built. Any other finding (a refactoring,
+a missing test that guards no bug, an open question), and a new
+feature or design, becomes one backlog item and a one-line mention,
+never a detour.
 
 The reason is the owner's: "I want to speed up total delivery time, ATM
 it feels like for every PR we put 2 new ones in the backlog. For me a

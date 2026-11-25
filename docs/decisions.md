@@ -3085,6 +3085,26 @@ architect's reading.
   longer and it ships later; accepted, as parking bugs made the backlog
   grow faster than delivery. Backlog items that are bugs get pulled into
   the next PR that touches their area (the architect's reading).
+- **The architect's readings of the owner's rule:**
+  - The change (MR/PR) is the feature delivery; the session that owns
+    it has a found bug fixed in it. A read-only or narrow-lane agent
+    (locator, reviewer, analyst, and a builder past its brief) reports
+    the bug to the session that briefed it.
+  - The architect-maintained docs are the exception: a work branch
+    flags what is stale in them instead of editing them ("Docs
+    completeness is part of being done").
+  - A bug is behaviour against the docs or the decisions in force (or a
+    crash, data loss, a flaky test, a stale doc). Changing documented
+    behaviour is a design and needs a human's sign-off as text; any
+    other finding (a refactoring, a missing test that guards no bug, an
+    open question) stays one backlog item.
+  - A docs fix a change needs or touches is made in it; after the green
+    run it is an unmarked commit as before. Only docs unrelated to the
+    change land after the merge in their own MR/PR
+    (`references/operating-rules.md` of the architect skill).
+  - A fix pulled in from outside the change's own area is new content:
+    reviewed and sized by its risk, not only in the standard-tier fix
+    round ("Every change gets an adversarial review").
 - **Evidence:** this change;
   [principles/ai-working-process.md](principles/ai-working-process.md),
   "Fix bugs where you find them".

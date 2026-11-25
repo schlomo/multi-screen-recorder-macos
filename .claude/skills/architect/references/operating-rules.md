@@ -67,11 +67,11 @@ verifying agent output are in the principles (linked from
 - **A Markdown-only commit on an MR/PR after its green run is
   unmarked, like any other commit after the green run** ("Iterate
   locally" in the principles), as the trunk's Markdown exemption does
-  not apply to a work branch: a docs fix that this change needs (a
-  troubleshooting or decision entry about it included) runs the
-  pipeline again, and one it does not need lands after the merge in
-  its own MR/PR (an architect-maintained file goes straight onto the
-  trunk). PR #27 was merged
+  not apply to a work branch: a docs fix that this change needs or
+  touches (a troubleshooting or decision entry about it included) is
+  made in it and runs the pipeline again; only a docs fix unrelated to
+  the change lands after the merge in its own MR/PR (an
+  architect-maintained file goes straight onto the trunk). PR #27 was merged
   with a marked Markdown commit on its head, so its snapshot release
   was not removed (`AGENTS.md`, "Pipeline").
 

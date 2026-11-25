@@ -87,7 +87,8 @@ section. "The backlog" below always means that place.
   result, the review state and the one check left for the human.
 - Keep the backlog current; its queued items, in order, are the
   roadmap. Update it at milestones, not during a human's review
-  windows. Keep work in flight small enough to review.
+  windows. Keep work in flight small enough to review; a found bug's
+  fix still goes in (D87).
 
 ## Challenge assumptions
 
