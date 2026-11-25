@@ -171,7 +171,8 @@ its `app-windows` subcommand, the app's window step of the scenarios'
 run (`Driver.startWindow` and `recordingWindows`, told `onThisMac`), on
 this Mac with the installed app or the given one: light only, no virtual
 screen connected, no dark appearance, no window moved (no Accessibility
-permission), `HOME`, the recording (about 15 s) and the scratch folder
+permission), `HOME`, the recording (about 15 s, longer while an audio
+input is still measuring, see the status window below) and the scratch folder
 deleted afterwards. It needs the Screen & System Audio Recording
 permission and Automation for the app, System Events and Finder for the
 program running it, and says which is missing; on this Mac the reopen
@@ -486,13 +487,22 @@ video from the e2e runs"):
     sends the app its reopen event (what a click on the Dock icon does),
     moves the window to the screen's corner with System Events (the VM's
     screen is small and the window first opens partly off it), makes the
-    app the frontmost one, and takes
+    app the frontmost one, waits until every audio input file of the
+    recording is out of measuring, so the window shows them synced, and
+    takes
     a 5 s video of that window with `screencapture -V` (H.264, 5.000 s,
     one frame per change, so about one a second), then the PNG right
     after it, then sends Stop (SIGINT) and waits for the recording's
     files. The video shows macOS's sharing indicator over the window's
     traffic lights and the pointer; the video has no shadow, its margin is
-    black.
+    black. Out of measuring is read from the recording's
+    `recording.log`, polled once a second (`AudioMeasuring`): an audio
+    input file is out of it once its `recorder` detail line says it
+    `joins the guide track` (the anchor's own file has that line at its
+    start) or has `no clear sound to sync`; the system audio is not
+    measured. Past 90 s (`audioMeasuringLimit`, *data*) the step fails,
+    naming the files still measuring; an input that hears no sound at all
+    stays measuring, so a muted or silent second input fails it.
   - `app-finder-window-<appearance>.png`: a Finder window of the finished
     recording folder, driven through AppleScript: list view, no sidebar,
     no toolbar or status bar, Name, Date Modified, Size and Kind as wide

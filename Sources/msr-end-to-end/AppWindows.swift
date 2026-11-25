@@ -130,6 +130,8 @@ extension Driver {
         try Screenshots.bringToFront(recorder.pid)
         try interruption.sleep(until: Date().addingTimeInterval(2))
 
+        try waitForAudioMeasured(in: recording)
+
         let review = scratch.appending(path: ReviewNames.folder).appending(path: ReviewNames.appStep)
         try FileManager.default.createDirectory(at: review, withIntermediateDirectories: true)
         try Screenshots.video(status, seconds: Self.statusVideoSeconds, to: review.appending(
@@ -142,6 +144,22 @@ extension Driver {
             throw DriverError("msr record did not end with exit 0 after Stop: \(recorder.exit.map { "\($0)" } ?? "still running")")
         }
         try finderWindow(of: recording, appearance: appearance, review: review)
+    }
+
+    /// Waits, polling once a second, until every audio input file of the recording is out of measuring, so
+    /// the status window shows them synced; past `EndToEndValues.audioMeasuringLimit` it fails naming those still measuring.
+    private func waitForAudioMeasured(in recording: URL) throws {
+        let log = recording.appending(path: "recording.log")
+        let deadline = Date().addingTimeInterval(EndToEndValues.audioMeasuringLimit)
+        while true {
+            let measuring = AudioMeasuring.filesMeasuring(log: try String(contentsOf: log, encoding: .utf8))
+            if measuring.isEmpty { return }
+            guard Date() < deadline else {
+                throw DriverError("audio files still measuring after \(Int(EndToEndValues.audioMeasuringLimit)) s: "
+                    + measuring.joined(separator: ", ") + "; see \(log.path)")
+            }
+            try interruption.sleep(until: Date().addingTimeInterval(1))
+        }
     }
 
     /// Connects and disconnects the virtual screens of `Scenario.statusWindowScreenEvents`, timed from

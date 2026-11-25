@@ -20,6 +20,9 @@ public enum EndToEndValues {
     /// How long the driver waits for the screens to settle after a change
     /// before it stops: they settle within about 2.5 s on the runner.
     public static let screensSettleLimit = 15.0
+    /// How long the driver waits for every audio input file of the app's recording to be out of
+    /// measuring (`AudioMeasuring`) before the status window's screenshots and video, in seconds.
+    public static let audioMeasuringLimit = 90.0
     /// How much less than everything up to the kill's last fragment a
     /// killed file may hold, in seconds.
     public static let killSlack = 0.5
