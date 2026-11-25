@@ -178,13 +178,12 @@ public struct AudioDelays: Sendable {
     }
 
     /// What the status window shows for a device's newest file: nothing for one out of the guide track (its
-    /// problem line says so) nor for one the mix places at 0 ms, rounded.
+    /// problem line says so); one the mix places shows it, 0 ms included (D86).
     public func shown(_ name: String) -> Shown? {
         guard let file = files[name], newest[file.uid] == name, !membership.isOut(file.uid), let placed = earlierBy[name] else { return nil }
         guard let placed else {
             return file.unclear >= RecorderValues.audioDelayUnclearMeasurements ? .noClearSoundToSync : .notInTheGuideTrackYet
         }
-        guard (placed * 1000).rounded() != 0 else { return nil }
         return anchorFiles.contains(name) ? .anchor(placed) : .synced(placed, carriedOver: file.applied.isCarriedOver)
     }
 

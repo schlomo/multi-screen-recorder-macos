@@ -20,7 +20,7 @@ import Testing
         #expect(first.earlierBy == ["r.mov": 0, "a.mov": nil, "b.mov": nil])
         #expect(first.delays == ["r.mov": Entry(delay: 0)])
         #expect(delays.shown("a.mov") == .notInTheGuideTrackYet)
-        #expect(delays.shown("r.mov") == nil)
+        #expect(delays.shown("r.mov") == .anchor(0))
         let measured = delays.update(files: recorded(["a.mov", "b.mov"]), reference: "r.mov", lags: ["a.mov": 0.5], at: 20)
         #expect(measured.earlierBy == ["r.mov": 0, "a.mov": 0.5, "b.mov": nil])
         #expect(measured.delays == ["a.mov": Entry(delay: 0.5), "r.mov": Entry(delay: 0)])
@@ -55,7 +55,7 @@ import Testing
         #expect(rounded(outcome.earlierBy) == ["a.mov": 0, "r.mov": 0.3, "b.mov": 0.5])
         #expect(rounded(outcome.delays) == ["a.mov": -0.3, "b.mov": 0.2, "r.mov": 0])
         #expect(delays.shown("r.mov") == .anchor(0.3))
-        #expect(delays.shown("a.mov") == nil)
+        #expect(delays.shown("a.mov") == .synced(0, carriedOver: false))
     }
 
     /// A new earliest input mid-recording changes no other file's listed audio delay, so no other clip is split.
@@ -240,11 +240,12 @@ import Testing
         #expect(changed.isMoved)
     }
 
-    /// A placement that rounds to 0 ms shows nothing, as one at 0 does.
-    @Test func aPlacementRoundingTo0MillisecondsShowsNothing() {
+    /// A placement that rounds to 0 ms shows its sync, 0 ms, as every synced input does (D86).
+    @Test func aPlacementRoundingTo0MillisecondsShowsSynced0Milliseconds() {
         var delays = AudioDelays()
         _ = delays.update(files: recorded(["a.mov"]), reference: "r.mov", lags: ["a.mov": 0.0004], at: 10)
-        #expect(delays.shown("a.mov") == nil)
+        #expect(delays.shown("a.mov").map(RecordingStatusTable.audioDelayText) == "synced 0 ms")
+        #expect(delays.shown("r.mov").map(RecordingStatusTable.audioDelayText) == "synced 0 ms")
     }
 
     /// A counted window no rule takes and a lag dropped say why in the recording log.

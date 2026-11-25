@@ -984,7 +984,8 @@ checked, reported or rewritten at the next start (D47).
   `-0`; empty for a screen; for an audio input's file being written,
   uncoloured and short, `· synced 553 ms`, how much earlier the
   "Audio inputs" mix places the file, once its audio delay is set or
-  confirmed by its own windows, `· synced 533 ms (carried)` while it
+  confirmed by its own windows, `· synced 0 ms` for the earliest input
+  and the anchor's own file at 0 (D86), `· synced 533 ms (carried)` while it
   holds its earlier file's, `· not synced yet` before it has one,
   `· no clear sound` once its file had sound in 3 measurements
   (`audioDelayUnclearMeasurements`, *data*) without a counted window
@@ -993,7 +994,9 @@ checked, reported or rewritten at the next start (D47).
   earlier in the guide track, in line with the earliest microphone;
   measured` (or `; carried over from its previous file until
   measured`; for the anchor's own file, which an earlier input moves,
-  the placement alone, as its audio delay is 0 by definition),
+  the placement alone, as its audio delay is 0 by definition; at 0 ms,
+  `The earliest microphone in the guide track, the others placed in
+  line with it` instead of the placement),
   `Not in the guide track until its audio
   delay is measured; its own audio track is recorded`, `Not in the
   guide track: no clear sound to measure its audio delay against; its
@@ -1652,7 +1655,7 @@ the metadata items (see "Output on disk").
   never measured and the system audio unchanged. The
   status window's Clock drift column shows how much earlier the mix
   places the file (`· synced 553 ms`, `· synced 533 ms (carried)`),
-  nothing at 0. The audio files are not changed; the "Audio inputs"
+  `· synced 0 ms` for the earliest, the anchor included (D86). The audio files are not changed; the "Audio inputs"
   guide track places each input by its audio delay (see "Guide tracks",
   D80); the detail lines say every decision (see "Logging").
 - **Failures.** A failing audio capture or writer and a full disk are

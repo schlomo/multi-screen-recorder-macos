@@ -190,6 +190,11 @@ import Testing
             "Not in the guide track until its audio delay is measured; its own audio track is recorded",
         ])
         #expect(RecordingStatusTable.audioDelayText(.noClearSoundToSync) == "no clear sound")
+        // The mix's zero shows its sync too (D86).
+        #expect(RecordingStatusTable.audioDelayText(.synced(-0.0001, carriedOver: false)) == "synced 0 ms")
+        #expect(RecordingStatusTable.audioDelayDetail(.synced(0, carriedOver: false))
+            == "The earliest microphone in the guide track, the others placed in line with it; measured")
+        #expect(RecordingStatusTable.audioDelayDetail(.anchor(0)) == "The earliest microphone in the guide track, the others placed in line with it")
         #expect(RecordingStatusTable.audioDelayDetail(.noClearSoundToSync)
             == "Not in the guide track: no clear sound to measure its audio delay against; its own audio track is recorded")
     }

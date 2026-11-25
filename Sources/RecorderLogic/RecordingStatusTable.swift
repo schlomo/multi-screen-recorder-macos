@@ -148,7 +148,10 @@ public enum RecordingStatusTable {
     /// how its audio delay came about, or why it is not in the guide track.
     public static func audioDelayDetail(_ shown: AudioDelays.Shown) -> String {
         func placed(_ seconds: Double) -> String {
-            "Placed \(Int((abs(seconds) * 1000).rounded())) ms earlier in the guide track, in line with the earliest microphone"
+            let milliseconds = Int((abs(seconds) * 1000).rounded())
+            return milliseconds == 0
+                ? "The earliest microphone in the guide track, the others placed in line with it"
+                : "Placed \(milliseconds) ms earlier in the guide track, in line with the earliest microphone"
         }
         return switch shown {
         case .notInTheGuideTrackYet: "Not in the guide track until its audio delay is measured; its own audio track is recorded"
