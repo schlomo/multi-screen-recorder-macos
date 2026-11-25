@@ -42,15 +42,14 @@ Still open from D34: what AGC does and whether it is on in auto mode;
 
 ## In flight
 
-- Branch `call-to-action-alerts-and-anchor-measured` (one PR, the
-  owner, 2026-11-24): items 49, 50 with 43, and from 52 the duplicate
-  no-audio set, the missing test, the long doc line and a 30 s
-  end-to-end scenario. Designs signed off as text on 2026-11-24
-  (D84, D85 in the branch): alerts (Dock bounce, badge, count, the
-  next launch's notice, `Report it:`) only for a problem with a call
-  to action; a reconnected anchor is measured against the reference
-  in use. The end-to-end run waits for an idle Mac (the owner,
-  2026-11-24: "don't use the local e2e VM, system is busy").
+- PR #32 (branch `call-to-action-alerts-and-anchor-measured`): items
+  49, 50 with 43, parts of 52; D84 (only a call to action bounces the
+  Dock, sets the badge or asks to report it, with the owner's table)
+  and D85 (a reconnected anchor is measured against the reference in
+  use). Reviewed, pipeline green on 733a926, snapshot `pr-32`. Left:
+  the end-to-end run on its head, waiting for an idle Mac (the owner,
+  2026-11-24: "don't use the local e2e VM, system is busy"), and the
+  owner's try-out.
 
 ## Queued
 
@@ -585,6 +584,15 @@ Still open from D34: what AGC does and whether it is on in auto mode;
    the VM stops with the variable still set. Usage 2026-11-12 to 24:
    399 macOS jobs, about 1,165 billed minutes, free for this public
    repository.
+53. **Follow-ups from PR #32**: the status window's line could name
+   the call to action's words; the "!" badge stays after a call to
+   action's problem ended (older than PR #32); a reference that is
+   not the anchor is never measured and shows "(carried)" on each new
+   file (D80's shortcut); an end-to-end scenario for a late or
+   reconnected microphone needs a broadband test signal (the 1 kHz
+   tone gives clarity about 1.6 against 12, so no window counts);
+   whether a gap of the anchor's device (no unplug) should also start
+   a measured file (D85 measures it only once the reference moved).
 52. **Follow-ups from PR #30**: the recorder's no-audio set duplicates
    the audio tracker's state; no test for a capture ending during no
    audio; one long doc line; an end-to-end scenario of 30 s or more
