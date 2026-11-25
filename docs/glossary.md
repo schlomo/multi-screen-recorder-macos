@@ -458,7 +458,7 @@ stays with, the anchor's returning file not taking it back (D80, D85).
 After 3 stalls in a row, or 1 while nothing is synced, it is tried on
 each input being written that is not flat, once per stall episode, one
 with an audio delay first, then by action score, and goes back once
-when every one was tried (D89). Not the "Reference implementation"
+when every one was tried, never to a flat input (D89). Not the "Reference implementation"
 above.
 
 ## Action score

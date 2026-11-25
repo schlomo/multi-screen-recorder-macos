@@ -110,8 +110,8 @@ public struct AudioDelays: Sendable {
     private var stalls = 0
     private var stalledReference: String?
     /// The stall episode (D89): the device it started from, every device tried in it, that one included, and
-    /// whether the reference went back to it; nil from a counted window or a new file on.
-    private var episode: (origin: String, tried: Set<String>, isBack: Bool)?
+    /// whether the reference went back to it or the log said it stays; nil from a counted window or a new file on.
+    private var episode: (origin: String, tried: Set<String>, isBack: Bool, hasStayed: Bool)?
     /// An input other than the anchor has had an audio delay in this recording (D89).
     private var hasSynced = false
 
@@ -263,7 +263,7 @@ public struct AudioDelays: Sendable {
     /// the reference among `candidates` (`files` as for `update`); a measurement against another reference
     /// than the one in use now counts nothing (D80, D85). After `referenceUnsyncedMeasurements` stalls in a row,
     /// 1 while no input but the anchor has had an audio delay, the reference is tried on the next candidate, and
-    /// once every candidate was tried it goes back to where the stall episode started (D89).
+    /// once every candidate was tried it goes back to where the stall episode started, once that is not flat (D89).
     public mutating func measured(
         _ measurement: Measurement, files newest: [String: String], candidates: [Candidate], at: Double
     ) -> Outcome {
@@ -301,7 +301,7 @@ public struct AudioDelays: Sendable {
             (stalls, episode) = (0, nil)
         } else if measurement.files.contains(where: \.hasSound) {
             stalls += 1
-            var current = episode ?? (origin: reference.uid, tried: [reference.uid], isBack: false)
+            var current = episode ?? (origin: reference.uid, tried: [reference.uid], isBack: false, hasStayed: false)
             if stalls >= (hasSynced ? RecorderValues.referenceUnsyncedMeasurements : 1) {
                 let untried = candidates.filter { !current.tried.contains($0.uid) && score($0) >= RecorderValues.actionScoreFlat }
                 let stalled = "reference \(reference.file): no counted window in \(stalls) measurement\(stalls == 1 ? "" : "s") "
@@ -314,11 +314,16 @@ public struct AudioDelays: Sendable {
                     target = next
                 } else if current.tried.count > 1, !current.isBack {
                     // Every candidate with action tried: no input is tried twice until a window counts or a new file
-                    // starts, so an episode moves the reference at most once per input and once back.
-                    current.isBack = true
-                    let origin = candidates.first { $0.uid == current.origin }
-                    lines.append("\(stalled); every candidate tried, " + (origin.map { "back to \($0.file)" } ?? "it stays the reference"))
-                    target = origin
+                    // starts, so an episode moves the reference at most once per input and once back. Never back to
+                    // a flat origin, where no talker could sync; the move back waits until the origin has action.
+                    if let origin = candidates.first(where: { $0.uid == current.origin }), score(origin) >= RecorderValues.actionScoreFlat {
+                        current.isBack = true
+                        lines.append("\(stalled); every candidate tried, back to \(origin.file)")
+                        target = origin
+                    } else if !current.hasStayed {
+                        current.hasStayed = true
+                        lines.append("\(stalled); every candidate tried, it stays the reference")
+                    }
                 }
                 episode = current
             }

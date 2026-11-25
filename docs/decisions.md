@@ -3228,8 +3228,9 @@ architect's reading.
   such slices (`actionScoreMinimumSlices`); all *data*. A counted
   window resets the count and ends the episode. When every candidate
   has been tried the reference goes back to the input the episode
-  started on, and nothing is tried twice until a window counts or a
-  new file starts. A try to an input with an audio delay re-bases,
+  started on, never while that one is flat (the reference then stays
+  on the last input tried), and nothing is tried twice until a window
+  counts or a new file starts. A try to an input with an audio delay re-bases,
   every audio delay kept; to one without, it becomes the new anchor
   and every input starts over. A move for no audio or a capture's end
   picks the same way, among every input being written. A measurement
@@ -3248,6 +3249,16 @@ architect's reading.
     file. As written, the rule left the reference on a hum until a new
     file when the talkers started after every candidate had been tried
     (the generated scenario of seed 22).
+  - The move back never goes to a flat origin: the reference stays on
+    the last input tried, and the log says so once (the architect's
+    ruling, so a flat input 1 never keeps the reference once the
+    talkers start after the tries). The move back waits instead of
+    being given up: an origin flat only in a pause gets the reference
+    back once it has action at a later stall. Given up, an unrelated
+    input kept the reference for good while the origin and another
+    microphone talked (the generated scenario of seed 13). So two
+    talkers that never correlate move it up to twice, the try and,
+    once the first speaks again, the move back.
   - A measurement in which no other input had sound neither counts as
     a stall nor resets the count.
   - The reference choice and a measurement's handling live in
@@ -3278,17 +3289,19 @@ architect's reading.
   time, inputs sharing speech long enough end synced, each input is
   tried at most once per episode); `ReferenceChoiceTests` (the owner's
   case, a hum, B-1, M-1, M-2, the audio delay preference, a pause
-  beside an unrelated input, a measurement against a moved reference);
+  beside an unrelated input, a measurement against a moved reference,
+  every candidate tried beside a flat input 1);
   `RecorderTests` (`aNearSilentInput1HandsTheReferenceToAMicrophoneAtTheFirstMeasurement`,
   `aLoudHumNeverBecomesTheReference`,
   `aPauseWhileAnUnsyncedInputSoundsMovesNothing`,
   `aReferenceStalledFor3MeasurementsIsTriedOnAnInputWithAnAudioDelay`,
   `aStalledReferenceWithNothingSyncedIsTriedOnTheMostAction`,
+  `aStalledReferenceIsTriedOnAnInputWithAnAudioDelayBeforeOneWithMoreAction`,
   `aMeasurementAgainstAReferenceThatMovedCountsNothing`);
   `AudioRowsFinalTests.aReferenceTriedOnAnInputWithoutAnAudioDelayWaitsForTheStartOverAndARebaseChangesNothing`;
-  each of 12 deliberate breaks of the rules (no try, no flat filter, no
+  each of 13 deliberate breaks of the rules (no try, no flat filter, no
   one-stall shortcut, threshold 1, no audio delay preference, the
   first-measurement pick back, stale lags counted, lowest number
-  instead of action, no tried set, no move back, silent slices scored,
-  no stale guard) fails at least one of these tests;
+  instead of action, no tried set, no move back, a move back to a flat
+  input, silent slices scored, no stale guard) fails at least one of these tests;
   [design/recorder.md](design/recorder.md), "Audio delay".

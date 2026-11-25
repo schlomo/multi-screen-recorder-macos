@@ -1624,7 +1624,9 @@ the metadata items (see "Output on disk").
   one or two measurements never moves a reference once something is
   synced; a measurement in which no other input had sound neither
   counts nor resets. Once every candidate was tried, the reference goes
-  back to the input the episode started on, once; an input not yet
+  back to the input the episode started on, once, and only while that
+  one is not flat: a flat one keeps the reference where it is, the last
+  input tried, until it has action again; an input not yet
   tried (one that only now has action) is still tried after that, but
   none twice, until a window counts or a new file starts. Once the
   reference is in no audio (muted, D69) or its capture ended
@@ -2183,8 +2185,9 @@ them:
   window in 3 measurements while another input had sound; candidates
   <file> 27.9 dB (audio delay), <file> 21.3 dB; tries <file>` (the
   candidates by action score, those with an audio delay marked), or
-  `…; every candidate tried, back to <file>` (or `it stays the
-  reference`); and `reference <file>: a window counted against it, it
+  `…; every candidate tried, back to <file>` (or, once, `it stays the
+  reference` while the input it would go back to is flat or not being
+  written); and `reference <file>: a window counted against it, it
   stays the reference` when a window counts after more than one try.
 - The mix: `<file>: joins the guide track placed earlier by 500 ms (the
   mix's zero: <file>)`, `<file>: placed earlier by 555 ms → 600 ms (the

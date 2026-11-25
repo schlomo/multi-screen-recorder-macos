@@ -114,15 +114,18 @@ import Testing
     }
 
     /// E2 of the review: two talkers taking turns of 60 s, each on a microphone that hears only its own: a
-    /// bounded number of moves, then the reference stays.
-    @Test func twoTalkersThatNeverCorrelateMoveTheReferenceABoundedNumberOfTimes() {
+    /// bounded number of moves, a try and the move back once the first talker speaks again, then the reference
+    /// stays for the two turns after it.
+    @Test func twoTalkersThatNeverCorrelateMoveTheReferenceABoundedNumberOfTimes() throws {
         let turns = (0..<24).map { ($0 / 6) % 2 == 0 }
         let steps = Self.steps([
             Self.input(1, .unrelated, turns.map { $0 ? .unrelated : .pause }),
             Self.input(2, .unrelated, turns.map { $0 ? .pause : .unrelated }),
         ])
         #expect(Self.moves(steps) <= 2, "\(steps.map(\.lines))")
-        #expect(!steps.dropFirst(12).contains { $0.movedBySound }, "\(steps.map(\.lines))")
+        let back = try #require(steps.firstIndex { $0.lines.contains { $0.contains("every candidate tried, back to ") } })
+        #expect(back <= 12, "\(steps.map(\.lines))")
+        #expect(!steps.dropFirst(back + 1).contains { $0.movedBySound }, "\(steps.map(\.lines))")
     }
 
     /// A reference that stops correlating hands the reference to an input with an audio delay before one with
@@ -139,6 +142,18 @@ import Testing
         #expect(!steps.contains { $0.lines.contains { $0.hasSuffix("every input starts over") } }, "\(steps.map(\.lines))")
         #expect(steps.allSatisfy { Self.delay(of: "u2", in: $0) == synced })
         #expect(steps.last.flatMap { Self.delay(of: "u3", in: $0) }.map { abs($0 - 0.1) < 0.002 } == true, "\(steps.map(\.lines))")
+    }
+
+    /// Every candidate tried while it had only unrelated sound, input 1 a hum: the move back never goes to the
+    /// flat input, so when the talkers start after the tries they sync against the last one tried.
+    @Test func everyCandidateTriedNeverLeavesTheReferenceOnAFlatInput() {
+        let steps = Self.steps([
+            Self.input(1, .flat, Self.repeated(.hum, 9)),
+            Self.input(2, .microphone, lag: 0, Self.repeated(.unrelated, 3) + Self.repeated(.speech, 6)),
+            Self.input(3, .microphone, lag: 0.2, Self.repeated(.unrelated, 3) + Self.repeated(.speech, 6)),
+        ])
+        #expect(steps.dropFirst().allSatisfy { $0.reference != "u1" }, "\(steps.map(\.lines))")
+        #expect(steps.last.flatMap { Self.delay(of: "u2", in: $0) ?? Self.delay(of: "u3", in: $0) } != nil, "\(steps.map(\.lines))")
     }
 
     /// A pause of the reference and a synced microphone for 20 s beside an unrelated input with action moves

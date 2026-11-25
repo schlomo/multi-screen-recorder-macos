@@ -670,6 +670,27 @@ extension GlobalRecordingLog {
             #expect(log.contains(": lag 300 ms early against \(a), clarity"))
         }
 
+        /// A stalled reference is tried on the input with an audio delay before one with more action and none:
+        /// re-based, every audio delay kept, nothing started over (D89).
+        @Test func aStalledReferenceIsTriedOnAnInputWithAnAudioDelayBeforeOneWithMoreAction() async throws {
+            try await startInputs(["R", "A", "B"])
+            try feed(["R": .speech(0), "A": .noisySpeech(0.5), "B": .quiet])
+            await recorder.measureAudioDelays()
+            for _ in 0..<4 {
+                try feed(["R": .hum, "A": .noisySpeech(0.5), "B": .speech(0.2)])
+                await recorder.measureAudioDelays()
+            }
+            let (r, a) = (try fileName(of: "R"), try fileName(of: "A"))
+            let (delaysOfA, delaysOfB) = (try delays(of: "A"), try delays(of: "B"))
+            #expect(delaysOfA.count == 1 && abs((delaysOfA.first ?? 0) - 0.5) < 0.002, "\(delaysOfA)")
+            #expect(delaysOfB.count == 1 && abs((delaysOfB.first ?? 0) - 0.2) < 0.002, "\(delaysOfB)")
+            _ = await stop()
+            let log = try recordingLog()
+            #expect(log.contains("; tries \(a)"), "\(log)")
+            #expect(log.contains("reference \(r) → \(a): lags re-based onto the anchor by 500 ms late"), "\(log)")
+            #expect(!log.contains("every input starts over"), "\(log)")
+        }
+
         /// The same with nothing synced: one stall suffices, and the input with the most action becomes the new
         /// anchor, every input starting over (D89).
         @Test func aStalledReferenceWithNothingSyncedIsTriedOnTheMostAction() async throws {
