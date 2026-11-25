@@ -76,6 +76,8 @@ public struct AudioTracker: Sendable {
         /// When it last appeared, went, or its capture ended without a failure.
         var changedAt: Int64
         var restartDelay: Duration
+        /// Its restarts after its writer failed (D88).
+        var writerRestarts: WriterRestarts?
         /// The channel count as last read, to start a new file when it changes.
         var channelCount: Int?
         /// It was recorded at some time: the status window and events name it.
@@ -96,6 +98,7 @@ public struct AudioTracker: Sendable {
     public let settleTime: Duration
     public let firstRestartDelay: Duration
     public let longestRestartDelay: Duration
+    public let writerFailedAgainWithin: Duration
 
     private var sources: [SourceID: Tracked] = [:]
     private var nextInputNumber = 1
@@ -120,12 +123,14 @@ public struct AudioTracker: Sendable {
         settings: Settings,
         settleTime: Duration = RecorderValues.settleTime,
         firstRestartDelay: Duration = RecorderValues.firstRestartDelay,
-        longestRestartDelay: Duration = RecorderValues.longestRestartDelay
+        longestRestartDelay: Duration = RecorderValues.longestRestartDelay,
+        writerFailedAgainWithin: Duration = RecorderValues.writerFailedAgainWithin
     ) {
         self.settings = settings
         self.settleTime = settleTime
         self.firstRestartDelay = firstRestartDelay
         self.longestRestartDelay = longestRestartDelay
+        self.writerFailedAgainWithin = writerFailedAgainWithin
     }
 
     /// The audio inputs, the main screen and the screens connected at the
@@ -308,7 +313,10 @@ public struct AudioTracker: Sendable {
             var failed = RecordingEvent(at: now, event: .audioFileWriterFailed, audioSource: tracked.name)
             failed.errorDetail = error
             step.events.append(failed)
-            scheduleRestart(id, at: now)
+            let (wait, restarts) = WriterRestarts.after(
+                tracked.writerRestarts, at: now, within: writerFailedAgainWithin, first: firstRestartDelay, longest: longestRestartDelay)
+            sources[id]?.phase = .waitingToRestart(notBefore: now + wait.nanoseconds)
+            sources[id]?.writerRestarts = restarts
         case .writerFellBehind:
             step.events.append(RecordingEvent(at: now, event: .audioFileWriterFellBehind, audioSource: tracked.name))
             scheduleRestart(id, at: now)
@@ -335,6 +343,9 @@ public struct AudioTracker: Sendable {
                 if tracked.wasRecorded { sources[id]?.startToTell = true }
                 systemAudioDisplayID = nil
                 step.actions.append(.startSystemAudio)
+            }
+            if case .waitingToRestart = tracked.phase, tracked.writerRestarts?.startedAt == nil {
+                sources[id]?.writerRestarts?.startedAt = now
             }
             sources[id]?.phase = .recording
             sources[id]?.isNoAudio = false

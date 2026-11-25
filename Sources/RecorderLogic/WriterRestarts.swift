@@ -1,4 +1,4 @@
-/// A screen's or camera's restarts after its writer failed (D88): a failed writer's status is final, so the
+/// A screen's, camera's or audio source's restarts after its writer failed (D88): a failed writer's status is final, so the
 /// first restart is at once; a writer failing again within `writerFailedAgainWithin` of its restart waits the
 /// back-off, rising, so a broken encoder cannot loop.
 struct WriterRestarts: Equatable, Sendable {
