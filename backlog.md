@@ -2,15 +2,13 @@
 
 ## Next session starts here
 
-PR #32 (items 49, 50 with 43, parts of 52; D84, D85) is reviewed and
-green on 733a926, snapshot `pr-32`. Before it is marked ready: the
-end-to-end run on its head (`scripts/end-to-end-test`, once the
-owner's Mac is idle; record the commit and result in the PR
-description) and the owner's try-out. Then item 51 (the runner VM,
-its own PR, the owner registers the runner), then item 22 (camera
-picture sync from claps). The owner, 2026-11-23: "Noticeable lip sync
-is my goal"; "Iterative improvement, every shipment is better". The
-end-to-end tests need an idle Mac (`docs/troubleshooting.md`).
+PR #32 (items 49, 50 with 43, parts of 52; D84 to D86) is ready on
+c6f66d2 and waits for the owner's try-out and merge. Then item 51
+(the runner VM, its own PR, the owner registers the runner), then
+item 22 (camera picture sync from claps). The owner, 2026-11-23:
+"Noticeable lip sync is my goal"; "Iterative improvement, every
+shipment is better". The end-to-end tests need an idle Mac: a video
+call is enough to fail `virtual-screen` (`docs/troubleshooting.md`).
 
 The owner's signing certificate is trusted for code signing in the
 login keychain since 2026-11-24, so a try-out can be built and signed
@@ -39,13 +37,13 @@ Still open from D34: what AGC does and whether it is on in auto mode;
 ## In flight
 
 - PR #32 (branch `call-to-action-alerts-and-anchor-measured`): items
-  49, 50 with 43, parts of 52; D84 (only a call to action bounces the
-  Dock, sets the badge or asks to report it, with the owner's table)
-  and D85 (a reconnected anchor is measured against the reference in
-  use). Reviewed, pipeline green on 733a926, snapshot `pr-32`. Left:
-  the end-to-end run on its head, waiting for an idle Mac (the owner,
-  2026-11-24: "don't use the local e2e VM, system is busy"), and the
-  owner's try-out.
+  49, 50 with 43, parts of 52; D84, D85, and D86 (every synced audio
+  input shows its sync, 0 ms included, from the owner's try-out).
+  Ready on c6f66d2: reviewed, pipeline green, end-to-end tested
+  (`virtual-screen` failed once with the busy-Mac encoder error during
+  the owner's video call, passed 2 of 2 re-run alone). Snapshot
+  0.20261125.114 installed in `/Applications`. Waiting for the owner's
+  try-out and merge.
 
 ## Queued
 
