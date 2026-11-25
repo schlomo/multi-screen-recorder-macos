@@ -2143,7 +2143,7 @@ them:
 
 A problem's call to action, when it is given (D84), is the detail line
 `call to action: <problem>` of category `recorder`; one that only decides the
-report at Stop is `call to action at Stop: <problem>`.
+report at Stop is `asks to report it at Stop: <problem>`.
 
 **Capture detail (D66).** The detail lines of category `capture` say
 what a screen capture and its writer saw, to root-cause a writer that

@@ -398,7 +398,7 @@ import Testing
         manifest.problems = [RecordingProblem(at: 0, problem: "Cannot write the recording log recording.log", error: "full")]
         manifest.finalize(ended: start + 60, timeZone: berlin, recordingLogWritten: false)
         #expect(manifest.result == .problems)
-        #expect(RecordingSummary(manifest: manifest, recordingFolder: "/r", seconds: 60, manifestWritten: true, problemsAskToReportIt: false).endedWithError)
+        #expect(RecordingSummary(manifest: manifest, recordingFolder: "/r", seconds: 60, manifestWritten: true, problemsAskToReportIt: false, filesEndedByAFullDisk: []).endedWithError)
     }
 
     /// A manifest from before D64 has an event's `error` and no `errorDetail`: reading it keeps the text.
@@ -599,28 +599,28 @@ import Testing
     }
 
     @Test func aCleanRecordingEndsWithoutError() {
-        let summary = RecordingSummary(manifest: manifest([.finalized]), recordingFolder: "/r", seconds: 3725, manifestWritten: true, problemsAskToReportIt: false)
+        let summary = RecordingSummary(manifest: manifest([.finalized]), recordingFolder: "/r", seconds: 3725, manifestWritten: true, problemsAskToReportIt: false, filesEndedByAFullDisk: [])
         #expect(!summary.endedWithError)
         #expect(summary.text == "Recorded 1h02m05s into /r\n  f0.mov  finalized\n")
     }
 
     @Test func aFileNotFinalizedOrAnErrorEventIsAnError() {
-        #expect(RecordingSummary(manifest: manifest([.notFinalized]), recordingFolder: "/r", seconds: 1, manifestWritten: true, problemsAskToReportIt: false).endedWithError)
+        #expect(RecordingSummary(manifest: manifest([.notFinalized]), recordingFolder: "/r", seconds: 1, manifestWritten: true, problemsAskToReportIt: false, filesEndedByAFullDisk: []).endedWithError)
         var failed = RecordingEvent(at: 65_000_000_000, event: .screenStreamFailed, screen: "LG")
         failed.errorDetail = "-3811"
         let summary = RecordingSummary(
             manifest: manifest([.finalized, .finalized], events: [failed, RecordingEvent(at: 0, event: .sleep)]),
-            recordingFolder: "/r", seconds: 70, manifestWritten: true, problemsAskToReportIt: false)
+            recordingFolder: "/r", seconds: 70, manifestWritten: true, problemsAskToReportIt: false, filesEndedByAFullDisk: [])
         #expect(summary.endedWithError)
         #expect(summary.text.hasSuffix("Error at 1m05s: screen stream failed, LG (-3811)\n"))
     }
 
     /// F3: the final manifest not written is a failure; the file on disk has no `ended`.
     @Test func aFinalManifestNotWrittenIsAnError() {
-        let summary = RecordingSummary(manifest: manifest([.finalized]), recordingFolder: "/r", seconds: 1, manifestWritten: false, problemsAskToReportIt: false)
+        let summary = RecordingSummary(manifest: manifest([.finalized]), recordingFolder: "/r", seconds: 1, manifestWritten: false, problemsAskToReportIt: false, filesEndedByAFullDisk: [])
         #expect(summary.endedWithError)
         #expect(summary.text.hasSuffix("The recording manifest could not be written at the end: recording.json has no end.\n"))
-        #expect(!RecordingSummary(manifest: manifest([.finalized]), recordingFolder: "/r", seconds: 1, manifestWritten: true, problemsAskToReportIt: false).endedWithError)
+        #expect(!RecordingSummary(manifest: manifest([.finalized]), recordingFolder: "/r", seconds: 1, manifestWritten: true, problemsAskToReportIt: false, filesEndedByAFullDisk: []).endedWithError)
     }
 
     /// Only a recording a person can report usefully asks to report it (D84): a problem whose call to action
@@ -628,7 +628,7 @@ import Testing
     @Test func onlyLostDataOrAProblemToReportAsksToReportIt() {
         func summary(_ states: [RecordingManifest.State], events: [RecordingEvent] = [], written: Bool = true, problems: Bool = false) -> RecordingSummary {
             RecordingSummary(manifest: manifest(states, events: events), recordingFolder: "/r", seconds: 1, manifestWritten: written,
-                             problemsAskToReportIt: problems)
+                             problemsAskToReportIt: problems, filesEndedByAFullDisk: [])
         }
         #expect(!summary([.finalized]).asksToReportIt)
         let stalled = summary([.finalized], events: [RecordingEvent(at: 1_000_000_000, event: .cameraStalled, camera: "C")])
@@ -647,7 +647,7 @@ import Testing
     @Test func aProblemIsListedWithItsTimeAndIsNoErrorByItself() {
         var told = manifest([.finalized])
         told.problems = [RecordingProblem(at: 65_000_000_000, problem: "The screens cannot be read", error: "denied")]
-        let summary = RecordingSummary(manifest: told, recordingFolder: "/r", seconds: 70, manifestWritten: true, problemsAskToReportIt: false)
+        let summary = RecordingSummary(manifest: told, recordingFolder: "/r", seconds: 70, manifestWritten: true, problemsAskToReportIt: false, filesEndedByAFullDisk: [])
         #expect(!summary.endedWithError)
         #expect(summary.text.hasSuffix("Problem at 1m05s: The screens cannot be read: denied\n"))
     }
@@ -658,7 +658,7 @@ import Testing
             name: "a.mov", audioSource: "Mic", audioSourceUID: "u", channels: .mono(1), start: 0, timecode: "t")]
         recorded.audioFiles[0].state = .finalized
         recorded.cpu = RecordingManifest.CPU(averagePercent: 12.4, peakPercent: 31.6)
-        let summary = RecordingSummary(manifest: recorded, recordingFolder: "/r", seconds: 5, manifestWritten: true, problemsAskToReportIt: false)
+        let summary = RecordingSummary(manifest: recorded, recordingFolder: "/r", seconds: 5, manifestWritten: true, problemsAskToReportIt: false, filesEndedByAFullDisk: [])
         #expect(summary.text == "Recorded 5s into /r\n  f0.mov  finalized\n  a.mov  finalized\n"
             + "CPU 12 % on average, 32 % at the peak, of one core (this process only)\n")
     }
@@ -685,7 +685,7 @@ import Testing
         recorded.files = [screen(2, "B", at: 0), screen(1, "A", at: 840), screen(1, "A", at: 0)]
         recorded.audioFiles = [audio(input(4, "D"), at: 0), audio(.systemAudio, at: 0), audio(input(10, "K"), at: 0),
                                audio(input(1, "C"), at: 900), audio(input(1, "C"), at: 0)]
-        let lines = RecordingSummary(manifest: recorded, recordingFolder: "/r", seconds: 5, manifestWritten: true, problemsAskToReportIt: false)
+        let lines = RecordingSummary(manifest: recorded, recordingFolder: "/r", seconds: 5, manifestWritten: true, problemsAskToReportIt: false, filesEndedByAFullDisk: [])
             .text.split(separator: "\n").dropFirst().map { $0.dropFirst(2).dropLast(11) }
         let names = lines.map { String($0) }
         #expect(names == [recorded.files[2].name, recorded.files[1].name, recorded.files[0].name,
@@ -698,7 +698,7 @@ import Testing
     @Test func aWriterThatFailedIsAnError() {
         var failed = RecordingEvent(at: 0, event: .screenFileWriterFailed, screen: "LG")
         failed.errorDetail = "cannot write"
-        let summary = RecordingSummary(manifest: manifest([.finalized], events: [failed]), recordingFolder: "/r", seconds: 1, manifestWritten: true, problemsAskToReportIt: false)
+        let summary = RecordingSummary(manifest: manifest([.finalized], events: [failed]), recordingFolder: "/r", seconds: 1, manifestWritten: true, problemsAskToReportIt: false, filesEndedByAFullDisk: [])
         #expect(summary.endedWithError)
         #expect(summary.text.contains("screen file writer failed, LG (cannot write)"))
     }
@@ -775,7 +775,7 @@ import Testing
         recorded.audioFiles = [RecordingManifest.AudioFile(
             name: "2026-11-12 14.03.05 Audio 0 - System.mov", audioSource: "System audio", audioSourceUID: nil, channels: .stereo,
             start: 0, timecode: "t")]
-        let names = RecordingSummary(manifest: recorded, recordingFolder: "/r", seconds: 5, manifestWritten: true, problemsAskToReportIt: false)
+        let names = RecordingSummary(manifest: recorded, recordingFolder: "/r", seconds: 5, manifestWritten: true, problemsAskToReportIt: false, filesEndedByAFullDisk: [])
             .text.split(separator: "\n").dropFirst().prefix(3).map { $0.dropFirst(22).prefix { $0 != "." } }
         #expect(names == ["Screen 1 - A", "Camera 1 - FaceTime HD Camera", "Audio 0 - System"])
     }

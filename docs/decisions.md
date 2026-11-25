@@ -2953,8 +2953,8 @@ architect's reading.
     to action from its own tell.
   - At Stop, a source still failing makes the recording ask to report
     it, without its 10 s: it does not come back in this recording.
-    That decides the report only: nothing bounces the Dock or sets the
-    badge at Stop.
+    That evaluation decides the report only: it bounces nothing and sets
+    no badge (a problem told while stopping still gives its live call).
   - An audio source or audio file ended by a full disk is the full
     disk: free up disk space, never "report it"; told as the full disk,
     one already told stands and no second call follows. A file a full

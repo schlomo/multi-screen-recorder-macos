@@ -204,7 +204,8 @@ public struct ProblemsTold: Sendable {
         var note: String?
         /// Its call to action was given (D84).
         var calledToAction = false
-        /// None whatever its kind: a screen's file ended because it showed another screen's picture (D84).
+        /// None whatever its kind: a problem whose call to action another one gives, another screen's picture or
+        /// the tail of a file a full disk cut short (D84).
         var withoutCallToAction = false
     }
 

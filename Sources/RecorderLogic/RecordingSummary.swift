@@ -14,7 +14,7 @@ public struct RecordingSummary: Equatable, Sendable {
 
     public init(
         manifest: RecordingManifest, recordingFolder: String, seconds: Double, manifestWritten: Bool, problemsAskToReportIt: Bool,
-        filesEndedByAFullDisk: Set<String> = []
+        filesEndedByAFullDisk: Set<String>
     ) {
         self.manifest = manifest
         self.recordingFolder = recordingFolder

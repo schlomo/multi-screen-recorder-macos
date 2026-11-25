@@ -455,7 +455,7 @@ public final class Recorder {
             }
             // A source still failing does not come back in this recording: it decides the report, nothing live (D84).
             for problem in problemsTold.callsToAction(now: context.now(), unrecoveredAfter: unrecoveredAfter, atStop: true) {
-                RecorderLog.detail("call to action at Stop: \(problem.text)", category: "recorder")
+                RecorderLog.detail("asks to report it at Stop: \(problem.text)", category: "recorder")
             }
             manifest.finalize(
                 ended: Date(), timeZone: context.timeZone, cpu: cpu.manifestEntry, recordingLogWritten: logFailure == nil)

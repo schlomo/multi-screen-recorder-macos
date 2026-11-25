@@ -59,7 +59,7 @@ import Testing
         let path = "/out/2026-11-19 14.10.46/"
         #expect(ProblemReport.noticeText(recordingFolder: path).hasPrefix("Its recording folder is /out/2026-11-19 14.10.46.\n"))
         let manifest = RecordingManifest(app: "a", started: Date(), timeZone: .gmt, settings: .manual)
-        let summary = RecordingSummary(manifest: manifest, recordingFolder: path, seconds: 1, manifestWritten: true, problemsAskToReportIt: false)
+        let summary = RecordingSummary(manifest: manifest, recordingFolder: path, seconds: 1, manifestWritten: true, problemsAskToReportIt: false, filesEndedByAFullDisk: [])
         #expect(summary.reportText(version: "v").contains("\nAttach: /out/2026-11-19 14.10.46/recording.log and"))
         #expect(ProblemReport.shownPath(path) == ProblemReport.shownPath("/out/2026-11-19 14.10.46"))
     }
@@ -73,7 +73,7 @@ import Testing
     @Test func theSummaryEndsWithTheLinkAndTheFilesToAttach() throws {
         var manifest = RecordingManifest(app: "a", started: Date(), timeZone: .gmt, settings: .manual)
         manifest.problems = [RecordingProblem(atSeconds: 3, problem: "The screens cannot be read", error: "denied")]
-        let summary = RecordingSummary(manifest: manifest, recordingFolder: "/r", seconds: 9, manifestWritten: false, problemsAskToReportIt: false)
+        let summary = RecordingSummary(manifest: manifest, recordingFolder: "/r", seconds: 9, manifestWritten: false, problemsAskToReportIt: false, filesEndedByAFullDisk: [])
         let lines = summary.reportText(version: "v").split(separator: "\n", omittingEmptySubsequences: false)
         #expect(lines.count == 3 && lines[2].isEmpty)
         #expect(lines[1] == "Attach: /r/recording.log and recording.json")
@@ -86,7 +86,7 @@ import Testing
     /// The recorder's folder path ends in a slash.
     @Test func theFilesToAttachHaveOneSlash() {
         let manifest = RecordingManifest(app: "a", started: Date(), timeZone: .gmt, settings: .manual)
-        let summary = RecordingSummary(manifest: manifest, recordingFolder: "/out/2026-11-19 14.10.46/", seconds: 1, manifestWritten: true, problemsAskToReportIt: false)
+        let summary = RecordingSummary(manifest: manifest, recordingFolder: "/out/2026-11-19 14.10.46/", seconds: 1, manifestWritten: true, problemsAskToReportIt: false, filesEndedByAFullDisk: [])
         #expect(summary.reportText(version: "v").hasSuffix("\nAttach: /out/2026-11-19 14.10.46/recording.log and recording.json\n"))
     }
 }
