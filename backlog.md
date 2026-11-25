@@ -2,18 +2,13 @@
 
 ## Next session starts here
 
-PR #32 (items 49, 50 with 43, parts of 52; D84 to D88) is ready on
-9336a12 and waits for the owner's merge: reviewed, pipeline green,
-end-to-end 7 of 7 on an idle Mac. At merge the owner confirms two
-readings: audio writers get D88's restart rule, and the badge and
-count show a call to action only while its problem lasts (the Dock
-bounce goes on until the app is clicked). Then item 51 (the runner
-VM, its own PR, the owner registers the runner; GitHub's hosted macOS
-runners stalled PR #32's pipeline twice on 2026-11-25), then item 22
-(camera picture sync from claps). The owner, 2026-11-23: "Noticeable
-lip sync is my goal"; "Iterative improvement, every shipment is
-better". The end-to-end tests need an idle Mac: a video call is
-enough to fail `virtual-screen` (`docs/troubleshooting.md`).
+Item 51 (the runner VM, its own PR, the owner registers the runner;
+GitHub's hosted macOS runners stalled PR #32's pipeline twice on
+2026-11-25), in a fresh session; then item 22 (camera picture sync
+from claps). The owner, 2026-11-23: "Noticeable lip sync is my goal";
+"Iterative improvement, every shipment is better". The end-to-end
+tests need an idle Mac: a video call is enough to fail
+`virtual-screen` (`docs/troubleshooting.md`).
 
 The owner's signing certificate is trusted for code signing in the
 login keychain since 2026-11-24, so a try-out can be built and signed
@@ -41,11 +36,7 @@ Still open from D34: what AGC does and whether it is on in auto mode;
 
 ## In flight
 
-- PR #32 (branch `call-to-action-alerts-and-anchor-measured`): items
-  49, 50 with 43, parts of 52; D84 to D88. Ready on 9336a12: reviewed,
-  pipeline green, end-to-end 7 of 7. The owner's try-out runs a local
-  build of 0af3768 (the app is unchanged since). Waiting for the
-  owner's merge.
+Nothing.
 
 ## Queued
 
@@ -515,10 +506,6 @@ Still open from D34: what AGC does and whether it is on in auto mode;
    rec9's decoded at +14.4 dBFS (2279 samples above 1.0 in a second);
    fine in a float editor, clipped in any 16- or 24-bit export. Find
    where the level comes from.
-43. **Orange problems and the Dock** (owner's call): every problem
-   bounces the Dock, sets the "!" badge and counts in the status line,
-   orange ones included; by the owner's rule orange needs no human.
-   D79's kind is exempt; ask whether all orange ones should be.
 44. **Smaller follow-ups from PR #27**: a stopRunning time-out for a
    camera; `framesRepeatedForLateness` names frames placed late (a
    manifest key, the owner's to rename); the Razer's padded zeros are
@@ -537,33 +524,6 @@ Still open from D34: what AGC does and whether it is on in auto mode;
    - a way to run the recorder's tests under CPU load locally, as the
      PR #27 builder did by hand (36 `yes` processes).
    Moot for the compiler once item 2 lands.
-49. **A reconnected first microphone is measured again** (the owner's
-   try-out of PR #30, 2026-11-24: "it feels like there is a slight echo
-   after the osmo reconnect that then gets less, but stays more than
-   before the disconnect"; "I'd fix it only in a follow up round").
-   [KNOWN, `2026-11-24 20.55.08`] The Osmo sounded first, so it was the
-   anchor; the Razer measured 548 to 581 ms early against it. After
-   its unplug (86.5 to 117.2 s) its new file became the anchor again at
-   0 ms and was never measured, while the Razer now measured 444 to 475
-   ms early: the Osmo had become about 100 ms less late. The Razer's
-   delay could change only by the 60 s rule (3 of 5 windows by Stop),
-   and hindsight merged its windows from before and after into one
-   548 ms, so its last 40 s are about 100 ms off. The architect's
-   proposal, for sign-off as text: an anchor device's new file is not
-   the anchor; it carries over and is measured against the reference
-   like any other input; hindsight's stretches also end at a change of
-   reference.
-50. **No notice for problems without a clear action** (the owner,
-   2026-11-24, of a "camera stalled" notice after a screen switch: "TBH
-   I don't think that this warrants a bug report, do you? What would we
-   do with that info?"; "I won't open a popup for past recordings if
-   there is no clear action"). The notice "The last recording had
-   problems" shows only for a recording with a problem that has a clear
-   action (a report we can act on, or something the person must do);
-   the others stay in the status window, `recording.json` and
-   `recording.log`. Design first: which problem kinds have a clear
-   action (`ProblemKind` in `Sources/RecorderLogic/ProblemsTold.swift`),
-   and whether `msr record`'s `Report it:` line follows the same rule.
 51. **A self-hosted runner in a VM on the owner's Mac, hosted as the
    fallback** (the owner, 2026-11-24: "Only I develop, can we put the
    private runner first and use GH hosted runner as fallback?"; "I
@@ -588,13 +548,10 @@ Still open from D34: what AGC does and whether it is on in auto mode;
    tone gives clarity about 1.6 against 12, so no window counts);
    whether a gap of the anchor's device (no unplug) should also start
    a measured file (D85 measures it only once the reference moved).
-52. **Follow-ups from PR #30**: the recorder's no-audio set duplicates
-   the audio tracker's state; no test for a capture ending during no
-   audio; one long doc line; an end-to-end scenario of 30 s or more
-   that checks a late microphone being placed (the VM's tone
-   recordings are 10 s, shorter than the first measurement); a
-   `recording.json` spec at v1 (the owner, 2026-11-24: "maybe time to
-   write a proper spec for the json? Or not yet").
+52. **Follow-ups from PR #30**: a `recording.json` spec at v1 (the
+   owner, 2026-11-24: "maybe time to write a proper spec for the json?
+   Or not yet"). The rest was done in PR #32; the late-microphone
+   scenario moved to item 53.
 
 ## Deliberately deferred
 
@@ -739,6 +696,16 @@ Still open from D34: what AGC does and whether it is on in auto mode;
   the README (D46). Revisit when people struggle with it.
 
 ## Done (recent)
+
+- 2026-11-25: PR #32 merged by the owner, release 0.20261125.116: items 49
+  (a reconnected anchor is measured again, D85), 50 with 43 (only a
+  call to action bounces the Dock, sets the badge or asks to report it,
+  D84), most of 52; every synced microphone shows its sync, 0 ms
+  included (D86); bugs are fixed where they are found (D87, proposed
+  upstream as tektit/ai-working-model#7); a failed writer starts a new
+  file at once (D88); screenshots wait until the audio rows are final.
+  End-to-end 7 of 7 on 9336a12; the owner's try-outs at home and at
+  work (an unplugged screen with a BRIO) looked good in Resolve.
 
 - 2026-11-24: PR #30 merged by the owner, release 0.20261124.108: item
   38 (microphones placed by their audio delay in the guide track, D80,
