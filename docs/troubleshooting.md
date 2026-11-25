@@ -195,6 +195,21 @@ One row per entry, the error text exactly as in the entry.
 - **Verify:** CI's `scripts/test` passes on the pushed head.
 - **Observed:** 2026-11-17, PR #19; resolved, CI passed with the fix
   (run 44125362376).
+- **Observed again:** 2026-11-25, PR #32, run 45617470455 on 2f62829:
+  `VideoFileTickerTests.aLongLastMixIsNotDroppedWhileTheWriterWaits`
+  "failed after 31.696 seconds", `samples.count → 48000 == videoSamples
+  → 337600` and `guideTracksCut` not empty, while
+  `ClockDriftCorrectionTests` (56 s) and `ClockDriftTrackerTests` (92 s)
+  ran in parallel on the 3-core hosted runner; it passed on 733a926 (run
+  45516567075) and locally. The writer is ready on an event, but the
+  30 s drain timeout was still within reach of a starved pool. Fix: the
+  three ticker tests that wait for the writer
+  (`theGuideTracksEndWithTheVideoAfterAStreamStopLongerThanFiveSeconds`,
+  `aLongLastMixIsNotDroppedWhileTheWriterWaits`,
+  `theLastGuideSamplesWaitForTheWriterWithinTheDrainTimeout`) use a
+  120 s drain timeout, every assertion kept;
+  `aLastMixTheWriterDoesNotTakeInTimeIsTold`, which asserts the timeout
+  fires, keeps its 50 ms.
 
 ## A virtual screen comes back at its last mode
 

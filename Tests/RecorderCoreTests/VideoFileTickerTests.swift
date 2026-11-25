@@ -180,7 +180,7 @@ import Testing
         let ticksOfVideo: Int64 = 7 * 30
         let videoSamples = Int((ticksOfVideo + 1) * 1600)
         let handedOver = 48_000
-        let (ticker, made, handed) = try guidedFile(handedOver: handedOver, drainTimeout: .seconds(30))
+        let (ticker, made, handed) = try guidedFile(handedOver: handedOver, drainTimeout: .seconds(120))
         var mix = handed
         mix.receive([[Float](repeating: 0.25, count: videoSamples - handedOver + 9600)], from: "A", at: 1_000_000_000)
         #expect(ticker.tick(now: grid.time(ofTick: ticksOfVideo - 3)) == nil)
@@ -207,7 +207,7 @@ import Testing
         let ticksOfVideo: Int64 = 7 * 30
         let videoSamples = Int((ticksOfVideo + 1) * 1600)
         let handedOver = 48_000
-        let (ticker, made, handed) = try guidedFile(handedOver: handedOver, drainTimeout: .seconds(30))
+        let (ticker, made, handed) = try guidedFile(handedOver: handedOver, drainTimeout: .seconds(120))
         var mix = handed
         mix.receive([[Float](repeating: 0.25, count: videoSamples - handedOver)], from: "A", at: 1_000_000_000)
         #expect(ticker.tick(now: grid.time(ofTick: ticksOfVideo)) == nil)
@@ -255,7 +255,7 @@ import Testing
     /// The guide samples at the end wait for the writer as the ticks do.
     @Test func theLastGuideSamplesWaitForTheWriterWithinTheDrainTimeout() async throws {
         // A drain timeout far above the writer's wait, so a slow machine passes too.
-        let (ticker, made, mix) = try guidedFile(handedOver: videoSamples, guideReady: false, drainTimeout: .seconds(30))
+        let (ticker, made, mix) = try guidedFile(handedOver: videoSamples, guideReady: false, drainTimeout: .seconds(120))
         #expect(ticker.tick(now: grid.time(ofTick: 30)) == nil)
         #expect(made.guides.isEmpty)
         made.becomesGuideReady(afterRefusals: 4)
