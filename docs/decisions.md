@@ -3058,3 +3058,32 @@ architect's reading.
 - **Evidence:** the owner's recording `2026-11-25 13.23.54`;
   `AudioDelaysTests` and `RecordingStatusTableTests`;
   [design/recorder.md](design/recorder.md), "The app" and "Audio delay".
+
+## D87: Bugs are fixed where they are found (2026-11-25)
+
+- **Status:** in force. Amends the "Stay on the job" principle (a
+  finding outside the job became a backlog item), now "Fix bugs where
+  you find them".
+- **Context:** The owner, 2026-11-25: "I want to speed up total delivery
+  time, ATM it feels like for every PR we put 2 new ones in the backlog.
+  For me a PR is a feature delivery, and bugs get fixed wherever we find
+  them. wrong?" Then, after the proposal and its check question (the
+  runner VM PR waits while a `msr timeline` bug the review found is
+  fixed and tested): "yes, that is what I wanted. We walk the path of
+  quality". The trigger: PR #32's end-to-end run exposed a screen file
+  writer whose failed end blocked its restart for 3 s, which would
+  otherwise have become another backlog item.
+- **Decision:** One job per session or brief, and a job is a feature
+  delivery. A bug found while doing it (wrong behaviour, a flaky test, a
+  stale doc, wherever it sits in the code) is fixed in the same change,
+  test first, and named in the change's description; a fix that needs a
+  design still gets a human's sign-off as text before it is built. Only
+  a new feature or a new design becomes a backlog item and a one-line
+  mention, never a detour. Replaces "Stay on the job" in part.
+- **Consequences:** A change grows while it is open, so its review takes
+  longer and it ships later; accepted, as parking bugs made the backlog
+  grow faster than delivery. Backlog items that are bugs get pulled into
+  the next PR that touches their area (the architect's reading).
+- **Evidence:** this change;
+  [principles/ai-working-process.md](principles/ai-working-process.md),
+  "Fix bugs where you find them".

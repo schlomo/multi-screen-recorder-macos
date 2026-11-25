@@ -52,15 +52,15 @@ verifying agent output are in the principles (linked from
   often carries the facts a new command, channel or check would
   collect (the owner, 2026-11-16: a screenshot of the start window
   instead of two Terminal commands).
-- **An MR/PR keeps its scope.** When a human's test asks for
-  something new rather than a fix, propose it as the next MR/PR, say
-  what the current one lacks without it, and let the human decide;
-  recommend keeping it in only when the current one would ship broken
-  without it. In PR #27 the late microphone leaving the guide track had
-  to go in ("Seems like a faulty release", the owner, 2026-11-23); the
-  audio delay, the problem lines' colours and the guide limiter could
-  each have been their own PR. PR #27 grew from two items to six
-  decisions and 67 commits.
+- **An MR/PR keeps its feature scope.** A bug a human's test or a
+  review finds is fixed in it ([Fix bugs where you find
+  them](../../../docs/principles/ai-working-process.md#fix-bugs-where-you-find-them)),
+  test first. Something new rather than a fix is proposed as the next
+  MR/PR: say what the current one lacks without it and let the human
+  decide. In PR #27 the late microphone leaving the guide track was a
+  fix and went in ("Seems like a faulty release", the owner,
+  2026-11-23); the audio delay, the problem lines' colours and the
+  guide limiter were new and could each have been their own PR.
 - **When deferring, say what the human sees meanwhile.** "Queued as
   item 38" hid that the guide track would keep a late microphone's
   echo until then; the owner had to ask.

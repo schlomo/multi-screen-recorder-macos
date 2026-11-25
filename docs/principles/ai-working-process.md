@@ -429,12 +429,22 @@ an open question is one backlog item, and an unknown is stated
 plainly where it matters. Team-facing docs spell names and terms out
 rather than using abbreviations only their author knows.
 
-## Stay on the job
+## Fix bugs where you find them
 
-One job per session or brief. A finding outside it becomes one
-backlog item and a one-line mention, never a detour: a detour spends
-context and a human's review attention on work nobody asked for, and
-the backlog keeps the finding from getting lost.
+One job per session or brief, and a job is a feature delivery. A bug
+found while doing it (wrong behaviour, a flaky test, a stale doc,
+wherever it sits in the code) is fixed in the same change, test first,
+and named in the change's description. A fix that needs a design still
+gets a human's sign-off as text before it is built. Only a new feature
+or a new design becomes one backlog item and a one-line mention, never
+a detour.
+
+The reason is the owner's: "I want to speed up total delivery time, ATM
+it feels like for every PR we put 2 new ones in the backlog. For me a
+PR is a feature delivery, and bugs get fixed wherever we find them."
+Parking bugs made the backlog grow faster than delivery. The cost,
+accepted: a change grows while it is open, so its review takes longer
+and it ships later.
 
 ## Specs and plans are not repo content
 
