@@ -2,19 +2,15 @@
 
 ## Next session starts here
 
-PR #30 is merged (2026-11-24, release 0.20261124.108: items 38, 47
-and 48, D80 to D82). PR #31 is with the owner: homepage screenshots
-from that release on the owner's Mac, and the problem report form's
-one file field (D83). The next PR is one PR (the owner, 2026-11-24:
-"I want less PRs"): item 49 (a reconnected first microphone measured
-again) and item 50 (no notice for problems without a clear action),
-with what fits from item 52. Both designs go to the owner as text
-first. Item 51 (the runner VM, its concept signed off) is its own PR,
-as the owner registers the runner. Then item 22 (camera picture sync
-from claps, a Calibrate button). The owner, 2026-11-23: "Noticeable
-lip sync is my goal"; "Iterative improvement, every shipment is
-better". The end-to-end tests need an idle Mac
-(`docs/troubleshooting.md`).
+PR #32 (items 49, 50 with 43, parts of 52; D84, D85) is reviewed and
+green on 733a926, snapshot `pr-32`. Before it is marked ready: the
+end-to-end run on its head (`scripts/end-to-end-test`, once the
+owner's Mac is idle; record the commit and result in the PR
+description) and the owner's try-out. Then item 51 (the runner VM,
+its own PR, the owner registers the runner), then item 22 (camera
+picture sync from claps). The owner, 2026-11-23: "Noticeable lip sync
+is my goal"; "Iterative improvement, every shipment is better". The
+end-to-end tests need an idle Mac (`docs/troubleshooting.md`).
 
 The owner's signing certificate is trusted for code signing in the
 login keychain since 2026-11-24, so a try-out can be built and signed
