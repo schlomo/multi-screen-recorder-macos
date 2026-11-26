@@ -99,13 +99,6 @@ public enum RecordingResolution: String, CaseIterable, Sendable, Encodable {
         let fitted = box.map { fit(size, into: size.isPortrait ? $0.rotated : $0) } ?? size
         return FrameSize(width: roundedDownToEven(fitted.width), height: roundedDownToEven(fitted.height))
     }
-
-    /// Whether a screen's file continues when its looks-like size changes:
-    /// only while the frame size stays the same; otherwise the file ends
-    /// and a new one starts at the new frame size (D30).
-    public func screenFileContinues(from oldLooksLike: FrameSize, to newLooksLike: FrameSize) -> Bool {
-        frameSize(forLooksLike: oldLooksLike) == frameSize(forLooksLike: newLooksLike)
-    }
 }
 
 private func fit(_ size: FrameSize, into box: FrameSize) -> FrameSize {

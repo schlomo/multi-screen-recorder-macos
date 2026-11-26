@@ -14,7 +14,6 @@ public enum Encoding {
     public static let systemAudioGuideTrackBitRate = 96_000
     /// A keyframe every this many seconds of video.
     public static let keyframeIntervalSeconds = 2
-    public static let keyframeIntervalFrames = keyframeIntervalSeconds * RecorderValues.framesPerSecond
     /// The encoder's quality target, 0 to 1: video is quality-targeted
     /// variable bit rate with a ceiling. A starting point, not designed.
     public static let videoQuality = 0.5

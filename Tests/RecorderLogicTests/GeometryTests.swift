@@ -128,28 +128,4 @@ import Testing
         #expect(RecordingResolution.p1080.frameSize(forLooksLike: ultrawide) == FrameSize(width: 1920, height: 802))
         #expect(RecordingResolution.p1080.frameSize(forLooksLike: fullHD) == fullHD)
     }
-
-    @Test func atNativeEveryLooksLikeSizeChangeStartsANewFile() {
-        #expect(RecordingResolution.native.screenFileContinues(from: uhd, to: fiveK) == false)
-        #expect(RecordingResolution.native.screenFileContinues(from: ultrawide, to: fullHD) == false)
-    }
-
-    @Test func at1080pTheSameFittedFrameSizeContinuesTheFile() {
-        #expect(RecordingResolution.p1080.screenFileContinues(from: uhd, to: fiveK))
-    }
-
-    @Test func at1080pAnotherFittedFrameSizeStartsANewFile() {
-        #expect(RecordingResolution.p1080.screenFileContinues(from: ultrawide, to: fullHD) == false)
-    }
-
-    @Test func anUnchangedLooksLikeSizeContinuesTheFile() {
-        for resolution in RecordingResolution.allCases where resolution.recordsScreens {
-            #expect(resolution.screenFileContinues(from: ultrawide, to: ultrawide))
-        }
-    }
-
-    @Test func turningAScreenToPortraitStartsANewFile() {
-        #expect(RecordingResolution.p1080.screenFileContinues(
-            from: uhd, to: FrameSize(width: 2160, height: 3840)) == false)
-    }
 }
