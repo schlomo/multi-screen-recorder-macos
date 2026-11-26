@@ -584,9 +584,11 @@ Still open from D34: what AGC does and whether it is on in auto mode;
    It must keep what the owner likes today (2026-11-26): a source whose
    device did not change keeps recording into the same file through
    another device's change; and the system audio keeps its file
-   through an output device change (D93, the owner, 2026-11-26:
+   through device changes where it can (D93, the owner, 2026-11-26:
    "system audio should keep the file if possible. after all, there is
-   no technical reason for system audio to 'disconnect'").
+   no technical reason for system audio to 'disconnect'"). Today it
+   does through an output change, but its stream is tied to the main
+   screen, so an undock starts a new system audio file.
    The probe and its stacks were in the session's scratchpad (`probe/`).
 
 ## Deliberately deferred
