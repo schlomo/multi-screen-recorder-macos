@@ -3273,8 +3273,9 @@ architect's reading.
   hurt the main and regular use cases". The owner's main use cases,
   2026-11-26, to stay simple and always work: a laptop alone or with
   one or two external screens, recording every screen, the default
-  microphone and the system audio; the same with a USB camera and one
-  or two USB microphones, the default microphone as the reference;
+  microphone and the system audio; the same with a USB camera or more
+  (a speaker camera, one on the hands or the desk) and one or two USB
+  microphones;
   screens and devices plugged in or out and the lid opened or closed
   during a recording (sleep is not a main case); stop or a crash never
   loses more than the last 5 seconds. Everything else is an edge case,
@@ -3282,7 +3283,7 @@ architect's reading.
   recording. On the owner's Mac the same day a healthy reference fell
   just short once (clarity 11 against 12) before the sync was
   established and every input started over. The owner signed off the
-  design (2026-11-26): option 1 with the "matched twice" count, and
+  design (2026-11-26) with the "matched twice" count, and
   without the "not in the guide track" problem line and its event: "we
   in any case want to trigger human attention only on actionable
   problems".
@@ -3311,10 +3312,10 @@ architect's reading.
     read from recordings made before, so `msr timeline` loads them).
   - The reference is chosen by what the inputs hear, never as the
     default microphone, which macOS moves on its own (D80): it starts as
-    the first input that records and moves only on counted windows. The
-    main use cases name "the default microphone as the reference"; that
-    holds only where the default microphone is that first input or the
-    others' evidence moves the reference to it. Put to the owner.
+    the first input that records and moves only on counted windows (the
+    owner, 2026-11-26: the default microphone moves automatically and has
+    no top-level user control, "so us being smart about the primary mic
+    (!= default) is valuable").
   - Not the distance from the reference instead of sets: in 3,200
     generated recordings with lags widened to ±0.9 s, 155 placed an
     input up to 1.5 s off in a mix that shifts 0.8 s, and an Osmo-like
