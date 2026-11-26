@@ -3493,7 +3493,7 @@ architect's reading.
   the main screen, so when the main screen goes (an undock) its file
   ends and a new one starts (the owner's recording 2026-11-26 19.38.01
   has three); keeping the file there is open work, backlog item 56.
-- **Consequences:** a helper-process design (backlog item 56) must not
-  tie the system audio's file to the main screen or an output
-  device.
+- **Consequences:** a helper-process design (backlog item 56) should
+  keep the system audio's file through a change of the main screen or
+  the output device where it can.
 - **Evidence:** PR #35; backlog item 56.
