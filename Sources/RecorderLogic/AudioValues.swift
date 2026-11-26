@@ -79,6 +79,10 @@ extension RecorderValues {
     /// Buffers are grouped by arrival in intervals of this length; each
     /// interval with a buffer gives a point, its smallest lateness.
     public static let clockDriftInterval = Duration.seconds(1)
+    /// A source's buffers in this long from its start are not measured:
+    /// the system audio's first second arrives about 22 ms less late than
+    /// the rest, which would be taken as drift and kept in the reference.
+    public static let clockDriftStartSkipped = Duration.seconds(2)
     /// Points older than this are dropped: the support line is laid under
     /// the points of the last 20 s.
     public static let clockDriftHorizon = Duration.seconds(20)

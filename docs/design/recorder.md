@@ -1479,10 +1479,17 @@ the metadata items (see "Output on disk").
   or a limit). Late stretches, the system audio's catch-up bursts (one
   second's smallest lateness is a sawtooth of up to 5.6 ms) and sparse
   intervals lie above the line and do not move it; the measurement never
-  depends on the correction. An estimate needs at least 5 points
-  (*data*) spanning at least 10 s (*data*). The first estimate's line at
-  the first point is the reference; the line at an interval's end minus
-  the reference is the sound that must have been added by then. The rate
+  depends on the correction. A source's buffers in the first 2 s
+  (*data*) from its start are not measured: the system audio's buffers
+  arrive about 22 ms less late in its first second than from then on
+  (measured on the owner's Mac, 2026-11-26), which would be taken as
+  drift and, through the reference, kept for the whole file (D92). An
+  estimate needs at least 5 points (*data*) spanning at least 10 s
+  (*data*). The first estimate's line at the first point is the
+  reference; the line at an interval's end minus the reference, plus the
+  drift from the start to the first point, is the sound that must have
+  been added by then. That drift is the kept slope over that time, as
+  at a gap, fixed once the clock drift is shown (10 estimates). The rate
   is the line's slope plus what is still off divided by 10 s (*data*,
   the catch-up time), limited to ±1000 ppm. Without a fresh estimate
   (intervals without buffers, or too few points after a pause) it stays
@@ -1493,10 +1500,12 @@ the metadata items (see "Output on disk").
   of the kept ones. What it does, simulated by the tests' simulation
   (its buffers arrive in order, so those held up by a stall queue behind
   it; the worst of 20 seeds, the correction against the true offset from
-  30 s on): a steady device within 0.29 ms over 600 s, its clock drift
+  30 s on): a steady device within 0.31 ms over 600 s, its clock drift
   shown within 1.1 ppm from 60 s and 0.65 ppm from 120 s; a source in
-  bursts like the system audio within 0.24 ms, also twice as deep, and
-  within 0.32 ms in each of the measured pattern's 4 phases; buffers of
+  bursts like the system audio within 0.38 ms, also twice as deep, and
+  within 0.74 ms in each of the measured pattern's 4 phases; the
+  system audio's start, its first second 22 ms less late, within
+  0.34 ms at 0 and -115 ppm; buffers of
   8192 samples within 0.7 ms, 16384 within 1.6 ms; a slow wander (±5 ms
   over 300 s) within 1.5 ms; a stall of 4 s within 0.34 ms; buffers
   delivered in 1 s of every 2 s, the other intervals empty, within
@@ -1520,9 +1529,9 @@ the metadata items (see "Output on disk").
   stall of 40 s, then a 600 s gap within 30 s: 530 ms). The reference
   comes from the first estimate's about 10 s of points and is never
   revised: a source at its lowest only once in 8 s can start up to
-  3.4 ms off for good, depending on where its lowest second falls
-  (within 0.57 ms in three of its eight phases; the measured 4 s pattern
-  within 0.32 ms in all four). A lasting step of the delivery delay is
+  4.1 ms off for good, depending on where its lowest second falls after
+  the 2 s not measured (within 0.93 ms in three of its eight phases; the
+  measured 4 s pattern within 0.74 ms in all four). A lasting step of the delivery delay is
   followed as if the clock had stepped (up after about 20 s, down at
   once) at up to 1000 ppm, and a step down overshoots (1.1 ms on 2 ms,
   2.1 ms on 4 ms). One early buffer pulls the line down for the horizon
@@ -1536,7 +1545,7 @@ the metadata items (see "Output on disk").
   carries a wrong `clockDriftPpm`. A fast wander (a period under about a
   minute, as the Logitech BRIO's) is not followed and comes out worse
   corrected than not: ±0.5 ms with a period of 12 to 40 s up to 1.5 ms
-  off, a rate alternating by ±100 ppm every 12 s up to 1.84 ms (1.2 ms
+  off, a rate alternating by ±100 ppm every 12 s up to 1.98 ms (1.2 ms
   uncorrected). On the real arrivals of six sources (probes on the
   owner's Mac): BlackHole within 0.05 ms, MacBook Pro Microphone
   0.11 ms, CalDigit Thunderbolt 3 Audio 0.28 ms, Razer Seiren V3 Mini

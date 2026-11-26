@@ -38,6 +38,7 @@ One row per entry, the error text exactly as in the entry.
 | `The job was not acquired by Runner of type hosted even after multiple attempts` | [No macOS runner: the pipeline job is cancelled](#no-macos-runner-the-pipeline-job-is-cancelled) |
 | `Multi Screen Recorder quit unexpectedly` (the app's crash dialog) after running the tests, with no crash of the app | [Crash dialog for crash reports the tests wrote](#crash-dialog-for-crash-reports-the-tests-wrote) |
 | `Expectation failed: (made.guideRefusals → 2) == 4` | [Timing tests fail while the audio delay invariants run](#timing-tests-fail-while-the-audio-delay-invariants-run) |
+| `Audio 0 - System: clock drift -1000.0 ppm, corrected +12.00 ms so far, 8.17 ms off`, then a lasting correction of about +20 ms at about 0 ppm | [The system audio is corrected by about 20 ms for good](#the-system-audio-is-corrected-by-about-20-ms-for-good) |
 | `Expectation failed: (end → 0.1) <= (asked + 1.0 / 30 → 0.09997991733333333)` | [A camera file's end is checked against a clock reading taken before Stop](#a-camera-files-end-is-checked-against-a-clock-reading-taken-before-stop) |
 | `camera stalled: FaceTime HD Camera (the camera delivered no frame for 2 s` | [A camera stalls while another camera starts](#a-camera-stalls-while-another-camera-starts) |
 
@@ -565,3 +566,26 @@ One row per entry, the error text exactly as in the entry.
   few seconds, at the other camera's `camera connected` or its file's
   start.
 - **Observed:** 2026-11-26, macOS 26, Apple silicon; open (macOS).
+
+## The system audio is corrected by about 20 ms for good
+
+- **Error:** in `recording.log`, `Audio 0 - System: clock drift -1000.0 ppm, corrected +12.00 ms so far, 8.17 ms off`
+  about 20 to 35 s after the system audio started, then the clock drift
+  near 0 ppm while the correction stays at about +20 ms; the manifest's
+  `clockDriftCorrection` about 0.02 at a `clockDriftPpm` near 0.
+- **Symptom:** the system audio's file is shifted by about 20 ms against
+  the other sources for the whole file; seen in nearly every recording
+  from 2026-11-22 to 2026-11-26, also after the system audio restarts.
+- **Why:** [KNOWN: a debug run on the owner's Mac, 2026-11-26] in its
+  first second the system audio's buffers arrive about 22 ms less late
+  (smallest lateness about 21 ms, then about 44 ms from 1.0 s on). The
+  first estimate's support line lay under that second at 1000 ppm, and
+  the reference taken from it is never revised, so the 22 ms stayed in
+  the correction.
+- **Fix:** a source's first 2 s are not measured (D92,
+  `RecorderValues.clockDriftStartSkipped`); the drift over them is the
+  kept slope's.
+- **Verify:** `swift test --filter aLessLateStartIsNotTakenAsDrift`
+  (22 ms without the fix, under 0.5 ms with it); in a recording, the
+  system audio's `clockDriftCorrection` near 0 at a drift near 0 ppm.
+- **Observed:** 2026-11-26, PR #35; fixed in PR #35.

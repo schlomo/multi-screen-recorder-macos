@@ -3418,3 +3418,28 @@ architect's reading.
   `aSourceCapturedAgainBeforeTheWaitStaysQuiet`,
   `anAudioSourceEndedByAFullDiskCallsToFreeUpDiskSpace`);
   [design/recorder.md](design/recorder.md), "The app" and "Cameras".
+
+## D92: A source's first 2 s are not measured for its clock drift (2026-11-26)
+
+- **Status:** in force; the architect's ruling, a detail of D57.
+- **Context:** The system audio's correction settled at about +20 ms in
+  nearly every recording since 2026-11-22 while its clock drift read
+  about 0 ppm (the owner's recording of 2026-11-26 18.35.24: +19.2 ms at
+  -9 ppm). A debug run on the owner's Mac the same day showed why: in
+  its first second the system audio's buffers arrive about 22 ms less
+  late than from then on; the first estimate's line, and with it the
+  reference that is never revised, was laid under that second.
+- **Decision:** a source's buffers in the first 2 s (*data*,
+  `clockDriftStartSkipped`) from its start are not measured. The drift
+  during the time from the start to the first point is the kept slope
+  over it, as at a gap, fixed once the clock drift is shown.
+- **Consequences:** a steady drift such as the Razer's is still followed
+  (within 0.34 ms in the tests' simulation); the reference's dependence
+  on where a source's lowest second falls moves with the start (the
+  measured 4 s pattern within 0.74 ms instead of 0.32 ms in its worst
+  phase, a source at its lowest once in 8 s up to 4.1 ms instead of
+  3.4 ms).
+- **Evidence:** [design/recorder.md](design/recorder.md), "Clock
+  drift"; `ClockDriftTrackerTests.aLessLateStartIsNotTakenAsDrift`;
+  [troubleshooting.md](troubleshooting.md), "The system audio is
+  corrected by about 20 ms for good".

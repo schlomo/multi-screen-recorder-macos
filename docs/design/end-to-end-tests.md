@@ -696,11 +696,11 @@ apart, a test cannot either:
   lasted longer than the median covers (a stall of 40 s, then a 600 s
   gap within 30 s: 530 ms).
 - **The reference is never revised.** It comes from the first
-  estimate's about 10 s of points: a source at its lowest only once in
-  8 s can start up to 3.4 ms off for good, depending on where its
-  lowest second falls (within 0.57 ms in three of its eight phases);
-  the system audio's measured 4 s pattern is within 0.32 ms in all
-  four phases.
+  estimate's about 10 s of points, after the start's 2 s that are not
+  measured: a source at its lowest only once in 8 s can start up to
+  4.1 ms off for good, depending on where its lowest second falls
+  (within 0.93 ms in three of its eight phases); the system audio's
+  measured 4 s pattern is within 0.74 ms in all four phases.
 - **One early buffer pulls the line down, amplified.** A buffer early
   by a glitch of its timestamp or arrival puts the line under it for
   the horizon: 20 ms early up to 12.3 ms off, 6 ms early 8.9 ms, 3 ms
