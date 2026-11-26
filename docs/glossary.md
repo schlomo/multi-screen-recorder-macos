@@ -445,7 +445,7 @@ the reference moved away is measured like any other input (D85). Only
 when the reference moves to an input without an audio delay does that
 input become the new anchor, every input then starting over (D80, D89);
 so a near-silent input 1 hands the anchor on at the first measurement
-in which another input has sound and action.
+in which two other inputs share sound.
 
 ## Reference
 
@@ -454,30 +454,26 @@ measured against for its audio delay (`AudioDelays.referenceDevice`):
 the anchor at first, kept while its capture runs and its newest file
 did not end on no audio; then the lowest-numbered input being written
 that has an audio delay, which it stays with, the anchor's returning
-file not taking it back (D80, D85). While no input but the anchor has
-had an audio delay, a reference miss tries it on the untried input
-that is not flat with the highest action score, and when every one was
-tried it goes back once, to where the try episode started or, that one
-flat, to the tried one with the highest action score (D89). Not the
+file not taking it back (D80, D85). Until the sync is confirmed, a
+reference miss moves it to the input the most other inputs' windows
+count against, if any; only a counted window moves it (D89). Not the
 "Reference implementation" above.
-
-## Action score
-
-How much an audio input's level moves in a measurement's 10 s window
-(`AudioDelay.actionScore`, D89): over the window's 100 ms slices with
-sound, each slice's rms in dB, the 90th percentile less the 10th; 0
-with fewer than 10 such slices. In the owner's recordings microphones'
-medians were 7.4 to 39.6 dB, an empty dock line-in 1.9 to 2.9 dB; a
-steady hum or the end-to-end test tone scores under 1 dB however loud.
-An input scoring under 4 dB is **flat** and never tried as the
-reference; within 3 dB of the highest is a tie.
 
 ## Reference miss
 
 A measurement with no counted window against the reference while
-another input being measured that is not flat had sound (D89). While
-nothing is synced, it tries the reference on another input; the tries
-from one to the next counted window are a **try episode**.
+another input being measured had sound (D89). Until the sync is
+confirmed, it correlates the other inputs with sound pairwise and moves
+the reference to the input the most others count against; with no
+counted pair, nothing moves.
+
+## Confirmed sync
+
+An input other than the anchor having 2 counted windows since the anchor
+became the anchor (`audioDelayConfirmingWindows`, D89); from then on a
+reference miss moves nothing, the reference moving only on no audio or
+its capture's end. Not a carried-over audio delay's own "confirmed" (a
+file's first counted window keeping it).
 
 ## Lag
 
