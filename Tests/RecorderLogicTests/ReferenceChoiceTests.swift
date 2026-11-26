@@ -61,7 +61,7 @@ import Testing
         #expect(lone.allSatisfy { $0.reference == "u1" }, "\(lone.map(\.lines))")
     }
 
-    /// B-1 of the second review: an input with unrelated sound, gated or not, never takes the reference from
+    /// An input with unrelated sound, gated or not, never takes the reference from
     /// microphones that sync: as input 1 it hands it on to them, as input 3 it never gets it.
     @Test(arguments: [Sound.unrelated, .gatedUnrelated])
     func anUnrelatedInputNeverKeepsTheReference(unrelated: Sound) {
@@ -81,7 +81,7 @@ import Testing
         #expect(Self.isNear(third.last.flatMap { Self.delay(of: "u2", in: $0) }, 0.1))
     }
 
-    /// B1 of the third review (H13): input 1's talker starts after 30 s, input 2 has room speech all along, input 3
+    /// Input 1's talker starts after 30 s, input 2 has room speech all along, input 3
     /// unrelated sound: nothing proves another reference, so nothing moves, and input 2 syncs once input 1 speaks,
     /// as under main's rules.
     @Test func aTalkerStartingLateOnInput1SyncsAsBefore() {
@@ -94,7 +94,7 @@ import Testing
         #expect(Self.isNear(steps.last.flatMap { Self.delay(of: "u2", in: $0) }, 0.1), "\(steps.map(\.lines))")
     }
 
-    /// M-1 of the second review and M1 of the third (DZN): a lone microphone beside an unrelated input whose file
+    /// A lone microphone beside an unrelated input whose file
     /// ends and starts again, the microphone pausing: nothing moves, the microphone stays the anchor and in the mix.
     @Test func aLoneMicrophoneBesideAnUnrelatedInputKeepsTheReference() {
         let steps = Self.steps([
@@ -105,7 +105,7 @@ import Testing
                 "\(steps.map(\.lines))")
     }
 
-    /// M2 of the third review (DZH): one counted window, as a burst on the dock gives, does not establish the
+    /// One counted window, as a burst on the dock gives, does not establish the
     /// sync: input 1 then hums, the microphones prove one of them, and every microphone ends synced.
     @Test func aSingleCountedWindowDoesNotEstablishTheSync() {
         let steps = Self.steps([
@@ -132,7 +132,7 @@ import Testing
     }
 
     /// A healthy recording whose input 1, a room microphone, syncs everything at the first measurement: nothing
-    /// moves, as before D89 (M-2 of the second review).
+    /// moves, as before D89.
     @Test func aHealthyFirstMeasurementKeepsItsCountedLags() {
         let steps = Self.steps([
             Self.input(1, .microphone, lag: 0.05, Self.repeated(.roomSpeech, 3)),
@@ -144,7 +144,7 @@ import Testing
         #expect(Self.isNear(Self.delay(of: "u3", in: steps[0]), 0.05), "\(steps[0].lines)")
     }
 
-    /// E2 of the second review: two talkers taking turns of 60 s, each on a microphone that hears only its own:
+    /// Two talkers taking turns of 60 s, each on a microphone that hears only its own:
     /// nothing proves another reference, so nothing moves.
     @Test func twoTalkersThatNeverCorrelateMoveNothing() {
         let turns = (0..<12).map { ($0 / 6) % 2 == 0 }
@@ -157,7 +157,7 @@ import Testing
     }
 
     /// A 40 s pause of the reference and a synced microphone beside an unrelated input moves nothing and keeps
-    /// both in the mix (BLOCKER 1 of the third version's review).
+    /// both in the mix.
     @Test func aPauseBesideAnUnrelatedInputMovesNothing() {
         let speaks = Self.repeated(Sound.speech, 2) + Self.repeated(.pause, 4) + Self.repeated(.speech, 2)
         let steps = Self.steps([
@@ -191,6 +191,23 @@ import Testing
         #expect(outcome.delays["u2.mov"]?.delay == -0.1 && outcome.delays["u4.mov"]?.delay == 0.3, "\(outcome.lines)")
     }
 
+    /// A miss move in a measurement whose files include one not known yet (the old anchor's next file): the move
+    /// starts every input over, so that file carries nothing over (D89).
+    @Test func aMissMoveCarriesNothingOverToAFileNotKnownYet() {
+        let window = { (lag: Double, counts: Bool) in AudioDelay.Window(lag: lag, clarity: counts ? 40 : 5) }
+        var delays = AudioDelays()
+        _ = delays.update(files: ["u1-1.mov": "u1", "u2.mov": "u2", "u3.mov": "u3"], reference: "u1-1.mov")
+        let files = ["u1-2.mov": "u1", "u2.mov": "u2", "u3.mov": "u3"]
+        let candidates = [AudioDelays.Candidate(file: "u1-2.mov", uid: "u1", number: 1), .init(file: "u2.mov", uid: "u2", number: 2),
+                          .init(file: "u3.mov", uid: "u3", number: 3)]
+        let measurement = AudioDelays.Measurement(
+            reference: "u1-2.mov", files: [.init(file: "u2.mov", window: window(0, false)), .init(file: "u3.mov", window: window(0, false))],
+            pairs: [.init(reference: "u2.mov", other: "u3.mov", window: window(0.1, true))])
+        let outcome = delays.measured(measurement, files: files, candidates: candidates, at: 10)
+        #expect(delays.referenceDevice == "u2", "\(outcome.lines)")
+        #expect(!outcome.lines.contains { $0.contains("carries over") } && outcome.delays["u1-2.mov"] == nil, "\(outcome.lines)")
+    }
+
     /// Once the sync is established, counted pairs move nothing, even when a measurement carries them (D89).
     @Test func countedPairsMoveNothingOnceTheSyncIsEstablished() {
         let window = { (lag: Double, counts: Bool) in AudioDelay.Window(lag: lag, clarity: counts ? 30 : 5) }
@@ -210,7 +227,7 @@ import Testing
         #expect(outcome.delays["u2.mov"]?.delay == 0.2 && outcome.delays["u3.mov"]?.delay == 0.1, "\(outcome.lines)")
     }
 
-    /// AX of the fourth review: the anchor's new file, measured against the reference it handed on to, counts toward
+    /// The anchor's new file, measured against the reference it handed on to, counts toward
     /// establishing the sync like any other input's, so a later miss wipes nothing (D89).
     @Test func theAnchorsNewFileEstablishesTheSync() {
         let steps = Self.steps([
@@ -223,7 +240,7 @@ import Testing
         #expect(Self.isNear(steps.last.flatMap { Self.delay(of: "u2", in: $0) }, 0.2), "\(steps.map(\.lines))")
     }
 
-    /// MV2 of the fourth review: the move is decided before anything is applied, so the measurement in which an
+    /// The move is decided before anything is applied, so the measurement in which an
     /// input syncs logs no "no clear sound" for it, and the move's start-over says why it happened (D89).
     @Test func aMoveIsDecidedBeforeTheMeasurementIsApplied() {
         let steps = Self.steps([

@@ -3226,8 +3226,14 @@ architect's reading.
   of a call, two inputs of one device) take the reference and establish
   the sync if the room is quiet at the start, and the room's microphones
   then never sync; accepted, as the audio mode Wired, the default,
-  records no virtual input but the default microphone
+  records no virtual input but the default microphone, which keeps out
+  the virtual case only
   (`RecorderTests.twoInputsOfOneCallTakeTheReferenceBeforeTheRoomSpeaks`).
+  Until the sync is established, a healthy reference whose window falls
+  just short once while two other inputs match moves too (the owner's
+  Mac, 2026-11-26: clarity 11 against 12, the pair at 68), the old
+  anchor out of the guide track until the next measurement syncs it
+  (`RecorderTests.aHealthyReferenceThatMissesOnceMovesAndSyncsAgain`).
   The measurement does up to n(n-1)/2 extra cross-correlations, only while the sync is not established and nothing
   counts against the reference.
 - **Evidence:** the owner's recording on 0.20261125.116; the replay of

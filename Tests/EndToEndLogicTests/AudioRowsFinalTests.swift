@@ -130,8 +130,9 @@ import Testing
     }
 
     /// Synthetic, from `AudioDelays`' format (D89): a reference miss that moves the reference to a proven input
-    /// starts over and waits for every input to join again, the old anchor that cannot sync ends at "no clear
-    /// sound"; a re-base, as when the reference's capture ends, changes no row.
+    /// starts over and waits for every input to show its sync again (a join, or its audio delay set when it was
+    /// placed before), the old anchor that cannot sync ending at "no clear sound"; a re-base, as when the
+    /// reference's capture ends, changes no row.
     @Test func aReferenceMovedOnAMissWaitsForTheStartOverAndARebaseChangesNothing() {
         let mic = "2026-11-25 13.23.54 Audio 1 - MacBook Pro Microphone.mov"
         let final = Self.anchorFinal + [Self.brioStartInput, Self.brioStarted, Self.brioJoins, Self.brioDrift]
@@ -144,6 +145,28 @@ import Testing
         #expect(notFinal(final + [moves, startOver, noClearSound]).isEmpty)
         let rebase = ["13:25:04 +70.1s detail recorder: reference \(mic) → \(Self.brio): lags re-based onto the anchor by 14 ms early"]
         #expect(notFinal(final + rebase).isEmpty)
+    }
+
+    /// Synthetic, from `AudioDelays`' format (D89): an input already in the guide track that syncs in the very
+    /// measurement whose reference miss moves the reference logs only its audio delay being set, no join, as its
+    /// placement may not change; that shows its sync.
+    @Test func anInputPlacedBeforeAMissMoveShowsItsSyncWhenItsAudioDelayIsSet() {
+        let mic = "2026-11-25 13.23.54 Audio 1 - MacBook Pro Microphone.mov"
+        let razer = "2026-11-25 13.24.48 Audio 3 - Razer Seiren V3 Mini.mov"
+        let final = Self.anchorFinal + [Self.brioStartInput, Self.brioStarted, Self.brioJoins, Self.brioDrift,
+            #"13:24:48 +54.3s detail recorder: audio: startInput(uid: "RAZER", number: 3, name: "Razer Seiren V3 Mini")"#,
+            "13:24:48 +54.7s detail recorder: file started: \(razer)",
+            "13:25:04 +70.1s detail recorder: \(razer): joins the guide track placed earlier by 0 ms (the mix's zero: \(Self.brio))",
+            "13:25:16 +82.3s detail recorder: Audio 3 - Razer Seiren V3 Mini: clock drift +2.0 ppm, corrected -0.01 ms so far, 0.01 ms off"]
+        #expect(notFinal(final).isEmpty)
+        let moved = [
+            "13:25:14 +80.1s detail recorder: reference \(mic): no counted window against it while another input had sound; "
+                + "\(Self.brio) has counted windows of 1 other input against it: \(razer)",
+            "13:25:14 +80.1s detail recorder: reference \(mic) → \(Self.brio): moved on a reference miss, so it is the new anchor "
+                + "and every input starts over",
+            "13:25:14 +80.1s detail recorder: \(razer): audio delay set by its first counted window: 14 ms late",
+        ]
+        #expect(notFinal(final + moved) == [mic])
     }
 
     /// Synthetic: no log has the system audio in no audio yet; its event names it "System audio".

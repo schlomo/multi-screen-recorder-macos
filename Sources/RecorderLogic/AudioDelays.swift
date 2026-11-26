@@ -4,7 +4,8 @@
 /// mixes (`GuideTrackMembership`, D79) and how much earlier it places each, what `recording.json` lists, and
 /// what the status window shows. A new file of an input whose earlier file had an audio delay starts with it,
 /// carried over. Another reference device re-bases every lag onto the anchor through its own audio delay; one
-/// without an audio delay becomes the anchor, and every input starts over. The anchor's files are those of its
+/// without an audio delay, or one a reference miss moved to before the sync is established (D89), becomes the
+/// anchor, and every input starts over. The anchor's files are those of its
 /// device while it is the reference; once the reference moved away, a new file of it is measured like any
 /// other (D85).
 public struct AudioDelays: Sendable {
@@ -44,7 +45,8 @@ public struct AudioDelays: Sendable {
         /// Every decision taken, one line each, for the recording log.
         public var lines: [String] = []
         /// Files whose `recording.json` entries so far are void: every input started over before the sync was
-        /// established, so they were against an anchor that no longer is one (D89).
+        /// established, so they were against an anchor that no longer is one (D89); the recorder leaves a file
+        /// that ended its list.
         public var cleared: Set<String> = []
     }
 
@@ -139,7 +141,8 @@ public struct AudioDelays: Sendable {
                 files[name] = File(uid: uid, order: known, applied: AudioDelay.Applied())
                 continue
             }
-            let carried = earlier.flatMap { file in delay(of: file.key).map { (file.key, $0) } }
+            // A miss move starts every input over, so nothing carries over into it.
+            let carried = isMiss ? nil : earlier.flatMap { file in delay(of: file.key).map { (file.key, $0) } }
             if let carried {
                 lines.append("\(name): carries over \(AudioDelay.text(carried.1)) from \(carried.0)")
                 carriedOver.append(name)
@@ -291,12 +294,12 @@ public struct AudioDelays: Sendable {
             outcome.lines = lines + outcome.lines
             return outcome
         }
-        // Pairs are only of inputs with sound: with none, nothing moves.
         guard lags.isEmpty, !isSyncEstablished else {
             var outcome = update(files: newest, reference: reference.file, lags: lags, unclear: unclear, at: at)
             outcome.lines = lines + outcome.lines
             return outcome
         }
+        // Pairs are only of inputs with sound: with none, nothing moves.
         var against: [String: [String: Double]] = [:]
         for pair in measurement.pairs {
             guard let window = pair.window else { continue }

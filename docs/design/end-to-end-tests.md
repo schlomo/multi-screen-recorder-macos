@@ -510,12 +510,14 @@ video from the e2e runs"):
     line, not `not measured yet`; the sync from a detail line of one of
     its files that `joins the guide track`, `rejoins the guide track`,
     `carries over` a delay, is `in` or `out of the guide track with` the
-    carried-over audio delay, `leaves the guide track` or has `no clear
-    sound to sync`, which the source's newer files keep (the anchor's own
+    carried-over audio delay, `leaves the guide track`, has its `audio
+    delay set by its first counted window` (an input placed before a
+    start-over that syncs in the same measurement logs no new join) or
+    has `no clear sound to sync`, which the source's newer files keep (the anchor's own
     file joins at its start, and a new file of the anchor's device logs
     nothing); a `reference … every input starts over` line clears it for
     every input but the new anchor, which show "not synced yet" again
-    until they join or, unable to sync to the new anchor, show "no clear
+    until they join or have their audio delay set or, unable to sync to the new anchor, show "no clear
     sound" (D89); a reference miss's line `reference <file>: no counted window …`
     and a re-base change no row. A source in no audio (a `no audio started` event
     naming it, with no `no audio stopped` after it) is not waited for:

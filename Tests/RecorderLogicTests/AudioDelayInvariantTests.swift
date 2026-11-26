@@ -156,7 +156,7 @@ import Testing
         let counted: Set<String>
         /// A file started before this measurement.
         let fileStarted: Bool
-        /// An input other than the anchor had established the sync before this measurement.
+        /// An input, the anchor's new file included, had established the sync before this measurement.
         let wasEstablished: Bool
         let delays: [String: Double]
         let writing: Set<String>

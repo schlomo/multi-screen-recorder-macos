@@ -634,7 +634,7 @@ extension GlobalRecordingLog {
             #expect(!log.contains("\(h) has counted windows"))
         }
 
-        /// B1 of the first review: the reference and a synced input pause for two measurements while an unsynced
+        /// The reference and a synced input pause for two measurements while an unsynced
         /// input with unrelated speech-like sound goes on: nothing moves, the audio delays and the mix stay (D89).
         @Test func aPauseWhileAnUnsyncedInputSoundsMovesNothing() async throws {
             try await startInputs(["R", "A", "C"])
@@ -664,7 +664,7 @@ extension GlobalRecordingLog {
         }
 
         /// The reference and a synced input pause for 40 s while an unsynced input with unrelated sound goes on:
-        /// nothing moves, and at Stop the audio delays are as before (D89, round 3's delta review, BLOCKER 1).
+        /// nothing moves, and at Stop the audio delays are as before (D89).
         @Test func aLongPauseWhileAnUnsyncedInputSoundsKeepsTheAudioDelays() async throws {
             try await startInputs(["R", "A", "C"])
             try feed(["R": .speech(0), "A": .speech(0.5), "C": .otherSpeech])
@@ -707,7 +707,7 @@ extension GlobalRecordingLog {
             #expect(log.contains("reference \(r) → \(a): moved on a reference miss, so it is the new anchor and every input starts over"), "\(log)")
         }
 
-        /// M2 of the third review (DZH): one counted window, as a burst on the dock gives, does not establish the
+        /// One counted window, as a burst on the dock gives, does not establish the
         /// sync; when the reference then hums, the microphones prove one of them and all end synced (D89).
         @Test func aSingleCountedWindowDoesNotEstablishTheSync() async throws {
             try await startInputs(["R", "A", "B", "C"])
@@ -724,7 +724,7 @@ extension GlobalRecordingLog {
             #expect(c.count == 1 && abs((c.first ?? 0) + 0.1) < 0.002, "\(c)")
         }
 
-        /// B1 of the third review (DZT): input 1's talker starts after 30 s, input 2 has noisy speech all along,
+        /// Input 1's talker starts after 30 s, input 2 has noisy speech all along,
         /// input 3 unrelated sound: nothing proves another reference, nothing moves, and input 2 syncs once input 1
         /// speaks, as under main's rules (D89).
         @Test func aTalkerStartingLateOnInput1SyncsAsBefore() async throws {
@@ -745,7 +745,7 @@ extension GlobalRecordingLog {
             #expect(!(try recordingLog()).contains("starts over"))
         }
 
-        /// M1 of the third review (DZN): a lone microphone beside an unrelated input whose file ends on no audio and
+        /// A lone microphone beside an unrelated input whose file ends on no audio and
         /// starts again: nothing moves, the microphone stays the anchor and in the guide track (D89).
         @Test func aLoneMicrophoneKeepsTheReferenceBesideAnUnrelatedInputsNewFile() async throws {
             try await startInputs(["R", "C"])
@@ -809,7 +809,7 @@ extension GlobalRecordingLog {
             #expect(delaysOfB.count == 1 && abs((delaysOfB.first ?? 0) + 0.3) < 0.002, "\(delaysOfB)")
         }
 
-        /// B1 of the fourth review, a known cost (D89): two inputs carrying one call's audio beside a room that is
+        /// A known cost (D89): two inputs carrying one call's audio beside a room that is
         /// quiet for the first 20 s take the reference and establish the sync, so the room's microphones, speaking
         /// later, never sync. The audio mode Wired, the default, records no virtual input but the default microphone.
         @Test func twoInputsOfOneCallTakeTheReferenceBeforeTheRoomSpeaks() async throws {
@@ -830,7 +830,7 @@ extension GlobalRecordingLog {
             #expect(try recordingLog().contains("reference \(r) → \(a): moved on a reference miss"))
         }
 
-        /// M1 of the fourth review: an input whose sound ends 0.3 s before the others' is measured over the same
+        /// An input whose sound ends 0.3 s before the others' is measured over the same
         /// windows, every window ending at the earliest end, and syncs (D89).
         @Test func anInputSlightlyBehindStillSyncs() async throws {
             try await startInputs(["R", "A", "B"])
@@ -839,6 +839,46 @@ extension GlobalRecordingLog {
             _ = await stop()
             let delaysOfB = try delays(of: "B")
             #expect(delaysOfB.count == 1 && abs((delaysOfB.first ?? 0) - 0.2) < 0.002, "\(delaysOfB)")
+        }
+
+        /// A file that ended on no audio keeps its list at a miss move's start-over, though it is still its device's
+        /// newest while the capture runs (D89).
+        @Test func aFileThatEndedKeepsItsEntriesAtAMissMove() async throws {
+            try await startInputs(["R", "A", "B", "C"])
+            try feed(["R": .speech(0), "A": .quiet, "B": .quiet, "C": .speech(0.3)])
+            await recorder.measureAudioDelays()
+            let buffersOfNoAudio = Int(RecorderValues.noAudioTime.nanoseconds * Int64(RecorderValues.audioSampleRate) / 1_000_000_000)
+                / samplesPerBuffer
+            try sendNext(0, buffers: buffersOfNoAudio + 10, to: sources.last(of: "C"))
+            try await wait("C's file's end") { (try? manifestOnDisk().audioFiles.first { $0.audioSource == "Mic C" }?.end) != nil }
+            try feed(["R": .quiet, "A": .speech(0.5), "B": .speech(0.2)])
+            await recorder.measureAudioDelays()
+            _ = await stop()
+            let delaysOfC = try delays(of: "C")
+            #expect(delaysOfC.count == 1 && abs((delaysOfC.first ?? 0) - 0.3) < 0.002, "\(delaysOfC)")
+            #expect(try recordingLog().contains("moved on a reference miss"))
+        }
+
+        /// The owner's Mac, 2026-11-26: before the sync is established, a healthy reference whose window falls just
+        /// short once while two other inputs match moves too, a known cost (D89): the old anchor syncs against the
+        /// new one at the next measurement, and every audio delay is kept.
+        @Test func aHealthyReferenceThatMissesOnceMovesAndSyncsAgain() async throws {
+            try await startInputs(["R", "A", "B"])
+            try feed(["R": .speech(0.4), "A": .speech(0), "B": .speech(0.014)])
+            await recorder.measureAudioDelays()
+            try feed(["R": .noise, "A": .speech(0), "B": .speech(0.014)])
+            await recorder.measureAudioDelays()
+            for _ in 0..<3 {
+                try feed(["R": .speech(0.4), "A": .speech(0), "B": .speech(0.014)])
+                await recorder.measureAudioDelays()
+            }
+            let (r, a) = (try fileName(of: "R"), try fileName(of: "A"))
+            _ = await stop()
+            #expect(try recordingLog().contains("reference \(r) → \(a): moved on a reference miss"))
+            let (delaysOfR, delaysOfB) = (try delays(of: "R"), try delays(of: "B"))
+            #expect(delaysOfR.count == 1 && abs((delaysOfR.first ?? 0) - 0.4) < 0.002, "\(delaysOfR)")
+            #expect(delaysOfB.count == 1 && abs((delaysOfB.first ?? 0) - 0.014) < 0.002, "\(delaysOfB)")
+            #expect(try delays(of: "A") == [0])
         }
 
         /// The reference muted while two inputs have an audio delay: the lower-numbered one takes it (D80, D85).

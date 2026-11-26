@@ -1633,13 +1633,17 @@ the metadata items (see "Output on disk").
   returning file does not take it back (D85). So a near-silent, dead or
   humming input 1 hands the reference on at the first measurement in
   which two other inputs share sound, but a reference that stops
-  correlating once the sync is established stays, as before D89. A known
-  cost: two inputs carrying one signal the room's microphones do not
-  hear (two loopbacks of a call, two inputs of one device) can take the
-  reference while the room is quiet at the start and establish the
-  sync, and the room's microphones then never sync; the audio mode
-  Wired, the default, records no virtual input but the default
-  microphone. The default
+  correlating once the sync is established stays, as before D89. Until
+  then, a healthy reference whose window falls just short once while two
+  other inputs match moves too (the owner's Mac, 2026-11-26: clarity 11
+  against 12, the pair at 68); the old anchor is out of the guide track
+  until the next measurement syncs it. A known cost: two inputs
+  carrying one signal the room's microphones do not hear (two loopbacks
+  of a call, two inputs of one device) can take the reference while the
+  room is quiet at the start and establish the sync, and the room's
+  microphones then never sync; the audio mode Wired, the default, keeps
+  out only the virtual case: it records no virtual input but the
+  default microphone. The default
   microphone plays no part (D80, amending D77). The system audio is
   neither measured nor the reference. A window counts
   only when its match is clear, the peak of |correlation| at least 12

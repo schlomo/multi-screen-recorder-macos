@@ -1119,7 +1119,10 @@ public final class Recorder {
         let mixedUpTo = mixedPosition.map { Double($0) / rate }
             ?? Double(context.now() - RecorderValues.guideTrackDelay.nanoseconds) / 1e9
         var changed = false
-        for file in outcome.cleared.sorted() { changed = manifest.audioDelaysReplaced([], file: file) != nil || changed }
+        // A file that ended keeps its list, though it stays its device's newest while the capture runs (D89).
+        for file in outcome.cleared.sorted() where manifest.audioFiles.first(where: { $0.name == file })?.end == nil {
+            changed = manifest.audioDelaysReplaced([], file: file) != nil || changed
+        }
         for (file, entry) in outcome.delays.sorted(by: { $0.key < $1.key }) {
             changed = manifest.audioDelaySet(entry, at: mixedUpTo, file: file) || changed
         }
