@@ -421,9 +421,9 @@ How much later an audio input's sound arrives than the anchor's,
 negative when earlier, beyond what its clock drift explains; measured
 while recording by cross-correlation against the reference: the anchor
 at first, the reference in use while its capture runs and it is not in
-no audio, else the lowest-numbered input being written that has an
-audio delay, whose own audio delay turns the lags into ones against the
-anchor; the reference stays with the input it moved to (D77, D80, D85).
+no audio, else the input it moved to, its own audio delay turning the
+lags into ones against the anchor; the reference stays with the input
+it moved to (D77, D80, D85, D89).
 A file's audio delay is set by its first
 counted window, once more by the median of its first 3, then only by the
 median of the latest 60 s, each time only beyond a frame (D80); a new
@@ -441,10 +441,12 @@ is unchanged.
 The device every audio delay of a recording is against: the first
 audio input whose file is written, its files' audio delay 0 while it is
 the reference, the default microphone or not; a new file of it after
-the reference moved away is measured like any other input (D85). Only
-when no input being written has an audio delay does the lowest-numbered
-input being written become the new anchor, every input then starting
-over (D80).
+the reference moved away is measured like any other input (D85). When
+the reference moves to an input without an audio delay (D80), or on a
+reference miss whatever its audio delay (D89), that input becomes the
+new anchor, every input then starting over; so a near-silent input 1
+hands the anchor on at the first measurement in which two other inputs
+share sound.
 
 ## Reference
 
@@ -452,9 +454,27 @@ The audio input whose newest file every other input's sound is
 measured against for its audio delay (`AudioDelays.referenceDevice`):
 the anchor at first, kept while its capture runs and its newest file
 did not end on no audio; then the lowest-numbered input being written
-that has an audio delay, which it stays with until its own file ends,
-the anchor's returning file not taking it back (D80, D85). Not the
+that has an audio delay, which it stays with, the anchor's returning
+file not taking it back (D80, D85). Until the sync is established, a
+reference miss moves it to the input the most other inputs' windows
+count against, if any; a reference miss with no counted window between
+the other inputs moves nothing (D89). Not the
 "Reference implementation" above.
+
+## Reference miss
+
+A measurement with no counted window against the reference while
+another input being measured had sound (D89). Until the sync is
+established, it correlates the other inputs with sound pairwise and moves
+the reference to the input the most others count against; with no
+counted pair, nothing moves.
+
+## Established sync
+
+An input having 2 counted windows since the anchor became the anchor,
+the anchor's own new file included (`audioDelayEstablishingWindows`, D89); from then on a
+reference miss moves nothing, the reference moving only on no audio or
+its capture's end.
 
 ## Lag
 

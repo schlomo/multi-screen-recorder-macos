@@ -1,3 +1,4 @@
+import Accelerate
 import Foundation
 import Testing
 @testable import RecorderLogic
@@ -39,6 +40,20 @@ import Testing
         let count = AudioDelay.windowSeconds * AudioDelay.sampleRate
         let (reference, _) = Self.pair(shift: 0)
         #expect(AudioDelay.window(reference: reference, other: [Float](repeating: 0, count: count)) == nil)
+    }
+
+    /// The vectorised cross-correlation and window give, bit for bit, what main's scalar code gave (`Scalar`):
+    /// speech-like bursts against a shifted copy, unrelated noise, and a near-silent window.
+    @Test func theVectorisedWindowIsTheScalarOneBitForBit() {
+        let count = AudioDelay.windowSeconds * AudioDelay.sampleRate
+        var generator = SeededRandom(seed: 11)
+        let noise = (0..<count).map { _ in Float.random(in: -0.1...0.1, using: &generator) }
+        let quiet = noise.map { $0 / 2000 }
+        let (reference, other) = Self.pair(shift: 1234)
+        for (a, b) in [(reference, other), (reference, noise), (noise, quiet), (other, reference)] {
+            #expect(AudioDelay.crossCorrelation(a, b) == Scalar.crossCorrelation(a, b))
+            #expect(AudioDelay.window(reference: a, other: b) == Scalar.window(reference: a, other: b))
+        }
     }
 
     @Test func theAudioDelaysValuesAreData() {
@@ -161,5 +176,54 @@ import Testing
     @Test func withoutOwnWindowsThereIsNoHindsight() {
         #expect(hindsight(AudioDelay.Applied(carriedOver: 0.5)) == nil)
         #expect(hindsight(AudioDelay.Applied()) == nil)
+    }
+}
+
+/// Main's scalar cross-correlation and window, before the vDSP rewrite (906c46a), as the model the rewrite matches.
+private enum Scalar {
+    static func window(reference: [Float], other: [Float]) -> AudioDelay.Window? {
+        guard vDSP.rootMeanSquare(reference) >= 1e-5, vDSP.rootMeanSquare(other) >= 1e-5 else { return nil }
+        let correlation = crossCorrelation(reference, other)
+        let n = correlation.count
+        let reach = min(AudioDelay.searchSeconds * AudioDelay.sampleRate, reference.count - 1)
+        let lags = Array(-reach...reach)
+        let magnitudes = lags.map { abs(correlation[($0 + n) % n]) }
+        let best = magnitudes.indices.max { magnitudes[$0] < magnitudes[$1] }!
+        let median = AudioDelay.median(magnitudes.map(Double.init))!
+        guard median > 0 else { return nil }
+        return AudioDelay.Window(lag: Double(lags[best]) / Double(AudioDelay.sampleRate), clarity: Float(Double(magnitudes[best]) / median))
+    }
+
+    static func crossCorrelation(_ a: [Float], _ b: [Float]) -> [Float] {
+        let log2n = vDSP_Length(Int.bitWidth - (2 * a.count - 1).leadingZeroBitCount)
+        let n = 1 << Int(log2n)
+        let half = n / 2
+        let fft = vDSP.FFT(log2n: log2n, radix: .radix2, ofType: DSPSplitComplex.self)!
+        func spectrum(_ signal: [Float]) -> (real: [Float], imaginary: [Float]) {
+            let padded = signal + [Float](repeating: 0, count: n - signal.count)
+            var real = [Float](repeating: 0, count: half), imaginary = [Float](repeating: 0, count: half)
+            real.withUnsafeMutableBufferPointer { re in
+                imaginary.withUnsafeMutableBufferPointer { im in
+                    var split = DSPSplitComplex(realp: re.baseAddress!, imagp: im.baseAddress!)
+                    padded.withUnsafeBytes { vDSP_ctoz($0.bindMemory(to: DSPComplex.self).baseAddress!, 2, &split, 1, vDSP_Length(half)) }
+                    fft.forward(input: split, output: &split)
+                }
+            }
+            return (real, imaginary)
+        }
+        let (ar, ai) = spectrum(a), (br, bi) = spectrum(b)
+        var real = (0..<half).map { ar[$0] * br[$0] + ai[$0] * bi[$0] }
+        var imaginary = (0..<half).map { ar[$0] * bi[$0] - ai[$0] * br[$0] }
+        real[0] = ar[0] * br[0]
+        imaginary[0] = ai[0] * bi[0]
+        var result = [Float](repeating: 0, count: n)
+        real.withUnsafeMutableBufferPointer { re in
+            imaginary.withUnsafeMutableBufferPointer { im in
+                var split = DSPSplitComplex(realp: re.baseAddress!, imagp: im.baseAddress!)
+                fft.inverse(input: split, output: &split)
+                result.withUnsafeMutableBytes { vDSP_ztoc(&split, 1, $0.bindMemory(to: DSPComplex.self).baseAddress!, 2, vDSP_Length(half)) }
+            }
+        }
+        return result
     }
 }

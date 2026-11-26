@@ -284,8 +284,11 @@ The named scenarios, each about 10 to 25 s of recording:
 
 The tone scenarios record only BlackHole, made the default microphone
 for the run, so it is the anchor and in the guide track "Audio inputs"
-from the start (D80). The anchor is the first input whose file starts,
-and with every input recorded that is a race between the VM's two:
+from the start (D80). The anchor is the first input whose file starts
+(a reference miss moves the reference only to an input that the window
+of one input other than the reference counts against, D89, which the
+VM's two inputs cannot give, so it never moves), and with
+every input recorded that is a race between the VM's two:
 in the run of 2026-11-24 at 2628b9d, the two files' starts in the tone
 scenario's `recording.json` were 0.1333 s for BlackHole and 0.1667 s
 for the Apple Virtual Sound Device. Any other
@@ -507,12 +510,16 @@ video from the e2e runs"):
     line, not `not measured yet`; the sync from a detail line of one of
     its files that `joins the guide track`, `rejoins the guide track`,
     `carries over` a delay, is `in` or `out of the guide track with` the
-    carried-over audio delay, `leaves the guide track` or has `no clear
-    sound to sync`, which the source's newer files keep (the anchor's own
+    carried-over audio delay, `leaves the guide track`, has its `audio
+    delay set by its first counted window` (an input placed before a
+    start-over that syncs in the same measurement logs no new join) or
+    has `no clear sound to sync`, which the source's newer files keep (the anchor's own
     file joins at its start, and a new file of the anchor's device logs
     nothing); a `reference … every input starts over` line clears it for
     every input but the new anchor, which show "not synced yet" again
-    until they join. A source in no audio (a `no audio started` event
+    until they join or have their audio delay set or, unable to sync to the new anchor, show "no clear
+    sound" (D89); a reference miss's line `reference <file>: no counted window …`
+    and a re-base change no row. A source in no audio (a `no audio started` event
     naming it, with no `no audio stopped` after it) is not waited for:
     its clock drift shows "measuring" for as long as it is silent. The
     event names only the device, so silence is keyed by the device name

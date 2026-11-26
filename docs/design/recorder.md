@@ -684,7 +684,9 @@ input's input volume at the file's start, 0 to 1 to the thousandth,
 null when it cannot be read, absent for the system audio (D69);
 `delays` the file's audio delays (D80), for a processor of the files
 to line the audio inputs up: a list of `{at, delay}`, in order; empty
-only when the file was never measured (it is then placed as recorded).
+when the file has no audio delay against the anchor: never measured
+clearly, or cleared at a start-over before the sync was established
+(D89); it is then placed as recorded.
 While recording, and after a crash, it holds the live entries, one per
 change of the value; at Stop, before the timeline file is written, each
 file's list is rewritten with hindsight: its stretches are bounded
@@ -699,8 +701,9 @@ keep theirs (see "Audio delay", D80). `at` is the
 seconds into the file from which the entry holds (to the millisecond,
 never below 0; the first entry also holds before its `at`, as the best
 known); `delay` is the seconds by which the file's sound there is later
-than the recording's anchor's, the first input whose file is written (to
-0.0001 s, negative when earlier). To line up the recording's audio
+than the recording's anchor's (see "Audio delay": the first input whose
+file is written, or the one the reference moved to while no input
+being written had an audio delay, D80, or on a reference miss, D89; to 0.0001 s, negative when earlier). To line up the recording's audio
 inputs, place each file's stretch from `at` on earlier by `delay` less
 the smallest of the files' latest `delay` (taken as 0 when that is
 above 0); a file with an empty list and the system audio are not moved;
@@ -1600,15 +1603,47 @@ the metadata items (see "Output on disk").
   audio delay included; a file of it ending on a gap or a channel
   change, its next file following, neither changes the reference nor
   starts anything over, and while it has no file open nothing is
-  measured that cycle. Once it is in no audio (muted, D69) or its
-  capture ended (unplugged), the reference moves to the input with the
-  lowest number whose file is being written and has an audio delay,
-  whose own audio delay turns its lags into ones against the anchor;
-  with none such, the input with the lowest number whose file is being
-  written becomes the new anchor (see below). The reference stays with
-  the input it moved to: the anchor's returning file does not take it
-  back, and it moves again only when its own file ends so (D85). So a
-  silent anchor never stalls measuring. The default
+  measured that cycle. **Moving the reference on evidence while the sync is not established (D89).**
+  The reference stays while windows count against it. A **reference
+  miss** is a measurement with no counted window against the reference
+  while another input being measured had sound. The sync is
+  **established** once an input has 2 counted windows since the anchor
+  became the anchor (the anchor's own new file, measured against the
+  reference it handed on to, included)
+  (`audioDelayEstablishingWindows`, *data*): one window, as a burst on an
+  empty line-in gives, does not establish it. While the sync is not
+  established, a reference miss also correlates the other inputs with
+  sound pairwise, over the same windows (each window of the measurement
+  ends at one common end, an input more than a window behind the
+  reference not holding the others back). If a pair's window counts,
+  the reference moves to the input the most others count against (a
+  tie goes to the lowest number); it becomes the new anchor, every
+  input starts over, and the lags of the inputs counted against it are
+  applied at once, so they are synced from that measurement on. If no
+  pair counts, nothing moves: no level, peak or other score picks a
+  reference, only a counted window. Once the sync is established, the
+  reference moves only as below. Once it is in no audio (muted,
+  D69) or its capture ended (unplugged), the reference goes to the
+  lowest-numbered input being written that has an audio delay, whose
+  own audio delay turns its lags into ones against the anchor; with
+  none such, the lowest-numbered input being written becomes the new
+  anchor (see below). The lags of a measurement against a reference
+  that moved while it ran are dropped and count toward none of this.
+  The reference stays with the input it moved to: the anchor's
+  returning file does not take it back (D85). So a near-silent, dead or
+  humming input 1 hands the reference on at the first measurement in
+  which two other inputs share sound, but a reference that stops
+  correlating once the sync is established stays, as before D89. Until
+  then, a healthy reference whose window falls just short once while two
+  other inputs match moves too (the owner's Mac, 2026-11-26: clarity 11
+  against 12, the pair at 68); the old anchor is not in the guide track
+  yet (shown "not synced yet") until the next measurement syncs it. A known cost: two inputs
+  carrying one signal the room's microphones do not hear (two loopbacks
+  of a call, two inputs of one device) can take the reference while the
+  room is quiet at the start and establish the sync, and the room's
+  microphones then never sync; the audio mode Wired, the default, keeps
+  out only the virtual case: it records no virtual input but the
+  default microphone. The default
   microphone plays no part (D80, amending D77). The system audio is
   neither measured nor the reference. A window counts
   only when its match is clear, the peak of |correlation| at least 12
@@ -1642,11 +1677,15 @@ the metadata items (see "Output on disk").
   Another reference keeps every audio delay: the lags against it are
   re-based onto the anchor through its own audio delay, which stays as
   it was while it is the reference (a shortcut: it is not measured
-  then), and the mix keeps every input. Only when no input being written has an audio
-  delay does the lowest-numbered one become the new anchor, and every
-  input starts over (no audio delay holds, nothing is carried over), its
-  audio delay against the old anchor taken as 0 and the entries written
-  before staying against the old anchor (a shortcut). An entry is the
+  then), and the mix keeps every input. When the reference moves to an
+  input without an audio delay, no input being written but the anchor
+  having one, or on a reference miss whatever its audio delay (D89),
+  that input becomes the new anchor, and every input starts over (no audio delay holds, nothing is carried over), its
+  audio delay against the old anchor taken as 0 (a shortcut). Before the
+  sync is established, the entries the files being written had are
+  cleared, as they were against an anchor that no longer is one; once
+  it is established, they stay against the old anchor (a shortcut); a
+  file that ended keeps its list either way (D89). An entry is the
   file's audio delay against the anchor, negative when earlier, and
   changes only when the file's own changes: a new earliest input changes
   no other file's entries. Measuring ends at Stop. Each change goes into
@@ -2148,7 +2187,13 @@ them:
   `out of the guide track`).
 - A reference change: `reference <old file> → <new file>: lags re-based
   onto the anchor by 500 ms late`, or `…: it has no audio delay, so it
-  is the new anchor and every input starts over`.
+  is the new anchor and every input starts over`, or, on a reference
+  miss, `…: moved on a reference miss, so it is the new anchor and every
+  input starts over` after its reason (D89): `reference <file>: no counted window
+  against it while another input had sound; <file> has counted windows
+  of 2 other inputs against it: <file>, <file>`, the pairs' windows
+  before it as `<file>: lag 322 ms late against <file>, clarity 423,
+  counted`.
 - The mix: `<file>: joins the guide track placed earlier by 500 ms (the
   mix's zero: <file>)`, `<file>: placed earlier by 555 ms → 600 ms (the
   mix's zero: <file>)` followed by `the Audio inputs guide track

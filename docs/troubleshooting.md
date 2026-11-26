@@ -37,6 +37,7 @@ One row per entry, the error text exactly as in the entry.
 | `AVFoundationErrorDomain -11800; reason: An unknown error occurred (-19092)` | [The end-to-end tests fail at a mode switch on a busy Mac](#the-end-to-end-tests-fail-at-a-mode-switch-on-a-busy-mac) |
 | `The job was not acquired by Runner of type hosted even after multiple attempts` | [No macOS runner: the pipeline job is cancelled](#no-macos-runner-the-pipeline-job-is-cancelled) |
 | `Multi Screen Recorder quit unexpectedly` (the app's crash dialog) after running the tests, with no crash of the app | [Crash dialog for crash reports the tests wrote](#crash-dialog-for-crash-reports-the-tests-wrote) |
+| `Expectation failed: (made.guideRefusals → 2) == 4` | [Timing tests fail while the audio delay invariants run](#timing-tests-fail-while-the-audio-delay-invariants-run) |
 
 ## Format
 
@@ -210,6 +211,55 @@ One row per entry, the error text exactly as in the entry.
   120 s drain timeout, every assertion kept;
   `aLastMixTheWriterDoesNotTakeInTimeIsTold`, which asserts the timeout
   fires, keeps its 50 ms.
+
+## Timing tests fail while the audio delay invariants run
+
+- **Error:** `Expectation failed: (made.guideRefusals → 2) == 4` and
+  `Expectation failed: received` (`GuideTrackFeedTests.swift:30`)
+- **Symptom:** in CI's `scripts/test` (run 45784134449 on 585af40 of
+  PR #34) `VideoFileTickerTests`
+  `theGuideTracksEndWithTheVideoAfterAStreamStopLongerThanFiveSeconds`,
+  `aLongLastMixIsNotDroppedWhileTheWriterWaits`,
+  `theLastGuideSamplesWaitForTheWriterWithinTheDrainTimeout` and
+  `GuideTrackFeedTests.theLastMixWaitsForSamplesThatComeLate` each
+  "failed after 264 s", with their 120 s and 60 s bounds passed; the
+  whole run took 519.7 s against 140.6 s on `main` (run 45659873665,
+  the ticker suite 28.4 s there).
+- **Why:** [KNOWN: CI's log] the four failed within 0.6 s of
+  `AudioDelayInvariantTests.theReferenceRulesHold(seed:)` (200 cases)
+  ended "after 263.789 s" and `ReferenceChoiceTests` "after 264.081 s".
+  [KNOWN: the test code] the invariant harness's `run` was synchronous:
+  each of the 200 cases computed for seconds without suspending, so the
+  cases held every thread of the cooperative pool, and a task the timing
+  tests wait on could not resume until they ended. [KNOWN: measured
+  locally with a probe test sleeping 50 ms in a loop beside the two
+  suites, 12 cores] its first resumption came 29.9 s late, the suites'
+  whole run. The same cause as "Async tests time out on CI while
+  simulation tests run" above, from new suites.
+- **Fix:** the harness's `run` is async and yields once per measurement
+  (`await Task.yield()`); the tests calling it are async. Every
+  assertion, bound and seed kept. A case still holds a thread between
+  two yields (measured locally: median 106 ms, at most 427 ms) and for
+  its setup before the first. With it the probe's resumptions were at
+  worst 2.1 to 2.4 s late over the same run. Serializing the suite, the
+  earlier entry's remedy, is not used here: its 200 cases would run for
+  many minutes on one thread. Yielding saves no CPU: CI's `scripts/test`
+  step, build included, took 11 min 26 s (run 45786893084) against
+  4 min 46 s on `main` before (run 45659873665).
+- **Verify:** CI's `scripts/test` passes on the pushed head.
+- **Observed:** 2026-11-26, PR #34; one passing run, 45786893084 on
+  4c0ef05 (whole run 510.1 s), with a thin margin:
+  `aLongLastMixIsNotDroppedWhileTheWriterWaits` took 106.7 s against
+  its 120 s bound, the two other ticker tests 89.5 s each, and
+  `GuideTrackFeedTests.theLastMixWaitsForSamplesThatComeLate` passed
+  after 73.4 s, past its 60 s wait (not explained by the log). The pool is
+  still short of threads for minutes: the serialized
+  `ClockDriftCorrectionTests` (294.5 s) and `ClockDriftTrackerTests`
+  (342.5 s) hold two of the runner's three threads without yielding
+  while the invariant cases share the third. A slower runner can fail
+  these tests again. The levers, the owner's to choose: a cheaper
+  implementation of the measurement the invariant cases run (no case
+  dropped), or the two clock drift suites yielding too.
 
 ## A virtual screen comes back at its last mode
 
