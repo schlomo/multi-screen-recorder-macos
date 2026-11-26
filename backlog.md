@@ -581,6 +581,9 @@ Nothing.
    device change; which jobs (capture, encode, analyse, mix, write)
    belong in which process or thread; what the inter-process transfer
    costs (frames, audio, CPU). Then a design for the owner's sign-off.
+   It must keep what the owner likes today (2026-11-26): a source whose
+   device did not change keeps recording into the same file through
+   another device's change.
    The probe and its stacks were in the session's scratchpad (`probe/`).
 
 ## Deliberately deferred
