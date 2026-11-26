@@ -1636,8 +1636,8 @@ the metadata items (see "Output on disk").
   correlating once the sync is established stays, as before D89. Until
   then, a healthy reference whose window falls just short once while two
   other inputs match moves too (the owner's Mac, 2026-11-26: clarity 11
-  against 12, the pair at 68); the old anchor is out of the guide track
-  until the next measurement syncs it. A known cost: two inputs
+  against 12, the pair at 68); the old anchor is not in the guide track
+  yet (shown "not synced yet") until the next measurement syncs it. A known cost: two inputs
   carrying one signal the room's microphones do not hear (two loopbacks
   of a call, two inputs of one device) can take the reference while the
   room is quiet at the start and establish the sync, and the room's

@@ -3232,7 +3232,8 @@ architect's reading.
   Until the sync is established, a healthy reference whose window falls
   just short once while two other inputs match moves too (the owner's
   Mac, 2026-11-26: clarity 11 against 12, the pair at 68), the old
-  anchor out of the guide track until the next measurement syncs it
+  anchor not in the guide track yet (shown "not synced yet") until the
+  next measurement syncs it
   (`RecorderTests.aHealthyReferenceThatMissesOnceMovesAndSyncsAgain`).
   The measurement does up to n(n-1)/2 extra cross-correlations, only while the sync is not established and nothing
   counts against the reference.
@@ -3248,7 +3249,8 @@ architect's reading.
   only to an input with a counted window, nothing moves once established,
   a re-base changes no audio delay, shared speech ends synced, no input
   main syncs lost but main's anchor, entries cleared exactly before
-  the sync is established); `ReferenceChoiceTests`; `RecorderTests`
+  the sync is established, a file that ended keeping its list in the
+  recorder); `ReferenceChoiceTests`; `RecorderTests`
   (`aNearSilentInput1HandsTheReferenceToAMicrophoneAtTheFirstMeasurement`,
   `aReferenceMissBeforeTheSyncIsEstablishedMovesToAProvenInput`,
   `aSingleCountedWindowDoesNotEstablishTheSync`,
