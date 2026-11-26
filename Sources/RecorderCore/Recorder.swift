@@ -109,6 +109,7 @@ public final class Recorder {
     /// The camera captures whose end was reported to the camera tracker.
     private var cameraCapturesGone: Set<Int> = []
     private var delayTask: Task<Void, Never>?
+    /// The audio inputs as read last, used when a read fails; none before the first read.
     private var audioInputsRead: [AudioInputInfo] = []
     private var endReports = CaptureEndReports()
     private var problemsTold = ProblemsTold()
@@ -236,7 +237,7 @@ public final class Recorder {
         apply(tracker.begin(screens, at: context.now()))
         if readsCameras { applyCameras(cameraTracker.begin(readCameras(), at: context.now())) }
         applyAudio(audioTracker.begin(
-            inputs: readAudioInputs() ?? [], mainDisplayID: screens.first(where: \.isMain)?.displayID,
+            inputs: readAudioInputs() ?? audioInputsRead, mainDisplayID: screens.first(where: \.isMain)?.displayID,
             screens: Set(screens.map(\.displayID)), at: context.now()))
         freeSpaceTask = Task { [weak self] in
             while !Task.isCancelled {
@@ -581,20 +582,20 @@ public final class Recorder {
         if readsCameras { applyCameras(cameraTracker.wake(readCameras(), at: context.now())) }
         guard readsScreens else {
             apply(tracker.wake([], at: context.now()))
-            applyAudio(audioTracker.wake(readAudioInputs() ?? [], at: context.now()))
+            applyAudio(audioTracker.wake(readAudioInputs() ?? audioInputsRead, at: context.now()))
             return
         }
         guard let screens = readScreens() else {
             apply(tracker.wakeUnread(at: context.now()))
             // The audio's wake does not depend on the screens, only the system audio's main screen does.
-            applyAudio(audioTracker.wake(readAudioInputs() ?? [], at: context.now()))
+            applyAudio(audioTracker.wake(readAudioInputs() ?? audioInputsRead, at: context.now()))
             return
         }
         let step = tracker.wake(screens, at: context.now())
         context.update(screens, lastScreenChange: tracker.lastScreenChange)
         apply(step)
         screensForAudio(screens)
-        applyAudio(audioTracker.wake(readAudioInputs() ?? [], at: context.now()))
+        applyAudio(audioTracker.wake(readAudioInputs() ?? audioInputsRead, at: context.now()))
     }
 
     // MARK: Actions

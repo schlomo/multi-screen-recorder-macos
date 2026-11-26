@@ -93,6 +93,7 @@ extension GlobalRecordingLog {
         }
 
         private let screensReadable = Switch()
+        private let audioInputsReadable = Switch()
         private var recorder: Recorder!
 
         /// A camera's frames, sent by the test with the host time of now.
@@ -239,13 +240,17 @@ extension GlobalRecordingLog {
             let sources = sources
             let volume = volume
             let screensReadable = screensReadable
+            let audioInputsReadable = audioInputsReadable
             let cameras = cameras
             let devices = RecorderDevices(
                 screens: { () throws(DeviceReadError) -> [ConnectedScreen] in
                     if screensReadable.isOn.withLock({ $0 }) { return [] }
                     throw DeviceReadError("the stand-in's screens cannot be read")
                 },
-                audioInputs: { inputs },
+                audioInputs: {
+                    if audioInputsReadable.isOn.withLock({ $0 }) { return inputs }
+                    throw DeviceReadError("the stand-in's audio inputs cannot be read")
+                },
                 audioInputSource: { uid in
                     let source = AudioCaptureTests.StandInSource()
                     sources.list.withLock { $0.append(source) }
@@ -381,6 +386,18 @@ extension GlobalRecordingLog {
             recorder.didWake()
             try await wait("the audio input's restart") { sources.count == 2 }
             #expect(observer.problems.map(\.problem.problem) == ["The screens cannot be read"])
+            #expect(try manifestOnDisk().events.map(\.event) == [.sleep, .wake])
+            _ = await stop()
+        }
+
+        @Test func aWakeWhoseAudioInputsCannotBeReadKeepsTheLastList() async throws {
+            try start()
+            #expect(sources.count == 1)
+            recorder.willSleep()
+            audioInputsReadable.isOn.withLock { $0 = false }
+            recorder.didWake()
+            try await wait("the audio input's restart") { sources.count == 2 }
+            #expect(observer.problems.map(\.problem.problem) == ["The audio inputs cannot be read"])
             #expect(try manifestOnDisk().events.map(\.event) == [.sleep, .wake])
             _ = await stop()
         }
