@@ -2,11 +2,32 @@
 
 ## Next session starts here
 
-Item 51 (the runner VM, its own PR, the owner registers the runner;
-GitHub's hosted macOS runners stalled PR #32's pipeline twice on
-2026-11-25), in a fresh session; then item 22 (camera picture sync
-from claps). The owner, 2026-11-23: "Noticeable lip sync is my goal";
-"Iterative improvement, every shipment is better". The end-to-end
+Simplification first (the owner, 2026-11-26: "it feels like we added a
+lot of complexity to cover edge cases and I'm afraid that we are
+starting to hurt the main and regular use cases"). A top-tier,
+read-only review of the whole repository runs now against the owner's
+main use cases (below); its report goes to the owner, who picks the
+cuts; then few, bundled simplification PRs (item 4 folds in), with the
+CI test time cut without dropping a case (since PR #34 `scripts/test`
+takes 11 min 26 s on CI against 4 min 46 s, with a thin margin on the
+timing tests, `docs/troubleshooting.md`). Item 22 is deferred; item 51
+follows the simplification unless GitHub's outages block PRs again.
+
+Main use cases (the owner, 2026-11-26), to stay simple and always work:
+a laptop alone or with one or two external screens, recording every
+screen, the default microphone and the system audio; the same with a
+USB camera and one or two USB microphones, the default microphone as
+the reference; screens and devices plugged in or out and the lid
+opened or closed during a recording (sleep is not a main case); stop
+or a crash never loses more than the last 5 seconds. Everything else
+is an edge case, which may cost some quality for simplicity but never
+a lost recording. Recorded in the decisions log with the first
+simplification PR.
+
+Release 0.20261126 of PR #34 to be installed for the homepage
+screenshots (`scripts/update-homepage-screenshots --this-mac`, the
+owner told first: lid open, microphones connected, sound playing).
+The end-to-end
 tests need an idle Mac: a video call is enough to fail
 `virtual-screen` (`docs/troubleshooting.md`).
 
@@ -421,31 +442,6 @@ Nothing.
    of PR code. Needs the owner's sign-off of the design. Its
    troubleshooting entry shipped with PR #30. Still wanted for the
    hosted runners once item 51 makes them the fallback.
-22. **A/V sync, cameras** (the owner, 2026-11-23: "Noticeable lip
-   sync is my goal"; claps "something we encourage without requiring
-   them"; a Calibrate button "highlight[ed] if recommended and ...
-   muted if we think it's not needed"). The architect's design, agreed
-   in general by the owner, to be signed off as text before building:
-   a camera's picture delay is measured from claps (the sound's onset
-   in the reference microphone, then the frame where each camera's
-   motion burst stops), watched all the time at about 0.03 % of a core
-   per camera; a value is stored per camera and format with its date
-   only once 3 claps agree within a frame; it is applied as a fixed
-   shift per camera file at its start (never inside a running file),
-   a value measured mid-file applies to the next file and to this
-   file's clip in the timeline file; a camera without a value is "not
-   measured" and not shifted. A Calibrate button guides "clap 3 times
-   where all cameras see you", highlighted when a recorded camera has
-   no value or an uncertain one (format, orientation, frame rate
-   changed, or old). Later in it: a flash on the screen plus a sound
-   (measured 2026-11-23, 10 of 10 events seen by every camera in an
-   empty room; a button, never automatic: calls, audiences).
-   Evidence 2026-11-23: picture later than the Razer's sound by about
-   +25 ms (BRIO) and +125 ms (Osmo) by a clap, +31 and +164 ms by the
-   flash; content without claps (motion against sound) fails, chance
-   level; lip analysis with Vision promising but fragile and 14 % of a
-   core, deferred. Tolerance: ITU-R BT.1359, sound at most 45 ms early
-   or 125 ms late. With item 39 if both touch the source rows.
 25. **A new screen showing a still picture gets no file until it
    changes** (found by PR #23's runs, 2026-11-19): ScreenCaptureKit
    delivers complete frames only on change, so a newly connected
@@ -554,6 +550,36 @@ Nothing.
    scenario moved to item 53.
 
 ## Deliberately deferred
+
+- **Item 22, A/V sync of cameras from claps** (deferred by the owner,
+  2026-11-26, for the simplification). Revive when picture sync is the
+  top complaint. The item as it stood:
+
+  22. **A/V sync, cameras** (the owner, 2026-11-23: "Noticeable lip
+     sync is my goal"; claps "something we encourage without requiring
+     them"; a Calibrate button "highlight[ed] if recommended and ...
+     muted if we think it's not needed"). The architect's design, agreed
+     in general by the owner, to be signed off as text before building:
+     a camera's picture delay is measured from claps (the sound's onset
+     in the reference microphone, then the frame where each camera's
+     motion burst stops), watched all the time at about 0.03 % of a core
+     per camera; a value is stored per camera and format with its date
+     only once 3 claps agree within a frame; it is applied as a fixed
+     shift per camera file at its start (never inside a running file),
+     a value measured mid-file applies to the next file and to this
+     file's clip in the timeline file; a camera without a value is "not
+     measured" and not shifted. A Calibrate button guides "clap 3 times
+     where all cameras see you", highlighted when a recorded camera has
+     no value or an uncertain one (format, orientation, frame rate
+     changed, or old). Later in it: a flash on the screen plus a sound
+     (measured 2026-11-23, 10 of 10 events seen by every camera in an
+     empty room; a button, never automatic: calls, audiences).
+     Evidence 2026-11-23: picture later than the Razer's sound by about
+     +25 ms (BRIO) and +125 ms (Osmo) by a clap, +31 and +164 ms by the
+     flash; content without claps (motion against sound) fails, chance
+     level; lip analysis with Vision promising but fragile and 14 % of a
+     core, deferred. Tolerance: ITU-R BT.1359, sound at most 45 ms early
+     or 125 ms late. With item 39 if both touch the source rows.
 
 - **A true-peak guide limiter** (low-pass plus lookahead; the
   analysis of 2026-11-23): the AAC encoder overshoots the soft limiter
@@ -696,6 +722,14 @@ Nothing.
   the README (D46). Revisit when people struggle with it.
 
 ## Done (recent)
+
+- 2026-11-26: PR #34 merged by the owner: before a sync is established,
+  a reference no input syncs to hands over to one proven by a pair
+  (D89); found by the dock line-in as the default input on the owner's
+  Mac, where three microphones stayed unsynced. 3,200-seed sweep: 498
+  more synced, 1 fewer; the owner's 15 recordings the same or better;
+  CPU unchanged. End-to-end 7 of 7 on d64a9a9. Cost: CI's test step
+  11 min 26 s (was 4 min 46 s).
 
 - 2026-11-25: PR #32 merged by the owner, release 0.20261125.116: items 49
   (a reconnected anchor is measured again, D85), 50 with 43 (only a
