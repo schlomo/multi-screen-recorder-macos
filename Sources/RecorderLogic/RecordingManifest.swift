@@ -579,8 +579,8 @@ public struct RecordingEvent: Codable, Equatable, Sendable {
         case audioInputLeftTheGuideTrack = "audio input left the guide track"
 
         /// The events of a file ended by a failure, and a camera's stall,
-        /// which loses picture: `Error at` lines of `msr record`'s summary;
-        /// the result follows the calls to action, not them (D47, D91). An
+        /// which loses picture: the `Error at` lines of the app's problem
+        /// report; the result follows the calls to action, not them (D47, D91). An
         /// audio input that disconnects, a gap, a change of the input volume
         /// and no audio are none.
         public var isFailure: Bool {

@@ -37,27 +37,36 @@ import Testing
         #expect(destination(kind, quiet: false) == .standardError)
     }
 
-    @Test(arguments: [RecordOutput.Kind.readyCheckFailed, .failureEvent, .problem, .summaryAlwaysTold, .error])
-    func quietStillWritesFailuresAndProblems(kind: RecordOutput.Kind) {
+    /// `--quiet` writes only what a person must act on: a problem's call to action, not every failure (D91).
+    @Test(arguments: [RecordOutput.Kind.readyCheckFailed, .callToAction, .summaryAlwaysTold, .error])
+    func quietStillWritesCallsToActionAndErrors(kind: RecordOutput.Kind) {
         #expect(destination(kind, quiet: true) == .standardError)
     }
 
+    /// Without `--quiet` the problem's own line told it already, mirroring the log: its call to action adds none.
+    @Test func aCallToActionIsItsOwnLineOnlyWhenQuiet() {
+        #expect(destination(.callToAction, quiet: false) == .nowhere)
+        let (output, _, err) = output(quiet: true, isTerminal: false)
+        output.tell(.failureEvent, "15:35:31 +90.7s camera stalled: BRIO\n")
+        output.tell(.problem, "Camera BRIO: camera stalled\n")
+        output.tell(.callToAction, "Disk full\n")
+        #expect(err.all == ["Disk full\n"])
+    }
+
     @Test(arguments: [RecordOutput.Kind.banner, .whatWillBeRecorded, .readyCheckPassed, .recordingFolderNotice,
-                      .stopMessage, .event, .summary])
+                      .stopMessage, .event, .failureEvent, .problem, .summary])
     func quietWritesNothingElse(kind: RecordOutput.Kind) {
         #expect(destination(kind, quiet: true) == .nowhere)
     }
 
     /// A failure that is an event and a problem is printed once, as its event line (D65).
     @Test func aProblemOfAnEventIsNeverPrinted() {
-        for quiet in [false, true] {
-            #expect(destination(.problemOfAnEvent, quiet: quiet) == .nowhere)
-            #expect(destination(.failureEvent, quiet: quiet) == .standardError)
-            let (output, _, err) = output(quiet: quiet, isTerminal: false)
-            output.tell(.failureEvent, "15:35:31 +90.7s audio file writer failed: Razer Seiren V3 Mini (cannot start writing a.mov)\n")
-            output.tell(.problemOfAnEvent, "The audio file of Razer Seiren V3 Mini failed: cannot start writing a.mov\n")
-            #expect(err.all == ["15:35:31 +90.7s audio file writer failed: Razer Seiren V3 Mini (cannot start writing a.mov)\n"])
-        }
+        #expect(destination(.problemOfAnEvent, quiet: true) == .nowhere)
+        #expect(destination(.problemOfAnEvent, quiet: false) == .nowhere)
+        let (output, _, err) = output(quiet: false, isTerminal: false)
+        output.tell(.failureEvent, "15:35:31 +90.7s audio file writer failed: Razer Seiren V3 Mini (cannot start writing a.mov)\n")
+        output.tell(.problemOfAnEvent, "The audio file of Razer Seiren V3 Mini failed: cannot start writing a.mov\n")
+        #expect(err.all == ["15:35:31 +90.7s audio file writer failed: Razer Seiren V3 Mini (cannot start writing a.mov)\n"])
     }
 
     @Test func theReadyCheckAndTheSummaryAreToldByTheirResult() {

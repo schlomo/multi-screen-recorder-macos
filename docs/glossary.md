@@ -117,7 +117,7 @@ recording manifest but never shows a line in the status window, bounces
 the Dock icon, sets the badge, counts in the status line or makes the
 result `problems` (D91). A source that
 fails gets its call to action only once it lasted 10 s without coming
-back; one still failing at Stop makes the recording ask to report it.
+back, or once its failures add up to 10 s (D91); one still failing at Stop makes the recording ask to report it.
 Only a call to action that includes "report it", or lost data, makes
 the recording ask to report it: `msr record`'s `Report it:` line and
 the app's notice at its next start. Not "action", which is a step a

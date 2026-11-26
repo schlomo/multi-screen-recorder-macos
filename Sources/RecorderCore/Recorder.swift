@@ -480,7 +480,7 @@ public final class Recorder {
         return RecordingSummary(
             manifest: manifest, recordingFolder: folder.path(percentEncoded: false), seconds: elapsedSeconds,
             manifestWritten: finalManifestWritten, problemsAskToReportIt: problemsTold.asksToReportIt,
-            filesEndedByAFullDisk: filesEndedByAFullDisk, problemsWithoutCallToAction: problemsTold.problemsWithoutCallToAction)
+            filesEndedByAFullDisk: filesEndedByAFullDisk, problemsCalledToAction: problemsTold.everyProblemCalledToAction)
     }
 
     // MARK: Screen changes
@@ -712,12 +712,12 @@ public final class Recorder {
         if let report, let problem = report.problem {
             let kind = report.problemKind(notCaptured: notCaptured)
             let over = gone(kind) ?? newerFileStart.map { (Int64(($0 * 1_000_000_000).rounded()), .recovered) }
-            problemsTold.show(problem, kind: kind, source: label, endedAt: over?.at, ending: over?.ending ?? .recovered,
+            problemsTold.track(problem, kind: kind, source: label, endedAt: over?.at, ending: over?.ending ?? .recovered,
                               withoutCallToAction: reason == .showsAnotherScreen)
             told(problem, ofAnEvent: report.event != nil)
         }
         if let report, let lost = report.lostProblem {
-            problemsTold.show(lost, kind: report.lostKind, withoutCallToAction: report.event?.event == .diskFull)
+            problemsTold.track(lost, kind: report.lostKind, withoutCallToAction: report.event?.event == .diskFull)
             told(lost)
         }
         // Both end paths may report the same end: said once.
@@ -802,7 +802,7 @@ public final class Recorder {
         guard !isStopped else { return }
         for camera in cameraTracker.sources where camera.state == .disconnected {
             problemsTold.cleared(.cameraNotCaptured(camera.uniqueID), at: context.now(), ending: .disconnected)
-            problemsTold.cleared(.cameraStalled(camera.uniqueID), at: context.now(), ending: .disconnected)
+            problemsTold.cleared(.cameraStalled(camera.uniqueID), at: context.now())
         }
         manifest.events += step.events
         if !step.events.isEmpty { try? writeManifest() }
@@ -864,7 +864,7 @@ public final class Recorder {
             capture.start()
         case .stop(let uniqueID):
             guard let (captureNumber, capture) = cameraCaptures.removeValue(forKey: uniqueID) else { return }
-            problemsTold.cleared(.cameraStalled(uniqueID), at: context.now(), ending: .stopped)
+            problemsTold.cleared(.cameraStalled(uniqueID), at: context.now())
             stopInProgress { [weak self] in
                 let file = await capture.stop()
                 guard let self else { return }
@@ -953,7 +953,7 @@ public final class Recorder {
         // No second read: `streamEnded` observes this fresh reading, taken once our capture no longer counts.
         let step = cameraTracker.streamEnded(uniqueID, reason, connected: readCameras(), at: context.now())
         applyCameras(step)
-        problemsTold.cleared(.cameraStalled(uniqueID), at: context.now(), ending: .stopped)
+        problemsTold.cleared(.cameraStalled(uniqueID), at: context.now())
         for failure in step.events where failure.event.isFailure {
             var problem = failure.problem
             if reason == .captureSourceGone, failure.event == .cameraStreamFailed {

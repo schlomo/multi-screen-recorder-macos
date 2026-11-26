@@ -129,7 +129,7 @@ final class RecordingSession: RecorderObserver {
         statusWindow.model.cpu = cpu ?? ""
 
         statusWindow.model.problems = recorder.problemLines()
-        statusWindow.model.asksToReportIt = recorder.problemsAskToReportIt
+        statusWindow.model.showsForAReport = recorder.problemsAskToReportIt
     }
 
     private func needsAttention() {
@@ -156,6 +156,7 @@ final class RecordingSession: RecorderObserver {
     }
 
     func recorder(_ recorder: Recorder, callToAction problem: RecordingProblem) {
+        output?.tell(.callToAction, problem.text + "\n")
         needsAttention()
     }
 }

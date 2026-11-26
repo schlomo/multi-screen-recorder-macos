@@ -163,7 +163,7 @@ public struct ProblemsTold: Sendable {
         var began: Int64
         var ended: Int64?
         var ending = Ending.recovered
-        /// Told with `add`, not only shown: a tell of its kind waits for it to end.
+        /// Told with `add`, not only tracked: a tell of its kind waits for it to end.
         var isTold = false
         /// What its line says besides its source, for a kind whose line is its own (D81).
         var note: String?
@@ -178,8 +178,8 @@ public struct ProblemsTold: Sendable {
 
     public init() {}
 
-    /// Into the manifest and the window's lines, unless one of its kind told before has not ended; a line only
-    /// shown does not keep it from the manifest. `source` names the screen or camera of a kind keyed by its ID;
+    /// Into the manifest and followed for its call to action and its line, unless one of its kind told before has
+    /// not ended; one only tracked does not keep it from the manifest. `source` names the screen or camera of a kind keyed by its ID;
     /// `endedAt`: already over when told, for a failure that ends with a new file (`endsWithANewFile`) after a
     /// newer file of its source started, or after its source went away (`ending`); `withoutCallToAction` for a
     /// problem whose call to action another one gives, such as a screen that showed another screen's picture or a
@@ -203,16 +203,16 @@ public struct ProblemsTold: Sendable {
             }
             told[shown].withoutCallToAction = withoutCallToAction
         } else {
-            show(problem, kind: kind, source: source, endedAt: endedAt, ending: ending, withoutCallToAction: withoutCallToAction)
+            track(problem, kind: kind, source: source, endedAt: endedAt, ending: ending, withoutCallToAction: withoutCallToAction)
             told[told.count - 1].isTold = true
             told[told.count - 1].note = note
         }
         return .tell(writeManifest: kind != .manifestNotWritten)
     }
 
-    /// Into the window's lines only, for a problem the manifest already lists (a video file's end); none while
-    /// one of its kind lasts. `endedAt` as for `add`.
-    public mutating func show(
+    /// Followed for its call to action and its line, without a manifest entry, for a problem the manifest already
+    /// lists (a video file's end); none while one of its kind lasts. `endedAt` as for `add`.
+    public mutating func track(
         _ problem: RecordingProblem, kind: ProblemKind, source: String? = nil, endedAt: Int64? = nil, ending: Ending = .recovered,
         withoutCallToAction: Bool = false
     ) {
@@ -231,7 +231,8 @@ public struct ProblemsTold: Sendable {
     }
 
     /// The problems whose call to action falls due at `now`, each given once (D84): at once, or for a source that
-    /// fails once it lasted `unrecoveredAfter`, though it ended since; `atStop`, also once it is still failing.
+    /// fails once it lasted `unrecoveredAfter`, though it ended since, or once its source's failures add up to
+    /// that (D91); `atStop`, also once it is still failing.
     public mutating func callsToAction(
         now: Int64, unrecoveredAfter: Duration = RecorderValues.unrecoveredAfter, atStop: Bool = false
     ) -> [RecordingProblem] {
@@ -239,6 +240,7 @@ public struct ProblemsTold: Sendable {
         for index in told.indices where !told[index].calledToAction && !told[index].withoutCallToAction && told[index].kind.callToAction != nil {
             let entry = told[index]
             let lasted = (entry.ended ?? now) - entry.began >= unrecoveredAfter.nanoseconds || (atStop && entry.ended == nil)
+                || (addsUp(index) && lostTime(of: entry.kind, now: now) >= unrecoveredAfter.nanoseconds)
             if entry.kind.callsToActionOnlyUnrecovered, !lasted { continue }
             told[index].calledToAction = true
             due.append(entry.problem)
@@ -246,10 +248,30 @@ public struct ProblemsTold: Sendable {
         return due
     }
 
-    /// When the next call to action of a failing source falls due, if it lasts that long (D84).
+    /// When the next call to action of a failing source falls due, if it lasts that long (D84, D91).
     public func nextCallToAction(unrecoveredAfter: Duration = RecorderValues.unrecoveredAfter) -> Int64? {
-        told.filter { !$0.calledToAction && !$0.withoutCallToAction && $0.ended == nil && $0.kind.callsToActionOnlyUnrecovered }
-            .map { $0.began + unrecoveredAfter.nanoseconds }.min()
+        let after = unrecoveredAfter.nanoseconds
+        return told.indices.filter {
+            !told[$0].calledToAction && !told[$0].withoutCallToAction && told[$0].ended == nil && told[$0].kind.callsToActionOnlyUnrecovered
+        }.map { index in
+            let entry = told[index]
+            guard addsUp(index) else { return entry.began + after }
+            // The lasting failure is the one adding to its source's earlier ones.
+            let before = lostTime(of: entry.kind, now: entry.began)
+            return entry.began + max(0, after - before)
+        }.min()
+    }
+
+    /// A source's failures add up (D91): its latest one, until one of them was called to action.
+    private func addsUp(_ index: Int) -> Bool {
+        let kind = told[index].kind
+        return told.lastIndex { $0.kind == kind && !$0.withoutCallToAction } == index
+            && !told.contains { $0.kind == kind && $0.calledToAction }
+    }
+
+    /// The time a kind lasted so far, its failures added up, leaving out those without a call to action (D91).
+    private func lostTime(of kind: ProblemKind, now: Int64) -> Int64 {
+        told.filter { $0.kind == kind && !$0.withoutCallToAction }.reduce(0) { $0 + max(0, ($1.ended ?? now) - $1.began) }
     }
 
     /// The problems whose call to action was given and that have not ended: what the badge and `msr record`'s
@@ -261,8 +283,8 @@ public struct ProblemsTold: Sendable {
     /// A call to action was given: the recording's result is `problems` (D91).
     public var gaveACallToAction: Bool { told.contains(where: \.calledToAction) }
 
-    /// The problems whose call to action was not given: `msr record`'s summary leaves them out (D91).
-    public var problemsWithoutCallToAction: [RecordingProblem] { told.filter { !$0.calledToAction }.map(\.problem) }
+    /// Every problem whose call to action was given, ended or not: what `msr record`'s summary lists (D91).
+    public var everyProblemCalledToAction: [RecordingProblem] { told.filter(\.calledToAction).map(\.problem) }
 
     /// A call to action given that includes "report it": the recording asks to report it once it ended, and the
     /// status window names the files for a report (D84, D91).

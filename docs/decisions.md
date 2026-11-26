@@ -3390,14 +3390,21 @@ architect's reading.
   only when a shown problem's call to action includes "report it",
   never under a full disk, a permission or a replug line alone),
   `msr record`'s end summary (its lines of what went wrong, and so its
-  `Report it:` link, list only the problems whose call to action was
-  given; failure events are no longer listed there), and the
+  `Report it:` link, are a positive list: the problems whose call to
+  action was given and one line per file not finalized; failure events
+  and every other problem are no longer listed there), and the
   recording's `result`: `problems` only
   when a call to action was given (at Stop too, for a source still
   failing) or a file is not finalized, so exit 3 for `msr record` too.
-  A problem without one is still written to the recording log, to
-  standard error by `msr record` (which mirrors the log for people
-  running the command, unchanged) and into `recording.json`'s
+  A failing source's failures add up: once its lost time since the
+  recording's start reaches `unrecoveredAfter` (the same 10 s) in
+  total, its call to action is given as if unrecovered, once (a
+  source failing for 8 s every 12 s calls to action during its second
+  failure). A shown line that has ended stays: it explains the bounce
+  a person saw. A problem without one is still written to the
+  recording log, to standard error by `msr record` (which mirrors the
+  log for people running the command; under `--quiet` it prints only
+  the problems whose call to action was given) and into `recording.json`'s
   `problems` and `events`, but shows nothing and leaves the result
   `ok`. The app's report of the last recording, read from
   `recording.json` alone, still lists every failure event and problem. A shown
@@ -3409,6 +3416,13 @@ architect's reading.
   [troubleshooting.md](troubleshooting.md), "A camera stalls while
   another camera starts"). Accepted, no workaround: a stall has no call
   to action, so it is now quiet.
+- **What `result` means:** `result` and exit 3 change meaning from
+  "nothing lost" to "nothing for a person to do": a stall or a
+  recovered failure loses picture or sound and still ends `ok`, so a
+  script that needs to know about loss reads `recording.json`'s
+  `problems` and `events`. The free space not read has no call to
+  action, so while it cannot be read the low-disk warning cannot fire;
+  accepted, per the owner-signed table of D84.
 - **What changes for a person:** a recording with a camera stall, a
   screen, camera or microphone that failed and came back within 10 s,
   a file failure followed by a new file, or a problem such as the free

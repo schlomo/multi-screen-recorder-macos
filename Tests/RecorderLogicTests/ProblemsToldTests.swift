@@ -104,6 +104,42 @@ import Testing
         #expect(told.lines(now: 40 * second) == ["Screen DELL not captured for 15 s at 0:01, recovered: denied"])
     }
 
+    /// A source that keeps failing for under `unrecoveredAfter` each time: its failures add up, and once its
+    /// lost time reaches `unrecoveredAfter` in total, its call to action is given once, for the failure then
+    /// lasting (D91). The reviewer's probe: 50 failures of 8 s in 600 s.
+    @Test func aSourceFailingAgainAndAgainCallsToActionOnceItsLostTimeAddsUp() {
+        var told = ProblemsTold()
+        var manifest = manifest()
+        var calls: [RecordingProblem] = []
+        for index in 0..<50 {
+            let began = Int64(index) * 12 * second
+            _ = told.add(problem(began, "Mic \(index)"), kind: .audioSourceFailed("Mic"), to: &manifest)
+            calls += told.callsToAction(now: began)
+            if index == 1 { #expect(told.nextCallToAction() == 14 * second) }
+            if let due = told.nextCallToAction(), due < began + 8 * second { calls += told.callsToAction(now: due) }
+            told.cleared(.audioSourceFailed("Mic"), at: began + 8 * second)
+            calls += told.callsToAction(now: began + 8 * second)
+        }
+        #expect(calls.map(\.problem) == ["Mic 1"])
+        #expect(told.gaveACallToAction && told.asksToReportIt)
+        #expect(told.lines(now: 600 * second) == ["Mic not captured for 8.0 s at 0:12, recovered: denied"])
+    }
+
+    /// Lost time adds up per source: another source's failures do not count, nor a screen's file ended by
+    /// another screen's picture, which calls to no action (D84, D91).
+    @Test func lostTimeAddsUpPerSourceOnly() {
+        var told = ProblemsTold()
+        var manifest = manifest()
+        _ = told.add(problem(0), kind: .audioSourceFailed("A"), to: &manifest)
+        told.cleared(.audioSourceFailed("A"), at: 6 * second)
+        _ = told.add(problem(0, "Screen 1 LG"), kind: .screenNotCaptured("U"), withoutCallToAction: true, to: &manifest)
+        told.cleared(.screenNotCaptured("U"), at: 20 * second)
+        _ = told.add(problem(20 * second), kind: .audioSourceFailed("B"), to: &manifest)
+        _ = told.add(problem(21 * second, "Screen 1 LG failed"), kind: .screenNotCaptured("U"), to: &manifest)
+        #expect(told.callsToAction(now: 25 * second).isEmpty)
+        #expect(told.nextCallToAction() == 30 * second)
+    }
+
     /// Repeats of a kind share one line, with other kinds told between them.
     @Test func repeatsOfAKindShareOneLine() {
         var told = ProblemsTold()
@@ -140,7 +176,7 @@ import Testing
         _ = told.add(problem(12 * second, "Screen DELL"), kind: .screenNotCaptured("U"), source: "DELL", to: &manifest)
         told.cleared(.screenNotCaptured("U"), at: 14 * second, ending: .disconnected)
         _ = told.add(problem(20 * second, "x"), kind: .audioInputNotRecordable("Razer"), to: &manifest)
-        told.show(problem(21 * second, "y"), kind: .videoFileLost("Screen 1 - DELL.mov"))
+        told.track(problem(21 * second, "y"), kind: .videoFileLost("Screen 1 - DELL.mov"))
         _ = told.callsToAction(now: 30 * second, unrecoveredAfter: .seconds(1))
         #expect(told.lines(now: 30 * second) == [
             "File Screen 1 - DELL.mov incomplete since 0:21: denied",
@@ -154,13 +190,13 @@ import Testing
     @Test func aShownLineNeitherSwallowsATellNorEndsWhatANewFileDoesNotEnd() {
         var told = ProblemsTold()
         var manifest = manifest()
-        told.show(problem(5 * second, "Camera file c.mov"), kind: .cameraNotCaptured("C"), source: "BRIO")
+        told.track(problem(5 * second, "Camera file c.mov"), kind: .cameraNotCaptured("C"), source: "BRIO")
         #expect(told.add(problem(5 * second, "Camera BRIO stream failed"), kind: .cameraNotCaptured("C"), source: "BRIO", to: &manifest)
             == .tell(writeManifest: true))
         #expect(manifest.problems.count == 1)
         #expect(told.add(problem(6 * second, "Camera BRIO"), kind: .cameraNotCaptured("C"), source: "BRIO", to: &manifest) == .alreadyTold)
-        told.show(problem(5 * second, "g"), kind: .videoFileLost("Screen 1 - DELL.mov"), endedAt: 6 * second)
-        told.show(problem(5 * second, "d"), kind: .diskFull, endedAt: 6 * second)
+        told.track(problem(5 * second, "g"), kind: .videoFileLost("Screen 1 - DELL.mov"), endedAt: 6 * second)
+        told.track(problem(5 * second, "d"), kind: .diskFull, endedAt: 6 * second)
         _ = told.callsToAction(now: 7 * second, unrecoveredAfter: .seconds(1))
         #expect(told.lines(now: 7 * second) == [
             "Disk full since 0:05: denied", "File Screen 1 - DELL.mov incomplete since 0:05: denied",
@@ -313,11 +349,11 @@ import Testing
         var manifest = manifest()
         _ = permission.add(problem(1 * second, "The Camera permission"), kind: .cameraPermissionMissing, to: &manifest)
         _ = permission.add(problem(1 * second, "Silence"), kind: .audioInputSilentAfterGaps("u"), to: &manifest)
-        permission.show(problem(1 * second, "Disk full"), kind: .diskFull)
+        permission.track(problem(1 * second, "Disk full"), kind: .diskFull)
         #expect(permission.callsToAction(now: 1 * second).count == 3)
         #expect(!permission.asksToReportIt)
         var lost = ProblemsTold()
-        lost.show(problem(1 * second, "Screen file s.mov"), kind: .videoFileLost("s.mov"))
+        lost.track(problem(1 * second, "Screen file s.mov"), kind: .videoFileLost("s.mov"))
         #expect(lost.callsToAction(now: 1 * second).map(\.problem) == ["Screen file s.mov"])
         #expect(lost.asksToReportIt)
         var changes = ProblemsTold()
@@ -331,7 +367,7 @@ import Testing
     @Test func aScreenShowingAnotherScreensPictureNeverCallsToAction() {
         var told = ProblemsTold()
         var manifest = manifest()
-        told.show(problem(1 * second, "Screen file s.mov"), kind: .screenNotCaptured("U"), withoutCallToAction: true)
+        told.track(problem(1 * second, "Screen file s.mov"), kind: .screenNotCaptured("U"), withoutCallToAction: true)
         _ = told.add(problem(1 * second, "Screen 1 LG"), kind: .screenNotCaptured("U"), withoutCallToAction: true, to: &manifest)
         _ = told.add(problem(1 * second, "Screen 2 DELL"), kind: .screenNotCaptured("V"), withoutCallToAction: true, to: &manifest)
         #expect(told.nextCallToAction() == nil)
@@ -360,13 +396,30 @@ import Testing
     @Test func aFailureToldAfterAnotherScreensPictureCallsToAction() {
         var told = ProblemsTold()
         var manifest = manifest()
-        told.show(problem(1 * second, "Screen file s.mov"), kind: .screenNotCaptured("U"), withoutCallToAction: true)
+        told.track(problem(1 * second, "Screen file s.mov"), kind: .screenNotCaptured("U"), withoutCallToAction: true)
         _ = told.add(problem(5 * second, "Screen 1 LG"), kind: .screenNotCaptured("U"), to: &manifest)
         #expect(told.nextCallToAction() == 15 * second)
         #expect(told.callsToAction(now: 14 * second).isEmpty)
         #expect(told.callsToAction(now: 15 * second).map(\.problem) == ["Screen 1 LG"])
         #expect(told.asksToReportIt)
     }
+    /// The problems whose call to action was given, for `msr record`'s summary: never one told without it, nor
+    /// one a later tell replaced, as another screen's picture followed by that screen's failure within the wait (D91).
+    @Test func everyProblemCalledToActionListsOnlyThose() {
+        var told = ProblemsTold()
+        var manifest = manifest()
+        _ = told.add(problem(1 * second, "Screen 1 LG"), kind: .screenNotCaptured("U"), withoutCallToAction: true, to: &manifest)
+        _ = told.add(problem(5 * second, "Screen 1 LG failed"), kind: .screenNotCaptured("U"), to: &manifest)
+        _ = told.add(problem(6 * second, "Camera stalled"), kind: .cameraStalled("C"), to: &manifest)
+        told.cleared(.screenNotCaptured("U"), at: 8 * second)
+        #expect(told.callsToAction(now: 8 * second).isEmpty)
+        #expect(told.everyProblemCalledToAction.isEmpty)
+        #expect(manifest.problems.count == 3)
+        _ = told.add(problem(9 * second, "Disk full"), kind: .diskFull, to: &manifest)
+        _ = told.callsToAction(now: 9 * second)
+        #expect(told.everyProblemCalledToAction.map(\.problem) == ["Disk full"])
+    }
+
     /// As the Recorder does it: another screen's picture told with the flag, then a failure of its own told.
     @Test func aFailureToldAfterAnotherScreensPictureToldCallsToAction() {
         var told = ProblemsTold()

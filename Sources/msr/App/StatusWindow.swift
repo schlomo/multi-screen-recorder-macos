@@ -14,7 +14,7 @@ final class StatusModel {
     /// One line per kind of problem whose call to action was given, newest first (D78, D91).
     var problems: [String] = []
     /// A shown problem's call to action includes "report it": the line naming the files for a report shows (D91).
-    var asksToReportIt = false
+    var showsForAReport = false
     /// Each audio source's level meter, drawn 10 times a second while the window is open (D69).
     var levels: [AudioTracker.SourceID: AudioLevel] = [:]
     /// The input volume of each audio input whose volume can be set: only those have a slider.
@@ -142,7 +142,7 @@ struct StatusView: View {
                         .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { problemsHeight = $0 }
                     }
                     .frame(height: min(problemsHeight, Self.problemsMaxHeight))
-                    if model.asksToReportIt {
+                    if model.showsForAReport {
                         Text(Self.forAReport)
                             .font(.callout)
                             .foregroundStyle(.secondary)

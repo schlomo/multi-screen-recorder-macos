@@ -11,12 +11,12 @@ public struct RecordingSummary: Equatable, Sendable {
     public let problemsAskToReportIt: Bool
     /// The names of the files whose writer failed on a full disk: not finalized, they ask for no report (D84).
     public let filesEndedByAFullDisk: Set<String>
-    /// The problems told without their call to action given: in the log and the manifest, not in the summary (D91).
-    public let problemsWithoutCallToAction: [RecordingProblem]
+    /// The problems whose call to action was given: the summary's lines of what went wrong (D91).
+    public let problemsCalledToAction: [RecordingProblem]
 
     public init(
         manifest: RecordingManifest, recordingFolder: String, seconds: Double, manifestWritten: Bool, problemsAskToReportIt: Bool,
-        filesEndedByAFullDisk: Set<String>, problemsWithoutCallToAction: [RecordingProblem] = []
+        filesEndedByAFullDisk: Set<String>, problemsCalledToAction: [RecordingProblem] = []
     ) {
         self.manifest = manifest
         self.recordingFolder = recordingFolder
@@ -24,7 +24,7 @@ public struct RecordingSummary: Equatable, Sendable {
         self.manifestWritten = manifestWritten
         self.problemsAskToReportIt = problemsAskToReportIt
         self.filesEndedByAFullDisk = filesEndedByAFullDisk
-        self.problemsWithoutCallToAction = problemsWithoutCallToAction
+        self.problemsCalledToAction = problemsCalledToAction
     }
 
     /// Ended with an error (exit 3): the manifest's result is `problems`
@@ -77,11 +77,16 @@ public struct RecordingSummary: Equatable, Sendable {
 
     public static let manifestNotWrittenLine = "The recording manifest could not be written at the end: \(RecordingNames.manifest) has no end."
 
-    /// What the summary tells went wrong, each with its seconds from the start: the problems whose call to
-    /// action was given, then, if the manifest has no end, that (D91).
+    /// What the summary tells went wrong, each with its seconds from the start, in time order: the problems whose
+    /// call to action was given and each file not finalized, at its end, then, if the manifest has no end, that (D91).
     public var whatWentWrong: [(at: Double, line: String)] {
-        let problems: [(at: Double, line: String)] = manifest.problems.filter { !problemsWithoutCallToAction.contains($0) }
-            .map { ($0.at, "Problem at \(Self.elapsed(seconds: $0.at)): \($0.text)") }
+        let notFinalized = manifest.files.map { ($0.name, $0.state, $0.end ?? $0.start) }
+            + manifest.cameraFiles.map { ($0.name, $0.state, $0.end ?? $0.start) }
+            + manifest.audioFiles.map { ($0.name, $0.state, $0.end ?? $0.start) }
+        let problems: [(at: Double, line: String)] = (problemsCalledToAction.map { ($0.at, $0.text) }
+            + notFinalized.filter { $0.1 != .finalized }.map { ($0.2, "File \($0.0) not finalized") })
+            .sorted { $0.0 < $1.0 }
+            .map { ($0.0, "Problem at \(Self.elapsed(seconds: $0.0)): \($0.1)") }
         guard !manifestWritten else { return problems }
         return problems + [(problems.map(\.at).max() ?? 0, Self.manifestNotWrittenLine)]
     }

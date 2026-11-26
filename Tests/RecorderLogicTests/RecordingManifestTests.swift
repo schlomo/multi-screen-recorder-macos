@@ -642,25 +642,36 @@ import Testing
         #expect(summary([.finalized], problems: true).asksToReportIt)
     }
 
-    /// Only a problem whose call to action was given is listed; one without stays in the log and the manifest (D91).
-    @Test func aProblemWithoutACallToActionIsNotListed() {
+    /// A positive list (D91): the problems whose call to action was given, never another one in the manifest,
+    /// such as a problem a later tell replaced; a problem listed is no error by itself.
+    @Test func onlyAProblemCalledToActionIsListed() {
         var told = manifest([.finalized])
-        let quiet = RecordingProblem(at: 5_000_000_000, problem: "Camera BRIO", error: "camera stalled")
+        let picture = RecordingProblem(at: 1_000_000_000, problem: "Screen 1 LG", error: "shows another screen's picture")
+        let failed = RecordingProblem(at: 5_000_000_000, problem: "Screen 1 LG failed", error: "stream failed")
         let full = RecordingProblem(at: 65_000_000_000, problem: "The audio file of Mic ended", error: "disk full")
-        told.problems = [quiet, full]
+        told.problems = [picture, failed, full]
         let summary = RecordingSummary(
             manifest: told, recordingFolder: "/r", seconds: 70, manifestWritten: true, problemsAskToReportIt: false,
-            filesEndedByAFullDisk: [], problemsWithoutCallToAction: [quiet])
+            filesEndedByAFullDisk: [], problemsCalledToAction: [full])
+        #expect(!summary.endedWithError)
         #expect(summary.text.hasSuffix("  f0.mov  finalized\nProblem at 1m05s: The audio file of Mic ended: disk full\n"))
         #expect(summary.whatWentWrong.map(\.line) == ["Problem at 1m05s: The audio file of Mic ended: disk full"])
+        let none = RecordingSummary(
+            manifest: told, recordingFolder: "/r", seconds: 70, manifestWritten: true, problemsAskToReportIt: false,
+            filesEndedByAFullDisk: [], problemsCalledToAction: [])
+        #expect(none.whatWentWrong.isEmpty)
     }
 
-    @Test func aProblemIsListedWithItsTimeAndIsNoErrorByItself() {
-        var told = manifest([.finalized])
-        told.problems = [RecordingProblem(at: 65_000_000_000, problem: "The screens cannot be read", error: "denied")]
-        let summary = RecordingSummary(manifest: told, recordingFolder: "/r", seconds: 70, manifestWritten: true, problemsAskToReportIt: false, filesEndedByAFullDisk: [])
-        #expect(!summary.endedWithError)
-        #expect(summary.text.hasSuffix("Problem at 1m05s: The screens cannot be read: denied\n"))
+    /// Each file not finalized is listed, by its end, with the problems called to action, in time order (D91).
+    @Test func eachFileNotFinalizedIsListed() {
+        var recorded = manifest([.finalized, .notFinalized])
+        recorded.files[1].end = 30
+        let full = RecordingProblem(at: 20_000_000_000, problem: "Disk full", error: nil)
+        recorded.problems = [full]
+        let summary = RecordingSummary(
+            manifest: recorded, recordingFolder: "/r", seconds: 70, manifestWritten: true, problemsAskToReportIt: false,
+            filesEndedByAFullDisk: ["f1.mov"], problemsCalledToAction: [full])
+        #expect(summary.whatWentWrong.map(\.line) == ["Problem at 20s: Disk full", "Problem at 30s: File f1.mov not finalized"])
     }
 
     @Test func theSummaryListsTheAudioFilesAndTheCPUUse() {
@@ -696,6 +707,8 @@ import Testing
         recorded.files = [screen(2, "B", at: 0), screen(1, "A", at: 840), screen(1, "A", at: 0)]
         recorded.audioFiles = [audio(input(4, "D"), at: 0), audio(.systemAudio, at: 0), audio(input(10, "K"), at: 0),
                                audio(input(1, "C"), at: 900), audio(input(1, "C"), at: 0)]
+        for index in recorded.files.indices { recorded.files[index].state = .finalized }
+        for index in recorded.audioFiles.indices { recorded.audioFiles[index].state = .finalized }
         let lines = RecordingSummary(manifest: recorded, recordingFolder: "/r", seconds: 5, manifestWritten: true, problemsAskToReportIt: false, filesEndedByAFullDisk: [])
             .text.split(separator: "\n").dropFirst().map { $0.dropFirst(2).dropLast(11) }
         let names = lines.map { String($0) }

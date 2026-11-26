@@ -562,9 +562,11 @@ One row per entry, the error text exactly as in the entry.
   shows no line, bounces nothing and leaves the result `ok` (D91).
   Running each camera in its own process would avoid it and was not
   chosen.
-- **Verify:** the recording log's `camera stall ended` comes within a
-  few seconds, at the other camera's `camera connected` or its file's
-  start.
+- **Verify:** the stall ends while the other camera starts: in the
+  owner's recording of 2026-11-26 the FaceTime HD Camera's `camera
+  stall ended` came at 24.554 s, 5.0 s after the BRIO's `camera
+  connected` and 8 ms before its `camera disconnected`; the probe's
+  frame gaps of 0.82 s to 0.86 s match each BRIO start's length.
 - **Observed:** 2026-11-26, macOS 26, Apple silicon; open (macOS).
 
 ## The system audio is corrected by about 20 ms for good

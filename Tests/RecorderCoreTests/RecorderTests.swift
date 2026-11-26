@@ -1570,6 +1570,39 @@ extension GlobalRecordingLog {
             #expect(summary.whatWentWrong.isEmpty)
         }
 
+        /// A camera's stall ends when its frames come again, or with its capture when it is unplugged, and a
+        /// stall after that is told again: two problems in `recording.json` and the recording log (D46, D91).
+        @Test(arguments: [false, true])
+        func aCameraThatStallsAgainIsToldAgain(unplugged: Bool) async throws {
+            cameras.connected.withLock { $0 = [Self.camera] }
+            try start(cameraMode: .real, cameraFrameWatch: Self.quickFrameWatch)
+            let first = try #require(cameras.last)
+            func stalls() -> Int {
+                (try? manifestOnDisk().problems.filter { $0.text.hasPrefix("Camera Stand-in camera: camera stalled") }.count) ?? 0
+            }
+            try await sendFrames(first, until: "the camera file") { (try? manifestOnDisk().cameraFiles.count) == 1 }
+            try await wait("the stall") { stalls() == 1 }
+            if unplugged {
+                cameras.connected.withLock { $0 = [] }
+                recorder.camerasChanged()
+                try await wait("the capture's end") { first.isStopped }
+                cameras.connected.withLock { $0 = [Self.camera] }
+                recorder.camerasChanged()
+                try await wait("the camera again") { cameras.opened.withLock { $0.count } == 2 }
+                try await sendFrames(try #require(cameras.last), until: "the second camera file") {
+                    (try? manifestOnDisk().cameraFiles.count) == 2
+                }
+            } else {
+                try await sendFrames(first, until: "the stall's end") {
+                    (try? manifestOnDisk().events.contains { $0.event == .cameraStallEnded }) == true
+                }
+            }
+            try await wait("the second stall") { stalls() == 2 }
+            _ = await stop()
+            let log = try recordingLog()
+            #expect(log.components(separatedBy: " problem: Camera Stand-in camera: camera stalled").count - 1 == 2, "\(log)")
+        }
+
         /// A stalled camera shows no line, unplugged too (D91).
         @Test func aStalledCameraShowsNoLine() async throws {
             cameras.connected.withLock { $0 = [Self.camera] }
@@ -2060,8 +2093,7 @@ extension GlobalRecordingLog {
             // Free up disk space includes no report: no line naming the files for one (D91).
             #expect(!recorder.problemsAskToReportIt)
             let summary = await stop()
-            #expect(!summary.whatWentWrong.isEmpty
-                && summary.whatWentWrong.allSatisfy { $0.line.hasPrefix("Problem at ") && $0.line.contains("The audio file of \(name) ended") })
+            #expect(summary.whatWentWrong.contains { $0.line.hasPrefix("Problem at ") && $0.line.contains("The audio file of \(name) ended") })
             #expect(!summary.problemsAskToReportIt)
             #expect(summary.manifest.result == .problems)
         }
