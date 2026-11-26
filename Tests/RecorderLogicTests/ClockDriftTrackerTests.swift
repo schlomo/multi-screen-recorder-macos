@@ -195,22 +195,24 @@ import Testing
     }
 
     /// The measured pattern, wherever its lowest second falls when the
-    /// first estimate takes the reference.
+    /// first estimate takes the reference: within 0.74 ms over 20 seeds
+    /// since the start's 2 s are not measured (D92; 0.32 ms before).
     @Test(arguments: 0..<4)
     func theMeasuredBurstsInEveryPhase(rotation: Int) {
         let run = run(burst(rotated(Self.measuredBursts, by: rotation)), seconds: 300)
-        #expect(run.worstError(from: 30) < 0.0005, "\(ms(run.worstError(from: 30)))")
+        #expect(run.worstError(from: 30) < 0.001, "\(ms(run.worstError(from: 30)))")
     }
 
     /// A known limit: the reference comes from the first estimate's points
     /// and is never revised, so a source at its lowest only once in 8 s
     /// can start off by up to about 4.1 ms for good, depending on where
     /// the lowest second falls (after the start's 2 s that are not
-    /// measured); in three of the eight phases it does not.
+    /// measured); in three of the eight phases it does not (within
+    /// 0.93 ms). The 20-seed worsts since D92: 4.05 ms and 0.93 ms.
     @Test(arguments: 0..<8, 1...3)
     func aSourceAtItsLowestOnlyOnceInEightSeconds(rotation: Int, seed: Int) {
         let run = run(burst(rotated([0, 0.003, 0.005, 0.004, 0.002, 0.005, 0.003, 0.004], by: rotation)), seconds: 300, seed: seed)
-        let bound = [4, 5, 6].contains(rotation) ? 0.0008 : 0.004
+        let bound = [4, 5, 6].contains(rotation) ? 0.0012 : 0.0046
         #expect(run.worstError(from: 30) < bound, "\(ms(run.worstError(from: 30)))")
     }
 
@@ -428,6 +430,32 @@ import Testing
 
     private func line(_ points: [(Double, Double)], maximum: Double = 0.001) -> ClockDriftTracker.Line {
         ClockDriftTracker.supportLine(points.map { (time: $0.0, lateness: $0.1) }, maximumSlope: maximum)
+    }
+
+    /// The drift over the start's skipped seconds is fixed once the clock
+    /// drift is shown, also when the kept slope's estimates are no more
+    /// than the shown minimum: two trackers that differ only in that keep
+    /// the same target, while their kept slopes differ.
+    @Test func theStartsDriftIsFixedOnceTheClockDriftIsShown() throws {
+        func make(shownEstimates: Int) -> ClockDriftTracker {
+            ClockDriftTracker(
+                horizon: .seconds(2), minimumPoints: 2, minimumSpan: .milliseconds(500),
+                shownEstimates: shownEstimates, shownMinimum: 2)
+        }
+        var fewest = make(shownEstimates: 2)
+        var more = make(shownEstimates: 3)
+        fewest.record(time: 0, arrival: 0, applied: 0)
+        more.record(time: 0, arrival: 0, applied: 0)
+        var lateness = 0.010
+        for (index, ppm) in [0.0, 400, -100, 300, -300, 200, 100].enumerated() {
+            lateness += ppm * 1e-6
+            interval(&fewest, Int64(index + 2), lateness: lateness)
+            interval(&more, Int64(index + 2), lateness: lateness)
+        }
+        #expect(fewest.clockDriftPpm != more.clockDriftPpm)
+        let fewestTarget = try #require(fewest.target)
+        let moreTarget = try #require(more.target)
+        #expect(abs(fewestTarget - moreTarget) < 1e-12, "\(fewestTarget) against \(moreTarget)")
     }
 
     @Test func theSupportLineRunsThroughTheTwoLowestPoints() {

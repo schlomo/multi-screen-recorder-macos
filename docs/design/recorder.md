@@ -1507,7 +1507,7 @@ the metadata items (see "Output on disk").
   it; the worst of 20 seeds, the correction against the true offset from
   30 s on): a steady device within 0.31 ms over 600 s, its clock drift
   shown within 1.1 ppm from 60 s and 0.65 ppm from 120 s; a source in
-  bursts like the system audio within 0.38 ms, also twice as deep, and
+  bursts like the system audio within 0.34 ms, also twice as deep, and
   within 0.74 ms in each of the measured pattern's 4 phases; the
   system audio's start, its first second 22 ms less late, within
   0.34 ms at 0 and -115 ppm; buffers of
@@ -1536,8 +1536,12 @@ the metadata items (see "Output on disk").
   revised: a source at its lowest only once in 8 s can start up to
   4.1 ms off for good, depending on where its lowest second falls after
   the 2 s not measured (within 0.93 ms in three of its eight phases; the
-  measured 4 s pattern within 0.74 ms in all four). A lasting step of the delivery delay is
-  followed as if the clock had stepped (up after about 20 s, down at
+  measured 4 s pattern within 0.74 ms in all four). A less-late start
+  longer than the 2 s not measured is taken in full, as before (2.2 s
+  of 22 ms: 24 ms off), and a stall at the start (buffers 0.5 to 4 s
+  late for 4 s) beginning 1 to 2 s after it leaves 7.9 to 9.9 ms off
+  for good (one beginning at 4 to 6 s up to 3.2 ms). A lasting step of
+  the delivery delay is followed as if the clock had stepped (up after about 20 s, down at
   once) at up to 1000 ppm, and a step down overshoots (1.1 ms on 2 ms,
   2.1 ms on 4 ms). One early buffer pulls the line down for the horizon
   and is amplified: 20 ms early up to 12.3 ms off, 6 ms early 8.9 ms,
@@ -1555,7 +1559,8 @@ the metadata items (see "Output on disk").
   owner's Mac): BlackHole within 0.05 ms, MacBook Pro Microphone
   0.11 ms, CalDigit Thunderbolt 3 Audio 0.28 ms, Razer Seiren V3 Mini
   0.48 ms, Logitech BRIO 0.93 ms against its 5 s envelope; the system
-  audio's correction ended at 0.09 ms, its rate within ±67 ppm. The
+  audio's correction ended at 0.09 ms, its rate within ±67 ppm (that
+  probe did not cover the system audio's start). The
   resampler is a polyphase Kaiser-windowed sinc of 64 taps (*data*), its
   phases interpolated linearly; it adds no latency to the timestamps and
   holds back the 32 samples its filter needs ahead until the next buffer

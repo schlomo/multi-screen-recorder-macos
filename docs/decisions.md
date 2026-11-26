@@ -3446,7 +3446,21 @@ architect's reading.
   on where a source's lowest second falls moves with the start (the
   measured 4 s pattern within 0.74 ms instead of 0.32 ms in its worst
   phase, a source at its lowest once in 8 s up to 4.1 ms instead of
-  3.4 ms).
+  3.4 ms); bursts like the system audio's within 0.34 ms instead of
+  0.22 ms; a rate alternating by ±100 ppm every 12 s up to 1.98 ms
+  instead of 1.84 ms. Three bounds of `ClockDriftTrackerTests` are
+  restated by the suite's rule (the 20-seed worst plus a margin) for
+  these measured costs, not loosened checks:
+  `theMeasuredBurstsInEveryPhase` 0.5 ms to 1.0 ms (worst 0.74 ms),
+  `aSourceAtItsLowestOnlyOnceInEightSeconds` 0.8 ms to 1.2 ms in its
+  three good phases (worst 0.93 ms) and 4.0 ms to 4.6 ms in the others
+  (worst 4.05 ms). Two limits: a less-late start longer than 2 s is
+  still taken in full (2.2 s simulated: 24 ms off, as before), and 2 of
+  13 recent recordings showed no shift, so the start varies; a stall at
+  the start (buffers 0.5 to 4 s late for 4 s) that begins 1 to 2 s after
+  it now leaves 7.9 to 9.9 ms off for good (0.3 to 0.4 ms before),
+  while one beginning at 4 to 6 s improves (3.2 to 4.6 ms before, 0.3
+  to 3.2 ms now), at -116 ppm over 20 seeds.
 - **Evidence:** [design/recorder.md](design/recorder.md), "Clock
   drift"; `ClockDriftTrackerTests.aLessLateStartIsNotTakenAsDrift`;
   [troubleshooting.md](troubleshooting.md), "The system audio is

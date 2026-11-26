@@ -588,4 +588,10 @@ One row per entry, the error text exactly as in the entry.
 - **Verify:** `swift test --filter aLessLateStartIsNotTakenAsDrift`
   (22 ms without the fix, under 0.5 ms with it); in a recording, the
   system audio's `clockDriftCorrection` near 0 at a drift near 0 ppm.
-- **Observed:** 2026-11-26, PR #35; fixed in PR #35.
+- **Observed:** 2026-11-26, PR #35; fixed in PR #35: the owner's
+  recording of 2026-11-26 19.38.01 (build 6620fc9; undocked and docked
+  again, the Logitech BRIO unplugged, the lid closed) shows the system
+  audio's clock drift +38.3, then +3.7 to +8.4 ppm and its correction
+  under 1 ms (-0.49 ms at +92.8 s, 0 ms after its restart at +106.3 s);
+  its three system audio files' `clockDriftCorrection` are 0, -0.0007
+  and 0.0002, where recordings before had about 0.02.

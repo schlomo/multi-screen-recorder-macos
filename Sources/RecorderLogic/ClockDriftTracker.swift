@@ -23,7 +23,9 @@
 /// estimates make up half or more of the kept slopes adds the kept
 /// slope's error over the gap's length; one early buffer pulls the line
 /// down for the horizon; the reference, taken from the first estimate's
-/// points, is never revised. Times are nanoseconds on the shared clock;
+/// points, is never revised; a less-late start longer than the skipped
+/// seconds is taken in full, and a stall beginning just after them can
+/// leave several milliseconds off for good. Times are nanoseconds on the shared clock;
 /// lateness, `target` and `applied` are seconds; a rate or a slope is
 /// output samples per input sample minus 1 (seconds of lateness per second).
 public struct ClockDriftTracker: Sendable {
@@ -71,6 +73,7 @@ public struct ClockDriftTracker: Sendable {
     /// it: the kept slope's, fixed once the clock drift is shown.
     private var unmeasured = 0.0
     private var unmeasuredDrift = 0.0
+    private var unmeasuredDriftFixed = false
     /// The latest estimates' slopes, for the clock drift shown and the kept slope.
     private var slopes: [Double] = []
     /// The median of `slopes`, 0 with none.
@@ -172,7 +175,10 @@ public struct ClockDriftTracker: Sendable {
         let sorted = slopes.sorted()
         let middle = sorted.count / 2
         keptSlope = sorted.count % 2 == 1 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2
-        if slopes.count <= shownMinimum { unmeasuredDrift = keptSlope * unmeasured }
+        if !unmeasuredDriftFixed {
+            unmeasuredDrift = keptSlope * unmeasured
+            unmeasuredDriftFixed = slopes.count >= shownMinimum
+        }
         let target = line.value(at: now) - reference! + unmeasuredDrift
         self.target = target
         remaining = target - applied
