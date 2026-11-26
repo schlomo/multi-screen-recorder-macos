@@ -198,16 +198,22 @@ final class RecordCommandDelegate: NSObject, NSApplicationDelegate {
     }
 }
 
-/// What `msr record` tells when asked to stop: the first request starts the
+/// A stop under way from its first request, in `msr record` and the app, and
+/// what `msr record` tells when asked to stop: the first request starts the
 /// stop, any later one only tells that it goes on.
 struct StopRequests {
     static let stopping = "Stopping the recording and finalizing the files…"
     static let stillFinalizing = "Still finalizing the files…"
     private(set) var isStopping = false
 
+    /// Whether this request started the stop: only the first does.
+    mutating func start() -> Bool {
+        defer { isStopping = true }
+        return !isStopping
+    }
+
     /// The line for standard error; the first request starts the stop.
     mutating func request() -> String {
-        defer { isStopping = true }
-        return isStopping ? Self.stillFinalizing : Self.stopping
+        start() ? Self.stopping : Self.stillFinalizing
     }
 }
