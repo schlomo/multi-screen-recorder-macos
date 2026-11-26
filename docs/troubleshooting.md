@@ -244,12 +244,19 @@ One row per entry, the error text exactly as in the entry.
   worst 2.1 to 2.4 s late over the same run. Serializing the suite, the
   earlier entry's remedy, is not used here: its 200 cases would run for
   many minutes on one thread. Yielding saves no CPU: CI's `scripts/test`
-  step takes about 11.5 minutes against about 4.8 on `main` before.
+  step, build included, took 11 min 26 s (run 45786893084) against
+  4 min 46 s on `main` before (run 45659873665).
 - **Verify:** CI's `scripts/test` passes on the pushed head.
-- **Observed:** 2026-11-26, PR #34; verified by one passing run,
-  45786893084 on 4c0ef05 (`VideoFileTickerTests` 124.0 s,
-  `theReferenceRulesHold` 294.6 s, whole run 510.1 s); the margin on
-  the 3-core runner is not measured.
+- **Observed:** 2026-11-26, PR #34; one passing run, 45786893084 on
+  4c0ef05 (whole run 510.1 s), with a thin margin:
+  `aLongLastMixIsNotDroppedWhileTheWriterWaits` took 106.7 s against
+  its 120 s bound, the two other ticker tests 89.5 s each. The pool is
+  still short of threads for minutes: the serialized
+  `ClockDriftCorrectionTests` (294.5 s) and `ClockDriftTrackerTests`
+  (342.5 s) hold two of the runner's three threads without yielding
+  while the invariant cases share the third. A slower runner can fail
+  these tests again; cutting the invariant suite's CPU is the lasting
+  fix.
 
 ## A virtual screen comes back at its last mode
 
