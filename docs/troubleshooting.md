@@ -270,8 +270,12 @@ One row per entry, the error text exactly as in the entry.
   3:25.91 wall and 717.6 s user CPU on `main` against 2:23.84 to 2:27.85
   wall and 461.7 s to 481.9 s user CPU on this PR's head (two runs); `AudioDelayInvariantTests`
   36.8 s to 15.6 s; the `RecorderCoreTests` target 107.4 s to 64.8 s;
-  the `RecorderLogicTests` target 49.5 s to 30.3 s. UNVERIFIED on CI's
-  runner: its figures are the first run of this change. What remains:
+  the `RecorderLogicTests` target 49.5 s to 30.3 s. On CI (run
+  45802785455 on 67ccea2): the `scripts/test` step 5 min 16 s against
+  11 min 26 s, the test run 172.0 s against 510.1 s (`main` before
+  PR #34: 140.6 s), `theReferenceRulesHold` 82.0 s against 294.6 s,
+  `VideoFileTickerTests` 44.4 s and `GuideTrackFeedTests` 40.1 s
+  against their 120 s and 60 s bounds. What remains:
   the CPU-bound suites (the invariant cases, the two clock drift suites)
   still share the cooperative pool with the real-time-bounded tests, so
   a slow runner can still push those near their bounds; the lever left,
