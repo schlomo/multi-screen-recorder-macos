@@ -37,9 +37,6 @@ public enum ProblemKind: Hashable, Sendable {
     case inputVolumeNotSet(String)
     /// An audio input whose input volume changes cannot be followed, by its name; clears when following it works (D69).
     case inputVolumeNotFollowed(String)
-    /// An audio input, by its UID, whose file is out of the "Audio inputs" guide track, `source` naming the
-    /// input and the note its offset; ends when it rejoins, its file ends or it disconnects (D79).
-    case audioInputOutOfTheGuideTrack(String)
     /// An audio input, by its UID, whose no audio began right after its gaps, `source` naming the input and
     /// the note its gaps' time; ends when its sound returns or it disconnects (D81).
     case audioInputSilentAfterGaps(String)
@@ -62,7 +59,7 @@ extension ProblemKind {
         case .audioFileLost, .videoFileLost, .audioInputChangesNotFollowed, .audioInputNotRecordable:
             true
         case .dockIconNotShown, .inputVolumeNotSet, .inputVolumeNotFollowed, .timelineFileNotWritten, .cameraStalled,
-             .guideTracksCut, .audioInputOutOfTheGuideTrack:
+             .guideTracksCut:
             false
         case .diskFull, .cameraPermissionMissing, .screenNotCaptured, .cameraNotCaptured, .audioSourceFailed, .audioFileFailed,
              .recordingLogNotWritten, .manifestNotWritten, .freeSpaceNotRead, .screensNotRead, .audioInputsNotRead,
@@ -99,7 +96,7 @@ extension ProblemKind {
         case .screenNotCaptured, .cameraNotCaptured, .audioSourceFailed, .audioFileFailed, .audioInputNotRecordable,
              .audioInputChangesNotFollowed:
             .startAgainAndReportIt
-        case .cameraStalled, .audioInputOutOfTheGuideTrack, .guideTracksCut, .dockIconNotShown, .inputVolumeNotSet,
+        case .cameraStalled, .guideTracksCut, .dockIconNotShown, .inputVolumeNotSet,
              .inputVolumeNotFollowed, .screensNotRead, .audioInputsNotRead, .freeSpaceNotRead, .timelineFileNotWritten:
             nil
         }
@@ -148,7 +145,7 @@ extension ProblemKind {
         case .inputVolumeNotFollowed(let name): "Input volume of \(name) not followed"
         case .diskFull: "Disk full"
         case .guideTracksCut(let name): "Guide tracks of \(name) cut"
-        case .audioInputOutOfTheGuideTrack(let uid), .audioInputSilentAfterGaps(let uid): source ?? uid
+        case .audioInputSilentAfterGaps(let uid): source ?? uid
         }
     }
 }
@@ -200,7 +197,7 @@ public struct ProblemsTold: Sendable {
         var ending = Ending.recovered
         /// Told with `add`, not only shown: a tell of its kind waits for it to end.
         var isTold = false
-        /// What its line says besides its source, for a kind whose line is its own (D79).
+        /// What its line says besides its source, for a kind whose line is its own (D81).
         var note: String?
         /// Its call to action was given (D84).
         var calledToAction = false
@@ -313,11 +310,10 @@ public struct ProblemsTold: Sendable {
 
     /// `<phrase> since 0:53`, `<phrase> for 7.4 s at 0:53, recovered` (or `, then disconnected`, `, stopped`: the `Ending`),
     /// `<phrase> 3 times, 12 s in total[, <ending>]`, then the latest error after a colon, `latest: ` before it
-    /// when the errors differ; a stall reads `stalled 7.4 s`, without its error, always the same; an input out of
-    /// the guide track has its own (`outOfTheGuideTrack`).
+    /// when the errors differ; a stall reads `stalled 7.4 s`, without its error, always the same; an input silent
+    /// after its gaps has its own (`silentAfterGaps`).
     private static func line(_ repeats: [Told], now: Int64) -> ProblemLine {
         let latest = repeats[repeats.count - 1]
-        if case .audioInputOutOfTheGuideTrack = latest.kind { return outOfTheGuideTrack(latest) }
         if case .audioInputSilentAfterGaps = latest.kind { return silentAfterGaps(latest, now: now) }
         let isStall = if case .cameraStalled = latest.kind { true } else { false }
         let phrase = latest.kind.phrase(source: latest.source)
@@ -333,19 +329,6 @@ public struct ProblemsTold: Sendable {
             "\(phrase) since \(time(latest.began))"
         }
         return ProblemLine(text: text + why, isRed: latest.kind.isRed(ongoing: latest.ended == nil))
-    }
-
-    /// An input out of the guide track, the latest time, orange: "Audio 2 Mic A 553 ms late, not in the guide track;
-    /// its own audio track is recorded", once over "Audio 2 Mic A was not in the guide track from 0:50 to 1:40 (553 ms
-    /// late); its own audio track is recorded" (D79).
-    private static func outOfTheGuideTrack(_ latest: Told) -> ProblemLine {
-        let input = latest.kind.phrase(source: latest.source), note = latest.note ?? ""
-        let text = if let ended = latest.ended {
-            "\(input) was not in the guide track from \(time(latest.began)) to \(time(ended)) (\(note)); its own audio track is recorded"
-        } else {
-            "\(input) \(note), not in the guide track; its own audio track is recorded"
-        }
-        return ProblemLine(text: text, isRed: false)
     }
 
     /// An input silent right after its gaps, the latest time: "Audio 3 BRIO sends only silence since its gaps at

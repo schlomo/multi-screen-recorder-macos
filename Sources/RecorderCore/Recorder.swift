@@ -1073,9 +1073,8 @@ public final class Recorder {
             jobs.append((file, referenceWindow, other))
         }
         guard !jobs.isEmpty else { return }
-        let measuresPairs = !audioDelays.isSyncEstablished
         let measurement = await Task.detached(priority: .utility) {
-            AudioDelays.measure(reference: referenceFile, others: jobs, measuresPairs: measuresPairs)
+            AudioDelays.measure(reference: referenceFile, others: jobs)
         }.value
         guard !isStopped else { return }
         applyAudioDelays(measurement: measurement, at: Double(end) / Double(AudioDelay.sampleRate))
@@ -1088,9 +1087,9 @@ public final class Recorder {
         }))
     }
 
-    /// The audio delays after a measurement (its windows ending at `at` seconds) or a file's start or end: files
-    /// leave and rejoin the guide track, every file being written is placed in it, and changed delays go into the
-    /// manifest, from where the mix is now (D79, D80). Nothing after Stop.
+    /// The audio delays after a measurement (its windows ending at `at` seconds) or a file's start or end: every
+    /// file being written is placed in the guide track or not mixed, and changed delays go into the manifest, from
+    /// where the mix is now (D80, D90). Nothing after Stop.
     private func applyAudioDelays(measurement: AudioDelays.Measurement? = nil, at: Double = 0) {
         guard !isStopped else { return }
         let files = audioInputFiles()
@@ -1103,8 +1102,6 @@ public final class Recorder {
             outcome = audioDelays.update(files: files, reference: reference.file)
         }
         for line in outcome.lines { RecorderLog.detail(line, category: "recorder") }
-        for (file, offset) in outcome.leaving.sorted(by: { $0.key < $1.key }) { leaveTheGuideTrack(file: file, offset: offset) }
-        for file in outcome.rejoining.sorted() { rejoinTheGuideTrack(file: file) }
         let rate = Double(RecorderValues.audioSampleRate)
         for (file, earlierBy) in outcome.earlierBy {
             guard let uid = files[file] else { continue }
@@ -1142,43 +1139,9 @@ public final class Recorder {
         }
     }
 
-    /// An audio input's file out of sync with the staying group leaves the "Audio inputs" guide track, its own
-    /// file unchanged; its event and problem once its capture took it out (D79). By design: no Dock bounce,
-    /// badge or count. Internal, so a test can ask for a leave its capture does not carry out.
-    func leaveTheGuideTrack(file name: String, offset: Double) {
-        guard let file = manifest.audioFiles.first(where: { $0.name == name }), let uid = file.audioSourceUID,
-              audioCaptures[.input(uid)]?.1.leaveTheGuideTrack(file: name) == true else {
-            RecorderLog.detail("\(name): its capture did not take the leave, the file no longer its current one", category: "recorder")
-            return
-        }
-        var event = RecordingEvent(at: context.now(), event: .audioInputLeftTheGuideTrack, audioSource: file.audioSource)
-        event.offset = (offset * 10_000).rounded() / 10_000
-        guard manifest.record([event]) else { return }
-        try? writeManifest()
-        told([event])
-        let number = audioTracker.sourcesShown.first { $0.id == .input(uid) }?.number
-        let problem = RecordingProblem(
-            atSeconds: event.at, problem: event.problem.problem,
-            error: ErrorDetail(message: event.event.rawValue, underlying: [ErrorDetail(message: AudioDelay.text(offset))]))
-        tell(problem, kind: .audioInputOutOfTheGuideTrack(uid), source: number.map { "Audio \($0) \(file.audioSource)" } ?? file.audioSource,
-             note: AudioDelay.text(offset), ofAnEvent: true, notifies: false)
-    }
-
-    /// A file that left the guide track rejoins it; its line turns to the past (D79).
-    private func rejoinTheGuideTrack(file name: String) {
-        guard let file = manifest.audioFiles.first(where: { $0.name == name }), let uid = file.audioSourceUID,
-              audioCaptures[.input(uid)]?.1.rejoinTheGuideTrack(file: name) == true else {
-            RecorderLog.detail("\(name): its capture did not take the rejoin, the file no longer its current one or not out", category: "recorder")
-            return
-        }
-        problemsTold.cleared(.audioInputOutOfTheGuideTrack(uid), at: context.now())
-    }
-
-    /// An audio input whose capture ended is out of the guide track no more, and no longer places the
-    /// others (D79, D80).
+    /// An audio input whose capture ended no longer places the others (D80).
     private func audioInputCaptureEnded(_ id: AudioTracker.SourceID) {
-        guard case .input(let uid) = id else { return }
-        problemsTold.cleared(.audioInputOutOfTheGuideTrack(uid), at: context.now())
+        guard case .input = id else { return }
         applyAudioDelays()
     }
 
@@ -1539,14 +1502,14 @@ public final class Recorder {
 
     private func tell(
         _ problem: RecordingProblem, kind: ProblemKind, source: String? = nil, note: String? = nil, endedAt: Int64? = nil,
-        ending: ProblemsTold.Ending = .recovered, ofAnEvent: Bool = false, notifies: Bool = true, withoutCallToAction: Bool = false
+        ending: ProblemsTold.Ending = .recovered, ofAnEvent: Bool = false, withoutCallToAction: Bool = false
     ) {
         switch problemsTold.add(
             problem, kind: kind, source: source, note: note, endedAt: endedAt, ending: ending, withoutCallToAction: withoutCallToAction,
             to: &manifest) {
         case .tell(let writesManifest):
             if writesManifest { try? writeManifest() }
-            told(problem, ofAnEvent: ofAnEvent, notifies: notifies)
+            told(problem, ofAnEvent: ofAnEvent)
         case .alreadyTold:
             break
         case .afterTheEnd:
@@ -1556,12 +1519,11 @@ public final class Recorder {
         }
     }
 
-    /// To the logs and, if it `notifies`, the observer (`msr record`'s standard error, D79); then the calls to
-    /// action due.
-    private func told(_ problem: RecordingProblem, ofAnEvent: Bool = false, notifies: Bool = true) {
+    /// To the logs and the observer (`msr record`'s standard error); then the calls to action due.
+    private func told(_ problem: RecordingProblem, ofAnEvent: Bool = false) {
         RecorderLog.error("at \(problem.at)s: \(problem.text)", category: "recorder")
         recordingLog?.problem(problem)
-        if notifies { observer?.recorder(self, problem: problem, ofAnEvent: ofAnEvent) }
+        observer?.recorder(self, problem: problem, ofAnEvent: ofAnEvent)
         callToAction()
     }
 

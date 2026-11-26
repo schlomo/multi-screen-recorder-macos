@@ -63,10 +63,9 @@ extension RecorderValues {
 /// clear sound to sync.
 extension RecorderValues {
     public static let audioDelayUnclearMeasurements = 3
-    /// The counted windows of any input, the anchor's new file included, that establish the sync: from then on the
-    /// reference moves only on no audio or its capture's end; one window, as a burst on an empty line-in gives, does
-    /// not (D89).
-    public static let audioDelayEstablishingWindows = 2
+    /// The counted windows since the anchor became the anchor that put an input in the anchor's group, which a
+    /// reference miss's start-over must outnumber; one window, as a burst on an empty line-in gives, does not (D90).
+    public static let audioDelayGroupWindows = 2
     public static let audioDelayChangeWindowSeconds = 60.0
     public static let audioDelayChangeWindows = 5
     /// One frame at 30 fps: closer than this, a new median changes nothing.

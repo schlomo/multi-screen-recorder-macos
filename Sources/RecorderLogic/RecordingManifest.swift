@@ -579,6 +579,7 @@ public struct RecordingEvent: Codable, Equatable, Sendable {
         case audioInputVolumeChanged = "audio input volume changed"
         case noAudioStarted = "no audio started"
         case noAudioStopped = "no audio stopped"
+        /// Written by releases before D90 only, read so their recordings' manifests still load.
         case audioInputLeftTheGuideTrack = "audio input left the guide track"
 
         /// The events of a file ended by a failure, and a camera's stall,
@@ -656,8 +657,8 @@ public struct RecordingEvent: Codable, Equatable, Sendable {
     public var length: Double?
     /// For `screen mirroring started`: the screen it mirrors.
     public var mirrors: String?
-    /// For `audio input left the guide track`: its file's offset in seconds from the staying group's earliest
-    /// input, to 0.0001 s, negative when earlier (D79).
+    /// For `audio input left the guide track`, written before D90: its file's offset in seconds from the staying
+    /// group's earliest input, to 0.0001 s, negative when earlier (D79).
     public var offset: Double?
     /// For a failure (`screen stream failed`, `audio input failed` and the
     /// like) and a failing writer: why, with its full chain.

@@ -76,10 +76,10 @@ import Testing
     @Test func everyLineThatMakesTheSyncFinalCounts() {
         let started = Self.anchorFinal + [Self.brioStartInput, Self.brioStarted, Self.brioDrift]
         for ending in [
-            "rejoins the guide track", "carries over 12 ms from 2026-11-25 13.20.00 Audio 2 - Logitech BRIO.mov",
-            "in the guide track with the carried-over audio delay", "out of the guide track with the carried-over audio delay",
+            "carries over 12 ms from 2026-11-25 13.20.00 Audio 2 - Logitech BRIO.mov",
+            "in the guide track with the carried-over audio delay", "not in the guide track with the carried-over audio delay",
             "no clear sound to sync, 6 measurements with sound and no counted window",
-            "leaves the guide track, +2.6 s from the staying group's earliest",
+            "not in the guide track, 2600 ms from the others",
         ] {
             #expect(notFinal(started + ["13:25:04 +70.1s detail recorder: \(Self.brio): \(ending)"]).isEmpty, "\(ending)")
         }

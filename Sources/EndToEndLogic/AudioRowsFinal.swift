@@ -14,9 +14,8 @@ public enum AudioRowsFinal {
     }
 
     private static let syncShown = [
-        "joins the guide track", "rejoins the guide track", "carries over ", "in the guide track with the carried-over audio delay",
-        "out of the guide track with ", "no clear sound to sync", "leaves the guide track",
-        "audio delay set by its first counted window",
+        "joins the guide track", "carries over ", "in the guide track with the carried-over audio delay",
+        "not in the guide track", "no clear sound to sync", "audio delay set by its first counted window",
     ]
 
     /// The newest files of the audio sources whose rows are not final yet, by number.

@@ -24,7 +24,6 @@ import Testing
         let measured = delays.update(files: recorded(["a.mov", "b.mov"]), reference: "r.mov", lags: ["a.mov": 0.5], at: 20)
         #expect(measured.earlierBy == ["r.mov": 0, "a.mov": 0.5, "b.mov": nil])
         #expect(measured.delays == ["a.mov": Entry(delay: 0.5), "r.mov": Entry(delay: 0)])
-        #expect(measured.leaving.isEmpty && measured.rejoining.isEmpty)
         #expect(delays.shown("a.mov") == .synced(0.5, carriedOver: false))
         #expect(delays.shown("b.mov") == .notInTheGuideTrackYet)
     }
@@ -69,16 +68,16 @@ import Testing
         #expect(rounded(after.earlierBy) == ["b.mov": 0, "r.mov": 0.3, "a.mov": 0.8])
     }
 
-    /// An input out of sync leaves the guide track; the others are placed by the earliest staying input, and the
-    /// list keeps every input's audio delay against the anchor.
-    @Test func anEarlyInputThatLeftNoLongerPlacesTheOthers() {
+    /// An input too far out of step is not mixed, and its row says how far (D90); the others are placed by the
+    /// earliest input mixed, and the list keeps every input's audio delay against the anchor.
+    @Test func anEarlyInputNotMixedNoLongerPlacesTheOthers() {
         var delays = AudioDelays()
         let outcome = delays.update(
             files: recorded(["a.mov", "b.mov", "c.mov"]), reference: "r.mov", lags: ["a.mov": -0.9, "b.mov": 0.1, "c.mov": 0], at: 20)
-        #expect(outcome.leaving == ["a.mov": -0.9])
-        #expect(outcome.earlierBy == ["r.mov": 0, "b.mov": 0.1, "c.mov": 0])
+        #expect(outcome.earlierBy == ["r.mov": 0, "b.mov": 0.1, "c.mov": 0, "a.mov": nil])
         #expect(outcome.delays == ["a.mov": Entry(delay: -0.9), "b.mov": Entry(delay: 0.1), "c.mov": Entry(delay: 0), "r.mov": Entry(delay: 0)])
-        #expect(delays.shown("a.mov") == nil)
+        #expect(outcome.lines.contains("a.mov: not in the guide track, 1000 ms from the others"), "\(outcome.lines)")
+        #expect(delays.shown("a.mov") == .notInTheGuideTrack(apart: 1.0))
     }
 
     /// A new file of an input whose earlier file had an audio delay starts with it, carried over, until its
@@ -95,14 +94,18 @@ import Testing
         #expect(delays.shown("a2.mov") == .synced(0.5, carriedOver: false))
     }
 
-    /// A new file of an input out of the guide track stays out with it, no new leave told.
-    @Test func aNewFileOfAnInputOutOfTheGuideTrackStaysOut() {
+    /// A new file of an input not mixed carries its audio delay over and is not mixed either; once its audio
+    /// delay lies within the limit it is mixed, nothing remembered (D90).
+    @Test func aNewFileOfAnInputNotMixedIsMixedOnceItsAudioDelayFits() {
         var delays = AudioDelays()
-        #expect(delays.update(files: recorded(["a1.mov"]), reference: "r.mov", lags: ["a1.mov": 0.9], at: 20).leaving == ["a1.mov": 0.9])
+        #expect(delays.update(files: recorded(["a1.mov"]), reference: "r.mov", lags: ["a1.mov": 0.9], at: 20).earlierBy["a1.mov"] == .some(nil))
         let next = delays.update(files: recorded(["a2.mov"]), reference: "r.mov")
-        #expect(next.leaving.isEmpty && next.rejoining.isEmpty)
-        #expect(next.earlierBy == ["r.mov": 0])
-        #expect(delays.shown("a2.mov") == nil)
+        #expect(next.earlierBy == ["r.mov": 0, "a2.mov": nil])
+        #expect(next.lines.contains("a2.mov: not in the guide track with the carried-over audio delay"), "\(next.lines)")
+        #expect(delays.shown("a2.mov") == .notInTheGuideTrack(apart: 0.9))
+        let fits = delays.update(files: recorded(["a2.mov"]), reference: "r.mov", lags: ["a2.mov": 0.5], at: 40)
+        #expect(fits.earlierBy == ["r.mov": 0, "a2.mov": 0.5])
+        #expect(delays.shown("a2.mov") == .synced(0.5, carriedOver: false))
     }
 
     /// The reference's capture ending makes another input the reference: every lag is re-based onto the anchor
@@ -114,7 +117,6 @@ import Testing
         #expect(without.lines.first == "reference r.mov → a.mov: lags re-based onto the anchor by 500 ms late")
         #expect(rounded(without.earlierBy) == ["a.mov": 0.3, "b.mov": 0])
         #expect(rounded(without.delays) == ["a.mov": 0.5, "b.mov": 0.2])
-        #expect(without.leaving.isEmpty)
         #expect(delays.referenceDevice == "A")
     }
 

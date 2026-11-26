@@ -1,7 +1,7 @@
 import Testing
 @testable import RecorderLogic
 
-/// The reference rules (D89) in hand-written scenarios, through the recorder's own calls
+/// The reference rules (D90) in hand-written scenarios, through the recorder's own calls
 /// (`AudioDelayInvariantTests.run`): the reference moves for lack of sync only to an input the measurement proves.
 @Suite struct ReferenceChoiceTests {
     typealias Input = AudioDelayInvariantTests.Input
@@ -105,30 +105,37 @@ import Testing
                 "\(steps.map(\.lines))")
     }
 
-    /// One counted window, as a burst on the dock gives, does not establish the
-    /// sync: input 1 then hums, the microphones prove one of them, and every microphone ends synced.
-    @Test func aSingleCountedWindowDoesNotEstablishTheSync() async {
+    /// Input 1 matches once, as a burst on the dock gives, then hums: the microphones prove input 2, synced by
+    /// that one window, and the reference moves to it keeping every audio delay (D90); every microphone ends
+    /// synced against input 1, the anchor.
+    @Test func aReferenceThatHumsAfterOneMatchHandsOnToTheSyncedInput() async {
         let steps = await Self.steps([
             Self.input(1, .steady, [.speech] + Self.repeated(.hum, 4)),
             Self.input(2, .microphone, lag: 0.3, Self.repeated(.speech, 5)),
             Self.input(3, .microphone, lag: 0.1, [.pause] + Self.repeated(.speech, 4)),
             Self.input(4, .microphone, lag: 0.2, [.pause] + Self.repeated(.speech, 4)),
         ])
-        #expect(Self.delay(of: "u2", in: steps[0]) != nil && !steps[0].wasEstablished, "\(steps[0].lines)")
-        #expect(steps[1].movedBySound && steps[1].reference == "u2", "\(steps[1].lines)")
-        #expect(Self.isNear(steps.last.flatMap { Self.delay(of: "u3", in: $0) }, -0.2), "\(steps.map(\.lines))")
-        #expect(Self.isNear(steps.last.flatMap { Self.delay(of: "u4", in: $0) }, -0.1), "\(steps.map(\.lines))")
+        #expect(Self.delay(of: "u2", in: steps[0]) != nil && steps[1].anchorGroupBefore == 1, "\(steps[0].lines)")
+        #expect(steps[1].movedBySound && steps[1].reference == "u2" && steps[1].startOvers.isEmpty, "\(steps[1].lines)")
+        #expect(steps.allSatisfy { $0.anchor == "u1" })
+        #expect(Self.isNear(steps.last.flatMap { Self.delay(of: "u2", in: $0) }, 0.3), "\(steps.map(\.lines))")
+        #expect(Self.isNear(steps.last.flatMap { Self.delay(of: "u3", in: $0) }, 0.1), "\(steps.map(\.lines))")
+        #expect(Self.isNear(steps.last.flatMap { Self.delay(of: "u4", in: $0) }, 0.2), "\(steps.map(\.lines))")
     }
 
-    /// Two counted windows establish the sync: input 1 then hums beside the microphones, and the reference stays.
-    @Test func twoCountedWindowsEstablishTheSync() async {
+    /// Two counted windows put input 2 in the anchor's group; input 1 then hums while inputs 2 and 3 talk: the
+    /// reference moves to input 2, nothing starting over, and input 3 syncs against the anchor (D90).
+    @Test func aReferenceThatGoesQuietAfterTheSyncHandsOnWithoutStartingOver() async {
         let steps = await Self.steps([
             Self.input(1, .steady, [.speech, .speech] + Self.repeated(.hum, 3)),
             Self.input(2, .microphone, lag: 0.3, Self.repeated(.speech, 5)),
             Self.input(3, .microphone, lag: 0.1, [.pause, .pause] + Self.repeated(.speech, 3)),
         ])
-        #expect(steps[2].wasEstablished, "\(steps.map(\.lines))")
-        #expect(steps.allSatisfy { $0.reference == "u1" && !$0.movedBySound }, "\(steps.map(\.lines))")
+        #expect(steps[2].anchorGroupBefore == 2, "\(steps.map(\.lines))")
+        #expect(steps[2].movedBySound && steps[2].reference == "u2", "\(steps.map(\.lines))")
+        #expect(steps.allSatisfy { $0.startOvers.isEmpty && $0.anchor == "u1" }, "\(steps.map(\.lines))")
+        #expect(Self.isNear(steps.last.flatMap { Self.delay(of: "u2", in: $0) }, 0.3), "\(steps.map(\.lines))")
+        #expect(Self.isNear(steps.last.flatMap { Self.delay(of: "u3", in: $0) }, 0.1), "\(steps.map(\.lines))")
     }
 
     /// A healthy recording whose input 1, a room microphone, syncs everything at the first measurement: nothing
@@ -208,8 +215,9 @@ import Testing
         #expect(!outcome.lines.contains { $0.contains("carries over") } && outcome.delays["u1-2.mov"] == nil, "\(outcome.lines)")
     }
 
-    /// Once the sync is established, counted pairs move nothing, even when a measurement carries them (D89).
-    @Test func countedPairsMoveNothingOnceTheSyncIsEstablished() {
+    /// Counted pairs of synced inputs move the reference to the one the most others count against, a tie to the
+    /// lowest number, as a re-base: every audio delay stays (D90).
+    @Test func countedPairsOfSyncedInputsReBaseKeepingEveryAudioDelay() {
         let window = { (lag: Double, counts: Bool) in AudioDelay.Window(lag: lag, clarity: counts ? 30 : 5) }
         let names = ["u1", "u2", "u3"]
         let candidates = names.enumerated().map { AudioDelays.Candidate(file: "\($1).mov", uid: $1, number: $0 + 1) }
@@ -217,26 +225,57 @@ import Testing
         var delays = AudioDelays()
         _ = delays.update(files: files, reference: "u1.mov")
         for at in [10.0, 20] { _ = delays.update(files: files, reference: "u1.mov", lags: ["u2.mov": 0.2, "u3.mov": 0.1], at: at) }
-        #expect(delays.isSyncEstablished)
+        #expect(delays.anchorGroup == 3)
         let measurement = AudioDelays.Measurement(
             reference: "u1.mov",
             files: names.dropFirst().map { .init(file: "\($0).mov", window: window(0, false)) },
             pairs: [.init(reference: "u2.mov", other: "u3.mov", window: window(-0.1, true))])
         let outcome = delays.measured(measurement, files: files, candidates: candidates, at: 30)
-        #expect(delays.referenceDevice == "u1" && !outcome.lines.contains { $0.hasPrefix("reference ") }, "\(outcome.lines)")
+        #expect(delays.referenceDevice == "u2" && delays.anchor == "u1", "\(outcome.lines)")
+        #expect(outcome.lines.contains("reference u1.mov → u2.mov: lags re-based onto the anchor by 200 ms late"), "\(outcome.lines)")
         #expect(outcome.delays["u2.mov"]?.delay == 0.2 && outcome.delays["u3.mov"]?.delay == 0.1, "\(outcome.lines)")
+        #expect(outcome.delays["u1.mov"]?.delay == 0 && outcome.cleared.isEmpty, "\(outcome.lines)")
     }
 
-    /// The anchor's new file, measured against the reference it handed on to, counts toward
-    /// establishing the sync like any other input's, so a later miss wipes nothing (D89).
-    @Test func theAnchorsNewFileEstablishesTheSync() async {
+    /// A stray pair, as one burst on two inputs gives, does not outnumber an anchor whose group holds another
+    /// input matched twice: nothing moves. A group of three does, and every input starts over at its input (D90).
+    @Test func aStartOverNeedsAGroupThatOutnumbersTheAnchors() {
+        let window = { (lag: Double, counts: Bool) in AudioDelay.Window(lag: lag, clarity: counts ? 30 : 5) }
+        let names = ["u1", "u2", "u3", "u4", "u5"]
+        let candidates = names.enumerated().map { AudioDelays.Candidate(file: "\($1).mov", uid: $1, number: $0 + 1) }
+        let files = Dictionary(uniqueKeysWithValues: candidates.map { ($0.file, $0.uid) })
+        var delays = AudioDelays()
+        _ = delays.update(files: files, reference: "u1.mov")
+        for at in [10.0, 20] { _ = delays.update(files: files, reference: "u1.mov", lags: ["u2.mov": 0.2], at: at) }
+        #expect(delays.anchorGroup == 2)
+        let unsynced = names.dropFirst().map { AudioDelays.Measurement.Measured(file: "\($0).mov", window: window(0, false)) }
+        let pair = AudioDelays.Measurement(
+            reference: "u1.mov", files: unsynced, pairs: [.init(reference: "u3.mov", other: "u4.mov", window: window(0.1, true))])
+        let stays = delays.measured(pair, files: files, candidates: candidates, at: 30)
+        #expect(delays.referenceDevice == "u1", "\(stays.lines)")
+        #expect(stays.lines.contains("reference u1.mov: u3.mov's group of 2 does not outnumber the anchor's group of 2: nothing moves"),
+                "\(stays.lines)")
+        let three = AudioDelays.Measurement(reference: "u1.mov", files: unsynced, pairs: [
+            .init(reference: "u3.mov", other: "u4.mov", window: window(0.1, true)),
+            .init(reference: "u3.mov", other: "u5.mov", window: window(0.2, true)),
+        ])
+        let moves = delays.measured(three, files: files, candidates: candidates, at: 40)
+        #expect(delays.referenceDevice == "u3" && delays.anchor == "u3", "\(moves.lines)")
+        #expect(moves.cleared == Set(files.keys) && moves.delays["u2.mov"] == nil, "\(moves.lines)")
+        #expect(moves.delays["u4.mov"]?.delay == 0.1 && moves.delays["u5.mov"]?.delay == 0.2, "\(moves.lines)")
+    }
+
+    /// The anchor's new file, measured against the reference it handed on to, is synced like any other input's,
+    /// so a later miss of that reference moves back to it, re-based, and wipes nothing (D85, D90).
+    @Test func theAnchorsNewFileIsSyncedSoAMissWipesNothing() async {
         let steps = await Self.steps([
             Self.input(1, .microphone, lag: 0, [.speech, .noAudio] + Self.repeated(.speech, 8)),
             Self.input(2, .microphone, lag: 0.2, Self.repeated(.speech, 5) + [.pause, .pause] + Self.repeated(.speech, 3)),
             Self.input(3, .microphone, lag: 0.1, Self.repeated(.pause, 5) + Self.repeated(.speech, 5)),
         ])
-        #expect(steps[4].wasEstablished, "\(steps.map(\.lines))")
-        #expect(Self.moves(steps) == 0 && !steps.flatMap(\.lines).contains { $0.hasSuffix("every input starts over") }, "\(steps.map(\.lines))")
+        #expect(Self.delay(of: "u1", in: steps[4]) != nil, "\(steps.map(\.lines))")
+        #expect(steps.allSatisfy { $0.anchor == "u1" } && !steps.flatMap(\.lines).contains { $0.hasSuffix("every input starts over") },
+                "\(steps.map(\.lines))")
         #expect(Self.isNear(steps.last.flatMap { Self.delay(of: "u2", in: $0) }, 0.2), "\(steps.map(\.lines))")
     }
 
@@ -298,7 +337,7 @@ import Testing
             let reference = window(inputs[0], measurement)
             return AudioDelays.measure(reference: "u1.mov", others: inputs.dropFirst().map {
                 (file: "\($0.uid).mov", reference: reference, other: window($0, measurement))
-            }, measuresPairs: true)
+            })
         }
         var delays = AudioDelays()
         _ = delays.update(files: files, reference: "u1.mov")

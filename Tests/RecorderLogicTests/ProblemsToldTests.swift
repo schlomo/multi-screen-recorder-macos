@@ -281,7 +281,7 @@ import Testing
         ]
         for kind in failing + [.audioInputChangesNotFollowed] { #expect(kind.callToAction == .startAgainAndReportIt) }
         let none: [ProblemKind] = [
-            .cameraStalled("C"), .audioInputOutOfTheGuideTrack("u"), .guideTracksCut("v.mov"), .dockIconNotShown,
+            .cameraStalled("C"), .guideTracksCut("v.mov"), .dockIconNotShown,
             .inputVolumeNotSet("Mic"), .inputVolumeNotFollowed("Mic"), .screensNotRead, .audioInputsNotRead, .freeSpaceNotRead,
         ]
         for kind in none { #expect(kind.callToAction == nil) }
