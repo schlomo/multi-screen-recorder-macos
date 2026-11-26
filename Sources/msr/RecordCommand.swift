@@ -10,7 +10,7 @@ extension RecordingDuration: ExpressibleByArgument {
     }
 }
 
-/// Exit 3: a file not finalized or ended by a failure, or a camera stalled (D47), the final manifest not written, or no start.
+/// Exit 3: the result `problems`, a call to action given or a file not finalized (D47, D91), the final manifest not written, or no start.
 let recordingEndedWithErrorExitCode: Int32 = 3
 
 extension CommandLineInterface {
@@ -20,7 +20,7 @@ extension CommandLineInterface {
             discussion: "Prints what will be recorded, runs the ready check, then records with the app's Dock icon. "
                 + "Standard output carries one line, the recording folder's path, when recording starts; everything for people goes to standard error, "
                 + "on a terminal with a status line redrawn once a second. "
-                + "Exits 0 when every file is finalized, no file was ended by a failure and no camera stalled, 1 when not ready, 3 otherwise or when it could not start.")
+                + "Exits 0 when every file is finalized and no problem called for action, 1 when not ready, 3 otherwise or when it could not start.")
 
         @OptionGroup var flags: SettingsFlags
 

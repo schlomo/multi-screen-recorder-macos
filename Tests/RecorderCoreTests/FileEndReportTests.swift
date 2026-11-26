@@ -39,7 +39,7 @@ private func failedEvent(at seconds: Double, error: ErrorDetail) -> RecordingEve
         var failed = fileEnd(writerError("cannot write f.mov: no luck"))
         failed.guideTracksCut = [GuideTrackCut(guide: .audioInputs, why: .samplesGone)]
         #expect(FileEndReport(reason: nil, end: failed, source: "LG", at: 3 * second).problem?.error == "cannot write f.mov: no luck")
-        // Guide tracks cut leave the video intact: their own kind, orange (D78).
+        // Guide tracks cut leave the video intact: their own kind (D78).
         #expect(report.problemKind(notCaptured: .screenNotCaptured("U")) == .guideTracksCut("f.mov"))
     }
 

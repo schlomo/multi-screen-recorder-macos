@@ -3364,3 +3364,57 @@ architect's reading.
   6 of 6 deliberate breaks of the new rules caught;
   [design/recorder.md](design/recorder.md), "Audio delay" and "Guide
   tracks".
+
+## D91: Only an actionable problem notifies a person; a camera stall at another camera's start is macOS's (2026-11-26)
+
+- **Status:** in force. Amends D78 (every problem a line in the status
+  window, red when broken, orange for a hiccup), D84 (every problem
+  listed in the status window; the result and exit status 3 still
+  reporting every failure event) and D47 (a failure event or a camera
+  stall made the result `problems`).
+- **Context:** The owner, 2026-11-26: "we in any case want to trigger
+  human attention only on actionable problems"; "If it is broken right
+  now but the user can't do anything about it then don't notify.
+  Actionable means 'go and do X'. Losing up to several seconds for a
+  device change can be unavoidable and is then as it is." Of a camera
+  stall while another camera starts: "we can't beat the limitations of
+  MacOS here."
+- **Decision:** a problem notifies a person only when its call to
+  action (D84: free up disk space, grant the permission, unplug and
+  plug in again, report it, start again and report it) was given, a
+  failing source's only once it lasted 10 s without coming back, as
+  before. Notifying is everything a person sees: the status window's
+  problem line, the Dock bounce and badge, `msr record`'s status line
+  count, the notice of the last recording's problems at the next start,
+  the report prompts, the "For a report ... attach them" line (shown
+  under the lines only), and the recording's `result`: `problems` only
+  when a call to action was given (at Stop too, for a source still
+  failing) or a file is not finalized, so exit 3 for `msr record` too.
+  A problem without one is still written to the recording log, to
+  standard error by `msr record` and into `recording.json`'s `problems`
+  and `events`, but shows nothing and leaves the result `ok`. A shown
+  line is one colour, red; the orange of D78 goes.
+- **Camera stall at another camera's start:** in one process
+  CoreMediaIO holds a process-wide lock while a camera's capture
+  starts, so the other cameras deliver no frame for as long as it
+  takes, 0.8 s to 4 s; in separate processes not (measured 2026-11-26,
+  [troubleshooting.md](troubleshooting.md), "A camera stalls while
+  another camera starts"). Accepted, no workaround: a stall has no call
+  to action, so it is now quiet.
+- **What changes for a person:** a recording with a camera stall, a
+  screen, camera or microphone that failed and came back within 10 s,
+  a file failure followed by a new file, or a problem such as the free
+  space not read shows no line, does not bounce, and ends `ok` (exit 0),
+  where before it showed an orange or red line and could end
+  `problems` (exit 3). A full disk, a permission missing, a silent
+  input after its gaps, a lost file or a source that does not come
+  back still shows its red line, bounces and ends `problems`.
+- **Evidence:** `ProblemsToldTests`
+  (`onlyAProblemWithACallToActionShowsALine`,
+  `aFailingSourceShowsItsLineOnlyOnceUnrecovered`),
+  `RecordingManifestTests`, `RecorderTests`
+  (`aCameraThatFailsIsAFailureToldOnceAndStartsAgain`,
+  `aCameraThatPausesIsStalledAndItsFileGoesOn`,
+  `aSourceCapturedAgainBeforeTheWaitStaysQuiet`,
+  `anAudioSourceEndedByAFullDiskCallsToFreeUpDiskSpace`);
+  [design/recorder.md](design/recorder.md), "The app" and "Cameras".

@@ -444,6 +444,8 @@ extension GlobalRecordingLog {
             #expect(timeline.contains(#""name": "Camera 1 - Stand-in camera""#))
         }
 
+        /// A camera that fails and comes back has no call to action: no line, no bounce, the result ok, but its
+        /// failure is in the manifest's events and problems (D91).
         @Test func aCameraThatFailsIsAFailureToldOnceAndStartsAgain() async throws {
             cameras.connected.withLock { $0 = [Self.camera] }
             try start(cameraMode: .real)
@@ -456,9 +458,16 @@ extension GlobalRecordingLog {
             #expect(observer.problems.first?.problem.problem == "Camera Stand-in camera")
             #expect(try manifestOnDisk().events.map(\.event) == [.cameraStreamFailed])
             try await wait("the restart") { cameras.opened.withLock { $0.count } == 2 }
+            try await sendFrames(try #require(cameras.last), until: "the new camera file") {
+                (try? manifestOnDisk().cameraFiles.count) == 2
+            }
+            #expect(recorder.problemLines().isEmpty)
             let summary = await stop()
-            #expect(summary.manifest.result == .problems)
-            #expect(summary.manifest.cameraFiles.map(\.state) == [.finalized])
+            #expect(observer.callsToAction.isEmpty)
+            #expect(summary.manifest.result == .ok)
+            #expect(!summary.endedWithError && !summary.asksToReportIt)
+            #expect(summary.manifest.problems.map(\.problem) == ["Camera Stand-in camera"])
+            #expect(summary.manifest.cameraFiles.map(\.state) == [.finalized, .finalized])
         }
 
         @Test func stopFinalizesTheCameraFileItRecords() async throws {
@@ -503,15 +512,13 @@ extension GlobalRecordingLog {
             #expect(summary.manifest.events.isEmpty)
         }
 
-        /// The audio inputs' changes that cannot be followed: told, red for the whole recording (D78).
-        @Test func audioInputChangesThatCannotBeFollowedAreARedLine() async throws {
+        /// The audio inputs' changes that cannot be followed: told, a line for the whole recording (D78, D91).
+        @Test func audioInputChangesThatCannotBeFollowedAreALine() async throws {
             try start(audioInputsFollowed: false)
             #expect(observer.problems.map(\.problem.problem) == ["Changes of the audio inputs cannot be followed"])
             // Stop and start the recording again, and report it, at once (D84).
             #expect(observer.callsToAction.map(\.problem) == ["Changes of the audio inputs cannot be followed"])
-            let line = try #require(recorder.problemLines().first)
-            #expect(line.text == "Changes of the audio inputs not followed since 0:00: the stand-in's listener failed")
-            #expect(line.isRed)
+            #expect(recorder.problemLines() == ["Changes of the audio inputs not followed since 0:00: the stand-in's listener failed"])
             _ = await stop()
         }
 
@@ -1359,20 +1366,19 @@ extension GlobalRecordingLog {
                 == ["Mic R": [0], "Mic A": []])
         }
 
-        /// A video file's writer failure and a full disk reach the window's lines, red until a new file of the
-        /// camera starts or there is room (D78).
+        /// A video file's writer failure not recovered within `unrecoveredAfter` and a full disk reach the window's
+        /// lines (D78, D91).
         @Test(arguments: [
             (VideoStreamEnd.writerFailed("cannot write c.mov"), "Camera 1 Stand-in camera not captured since "),
             (.diskFull, "Disk full since "),
         ])
-        func aCameraFileEndedByItsWriterOrAFullDiskIsARedLine(end: VideoStreamEnd, line: String) async throws {
+        func aCameraFileEndedByItsWriterOrAFullDiskIsALine(end: VideoStreamEnd, line: String) async throws {
             cameras.connected.withLock { $0 = [Self.camera] }
-            try start(cameraMode: .real)
+            try start(cameraMode: .real, unrecoveredAfter: .milliseconds(300))
             let camera = try #require(cameras.last)
             try await sendFrames(camera, until: "the camera file") { (try? manifestOnDisk().cameraFiles.count) == 1 }
             camera.lose(end)
-            try await wait("the line") { recorder.problemLines().first?.text.hasPrefix(line) == true }
-            #expect(recorder.problemLines().first?.isRed == true)
+            try await wait("the line") { recorder.problemLines().first?.hasPrefix(line) == true }
             _ = await stop()
         }
 
@@ -1543,8 +1549,9 @@ extension GlobalRecordingLog {
             #expect(stalledRow.details.contains("\nThis file so far: "))
             #expect(recorder.status().rows.allSatisfy { $0.details.hasPrefix($0.source.text) })
             #expect(observer.problems.map(\.problem.text) == ["Camera Stand-in camera: camera stalled: \(CameraTracker.stalledError.text)"])
-            // Nothing a person can do about a stall: no call to action (D84).
+            // Nothing a person can do about a stall: no call to action, no line (D84, D91).
             #expect(observer.callsToAction.isEmpty)
+            #expect(recorder.problemLines().isEmpty)
             try await sendFrames(camera, until: "the stall's end") { (try? manifestOnDisk().events.count) == 2 }
             let ended = try #require(try manifestOnDisk().events.last)
             #expect(ended.event == .cameraStallEnded)
@@ -1554,25 +1561,23 @@ extension GlobalRecordingLog {
             #expect(cameras.opened.withLock { $0.count } == 1)
             #expect(summary.manifest.cameraFiles.map(\.state) == [.finalized])
             #expect(summary.manifest.problems.count == 1)
-            // A stall loses picture (D47), but asks for no report (D84).
-            #expect(summary.manifest.result == .problems)
-            #expect(summary.endedWithError && !summary.asksToReportIt)
+            // A stall that ended calls to no action: the result is ok, and it asks for no report (D84, D91).
+            #expect(summary.manifest.result == .ok)
+            #expect(!summary.endedWithError && !summary.asksToReportIt)
+            #expect(try recordingLog().contains("camera stalled"))
         }
 
-        /// A stalled camera unplugged: its stall ends there, then disconnected, orange (D78).
-        @Test func aStalledCameraUnpluggedEndsItsStallLine() async throws {
+        /// A stalled camera shows no line, unplugged too (D91).
+        @Test func aStalledCameraShowsNoLine() async throws {
             cameras.connected.withLock { $0 = [Self.camera] }
             try start(cameraMode: .real, cameraFrameWatch: Self.quickFrameWatch)
             let camera = try #require(cameras.last)
             try await sendFrames(camera, until: "the camera file") { (try? manifestOnDisk().cameraFiles.count) == 1 }
             try await wait("the stall") { (try? manifestOnDisk().events.map(\.event)) == [.cameraStalled] }
-            #expect(recorder.problemLines().map(\.text) == ["Camera 1 Stand-in camera stalled since 0:00"])
+            #expect(recorder.problemLines().isEmpty)
             cameras.connected.withLock { $0 = [] }
             recorder.camerasChanged()
-            let line = try #require(recorder.problemLines().first)
-            #expect(line.text.hasPrefix("Camera 1 Stand-in camera stalled "))
-            #expect(line.text.hasSuffix(" s at 0:00, then disconnected"))
-            #expect(!line.isRed)
+            #expect(recorder.problemLines().isEmpty)
             _ = await stop()
         }
 
@@ -1711,8 +1716,8 @@ extension GlobalRecordingLog {
             _ = await stop()
         }
 
-        /// A camera file a full disk cut short: its lost tail is a red line without a call to action of its own, and
-        /// the recording asks for no report (D84).
+        /// A camera file a full disk cut short: its lost tail has no call to action of its own, so no line, and the
+        /// recording asks for no report (D84, D91).
         @Test func aCameraFileAFullDiskCutShortAsksForNoReport() async throws {
             cameras.connected.withLock { $0 = [Self.camera] }
             try start(cameraMode: .real)
@@ -1722,8 +1727,7 @@ extension GlobalRecordingLog {
             recorder.cameraCaptureEnded(
                 uniqueID: "StandInCamera", captureNumber: 1, camera: "Stand-in camera", reason: .diskFull,
                 file: failedEnd(of: file, lost: "its last 2 s", isDiskFull: true))
-            let lost = try #require(recorder.problemLines().first { $0.text.hasPrefix("File \(file.name) incomplete") })
-            #expect(lost.isRed)
+            #expect(!recorder.problemLines().contains { $0.hasPrefix("File \(file.name) incomplete") })
             #expect(observer.callsToAction.allSatisfy { !$0.problem.contains("incomplete") && !$0.problem.contains("its last 2 s") })
             #expect(observer.callsToAction.count == 1)
             let summary = await stop()
@@ -1732,7 +1736,7 @@ extension GlobalRecordingLog {
         }
 
         /// A failure of a camera's file, reported after a newer file of the camera started, is over when
-        /// told: orange at once (D78).
+        /// told: no line (D78, D91).
         @Test func aCameraFileFailureReportedAfterANewerFileIsOverAtOnce() async throws {
             cameras.connected.withLock { $0 = [Self.camera] }
             try start(cameraMode: .real)
@@ -1746,14 +1750,12 @@ extension GlobalRecordingLog {
             recorder.cameraCaptureEnded(
                 uniqueID: "StandInCamera", captureNumber: 1, camera: "Stand-in camera", reason: .writerFailed("cannot write"),
                 file: failedEnd(of: file))
-            let line = try #require(recorder.problemLines().first { $0.text.hasPrefix("Camera 1 Stand-in camera not captured") })
-            #expect(line.text.contains(", recovered: "))
-            #expect(!line.isRed)
+            #expect(!recorder.problemLines().contains { $0.hasPrefix("Camera 1 Stand-in camera not captured") })
             _ = await stop()
         }
 
-        /// A failure of a camera's file reported after the camera was unplugged ends at once, then disconnected;
-        /// the part of the file lost is a red line of its own (D78).
+        /// A failure of a camera's file reported after the camera was unplugged ends at once, no line; the part of
+        /// the file lost is a line of its own: report it (D78, D91).
         @Test func aCameraFileFailureReportedAfterItsCameraWentIsOverAndItsLostPartRed() async throws {
             _ = try await recordThenStop(nil)
             try await wait("the file's end") { (try? manifestOnDisk().cameraFiles.first?.state) == .finalized }
@@ -1762,32 +1764,30 @@ extension GlobalRecordingLog {
                 uniqueID: "StandInCamera", captureNumber: 1, camera: "Stand-in camera", reason: .writerFailed("cannot write"),
                 file: failedEnd(of: file, lost: "its last 2 s"))
             let lines = recorder.problemLines()
-            let lost = try #require(lines.first { $0.text.hasPrefix("File \(file.name) incomplete since ") })
-            #expect(lost.isRed)
-            let failure = try #require(lines.first { $0.text.hasPrefix("Camera 1 Stand-in camera not captured") })
-            #expect(failure.text.contains(", then disconnected: "))
-            #expect(!failure.isRed)
+            #expect(lines.contains { $0.hasPrefix("File \(file.name) incomplete since ") })
+            #expect(!lines.contains { $0.hasPrefix("Camera 1 Stand-in camera not captured") })
             _ = await stop()
         }
 
-        /// A full disk is red until the free space check finds room (D78).
+        /// A full disk lasts until the free space check finds room (D78).
         @Test func aFullDiskEndsOnceThereIsRoom() async throws {
             cameras.connected.withLock { $0 = [Self.camera] }
             try start(cameraMode: .real)
             let camera = try #require(cameras.last)
             try await sendFrames(camera, until: "the camera file") { (try? manifestOnDisk().cameraFiles.count) == 1 }
             camera.lose(.diskFull)
-            try await wait("the line") { recorder.problemLines().first?.text.hasPrefix("Disk full since ") == true }
-            #expect(recorder.problemLines().first?.isRed == true)
+            try await wait("the line") { recorder.problemLines().first?.hasPrefix("Disk full since ") == true }
             // The next free space check, at most 5 s on.
-            try await wait("the room", seconds: 7) { recorder.problemLines().first { $0.text.hasPrefix("Disk full ") }?.isRed == false }
+            try await wait("the room", seconds: 7) {
+                recorder.problemLines().first { $0.hasPrefix("Disk full ") }?.contains(", recovered") == true
+            }
             _ = await stop()
         }
 
         /// Two audio inputs of the same name: a new file of one ends only its own failed files' lines (D78).
         @Test func aNewAudioFileEndsOnlyItsOwnInputsFailedFiles() async throws {
             let inputs = ["X", "Y"].map { AudioInputInfo(name: "Mic", channelCount: 1, isDefault: $0 == "X", transport: .usb, uid: $0) }
-            try start(inputs: inputs)
+            try start(inputs: inputs, unrecoveredAfter: .milliseconds(300))
             try await wait("the audio inputs' captures") { sources.byUID.withLock { $0.count } == 2 }
             try await startAudioFiles(["X", "Y"])
             let x = try #require(try manifestOnDisk().audioFiles.first { $0.audioSourceUID == "X" })
@@ -1795,12 +1795,11 @@ extension GlobalRecordingLog {
             try #require(sources.last(of: "Y")).lose(.captureFailed("the stand-in failed"))
             try await wait("Y's restart") { sources.byUID.withLock { $0["Y"]?.count } == 2 }
             try await startAudioFiles(["Y"], "Y's new file", count: 3)
-            let line = try #require(recorder.problemLines().first { $0.text.hasPrefix("File \(x.name) failed") })
-            #expect(line.isRed)
+            try await wait("X's line") { recorder.problemLines().contains { $0.hasPrefix("File \(x.name) failed since ") } }
             _ = await stop()
         }
 
-        /// A failure of an audio file reported after a newer file of its input started is over when told (D78).
+        /// A failure of an audio file reported after a newer file of its input started is over when told: no line (D78, D91).
         @Test func anAudioFileFailureReportedAfterANewerFileIsOverAtOnce() async throws {
             try start()
             try await startAudioFiles([uid])
@@ -1809,8 +1808,7 @@ extension GlobalRecordingLog {
             try await startAudioFiles([uid], "the new file", count: 2)
             let first = try #require(try manifestOnDisk().audioFiles.first)
             recorder.audioFileEnded(failedEnd(of: first))
-            let line = try #require(recorder.problemLines().first { $0.text.hasPrefix("File \(first.name) failed") })
-            #expect(!line.isRed)
+            #expect(!recorder.problemLines().contains { $0.hasPrefix("File \(first.name) failed") })
             _ = await stop()
         }
 
@@ -1820,22 +1818,6 @@ extension GlobalRecordingLog {
             file.end = file.end ?? file.start + 0.5
             file.state = .notFinalized
             return AudioFileEnd(file: file, error: AudioFileWriterError(nil, while: "cannot write \(file.name)"))
-        }
-
-        /// A stalled camera the recorder stops, here as it is suspended: its stall ends with its capture,
-        /// neither recovered nor disconnected (D78).
-        @Test func aStalledCameraStoppedEndsItsStallLine() async throws {
-            cameras.connected.withLock { $0 = [Self.camera] }
-            try start(cameraMode: .real, cameraFrameWatch: Self.quickFrameWatch)
-            let camera = try #require(cameras.last)
-            try await sendFrames(camera, until: "the camera file") { (try? manifestOnDisk().cameraFiles.count) == 1 }
-            try await wait("the stall") { (try? manifestOnDisk().events.map(\.event)) == [.cameraStalled] }
-            cameras.connected.withLock { $0 = [Self.suspended] }
-            recorder.camerasChanged()
-            let line = try #require(recorder.problemLines().first)
-            #expect(line.text.hasPrefix("Camera 1 Stand-in camera stalled "))
-            #expect(line.text.hasSuffix(" s at 0:00, stopped"))
-            _ = await stop()
         }
 
         /// The writer takes only decoded pictures; a frame without one ends the capture, never silently.
@@ -1988,9 +1970,9 @@ extension GlobalRecordingLog {
             #expect(recorder.meters().levels.isEmpty)
         }
 
-        /// No audio right after a gap is the input broken by it: a red line saying what to do, told as a
-        /// problem, orange in the past once its sound returns (D81).
-        @Test func noAudioRightAfterAGapIsARedProblemUntilTheSoundReturns() async throws {
+        /// No audio right after a gap is the input broken by it: a line saying what to do, told as a
+        /// problem, in the past once its sound returns (D81).
+        @Test func noAudioRightAfterAGapIsAProblemUntilTheSoundReturns() async throws {
             try start()
             let buffersOfNoAudio = Int(RecorderValues.noAudioTime.nanoseconds * Int64(RecorderValues.audioSampleRate) / 1_000_000_000)
                 / samplesPerBuffer
@@ -2000,15 +1982,13 @@ extension GlobalRecordingLog {
             try send(0, buffers: buffersOfNoAudio + 10, after: 13, from: origin)
             try await wait("the problem") { !observer.problems.isEmpty }
             #expect(try manifestOnDisk().events.map(\.event) == [.audioInputGap, .noAudioStarted])
-            #expect(recorder.problemLines() == [ProblemLine(
-                text: "Audio 1 \(name) sends only silence since its gaps at 0:00; unplug and plug it in again", isRed: true)])
+            #expect(recorder.problemLines() == ["Audio 1 \(name) sends only silence since its gaps at 0:00; unplug and plug it in again"])
             #expect(observer.callsToAction.map(\.problem) == ["The audio input \(name) sends only silence since its gaps at 0:00"])
             #expect(try manifestOnDisk().problems.map(\.problem) == ["The audio input \(name) sends only silence since its gaps at 0:00"])
             try send(0.25, buffers: 10, after: buffersOfNoAudio + 23, from: origin)
             try await wait("the sound") { recorder.status().rows.first?.state == "recording" }
             let past = try #require(recorder.problemLines().first)
-            #expect(!past.isRed)
-            #expect(past.text.wholeMatch(of: /Audio 1 .+ sent only silence for .+ after its gaps at 0:00, recovered/) != nil, "\(past.text)")
+            #expect(past.wholeMatch(of: /Audio 1 .+ sent only silence for .+ after its gaps at 0:00, recovered/) != nil, "\(past)")
             _ = await stop()
             let log = try String(contentsOf: recorder.folder.appending(path: RecordingNames.recordingLog), encoding: .utf8)
             #expect(log.contains("Audio 1 \(name): no audio since 0:00, right after its gap at 0:00: a red problem (D81)"))
@@ -2027,7 +2007,8 @@ extension GlobalRecordingLog {
             #expect(summary.asksToReportIt)
         }
 
-        /// A source captured again before `unrecoveredAfter` stays quiet, at Stop too (D84).
+        /// A source captured again before `unrecoveredAfter` stays quiet, at Stop too: no line, the result ok, but
+        /// its problem in the manifest and the recording log (D84, D91).
         @Test func aSourceCapturedAgainBeforeTheWaitStaysQuiet() async throws {
             try start(unrecoveredAfter: .seconds(60))
             try send(0.25, buffers: 2)
@@ -2039,9 +2020,14 @@ extension GlobalRecordingLog {
                 try? sendNext(0.25, buffers: 1, to: sources.last)
                 return (try? manifestOnDisk().audioFiles.count) == 2
             }
+            #expect(recorder.problemLines().isEmpty)
             let summary = await stop()
             #expect(observer.callsToAction.isEmpty)
             #expect(!summary.asksToReportIt)
+            #expect(summary.manifest.result == .ok)
+            #expect(summary.manifest.problems.map(\.problem) == ["The audio input \(name) failed"])
+            let log = try String(contentsOf: recorder.folder.appending(path: RecordingNames.recordingLog), encoding: .utf8)
+            #expect(log.contains("The audio input \(name) failed"))
         }
 
         /// A source still failing at Stop makes the recording ask to report it, without waiting for
@@ -2067,9 +2053,10 @@ extension GlobalRecordingLog {
             source.lose(.diskFull)
             try await wait("the problem") { !observer.problems.isEmpty }
             #expect(observer.callsToAction.map(\.problem) == ["The audio file of \(name) ended"])
-            #expect(recorder.problemLines().first?.text.hasPrefix("Disk full since ") == true)
+            #expect(recorder.problemLines().first?.hasPrefix("Disk full since ") == true)
             let summary = await stop()
             #expect(!summary.problemsAskToReportIt)
+            #expect(summary.manifest.result == .problems)
         }
 
         /// An audio file whose writer failed because the disk is full is the full disk, free up disk space, told
@@ -2086,10 +2073,9 @@ extension GlobalRecordingLog {
             var end = AudioFileEnd(file: file, error: AudioFileWriterError(POSIXError(.ENOSPC), while: "cannot write \(file.name)"))
             end.lost = "its last 0.5 s were not written"
             recorder.audioFileEnded(end)
-            // Its lost tail is still a red line, but the full disk is the one call to action (D84).
+            // The full disk is the one call to action, its lost tail without a line (D84, D91).
             #expect(observer.callsToAction.map(\.problem) == ["The audio file of \(name) ended"])
-            #expect(recorder.problemLines().map(\.text).filter { $0.hasPrefix("File ") }.map { $0.hasPrefix("File \(file.name) incomplete") }
-                == [true])
+            #expect(!recorder.problemLines().contains { $0.hasPrefix("File ") })
             let summary = await stop()
             #expect(summary.manifest.audioFiles.map(\.state) == [.notFinalized])
             #expect(!summary.asksToReportIt)
@@ -2112,9 +2098,8 @@ extension GlobalRecordingLog {
                 try? sendNext(0.25, buffers: 1, to: sources.last)
                 return recorder.status().rows.first?.state == "recording"
             }
-            let past = try #require(recorder.problemLines().first { $0.text.hasPrefix("Audio 1") })
-            #expect(!past.isRed)
-            #expect(past.text.wholeMatch(of: /Audio 1 .+ sent only silence for .+ after its gaps at 0:00, stopped/) != nil, "\(past.text)")
+            let past = try #require(recorder.problemLines().first { $0.hasPrefix("Audio 1") })
+            #expect(past.wholeMatch(of: /Audio 1 .+ sent only silence for .+ after its gaps at 0:00, stopped/) != nil, "\(past)")
             _ = await stop()
         }
 

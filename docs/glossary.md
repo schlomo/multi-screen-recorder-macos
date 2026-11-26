@@ -100,20 +100,22 @@ printed already (D64).
 
 ## Problem
 
-Something that went wrong in a recording and that the person is told:
-a line in the status window (red when something
-is broken, orange for a hiccup, D78), a line on standard
-error in `msr record`, a line in the recording log, and an entry in the
-recording manifest's `problems` with its time and full error (D46, D64);
-the Dock badge's "!" and a bounce only with a call to action (D84).
+Something that went wrong in a recording: a line on standard error in
+`msr record`, a line in the recording log, and an entry in the
+recording manifest's `problems` with its time and full error (D46,
+D64); a red line in the status window, the Dock badge's "!", a bounce
+and the result `problems` only once its call to action was given (D78,
+D84, D91).
 
 ## Call to action
 
 What a person has to do about a problem, by its kind (`CallToAction`,
 D84): free up disk space, grant the permission, unplug and plug in the
 device again, report it, or stop and start the recording again (or
-replug) and report it; a kind without one is told but never bounces the
-Dock icon, sets the badge or counts in the status line. A source that
+replug) and report it; a kind without one is logged and listed in the
+recording manifest but never shows a line in the status window, bounces
+the Dock icon, sets the badge, counts in the status line or makes the
+result `problems` (D91). A source that
 fails gets its call to action only once it lasted 10 s without coming
 back; one still failing at Stop makes the recording ask to report it.
 Only a call to action that includes "report it", or lost data, makes
@@ -128,8 +130,7 @@ status window says how long it lasted, when it began and how it ended:
 `recovered`, `then disconnected` when its source went away, or `stopped`
 when its capture ended without recovering and without a disconnect
 (Stop, out of the camera mode, the camera suspended, or the capture
-ended by a failure); it
-is orange unless the problem damaged the recording (D78).
+ended by a failure) (D78).
 
 ## Recovered
 
@@ -244,7 +245,8 @@ orientation, with the event `camera orientation changed` while recording
 A camera that delivers no frame for 2 s while recording: its camera file
 goes on, repeating its last frame, until frames come again (events
 `camera stalled` and `camera stall ended`) or, after 10 s, the stream
-counts as failing. It makes the result `problems` (D47, D74).
+counts as failing. It has no call to action: it shows nothing and
+leaves the result `ok` (D74, D91).
 
 ## Camera mode
 

@@ -180,7 +180,7 @@ import Testing
     @Test func theProblemsAreaGrowsToFiveLinesAndNoFurther() {
         func heightWith(_ count: Int) -> CGFloat {
             let model = statusModel(name: "Mic", cpu: "CPU 3 %")
-            model.problems = (0..<count).map { ProblemLine(text: "Screen DELL not captured since 0:\($0 % 6)0: failed", isRed: $0 % 2 == 0) }
+            model.problems = (0..<count).map { "Screen DELL not captured since 0:\($0 % 6)0: failed" }
             return height(status(model))
         }
         let one = heightWith(1), five = heightWith(5)

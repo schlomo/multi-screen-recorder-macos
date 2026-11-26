@@ -283,8 +283,8 @@ public final class Recorder {
     /// Seconds since the recording started, on the shared clock.
     public var elapsedSeconds: Double { Double(context.now()) / 1_000_000_000 }
 
-    /// The status window's problem lines, read now (D78).
-    public func problemLines() -> [ProblemLine] { problemsTold.lines(now: context.now()) }
+    /// The status window's problem lines, read now: only problems whose call to action was given (D78, D91).
+    public func problemLines() -> [String] { problemsTold.lines(now: context.now()) }
 
     /// `msr record` could not show its Dock icon: a problem; the recording goes on.
     public func dockIconNotShown() {
@@ -457,12 +457,13 @@ public final class Recorder {
             if let logFailure {
                 tell("Cannot write the recording log \(RecordingNames.recordingLog)", error: logFailure, kind: .recordingLogNotWritten)
             }
-            // A source still failing does not come back in this recording: it decides the report, nothing live (D84).
+            // A source still failing does not come back in this recording: it decides the report and the result,
+            // nothing live (D84, D91).
             for problem in problemsTold.callsToAction(now: context.now(), unrecoveredAfter: unrecoveredAfter, atStop: true) {
                 RecorderLog.detail("asks to report it at Stop: \(problem.text)", category: "recorder")
             }
             manifest.finalize(
-                ended: Date(), timeZone: context.timeZone, cpu: cpu.manifestEntry, recordingLogWritten: logFailure == nil)
+                ended: Date(), timeZone: context.timeZone, cpu: cpu.manifestEntry, calledToAction: problemsTold.gaveACallToAction)
             do {
                 try writeManifest()
             } catch {
@@ -893,7 +894,7 @@ public final class Recorder {
 
     private func cameraStallEnded(uniqueID: String, captureNumber: Int, length: Int64) {
         guard !isStopped, cameraCaptures[uniqueID]?.0 == captureNumber else { return }
-        problemsTold.cleared(.cameraStalled(uniqueID), at: context.now(), length: length)
+        problemsTold.cleared(.cameraStalled(uniqueID), at: context.now())
         applyCameras(cameraTracker.stallEnded(uniqueID, length: length, at: context.now()))
     }
 

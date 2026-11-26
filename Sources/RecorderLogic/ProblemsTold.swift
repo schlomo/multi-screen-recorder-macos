@@ -48,30 +48,9 @@ public enum ProblemKind: Hashable, Sendable {
     case guideTracksCut(String)
 }
 
-extension ProblemKind {
-    /// Whether its line is red (D78, the owner's rule): something broken that a person must fix,
-    /// or a recording not usable as it is. Red while it lasts and its source is not recorded or
-    /// saved, or a person must act; a damaged file and changes of the audio inputs not followed
-    /// always. Orange, a hiccup in a recording that worked: everything once it is over, and always
-    /// what never touches what is recorded, and a stall, whose file goes on.
-    func isRed(ongoing: Bool) -> Bool {
-        switch self {
-        case .audioFileLost, .videoFileLost, .audioInputChangesNotFollowed, .audioInputNotRecordable:
-            true
-        case .dockIconNotShown, .inputVolumeNotSet, .inputVolumeNotFollowed, .timelineFileNotWritten, .cameraStalled,
-             .guideTracksCut:
-            false
-        case .diskFull, .cameraPermissionMissing, .screenNotCaptured, .cameraNotCaptured, .audioSourceFailed, .audioFileFailed,
-             .recordingLogNotWritten, .manifestNotWritten, .freeSpaceNotRead, .screensNotRead, .audioInputsNotRead,
-             .audioInputSilentAfterGaps:
-            ongoing
-        }
-    }
-}
-
-/// What a person has to do about a problem (D84, the owner's rule): only a problem with one bounces the Dock
-/// icon, sets the badge and counts in `msr record`'s status line; one without stays quiet, listed in the status
-/// window, `recording.json` and the recording log.
+/// What a person has to do about a problem (D84, D91, the owner's rule): only a problem whose call to action was
+/// given shows a line in the status window, bounces the Dock icon, sets the badge, counts in `msr record`'s status
+/// line and makes the result `problems`; one without stays quiet, listed in `recording.json` and the recording log.
 public enum CallToAction: Equatable, Sendable {
     case freeUpDiskSpace
     case grantThePermission
@@ -147,17 +126,6 @@ extension ProblemKind {
         case .guideTracksCut(let name): "Guide tracks of \(name) cut"
         case .audioInputSilentAfterGaps(let uid): source ?? uid
         }
-    }
-}
-
-/// A line of the status window's problems: red when broken, orange for a hiccup (D78).
-public struct ProblemLine: Equatable, Sendable {
-    public var text: String
-    public var isRed: Bool
-
-    public init(text: String, isRed: Bool) {
-        self.text = text
-        self.isRed = isRed
     }
 }
 
@@ -249,21 +217,17 @@ public struct ProblemsTold: Sendable {
         withoutCallToAction: Bool = false
     ) {
         guard !told.contains(where: { $0.kind == kind && $0.ended == nil }) else { return }
-        let at = Int64((problem.at * 1_000_000_000).rounded())
-        // A stall is told once the camera delivered no frame for the stall limit: it began that much earlier.
-        let began = if case .cameraStalled = kind { max(0, at - RecorderValues.cameraStallLimit.nanoseconds) } else { at }
+        let began = Int64((problem.at * 1_000_000_000).rounded())
         let ended = kind.endsWithANewFile ? endedAt.map { max($0, began) } : nil
         told.append(Told(
             kind: kind, problem: problem, source: source, began: began, ended: ended, ending: ending, withoutCallToAction: withoutCallToAction))
     }
 
-    /// The kind went away at `now`: it is told again when it comes back. A
-    /// stall's `length` says when it began (its end minus its length).
-    public mutating func cleared(_ kind: ProblemKind, at now: Int64, length: Int64? = nil, ending: Ending = .recovered) {
+    /// The kind went away at `now`: it is told again when it comes back.
+    public mutating func cleared(_ kind: ProblemKind, at now: Int64, ending: Ending = .recovered) {
         guard let index = told.lastIndex(where: { $0.kind == kind && $0.ended == nil }) else { return }
         told[index].ended = now
         told[index].ending = ending
-        if let length { told[index].began = max(0, now - length) }
     }
 
     /// The problems whose call to action falls due at `now`, each given once (D84): at once, or for a source that
@@ -294,54 +258,53 @@ public struct ProblemsTold: Sendable {
         told.filter { $0.calledToAction && $0.ended == nil }.map(\.problem)
     }
 
+    /// A call to action was given: the recording's result is `problems` (D91).
+    public var gaveACallToAction: Bool { told.contains(where: \.calledToAction) }
+
     /// A call to action given that includes "report it": the recording asks to report it once it ended (D84).
     public var asksToReportIt: Bool {
         told.contains { $0.calledToAction && $0.kind.callToAction?.includesReportIt == true }
     }
 
-    /// The status window's lines, one per kind (a kind names its source): red first, then
-    /// orange, each newest first (D78).
-    public func lines(now: Int64) -> [ProblemLine] {
+    /// The status window's lines, one per kind (a kind names its source), newest first, of the problems whose
+    /// call to action was given: one without shows nothing (D78, D91).
+    public func lines(now: Int64) -> [String] {
+        let shown = told.filter(\.calledToAction)
         var kinds: [ProblemKind] = []
-        for entry in told.reversed() where !kinds.contains(entry.kind) { kinds.append(entry.kind) }
-        let lines = kinds.map { kind in Self.line(told.filter { $0.kind == kind }, now: now) }
-        return lines.filter(\.isRed) + lines.filter { !$0.isRed }
+        for entry in shown.reversed() where !kinds.contains(entry.kind) { kinds.append(entry.kind) }
+        return kinds.map { kind in Self.line(shown.filter { $0.kind == kind }, now: now) }
     }
 
     /// `<phrase> since 0:53`, `<phrase> for 7.4 s at 0:53, recovered` (or `, then disconnected`, `, stopped`: the `Ending`),
     /// `<phrase> 3 times, 12 s in total[, <ending>]`, then the latest error after a colon, `latest: ` before it
-    /// when the errors differ; a stall reads `stalled 7.4 s`, without its error, always the same; an input silent
-    /// after its gaps has its own (`silentAfterGaps`).
-    private static func line(_ repeats: [Told], now: Int64) -> ProblemLine {
+    /// when the errors differ; an input silent after its gaps has its own (`silentAfterGaps`).
+    private static func line(_ repeats: [Told], now: Int64) -> String {
         let latest = repeats[repeats.count - 1]
         if case .audioInputSilentAfterGaps = latest.kind { return silentAfterGaps(latest, now: now) }
-        let isStall = if case .cameraStalled = latest.kind { true } else { false }
         let phrase = latest.kind.phrase(source: latest.source)
         let errors = repeats.map(\.problem.error)
-        let why = isStall ? "" : latest.problem.error.map { ": " + (Set(errors).count > 1 ? "latest: " : "") + $0 } ?? ""
+        let why = latest.problem.error.map { ": " + (Set(errors).count > 1 ? "latest: " : "") + $0 } ?? ""
         let ending = text(latest.ending)
         let text = if repeats.count > 1 {
             "\(phrase) \(repeats.count) times, \(seconds(repeats.reduce(Int64(0)) { $0 + ($1.ended ?? now) - $1.began })) in total"
                 + (latest.ended == nil ? "" : ", \(ending)")
         } else if let ended = latest.ended {
-            "\(phrase) \(isStall ? "" : "for ")\(seconds(ended - latest.began)) at \(time(latest.began)), \(ending)"
+            "\(phrase) for \(seconds(ended - latest.began)) at \(time(latest.began)), \(ending)"
         } else {
             "\(phrase) since \(time(latest.began))"
         }
-        return ProblemLine(text: text + why, isRed: latest.kind.isRed(ongoing: latest.ended == nil))
+        return text + why
     }
 
     /// An input silent right after its gaps, the latest time: "Audio 3 BRIO sends only silence since its gaps at
-    /// 0:25; unplug and plug it in again", red; once over "Audio 3 BRIO sent only silence for 1:05 after its gaps
-    /// at 0:25, recovered" (or the other `Ending`), orange (D81).
-    private static func silentAfterGaps(_ latest: Told, now: Int64) -> ProblemLine {
+    /// 0:25; unplug and plug it in again"; once over "Audio 3 BRIO sent only silence for 1:05 after its gaps
+    /// at 0:25, recovered" (or the other `Ending`) (D81).
+    private static func silentAfterGaps(_ latest: Told, now: Int64) -> String {
         let input = latest.kind.phrase(source: latest.source), gaps = latest.note ?? ""
         guard let ended = latest.ended else {
-            return ProblemLine(text: "\(input) sends only silence since its gaps at \(gaps); unplug and plug it in again", isRed: true)
+            return "\(input) sends only silence since its gaps at \(gaps); unplug and plug it in again"
         }
-        return ProblemLine(
-            text: "\(input) sent only silence for \(seconds(ended - latest.began)) after its gaps at \(gaps), \(text(latest.ending))",
-            isRed: false)
+        return "\(input) sent only silence for \(seconds(ended - latest.began)) after its gaps at \(gaps), \(text(latest.ending))"
     }
 
     private static func text(_ ending: Ending) -> String {

@@ -39,6 +39,7 @@ One row per entry, the error text exactly as in the entry.
 | `Multi Screen Recorder quit unexpectedly` (the app's crash dialog) after running the tests, with no crash of the app | [Crash dialog for crash reports the tests wrote](#crash-dialog-for-crash-reports-the-tests-wrote) |
 | `Expectation failed: (made.guideRefusals → 2) == 4` | [Timing tests fail while the audio delay invariants run](#timing-tests-fail-while-the-audio-delay-invariants-run) |
 | `Expectation failed: (end → 0.1) <= (asked + 1.0 / 30 → 0.09997991733333333)` | [A camera file's end is checked against a clock reading taken before Stop](#a-camera-files-end-is-checked-against-a-clock-reading-taken-before-stop) |
+| `camera stalled: FaceTime HD Camera (the camera delivered no frame for 2 s` | [A camera stalls while another camera starts](#a-camera-stalls-while-another-camera-starts) |
 
 ## Format
 
@@ -532,3 +533,35 @@ One row per entry, the error text exactly as in the entry.
   the wait would end after that. The test keeps the 100 ms gap.
 - **Verify:** `swift test --filter aCameraFileEndsWhereTheStopWasAsked`.
 - **Observed:** 2026-11-26, Swift 6.3, Xcode 26; open.
+
+## A camera stalls while another camera starts
+
+- **Error:** `camera stalled: FaceTime HD Camera (the camera delivered no frame for 2 s`
+- **Symptom:** in a recording's `recording.log` and `recording.json`
+  (event `camera stalled`, then `camera stall ended`), a running camera
+  stalls at the moment another camera starts its capture, such as after
+  a screen switch or a camera plugged in; its file goes on, repeating
+  its last frame. Since D91 it shows nothing to the person.
+- **Why:** [KNOWN: measured on the owner's Mac, 2026-11-26, with a probe
+  that opens the FaceTime HD Camera and a Logitech BRIO without file
+  output and starts the BRIO's capture session again and again] in one
+  process, CoreMediaIO holds a process-wide lock while a camera's
+  `AVCaptureSession.startRunning` runs, so every other camera of the
+  process delivers no frame for as long as that start takes: the
+  FaceTime camera's longest frame gap was 821 ms to 862 ms for each
+  BRIO start of 823 ms to 841 ms. With each camera in its own process,
+  the same starts left gaps of 43 ms at most. A stack sample of the one
+  process during a start shows CoreMediaIO's frame thread
+  (`CMIOGraph::PullOutputUnits`) in `__psynch_mutexwait` for 636
+  samples, beside `startRunning` itself. A start of 4 s
+  [KNOWN: as observed in a recording, per the architect's brief of
+  2026-11-26] passes the stall limit of 2 s and is logged as this stall.
+- **Fix:** none; macOS's limit. The owner, 2026-11-26: "we can't beat
+  the limitations of MacOS here." A stall has no call to action, so it
+  shows no line, bounces nothing and leaves the result `ok` (D91).
+  Running each camera in its own process would avoid it and was not
+  chosen.
+- **Verify:** the recording log's `camera stall ended` comes within a
+  few seconds, at the other camera's `camera connected` or its file's
+  start.
+- **Observed:** 2026-11-26, macOS 26, Apple silicon; open (macOS).

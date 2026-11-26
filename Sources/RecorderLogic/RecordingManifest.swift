@@ -290,11 +290,11 @@ public struct RecordingManifest: Codable, Equatable, Sendable {
         }
     }
 
-    /// How a finalized recording went (D47).
+    /// How a finalized recording went (D47, D91).
     public enum Result: String, Codable, Sendable {
-        /// Every file is finalized, no file was ended by a failure and no camera stalled.
+        /// Every file is finalized and no problem called to action: what went wrong, if anything, fixed itself.
         case ok
-        /// A file is not finalized or was ended by a failure, or a camera stalled (`RecordingEvent.Kind.isFailure`).
+        /// A problem's call to action was given (`ProblemKind.callToAction`), or a file is not finalized.
         case problems
     }
 
@@ -315,7 +315,7 @@ public struct RecordingManifest: Codable, Equatable, Sendable {
     public var cameraFiles: [CameraFile]
     public var audioFiles: [AudioFile]
     public var events: [RecordingEvent]
-    /// Every problem told to the person.
+    /// Every problem told, with a call to action or without.
     public var problems: [RecordingProblem]
 
     public init(app: String, started: Date, timeZone: TimeZone, settings: Settings) {
@@ -412,13 +412,10 @@ public struct RecordingManifest: Codable, Equatable, Sendable {
             .map(\.element)
     }
 
-    /// Whether nothing was lost: every file is finalized, no file was
-    /// ended by a failure and no camera stalled (`isFailure`). A problem
-    /// told alone changes nothing (D47).
+    /// Whether every file is finalized; a failure event or a problem told alone changes nothing (D47, D91).
     public var endedWell: Bool {
         files.allSatisfy { $0.state == .finalized } && cameraFiles.allSatisfy { $0.state == .finalized }
             && audioFiles.allSatisfy { $0.state == .finalized }
-            && !events.contains(where: \.event.isFailure)
     }
 
     /// An audio file started: listed from now on; false when the manifest
@@ -481,14 +478,13 @@ public struct RecordingManifest: Codable, Equatable, Sendable {
     }
 
     /// The recording ends: its end time, its result and its CPU use; a
-    /// result of `problems` never comes with empty `problems` (D47). A
-    /// recording log that did not end complete on disk, a problem told
-    /// before, makes the result `problems` too (D64).
-    public mutating func finalize(ended date: Date, timeZone: TimeZone, cpu: CPU? = nil, recordingLogWritten: Bool = true) {
+    /// result of `problems` never comes with empty `problems` (D47).
+    /// `calledToAction`: a problem's call to action was given (D91).
+    public mutating func finalize(ended date: Date, timeZone: TimeZone, cpu: CPU? = nil, calledToAction: Bool = false) {
         state = .finalized
         ended = Self.timestamp(date, timeZone: timeZone)
         problems += untoldProblems
-        result = endedWell && recordingLogWritten ? .ok : .problems
+        result = endedWell && !calledToAction ? .ok : .problems
         self.cpu = cpu
     }
 
@@ -583,9 +579,10 @@ public struct RecordingEvent: Codable, Equatable, Sendable {
         case audioInputLeftTheGuideTrack = "audio input left the guide track"
 
         /// The events of a file ended by a failure, and a camera's stall,
-        /// which loses picture: they make the result `problems` and `msr
-        /// record` exit 3 (D47). An audio input that disconnects, a gap, a
-        /// change of the input volume and no audio are none.
+        /// which loses picture: `Error at` lines of `msr record`'s summary;
+        /// the result follows the calls to action, not them (D47, D91). An
+        /// audio input that disconnects, a gap, a change of the input volume
+        /// and no audio are none.
         public var isFailure: Bool {
             switch self {
             case .screenStreamFailed, .screenShowsAnotherScreensPicture, .screenFileWriterFellBehind,

@@ -25,7 +25,7 @@ public struct RecordingSummary: Equatable, Sendable {
     }
 
     /// Ended with an error (exit 3): the manifest's result is `problems`
-    /// (D47, D64), or the finalized manifest could not be written (F3).
+    /// (D47, D64, D91), or the finalized manifest could not be written (F3).
     public var endedWithError: Bool { !manifest.endedWell || manifest.result == .problems || !manifestWritten }
 
     /// Whether the person is asked to report the recording, by `msr record`'s `Report it:` line and the app's
