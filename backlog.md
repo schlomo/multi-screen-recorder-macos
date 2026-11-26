@@ -16,17 +16,22 @@ follows the simplification unless GitHub's outages block PRs again.
 Main use cases (the owner, 2026-11-26), to stay simple and always work:
 a laptop alone or with one or two external screens, recording every
 screen, the default microphone and the system audio; the same with a
-USB camera and one or two USB microphones, the default microphone as
-the reference; screens and devices plugged in or out and the lid
+USB camera or more (a speaker camera, one on the hands or the desk)
+and one or two USB microphones; screens and devices plugged in or out and the lid
 opened or closed during a recording (sleep is not a main case); stop
 or a crash never loses more than the last 5 seconds. Everything else
 is an edge case, which may cost some quality for simplicity but never
 a lost recording. Recorded in the decisions log with the first
-simplification PR.
+simplification PR. The reference stays a smart choice, not the
+default microphone: macOS moves the default microphone on its own and
+gives the user no control over it, so choosing the reference by the
+sound is valuable (the owner, 2026-11-26). The owner wants one
+simplification PR that proves the quality stays the same: simpler
+rules, smart about the edge cases, no major problem there.
 
-Release 0.20261126 of PR #34 to be installed for the homepage
-screenshots (`scripts/update-homepage-screenshots --this-mac`, the
-owner told first: lid open, microphones connected, sound playing).
+PR #35 (faster tests, CI's test step 5 min 16 s) is green and
+reviewed; its end-to-end run waits for an idle Mac. PR #36 carries the
+homepage screenshots from 0.20261126.118 (installed).
 The end-to-end
 tests need an idle Mac: a video call is enough to fail
 `virtual-screen` (`docs/troubleshooting.md`).
@@ -548,6 +553,19 @@ Nothing.
    owner, 2026-11-24: "maybe time to write a proper spec for the json?
    Or not yet"). The rest was done in PR #32; the late-microphone
    scenario moved to item 53.
+
+54. **A full disk ends the recording** (the owner, 2026-11-26: "full
+   disk means we stop recording before crashing the system"). Today
+   the recorder warns when the free space is low, and a writer that
+   hits a full disk stops and waits for room again. Wanted: the
+   recording ends with a clear error before the disk is full, with no
+   bug report offered; the Dock icon bounces and the status window
+   says the recording ended because the disk is full. Design first
+   (the threshold, what happens to the waiting); with item 55.
+55. **The status window stays open after Stop with a summary** (the
+   owner, 2026-11-26): what was recorded and the important states,
+   such as why the recording ended; it closes by itself after 10 s
+   when nothing went wrong, stays when something did. Design first.
 
 ## Deliberately deferred
 
