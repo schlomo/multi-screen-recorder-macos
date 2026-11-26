@@ -43,7 +43,7 @@ import Testing
     }
 
     /// An FFT setup is made once per size for the process, and shared by every call, also from other threads.
-    @Test func oneFFTSetupServesEverySizeAndEveryCaller() async {
+    @Test func eachSizeHasOneFFTSetupSharedByEveryCaller() async {
         let first = AudioDelay.fftSetup(12)
         #expect(AudioDelay.fftSetup(12) === first)
         #expect(AudioDelay.fftSetup(13) !== first)

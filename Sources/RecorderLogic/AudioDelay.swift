@@ -220,20 +220,21 @@ public enum AudioDelay {
     }
 
     /// One FFT setup per size for the process: creating one per call dominated the measurement's cost.
-    /// Sharing is safe as Apple's FFT setups are read-only after creation.
+    /// Sharing is safe: Apple's vDSP.h says FFT/DFT setups need only read-only access, so concurrent execution is safe.
+    /// The recorder holds one 2^18 setup, about 17 MB, from its first measurement to the process's end.
     final class SharedFFT: @unchecked Sendable {
         let fft: vDSP.FFT<DSPSplitComplex>
         init(_ fft: vDSP.FFT<DSPSplitComplex>) { self.fft = fft }
     }
     private static let setups = Mutex<[vDSP_Length: SharedFFT]>([:])
     static func fftSetup(_ log2n: vDSP_Length) -> SharedFFT {
-        setups.withLock { setups in
-            if let shared = setups[log2n] { return shared }
+        setups.withLock { bySize in
+            if let shared = bySize[log2n] { return shared }
             guard let fft = vDSP.FFT(log2n: log2n, radix: .radix2, ofType: DSPSplitComplex.self) else {
                 preconditionFailure("vDSP cannot set up an FFT of 2^\(log2n) points")
             }
             let shared = SharedFFT(fft)
-            setups[log2n] = shared
+            bySize[log2n] = shared
             return shared
         }
     }

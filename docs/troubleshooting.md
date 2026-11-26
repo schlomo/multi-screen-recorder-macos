@@ -258,17 +258,17 @@ One row per entry, the error text exactly as in the entry.
   (342.5 s) hold two of the runner's three threads without yielding
   while the invariant cases share the third. A slower runner can fail
   these tests again.
-- **Cheaper, nothing dropped** (the follow-up PR `faster-tests`): the
+- **Observed again** (PR #35): the
   measurement built an FFT setup per cross-correlation, 68 % of the
   invariant suite's time in `vDSP_create_fftsetup` [KNOWN: sampled
   locally]; `AudioDelay` now keeps one setup per size for the process
   (the vectorised result stays bit-equal to the scalar one). The
   invariant harness measures main's rules once when they share the new
   rules' reference and windows, and `RecorderTests` builds each noise
-  and burst table once per process, bit-identical samples. `scripts/build-app`
-  builds only `msr`, not the end-to-end driver. Measured locally (12
+  and burst table once per process, bit-identical samples. Measured locally from a clean build (12
   cores, same machine, `scripts/test` including the build): whole run
-  3:25 to 2:14 wall, 710 s to 366 s user CPU; `AudioDelayInvariantTests`
+  3:25.91 wall and 717.6 s user CPU on `main` against 2:23.84 to 2:27.85
+  wall and 461.7 s to 481.9 s user CPU on this PR's head (two runs); `AudioDelayInvariantTests`
   36.8 s to 15.6 s; the `RecorderCoreTests` target 107.4 s to 64.8 s;
   the `RecorderLogicTests` target 49.5 s to 30.3 s. UNVERIFIED on CI's
   runner: its figures are the first run of this change. What remains:
