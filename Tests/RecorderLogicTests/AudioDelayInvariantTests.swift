@@ -182,7 +182,7 @@ import Testing
 
     /// Runs the scenario as the recorder does, under the rules and, beside them, under main's; `check` sees each
     /// measurement's outcome.
-    static func run(_ scenario: Scenario, seed: UInt64, check: (Int, Step, Step?) -> Void) {
+    static func run(_ scenario: Scenario, seed: UInt64, check: (Int, Step, Step?) -> Void) async {
         var random = SeededRandom(seed: seed &+ 2000)
         let speech = speech(measurements: scenario.measurements, seed: seed)
         var runs = [Run(measuresPairs: true), Run(measuresPairs: false)]
@@ -225,6 +225,9 @@ import Testing
         }
         var previous: Step?
         for measurement in 0..<scenario.measurements {
+            // Each measurement is tens of milliseconds of CPU: yield, so a run never holds a thread of the cooperative
+            // pool for long, where the async timing tests in the same process resume (docs/troubleshooting.md).
+            await Task.yield()
             var fileStarted = false
             (rebases, fileLines, startOvers) = ([], [], [])
             for input in scenario.inputs {
@@ -290,14 +293,14 @@ import Testing
     /// measurements end with an input other than the anchor synced; (viii) every input main's rules sync, but
     /// main's anchor, is synced at the end; (ix) a start-over clears the entries of exactly the files being written
     /// while the sync is not established, and none once it is.
-    @Test(arguments: seeds) func theReferenceRulesHold(seed: UInt64) {
+    @Test(arguments: seeds) func theReferenceRulesHold(seed: UInt64) async {
         let scenario = Scenario(seed: seed)
         let byUID = Dictionary(uniqueKeysWithValues: scenario.inputs.map { ($0.uid, $0) })
         var sinceCounted = Int.max
         var shared: [String: Int] = [:]
         var sharing = 0
         var last: Step?
-        Self.run(scenario, seed: seed) { measurement, step, previous in
+        await Self.run(scenario, seed: seed) { measurement, step, previous in
             func context(_ invariant: String) -> Comment {
                 "(\(invariant)) measurement \(measurement), seed \(seed):\n\(scenario)\n\(step.lines.joined(separator: "\n"))"
             }

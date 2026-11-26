@@ -211,6 +211,39 @@ One row per entry, the error text exactly as in the entry.
   `aLastMixTheWriterDoesNotTakeInTimeIsTold`, which asserts the timeout
   fires, keeps its 50 ms.
 
+## Timing tests fail while the audio delay invariants run
+
+- **Error:** `Expectation failed: (made.guideRefusals → 2) == 4` and
+  `Expectation failed: received` (`GuideTrackFeedTests.swift:30`)
+- **Symptom:** in CI's `scripts/test` (run 45784134449 on 585af40 of
+  PR #34) `VideoFileTickerTests`
+  `theGuideTracksEndWithTheVideoAfterAStreamStopLongerThanFiveSeconds`,
+  `aLongLastMixIsNotDroppedWhileTheWriterWaits`,
+  `theLastGuideSamplesWaitForTheWriterWithinTheDrainTimeout` and
+  `GuideTrackFeedTests.theLastMixWaitsForSamplesThatComeLate` each
+  "failed after 264 s", with their 120 s and 60 s bounds passed; the
+  whole run took 519.7 s against 140.6 s on `main` (run 45659873665,
+  the ticker suite 28.4 s there).
+- **Why:** [KNOWN: CI's log] the four failed within 0.6 s of
+  `AudioDelayInvariantTests.theReferenceRulesHold(seed:)` (200 cases)
+  and `ReferenceChoiceTests` ending, both "after 263.8 s".
+  [KNOWN: the test code] the invariant harness's `run` was synchronous:
+  each of the 200 cases computed for seconds without suspending, so the
+  cases held every thread of the cooperative pool, and a task the timing
+  tests wait on could not resume until they ended. [KNOWN: measured
+  locally with a probe test sleeping 50 ms in a loop beside the two
+  suites, 12 cores] its first resumption came 29.9 s late, the suites'
+  whole run. The same cause as "Async tests time out on CI while
+  simulation tests run" above, from new suites.
+- **Fix:** the harness's `run` is async and yields once per measurement
+  (`await Task.yield()`), so no case holds a pool thread for longer than
+  one measurement; the tests calling it are async. Every assertion,
+  bound and seed kept. With it the probe's resumptions were at worst
+  2.1 s late (mean 1.7 s) over the same run, which took 31.4 s against
+  32.5 s before.
+- **Verify:** CI's `scripts/test` passes on the pushed head.
+- **Observed:** 2026-11-26, PR #34; fix not yet verified on CI.
+
 ## A virtual screen comes back at its last mode
 
 - **Error:** `the virtual screen 24 is not active at 1280x720 within 5 s, but 1600x900`

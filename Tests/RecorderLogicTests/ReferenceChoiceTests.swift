@@ -14,9 +14,9 @@ import Testing
     static func repeated(_ sound: Sound, _ count: Int) -> [Sound] { Array(repeating: sound, count: count) }
 
     /// Each measurement's step, in order.
-    static func steps(_ inputs: [Input], seed: UInt64 = 1) -> [AudioDelayInvariantTests.Step] {
+    static func steps(_ inputs: [Input], seed: UInt64 = 1) async -> [AudioDelayInvariantTests.Step] {
         var steps: [AudioDelayInvariantTests.Step] = []
-        AudioDelayInvariantTests.run(.init(inputs: inputs), seed: seed) { _, step, _ in steps.append(step) }
+        await AudioDelayInvariantTests.run(.init(inputs: inputs), seed: seed) { _, step, _ in steps.append(step) }
         return steps
     }
 
@@ -32,8 +32,8 @@ import Testing
     /// hear the talker. The first measurement counts nothing against input 1, but the microphones count against
     /// each other: the reference moves to input 2 (all tie, the lowest number), and the others sync against it in
     /// that same measurement.
-    @Test func aNearSilentInput1HandsTheReferenceOnAtTheFirstMeasurement() {
-        let steps = Self.steps([
+    @Test func aNearSilentInput1HandsTheReferenceOnAtTheFirstMeasurement() async {
+        let steps = await Self.steps([
             Self.input(1, .steady, Self.repeated(.pause, 3)),
             Self.input(2, .microphone, lag: 0.5, Self.repeated(.speech, 3)),
             Self.input(3, .microphone, lag: 0, Self.repeated(.speech, 3)),
@@ -47,14 +47,14 @@ import Testing
 
     /// A loud steady hum as input 1 hands the reference on and never gets it back; beside a lone microphone it
     /// moves nothing.
-    @Test func aHumIsNeverTheReferenceBesideMicrophones() {
-        let beside = Self.steps([
+    @Test func aHumIsNeverTheReferenceBesideMicrophones() async {
+        let beside = await Self.steps([
             Self.input(1, .steady, Self.repeated(.hum, 6)),
             Self.input(2, .microphone, lag: 0, Self.repeated(.speech, 2) + Self.repeated(.pause, 2) + Self.repeated(.speech, 2)),
             Self.input(3, .microphone, lag: 0.2, Self.repeated(.speech, 2) + Self.repeated(.pause, 2) + Self.repeated(.speech, 2)),
         ])
         #expect(beside.allSatisfy { $0.reference == "u2" }, "\(beside.map(\.lines))")
-        let lone = Self.steps([
+        let lone = await Self.steps([
             Self.input(1, .microphone, lag: 0, Self.repeated(.speech, 4)),
             Self.input(2, .steady, Self.repeated(.hum, 4)),
         ])
@@ -64,15 +64,15 @@ import Testing
     /// An input with unrelated sound, gated or not, never takes the reference from
     /// microphones that sync: as input 1 it hands it on to them, as input 3 it never gets it.
     @Test(arguments: [Sound.unrelated, .gatedUnrelated])
-    func anUnrelatedInputNeverKeepsTheReference(unrelated: Sound) {
-        let first = Self.steps([
+    func anUnrelatedInputNeverKeepsTheReference(unrelated: Sound) async {
+        let first = await Self.steps([
             Self.input(1, .unrelated, Self.repeated(unrelated, 4)),
             Self.input(2, .microphone, lag: 0, Self.repeated(.roomSpeech, 4)),
             Self.input(3, .microphone, lag: 0.1, Self.repeated(.roomSpeech, 4)),
         ])
         #expect(first.allSatisfy { $0.reference == "u2" }, "\(first.map(\.lines))")
         #expect(Self.isNear(Self.delay(of: "u3", in: first[0]), 0.1), "\(first[0].lines)")
-        let third = Self.steps([
+        let third = await Self.steps([
             Self.input(1, .microphone, lag: 0, Self.repeated(.roomSpeech, 4)),
             Self.input(2, .microphone, lag: 0.1, Self.repeated(.roomSpeech, 4)),
             Self.input(3, .unrelated, Self.repeated(unrelated, 4)),
@@ -84,8 +84,8 @@ import Testing
     /// Input 1's talker starts after 30 s, input 2 has room speech all along, input 3
     /// unrelated sound: nothing proves another reference, so nothing moves, and input 2 syncs once input 1 speaks,
     /// as under main's rules.
-    @Test func aTalkerStartingLateOnInput1SyncsAsBefore() {
-        let steps = Self.steps([
+    @Test func aTalkerStartingLateOnInput1SyncsAsBefore() async {
+        let steps = await Self.steps([
             Self.input(1, .microphone, lag: 0, Self.repeated(.pause, 3) + Self.repeated(.speech, 4)),
             Self.input(2, .microphone, lag: 0.1, Self.repeated(.roomSpeech, 7)),
             Self.input(3, .unrelated, Self.repeated(.unrelated, 7)),
@@ -96,8 +96,8 @@ import Testing
 
     /// A lone microphone beside an unrelated input whose file
     /// ends and starts again, the microphone pausing: nothing moves, the microphone stays the anchor and in the mix.
-    @Test func aLoneMicrophoneBesideAnUnrelatedInputKeepsTheReference() {
-        let steps = Self.steps([
+    @Test func aLoneMicrophoneBesideAnUnrelatedInputKeepsTheReference() async {
+        let steps = await Self.steps([
             Self.input(1, .microphone, lag: 0, Self.repeated(.speech, 3) + Self.repeated(.pause, 4) + Self.repeated(.speech, 3)),
             Self.input(2, .unrelated, Self.repeated(.unrelated, 4) + [.noAudio] + Self.repeated(.unrelated, 5)),
         ])
@@ -107,8 +107,8 @@ import Testing
 
     /// One counted window, as a burst on the dock gives, does not establish the
     /// sync: input 1 then hums, the microphones prove one of them, and every microphone ends synced.
-    @Test func aSingleCountedWindowDoesNotEstablishTheSync() {
-        let steps = Self.steps([
+    @Test func aSingleCountedWindowDoesNotEstablishTheSync() async {
+        let steps = await Self.steps([
             Self.input(1, .steady, [.speech] + Self.repeated(.hum, 4)),
             Self.input(2, .microphone, lag: 0.3, Self.repeated(.speech, 5)),
             Self.input(3, .microphone, lag: 0.1, [.pause] + Self.repeated(.speech, 4)),
@@ -121,8 +121,8 @@ import Testing
     }
 
     /// Two counted windows establish the sync: input 1 then hums beside the microphones, and the reference stays.
-    @Test func twoCountedWindowsEstablishTheSync() {
-        let steps = Self.steps([
+    @Test func twoCountedWindowsEstablishTheSync() async {
+        let steps = await Self.steps([
             Self.input(1, .steady, [.speech, .speech] + Self.repeated(.hum, 3)),
             Self.input(2, .microphone, lag: 0.3, Self.repeated(.speech, 5)),
             Self.input(3, .microphone, lag: 0.1, [.pause, .pause] + Self.repeated(.speech, 3)),
@@ -133,8 +133,8 @@ import Testing
 
     /// A healthy recording whose input 1, a room microphone, syncs everything at the first measurement: nothing
     /// moves, as before D89.
-    @Test func aHealthyFirstMeasurementKeepsItsCountedLags() {
-        let steps = Self.steps([
+    @Test func aHealthyFirstMeasurementKeepsItsCountedLags() async {
+        let steps = await Self.steps([
             Self.input(1, .microphone, lag: 0.05, Self.repeated(.roomSpeech, 3)),
             Self.input(2, .microphone, lag: 0, Self.repeated(.speech, 3)),
             Self.input(3, .microphone, lag: 0.1, Self.repeated(.speech, 3)),
@@ -146,9 +146,9 @@ import Testing
 
     /// Two talkers taking turns of 60 s, each on a microphone that hears only its own:
     /// nothing proves another reference, so nothing moves.
-    @Test func twoTalkersThatNeverCorrelateMoveNothing() {
+    @Test func twoTalkersThatNeverCorrelateMoveNothing() async {
         let turns = (0..<12).map { ($0 / 6) % 2 == 0 }
-        let steps = Self.steps([
+        let steps = await Self.steps([
             Self.input(1, .unrelated, turns.map { $0 ? .unrelated : .pause }),
             Self.input(2, .unrelated, turns.map { $0 ? .pause : .unrelated }),
             Self.input(3, .unrelated, Self.repeated(.unrelated, 12)),
@@ -158,9 +158,9 @@ import Testing
 
     /// A 40 s pause of the reference and a synced microphone beside an unrelated input moves nothing and keeps
     /// both in the mix.
-    @Test func aPauseBesideAnUnrelatedInputMovesNothing() {
+    @Test func aPauseBesideAnUnrelatedInputMovesNothing() async {
         let speaks = Self.repeated(Sound.speech, 2) + Self.repeated(.pause, 4) + Self.repeated(.speech, 2)
-        let steps = Self.steps([
+        let steps = await Self.steps([
             Self.input(1, .microphone, lag: 0, speaks),
             Self.input(2, .microphone, lag: 0.5, speaks),
             Self.input(3, .unrelated, Self.repeated(.unrelated, 8)),
@@ -229,8 +229,8 @@ import Testing
 
     /// The anchor's new file, measured against the reference it handed on to, counts toward
     /// establishing the sync like any other input's, so a later miss wipes nothing (D89).
-    @Test func theAnchorsNewFileEstablishesTheSync() {
-        let steps = Self.steps([
+    @Test func theAnchorsNewFileEstablishesTheSync() async {
+        let steps = await Self.steps([
             Self.input(1, .microphone, lag: 0, [.speech, .noAudio] + Self.repeated(.speech, 8)),
             Self.input(2, .microphone, lag: 0.2, Self.repeated(.speech, 5) + [.pause, .pause] + Self.repeated(.speech, 3)),
             Self.input(3, .microphone, lag: 0.1, Self.repeated(.pause, 5) + Self.repeated(.speech, 5)),
@@ -242,8 +242,8 @@ import Testing
 
     /// The move is decided before anything is applied, so the measurement in which an
     /// input syncs logs no "no clear sound" for it, and the move's start-over says why it happened (D89).
-    @Test func aMoveIsDecidedBeforeTheMeasurementIsApplied() {
-        let steps = Self.steps([
+    @Test func aMoveIsDecidedBeforeTheMeasurementIsApplied() async {
+        let steps = await Self.steps([
             Self.input(1, .steady, Self.repeated(.noise, 4)),
             Self.input(2, .microphone, lag: 0.2, Self.repeated(.speech, 4)),
             Self.input(3, .microphone, lag: 0.1, [.noAudio, .noAudio] + Self.repeated(.speech, 2)),
@@ -255,8 +255,8 @@ import Testing
     }
 
     /// The reference's capture ends: the lowest-numbered input with an audio delay takes it (D80, D85).
-    @Test func aReferenceWhoseCaptureEndsGoesToTheLowestNumberWithAnAudioDelay() {
-        let steps = Self.steps([
+    @Test func aReferenceWhoseCaptureEndsGoesToTheLowestNumberWithAnAudioDelay() async {
+        let steps = await Self.steps([
             Self.input(1, .microphone, lag: 0, [.speech, .noAudio, .noAudio]),
             Self.input(2, .microphone, lag: 0.3, Self.repeated(.roomSpeech, 3)),
             Self.input(3, .microphone, lag: 0.1, Self.repeated(.speech, 3)),
@@ -267,8 +267,8 @@ import Testing
 
     /// The reference's capture ends: an input with an audio delay takes it before a lower-numbered one without,
     /// re-based, nothing started over (D80, D85).
-    @Test func aReferenceWhoseCaptureEndsPrefersAnInputWithAnAudioDelay() {
-        let steps = Self.steps([
+    @Test func aReferenceWhoseCaptureEndsPrefersAnInputWithAnAudioDelay() async {
+        let steps = await Self.steps([
             Self.input(1, .microphone, lag: 0, [.speech, .noAudio, .noAudio]),
             Self.input(2, .microphone, lag: 0.3, [.pause, .speech, .speech]),
             Self.input(3, .microphone, lag: 0.1, Self.repeated(.speech, 3)),
