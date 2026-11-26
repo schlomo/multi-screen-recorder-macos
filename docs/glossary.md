@@ -445,37 +445,39 @@ the reference moved away is measured like any other input (D85). Only
 when the reference moves to an input without an audio delay does that
 input become the new anchor, every input then starting over (D80, D89);
 so a near-silent input 1 hands the anchor on at the first measurement
-with sound.
+in which another input has sound and action.
 
 ## Reference
 
 The audio input whose newest file every other input's sound is
 measured against for its audio delay (`AudioDelays.referenceDevice`):
-the anchor at first, kept while windows count against it, its capture
-runs and its newest file did not end on no audio; then the input being
-written that has an audio delay and the most action score, which it
-stays with, the anchor's returning file not taking it back (D80, D85).
-After 3 stalls in a row, or 1 while nothing is synced, it is tried on
-each input being written that is not flat, once per stall episode, one
-with an audio delay first, then by action score, and goes back once
-when every one was tried, never to a flat input (D89). Not the "Reference implementation"
-above.
+the anchor at first, kept while its capture runs and its newest file
+did not end on no audio; then the lowest-numbered input being written
+that has an audio delay, which it stays with, the anchor's returning
+file not taking it back (D80, D85). While no input but the anchor has
+had an audio delay, a reference miss tries it on the untried input
+that is not flat with the highest action score, and when every one was
+tried it goes back once, to where the try episode started or, that one
+flat, to the tried one with the highest action score (D89). Not the
+"Reference implementation" above.
 
 ## Action score
 
 How much an audio input's level moves in a measurement's 10 s window
 (`AudioDelay.actionScore`, D89): over the window's 100 ms slices with
 sound, each slice's rms in dB, the 90th percentile less the 10th; 0
-with fewer than 10 such slices. Speech scores about 20 to 30 dB, also
-gated; a steady hum, a loopback of noise or an empty line-in under 1 dB
-however loud. An input scoring under 6 dB is **flat** and never tried
-as the reference; within 3 dB is a tie.
+with fewer than 10 such slices. In the owner's recordings microphones'
+medians were 7.4 to 39.6 dB, an empty dock line-in 1.9 to 2.9 dB; a
+steady hum or the end-to-end test tone scores under 1 dB however loud.
+An input scoring under 4 dB is **flat** and never tried as the
+reference; within 3 dB of the highest is a tie.
 
-## Stall
+## Reference miss
 
 A measurement with no counted window against the reference while
-another input being measured had sound (D89). A counted window resets
-the count and ends the stall episode.
+another input being measured that is not flat had sound (D89). While
+nothing is synced, it tries the reference on another input; the tries
+from one to the next counted window are a **try episode**.
 
 ## Lag
 

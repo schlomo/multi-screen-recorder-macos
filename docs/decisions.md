@@ -3172,13 +3172,15 @@ architect's reading.
   [design/recorder.md](design/recorder.md), "Screens coming and going",
   "A failed file's end" and the audio "Failures".
 
-## D89: The reference stays while windows count; a stalled one is tried on each input with action once, then goes back (2026-11-25)
+## D89: While nothing is synced, a reference that matches nothing is tried on the input with the most action (2026-11-25)
 
 - **Status:** in force. Amends D80's and D85's reference rule (moved
-  only on no audio or a capture's end, to the lowest-numbered input):
-  the reference is also tried elsewhere when nothing syncs to it, and
-  any move picks by audio delay, then action. D80's anchor, the first
-  input whose file is written, stands.
+  only on no audio or a capture's end): while no input but the anchor
+  has had an audio delay, the reference is also tried elsewhere when
+  nothing matches it. Once one has, D80's and D85's rule holds as it
+  was: the reference in use, else the lowest-numbered input being
+  written with an audio delay, else the lowest-numbered one as the new
+  anchor.
 - **Context:** The owner's recording on 0.20261125.116: audio input 1
   a CalDigit Thunderbolt 3 Audio, a dock's line-in with nothing
   connected (its level bar empty, but not digital zero), then an
@@ -3193,115 +3195,109 @@ architect's reading.
   rms and moved a silent reference; its review found it wrong: a 10 s
   rms of the 8 kHz mix is not what the level bar shows (a clean quiet
   microphone peaking at -52 dBFS became "silent"), one quiet window
-  started everything over, and a humming reference still stalled
-  everything. The loudest input is no answer either: a hum is loud but
+  started everything over, and a humming reference still held
+  everything up. The loudest input is no answer either: a hum is loud but
   flat. The owner, 2026-11-25: "maybe not highest peaks but most
   motion? or most action?"; and "for this complex logic you'll need to
-  think about good tests and prove it". A second fix (ea609ee) picked
-  the input with the most action at the first measurement with sound
-  and moved the reference to more action after 3 measurements without
-  a counted window. Its review found the pick itself the fault: an
-  input with unrelated sound and more action (a loopback of a video, a
-  second room) took the reference and kept it, as nothing more active
-  came along (B-1); the first-measurement pick started over a
-  recording whose input 1 already synced (M-1); two talkers that never
-  correlate could swap the reference without end (M-2); and a gated
-  microphone scored like a hum, its muted slices counted (the review's
-  experiment E2). The replay of ea609ee on the owner's 15 recordings
-  set the first audio delay 10 s later than main in 7 of them, for the
-  start-over. The architect's design that followed, evidence first:
-  only a measurement that fails to sync moves the reference, and the
-  action score only filters and orders the inputs it is tried on.
-- **Decision:** The silence threshold stays at -100 dBFS. The
-  reference stays while windows count against it; nothing picks it at
-  the first measurement. A **stall** is a measurement with no counted
-  window against the reference while another input being measured had
-  sound; after 3 stalls in a row (`referenceUnsyncedMeasurements`,
-  *data*), or after 1 while no input but the anchor has ever had an
-  audio delay, the reference is tried on another input. The candidates:
-  being written, not the reference, not **flat** (an **action score**
-  under 6 dB, `actionScoreFlat`), not yet tried in this stall episode;
-  those with an audio delay first, then by action score, a tie (within
-  3 dB, `actionScoreTie`) going to the lowest number. The action score
-  is a measurement's 100 ms slices' rms in dB over the slices with
-  sound only, the 90th percentile less the 10th, 0 with fewer than 10
-  such slices (`actionScoreMinimumSlices`); all *data*. A counted
-  window resets the count and ends the episode. When every candidate
-  has been tried the reference goes back to the input the episode
-  started on, never while that one is flat (the reference then stays
-  on the last input tried), and nothing is tried twice until a window
-  counts or a new file starts. A try to an input with an audio delay re-bases,
-  every audio delay kept; to one without, it becomes the new anchor
-  and every input starts over. A move for no audio or a capture's end
-  picks the same way, among every input being written. A measurement
-  against a reference that moved while it ran counts no lag and sets
-  no action score. `recording.log` says the stall count, each try with
-  its candidates and their scores, the move back and the episode's end
-  (see [design/recorder.md](design/recorder.md), "Recording log").
+  think about good tests and prove it". A second fix (ea609ee) made the
+  input with the most action the reference at the first measurement
+  with sound and moved it after 3 measurements without a counted
+  window. Its review: an input with unrelated sound and more action (a
+  loopback of a video, a second room) took the reference and kept it
+  (B-1); a lone microphone pausing beside such an input lost the
+  reference to it (M-1); a healthy recording whose input 1 had less
+  action started over at the first measurement (M-2); two talkers that
+  never correlate could swap the reference without end (E2); and a
+  gated microphone scored like a hum, its muted slices counted. A third
+  version (5a457e0, f9f61c5) tried the reference on inputs one by one
+  after a miss, filtered and ordered by action. Its delta review: once
+  something was synced, a pause of the synced microphones beside an
+  unrelated input with action tried that input, started over and threw
+  every audio delay away, and hindsight at Stop wrote wrong ones
+  (BLOCKER 1); any input's new file ended the episode, so the moves
+  were unbounded (MAJOR 1); with nothing synced, a try takes the first
+  microphone out of the guide track for an interval (MAJOR 2); 9 of 30
+  deliberate breaks of the rules went unnoticed by the tests, one test
+  input meant as unrelated being related (MAJOR 3). The owner's bug
+  needs only the case where nothing is synced, so the architect
+  narrowed the rule to it.
+- **Decision:** The silence threshold stays at -100 dBFS. Each
+  measurement gives every input measured an **action score**: its
+  window's 100 ms slices' rms in dB over the slices with sound only,
+  the 90th percentile less the 10th, 0 with fewer than 10 such slices
+  (`actionScoreMinimumSlices`); under 4 dB (`actionScoreFlat`) an input
+  is **flat**; all *data*. A **reference miss** is a measurement with
+  no counted window against the reference while another input being
+  measured that is not flat had sound. While no input but the anchor
+  has ever had an audio delay in the recording, a reference miss tries
+  the reference on the input being written, not the reference, not
+  flat, not yet tried in this **try episode**, with the highest action
+  score (a tie within 3 dB, `actionScoreTie`, goes to the lowest
+  number); it has no audio delay, so it becomes the new anchor and
+  every input starts over. A counted window ends the episode. A
+  device's new file takes it out of the tried inputs, the episode going
+  on. When every candidate was tried, the reference goes back to the
+  input the episode started on or, that one flat, to the tried input
+  with the highest action score, once per episode. Once any input but
+  the anchor has had an audio delay, nothing is tried. A measurement
+  against a reference that moved while it ran counts no lag.
+  `recording.log` says each try with its candidates and their scores,
+  the move back and the episode's end (see
+  [design/recorder.md](design/recorder.md), "Recording log").
 - **Decided while building (the builder's reading, for the owner to
   confirm):**
-  - The move back needs at least one try: an episode whose only
-    candidate is none (every other input flat) moves nothing and logs
-    nothing.
-  - After the move back, an input not yet tried (one that gained
-    action only later) is still tried; only a second try of the same
-    input, and a second move back, wait for a counted window or a new
-    file. As written, the rule left the reference on a hum until a new
-    file when the talkers started after every candidate had been tried
-    (the generated scenario of seed 22).
-  - The move back never goes to a flat origin: the reference stays on
-    the last input tried, and the log says so once (the architect's
-    ruling, so a flat input 1 never keeps the reference once the
-    talkers start after the tries). The move back waits instead of
-    being given up: an origin flat only in a pause gets the reference
-    back once it has action at a later stall. Given up, an unrelated
-    input kept the reference for good while the origin and another
-    microphone talked (the generated scenario of seed 13). So two
-    talkers that never correlate move it up to twice, the try and,
-    once the first speaks again, the move back.
-  - A measurement in which no other input had sound neither counts as
-    a stall nor resets the count.
-  - The reference choice and a measurement's handling live in
-    `AudioDelays` (`reference(among:)`, `measure`, `measured`), pure,
-    so the invariant tests and a replay of recorded sound run the
-    recorder's own path.
+  - The flat threshold is 4 dB, not the 6 dB first chosen: in the
+    replay of the owner's recordings the dock line-in scored 1.9 to
+    2.9 dB (15.5 and 20.9 dB for a burst on it) and microphones' windows
+    with speech went down to 4.0 to 5.8 dB; the generated speech behind
+    a gate scored from 4.1 dB, 28 of 240 windows under 6 dB.
+  - After the move back, only an input whose new file started is
+    tried, until a window counts.
+  - The tried inputs' scores, and those of the candidates, are the
+    measurement's own; nothing carries an action score over.
+  - The audio word "stall" of the earlier versions is "reference miss":
+    "stall" is a camera's (see the glossary).
 - **Consequences:** a near-silent, dead or humming input 1 hands the
-  reference on at the first measurement with sound, a stalled reference
-  once something is synced within about 30 s; a reference that syncs is
-  never moved for sound. An input with unrelated sound is tried at most
-  once per episode and does not keep the reference. An input that
-  cannot sync to any reference still ends at "no clear sound". A
-  first counted window on a burst can still set a wrong audio delay (a
-  D77 matter the replay showed; D89 only lets that input be measured).
-- **Evidence:** the owner's recording on 0.20261125.116; the reviews of
-  e1919b8 and ea609ee (B-1, M-1, M-2, E2); the replay of the owner's 15
-  recordings at 5a457e0 against main's rules: every audio delay main
-  set unchanged within a frame, the first set at the same time in each,
-  and newly synced inputs in 3 (`2026-11-18 19.57.19`, whose input 1
-  was digital near-silence at -91 dB; `2026-11-19 15.34.00`;
-  `2026-11-20 12.36.09`, its first audio delay at 30.1 s instead of
-  120.5 s); `AudioDelayTests.theActionScoreFollowsTheLevelsMotionNotItsHeight`;
+  reference on at the first measurement in which another input has
+  sound and action. While nothing is synced, a try takes the input that
+  was the anchor out of the "Audio inputs" guide track until it is
+  measured against the new anchor, one or two measurements; a recording
+  whose inputs only start talking after the first measurement may thus
+  start over once without need (the replay's `2026-11-24 06.17.56`, its
+  audio delays the same within a frame). Once something is synced, a
+  reference that stops matching stays, as before D89: an input that
+  cannot sync to it ends at "no clear sound". An input with unrelated
+  sound is tried at most once per episode and new file.
+- **Evidence:** the owner's recording on 0.20261125.116; the reviews
+  named above; the replay of the owner's 15 recordings at db9cc66
+  against main's rules: every audio delay main set unchanged within a
+  frame, the first set at the same time in each, and newly synced
+  inputs in 3 (`2026-11-18 19.57.19`, whose input 1 was digital
+  near-silence at -91 dB; `2026-11-19 15.34.00`; `2026-11-20 12.36.09`,
+  its first audio delay at 30.1 s instead of 120.5 s);
+  `AudioDelayTests.theActionScoreFollowsTheLevelsMotionNotItsHeight`;
   `AudioDelayInvariantTests.theReferenceRulesHold` (200 seeded
   scenarios of microphones, unrelated, gated and flat inputs: a pause
   never moves the reference nor drops a synced input, a re-base
-  changes no audio delay, a flat input is never tried, shared speech
-  syncs within a frame, a flat reference beside talkers hands over in
-  time, inputs sharing speech long enough end synced, each input is
-  tried at most once per episode); `ReferenceChoiceTests` (the owner's
-  case, a hum, B-1, M-1, M-2, the audio delay preference, a pause
-  beside an unrelated input, a measurement against a moved reference,
-  every candidate tried beside a flat input 1);
-  `RecorderTests` (`aNearSilentInput1HandsTheReferenceToAMicrophoneAtTheFirstMeasurement`,
+  changes no audio delay, a flat input is never tried, nothing is
+  tried once an input other than the anchor has had an audio delay,
+  shared speech syncs within a frame, a flat reference beside talkers
+  is replaced at once while nothing is synced, talkers from a time
+  nothing was synced end with something synced, an episode's moves are
+  bounded by its inputs and new files); `ReferenceChoiceTests` (the
+  owner's case, the most action, a hum, B-1, M-1, M-2, E2, a reference
+  miss once something is synced, a capture's end to the lowest number
+  and to an input with an audio delay first, a measurement against a
+  moved reference, a flat origin, the reference never trying itself, a
+  new file of another input, a tried input's new file, an episode's
+  end, the flat threshold); `RecorderTests`
+  (`aNearSilentInput1HandsTheReferenceToAMicrophoneAtTheFirstMeasurement`,
   `aLoudHumNeverBecomesTheReference`,
   `aPauseWhileAnUnsyncedInputSoundsMovesNothing`,
-  `aReferenceStalledFor3MeasurementsIsTriedOnAnInputWithAnAudioDelay`,
-  `aStalledReferenceWithNothingSyncedIsTriedOnTheMostAction`,
-  `aStalledReferenceIsTriedOnAnInputWithAnAudioDelayBeforeOneWithMoreAction`,
-  `aMeasurementAgainstAReferenceThatMovedCountsNothing`);
+  `aLongPauseWhileAnUnsyncedInputSoundsKeepsTheAudioDelays`,
+  `aReferenceMissWithNothingSyncedTriesTheMostAction`,
+  `aMeasurementAgainstAReferenceThatMovedCountsNothing`,
+  `aMutedReferenceGoesToTheLowestNumberWithAnAudioDelay`);
   `AudioRowsFinalTests.aReferenceTriedOnAnInputWithoutAnAudioDelayWaitsForTheStartOverAndARebaseChangesNothing`;
-  each of 13 deliberate breaks of the rules (no try, no flat filter, no
-  one-stall shortcut, threshold 1, no audio delay preference, the
-  first-measurement pick back, stale lags counted, lowest number
-  instead of action, no tried set, no move back, a move back to a flat
-  input, silent slices scored, no stale guard) fails at least one of these tests;
-  [design/recorder.md](design/recorder.md), "Audio delay".
+  each of 29 deliberate breaks of the rules fails at least one of these
+  tests; [design/recorder.md](design/recorder.md), "Audio delay".

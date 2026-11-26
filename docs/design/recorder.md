@@ -701,7 +701,7 @@ never below 0; the first entry also holds before its `at`, as the best
 known); `delay` is the seconds by which the file's sound there is later
 than the recording's anchor's (see "Audio delay": the first input whose
 file is written, or the one the reference moved to while no input
-had an audio delay, D89; to 0.0001 s, negative when earlier). To line up the recording's audio
+being written had an audio delay, D80, D89; to 0.0001 s, negative when earlier). To line up the recording's audio
 inputs, place each file's stretch from `at` on earlier by `delay` less
 the smallest of the files' latest `delay` (taken as 0 when that is
 above 0); a file with an empty list and the system audio are not moved;
@@ -1601,46 +1601,48 @@ the metadata items (see "Output on disk").
   audio delay included; a file of it ending on a gap or a channel
   change, its next file following, neither changes the reference nor
   starts anything over, and while it has no file open nothing is
-  measured that cycle. **Choosing the reference (D89).**
+  measured that cycle. **Trying another reference while nothing is synced (D89).**
   Each measurement gives every input measured an **action score**: its
   window split into 100 ms slices, each slice's rms in dB, taken over
   the slices with sound only (at or above the silence threshold, -100
   dBFS), the 90th percentile less the 10th; fewer than 10 such slices
   score 0 (`actionScoreSlice`, `actionScoreHighPercentile`,
-  `actionScoreLowPercentile`, `actionScoreMinimumSlices`, *data*).
-  Speech moves a lot (about 20 to 30 dB), also when a noise gate mutes
-  its pauses; a steady hum, a loopback of noise or an empty line-in
-  hardly at all (under 1 dB) however loud. An input scoring under 6 dB
-  (`actionScoreFlat`, *data*) is **flat**. The reference stays while
-  windows count against it. A measurement with no counted window
-  against it while another input being measured had sound is a
-  **stall**; after 3 stalls in a row (`referenceUnsyncedMeasurements`,
-  *data*), or after 1 while no input but the anchor has ever had an
-  audio delay, the reference is tried on another input: one being
-  written, not flat, not yet tried in this stall episode, one with an
-  audio delay before one without, then the most action (within 3 dB,
-  `actionScoreTie`, *data*, a tie, which goes to the lowest number). A
-  counted window resets the count and ends the episode, so a pause of
-  one or two measurements never moves a reference once something is
-  synced; a measurement in which no other input had sound neither
-  counts nor resets. Once every candidate was tried, the reference goes
-  back to the input the episode started on, once, and only while that
-  one is not flat: a flat one keeps the reference where it is, the last
-  input tried, until it has action again; an input not yet
-  tried (one that only now has action) is still tried after that, but
-  none twice, until a window counts or a new file starts. Once the
-  reference is in no audio (muted, D69) or its capture ended
-  (unplugged), it goes to the input being written that has an audio
-  delay and the most action in the latest measurement. Either move, to
-  an input with an audio delay, re-bases: its own audio delay turns its
-  lags into ones against the anchor; to one without, it becomes the new
+  `actionScoreLowPercentile`, `actionScoreMinimumSlices`, *data*). In
+  the owner's recordings the microphones' medians were 7.4 to 39.6 dB,
+  their windows down to 0.3 dB in a pause, the empty dock line-in 1.9
+  to 2.9 dB (15.5 and 20.9 dB for a burst on it). An input scoring
+  under 4 dB (`actionScoreFlat`, *data*) is **flat**: above the line-in,
+  below the generated tests' speech behind a gate (from 4.1 dB). The
+  reference stays while windows count against it. A **reference miss**
+  is a measurement with no counted window against the reference while
+  another input being measured that is not flat had sound. While no
+  input but the anchor has ever had an audio delay in the recording, a
+  reference miss tries the reference on another input: one being
+  written, not the reference, not flat, not yet tried in this **try
+  episode**, the one with the highest action score (within 3 dB,
+  `actionScoreTie`, *data*, a tie, which goes to the lowest number). It
+  has no audio delay, so it becomes the new anchor and every input
+  starts over, nothing synced being lost; the input that was the anchor
+  leaves the guide track until it is measured against the new one. A
+  counted window ends the episode. A device's new file takes it out of
+  the tried inputs, so it may be tried again, and the episode goes on.
+  Once every candidate was tried, the reference goes back to the input
+  the episode started on or, if that one is flat, to the tried input
+  with the highest action score, once per episode; after that only an
+  input whose new file started is tried, until a window counts. Once
+  any input but the anchor has had an audio delay, nothing is tried:
+  the reference moves only as below. Once it is in no audio (muted,
+  D69) or its capture ended (unplugged), the reference goes to the
+  lowest-numbered input being written that has an audio delay, whose
+  own audio delay turns its lags into ones against the anchor; with
+  none such, the lowest-numbered input being written becomes the new
   anchor (see below). The lags of a measurement against a reference
-  that moved while it ran are dropped, and neither it nor its action
-  scores count toward any of this. The reference stays with the input
-  it moved to: the anchor's returning file does not take it back (D85).
-  So a near-silent, dead or humming input 1 hands the reference on at
-  the first measurement with sound, and a stalled reference once
-  something is synced within about 30 s. The default
+  that moved while it ran are dropped and count toward none of this.
+  The reference stays with the input it moved to: the anchor's
+  returning file does not take it back (D85). So a near-silent, dead or
+  humming input 1 hands the reference on at the first measurement in
+  which another input has sound and action, but a reference that stops
+  correlating once something is synced stays, as before D89. The default
   microphone plays no part (D80, amending D77). The system audio is
   neither measured nor the reference. A window counts
   only when its match is clear, the peak of |correlation| at least 12
@@ -1674,8 +1676,9 @@ the metadata items (see "Output on disk").
   Another reference keeps every audio delay: the lags against it are
   re-based onto the anchor through its own audio delay, which stays as
   it was while it is the reference (a shortcut: it is not measured
-  then), and the mix keeps every input. Only when no input being written has an audio
-  delay does the one with the most action become the new anchor, and every
+  then), and the mix keeps every input. Only when the reference moves to
+  an input without an audio delay, no input being written but the
+  anchor having one, does that input become the new anchor, and every
   input starts over (no audio delay holds, nothing is carried over), its
   audio delay against the old anchor taken as 0 and the entries written
   before staying against the old anchor (a shortcut). An entry is the
@@ -2181,13 +2184,12 @@ them:
 - A reference change: `reference <old file> → <new file>: lags re-based
   onto the anchor by 500 ms late`, or `…: it has no audio delay, so it
   is the new anchor and every input starts over`, after the reason when
-  a stall tries another input (D89): `reference <file>: no counted
-  window in 3 measurements while another input had sound; candidates
-  <file> 27.9 dB (audio delay), <file> 21.3 dB; tries <file>` (the
-  candidates by action score, those with an audio delay marked), or
-  `…; every candidate tried, back to <file>` (or, once, `it stays the
-  reference` while the input it would go back to is flat or not being
-  written); and `reference <file>: a window counted against it, it
+  a reference miss tries another input (D89): `reference <file>: no
+  counted window while another input had sound; candidates <file> 27.9
+  dB, <file> 21.3 dB; tries <file>` (the candidates by action score),
+  or `…; every candidate tried, back to <file>` or `…; every candidate
+  tried, the reference to the tried one with the most action: <file>
+  27.9 dB`; and `reference <file>: a window counted against it, it
   stays the reference` when a window counts after more than one try.
 - The mix: `<file>: joins the guide track placed earlier by 500 ms (the
   mix's zero: <file>)`, `<file>: placed earlier by 555 ms → 600 ms (the
