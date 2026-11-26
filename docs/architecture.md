@@ -109,8 +109,9 @@ D28).
   picture ends its file loudly; every file ends at sleep, on a clock
   that counts sleep. `msr record` shows the app's Dock icon and can be
   stopped there through the status window; the app quits after Stop.
-  A recording's `result` is `ok` unless part of it was lost; no crash
-  markers (D47).
+  A recording's `result` is `ok` unless a problem gave a person
+  something to do; a loss nobody can act on is listed only in the log
+  and `recording.json` (D47, D91).
 - Audio (built in PR #12, D49 to D52): one audio file per audio source,
   each with a timecode track; gaps over 32 ms filled up to 1 s, a new
   file beyond; every source resampled to the shared clock, its clock drift
@@ -121,9 +122,13 @@ D28).
   cross-correlation, and the timeline file shifts its audio by it
   (D77, D80); the guide tracks are mixed 1 s behind live, and "Audio
   inputs" places each input earlier by its audio delay, an input
-  joining once it has one and more than 0.8 s out of sync with the
-  largest group leaving it, its own audio file still recorded (D79,
-  D80); a new file of an input carries its audio delay over (D80).
+  joining once it has one; when the synced inputs lie more than 0.8 s
+  apart, the largest set within 0.8 s is mixed, its own audio file
+  still recorded either way (D79, D80, D90). When the reference's
+  sound is missing, the inputs are compared pairwise and the sync
+  moves to the input most others agree with (D90); a new file of an
+  input carries its audio delay over (D80). A source's first 2 s are
+  not measured for its clock drift (D92).
 - Audio: none, the default microphone, wired (the default microphone
   plus every built-in and wired input) or all inputs, with system audio
   and AGC as separate switches (D12, D44); one audio file per source, every
@@ -153,9 +158,10 @@ D28).
   crash-safe fragmented files, keeping the Mac awake (D14). The window
   shows what will be recorded and what it costs in disk space (D26,
   D33), and follows screens, cameras and audio inputs as they change
-  (D36, D74). The status window's problem lines are red while
-  something is broken or a person must act, orange once it is over or
-  for a hiccup, one line per source and kind (D78).
+  (D36, D74). Only a problem with a call to action (a thing a person
+  can go and do) notifies: a status window line, the Dock bounce, the
+  report hint and the last-recording notice; every other problem goes
+  only to the log and `recording.json` (D78, D91).
 - No network connections; feedback goes to GitHub Issues (D15).
 
 ### Front ends
