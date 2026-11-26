@@ -59,7 +59,7 @@ own clock is resampled continuously to stay with the screen files
     track by its measured delay, so a late one is in sync there. A
     microphone joins it only once measured: for the first 10 to 20 s only
     the anchor microphone (the first to start) is in it. Until the sync
-    is confirmed, a measurement that matches nothing compares the other
+    is established, a measurement that matches nothing compares the other
     microphones with each other and makes the one they match the anchor,
     so an empty line-in as the first input holds nothing up; the one that
     was the anchor then leaves the guide track until it is measured

@@ -1073,7 +1073,7 @@ public final class Recorder {
             jobs.append((file, uid, referenceWindow, other))
         }
         guard !jobs.isEmpty else { return }
-        let measuresPairs = !audioDelays.isSyncConfirmed
+        let measuresPairs = !audioDelays.isSyncEstablished
         let measurement = await Task.detached(priority: .utility) {
             AudioDelays.measure(reference: (referenceFile, reference.uid), others: jobs, measuresPairs: measuresPairs)
         }.value

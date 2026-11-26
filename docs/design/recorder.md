@@ -684,7 +684,9 @@ input's input volume at the file's start, 0 to 1 to the thousandth,
 null when it cannot be read, absent for the system audio (D69);
 `delays` the file's audio delays (D80), for a processor of the files
 to line the audio inputs up: a list of `{at, delay}`, in order; empty
-only when the file was never measured (it is then placed as recorded).
+when the file has no audio delay against the anchor: never measured
+clearly, or cleared at a start-over before the sync was established
+(D89); it is then placed as recorded.
 While recording, and after a crash, it holds the live entries, one per
 change of the value; at Stop, before the timeline file is written, each
 file's list is rewritten with hindsight: its stretches are bounded
@@ -1601,15 +1603,15 @@ the metadata items (see "Output on disk").
   audio delay included; a file of it ending on a gap or a channel
   change, its next file following, neither changes the reference nor
   starts anything over, and while it has no file open nothing is
-  measured that cycle. **Moving the reference on evidence while the sync is not confirmed (D89).**
+  measured that cycle. **Moving the reference on evidence while the sync is not established (D89).**
   The reference stays while windows count against it. A **reference
   miss** is a measurement with no counted window against the reference
   while another input being measured had sound. The sync is
-  **confirmed** once an input other than the anchor has 2 counted
+  **established** once an input other than the anchor has 2 counted
   windows since the anchor became the anchor
-  (`audioDelayConfirmingWindows`, *data*): one window, as a burst on an
-  empty line-in gives, does not confirm it. While the sync is not
-  confirmed, a reference miss also correlates the other inputs with
+  (`audioDelayEstablishingWindows`, *data*): one window, as a burst on an
+  empty line-in gives, does not establish it. While the sync is not
+  established, a reference miss also correlates the other inputs with
   sound pairwise, over the same windows (each window of the measurement
   ends at one common end, an input more than a window behind the
   reference not holding the others back). If a pair's window counts,
@@ -1618,7 +1620,7 @@ the metadata items (see "Output on disk").
   input starts over, and the lags of the inputs counted against it are
   applied at once, so they are synced from that measurement on. If no
   pair counts, nothing moves: no level, peak or other score picks a
-  reference, only a counted window. Once the sync is confirmed, the
+  reference, only a counted window. Once the sync is established, the
   reference moves only as below. Once it is in no audio (muted,
   D69) or its capture ended (unplugged), the reference goes to the
   lowest-numbered input being written that has an audio delay, whose
@@ -1630,7 +1632,7 @@ the metadata items (see "Output on disk").
   returning file does not take it back (D85). So a near-silent, dead or
   humming input 1 hands the reference on at the first measurement in
   which two other inputs share sound, but a reference that stops
-  correlating once the sync is confirmed stays, as before D89. The default
+  correlating once the sync is established stays, as before D89. The default
   microphone plays no part (D80, amending D77). The system audio is
   neither measured nor the reference. A window counts
   only when its match is clear, the peak of |correlation| at least 12
@@ -1669,9 +1671,9 @@ the metadata items (see "Output on disk").
   anchor having one, does that input become the new anchor, and every
   input starts over (no audio delay holds, nothing is carried over), its
   audio delay against the old anchor taken as 0 (a shortcut). Before the
-  sync is confirmed, the entries the files being written had are
+  sync is established, the entries the files being written had are
   cleared, as they were against an anchor that no longer is one; once
-  it is confirmed, they stay against the old anchor (a shortcut); a
+  it is established, they stay against the old anchor (a shortcut); a
   file that ended keeps its list either way (D89). An entry is the
   file's audio delay against the anchor, negative when earlier, and
   changes only when the file's own changes: a new earliest input changes

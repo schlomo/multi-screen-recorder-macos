@@ -105,29 +105,29 @@ import Testing
                 "\(steps.map(\.lines))")
     }
 
-    /// M2 of the third review (DZH): one counted window, as a burst on the dock gives, does not confirm the
+    /// M2 of the third review (DZH): one counted window, as a burst on the dock gives, does not establish the
     /// sync: input 1 then hums, the microphones prove one of them, and every microphone ends synced.
-    @Test func aSingleCountedWindowDoesNotConfirmTheSync() {
+    @Test func aSingleCountedWindowDoesNotEstablishTheSync() {
         let steps = Self.steps([
             Self.input(1, .steady, [.speech] + Self.repeated(.hum, 4)),
             Self.input(2, .microphone, lag: 0.3, Self.repeated(.speech, 5)),
             Self.input(3, .microphone, lag: 0.1, [.pause] + Self.repeated(.speech, 4)),
             Self.input(4, .microphone, lag: 0.2, [.pause] + Self.repeated(.speech, 4)),
         ])
-        #expect(Self.delay(of: "u2", in: steps[0]) != nil && !steps[0].wasConfirmed, "\(steps[0].lines)")
+        #expect(Self.delay(of: "u2", in: steps[0]) != nil && !steps[0].wasEstablished, "\(steps[0].lines)")
         #expect(steps[1].movedBySound && steps[1].reference == "u2", "\(steps[1].lines)")
         #expect(Self.isNear(steps.last.flatMap { Self.delay(of: "u3", in: $0) }, -0.2), "\(steps.map(\.lines))")
         #expect(Self.isNear(steps.last.flatMap { Self.delay(of: "u4", in: $0) }, -0.1), "\(steps.map(\.lines))")
     }
 
-    /// Two counted windows confirm the sync: input 1 then hums beside the microphones, and the reference stays.
-    @Test func twoCountedWindowsConfirmTheSync() {
+    /// Two counted windows establish the sync: input 1 then hums beside the microphones, and the reference stays.
+    @Test func twoCountedWindowsEstablishTheSync() {
         let steps = Self.steps([
             Self.input(1, .steady, [.speech, .speech] + Self.repeated(.hum, 3)),
             Self.input(2, .microphone, lag: 0.3, Self.repeated(.speech, 5)),
             Self.input(3, .microphone, lag: 0.1, [.pause, .pause] + Self.repeated(.speech, 3)),
         ])
-        #expect(steps[2].wasConfirmed, "\(steps.map(\.lines))")
+        #expect(steps[2].wasEstablished, "\(steps.map(\.lines))")
         #expect(steps.allSatisfy { $0.reference == "u1" && !$0.movedBySound }, "\(steps.map(\.lines))")
     }
 

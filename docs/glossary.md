@@ -454,7 +454,7 @@ measured against for its audio delay (`AudioDelays.referenceDevice`):
 the anchor at first, kept while its capture runs and its newest file
 did not end on no audio; then the lowest-numbered input being written
 that has an audio delay, which it stays with, the anchor's returning
-file not taking it back (D80, D85). Until the sync is confirmed, a
+file not taking it back (D80, D85). Until the sync is established, a
 reference miss moves it to the input the most other inputs' windows
 count against, if any; only a counted window moves it (D89). Not the
 "Reference implementation" above.
@@ -463,17 +463,16 @@ count against, if any; only a counted window moves it (D89). Not the
 
 A measurement with no counted window against the reference while
 another input being measured had sound (D89). Until the sync is
-confirmed, it correlates the other inputs with sound pairwise and moves
+established, it correlates the other inputs with sound pairwise and moves
 the reference to the input the most others count against; with no
 counted pair, nothing moves.
 
-## Confirmed sync
+## Established sync
 
 An input other than the anchor having 2 counted windows since the anchor
-became the anchor (`audioDelayConfirmingWindows`, D89); from then on a
+became the anchor (`audioDelayEstablishingWindows`, D89); from then on a
 reference miss moves nothing, the reference moving only on no audio or
-its capture's end. Not a carried-over audio delay's own "confirmed" (a
-file's first counted window keeping it).
+its capture's end.
 
 ## Lag
 

@@ -682,9 +682,9 @@ extension GlobalRecordingLog {
             #expect(!log.contains("starts over"))
         }
 
-        /// A reference that stops matching before the sync is confirmed moves to an input the others count against
+        /// A reference that stops matching before the sync is established moves to an input the others count against
         /// (of those that tie, the lowest number), which becomes the new anchor, every input starting over (D89).
-        @Test func aReferenceMissBeforeTheSyncIsConfirmedMovesToAProvenInput() async throws {
+        @Test func aReferenceMissBeforeTheSyncIsEstablishedMovesToAProvenInput() async throws {
             try await startInputs(["R", "A", "B"])
             try feed(["R": .speech(0), "A": .quiet, "B": .quiet])
             await recorder.measureAudioDelays()
@@ -702,9 +702,9 @@ extension GlobalRecordingLog {
             #expect(log.contains("reference \(r) → \(a): it has no audio delay, so it is the new anchor and every input starts over"), "\(log)")
         }
 
-        /// M2 of the third review (DZH): one counted window, as a burst on the dock gives, does not confirm the
+        /// M2 of the third review (DZH): one counted window, as a burst on the dock gives, does not establish the
         /// sync; when the reference then hums, the microphones prove one of them and all end synced (D89).
-        @Test func aSingleCountedWindowDoesNotConfirmTheSync() async throws {
+        @Test func aSingleCountedWindowDoesNotEstablishTheSync() async throws {
             try await startInputs(["R", "A", "B", "C"])
             try feed(["R": .speech(0), "A": .speech(0.3), "B": .quiet, "C": .quiet])
             await recorder.measureAudioDelays()
@@ -769,11 +769,11 @@ extension GlobalRecordingLog {
         }
 
         /// A measurement taken against a reference that moved while it ran counts nothing (D89): before the sync is
-        /// confirmed, two measurements run against a quiet R at once; the first proves A and moves the reference, B
+        /// established, two measurements run against a quiet R at once; the first proves A and moves the reference, B
         /// syncing against A at once; the second, against R, moves nothing more.
-        /// Two counted windows confirm the sync: the reference then goes quiet while two synced inputs share speech,
+        /// Two counted windows establish the sync: the reference then goes quiet while two synced inputs share speech,
         /// and nothing moves, as before D89.
-        @Test func aReferenceMissOnceTheSyncIsConfirmedMovesNothing() async throws {
+        @Test func aReferenceMissOnceTheSyncIsEstablishedMovesNothing() async throws {
             try await startInputs(["R", "A", "B"])
             try feed(["R": .speech(0), "A": .speech(0.5), "B": .speech(0.2)])
             for _ in 0..<2 { await recorder.measureAudioDelays() }

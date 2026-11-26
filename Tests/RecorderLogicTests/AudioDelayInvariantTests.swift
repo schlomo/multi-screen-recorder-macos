@@ -156,8 +156,8 @@ import Testing
         let counted: Set<String>
         /// A file started before this measurement.
         let fileStarted: Bool
-        /// An input other than the anchor had confirmed its sync before this measurement.
-        let wasConfirmed: Bool
+        /// An input other than the anchor had established the sync before this measurement.
+        let wasEstablished: Bool
         let delays: [String: Double]
         let writing: Set<String>
         let mixed: Set<String>
@@ -165,9 +165,9 @@ import Testing
         let countedAgainstTheReference: Bool
         /// Each file change's re-base before this measurement: the audio delays before and after it.
         let rebases: [(before: [String: Double], after: [String: Double])]
-        /// Each start-over before or in this measurement: whether the sync was confirmed before it, the files it
+        /// Each start-over before or in this measurement: whether the sync was established before it, the files it
         /// cleared and those being written.
-        let startOvers: [(wasConfirmed: Bool, cleared: Set<String>, writing: Set<String>)]
+        let startOvers: [(wasEstablished: Bool, cleared: Set<String>, writing: Set<String>)]
         let lines: [String]
         let mainDelays: [String: Double]
         let mainAnchor: String?
@@ -190,10 +190,10 @@ import Testing
         var newest: [String: String] = [:]
         var writing: Set<String> = []
         var rebases: [(before: [String: Double], after: [String: Double])] = []
-        var startOvers: [(wasConfirmed: Bool, cleared: Set<String>, writing: Set<String>)] = []
-        func noteStartOver(_ outcome: AudioDelays.Outcome, wasConfirmed: Bool) {
+        var startOvers: [(wasEstablished: Bool, cleared: Set<String>, writing: Set<String>)] = []
+        func noteStartOver(_ outcome: AudioDelays.Outcome, wasEstablished: Bool) {
             guard outcome.lines.contains(where: { $0.hasSuffix("every input starts over") }) else { return }
-            startOvers.append((wasConfirmed, outcome.cleared, Set(newest.keys)))
+            startOvers.append((wasEstablished, outcome.cleared, Set(newest.keys)))
         }
         var fileLines: [String] = []
         func file(_ uid: String) -> String { "\(uid)-\(fileNumber[uid]!).mov" }
@@ -203,11 +203,11 @@ import Testing
         func fileChanged() {
             for index in runs.indices {
                 guard let reference = runs[index].delays.reference(among: candidates()) else { continue }
-                let wasConfirmed = runs[index].delays.isSyncConfirmed
+                let wasEstablished = runs[index].delays.isSyncEstablished
                 let outcome = runs[index].delays.update(files: newest, reference: reference.file)
                 let after = outcome.delays.mapValues(\.delay)
                 if index == 0 {
-                    noteStartOver(outcome, wasConfirmed: wasConfirmed)
+                    noteStartOver(outcome, wasEstablished: wasEstablished)
                     fileLines += outcome.lines
                     if outcome.lines.contains(where: { $0.contains(": lags re-based onto the anchor by ") }) {
                         rebases.append((runs[index].latest, after))
@@ -246,28 +246,28 @@ import Testing
                 (candidate.uid, window(byUID[candidate.uid]!.sounds[measurement], input: byUID[candidate.uid]!,
                                        measurement: measurement, speech: speech, random: &random))
             })
-            var outcomes: [(reference: String, measurement: AudioDelays.Measurement, outcome: AudioDelays.Outcome, wasConfirmed: Bool)?] = []
+            var outcomes: [(reference: String, measurement: AudioDelays.Measurement, outcome: AudioDelays.Outcome, wasEstablished: Bool)?] = []
             for index in runs.indices {
-                let wasConfirmed = runs[index].delays.isSyncConfirmed
+                let wasEstablished = runs[index].delays.isSyncEstablished
                 guard let reference = runs[index].delays.reference(among: candidates()) else { outcomes.append(nil); continue }
                 let others = candidates().filter { $0.uid != reference.uid }
                     .map { (file: $0.file, uid: $0.uid, reference: windows[reference.uid]!, other: windows[$0.uid]!) }
                 guard !others.isEmpty else { outcomes.append(nil); continue }
                 let measured = AudioDelays.measure(
                     reference: (reference.file, reference.uid), others: others,
-                    measuresPairs: runs[index].measuresPairs && !wasConfirmed)
+                    measuresPairs: runs[index].measuresPairs && !wasEstablished)
                 let outcome = runs[index].delays.measured(measured, files: newest, candidates: candidates(), at: Double(measurement + 1) * 10)
                 runs[index].latest = outcome.delays.mapValues(\.delay)
-                outcomes.append((reference.uid, measured, outcome, wasConfirmed))
+                outcomes.append((reference.uid, measured, outcome, wasEstablished))
             }
-            guard let (reference, measured, outcome, wasConfirmed) = outcomes[0] else { continue }
-            noteStartOver(outcome, wasConfirmed: wasConfirmed)
+            guard let (reference, measured, outcome, wasEstablished) = outcomes[0] else { continue }
+            noteStartOver(outcome, wasEstablished: wasEstablished)
             let pairsCounted = measured.pairs.filter { $0.window?.counts == true }
             let step = Step(
                 measuredAgainst: reference, reference: runs[0].delays.referenceDevice, anchor: runs[0].delays.anchor,
                 movedBySound: runs[0].delays.referenceDevice != reference,
                 counted: Set(pairsCounted.flatMap { [newest[$0.reference]!, newest[$0.other]!] }),
-                fileStarted: fileStarted, wasConfirmed: wasConfirmed, delays: runs[0].latest, writing: Set(candidates().map(\.file)),
+                fileStarted: fileStarted, wasEstablished: wasEstablished, delays: runs[0].latest, writing: Set(candidates().map(\.file)),
                 mixed: Set(outcome.earlierBy.compactMap { $0.value == nil ? nil : $0.key }),
                 countedAgainstTheReference: measured.files.contains { $0.window?.counts == true },
                 rebases: rebases, startOvers: startOvers, lines: fileLines + outcome.lines,
@@ -280,16 +280,16 @@ import Testing
     static let seeds: [UInt64] = Array(1...200)
 
     /// Every invariant on every measurement of the seed's scenario, each failure naming its invariant:
-    /// (i) a pause of one or two measurements after a counted window, the sync confirmed, never moves the
+    /// (i) a pause of one or two measurements after a counted window, the sync established, never moves the
     /// reference nor takes a synced input out of the mix; (ii) a re-base onto another reference changes no audio
     /// delay and drops none; (iii) the reference moves for lack of sync only to an input with a counted window
     /// against it in that measurement; (iv) an input with speech in 3 measurements in a row that the unchanged
     /// reference also has speech in is synced within a frame of its true audio delay against the anchor; (v) once
-    /// the sync is confirmed, nothing moves for lack of sync; (vi) a reference without speech beside two inputs
-    /// sharing speech, the sync not confirmed, is replaced at once; (vii) inputs sharing speech for 2
+    /// the sync is established, nothing moves for lack of sync; (vi) a reference without speech beside two inputs
+    /// sharing speech, the sync not established, is replaced at once; (vii) inputs sharing speech for 2
     /// measurements end with an input other than the anchor synced; (viii) every input main's rules sync, but
     /// main's anchor, is synced at the end; (ix) a start-over clears the entries of exactly the files being written
-    /// while the sync is not confirmed, and none once it is.
+    /// while the sync is not established, and none once it is.
     @Test(arguments: seeds) func theReferenceRulesHold(seed: UInt64) {
         let scenario = Scenario(seed: seed)
         let byUID = Dictionary(uniqueKeysWithValues: scenario.inputs.map { ($0.uid, $0) })
@@ -306,7 +306,7 @@ import Testing
             let stayed = previous.map { $0.reference == step.measuredAgainst } ?? true
             // (i)
             sinceCounted = step.countedAgainstTheReference ? 0 : sinceCounted == Int.max ? Int.max : sinceCounted + 1
-            if let previous, step.wasConfirmed, !step.countedAgainstTheReference, sinceCounted <= 2, stayed, !step.fileStarted {
+            if let previous, step.wasEstablished, !step.countedAgainstTheReference, sinceCounted <= 2, stayed, !step.fileStarted {
                 #expect(!step.movedBySound, context("i"))
                 let stillMixed = previous.mixed.filter { step.writing.contains($0) }
                 #expect(stillMixed.isSubset(of: step.mixed), context("i"))
@@ -335,16 +335,16 @@ import Testing
                 }
             }
             // (v)
-            if step.wasConfirmed { #expect(!step.movedBySound, context("v")) }
+            if step.wasEstablished { #expect(!step.movedBySound, context("v")) }
             // (vi)
             let speakers = scenario.inputs.filter { $0.uid != step.measuredAgainst && writes($0.uid) && sound($0.uid).sharesSpeech }
             if !sound(step.measuredAgainst).sharesSpeech, sound(step.measuredAgainst) != .unrelated,
-               speakers.count >= 2, !step.wasConfirmed, !step.countedAgainstTheReference {
+               speakers.count >= 2, !step.wasEstablished, !step.countedAgainstTheReference {
                 #expect(step.movedBySound, context("vi: still on \(step.measuredAgainst)"))
             }
             // (ix)
             for startOver in step.startOvers {
-                #expect(startOver.cleared == (startOver.wasConfirmed ? [] : startOver.writing), context("ix: \(startOver)"))
+                #expect(startOver.cleared == (startOver.wasEstablished ? [] : startOver.writing), context("ix: \(startOver)"))
             }
             // (vii)
             let sharingNow = scenario.inputs.filter { writes($0.uid) && sound($0.uid).sharesSpeech }

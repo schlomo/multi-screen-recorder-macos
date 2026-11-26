@@ -3175,7 +3175,7 @@ architect's reading.
 ## D89: The audio reference moves only on evidence (2026-11-26)
 
 - **Status:** in force. Amends D80's and D85's reference rule (moved
-  only on no audio or a capture's end) until the sync is confirmed.
+  only on no audio or a capture's end) until the sync is established.
 - **Context:** The owner's recording on 0.20261125.116: audio input 1
   a dock's line-in with nothing connected, not digital zero, then three
   microphones with clear speech. The line-in became the anchor and the
@@ -3189,16 +3189,16 @@ architect's reading.
   the reference, needless start-overs or synced inputs lost.
 - **Decision:** The reference moves only on evidence. A **reference
   miss** is a measurement with no counted window against the reference
-  while another input had sound. The sync is **confirmed** once an
+  while another input had sound. The sync is **established** once an
   input other than the anchor has 2 counted windows since the anchor
-  became the anchor (`audioDelayConfirmingWindows`, *data*). While it
+  became the anchor (`audioDelayEstablishingWindows`, *data*). While it
   is not, a reference miss correlates the other inputs with sound
   pairwise over the same windows; if a pair counts, the reference moves
   to the input the most others count against (a tie to the lowest
   number), as a start-over whose lags against the new reference are
   applied at once, and the entries the files being written had so far
   are cleared. If none counts, nothing moves. Once the sync is
-  confirmed, the reference moves only on no audio or a capture's end,
+  established, the reference moves only on no audio or a capture's end,
   by main's pick.
   - Not a level threshold: a 10 s rms is not what the level bar shows;
     a quiet clean microphone became "silent".
@@ -3210,11 +3210,11 @@ architect's reading.
     their bounds needed a try episode, a tried set and a move back.
 - **Decided while building (the builder's reading, for the owner to
   confirm):**
-  - Confirmation counts each device's counted windows since the last
+  - Establishing counts each device's counted windows since the last
     start-over, not latched: after a capture's end starts over onto an
-    input that matches nothing, the sync is no longer confirmed.
+    input that matches nothing, the sync is no longer established.
   - The anchor's own windows (its new file after the reference moved
-    away) do not confirm it.
+    away) do not establish it.
   - Every window of a measurement ends at one common end, so the pairs
     line up; an input more than a window behind the reference does not
     hold the others back.
@@ -3224,12 +3224,13 @@ architect's reading.
   reference on at the first measurement in which two other inputs share
   sound, and those are synced from that measurement on. Two talkers who
   never correlate move nothing. A single counted window, as a burst on
-  an empty line-in gives, confirms nothing. Once confirmed, a reference
+  an empty line-in gives, establishes nothing. Once established, a reference
   that stops matching stays, as before D89: an input that cannot sync to
-  it ends at "no clear sound", and where main's rules happened to keep a
-  different reference, an input they sync may stay unsynced (1 of 3,200
-  generated scenarios). The measurement does up to n(n-1)/2 extra
-  cross-correlations, only while the sync is not confirmed and nothing
+  it ends at "no clear sound". An input that only correlates with an
+  input other than the reference in use waits until the reference
+  changes, a known cost (1 of 3,200 generated recordings, none of the
+  owner's 15). The measurement does up to n(n-1)/2 extra
+  cross-correlations, only while the sync is not established and nothing
   counts against the reference.
 - **Evidence:** the owner's recording on 0.20261125.116; the replay of
   the owner's 15 recordings against main's rules: every audio delay main
@@ -3240,14 +3241,14 @@ architect's reading.
   run side by side with main's rules (`measuresPairs: false`): more
   inputs synced at the end in 498, fewer in 1;
   `AudioDelayInvariantTests.theReferenceRulesHold` (200 seeds: a move
-  only to an input with a counted window, nothing moves once confirmed,
+  only to an input with a counted window, nothing moves once established,
   a re-base changes no audio delay, shared speech ends synced, no input
   main syncs lost but main's anchor, entries cleared exactly before
-  confirmation); `ReferenceChoiceTests`; `RecorderTests`
+  the sync is established); `ReferenceChoiceTests`; `RecorderTests`
   (`aNearSilentInput1HandsTheReferenceToAMicrophoneAtTheFirstMeasurement`,
-  `aReferenceMissBeforeTheSyncIsConfirmedMovesToAProvenInput`,
-  `aSingleCountedWindowDoesNotConfirmTheSync`,
-  `aReferenceMissOnceTheSyncIsConfirmedMovesNothing`, the pause tests);
+  `aReferenceMissBeforeTheSyncIsEstablishedMovesToAProvenInput`,
+  `aSingleCountedWindowDoesNotEstablishTheSync`,
+  `aReferenceMissOnceTheSyncIsEstablishedMovesNothing`, the pause tests);
   `AudioDelayTests.theVectorisedWindowIsTheScalarOneBitForBit`; 22 of
   29 deliberate breaks of the rules caught, the other 7 changing cost
   only or edge cases named in the PR; [design/recorder.md](design/recorder.md),
