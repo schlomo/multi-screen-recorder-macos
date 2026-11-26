@@ -225,8 +225,9 @@ import Testing
         }
         var previous: Step?
         for measurement in 0..<scenario.measurements {
-            // Each measurement is tens of milliseconds of CPU: yield, so a run never holds a thread of the cooperative
-            // pool for long, where the async timing tests in the same process resume (docs/troubleshooting.md).
+            // Each measurement is up to a few hundred milliseconds of CPU: yield, so a run holds a thread of the
+            // cooperative pool no longer than that, where the async timing tests in the same process resume
+            // (docs/troubleshooting.md).
             await Task.yield()
             var fileStarted = false
             (rebases, fileLines, startOvers) = ([], [], [])

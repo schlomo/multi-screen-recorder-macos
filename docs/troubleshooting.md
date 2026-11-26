@@ -37,6 +37,7 @@ One row per entry, the error text exactly as in the entry.
 | `AVFoundationErrorDomain -11800; reason: An unknown error occurred (-19092)` | [The end-to-end tests fail at a mode switch on a busy Mac](#the-end-to-end-tests-fail-at-a-mode-switch-on-a-busy-mac) |
 | `The job was not acquired by Runner of type hosted even after multiple attempts` | [No macOS runner: the pipeline job is cancelled](#no-macos-runner-the-pipeline-job-is-cancelled) |
 | `Multi Screen Recorder quit unexpectedly` (the app's crash dialog) after running the tests, with no crash of the app | [Crash dialog for crash reports the tests wrote](#crash-dialog-for-crash-reports-the-tests-wrote) |
+| `Expectation failed: (made.guideRefusals → 2) == 4` | [Timing tests fail while the audio delay invariants run](#timing-tests-fail-while-the-audio-delay-invariants-run) |
 
 ## Format
 
@@ -226,7 +227,7 @@ One row per entry, the error text exactly as in the entry.
   the ticker suite 28.4 s there).
 - **Why:** [KNOWN: CI's log] the four failed within 0.6 s of
   `AudioDelayInvariantTests.theReferenceRulesHold(seed:)` (200 cases)
-  and `ReferenceChoiceTests` ending, both "after 263.8 s".
+  ended "after 263.789 s" and `ReferenceChoiceTests` "after 264.081 s".
   [KNOWN: the test code] the invariant harness's `run` was synchronous:
   each of the 200 cases computed for seconds without suspending, so the
   cases held every thread of the cooperative pool, and a task the timing
@@ -236,13 +237,19 @@ One row per entry, the error text exactly as in the entry.
   whole run. The same cause as "Async tests time out on CI while
   simulation tests run" above, from new suites.
 - **Fix:** the harness's `run` is async and yields once per measurement
-  (`await Task.yield()`), so no case holds a pool thread for longer than
-  one measurement; the tests calling it are async. Every assertion,
-  bound and seed kept. With it the probe's resumptions were at worst
-  2.1 s late (mean 1.7 s) over the same run, which took 31.4 s against
-  32.5 s before.
+  (`await Task.yield()`); the tests calling it are async. Every
+  assertion, bound and seed kept. A case still holds a thread between
+  two yields (measured locally: median 106 ms, at most 427 ms) and for
+  its setup before the first. With it the probe's resumptions were at
+  worst 2.1 to 2.4 s late over the same run. Serializing the suite, the
+  earlier entry's remedy, is not used here: its 200 cases would run for
+  many minutes on one thread. Yielding saves no CPU: CI's `scripts/test`
+  step takes about 11.5 minutes against about 4.8 on `main` before.
 - **Verify:** CI's `scripts/test` passes on the pushed head.
-- **Observed:** 2026-11-26, PR #34; fix not yet verified on CI.
+- **Observed:** 2026-11-26, PR #34; verified by one passing run,
+  45786893084 on 4c0ef05 (`VideoFileTickerTests` 124.0 s,
+  `theReferenceRulesHold` 294.6 s, whole run 510.1 s); the margin on
+  the 3-core runner is not measured.
 
 ## A virtual screen comes back at its last mode
 
