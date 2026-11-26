@@ -261,7 +261,11 @@ public struct ProblemsTold: Sendable {
     /// A call to action was given: the recording's result is `problems` (D91).
     public var gaveACallToAction: Bool { told.contains(where: \.calledToAction) }
 
-    /// A call to action given that includes "report it": the recording asks to report it once it ended (D84).
+    /// The problems whose call to action was not given: `msr record`'s summary leaves them out (D91).
+    public var problemsWithoutCallToAction: [RecordingProblem] { told.filter { !$0.calledToAction }.map(\.problem) }
+
+    /// A call to action given that includes "report it": the recording asks to report it once it ended, and the
+    /// status window names the files for a report (D84, D91).
     public var asksToReportIt: Bool {
         told.contains { $0.calledToAction && $0.kind.callToAction?.includesReportIt == true }
     }

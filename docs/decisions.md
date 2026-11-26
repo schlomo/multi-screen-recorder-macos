@@ -3387,12 +3387,20 @@ architect's reading.
   problem line, the Dock bounce and badge, `msr record`'s status line
   count, the notice of the last recording's problems at the next start,
   the report prompts, the "For a report ... attach them" line (shown
-  under the lines only), and the recording's `result`: `problems` only
+  only when a shown problem's call to action includes "report it",
+  never under a full disk, a permission or a replug line alone),
+  `msr record`'s end summary (its lines of what went wrong, and so its
+  `Report it:` link, list only the problems whose call to action was
+  given; failure events are no longer listed there), and the
+  recording's `result`: `problems` only
   when a call to action was given (at Stop too, for a source still
   failing) or a file is not finalized, so exit 3 for `msr record` too.
   A problem without one is still written to the recording log, to
-  standard error by `msr record` and into `recording.json`'s `problems`
-  and `events`, but shows nothing and leaves the result `ok`. A shown
+  standard error by `msr record` (which mirrors the log for people
+  running the command, unchanged) and into `recording.json`'s
+  `problems` and `events`, but shows nothing and leaves the result
+  `ok`. The app's report of the last recording, read from
+  `recording.json` alone, still lists every failure event and problem. A shown
   line is one colour, red; the orange of D78 goes.
 - **Camera stall at another camera's start:** in one process
   CoreMediaIO holds a process-wide lock while a camera's capture

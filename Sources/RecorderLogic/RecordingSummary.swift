@@ -1,6 +1,6 @@
 /// What `msr record` prints at its end: how long it recorded and where,
-/// each file and its state (the screens by number, then the cameras by number, then the audio sources by number, the system audio first), our process's CPU use, and the events that are
-/// errors.
+/// each file and its state (the screens by number, then the cameras by number, then the audio sources by number, the system audio first), our process's CPU use, and the problems whose
+/// call to action was given (D91).
 public struct RecordingSummary: Equatable, Sendable {
     public let manifest: RecordingManifest
     public let recordingFolder: String
@@ -11,10 +11,12 @@ public struct RecordingSummary: Equatable, Sendable {
     public let problemsAskToReportIt: Bool
     /// The names of the files whose writer failed on a full disk: not finalized, they ask for no report (D84).
     public let filesEndedByAFullDisk: Set<String>
+    /// The problems told without their call to action given: in the log and the manifest, not in the summary (D91).
+    public let problemsWithoutCallToAction: [RecordingProblem]
 
     public init(
         manifest: RecordingManifest, recordingFolder: String, seconds: Double, manifestWritten: Bool, problemsAskToReportIt: Bool,
-        filesEndedByAFullDisk: Set<String>
+        filesEndedByAFullDisk: Set<String>, problemsWithoutCallToAction: [RecordingProblem] = []
     ) {
         self.manifest = manifest
         self.recordingFolder = recordingFolder
@@ -22,6 +24,7 @@ public struct RecordingSummary: Equatable, Sendable {
         self.manifestWritten = manifestWritten
         self.problemsAskToReportIt = problemsAskToReportIt
         self.filesEndedByAFullDisk = filesEndedByAFullDisk
+        self.problemsWithoutCallToAction = problemsWithoutCallToAction
     }
 
     /// Ended with an error (exit 3): the manifest's result is `problems`
@@ -58,9 +61,9 @@ public struct RecordingSummary: Equatable, Sendable {
         return lines.joined(separator: "\n") + "\n"
     }
 
-    /// The events that are errors, then the problems, then, if `endMissing`,
-    /// that the manifest has no end, each with its seconds from the start:
-    /// the missing end at the latest of them, as the last thing that went wrong.
+    /// For the app's report of the last recording, which reads only its manifest: the events that are
+    /// errors, then every problem, then, if `endMissing`, that the manifest has no end, each with its
+    /// seconds from the start: the missing end at the latest of them, as the last thing that went wrong.
     public static func failureLines(of manifest: RecordingManifest, endMissing: Bool) -> [(at: Double, line: String)] {
         let errors = manifest.events.filter(\.event.isFailure).map { event in
             (event.at, "Error at \(elapsed(seconds: event.at)): \(event.event.rawValue)"
@@ -74,9 +77,13 @@ public struct RecordingSummary: Equatable, Sendable {
 
     public static let manifestNotWrittenLine = "The recording manifest could not be written at the end: \(RecordingNames.manifest) has no end."
 
-    /// What the summary tells went wrong, each with its seconds from the start.
+    /// What the summary tells went wrong, each with its seconds from the start: the problems whose call to
+    /// action was given, then, if the manifest has no end, that (D91).
     public var whatWentWrong: [(at: Double, line: String)] {
-        Self.failureLines(of: manifest, endMissing: !manifestWritten)
+        let problems: [(at: Double, line: String)] = manifest.problems.filter { !problemsWithoutCallToAction.contains($0) }
+            .map { ($0.at, "Problem at \(Self.elapsed(seconds: $0.at)): \($0.text)") }
+        guard !manifestWritten else { return problems }
+        return problems + [(problems.map(\.at).max() ?? 0, Self.manifestNotWrittenLine)]
     }
 
     /// The end of the summary of a recording that asks to report it (D84): the

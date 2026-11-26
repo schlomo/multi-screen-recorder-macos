@@ -249,7 +249,7 @@ set after Stop), the time recorded (`h:mm:ss`, every second), data and
 free space, the CPU use of Multi Screen Recorder itself (encoding and
 capture also run in macOS's own processes, which it does not include),
 and, in red, any problem you have to do something about, at most 5 lines with more scrolling, with a line naming the two files a report
-needs. Stop there finalizes the files, opens the
+needs when one of them asks you to report it. Stop there finalizes the files, opens the
 recording folder in Finder and quits; Continue keeps recording. The
 recording folder holds a video file per screen, a new one each time a
 screen comes back or changes its frame size, an audio file per audio

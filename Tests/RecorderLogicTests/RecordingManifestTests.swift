@@ -601,8 +601,8 @@ import Testing
         #expect(summary.text == "Recorded 1h02m05s into /r\n  f0.mov  finalized\n")
     }
 
-    /// A file not finalized is an error; an error event alone is listed but none (D91).
-    @Test func aFileNotFinalizedIsAnErrorAndAnErrorEventIsListed() {
+    /// A file not finalized is an error; an error event alone is neither an error nor listed (D91).
+    @Test func aFileNotFinalizedIsAnErrorAndAnErrorEventIsNotListed() {
         #expect(RecordingSummary(manifest: manifest([.notFinalized]), recordingFolder: "/r", seconds: 1, manifestWritten: true, problemsAskToReportIt: false, filesEndedByAFullDisk: []).endedWithError)
         var failed = RecordingEvent(at: 65_000_000_000, event: .screenStreamFailed, screen: "LG")
         failed.errorDetail = "-3811"
@@ -610,7 +610,7 @@ import Testing
             manifest: manifest([.finalized, .finalized], events: [failed, RecordingEvent(at: 0, event: .sleep)]),
             recordingFolder: "/r", seconds: 70, manifestWritten: true, problemsAskToReportIt: false, filesEndedByAFullDisk: [])
         #expect(!summary.endedWithError)
-        #expect(summary.text.hasSuffix("Error at 1m05s: screen stream failed, LG (-3811)\n"))
+        #expect(summary.text == "Recorded 1m10s into /r\n  f0.mov  finalized\n  f1.mov  finalized\n")
     }
 
     /// F3: the final manifest not written is a failure; the file on disk has no `ended`.
@@ -640,6 +640,19 @@ import Testing
                                  problemsAskToReportIt: false, filesEndedByAFullDisk: ["f0.mov"]).asksToReportIt)
         #expect(summary([.finalized], written: false).asksToReportIt)
         #expect(summary([.finalized], problems: true).asksToReportIt)
+    }
+
+    /// Only a problem whose call to action was given is listed; one without stays in the log and the manifest (D91).
+    @Test func aProblemWithoutACallToActionIsNotListed() {
+        var told = manifest([.finalized])
+        let quiet = RecordingProblem(at: 5_000_000_000, problem: "Camera BRIO", error: "camera stalled")
+        let full = RecordingProblem(at: 65_000_000_000, problem: "The audio file of Mic ended", error: "disk full")
+        told.problems = [quiet, full]
+        let summary = RecordingSummary(
+            manifest: told, recordingFolder: "/r", seconds: 70, manifestWritten: true, problemsAskToReportIt: false,
+            filesEndedByAFullDisk: [], problemsWithoutCallToAction: [quiet])
+        #expect(summary.text.hasSuffix("  f0.mov  finalized\nProblem at 1m05s: The audio file of Mic ended: disk full\n"))
+        #expect(summary.whatWentWrong.map(\.line) == ["Problem at 1m05s: The audio file of Mic ended: disk full"])
     }
 
     @Test func aProblemIsListedWithItsTimeAndIsNoErrorByItself() {
@@ -693,13 +706,13 @@ import Testing
             "Screen 1 - A", "Screen 1 - A", "Screen 2 - B", "Audio 0 - System", "Audio 1 - C", "Audio 1 - C", "Audio 4 - D", "Audio 10 - K"])
     }
 
-    /// Listed, but no error by itself: its source starts again (D91).
-    @Test func aWriterThatFailedIsListedButNoErrorByItself() {
+    /// Neither listed nor an error by itself: its source starts again (D91).
+    @Test func aWriterThatFailedIsNoErrorAndNotListedByItself() {
         var failed = RecordingEvent(at: 0, event: .screenFileWriterFailed, screen: "LG")
         failed.errorDetail = "cannot write"
         let summary = RecordingSummary(manifest: manifest([.finalized], events: [failed]), recordingFolder: "/r", seconds: 1, manifestWritten: true, problemsAskToReportIt: false, filesEndedByAFullDisk: [])
         #expect(!summary.endedWithError)
-        #expect(summary.text.contains("screen file writer failed, LG (cannot write)"))
+        #expect(!summary.text.contains("screen file writer failed"))
     }
 }
 

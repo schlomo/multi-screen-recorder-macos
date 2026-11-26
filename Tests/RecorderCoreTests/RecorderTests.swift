@@ -518,6 +518,8 @@ extension GlobalRecordingLog {
             #expect(observer.problems.map(\.problem.problem) == ["Changes of the audio inputs cannot be followed"])
             // Stop and start the recording again, and report it, at once (D84).
             #expect(observer.callsToAction.map(\.problem) == ["Changes of the audio inputs cannot be followed"])
+            // Its call to action includes "report it": the window names the files for a report (D91).
+            #expect(recorder.problemsAskToReportIt)
             #expect(recorder.problemLines() == ["Changes of the audio inputs not followed since 0:00: the stand-in's listener failed"])
             _ = await stop()
         }
@@ -1565,6 +1567,7 @@ extension GlobalRecordingLog {
             #expect(summary.manifest.result == .ok)
             #expect(!summary.endedWithError && !summary.asksToReportIt)
             #expect(try recordingLog().contains("camera stalled"))
+            #expect(summary.whatWentWrong.isEmpty)
         }
 
         /// A stalled camera shows no line, unplugged too (D91).
@@ -2054,7 +2057,11 @@ extension GlobalRecordingLog {
             try await wait("the problem") { !observer.problems.isEmpty }
             #expect(observer.callsToAction.map(\.problem) == ["The audio file of \(name) ended"])
             #expect(recorder.problemLines().first?.hasPrefix("Disk full since ") == true)
+            // Free up disk space includes no report: no line naming the files for one (D91).
+            #expect(!recorder.problemsAskToReportIt)
             let summary = await stop()
+            #expect(!summary.whatWentWrong.isEmpty
+                && summary.whatWentWrong.allSatisfy { $0.line.hasPrefix("Problem at ") && $0.line.contains("The audio file of \(name) ended") })
             #expect(!summary.problemsAskToReportIt)
             #expect(summary.manifest.result == .problems)
         }

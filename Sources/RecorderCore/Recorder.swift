@@ -292,6 +292,9 @@ public final class Recorder {
              kind: .dockIconNotShown)
     }
 
+    /// A call to action given includes "report it": the status window names the files for a report (D91).
+    public var problemsAskToReportIt: Bool { problemsTold.asksToReportIt }
+
     /// The problems whose call to action was given and that have not ended (D84).
     public func problemsCalledToAction() -> [RecordingProblem] { problemsTold.callsToActionOngoing }
 
@@ -477,7 +480,7 @@ public final class Recorder {
         return RecordingSummary(
             manifest: manifest, recordingFolder: folder.path(percentEncoded: false), seconds: elapsedSeconds,
             manifestWritten: finalManifestWritten, problemsAskToReportIt: problemsTold.asksToReportIt,
-            filesEndedByAFullDisk: filesEndedByAFullDisk)
+            filesEndedByAFullDisk: filesEndedByAFullDisk, problemsWithoutCallToAction: problemsTold.problemsWithoutCallToAction)
     }
 
     // MARK: Screen changes
