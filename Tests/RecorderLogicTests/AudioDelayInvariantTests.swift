@@ -27,10 +27,9 @@ import Testing
         case noAudio
 
         var sharesSpeech: Bool { self == .speech || self == .gatedSpeech || self == .roomSpeech }
-        var isFlat: Bool { self == .pause || self == .hum || self == .noise }
     }
 
-    enum Kind: String { case microphone, unrelated, flat }
+    enum Kind: String { case microphone, unrelated, steady }
 
     struct Input {
         let uid: String
@@ -54,7 +53,7 @@ import Testing
             let count = Int.random(in: 2...5, using: &random)
             inputs = (1...count).map { number in
                 let roll = Double.random(in: 0..<1, using: &random)
-                let kind: Kind = number == 2 || roll < 0.5 ? .microphone : roll < 0.7 ? .unrelated : .flat
+                let kind: Kind = number == 2 || roll < 0.5 ? .microphone : roll < 0.7 ? .unrelated : .steady
                 let lag = (Double.random(in: -0.35...0.35, using: &random) * 1000).rounded() / 1000
                 return Input(uid: "u\(number)", number: number, kind: kind, lag: lag, sounds: [])
             }
@@ -68,7 +67,7 @@ import Testing
                     case .microphone:
                         roll < 0.45 ? .speech : roll < 0.55 ? .roomSpeech : roll < 0.65 ? .gatedSpeech : roll < 0.88 ? .pause : .noAudio
                     case .unrelated: roll < 0.7 ? (gated ? .gatedUnrelated : .unrelated) : roll < 0.9 ? .pause : .noAudio
-                    case .flat: roll < 0.45 ? .hum : roll < 0.9 ? .noise : .noAudio
+                    case .steady: roll < 0.45 ? .hum : roll < 0.9 ? .noise : .noAudio
                     }
                     sounds += Array(repeating: sound, count: Int.random(in: 1...6, using: &random))
                 }
@@ -145,45 +144,77 @@ import Testing
         }
     }
 
-    /// One measurement's state, as the invariants see it.
+    /// One measurement's state, as the invariants see it, with the same measurement under main's rules beside it
+    /// (`main`: the same calls, measuring no pairs, so the reference never moves for lack of sync).
     struct Step {
         /// The device measured against, and the reference after the measurement.
         let measuredAgainst: String
         let reference: String?
         let anchor: String?
         let movedBySound: Bool
-        /// The device the reference was tried on, from the log line.
-        let triedOn: String?
+        /// The devices in a pair whose window counted in this measurement.
+        let counted: Set<String>
         /// A file started before this measurement.
         let fileStarted: Bool
-        /// An input other than the anchor had an audio delay before this measurement.
-        let wasSynced: Bool
+        /// An input other than the anchor had confirmed its sync before this measurement.
+        let wasConfirmed: Bool
         let delays: [String: Double]
         let writing: Set<String>
         let mixed: Set<String>
-        let counted: Bool
+        /// A window against the reference counted.
+        let countedAgainstTheReference: Bool
+        /// Each file change's re-base before this measurement: the audio delays before and after it.
+        let rebases: [(before: [String: Double], after: [String: Double])]
+        /// Each start-over before or in this measurement: whether the sync was confirmed before it, the files it
+        /// cleared and those being written.
+        let startOvers: [(wasConfirmed: Bool, cleared: Set<String>, writing: Set<String>)]
         let lines: [String]
+        let mainDelays: [String: Double]
+        let mainAnchor: String?
     }
 
-    /// Runs the scenario as the recorder does; `check` sees each measurement's outcome.
+    /// One rule set's state through a run.
+    private struct Run {
+        var delays = AudioDelays()
+        var latest: [String: Double] = [:]
+        let measuresPairs: Bool
+    }
+
+    /// Runs the scenario as the recorder does, under the rules and, beside them, under main's; `check` sees each
+    /// measurement's outcome.
     static func run(_ scenario: Scenario, seed: UInt64, check: (Int, Step, Step?) -> Void) {
         var random = SeededRandom(seed: seed &+ 2000)
         let speech = speech(measurements: scenario.measurements, seed: seed)
-        var delays = AudioDelays()
+        var runs = [Run(measuresPairs: true), Run(measuresPairs: false)]
         var fileNumber: [String: Int] = [:]
         var newest: [String: String] = [:]
         var writing: Set<String> = []
-        var synced = false
+        var rebases: [(before: [String: Double], after: [String: Double])] = []
+        var startOvers: [(wasConfirmed: Bool, cleared: Set<String>, writing: Set<String>)] = []
+        func noteStartOver(_ outcome: AudioDelays.Outcome, wasConfirmed: Bool) {
+            guard outcome.lines.contains(where: { $0.hasSuffix("every input starts over") }) else { return }
+            startOvers.append((wasConfirmed, outcome.cleared, Set(newest.keys)))
+        }
+        var fileLines: [String] = []
         func file(_ uid: String) -> String { "\(uid)-\(fileNumber[uid]!).mov" }
         func candidates() -> [AudioDelays.Candidate] {
             scenario.inputs.filter { writing.contains($0.uid) }.map { .init(file: file($0.uid), uid: $0.uid, number: $0.number) }
         }
-        func took(_ outcome: AudioDelays.Outcome) {
-            synced = synced || outcome.delays.contains { newest[$0.key] != delays.anchor }
-        }
         func fileChanged() {
-            guard let reference = delays.reference(among: candidates()) else { return }
-            took(delays.update(files: newest, reference: reference.file))
+            for index in runs.indices {
+                guard let reference = runs[index].delays.reference(among: candidates()) else { continue }
+                let wasConfirmed = runs[index].delays.isSyncConfirmed
+                let outcome = runs[index].delays.update(files: newest, reference: reference.file)
+                let after = outcome.delays.mapValues(\.delay)
+                if index == 0 {
+                    noteStartOver(outcome, wasConfirmed: wasConfirmed)
+                    fileLines += outcome.lines
+                    if outcome.lines.contains(where: { $0.contains(": lags re-based onto the anchor by ") }) {
+                        rebases.append((runs[index].latest, after))
+                    }
+                }
+                runs[index].latest = after
+            }
         }
         // Every file starts at once, the first input's first (the recorder's anchor at first).
         for input in scenario.inputs {
@@ -195,6 +226,7 @@ import Testing
         var previous: Step?
         for measurement in 0..<scenario.measurements {
             var fileStarted = false
+            (rebases, fileLines, startOvers) = ([], [], [])
             for input in scenario.inputs {
                 let silentNow = input.sounds[measurement] == .noAudio
                 if silentNow, writing.contains(input.uid) {
@@ -209,27 +241,37 @@ import Testing
                     fileChanged()
                 }
             }
-            let wasSynced = synced
-            guard let reference = delays.reference(among: candidates()) else { continue }
             let byUID = Dictionary(uniqueKeysWithValues: scenario.inputs.map { ($0.uid, $0) })
             let windows = Dictionary(uniqueKeysWithValues: candidates().map { candidate in
                 (candidate.uid, window(byUID[candidate.uid]!.sounds[measurement], input: byUID[candidate.uid]!,
                                        measurement: measurement, speech: speech, random: &random))
             })
-            let others = candidates().filter { $0.uid != reference.uid }
-                .map { (file: $0.file, uid: $0.uid, reference: windows[reference.uid]!, other: windows[$0.uid]!) }
-            guard !others.isEmpty else { continue }
-            let measured = AudioDelays.measure(reference: (reference.file, reference.uid), others: others)
-            let outcome = delays.measured(measured, files: newest, candidates: candidates(), at: Double(measurement + 1) * 10)
-            took(outcome)
-            let tried = outcome.lines.lazy.compactMap { $0.firstMatch(of: /; tries (u\d+)-\d+\.mov/)?.1 }.first.map(String.init)
+            var outcomes: [(reference: String, measurement: AudioDelays.Measurement, outcome: AudioDelays.Outcome, wasConfirmed: Bool)?] = []
+            for index in runs.indices {
+                let wasConfirmed = runs[index].delays.isSyncConfirmed
+                guard let reference = runs[index].delays.reference(among: candidates()) else { outcomes.append(nil); continue }
+                let others = candidates().filter { $0.uid != reference.uid }
+                    .map { (file: $0.file, uid: $0.uid, reference: windows[reference.uid]!, other: windows[$0.uid]!) }
+                guard !others.isEmpty else { outcomes.append(nil); continue }
+                let measured = AudioDelays.measure(
+                    reference: (reference.file, reference.uid), others: others,
+                    measuresPairs: runs[index].measuresPairs && !wasConfirmed)
+                let outcome = runs[index].delays.measured(measured, files: newest, candidates: candidates(), at: Double(measurement + 1) * 10)
+                runs[index].latest = outcome.delays.mapValues(\.delay)
+                outcomes.append((reference.uid, measured, outcome, wasConfirmed))
+            }
+            guard let (reference, measured, outcome, wasConfirmed) = outcomes[0] else { continue }
+            noteStartOver(outcome, wasConfirmed: wasConfirmed)
+            let pairsCounted = measured.pairs.filter { $0.window?.counts == true }
             let step = Step(
-                measuredAgainst: reference.uid, reference: delays.referenceDevice, anchor: delays.anchor,
-                movedBySound: delays.referenceDevice != reference.uid, triedOn: tried, fileStarted: fileStarted,
-                wasSynced: wasSynced, delays: outcome.delays.mapValues(\.delay), writing: Set(candidates().map(\.file)),
+                measuredAgainst: reference, reference: runs[0].delays.referenceDevice, anchor: runs[0].delays.anchor,
+                movedBySound: runs[0].delays.referenceDevice != reference,
+                counted: Set(pairsCounted.flatMap { [newest[$0.reference]!, newest[$0.other]!] }),
+                fileStarted: fileStarted, wasConfirmed: wasConfirmed, delays: runs[0].latest, writing: Set(candidates().map(\.file)),
                 mixed: Set(outcome.earlierBy.compactMap { $0.value == nil ? nil : $0.key }),
-                counted: measured.files.contains { $0.window?.counts == true },
-                lines: outcome.lines)
+                countedAgainstTheReference: measured.files.contains { $0.window?.counts == true },
+                rebases: rebases, startOvers: startOvers, lines: fileLines + outcome.lines,
+                mainDelays: runs[1].latest, mainAnchor: runs[1].delays.anchor)
             check(measurement, step, previous)
             previous = step
         }
@@ -238,26 +280,23 @@ import Testing
     static let seeds: [UInt64] = Array(1...200)
 
     /// Every invariant on every measurement of the seed's scenario, each failure naming its invariant:
-    /// (i) a pause of one or two measurements after a counted window, something synced, never moves the
+    /// (i) a pause of one or two measurements after a counted window, the sync confirmed, never moves the
     /// reference nor takes a synced input out of the mix; (ii) a re-base onto another reference changes no audio
-    /// delay and drops none; (iii) the reference is never tried on an input without action; (iv) an input with
-    /// speech in 3 measurements in a row that the unchanged reference also has speech in is synced within a frame
-    /// of its true audio delay against the anchor; (v) the reference is never tried elsewhere once an input other
-    /// than the anchor has had an audio delay, so nothing starts over then; (vi) a reference without action beside
-    /// two inputs sharing speech, nothing synced, is replaced within one measurement; (vii) inputs sharing speech,
-    /// from a time nothing was synced, long enough for every try, end with an input other than the anchor synced; (viii) a try episode, from a
-    /// counted window to the next, moves the reference at most once per input plus once per file started in it,
-    /// plus the move back.
+    /// delay and drops none; (iii) the reference moves for lack of sync only to an input with a counted window
+    /// against it in that measurement; (iv) an input with speech in 3 measurements in a row that the unchanged
+    /// reference also has speech in is synced within a frame of its true audio delay against the anchor; (v) once
+    /// the sync is confirmed, nothing moves for lack of sync; (vi) a reference without speech beside two inputs
+    /// sharing speech, the sync not confirmed, is replaced at once; (vii) inputs sharing speech for 2
+    /// measurements end with an input other than the anchor synced; (viii) every input main's rules sync, but
+    /// main's anchor, is synced at the end; (ix) a start-over clears the entries of exactly the files being written
+    /// while the sync is not confirmed, and none once it is.
     @Test(arguments: seeds) func theReferenceRulesHold(seed: UInt64) {
         let scenario = Scenario(seed: seed)
         let byUID = Dictionary(uniqueKeysWithValues: scenario.inputs.map { ($0.uid, $0) })
         var sinceCounted = Int.max
         var shared: [String: Int] = [:]
-        var flatReference = 0
         var sharing = 0
-        var sharingFromUnsynced = false
-        var filesInEpisode = 0
-        var movesInEpisode = 0
+        var last: Step?
         Self.run(scenario, seed: seed) { measurement, step, previous in
             func context(_ invariant: String) -> Comment {
                 "(\(invariant)) measurement \(measurement), seed \(seed):\n\(scenario)\n\(step.lines.joined(separator: "\n"))"
@@ -266,20 +305,22 @@ import Testing
             func writes(_ uid: String) -> Bool { step.writing.contains { $0.hasPrefix("\(uid)-") } }
             let stayed = previous.map { $0.reference == step.measuredAgainst } ?? true
             // (i)
-            sinceCounted = step.counted ? 0 : sinceCounted == Int.max ? Int.max : sinceCounted + 1
-            if let previous, step.wasSynced, !step.counted, sinceCounted <= 2, stayed, !step.fileStarted {
+            sinceCounted = step.countedAgainstTheReference ? 0 : sinceCounted == Int.max ? Int.max : sinceCounted + 1
+            if let previous, step.wasConfirmed, !step.countedAgainstTheReference, sinceCounted <= 2, stayed, !step.fileStarted {
                 #expect(!step.movedBySound, context("i"))
                 let stillMixed = previous.mixed.filter { step.writing.contains($0) }
                 #expect(stillMixed.isSubset(of: step.mixed), context("i"))
             }
             // (ii)
-            if let previous, step.lines.contains(where: { $0.contains(": lags re-based onto the anchor by ") }) {
-                for (name, delay) in previous.delays where step.writing.contains(name) {
-                    #expect(step.delays[name] == delay, context("ii: \(name)"))
+            for rebase in step.rebases {
+                for (name, delay) in rebase.before where step.writing.contains(name) {
+                    #expect(rebase.after[name] == delay, context("ii: \(name)"))
                 }
             }
             // (iii)
-            if let tried = step.triedOn { #expect(!sound(tried).isFlat && sound(tried) != .noAudio, context("iii: tried \(tried)")) }
+            if step.movedBySound, let reference = step.reference {
+                #expect(step.counted.contains(reference), context("iii: moved to \(reference)"))
+            }
             // (iv)
             if step.anchor != previous?.anchor || step.movedBySound || !stayed { shared = [:] }
             if let reference = byUID[step.measuredAgainst], sound(reference.uid).sharesSpeech,
@@ -294,41 +335,31 @@ import Testing
                 }
             }
             // (v)
-            if step.triedOn != nil {
-                #expect(!step.wasSynced, context("v"))
-                if let previous {
-                    let anchorFile = previous.anchor.map { "\($0)-" }
-                    let synced = previous.delays.keys.filter { name in
-                        step.writing.contains(name) && !(anchorFile.map(name.hasPrefix) ?? false)
-                    }
-                    #expect(synced.isEmpty, context("v: \(synced) had an audio delay"))
-                }
-            }
-            // (vi): the count restarts at a file's start, which starts a new episode.
+            if step.wasConfirmed { #expect(!step.movedBySound, context("v")) }
+            // (vi)
             let speakers = scenario.inputs.filter { $0.uid != step.measuredAgainst && writes($0.uid) && sound($0.uid).sharesSpeech }
-            if sound(step.measuredAgainst).isFlat, speakers.count >= 2, stayed, !step.fileStarted, !step.wasSynced {
-                flatReference += 1
-                #expect(step.movedBySound || flatReference < 1, context("vi: still on \(step.measuredAgainst) after \(flatReference)"))
-            } else {
-                flatReference = 0
+            if !sound(step.measuredAgainst).sharesSpeech, sound(step.measuredAgainst) != .unrelated,
+               speakers.count >= 2, !step.wasConfirmed, !step.countedAgainstTheReference {
+                #expect(step.movedBySound, context("vi: still on \(step.measuredAgainst)"))
             }
-            // (vii): two speakers or more, from a time nothing was synced, for as long as every input could be tried,
-            // the reference one of them or not, end with an input other than the anchor synced; once one is, (iv)
-            // holds for the rest, and a reference that pauses then is not tried elsewhere (v).
+            // (ix)
+            for startOver in step.startOvers {
+                #expect(startOver.cleared == (startOver.wasConfirmed ? [] : startOver.writing), context("ix: \(startOver)"))
+            }
+            // (vii)
             let sharingNow = scenario.inputs.filter { writes($0.uid) && sound($0.uid).sharesSpeech }
             sharing = sharingNow.count >= 2 && !step.fileStarted ? sharing + 1 : 0
-            if sharing == 1 { sharingFromUnsynced = !step.wasSynced }
-            if sharingFromUnsynced, sharing == scenario.inputs.count + 1 {
+            if sharing >= 2 {
                 let anchorFile = step.anchor.map { "\($0)-" } ?? "-"
-                #expect(step.wasSynced || step.delays.keys.contains { !$0.hasPrefix(anchorFile) }, context("vii: nothing synced"))
+                #expect(step.delays.keys.contains { !$0.hasPrefix(anchorFile) }, context("vii: nothing synced"))
             }
-            // (viii)
-            if step.counted { (movesInEpisode, filesInEpisode) = (0, 0) }
-            filesInEpisode += step.writing.subtracting(previous?.writing ?? step.writing).count
-            if step.movedBySound {
-                movesInEpisode += 1
-                #expect(movesInEpisode <= scenario.inputs.count + filesInEpisode, context("viii: \(movesInEpisode) moves"))
-            }
+            last = step
+        }
+        // (viii)
+        guard let last else { return }
+        let mainAnchor = last.mainAnchor.map { "\($0)-" } ?? "-"
+        for name in last.mainDelays.keys where !name.hasPrefix(mainAnchor) && last.writing.contains(name) {
+            #expect(last.delays[name] != nil, "(viii) seed \(seed): \(name) synced by main's rules only\n\(scenario)")
         }
     }
 }

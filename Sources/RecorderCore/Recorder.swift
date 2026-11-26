@@ -1055,10 +1055,14 @@ public final class Recorder {
             return
         }
         let count = AudioDelay.windowSeconds * AudioDelay.sampleRate
+        // One end for every window, so the measurement's pairs of other inputs line up too (D89); an input more
+        // than a window behind the reference does not hold the others back.
+        let end = others.compactMap { audioDelayFeed.endIndex(of: writing[$0]!) }
+            .filter { $0 > referenceEnd - Int64(count) }.reduce(referenceEnd, min)
         var jobs: [(file: String, uid: String, reference: [Float], other: [Float])] = []
         for file in others {
             let uid = writing[file]!
-            guard let end = audioDelayFeed.endIndex(of: uid).map({ min($0, referenceEnd) }),
+            guard audioDelayFeed.endIndex(of: uid) != nil,
                   let start = manifest.audioFiles.first(where: { $0.name == file })?.start,
                   Double(end - Int64(count)) / Double(AudioDelay.sampleRate) >= start,
                   let other = audioDelayFeed.window(of: uid, endingAt: end, count: count),
@@ -1069,11 +1073,12 @@ public final class Recorder {
             jobs.append((file, uid, referenceWindow, other))
         }
         guard !jobs.isEmpty else { return }
+        let measuresPairs = !audioDelays.isSyncConfirmed
         let measurement = await Task.detached(priority: .utility) {
-            AudioDelays.measure(reference: (referenceFile, reference.uid), others: jobs)
+            AudioDelays.measure(reference: (referenceFile, reference.uid), others: jobs, measuresPairs: measuresPairs)
         }.value
         guard !isStopped else { return }
-        applyAudioDelays(measurement: measurement, at: Double(referenceEnd) / Double(AudioDelay.sampleRate))
+        applyAudioDelays(measurement: measurement, at: Double(end) / Double(AudioDelay.sampleRate))
     }
 
     /// Each audio input's newest file while its capture runs, by name, with its device's UID (D80).
@@ -1114,6 +1119,7 @@ public final class Recorder {
         let mixedUpTo = mixedPosition.map { Double($0) / rate }
             ?? Double(context.now() - RecorderValues.guideTrackDelay.nanoseconds) / 1e9
         var changed = false
+        for file in outcome.cleared.sorted() { changed = manifest.audioDelaysReplaced([], file: file) != nil || changed }
         for (file, entry) in outcome.delays.sorted(by: { $0.key < $1.key }) {
             changed = manifest.audioDelaySet(entry, at: mixedUpTo, file: file) || changed
         }

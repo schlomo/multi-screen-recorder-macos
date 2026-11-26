@@ -43,6 +43,9 @@ public struct AudioDelays: Sendable {
         public var isMoved = false
         /// Every decision taken, one line each, for the recording log.
         public var lines: [String] = []
+        /// Files whose `recording.json` entries so far are void: every input started over before the sync was
+        /// confirmed, so they were against an anchor that no longer is one (D89).
+        public var cleared: Set<String> = []
     }
 
     private struct File: Sendable {
@@ -67,7 +70,7 @@ public struct AudioDelays: Sendable {
     }
 
     /// One measurement (D77): each other file's window against the reference's file over their latest common
-    /// window.
+    /// window, and, when asked, each pair of other files with sound against each other over the same windows (D89).
     public struct Measurement: Sendable {
         public struct Measured: Sendable {
             public var file: String
@@ -76,21 +79,26 @@ public struct AudioDelays: Sendable {
             public var window: AudioDelay.Window?
             /// Its own window is not silent.
             public var hasSound: Bool
-            public var actionScore: Double
+        }
+
+        /// `other`'s window against `reference`'s, two files other than the reference's.
+        public struct Pair: Sendable {
+            public var reference: String
+            public var other: String
+            public var window: AudioDelay.Window?
         }
 
         public var reference: String
         public var referenceUID: String
-        public var referenceHasSound: Bool
-        public var referenceActionScore: Double
         public var files: [Measured]
+        public var pairs: [Pair] = []
     }
 
     private var files: [String: File] = [:]
     /// Each device's newest file, by the device's UID, while its capture runs.
     private var newest: [String: String] = [:]
     /// The device every audio delay is against: the first input whose file is written, or the new one after a
-    /// start-over (D80), as when a reference miss tries an input without an audio delay (D89).
+    /// start-over (D80), as when a reference miss moves the reference to an input without an audio delay (D89).
     public private(set) var anchor: String?
     /// The anchor's files, its audio delay 0 by definition: those of its device that became known while it was
     /// the reference, as its first file or after another of them (D85).
@@ -103,12 +111,13 @@ public struct AudioDelays: Sendable {
     /// The reference's file, by name.
     private var referenceFile: String?
     private var known = 0
-    /// The try episode (D89): the device it started from, every device tried in it, that one included (a
-    /// device's new file takes it out again), and whether every candidate was tried and the reference settled;
-    /// nil until a reference miss and from a counted window on.
-    private var episode: (origin: String, tried: Set<String>, isSettled: Bool)?
-    /// An input other than the anchor has had an audio delay in this recording (D89).
-    private var hasSynced = false
+    /// Each device's counted windows since the anchor became the anchor (D89).
+    private var countedWindows: [String: Int] = [:]
+    /// An input other than the anchor has had `audioDelayConfirmingWindows` counted windows since the anchor became
+    /// the anchor: until another start-over, the reference moves only on no audio or its capture's end (D89).
+    public var isSyncConfirmed: Bool {
+        countedWindows.contains { $0.key != anchor && $0.value >= RecorderValues.audioDelayConfirmingWindows }
+    }
 
     public init() {}
 
@@ -122,11 +131,11 @@ public struct AudioDelays: Sendable {
         guard let referenceUID = newest[reference] else { preconditionFailure("the reference \(reference) is not recorded") }
         var lines: [String] = []
         var carriedOver: [String] = []
+        var cleared: Set<String> = []
         if anchor == nil { anchor = referenceUID }
         for (name, uid) in newest.sorted(by: { $0.key < $1.key }) where files[name] == nil {
             let earlier = files.filter { $0.value.uid == uid }.max { $0.value.order < $1.value.order }
             known += 1
-            episode?.tried.remove(uid)
             // Only after an anchor file, or as the device's first: a file after a measured one carries that over.
             if uid == anchor, referenceUID == anchor, earlier.map({ anchorFiles.contains($0.key) }) ?? true {
                 anchorFiles.insert(name)
@@ -146,13 +155,15 @@ public struct AudioDelays: Sendable {
         if delay(of: reference) == nil {
             lines.append("reference \(referenceFile ?? "none") → \(reference): it has no audio delay, so it is the new anchor and every input starts over")
             // shortcut: only when no input being written has an audio delay but the anchor's own 0
-            // (`reference(among:)` picks such a reference first, and a reference miss tries another only while no input but
-            // the anchor has had one, D89), the new anchor's audio delay against the old one is unknown and taken as 0, so every input
-            // starts over and the entries written so far stay against the old anchor; keep the old anchor's last
-            // known delays if a lost anchor proves common.
+            // (`reference(among:)` picks such a reference first, and a reference miss moves it only before the sync is
+            // confirmed, D89), the new anchor's audio delay against the old one is unknown and taken as 0, so every
+            // input starts over; the entries written so far stay against the old anchor once the sync was confirmed
+            // and are cleared before; keep the old anchor's last known delays if a lost anchor proves common.
             anchor = referenceUID
             anchorFiles = [reference]
             for name in files.keys { (files[name]!.applied, files[name]!.unclear) = (AudioDelay.Applied(), 0) }
+            if !isSyncConfirmed { cleared = Set(self.newest.values) }
+            countedWindows = [:]
         }
         // shortcut: a reference other than the anchor is not measured, so its audio delay against the anchor, the
         // base, stays as it was when it became the reference, for as long as its file is written (D85); measure
@@ -175,11 +186,11 @@ public struct AudioDelays: Sendable {
                 continue
             }
             files[name]!.applied.add(lag + base, at: at, against: referenceUID)
+            countedWindows[files[name]!.uid, default: 0] += 1
             if let decision = files[name]!.applied.decision { lines.append("\(name): audio delay \(decision)") }
         }
 
         let delays = Dictionary(uniqueKeysWithValues: self.newest.compactMap { uid, name in delay(of: name).map { (uid, $0) } })
-        if delays.keys.contains(where: { $0 != anchor }) { hasSynced = true }
         let change = membership.update(delays: delays, writing: Set(self.newest.keys))
         let zero = delays.filter { !membership.isOut($0.key) }.values.min() ?? 0
         var outcome = Outcome(
@@ -216,23 +227,33 @@ public struct AudioDelays: Sendable {
             outcome.delays[name] = Entry(delay: delay)
         }
         outcome.lines = lines
+        outcome.cleared = cleared
         return outcome
     }
 
     /// Measures each other file's window against the reference's (`others`: each file with its own window and
-    /// the reference's over the same span); pure, so the recorder runs it off the main thread.
+    /// the reference's, all over the same span); with `measuresPairs`, when no window counts against the
+    /// reference, also each pair of the other files with sound against each other (D89). Pure, so the recorder runs
+    /// it off the main thread.
     public static func measure(
-        reference: (file: String, uid: String), others: [(file: String, uid: String, reference: [Float], other: [Float])]
+        reference: (file: String, uid: String), others: [(file: String, uid: String, reference: [Float], other: [Float])],
+        measuresPairs: Bool
     ) -> Measurement {
-        let referenceWindow = others.first?.reference ?? []
-        return Measurement(
+        var measurement = Measurement(
             reference: reference.file, referenceUID: reference.uid,
-            referenceHasSound: !referenceWindow.isEmpty && !AudioDelay.isSilent(referenceWindow),
-            referenceActionScore: AudioDelay.actionScore(referenceWindow),
             files: others.map {
                 .init(file: $0.file, uid: $0.uid, window: AudioDelay.window(reference: $0.reference, other: $0.other),
-                      hasSound: !AudioDelay.isSilent($0.other), actionScore: AudioDelay.actionScore($0.other))
+                      hasSound: !AudioDelay.isSilent($0.other))
             })
+        guard measuresPairs, !measurement.files.contains(where: { $0.window?.counts == true }) else { return measurement }
+        let sounding = others.filter { !AudioDelay.isSilent($0.other) }
+        for (index, first) in sounding.enumerated() {
+            for second in sounding[(index + 1)...] {
+                measurement.pairs.append(.init(
+                    reference: first.file, other: second.file, window: AudioDelay.window(reference: first.other, other: second.other)))
+            }
+        }
+        return measurement
     }
 
     /// The reference among `candidates` (D80, D85): the reference in use while it is one of them, else the
@@ -244,22 +265,12 @@ public struct AudioDelays: Sendable {
             ?? byNumber.first { hasAudioDelay($0.file, device: $0.uid) } ?? byNumber.first
     }
 
-    /// The candidate with the highest of `scores`, unscored ones at 0; within `actionScoreTie` of it, the lowest
-    /// number (D89).
-    private static func mostAction(_ candidates: [Candidate], scores: [String: Double]) -> Candidate? {
-        guard let top = candidates.map({ scores[$0.uid] ?? 0 }).max() else { return nil }
-        return candidates.filter { (scores[$0.uid] ?? 0) >= top - RecorderValues.actionScoreTie }.min { $0.number < $1.number }
-    }
-
-    /// An action score below `actionScoreFlat`: an empty line-in, a hum, near-silence (D89).
-    public static func isFlat(_ score: Double) -> Bool { score < RecorderValues.actionScoreFlat }
-
     /// The audio delays after `measurement`: its counted windows' lags and unclear files, each window's line,
     /// the reference among `candidates` (`files` as for `update`); a measurement against another reference
-    /// than the one in use now counts nothing (D80, D85). While no input but the anchor has had an audio delay, a
-    /// reference miss (no counted window while another input that is not flat had sound) tries the reference on the
-    /// untried candidate with the most action; once every candidate was tried, it goes back to where the try
-    /// episode started or, that one flat, to the tried one with the most action (D89).
+    /// than the one in use now counts nothing (D80, D85). Before the sync is confirmed, a reference miss (no
+    /// counted window against the reference while another input had sound) moves the reference to the candidate
+    /// the most others count against in the measurement's pairs, if any, and applies their lags against it at
+    /// once (D89).
     public mutating func measured(
         _ measurement: Measurement, files newest: [String: String], candidates: [Candidate], at: Double
     ) -> Outcome {
@@ -271,8 +282,7 @@ public struct AudioDelays: Sendable {
                 lines.append("\(measured.file): not measured, it or the reference \(measurement.reference) is silent")
                 continue
             }
-            lines.append("\(measured.file): lag \(AudioDelay.text(window.lag)) against \(measurement.reference), "
-                + "clarity \(Int(window.clarity.rounded())), " + (window.counts ? "counted" : "not counted"))
+            lines.append(Self.line(measured.file, window, against: measurement.reference))
             if window.counts { lags[measured.file] = window.lag } else { unclear.insert(measured.file) }
         }
         guard let reference = reference(among: candidates) else { return Outcome(lines: lines) }
@@ -285,52 +295,43 @@ public struct AudioDelays: Sendable {
             outcome.lines = lines + outcome.lines
             return outcome
         }
-        let wasSynced = hasSynced
+        let wasConfirmed = isSyncConfirmed
         var outcome = update(files: newest, reference: reference.file, lags: lags, unclear: unclear, at: at)
-        var target: Candidate?
-        if !lags.isEmpty {
-            if let episode, episode.tried.count > 1 {
-                lines.append("reference \(reference.file): a window counted against it, it stays the reference")
-            }
-            episode = nil
-        } else if !wasSynced, measurement.files.contains(where: { $0.hasSound && !Self.isFlat($0.actionScore) }) {
-            let scores = Dictionary(
-                measurement.files.map { ($0.uid, $0.actionScore) } + [(measurement.referenceUID, measurement.referenceActionScore)]) { $1 }
-            func text(_ candidate: Candidate) -> String { "\(candidate.file) \(String(format: "%.1f", scores[candidate.uid] ?? 0)) dB" }
-            var current = episode ?? (origin: reference.uid, tried: [reference.uid], isSettled: false)
-            let untried = candidates.filter {
-                $0.uid != reference.uid && !current.tried.contains($0.uid) && !Self.isFlat(scores[$0.uid] ?? 0)
-            }
-            let missed = "reference \(reference.file): no counted window while another input had sound"
-            if let next = Self.mostAction(untried, scores: scores) {
-                let listed = untried.sorted { (scores[$0.uid] ?? 0) > (scores[$1.uid] ?? 0) }.map(text)
-                lines.append("\(missed); candidates \(listed.joined(separator: ", ")); tries \(next.file)")
-                current.tried.insert(next.uid)
-                target = next
-            } else if current.tried.count > 1, !current.isSettled {
-                // Every candidate with action tried: none is tried again until a window counts or its new file starts.
-                current.isSettled = true
-                let tried = candidates.filter { current.tried.contains($0.uid) }
-                if let origin = tried.first(where: { $0.uid == current.origin }), !Self.isFlat(scores[origin.uid] ?? 0) {
-                    lines.append("\(missed); every candidate tried, back to \(origin.file)")
-                    target = origin
-                } else if let best = Self.mostAction(tried.filter { $0.uid != current.origin }, scores: scores) {
-                    lines.append("\(missed); every candidate tried, the reference to the tried one with the most action: "
-                        + text(best))
-                    target = best
-                }
-            }
-            episode = current
+        guard lags.isEmpty, !wasConfirmed, measurement.files.contains(where: \.hasSound) else {
+            outcome.lines = lines + outcome.lines
+            return outcome
         }
-        if let target, target.uid != reference.uid {
-            let moved = update(files: newest, reference: target.file, at: at)
-            outcome = Outcome(
-                leaving: outcome.leaving.merging(moved.leaving) { $1 }, rejoining: outcome.rejoining.union(moved.rejoining),
-                earlierBy: moved.earlierBy, delays: moved.delays, isMoved: outcome.isMoved || moved.isMoved,
-                lines: outcome.lines + moved.lines)
+        var against: [String: [String: Double]] = [:]
+        for pair in measurement.pairs {
+            guard let window = pair.window else { continue }
+            lines.append(Self.line(pair.other, window, against: pair.reference))
+            guard window.counts else { continue }
+            against[pair.reference, default: [:]][pair.other] = window.lag
+            against[pair.other, default: [:]][pair.reference] = -window.lag
         }
-        outcome.lines = lines + outcome.lines
+        let proven = candidates.filter { against[$0.file] != nil }
+            .max { (against[$0.file]!.count, $1.number) < (against[$1.file]!.count, $0.number) }
+        guard let proven, let provenLags = against[proven.file] else {
+            outcome.lines = lines + outcome.lines
+            return outcome
+        }
+        lines.append("reference \(reference.file): no counted window against it while another input had sound; \(proven.file) has "
+            + "counted windows of \(provenLags.count) other input\(provenLags.count == 1 ? "" : "s") against it: "
+            + provenLags.keys.sorted().joined(separator: ", "))
+        // Nothing confirmed: the new reference starts over as the anchor, whatever single window gave it a delay.
+        for name in files.keys { (files[name]!.applied, files[name]!.unclear) = (AudioDelay.Applied(), 0) }
+        anchorFiles = []
+        let moved = update(files: newest, reference: proven.file, lags: provenLags, at: at)
+        outcome = Outcome(
+            leaving: outcome.leaving.merging(moved.leaving) { $1 }, rejoining: outcome.rejoining.union(moved.rejoining),
+            earlierBy: moved.earlierBy, delays: moved.delays, isMoved: outcome.isMoved || moved.isMoved,
+            lines: lines + outcome.lines + moved.lines, cleared: moved.cleared)
         return outcome
+    }
+
+    private static func line(_ file: String, _ window: AudioDelay.Window, against reference: String) -> String {
+        "\(file): lag \(AudioDelay.text(window.lag)) against \(reference), clarity \(Int(window.clarity.rounded())), "
+            + (window.counts ? "counted" : "not counted")
     }
 
     /// What the status window shows for a device's newest file: nothing for one out of the guide track (its

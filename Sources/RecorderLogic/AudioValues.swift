@@ -63,19 +63,9 @@ extension RecorderValues {
 /// clear sound to sync.
 extension RecorderValues {
     public static let audioDelayUnclearMeasurements = 3
-    /// An action score (D89) is the spread of the levels of a window's slices with sound, each slice this long:
-    /// the level of `actionScoreHighPercentile` of them less that of `actionScoreLowPercentile`, in dB; with
-    /// fewer than `actionScoreMinimumSlices` slices with sound, 0.
-    public static let actionScoreSlice = Duration.milliseconds(100)
-    public static let actionScoreLowPercentile = 0.1
-    public static let actionScoreHighPercentile = 0.9
-    public static let actionScoreMinimumSlices = 10
-    /// Below this action score an input is flat, never tried as the reference: the owner's dock line-in with
-    /// nothing connected scored 1.9 to 2.9 dB in the replayed recordings, speech behind a gate from 4.1 dB in the
-    /// generated scenarios, real microphones' medians 7.4 to 39.6 dB.
-    public static let actionScoreFlat = 4.0
-    /// Action scores this close to the highest are a tie, which goes to the lowest number.
-    public static let actionScoreTie = 3.0
+    /// The counted windows of an input other than the anchor that confirm the sync: from then on the reference
+    /// moves only on no audio or its capture's end; one window, as a burst on an empty line-in gives, does not (D89).
+    public static let audioDelayConfirmingWindows = 2
     public static let audioDelayChangeWindowSeconds = 60.0
     public static let audioDelayChangeWindows = 5
     /// One frame at 30 fps: closer than this, a new median changes nothing.
