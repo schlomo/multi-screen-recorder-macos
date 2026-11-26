@@ -3298,7 +3298,8 @@ architect's reading.
   the anchor (`audioDelayGroupWindows`, *data*, formerly
   `audioDelayEstablishingWindows`). Every start-over clears the entries
   of the files being written. Once the reference is another input, the
-  anchor's file is measured like any other, carrying over its 0. The
+  anchor's file being written is measured like any other from its own
+  0, which hindsight keeps for the stretch before. The
   "Audio inputs" guide track mixes every input with an audio delay
   unless they lie further apart than 0.8 s; then the largest set within
   0.8 s of each other, on a tie the reference's, decided afresh each
@@ -3323,6 +3324,11 @@ architect's reading.
   - Not V1 (start over when the group outnumbers every input synced
     now): a stray burst on two junk inputs then keeps the room's
     microphones unsynced for the whole recording.
+  - Two deviations from the signed design, both more conservative: on
+    a miss a synced input the others count against is preferred, a
+    re-base, over an unsynced one more inputs count against, a
+    start-over; and the anchor's group counts each device's counted
+    windows since the anchor became the anchor, not each file's own.
 - **What got worse:** in the 3,200 generated recordings as generated,
   nothing. With lags widened ×2.6: seed 2650 syncs one input fewer
   (after a re-base its lag from the new reference is beyond the ±1 s
@@ -3335,7 +3341,12 @@ architect's reading.
   miss (a normal measurement 0.008, 0.019 and 0.029 s, unchanged).
   Known costs kept: two loopbacks of a call during a quiet start keep
   the reference from the room's two microphones; two rooms taking
-  turns every 10 s start over every turn.
+  turns every 10 s start over every turn. A late start-over: two inputs
+  synced for an hour, then one miss in which three unsynced inputs
+  match each other, starts over and clears the synced inputs' entries;
+  only possible with five or more inputs, outside the owner's main use
+  cases, and the generated recordings, with one shared talker, cannot
+  show it.
 - **Evidence:** the 3,200 generated recordings run side by side with
   the rules before (`faster-tests` at 3dac59c): as generated 132 seeds
   more microphone-synced steps, 0 fewer, 27 seeds more inputs synced at
