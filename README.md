@@ -62,8 +62,10 @@ own clock is resampled continuously to stay with the screen files
     are measured against one of them, the reference, chosen by what they
     hear, never by which is the default: when it matches nothing, the
     others are compared with each other and the reference moves to the one
-    they match, keeping every sync made, so an empty line-in as the first
-    input holds nothing up. Two inputs carrying the same other sound (two
+    they match, keeping every sync made when that one is synced already;
+    else it starts over, every microphone measured again, but only when
+    more of them match it than match the anchor, so an empty line-in as
+    the first input holds nothing up. Two inputs carrying the same other sound (two
     loopbacks of a call) during a quiet start can win that instead, and
     the room's microphones then stay out; the audio mode Wired, the
     default, records no virtual input but the default microphone. One never measured

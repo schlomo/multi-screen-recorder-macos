@@ -262,13 +262,13 @@ Full text: [docs/working-on-this-mac.md](docs/working-on-this-mac.md).
   later on the `PATH`.
 - `msr` without arguments, `msr check` and `msr record` prompt for
   permissions, capture a frame, write the output folder and, at Stop,
-  `state.json`. An agent runs them on the owner's Mac only to test the
-  roadmap's work or through `scripts/update-homepage-screenshots
-  --this-mac`, the owner told before each such run (D56, D82); on
-  anyone else's Mac never unasked. Tests run into a scratch folder with
-  a scratch `HOME`, never touching the owner's settings or permissions
-  (D48). `msr list`, `msr version`, `msr timeline`, `msr settings` and
-  the tests are safe.
+  `state.json`; `msr list` reads the devices. An agent runs these on
+  the owner's Mac only to test the roadmap's work or through
+  `scripts/update-homepage-screenshots --this-mac`, the owner told
+  before each such run (D56, D82); on anyone else's Mac never unasked.
+  Tests run into a scratch folder with a scratch `HOME`, never touching
+  the owner's settings or permissions (D48). `msr version`,
+  `msr timeline`, `msr settings` and the tests are safe.
 - `scripts/install-app` replaces the installed app in `/Applications`:
   only with the owner's go-ahead, never while the owner records.
 - Real capture needs permissions granted by a person; capture behaviour

@@ -31,14 +31,14 @@ every agent stay in `AGENTS.md`.
   "Work branches"). PRs from
   forks and Dependabot are tested, built, smoke-tested and end-to-end
   tested, never signed or published. Signing needs the repository secret
-  `SIGNING_CERTIFICATE_P12` ([delivery.md](docs/design/delivery.md)).
+  `SIGNING_CERTIFICATE_P12` ([delivery.md](design/delivery.md)).
   Who may register pipelines and edit branch policies: the repository
   owner.
 
 - **Environments:** the user's Mac; the homepage, a Hugo site in
   `homepage/` on `main`, built and served by Cloudflare Workers Builds
   at `multiscreenrecorder.schapiro.org` (D53); connecting the Worker to
-  the repository is the owner's ([homepage/README.md](homepage/README.md)).
+  the repository is the owner's ([homepage/README.md](../homepage/README.md)).
 
 ## Running the tests
 
@@ -57,7 +57,7 @@ while it adds a virtual screen and plays a tone into BlackHole, then
 examines the recording folders and takes a screenshot of the app's
 window) and copies its scratch folder back; its exit status is the
 driver's
-([end-to-end-tests.md](docs/design/end-to-end-tests.md)); with
+([end-to-end-tests.md](design/end-to-end-tests.md)); with
 `--release` or `--snapshot <n>` it runs that published app instead of
 the built one. They need an idle Mac: another VM, video editing, a
 virus scan or a backup running can make them fail. Before a PR
@@ -74,7 +74,7 @@ instead and only copies them into the checkout (D82).
 
 - Building and testing need macOS 26 or later on Apple silicon with
   Xcode 26 or later; CI has Xcode 26.6 (Swift 6.3), and the package
-  must build there ([delivery.md](docs/design/delivery.md)). A Linux
+  must build there ([delivery.md](design/delivery.md)). A Linux
   container (such as a cloud agent session) can edit and review but not
   build or run anything. Say UNVERIFIED for any change not built and
   run on a Mac or by CI.
@@ -83,7 +83,7 @@ instead and only copies them into the checkout (D82).
   accepted (`scripts/test` checks this first).
 - Six scripts are Python, standard library only, and need Python 3.15
   or later as `python3` on the `PATH` (the runner image's; macOS ships
-  an older one); see [delivery.md](docs/design/delivery.md).
+  an older one); see [delivery.md](design/delivery.md).
 - `msr` without arguments starts the app, and the app, `msr check` and
   `msr record` run the ready check, which requests any never-asked
   permission and captures one frame of a screen (not at the recording
@@ -125,6 +125,6 @@ instead and only copies them into the checkout (D82).
   (the v1 gate in `backlog.md`) and by the end-to-end tests in that VM
   (D67). They run nowhere else: GitHub's hosted runner stalls its own
   video encoder at a virtual screen's mode switch
-  ([end-to-end-tests.md](docs/design/end-to-end-tests.md), "Why the
+  ([end-to-end-tests.md](design/end-to-end-tests.md), "Why the
   VM"). The VM has no camera. A run records and plays sound inside the
   VM only, never on the Mac; the VM takes about 30 GB of its disk.
