@@ -3479,3 +3479,19 @@ architect's reading.
   drift"; `ClockDriftTrackerTests.aLessLateStartIsNotTakenAsDrift`;
   [troubleshooting.md](troubleshooting.md), "The system audio is
   corrected by about 20 ms for good".
+
+## D93: The system audio keeps its file through an output device change (2026-11-26)
+
+- **Status:** in force; the owner's ruling.
+- **Context:** The owner, 2026-11-26: "system audio should keep the
+  file if possible. after all, there is no technical reason for system
+  audio to 'disconnect'".
+- **Decision:** a change of the audio output device does not end the
+  system audio's file; only a failed capture does. The architect's
+  reading: the recorder already does this, as ScreenCaptureKit captures
+  the system mix and no code reacts to an output device change (not yet
+  tried with a real output switch); a design that moves capture into
+  helper processes keeps it.
+- **Consequences:** a helper-process design (backlog item 56) must not
+  tie the system audio's capture to an output device.
+- **Evidence:** PR #35; backlog item 56.
