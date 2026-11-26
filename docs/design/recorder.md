@@ -696,8 +696,8 @@ windows ending within it, one with fewer than 2 keeping its live value
 (the better estimate then), neighbours within a frame merged, but never
 across a change of the reference, the first at 0, so a file whose audio
 delay the 60 s rule never changed, measured against one reference, has
-one entry; the anchor's files and a file without own counted windows
-keep theirs (see "Audio delay", D80). `at` is the
+one entry; the anchor's files while the anchor is the reference and a
+file without own counted windows keep theirs (see "Audio delay", D80). `at` is the
 seconds into the file from which the entry holds (to the millisecond,
 never below 0; the first entry also holds before its `at`, as the best
 known); `delay` is the seconds by which the file's sound there is later
@@ -709,8 +709,11 @@ the smallest of the files' latest `delay` (taken as 0 when that is
 above 0); a file with an empty list and the system audio are not moved;
 the timeline file does exactly this. The anchor's files list
 `{at: 0, delay: 0}` (a device that becomes the anchor later gets that
-entry from then on; a new file of the anchor's device after the
-reference moved away is measured like any other, D85, D90); the system
+entry from then on); once the reference moved away, the anchor's file
+being written is measured like any other and may then list more
+entries after its 0, which hindsight keeps for the stretch the anchor
+was the reference, and a new file of the anchor's device is measured
+like any other (D85, D90); the system
 audio's list is always empty; a new
 file of an input starts with its earlier file's value as its first
 entry at 0. How a
@@ -992,7 +995,8 @@ checked, reported or rewritten at the next start (D47).
   uncoloured and short, `· synced 553 ms`, how much earlier the
   "Audio inputs" mix places the file, once its audio delay is set or
   confirmed by its own windows, `· synced 0 ms` for the earliest input
-  and the anchor's own file at 0 (D86), `· synced 533 ms (carried)` while it
+  and the anchor's own file at 0 (D86), also once the reference moved
+  away, until its first counted window (D90), `· synced 533 ms (carried)` while it
   holds its earlier file's, `· not synced yet` before it has one,
   `· no clear sound` once its file had sound in 3 measurements
   (`audioDelayUnclearMeasurements`, *data*) without a counted window
@@ -1673,8 +1677,10 @@ the metadata items (see "Output on disk").
   new file that starts before the earlier one's end is told still
   carries it over. The anchor's files, those of its device that start
   while it is the reference, are 0, listed as such. Once the reference
-  is another input, the anchor's file being written carries over its 0
-  and is measured against the reference in use like any other input,
+  is another input, the anchor's file being written starts from its own
+  0 (shown as such, not as carried over; hindsight keeps it for the
+  stretch before its first window against the new reference) and is
+  measured against the reference in use like any other input,
   and so is a new file of the anchor's device, carrying over its earlier
   file's audio delay: an Osmo that comes back about 100 ms less late
   after a replug is followed (D85, the owner's recording `2026-11-24
@@ -2196,7 +2202,7 @@ them:
   `reference <file>: <file>'s group of 2 does not outnumber the anchor's
   group of 2: nothing moves`. Once the reference is another input:
   `<file>: the anchor's file, measured against <file> from now on,
-  carrying over 0 ms`.
+  starting at 0 ms`, only for one being written.
 - The mix: `<file>: joins the guide track placed earlier by 500 ms (the
   mix's zero: <file>)`, `<file>: placed earlier by 555 ms → 600 ms (the
   mix's zero: <file>)` followed by `the Audio inputs guide track

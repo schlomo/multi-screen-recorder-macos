@@ -464,7 +464,7 @@ public struct RecordingManifest: Codable, Equatable, Sendable {
         return true
     }
 
-    /// The file's audio delays replaced, with hindsight at Stop (D80) or cleared at a start-over (D89); the entries
+    /// The file's audio delays replaced, with hindsight at Stop (D80) or cleared at a start-over (D90); the entries
     /// before, nil when unchanged.
     public mutating func audioDelaysReplaced(_ delays: [AudioFile.Delay], file name: String) -> [AudioFile.Delay]? {
         guard state != .finalized, let index = audioFiles.firstIndex(where: { $0.name == name }),

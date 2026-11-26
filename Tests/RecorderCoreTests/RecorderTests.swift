@@ -897,6 +897,27 @@ extension GlobalRecordingLog {
             #expect(try delays(of: "R") == [0])
         }
 
+        /// The anchor's file, measured after a re-base, keeps its 0 for the stretch it was the reference: Stop's
+        /// hindsight splits it where it began to be measured against the new reference (D85, D90). A is 0.5 late,
+        /// then 0.3: R, measured against A from its base of 0.5, is then 0.2 late.
+        @Test func theAnchorsStretchAsTheReferenceKeepsItsZeroAfterARebase() async throws {
+            try await startInputs(["R", "A", "B"])
+            for _ in 0..<3 {
+                try feed(["R": .speech(0), "A": .speech(0.5), "B": .speech(0.2)])
+                await recorder.measureAudioDelays()
+            }
+            try feed(["R": .quiet, "A": .speech(0.3), "B": .speech(0.2)])
+            await recorder.measureAudioDelays()
+            for _ in 0..<4 {
+                try feed(["R": .speech(0), "A": .speech(0.3), "B": .speech(0.2)])
+                await recorder.measureAudioDelays()
+            }
+            _ = await stop()
+            let entries = try #require(try manifestOnDisk().audioFiles.last { $0.audioSourceUID == "R" }?.delays)
+            #expect(entries.count == 2 && entries.first == .init(at: 0, delay: 0), "\(entries)")
+            #expect(entries.count == 2 && entries[1].at > 0 && abs(entries[1].delay - 0.2) < 0.002, "\(entries)")
+        }
+
         /// The reference muted while two inputs have an audio delay: the lower-numbered one takes it (D80, D85).
         @Test func aMutedReferenceGoesToTheLowestNumberWithAnAudioDelay() async throws {
             try await startInputs(["R", "A", "B"])

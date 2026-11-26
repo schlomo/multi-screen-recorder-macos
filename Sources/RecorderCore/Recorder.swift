@@ -1046,9 +1046,10 @@ public final class Recorder {
     /// off the main thread, and hands the measurement to the audio delays (D77, D80). Nothing after Stop.
     func measureAudioDelays() async {
         guard !isStopped else { return }
-        let ended = Set(manifest.audioFiles.filter { $0.end != nil }.map(\.name))
-        let writing = audioInputFiles().filter { !ended.contains($0.key) }
-        guard let reference = audioDelays.reference(among: delayCandidates(among: audioInputFiles())) else { return }
+        let files = audioInputFiles()
+        let ended = endedFiles(among: files)
+        let writing = files.filter { !ended.contains($0.key) }
+        guard let reference = audioDelays.reference(among: delayCandidates(among: files, ended: ended)) else { return }
         let referenceFile = reference.file
         let others = writing.filter { $0.value != reference.uid }.keys.sorted()
         guard writing[referenceFile] != nil, let referenceEnd = audioDelayFeed.endIndex(of: reference.uid) else {
@@ -1094,13 +1095,14 @@ public final class Recorder {
     private func applyAudioDelays(measurement: AudioDelays.Measurement? = nil, at: Double = 0) {
         guard !isStopped else { return }
         let files = audioInputFiles()
-        let candidates = delayCandidates(among: files)
+        let ended = endedFiles(among: files)
+        let candidates = delayCandidates(among: files, ended: ended)
         let outcome: AudioDelays.Outcome
         if let measurement {
-            outcome = audioDelays.measured(measurement, files: files, candidates: candidates, at: at)
+            outcome = audioDelays.measured(measurement, files: files, candidates: candidates, at: at, ended: ended)
         } else {
             guard let reference = audioDelays.reference(among: candidates) else { return }
-            outcome = audioDelays.update(files: files, reference: reference.file)
+            outcome = audioDelays.update(files: files, reference: reference.file, ended: ended)
         }
         for line in outcome.lines { RecorderLog.detail(line, category: "recorder") }
         let rate = Double(RecorderValues.audioSampleRate)
@@ -1117,7 +1119,7 @@ public final class Recorder {
         let mixedUpTo = mixedPosition.map { Double($0) / rate }
             ?? Double(context.now() - RecorderValues.guideTrackDelay.nanoseconds) / 1e9
         var changed = false
-        // A file that ended keeps its list, though it stays its device's newest while the capture runs (D89).
+        // A file that ended keeps its list, though it stays its device's newest while the capture runs (D90).
         for file in outcome.cleared.sorted() where manifest.audioFiles.first(where: { $0.name == file })?.end == nil {
             changed = manifest.audioDelaysReplaced([], file: file) != nil || changed
         }
@@ -1146,11 +1148,15 @@ public final class Recorder {
         applyAudioDelays()
     }
 
+    /// The files among `files` that ended, their capture still running.
+    private func endedFiles(among files: [String: String]) -> Set<String> {
+        Set(manifest.audioFiles.filter { $0.end != nil && files[$0.name] != nil }.map(\.name))
+    }
+
     /// The files among `files` that may be the reference (D80, D85): those being written, and the reference's
     /// file ended otherwise than on no audio (a gap or a channel change, its next file following); with none
     /// being written, them all. The audio delays pick the reference among them.
-    private func delayCandidates(among files: [String: String]) -> [AudioDelays.Candidate] {
-        let ended = Set(manifest.audioFiles.filter { $0.end != nil }.map(\.name))
+    private func delayCandidates(among files: [String: String], ended: Set<String>) -> [AudioDelays.Candidate] {
         let writing = files.filter { name, uid in
             !ended.contains(name) || (uid == audioDelays.referenceDevice && !audioTracker.hasNoAudio(.input(uid)))
         }

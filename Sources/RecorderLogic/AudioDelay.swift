@@ -78,6 +78,16 @@ public enum AudioDelay {
             isCarriedOver = true
         }
 
+        /// The anchor's own 0, as against the anchor: its first window against another reference is a change of
+        /// reference, so hindsight keeps the 0 for the stretch before (D90).
+        public init(anchor: String) {
+            delay = 0
+            latestReferenceDevice = anchor
+        }
+
+        /// Whether it has an own counted window.
+        public var isMeasured: Bool { !windows.isEmpty }
+
         /// The rule the latest window's lag was evaluated by and its outcome, or why no rule was, for the
         /// recording log.
         public private(set) var decision: String?

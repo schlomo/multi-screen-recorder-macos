@@ -237,6 +237,43 @@ import Testing
         #expect(outcome.delays["u1.mov"]?.delay == 0 && outcome.cleared.isEmpty, "\(outcome.lines)")
     }
 
+    /// After a re-base the anchor's file shows its own 0 until measured, not one carried over from a previous file
+    /// it does not have; once measured, it shows its measured audio delay (D90).
+    @Test func theAnchorsRowAfterAReBaseShowsItsOwnZeroUntilMeasured() {
+        let window = { (lag: Double, counts: Bool) in AudioDelay.Window(lag: lag, clarity: counts ? 30 : 5) }
+        let names = ["u1", "u2", "u3"]
+        let candidates = names.enumerated().map { AudioDelays.Candidate(file: "\($1).mov", uid: $1, number: $0 + 1) }
+        let files = Dictionary(uniqueKeysWithValues: candidates.map { ($0.file, $0.uid) })
+        var delays = AudioDelays()
+        _ = delays.update(files: files, reference: "u1.mov")
+        for at in [10.0, 20] { _ = delays.update(files: files, reference: "u1.mov", lags: ["u2.mov": 0.2, "u3.mov": 0.1], at: at) }
+        let miss = AudioDelays.Measurement(
+            reference: "u1.mov", files: ["u2", "u3"].map { .init(file: "\($0).mov", window: window(0, false)) },
+            pairs: [.init(reference: "u2.mov", other: "u3.mov", window: window(-0.1, true))])
+        let moved = delays.measured(miss, files: files, candidates: candidates, at: 30)
+        #expect(delays.referenceDevice == "u2", "\(moved.lines)")
+        let shown = delays.shown("u1.mov")
+        #expect(shown == .anchor(0), "\(String(describing: shown))")
+        let measured = AudioDelays.Measurement(reference: "u2.mov", files: [.init(file: "u1.mov", window: window(-0.15, true))])
+        _ = delays.measured(measured, files: files, candidates: candidates, at: 40)
+        let measuredShown = delays.shown("u1.mov")
+        let isMeasured = if case .synced(_, carriedOver: false)? = measuredShown { true } else { false }
+        #expect(isMeasured, "\(String(describing: measuredShown))")
+    }
+
+    /// An anchor's file that ended is not measured after a re-base, so the log says so only of one being written.
+    @Test func anEndedAnchorFileIsNotSaidToBeMeasuredAfterAReBase() {
+        let names = ["u1", "u2", "u3"]
+        let candidates = names.enumerated().map { AudioDelays.Candidate(file: "\($1).mov", uid: $1, number: $0 + 1) }
+        let files = Dictionary(uniqueKeysWithValues: candidates.map { ($0.file, $0.uid) })
+        var delays = AudioDelays()
+        _ = delays.update(files: files, reference: "u1.mov")
+        for at in [10.0, 20] { _ = delays.update(files: files, reference: "u1.mov", lags: ["u2.mov": 0.2, "u3.mov": 0.1], at: at) }
+        let moved = delays.update(files: files, reference: "u2.mov", at: 30, ended: ["u1.mov"])
+        #expect(delays.referenceDevice == "u2", "\(moved.lines)")
+        #expect(!moved.lines.contains { $0.hasPrefix("u1.mov: the anchor's file") }, "\(moved.lines)")
+    }
+
     /// A stray pair, as one burst on two inputs gives, does not outnumber an anchor whose group holds another
     /// input matched twice: nothing moves. A group of three does, and every input starts over at its input (D90).
     @Test func aStartOverNeedsAGroupThatOutnumbersTheAnchors() {

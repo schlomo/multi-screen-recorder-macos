@@ -5,7 +5,8 @@
 /// audio delay starts with it, carried over. Another reference device with an audio delay re-bases every lag onto
 /// the anchor through its own audio delay; one without becomes the anchor, and every input starts over. The
 /// anchor's files are those of its device while it is the reference; once the reference is another input, the
-/// anchor's file is measured like any other, carrying over its 0 (D90).
+/// anchor's file being written is measured like any other from its own 0, which hindsight keeps for the stretch
+/// before (D90).
 public struct AudioDelays: Sendable {
     public enum Shown: Equatable, Sendable {
         case notInTheGuideTrackYet
@@ -120,10 +121,11 @@ public struct AudioDelays: Sendable {
     /// `files` maps each audio input's newest file, while its capture runs, to its device's UID, `reference`
     /// among them; `lags` are counted windows' lags against it, `unclear` the files whose window had sound but
     /// did not count, the windows ending at `at` seconds of the recording; `isMiss`: a reference miss moved the
-    /// reference to `reference`, a start-over whatever its audio delay (D90).
+    /// reference to `reference`, a start-over whatever its audio delay (D90); `ended`: the files among them that
+    /// ended, their capture still running.
     public mutating func update(
         files newest: [String: String], reference: String, lags: [String: Double] = [:], unclear: Set<String> = [],
-        at: Double = 0, isMiss: Bool = false
+        at: Double = 0, isMiss: Bool = false, ended: Set<String> = []
     ) -> Outcome {
         guard let referenceUID = newest[reference] else { preconditionFailure("the reference \(reference) is not recorded") }
         var lines: [String] = []
@@ -162,13 +164,13 @@ public struct AudioDelays: Sendable {
             cleared = Set(self.newest.values)
             countedWindows = [:]
         }
-        // Once the reference is another input, the anchor's file is measured like any other, carrying over its 0,
-        // so a drifting anchor is followed (D90).
-        if referenceUID != anchor {
+        // Once the reference is another input, the anchor's file is measured like any other from its own 0, so a
+        // drifting anchor is followed (D90).
+        if referenceUID != anchor, let anchor {
             for name in anchorFiles.sorted() {
-                files[name]!.applied = AudioDelay.Applied(carriedOver: 0)
-                guard self.newest[files[name]!.uid] == name else { continue }
-                lines.append("\(name): the anchor's file, measured against \(reference) from now on, carrying over 0 ms")
+                files[name]!.applied = AudioDelay.Applied(anchor: anchor)
+                guard self.newest[files[name]!.uid] == name, !ended.contains(name) else { continue }
+                lines.append("\(name): the anchor's file, measured against \(reference) from now on, starting at 0 ms")
             }
             anchorFiles = []
         }
@@ -277,7 +279,7 @@ public struct AudioDelays: Sendable {
     /// start-over, but only when its group, it and those, outnumbers the anchor's (`anchorGroup`). A tie goes
     /// to the lowest number.
     public mutating func measured(
-        _ measurement: Measurement, files newest: [String: String], candidates: [Candidate], at: Double
+        _ measurement: Measurement, files newest: [String: String], candidates: [Candidate], at: Double, ended: Set<String> = []
     ) -> Outcome {
         var lines: [String] = []
         var lags: [String: Double] = [:]
@@ -286,7 +288,8 @@ public struct AudioDelays: Sendable {
         func updated(
             reference: String, lags: [String: Double] = [:], unclear: Set<String> = [], isMiss: Bool = false
         ) -> Outcome {
-            var outcome = update(files: newest, reference: reference, lags: lags, unclear: unclear, at: at, isMiss: isMiss)
+            var outcome = update(
+                files: newest, reference: reference, lags: lags, unclear: unclear, at: at, isMiss: isMiss, ended: ended)
             outcome.lines = lines + outcome.lines
             return outcome
         }
@@ -350,7 +353,9 @@ public struct AudioDelays: Sendable {
         guard let placed else {
             return file.unclear >= RecorderValues.audioDelayUnclearMeasurements ? .noClearSoundToSync : .notInTheGuideTrackYet
         }
-        return anchorFiles.contains(name) ? .anchor(placed) : .synced(placed, carriedOver: file.applied.isCarriedOver)
+        // The anchor's file, measured after a move of the reference, shows its own 0 until its first counted window.
+        return file.applied.isCarriedOver || file.applied.isMeasured
+            ? .synced(placed, carriedOver: file.applied.isCarriedOver) : .anchor(placed)
     }
 
     /// The device of the reference in use: it stays the reference while its file is written (D85).

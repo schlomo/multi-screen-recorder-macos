@@ -428,7 +428,8 @@ file of the same input starts with the earlier file's, carried over.
 Written as the audio file's `delays`, one entry per change of its own,
 rewritten with hindsight at Stop (one entry per stretch between the
 changes of the 60 s rule and of the reference); the anchor's files list
-0. The "Audio inputs" guide track places the
+0, and the anchor's file being written, measured once the reference is
+another input, may then list more after it. The "Audio inputs" guide track places the
 file's sound earlier by it less the smallest of the inputs it mixes, the
 timeline file by it less the smallest of the files' latest; the audio file itself
 is unchanged.
