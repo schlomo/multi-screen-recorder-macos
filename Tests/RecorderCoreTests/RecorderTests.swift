@@ -1418,12 +1418,16 @@ extension GlobalRecordingLog {
             let camera = try #require(cameras.last)
             camera.stopTakes.withLock { $0 = .seconds(1) }
             try await sendFrames(camera, until: "the camera file") { (try? manifestOnDisk().cameraFiles.count) == 1 }
-            let asked = recorder.elapsedSeconds
+            let before = recorder.elapsedSeconds
+            // The time a busy machine takes between a test's clock reading and the recorder's.
+            try await Task.sleep(for: .milliseconds(100))
             let summary = await stop()
-            #expect(recorder.elapsedSeconds - asked >= 1)
+            let stopped = recorder.elapsedSeconds
             let end = try #require(summary.manifest.cameraFiles.first?.end)
-            #expect(end <= asked + 1.0 / 30)
-            #expect(end > asked - 0.2)
+            // The stream stopped one second after the recorder asked, so a file that ended when the
+            // stream stopped, or repeated its last frame for the wait, ends after `stopped - 1`.
+            #expect(end <= stopped - 1)
+            #expect(end > before - 0.2)
         }
 
         @Test func atSleepTheCameraFileEndsAndAtWakeANewOneStarts() async throws {

@@ -38,6 +38,7 @@ One row per entry, the error text exactly as in the entry.
 | `The job was not acquired by Runner of type hosted even after multiple attempts` | [No macOS runner: the pipeline job is cancelled](#no-macos-runner-the-pipeline-job-is-cancelled) |
 | `Multi Screen Recorder quit unexpectedly` (the app's crash dialog) after running the tests, with no crash of the app | [Crash dialog for crash reports the tests wrote](#crash-dialog-for-crash-reports-the-tests-wrote) |
 | `Expectation failed: (made.guideRefusals → 2) == 4` | [Timing tests fail while the audio delay invariants run](#timing-tests-fail-while-the-audio-delay-invariants-run) |
+| `Expectation failed: (end → 0.1) <= (asked + 1.0 / 30 → 0.09997991733333333)` | [A camera file's end is checked against a clock reading taken before Stop](#a-camera-files-end-is-checked-against-a-clock-reading-taken-before-stop) |
 
 ## Format
 
@@ -498,3 +499,26 @@ One row per entry, the error text exactly as in the entry.
 - **Verify:** 20 runs of `InstallAppScriptTests` write no new
   `msr-*.ips`.
 - **Observed:** 2026-11-17, PR #20; resolved.
+
+## A camera file's end is checked against a clock reading taken before Stop
+
+- **Error:** `Expectation failed: (end → 0.1) <= (asked + 1.0 / 30 → 0.09997991733333333)`
+- **Symptom:** in CI (run 45811289731, PR #36), `RecorderTests.aCameraFileEndsWhereTheStopWasAskedThoughItsStreamStopsLate`
+  fails at its first bound; it passes locally, also under 24 `yes` processes on 12 cores.
+- **Why:** [KNOWN: the test code before the fix] the test read the clock
+  (`asked`), then called `stop()`; the recorder takes its own reading
+  when the camera file's finishing begins (`VideoFileFeed.beginFinishing`),
+  and the file ends at the tick at or before that reading. The bound
+  `asked + 1/30` held only while the two readings were less than a
+  tick (33 ms) apart, which a loaded runner's scheduling breaks. The
+  product was right: the file ended at Stop, a tick (67 ms) after the
+  test's reading. [KNOWN: reproduced locally, 2026-11-26] a 100 ms
+  sleep between the reading and `stop()` fails the old bound with the
+  same message form, and passes the new one.
+- **Fix:** the bound no longer uses a reading taken before Stop. The
+  stream stops one second after the recorder asked, so the file's end
+  must be `<=` the clock reading after `stop()` returns, minus 1 s;
+  a file that ended with the stream or repeated its last frame for
+  the wait would end after that. The test keeps the 100 ms gap.
+- **Verify:** `swift test --filter aCameraFileEndsWhereTheStopWasAsked`.
+- **Observed:** 2026-11-26, Swift 6.3, Xcode 26; open.
