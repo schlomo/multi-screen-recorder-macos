@@ -4,14 +4,17 @@
 
 Simplification first (the owner, 2026-11-26: "it feels like we added a
 lot of complexity to cover edge cases and I'm afraid that we are
-starting to hurt the main and regular use cases"). A top-tier,
-read-only review of the whole repository runs now against the owner's
-main use cases (below); its report goes to the owner, who picks the
-cuts; then few, bundled simplification PRs (item 4 folds in), with the
-CI test time cut without dropping a case (since PR #34 `scripts/test`
-takes 11 min 26 s on CI against 4 min 46 s, with a thin margin on the
-timing tests, `docs/troubleshooting.md`). Item 22 is deferred; item 51
-follows the simplification unless GitHub's outages block PRs again.
+starting to hurt the main and regular use cases"). PR #35 is the
+first simplification PR, waiting for the owner's merge: the CI test
+time cut (CI's test step 5 min 16 s, was 11 min 26 s), one audio sync
+rule and a stateless guide track (D90), only actionable problems
+notify (D91), the clock drift skips a source's first 2 s (D92), the
+fixes of a top-tier audit, and the owner's system audio ruling (D93).
+At its merge: this section, "Done (recent)", items 4 and 53 checked
+against what it settled, the release installed. Then the next
+cuts the owner picks from the main use cases (below). Item 22 is
+deferred; item 51 follows the simplification unless GitHub's outages
+block PRs again.
 
 Main use cases (the owner, 2026-11-26), to stay simple and always work:
 a laptop alone or with one or two external screens, recording every
@@ -29,9 +32,6 @@ sound is valuable (the owner, 2026-11-26). The owner wants one
 simplification PR that proves the quality stays the same: simpler
 rules, smart about the edge cases, no major problem there.
 
-PR #35 (faster tests, CI's test step 5 min 16 s) is green and
-reviewed; its end-to-end run waits for an idle Mac. PR #36 carries the
-homepage screenshots from 0.20261126.118 (installed).
 The end-to-end
 tests need an idle Mac: a video call is enough to fail
 `virtual-screen` (`docs/troubleshooting.md`).
@@ -62,7 +62,7 @@ Still open from D34: what AGC does and whether it is on in auto mode;
 
 ## In flight
 
-Nothing.
+- PR #35, the first simplification PR (above), branch `faster-tests`.
 
 ## Queued
 
@@ -583,7 +583,10 @@ Nothing.
    costs (frames, audio, CPU). Then a design for the owner's sign-off.
    It must keep what the owner likes today (2026-11-26): a source whose
    device did not change keeps recording into the same file through
-   another device's change.
+   another device's change; and the system audio keeps its file
+   through an output device change (D93, the owner, 2026-11-26:
+   "system audio should keep the file if possible. after all, there is
+   no technical reason for system audio to 'disconnect'").
    The probe and its stacks were in the session's scratchpad (`probe/`).
 
 ## Deliberately deferred
@@ -759,6 +762,9 @@ Nothing.
   the README (D46). Revisit when people struggle with it.
 
 ## Done (recent)
+
+- 2026-11-26: PR #36 merged by the owner: the homepage screenshots
+  from release 0.20261126.118.
 
 - 2026-11-26: PR #34 merged by the owner: before a sync is established,
   a reference no input syncs to hands over to one proven by a pair
