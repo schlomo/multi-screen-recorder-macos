@@ -1418,9 +1418,11 @@ extension GlobalRecordingLog {
             let summary = await stop()
             let stopped = recorder.elapsedSeconds
             let end = try #require(summary.manifest.cameraFiles.first?.end)
-            // The stream stopped one second after the recorder asked, so a file that ended when the
-            // stream stopped, or repeated its last frame for the wait, ends after `stopped - 1`.
-            #expect(end <= stopped - 1)
+            // The recorder asked at or before `stopped - 1`, the stream stopping one second after;
+            // the file's last tick is at or before that, and the file ends one frame duration later.
+            // A file that ended when the stream stopped, or repeated its last frame for the wait,
+            // ends after that.
+            #expect(end <= stopped - 1 + 1.0 / 30)
             #expect(end > before - 0.2)
         }
 

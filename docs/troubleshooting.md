@@ -39,7 +39,7 @@ One row per entry, the error text exactly as in the entry.
 | `Multi Screen Recorder quit unexpectedly` (the app's crash dialog) after running the tests, with no crash of the app | [Crash dialog for crash reports the tests wrote](#crash-dialog-for-crash-reports-the-tests-wrote) |
 | `Expectation failed: (made.guideRefusals → 2) == 4` | [Timing tests fail while the audio delay invariants run](#timing-tests-fail-while-the-audio-delay-invariants-run) |
 | `Audio 0 - System: clock drift -1000.0 ppm, corrected +12.00 ms so far, 8.17 ms off`, then a lasting correction of about +20 ms at about 0 ppm | [The system audio is corrected by about 20 ms for good](#the-system-audio-is-corrected-by-about-20-ms-for-good) |
-| `Expectation failed: (end → 0.1) <= (asked + 1.0 / 30 → 0.09997991733333333)` | [A camera file's end is checked against a clock reading taken before Stop](#a-camera-files-end-is-checked-against-a-clock-reading-taken-before-stop) |
+| `Expectation failed: (end → 0.1) <= (asked + 1.0 / 30 → 0.09997991733333333)`, later `Expectation failed: end <= stopped - 1` | [A camera file's end is checked against a clock reading taken before Stop](#a-camera-files-end-is-checked-against-a-clock-reading-taken-before-stop) |
 | `camera stalled: FaceTime HD Camera (the camera delivered no frame for 2 s` | [A camera stalls while another camera starts](#a-camera-stalls-while-another-camera-starts) |
 
 ## Format
@@ -532,8 +532,21 @@ One row per entry, the error text exactly as in the entry.
   must be `<=` the clock reading after `stop()` returns, minus 1 s;
   a file that ended with the stream or repeated its last frame for
   the wait would end after that. The test keeps the 100 ms gap.
-- **Verify:** `swift test --filter aCameraFileEndsWhereTheStopWasAsked`.
-- **Observed:** 2026-11-26, Swift 6.3, Xcode 26; open.
+- **Second cause:** that fix failed 3 times in 200 runs locally,
+  `Expectation failed: end <= stopped - 1` with `end → 0.16666666666666666`
+  and `stopped - 1 → 0.15834970800000003`. [KNOWN:
+  `VideoFileTicker.finish`] the file's `end` is the time after its last
+  tick (`lastWrittenTick + 1`), the end of the last frame's duration,
+  and that last tick is at or before the recorder's reading, so `end`
+  can be up to one tick (33 ms at 30 fps) after it. The bound failed
+  whenever finalizing after the stream's 1 s took less than that. The
+  recorder is right; the test's bound now adds that one tick,
+  `end <= stopped - 1 + 1.0 / 30`, which a file that ended with the
+  stream or repeated its last frame for the wait still breaks.
+- **Verify:** `swift test --filter aCameraFileEndsWhereTheStopWasAsked
+  --maximum-repetitions 200`: 3 failures in 200 before, 0 after
+  (2026-11-26).
+- **Observed:** 2026-11-26, Swift 6.3, Xcode 26; resolved (test).
 
 ## A camera stalls while another camera starts
 
