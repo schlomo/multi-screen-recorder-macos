@@ -567,6 +567,22 @@ Nothing.
    such as why the recording ended; it closes by itself after 10 s
    when nothing went wrong, stays when something did. Design first.
 
+56. **Capture in helper processes, where they pay** (the owner,
+   2026-11-26: "see which software architecture makes sense for the
+   problem, based on understanding what exactly is stalling or gets
+   locked"). Measured 2026-11-26 with a probe on the owner's Mac (BRIO
+   and FaceTime HD Camera): while one camera's `startRunning` runs,
+   CoreMediaIO holds a lock the whole process shares, so every other
+   camera's frames stop as long as it takes (0.8 s in the probe, 4 s at
+   a redock); our cameras already have their own sessions and queues,
+   so a thread is not enough; with the restarted camera in a second
+   process the other never stalled. To find out before any design:
+   whether audio inputs and screens have such process-wide holds at a
+   device change; which jobs (capture, encode, analyse, mix, write)
+   belong in which process or thread; what the inter-process transfer
+   costs (frames, audio, CPU). Then a design for the owner's sign-off.
+   The probe and its stacks were in the session's scratchpad (`probe/`).
+
 ## Deliberately deferred
 
 - **Item 22, A/V sync of cameras from claps** (deferred by the owner,
