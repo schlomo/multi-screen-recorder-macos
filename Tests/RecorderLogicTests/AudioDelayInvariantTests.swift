@@ -257,9 +257,15 @@ import Testing
                 let others = candidates().filter { $0.uid != reference.uid }
                     .map { (file: $0.file, reference: windows[reference.uid]!, other: windows[$0.uid]!) }
                 guard !others.isEmpty else { outcomes.append(nil); continue }
-                let measured = AudioDelays.measure(
-                    reference: reference.file, others: others,
-                    measuresPairs: runs[index].measuresPairs && !wasEstablished)
+                // Main's rules with the same reference see the same windows: reuse the first run's per-file results.
+                let measured: AudioDelays.Measurement
+                if !runs[index].measuresPairs, let first = outcomes.first?.map(\.measurement), first.reference == reference.file {
+                    measured = AudioDelays.Measurement(reference: first.reference, files: first.files)
+                } else {
+                    measured = AudioDelays.measure(
+                        reference: reference.file, others: others,
+                        measuresPairs: runs[index].measuresPairs && !wasEstablished)
+                }
                 let outcome = runs[index].delays.measured(measured, files: newest, candidates: candidates(), at: Double(measurement + 1) * 10)
                 runs[index].latest = outcome.delays.mapValues(\.delay)
                 outcomes.append((reference.uid, measured, outcome, wasEstablished))

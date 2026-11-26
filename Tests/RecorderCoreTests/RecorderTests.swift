@@ -507,11 +507,7 @@ extension GlobalRecordingLog {
                 file.audioSourceUID.map { ($0, file.start) }
             }) { $1 }
             let base = Int((uids.keys.compactMap { newest[$0] }.max() ?? 0).rounded(.up))
-            var seed: UInt64 = 7
-            let noise = (0..<(15 * rate)).map { _ -> Float in
-                seed = seed &* 6_364_136_223_846_793_005 &+ 1_442_695_040_888_963_407
-                return Float(Int64(bitPattern: seed >> 11) % 2001 - 1000) / 2000
-            }
+            let noise = FedTables.noise(seed: 7)
             for (uid, lag) in uids {
                 for chunk in stride(from: rate, to: 13 * rate, by: rate / 10) {
                     let shift = Int((lag * Double(rate)).rounded())
@@ -544,33 +540,24 @@ extension GlobalRecordingLog {
                 file.audioSourceUID.map { ($0, file.start) }
             }) { $1 }
             let base = Int((sounds.keys.compactMap { newest[$0] }.max() ?? 0).rounded(.up))
-            func noise(seed start: UInt64) -> [Float] {
-                var seed = start
-                return (0..<(15 * rate)).map { _ -> Float in
-                    seed = seed &* 6_364_136_223_846_793_005 &+ 1_442_695_040_888_963_407
-                    return Float(Int64(bitPattern: seed >> 11) % 2001 - 1000) / 2000
-                }
-            }
-            func bursts(_ noise: [Float], phase: Int, slot: Int) -> [Float] {
-                noise.enumerated().map { (($0.offset + phase) / slot) % 3 == 0 ? $0.element : $0.element / 20 }
-            }
-            let speech = bursts(noise(seed: 7), phase: 0, slot: rate / 5)
-            let call = bursts(noise(seed: 991), phase: 3000, slot: rate / 4)
+            let speech = FedTables.bursts(seed: 7, phase: 0, slot: rate / 5)
+            let call = FedTables.bursts(seed: 991, phase: 3000, slot: rate / 4)
             for (uid, sound) in sounds {
-                let own = noise(seed: 100 + UInt64(uid.unicodeScalars.first!.value))
+                let first = UInt64(uid.unicodeScalars.first!.value)
+                let own = FedTables.noise(seed: 100 + first)
                 let (signal, lag): ([Float], Double) = switch sound {
                 case .speech(let lag): (speech, lag)
                 case .call(let lag): (call, lag)
-                case .noisySpeech(let lag): (zip(speech, own).map { $0 + 0.3 * $1 }, lag)
-                case .otherSpeech: (own.enumerated().map { sample in
-                    var slot = UInt64(sample.offset / (rate / 8)) &* 0x9E37_79B9_7F4A_7C15 &+ UInt64(uid.unicodeScalars.first!.value)
+                case .noisySpeech(let lag): (FedTables.cached("noisySpeech \(first)") { zip(speech, own).map { $0 + 0.3 * $1 } }, lag)
+                case .otherSpeech: (FedTables.cached("otherSpeech \(first)") { own.enumerated().map { sample in
+                    var slot = UInt64(sample.offset / (rate / 8)) &* 0x9E37_79B9_7F4A_7C15 &+ first
                     slot ^= slot >> 29
                     slot = slot &* 0xBF58_476D_1CE4_E5B9
                     slot ^= slot >> 32
                     return slot % 2 == 0 ? sample.element : sample.element / 20
-                }, 0)
-                case .quiet: (own.map { $0 / 1000 }, 0)
-                case .hum: ((0..<own.count).map { Float(0.5 * sin(2 * Double.pi * 50 * Double($0) / Double(rate))) }, 0)
+                } }, 0)
+                case .quiet: (FedTables.cached("quiet \(first)") { own.map { $0 / 1000 } }, 0)
+                case .hum: (FedTables.cached("hum") { (0..<own.count).map { Float(0.5 * sin(2 * Double.pi * 50 * Double($0) / Double(rate))) } }, 0)
                 case .noise: (own, 0)
                 }
                 let shift = Int((lag * Double(rate)).rounded())
@@ -2182,6 +2169,35 @@ extension GlobalRecordingLog {
             #expect(observer.eventLines.allSatisfy { !$0.isFailure })
             let log = try String(contentsOf: recorder.folder.appending(path: RecordingNames.recordingLog), encoding: .utf8)
             #expect(log.contains("Audio 1 \(name): no audio since 0:00, no gap within 10 s before: no problem (D81)"))
+        }
+    }
+}
+
+/// The noise and the sounds built from it that `feed` and `feedDelayedNoise` send, each built once per process:
+/// pure functions of their seed and length.
+private enum FedTables {
+    private static let tables = Mutex<[String: [Float]]>([:])
+
+    static func cached(_ key: String, _ make: () -> [Float]) -> [Float] {
+        if let table = tables.withLock({ $0[key] }) { return table }
+        let table = make()
+        tables.withLock { $0[key] = table }
+        return table
+    }
+
+    static func noise(seed start: UInt64) -> [Float] {
+        cached("noise \(start)") {
+            var seed = start
+            return (0..<(15 * RecorderValues.audioSampleRate)).map { _ -> Float in
+                seed = seed &* 6_364_136_223_846_793_005 &+ 1_442_695_040_888_963_407
+                return Float(Int64(bitPattern: seed >> 11) % 2001 - 1000) / 2000
+            }
+        }
+    }
+
+    static func bursts(seed: UInt64, phase: Int, slot: Int) -> [Float] {
+        cached("bursts \(seed) \(phase) \(slot)") {
+            noise(seed: seed).enumerated().map { (($0.offset + phase) / slot) % 3 == 0 ? $0.element : $0.element / 20 }
         }
     }
 }

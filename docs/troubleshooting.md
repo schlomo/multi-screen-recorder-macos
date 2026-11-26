@@ -257,9 +257,25 @@ One row per entry, the error text exactly as in the entry.
   `ClockDriftCorrectionTests` (294.5 s) and `ClockDriftTrackerTests`
   (342.5 s) hold two of the runner's three threads without yielding
   while the invariant cases share the third. A slower runner can fail
-  these tests again. The levers, the owner's to choose: a cheaper
-  implementation of the measurement the invariant cases run (no case
-  dropped), or the two clock drift suites yielding too.
+  these tests again.
+- **Cheaper, nothing dropped** (the follow-up PR `faster-tests`): the
+  measurement built an FFT setup per cross-correlation, 68 % of the
+  invariant suite's time in `vDSP_create_fftsetup` [KNOWN: sampled
+  locally]; `AudioDelay` now keeps one setup per size for the process
+  (the vectorised result stays bit-equal to the scalar one). The
+  invariant harness measures main's rules once when they share the new
+  rules' reference and windows, and `RecorderTests` builds each noise
+  and burst table once per process, bit-identical samples. `scripts/build-app`
+  builds only `msr`, not the end-to-end driver. Measured locally (12
+  cores, same machine, `scripts/test` including the build): whole run
+  3:25 to 2:14 wall, 710 s to 366 s user CPU; `AudioDelayInvariantTests`
+  36.8 s to 15.6 s; the `RecorderCoreTests` target 107.4 s to 64.8 s;
+  the `RecorderLogicTests` target 49.5 s to 30.3 s. UNVERIFIED on CI's
+  runner: its figures are the first run of this change. What remains:
+  the CPU-bound suites (the invariant cases, the two clock drift suites)
+  still share the cooperative pool with the real-time-bounded tests, so
+  a slow runner can still push those near their bounds; the lever left,
+  the owner's to choose, is the two clock drift suites yielding too.
 
 ## A virtual screen comes back at its last mode
 

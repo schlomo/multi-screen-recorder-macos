@@ -23,8 +23,8 @@ archive="build/msr-app.tar"
 icon_source="assets/icon/app-icon.png"
 [[ -f "$icon_source" ]] || { echo "scripts/build-app: $icon_source is missing" >&2; exit 1; }
 
-swift build -c release
-bin_path="$(swift build -c release --show-bin-path)"
+swift build -c release --product msr
+bin_path="$(swift build -c release --product msr --show-bin-path)"
 
 rm -rf build
 mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources"

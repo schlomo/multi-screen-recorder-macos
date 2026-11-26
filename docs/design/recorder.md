@@ -1593,7 +1593,7 @@ the metadata items (see "Output on disk").
   kHz (each 6 samples averaged), into a ring of its latest 12 s
   (`AudioDelayFeed`); every 10 s, off the capture queues and the main
   thread, each audio input's newest file, while it is being written, is
-  cross-correlated (`AudioDelay`, Accelerate's FFT) with the reference's
+  cross-correlated (`AudioDelay`, Accelerate's FFT, one setup per size shared by the process) with the reference's
   over their latest common 10 s, searching ±1 s. Every
   audio delay is against the recording's **anchor**, the first input
   whose file is written, its own 0. The reference is the anchor at
