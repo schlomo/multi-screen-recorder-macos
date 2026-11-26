@@ -342,7 +342,7 @@ import Testing
         #expect(told.lines(now: 100 * second).isEmpty)
     }
 
-    /// A shown problem, such as an incomplete video file, gives its call to action too; only one whose words
+    /// A tracked problem, such as an incomplete video file, gives its call to action too; only one whose words
     /// include "report it" asks for a report after the recording.
     @Test func onlyACallToActionWithReportItAsksForAReport() {
         var permission = ProblemsTold()
@@ -363,7 +363,7 @@ import Testing
     }
 
     /// A screen whose file ended because it showed another screen's picture: in the owner's table under none, so
-    /// its problem never calls to action, also past `unrecoveredAfter`, shown first or told first (D84).
+    /// its problem never calls to action, also past `unrecoveredAfter`, tracked first or told first (D84).
     @Test func aScreenShowingAnotherScreensPictureNeverCallsToAction() {
         var told = ProblemsTold()
         var manifest = manifest()

@@ -544,11 +544,12 @@ One row per entry, the error text exactly as in the entry.
   `end <= stopped - 1 + 1.0 / 30`, which a file that ended with the
   stream or repeated its last frame for the wait still breaks.
 - **Verify:** `swift test --filter aCameraFileEndsWhereTheStopWasAsked
-  --maximum-repetitions 200` passes. The failure is rare: the session
-  that found it saw 3 in 200 runs; a rerun of the old bound on
-  2026-11-26 had none in 200, so a clean run does not prove the fix;
-  the argument from `VideoFileTicker.finish` above does.
-- **Observed:** 2026-11-26, Swift 6.3, Xcode 26; resolved (test).
+  --maximum-repetitions 200` passes; the fix is argued from
+  `VideoFileTicker.finish` above, not reproduced, as the failure is
+  rare.
+- **Observed:** 2026-11-26, Swift 6.3, Xcode 26: 3 failures in 200
+  runs of the old bound when found; a rerun of the old bound the same
+  day had none in 200. Resolved (test), fix argued, not reproduced.
 
 ## A camera stalls while another camera starts
 

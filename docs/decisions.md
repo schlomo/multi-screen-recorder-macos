@@ -3486,12 +3486,14 @@ architect's reading.
 - **Context:** The owner, 2026-11-26: "system audio should keep the
   file if possible. after all, there is no technical reason for system
   audio to 'disconnect'".
-- **Decision:** a change of the audio output device does not end the
-  system audio's file; only a failed capture does. The architect's
-  reading: the recorder already does this, as ScreenCaptureKit captures
-  the system mix and no code reacts to an output device change (not yet
-  tried with a real output switch); a design that moves capture into
-  helper processes keeps it.
+- **Decision:** the system audio keeps its file through device
+  changes where it can. The architect's reading: no code reacts to an
+  output device change, so that keeps the file today (not yet tried
+  with a real output switch); but the system audio's stream is tied to
+  the main screen, so when the main screen goes (an undock) its file
+  ends and a new one starts (the owner's recording 2026-11-26 19.38.01
+  has three); keeping the file there is open work, backlog item 56.
 - **Consequences:** a helper-process design (backlog item 56) must not
-  tie the system audio's capture to an output device.
+  tie the system audio's file to the main screen or an output
+  device.
 - **Evidence:** PR #35; backlog item 56.
