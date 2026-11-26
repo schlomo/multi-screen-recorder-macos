@@ -387,6 +387,12 @@ One row per entry, the error text exactly as in the entry.
   pushed head.
 - **Observed:** 2026-11-23, PR #27, runner Xcode 26.6; resolved
   (the pipeline on abc1953 passed).
+- **Since D90:** an input no longer leaves or rejoins the guide track
+  and has no problem line for it; the two tests became
+  `anAudioInputUnmixedOnAFalseFirstWindowIsMixedOnceItsMedianFits`
+  (whose wait reads `A out of the guide track again`) and
+  `anAudioInputBeyondTheLimitIsNotMixedOnlyItsRowSayingSo`, both
+  sending with `sendNext`.
 
 ## A slow runner's pause gives a stand-in input a gap before its no audio
 
@@ -411,6 +417,10 @@ One row per entry, the error text exactly as in the entry.
   gives its camera a first-frame limit of 600 s.
 - **Verify:** the guide-track tests pass 10 of 10 runs under the same
   load; CI's `scripts/test` passes on the pushed head.
+- **Since D90:** the test is
+  `anAudioInputBeyondTheLimitIsNotMixedOnlyItsRowSayingSo`, which
+  expects no problem line at all; the guide track's line in the error
+  text is no longer told.
 
 ## Swift 6.3 rejects self in a later argument after callbacks capture it
 

@@ -3260,3 +3260,95 @@ architect's reading.
   30 deliberate breaks of the rules caught, the other 4 changing only
   the cost or an input's count of unclear measurements; [design/recorder.md](design/recorder.md),
   "Audio delay".
+
+## D90: One rule for the audio reference, a stateless guide track (2026-11-26)
+
+- **Status:** in force. Supersedes D89's two phases ("before" and
+  "after the sync is established") and D79's leave and rejoin of the
+  "Audio inputs" guide track, its event and its problem line; amends
+  D85 (the anchor's file is measured once the reference is another
+  input).
+- **Context:** The owner, 2026-11-26: "it feels like we added a lot of
+  complexity to cover edge cases and I'm afraid that we are starting to
+  hurt the main and regular use cases". The owner's main use cases,
+  2026-11-26, to stay simple and always work: a laptop alone or with
+  one or two external screens, recording every screen, the default
+  microphone and the system audio; the same with a USB camera and one
+  or two USB microphones, the default microphone as the reference;
+  screens and devices plugged in or out and the lid opened or closed
+  during a recording (sleep is not a main case); stop or a crash never
+  loses more than the last 5 seconds. Everything else is an edge case,
+  which may cost some quality for simplicity but never a lost
+  recording. On the owner's Mac the same day a healthy reference fell
+  just short once (clarity 11 against 12) before the sync was
+  established and every input started over. The owner signed off the
+  design (2026-11-26): option 1 with the "matched twice" count, and
+  without the "not in the guide track" problem line and its event: "we
+  in any case want to trigger human attention only on actionable
+  problems".
+- **Decision:** One rule for the reference for the whole recording. A
+  reference miss always compares the other inputs with sound pairwise;
+  if a pair counts, the reference moves to the input with an audio
+  delay the most others count against, a re-base that keeps every
+  audio delay; with none such, to the input the most others count
+  against, as a start-over, but only when its group (it and those
+  counted against it) outnumbers the anchor's group: the anchor and
+  each other input being written with 2 counted windows since it became
+  the anchor (`audioDelayGroupWindows`, *data*, formerly
+  `audioDelayEstablishingWindows`). Every start-over clears the entries
+  of the files being written. Once the reference is another input, the
+  anchor's file is measured like any other, carrying over its 0. The
+  "Audio inputs" guide track mixes every input with an audio delay
+  unless they lie further apart than 0.8 s; then the largest set within
+  0.8 s of each other, on a tie the reference's, decided afresh each
+  time, nothing remembered. An input left out says so in its status row
+  only (`not in the guide track, 950 ms from the others`): no event, no
+  problem, no Dock bounce, as nobody can act on it, and only actionable
+  problems call for a person's attention.
+  - Gone: the established sync, "once established nothing moves", the
+    leave/rejoin memory, the problem kind for an input out of the guide
+    track, `audio input left the guide track` and its `offset` (still
+    read from recordings made before, so `msr timeline` loads them).
+  - The reference is chosen by what the inputs hear, never as the
+    default microphone, which macOS moves on its own (D80): it starts as
+    the first input that records and moves only on counted windows. The
+    main use cases name "the default microphone as the reference"; that
+    holds only where the default microphone is that first input or the
+    others' evidence moves the reference to it. Put to the owner.
+  - Not the distance from the reference instead of sets: in 3,200
+    generated recordings with lags widened to ±0.9 s, 155 placed an
+    input up to 1.5 s off in a mix that shifts 0.8 s, and an Osmo-like
+    late input 1 would keep only itself.
+  - Not V1 (start over when the group outnumbers every input synced
+    now): a stray burst on two junk inputs then keeps the room's
+    microphones unsynced for the whole recording.
+- **What got worse:** in the 3,200 generated recordings as generated,
+  nothing. With lags widened ×2.6: seed 2650 syncs one input fewer
+  (after a re-base its lag from the new reference is beyond the ±1 s
+  search; today it synced but was out of the guide track), and 9 seeds
+  mix a synced microphone in 19 fewer steps in all (a tie now goes to
+  the reference's set, not the set that stayed before). A reference
+  miss now measures pairs also after the sync was made: up to
+  n(n-1)/2 extra cross-correlations, measured in a release build on an
+  M3 Pro at 0.016 s for 4 inputs, 0.075 s for 8 and 0.18 s for 12 per
+  miss (a normal measurement 0.008, 0.019 and 0.029 s, unchanged).
+  Known costs kept: two loopbacks of a call during a quiet start keep
+  the reference from the room's two microphones; two rooms taking
+  turns every 10 s start over every turn.
+- **Evidence:** the 3,200 generated recordings run side by side with
+  the rules before (`faster-tests` at 3dac59c): as generated 132 seeds
+  more microphone-synced steps, 0 fewer, 27 seeds more inputs synced at
+  the end, 0 fewer, 0 wrong placements, 0 inputs synced under both more
+  than a frame apart, first sync never later, 1,844 start-overs against
+  1,886; `AudioDelayInvariantTests` holds on all 3,200 (200 committed).
+  The owner's 16 recordings replayed: every file's entries, hindsight,
+  status and the reference changes identical. `AudioSyncCaseTests` (the
+  cases A to J and the drift: worst placement error 41 ms, as before,
+  117 ms without measuring the anchor's file), `ReferenceChoiceTests`,
+  `AudioDelaysTests`, `GuideTrackMembershipTests`, `RecorderTests`
+  (`anAudioInputBeyondTheLimitIsNotMixedOnlyItsRowSayingSo`,
+  `aHealthyReferenceThatMissesOnceKeepsEverySync`,
+  `aReferenceMissAfterTheSyncMovesToASyncedInputKeepingEveryAudioDelay`);
+  6 of 6 deliberate breaks of the new rules caught;
+  [design/recorder.md](design/recorder.md), "Audio delay" and "Guide
+  tracks".

@@ -58,18 +58,19 @@ own clock is resampled continuously to stay with the screen files
     separate recording. Each microphone is placed in the audio inputs' guide
     track by its measured delay, so a late one is in sync there. A
     microphone joins it only once measured: for the first 10 to 20 s only
-    the anchor microphone (the first to start) is in it. Until the sync
-    is established, a measurement that matches nothing compares the other
-    microphones with each other and makes the one they match the anchor,
-    so an empty line-in as the first input holds nothing up; the one that
-    was the anchor then leaves the guide track until it is measured
-    against the new one. Two inputs carrying the same other sound (two
+    the anchor microphone (the first to start) is in it. The microphones
+    are measured against one of them, the reference, chosen by what they
+    hear, never by which is the default: when it matches nothing, the
+    others are compared with each other and the reference moves to the one
+    they match, keeping every sync made, so an empty line-in as the first
+    input holds nothing up. Two inputs carrying the same other sound (two
     loopbacks of a call) during a quiet start can win that instead, and
     the room's microphones then stay out; the audio mode Wired, the
     default, records no virtual input but the default microphone. One never measured
     never joins;
-    one more than 0.8 s off the others leaves it rather than echo in it;
-    its own audio track is still recorded.
+    one more than 0.8 s off the others is left out rather than echo in
+    it, its row in the status window saying so; its own audio track is
+    still recorded.
 - **Scriptable.** Everything also works from the command line.
 - **Nothing leaves your Mac.** The app makes no network connections.
 

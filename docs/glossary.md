@@ -372,13 +372,10 @@ which is told as a problem. "Audio inputs" is mixed 1 s behind and
 places each audio input earlier by its audio delay, less the smallest
 of those it mixes; the anchor is in it from the start, another input
 only once its file has an audio delay, an input whose file ended keeping
-its place until its capture ends (D80). An audio input out of sync
-with the others leaves it (D79): the largest group of inputs whose
-audio delays lie within 0.8 s of each other stays.
-
-## Offset (guide track)
-
-An audio input file's distance from the earliest input of the group the "Audio inputs" guide track keeps, in seconds, negative when earlier (D79).
+its place until its capture ends (D80). It mixes every input with an
+audio delay unless they lie further apart than 0.8 s; then the largest
+set within 0.8 s of each other, on a tie the reference's, decided afresh
+each time; an input left out says so in its status row only (D90).
 
 ## Level meter
 
@@ -423,7 +420,7 @@ while recording by cross-correlation against the reference: the anchor
 at first, the reference in use while its capture runs and it is not in
 no audio, else the input it moved to, its own audio delay turning the
 lags into ones against the anchor; the reference stays with the input
-it moved to (D77, D80, D85, D89).
+it moved to (D77, D80, D85, D90).
 A file's audio delay is set by its first
 counted window, once more by the median of its first 3, then only by the
 median of the latest 60 s, each time only beyond a frame (D80); a new
@@ -440,13 +437,13 @@ is unchanged.
 
 The device every audio delay of a recording is against: the first
 audio input whose file is written, its files' audio delay 0 while it is
-the reference, the default microphone or not; a new file of it after
-the reference moved away is measured like any other input (D85). When
-the reference moves to an input without an audio delay (D80), or on a
-reference miss whatever its audio delay (D89), that input becomes the
-new anchor, every input then starting over; so a near-silent input 1
-hands the anchor on at the first measurement in which two other inputs
-share sound.
+the reference, the default microphone or not; once the reference is
+another input, its file is measured like any other input's (D85, D90).
+When the reference moves to an input without an audio delay (D80),
+also on a reference miss's start-over (D90), that input becomes the new
+anchor, every input then starting over; so a near-silent input 1 hands
+the anchor on at the first measurement in which two other inputs share
+sound.
 
 ## Reference
 
@@ -455,26 +452,28 @@ measured against for its audio delay (`AudioDelays.referenceDevice`):
 the anchor at first, kept while its capture runs and its newest file
 did not end on no audio; then the lowest-numbered input being written
 that has an audio delay, which it stays with, the anchor's returning
-file not taking it back (D80, D85). Until the sync is established, a
-reference miss moves it to the input the most other inputs' windows
-count against, if any; a reference miss with no counted window between
-the other inputs moves nothing (D89). Not the
-"Reference implementation" above.
+file not taking it back (D80, D85). Chosen by what the inputs hear,
+never as the default microphone, which macOS moves on its own: a
+reference miss moves it by the other inputs' counted windows against
+each other, if any (D90). Not the "Reference implementation" above.
 
 ## Reference miss
 
 A measurement with no counted window against the reference while
-another input being measured had sound (D89). Until the sync is
-established, it correlates the other inputs with sound pairwise and moves
-the reference to the input the most others count against; with no
-counted pair, nothing moves.
+another input being measured had sound (D89). It correlates the other
+inputs with sound pairwise; with no counted pair, nothing moves. Else
+the reference moves to the input with an audio delay the most others
+count against, a re-base keeping every audio delay; with none such, to
+the input the most others count against, starting every input over,
+but only when its group outnumbers the anchor's group (D90).
 
-## Established sync
+## Anchor's group
 
-An input having 2 counted windows since the anchor became the anchor,
-the anchor's own new file included (`audioDelayEstablishingWindows`, D89); from then on a
-reference miss moves nothing, the reference moving only on no audio or
-its capture's end.
+The anchor and each other audio input being written with 2 counted
+windows since the anchor became the anchor (`audioDelayGroupWindows`):
+a reference miss starts over only for a bigger group, so one stray
+counted window, as a burst on an empty line-in gives, proves nothing
+(D90).
 
 ## Lag
 

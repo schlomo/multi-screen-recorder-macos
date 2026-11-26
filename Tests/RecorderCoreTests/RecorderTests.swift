@@ -674,9 +674,10 @@ extension GlobalRecordingLog {
             #expect(!log.contains("starts over"))
         }
 
-        /// A reference that stops matching before the sync is established moves to an input the others count against
-        /// (of those that tie, the lowest number), which becomes the new anchor, every input starting over (D89).
-        @Test func aReferenceMissBeforeTheSyncIsEstablishedMovesToAProvenInput() async throws {
+        /// A reference that stops matching while no input but the anchor is matched twice moves to an unsynced input
+        /// the others count against (of those that tie, the lowest number), which becomes the new anchor, every input
+        /// starting over (D89, D90).
+        @Test func aReferenceMissBeforeTheSyncMovesToAProvenInputStartingOver() async throws {
             try await startInputs(["R", "A", "B"])
             try feed(["R": .speech(0), "A": .quiet, "B": .quiet])
             await recorder.measureAudioDelays()
@@ -785,9 +786,9 @@ extension GlobalRecordingLog {
             #expect(!log.contains("starts over"))
         }
 
-        /// A measurement taken against a reference that moved while it ran counts nothing (D89): before the sync is
-        /// established, two measurements run against a quiet R at once; the first proves A and moves the reference, B
-        /// syncing against A at once; the second, against R, moves nothing more.
+        /// A measurement taken against a reference that moved while it ran counts nothing (D89): two measurements run
+        /// against a quiet R at once; the first proves A and moves the reference, B syncing against A at once; the
+        /// second, against R, moves nothing more.
         @Test func aMeasurementAgainstAReferenceThatMovedCountsNothing() async throws {
             try await startInputs(["R", "A", "B"])
             try feed(["R": .quiet, "A": .speech(0.5), "B": .speech(0.2)])
@@ -804,9 +805,10 @@ extension GlobalRecordingLog {
             #expect(delaysOfB.count == 1 && abs((delaysOfB.first ?? 0) + 0.3) < 0.002, "\(delaysOfB)")
         }
 
-        /// A known cost (D89): two inputs carrying one call's audio beside a room that is
-        /// quiet for the first 20 s take the reference and establish the sync, so the room's microphones, speaking
-        /// later, never sync. The audio mode Wired, the default, records no virtual input but the default microphone.
+        /// A known cost (D89, D90): two inputs carrying one call's audio beside a room that is quiet for the first 20 s
+        /// take the reference, the second matching it every time, so there is no miss and the room's microphones,
+        /// speaking later, never sync. The audio mode Wired, the default, records no virtual input but the default
+        /// microphone.
         @Test func twoInputsOfOneCallTakeTheReferenceBeforeTheRoomSpeaks() async throws {
             try await startInputs(["R", "M", "N", "A", "B"])
             for _ in 0..<2 {

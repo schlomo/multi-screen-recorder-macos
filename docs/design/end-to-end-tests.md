@@ -508,9 +508,10 @@ video from the e2e runs"):
     name's `/` and `:`; a `startInput` detail line maps a device name to
     N): the clock drift from the source's latest `clock drift` detail
     line, not `not measured yet`; the sync from a detail line of one of
-    its files that `joins the guide track`, `rejoins the guide track`,
-    `carries over` a delay, is `in` or `out of the guide track with` the
-    carried-over audio delay, `leaves the guide track`, has its `audio
+    its files that `joins the guide track`, `carries over` a delay, is
+    `in the guide track with` the carried-over audio delay, is `not in
+    the guide track` (with the carried-over audio delay, or too far from
+    the others to mix, D90), has its `audio
     delay set by its first counted window` (an input placed before a
     start-over that syncs in the same measurement logs no new join) or
     has `no clear sound to sync`, which the source's newer files keep (the anchor's own
