@@ -13,7 +13,7 @@ import Testing
         case speech
         /// The shared speech behind a noise gate: digital zero between the bursts.
         case gatedSpeech
-        /// The shared speech from afar under the room's noise: less action.
+        /// The shared speech from afar under the room's noise.
         case roomSpeech
         /// Speech-like bursts of its own, unrelated to the shared speech: another room, a loopback.
         case unrelated
@@ -251,10 +251,10 @@ import Testing
                 let wasEstablished = runs[index].delays.isSyncEstablished
                 guard let reference = runs[index].delays.reference(among: candidates()) else { outcomes.append(nil); continue }
                 let others = candidates().filter { $0.uid != reference.uid }
-                    .map { (file: $0.file, uid: $0.uid, reference: windows[reference.uid]!, other: windows[$0.uid]!) }
+                    .map { (file: $0.file, reference: windows[reference.uid]!, other: windows[$0.uid]!) }
                 guard !others.isEmpty else { outcomes.append(nil); continue }
                 let measured = AudioDelays.measure(
-                    reference: (reference.file, reference.uid), others: others,
+                    reference: reference.file, others: others,
                     measuresPairs: runs[index].measuresPairs && !wasEstablished)
                 let outcome = runs[index].delays.measured(measured, files: newest, candidates: candidates(), at: Double(measurement + 1) * 10)
                 runs[index].latest = outcome.delays.mapValues(\.delay)

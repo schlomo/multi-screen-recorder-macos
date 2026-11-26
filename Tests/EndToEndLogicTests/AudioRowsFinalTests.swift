@@ -130,14 +130,14 @@ import Testing
     }
 
     /// Synthetic, from `AudioDelays`' format (D89): a reference miss that moves the reference to a proven input
-    /// without an audio delay starts over and waits for every input to join again, the old anchor that cannot sync
-    /// ends at "no clear sound"; a re-base, as when the reference's capture ends, changes no row.
-    @Test func aReferenceMovedToAProvenInputWithoutAnAudioDelayWaitsForTheStartOverAndARebaseChangesNothing() {
+    /// starts over and waits for every input to join again, the old anchor that cannot sync ends at "no clear
+    /// sound"; a re-base, as when the reference's capture ends, changes no row.
+    @Test func aReferenceMovedOnAMissWaitsForTheStartOverAndARebaseChangesNothing() {
         let mic = "2026-11-25 13.23.54 Audio 1 - MacBook Pro Microphone.mov"
         let final = Self.anchorFinal + [Self.brioStartInput, Self.brioStarted, Self.brioJoins, Self.brioDrift]
         let moves = "13:25:04 +70.1s detail recorder: reference \(mic): no counted window against it while another input "
-            + "had sound; \(Self.brio) has counted windows of 1 other input against it: 2026-11-25 13.23.54 Audio 0 - System.mov"
-        let startOver = "13:25:04 +70.1s detail recorder: reference \(mic) → \(Self.brio): it has no audio delay, so it is the new "
+            + "had sound; \(Self.brio) has counted windows of 1 other input against it: 2026-11-25 13.24.50 Audio 3 - Razer Seiren V3 Mini.mov"
+        let startOver = "13:25:04 +70.1s detail recorder: reference \(mic) → \(Self.brio): moved on a reference miss, so it is the new "
             + "anchor and every input starts over"
         let noClearSound = "13:25:34 +100.1s detail recorder: \(mic): no clear sound to sync, 3 measurements with sound and no counted window"
         #expect(notFinal(final + [moves, startOver]) == [mic])

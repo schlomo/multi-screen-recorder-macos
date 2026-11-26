@@ -179,8 +179,8 @@ import Testing
         var delays = AudioDelays()
         _ = delays.update(files: files, reference: "u1.mov")
         let measurement = AudioDelays.Measurement(
-            reference: "u1.mov", referenceUID: "u1",
-            files: names.dropFirst().map { .init(file: "\($0).mov", uid: $0, window: window(0, false), hasSound: true) },
+            reference: "u1.mov",
+            files: names.dropFirst().map { .init(file: "\($0).mov", window: window(0, false)) },
             pairs: [
                 .init(reference: "u2.mov", other: "u3.mov", window: window(0.1, true)),
                 .init(reference: "u2.mov", other: "u4.mov", window: window(0.2, false)),
@@ -189,6 +189,52 @@ import Testing
         let outcome = delays.measured(measurement, files: files, candidates: candidates, at: 10)
         #expect(delays.referenceDevice == "u3", "\(outcome.lines)")
         #expect(outcome.delays["u2.mov"]?.delay == -0.1 && outcome.delays["u4.mov"]?.delay == 0.3, "\(outcome.lines)")
+    }
+
+    /// Once the sync is established, counted pairs move nothing, even when a measurement carries them (D89).
+    @Test func countedPairsMoveNothingOnceTheSyncIsEstablished() {
+        let window = { (lag: Double, counts: Bool) in AudioDelay.Window(lag: lag, clarity: counts ? 30 : 5) }
+        let names = ["u1", "u2", "u3"]
+        let candidates = names.enumerated().map { AudioDelays.Candidate(file: "\($1).mov", uid: $1, number: $0 + 1) }
+        let files = Dictionary(uniqueKeysWithValues: candidates.map { ($0.file, $0.uid) })
+        var delays = AudioDelays()
+        _ = delays.update(files: files, reference: "u1.mov")
+        for at in [10.0, 20] { _ = delays.update(files: files, reference: "u1.mov", lags: ["u2.mov": 0.2, "u3.mov": 0.1], at: at) }
+        #expect(delays.isSyncEstablished)
+        let measurement = AudioDelays.Measurement(
+            reference: "u1.mov",
+            files: names.dropFirst().map { .init(file: "\($0).mov", window: window(0, false)) },
+            pairs: [.init(reference: "u2.mov", other: "u3.mov", window: window(-0.1, true))])
+        let outcome = delays.measured(measurement, files: files, candidates: candidates, at: 30)
+        #expect(delays.referenceDevice == "u1" && !outcome.lines.contains { $0.hasPrefix("reference ") }, "\(outcome.lines)")
+        #expect(outcome.delays["u2.mov"]?.delay == 0.2 && outcome.delays["u3.mov"]?.delay == 0.1, "\(outcome.lines)")
+    }
+
+    /// AX of the fourth review: the anchor's new file, measured against the reference it handed on to, counts toward
+    /// establishing the sync like any other input's, so a later miss wipes nothing (D89).
+    @Test func theAnchorsNewFileEstablishesTheSync() {
+        let steps = Self.steps([
+            Self.input(1, .microphone, lag: 0, [.speech, .noAudio] + Self.repeated(.speech, 8)),
+            Self.input(2, .microphone, lag: 0.2, Self.repeated(.speech, 5) + [.pause, .pause] + Self.repeated(.speech, 3)),
+            Self.input(3, .microphone, lag: 0.1, Self.repeated(.pause, 5) + Self.repeated(.speech, 5)),
+        ])
+        #expect(steps[4].wasEstablished, "\(steps.map(\.lines))")
+        #expect(Self.moves(steps) == 0 && !steps.flatMap(\.lines).contains { $0.hasSuffix("every input starts over") }, "\(steps.map(\.lines))")
+        #expect(Self.isNear(steps.last.flatMap { Self.delay(of: "u2", in: $0) }, 0.2), "\(steps.map(\.lines))")
+    }
+
+    /// MV2 of the fourth review: the move is decided before anything is applied, so the measurement in which an
+    /// input syncs logs no "no clear sound" for it, and the move's start-over says why it happened (D89).
+    @Test func aMoveIsDecidedBeforeTheMeasurementIsApplied() {
+        let steps = Self.steps([
+            Self.input(1, .steady, Self.repeated(.noise, 4)),
+            Self.input(2, .microphone, lag: 0.2, Self.repeated(.speech, 4)),
+            Self.input(3, .microphone, lag: 0.1, [.noAudio, .noAudio] + Self.repeated(.speech, 2)),
+        ])
+        #expect(steps[2].movedBySound && steps[2].reference == "u2", "\(steps.map(\.lines))")
+        #expect(!steps[2].lines.contains { $0.contains("no clear sound") }, "\(steps[2].lines)")
+        #expect(steps[2].lines.contains { $0.hasSuffix("u2-1.mov: moved on a reference miss, so it is the new anchor and every input starts over") },
+                "\(steps[2].lines)")
     }
 
     /// The reference's capture ends: the lowest-numbered input with an audio delay takes it (D80, D85).
@@ -233,8 +279,8 @@ import Testing
         let files = Dictionary(uniqueKeysWithValues: candidates.map { ($0.file, $0.uid) })
         func measure(_ measurement: Int) -> AudioDelays.Measurement {
             let reference = window(inputs[0], measurement)
-            return AudioDelays.measure(reference: ("u1.mov", "u1"), others: inputs.dropFirst().map {
-                (file: "\($0.uid).mov", uid: $0.uid, reference: reference, other: window($0, measurement))
+            return AudioDelays.measure(reference: "u1.mov", others: inputs.dropFirst().map {
+                (file: "\($0.uid).mov", reference: reference, other: window($0, measurement))
             }, measuresPairs: true)
         }
         var delays = AudioDelays()

@@ -525,18 +525,20 @@ extension GlobalRecordingLog {
         enum FedSound {
             /// Speech-like bursts shared by every input, later by the lag.
             case speech(Double)
-            /// The same speech under steady noise: less action.
+            /// The same speech under steady noise.
             case noisySpeech(Double)
             /// Speech-like bursts of another talker, unrelated to `speech`: loud and quiet 125 ms slots at random.
             case otherSpeech
-            /// Near-silence of its own, about -71 dBFS rms: above digital zero, below the level bar.
+            /// Near-silence of its own, about -71 dBFS rms: above digital zero.
             case quiet
+            /// Bursts of a second shared signal, unrelated to `speech`, later by the lag: a call's audio on two loopbacks.
+            case call(Double)
             case hum
             case noise
         }
 
-        /// As `feedDelayedNoise`, each input its own sound.
-        private func feed(_ sounds: [String: FedSound]) throws {
+        /// As `feedDelayedNoise`, each input its own sound, an input's sound ending `shortBy` seconds early.
+        private func feed(_ sounds: [String: FedSound], shortBy: [String: Double] = [:]) throws {
             let rate = RecorderValues.audioSampleRate
             let newest = Dictionary(try manifestOnDisk().audioFiles.compactMap { file in
                 file.audioSourceUID.map { ($0, file.start) }
@@ -549,14 +551,16 @@ extension GlobalRecordingLog {
                     return Float(Int64(bitPattern: seed >> 11) % 2001 - 1000) / 2000
                 }
             }
-            func bursts(_ noise: [Float], phase: Int) -> [Float] {
-                noise.enumerated().map { (($0.offset + phase) / (rate / 5)) % 3 == 0 ? $0.element : $0.element / 20 }
+            func bursts(_ noise: [Float], phase: Int, slot: Int) -> [Float] {
+                noise.enumerated().map { (($0.offset + phase) / slot) % 3 == 0 ? $0.element : $0.element / 20 }
             }
-            let speech = bursts(noise(seed: 7), phase: 0)
+            let speech = bursts(noise(seed: 7), phase: 0, slot: rate / 5)
+            let call = bursts(noise(seed: 991), phase: 3000, slot: rate / 4)
             for (uid, sound) in sounds {
                 let own = noise(seed: 100 + UInt64(uid.unicodeScalars.first!.value))
                 let (signal, lag): ([Float], Double) = switch sound {
                 case .speech(let lag): (speech, lag)
+                case .call(let lag): (call, lag)
                 case .noisySpeech(let lag): (zip(speech, own).map { $0 + 0.3 * $1 }, lag)
                 case .otherSpeech: (own.enumerated().map { sample in
                     var slot = UInt64(sample.offset / (rate / 8)) &* 0x9E37_79B9_7F4A_7C15 &+ UInt64(uid.unicodeScalars.first!.value)
@@ -570,7 +574,8 @@ extension GlobalRecordingLog {
                 case .noise: (own, 0)
                 }
                 let shift = Int((lag * Double(rate)).rounded())
-                for chunk in stride(from: rate, to: 13 * rate, by: rate / 10) {
+                let until = 13 * rate - Int((shortBy[uid] ?? 0) * Double(rate))
+                for chunk in stride(from: rate, to: until, by: rate / 10) {
                     let samples = Array(signal[(chunk - shift + rate)..<(chunk - shift + rate + rate / 10)])
                     recorder.audioDelayFeed.receive([samples], from: uid, at: Int64(base * rate + chunk) * 1_000_000_000 / Int64(rate))
                 }
@@ -608,7 +613,7 @@ extension GlobalRecordingLog {
             let log = try recordingLog()
             #expect(log.contains("reference \(q): no counted window against it while another input had sound; \(o) has counted "
                 + "windows of 2 other inputs against it"), "\(log)")
-            #expect(log.contains("reference \(q) → \(o): it has no audio delay, so it is the new anchor and every input starts over"))
+            #expect(log.contains("reference \(q) → \(o): moved on a reference miss, so it is the new anchor and every input starts over"))
             #expect(log.contains("\(q): no clear sound to sync"))
         }
 
@@ -624,7 +629,7 @@ extension GlobalRecordingLog {
             #expect(b.count == 1 && abs((b.first ?? 0) - 0.2) < 0.002, "\(b)")
             _ = await stop()
             let log = try recordingLog()
-            #expect(log.contains("reference \(h) → \(a): it has no audio delay"), "\(log)")
+            #expect(log.contains("reference \(h) → \(a): moved on a reference miss"), "\(log)")
             #expect(!log.contains("→ \(h)"))
             #expect(!log.contains("\(h) has counted windows"))
         }
@@ -699,7 +704,7 @@ extension GlobalRecordingLog {
             _ = await stop()
             #expect(try delays(of: "R").isEmpty)
             let log = try recordingLog()
-            #expect(log.contains("reference \(r) → \(a): it has no audio delay, so it is the new anchor and every input starts over"), "\(log)")
+            #expect(log.contains("reference \(r) → \(a): moved on a reference miss, so it is the new anchor and every input starts over"), "\(log)")
         }
 
         /// M2 of the third review (DZH): one counted window, as a burst on the dock gives, does not establish the
@@ -768,9 +773,6 @@ extension GlobalRecordingLog {
             #expect(!(try recordingLog()).contains("reference "))
         }
 
-        /// A measurement taken against a reference that moved while it ran counts nothing (D89): before the sync is
-        /// established, two measurements run against a quiet R at once; the first proves A and moves the reference, B
-        /// syncing against A at once; the second, against R, moves nothing more.
         /// Two counted windows establish the sync: the reference then goes quiet while two synced inputs share speech,
         /// and nothing moves, as before D89.
         @Test func aReferenceMissOnceTheSyncIsEstablishedMovesNothing() async throws {
@@ -788,6 +790,9 @@ extension GlobalRecordingLog {
             #expect(!log.contains("starts over"))
         }
 
+        /// A measurement taken against a reference that moved while it ran counts nothing (D89): before the sync is
+        /// established, two measurements run against a quiet R at once; the first proves A and moves the reference, B
+        /// syncing against A at once; the second, against R, moves nothing more.
         @Test func aMeasurementAgainstAReferenceThatMovedCountsNothing() async throws {
             try await startInputs(["R", "A", "B"])
             try feed(["R": .quiet, "A": .speech(0.5), "B": .speech(0.2)])
@@ -804,8 +809,39 @@ extension GlobalRecordingLog {
             #expect(delaysOfB.count == 1 && abs((delaysOfB.first ?? 0) + 0.3) < 0.002, "\(delaysOfB)")
         }
 
-        /// The reference muted while two inputs have an audio delay: the lower-numbered one takes it, though the
-        /// other has more action (D80, D85).
+        /// B1 of the fourth review, a known cost (D89): two inputs carrying one call's audio beside a room that is
+        /// quiet for the first 20 s take the reference and establish the sync, so the room's microphones, speaking
+        /// later, never sync. The audio mode Wired, the default, records no virtual input but the default microphone.
+        @Test func twoInputsOfOneCallTakeTheReferenceBeforeTheRoomSpeaks() async throws {
+            try await startInputs(["R", "M", "N", "A", "B"])
+            for _ in 0..<2 {
+                try feed(["R": .quiet, "M": .quiet, "N": .quiet, "A": .call(0), "B": .call(0.01)])
+                await recorder.measureAudioDelays()
+            }
+            for _ in 0..<5 {
+                try feed(["R": .speech(0), "M": .speech(0.1), "N": .speech(0.2), "A": .call(0), "B": .call(0.01)])
+                await recorder.measureAudioDelays()
+            }
+            _ = await stop()
+            let delaysOfB = try delays(of: "B")
+            #expect(try delays(of: "A") == [0] && delaysOfB.count == 1 && abs((delaysOfB.first ?? 0) - 0.01) < 0.002, "\(delaysOfB)")
+            for uid in ["R", "M", "N"] { #expect(try delays(of: uid).isEmpty, "\(uid)") }
+            let (r, a) = (try fileName(of: "R"), try fileName(of: "A"))
+            #expect(try recordingLog().contains("reference \(r) → \(a): moved on a reference miss"))
+        }
+
+        /// M1 of the fourth review: an input whose sound ends 0.3 s before the others' is measured over the same
+        /// windows, every window ending at the earliest end, and syncs (D89).
+        @Test func anInputSlightlyBehindStillSyncs() async throws {
+            try await startInputs(["R", "A", "B"])
+            try feed(["R": .speech(0), "A": .speech(0.5), "B": .speech(0.2)], shortBy: ["B": 0.3])
+            await recorder.measureAudioDelays()
+            _ = await stop()
+            let delaysOfB = try delays(of: "B")
+            #expect(delaysOfB.count == 1 && abs((delaysOfB.first ?? 0) - 0.2) < 0.002, "\(delaysOfB)")
+        }
+
+        /// The reference muted while two inputs have an audio delay: the lower-numbered one takes it (D80, D85).
         @Test func aMutedReferenceGoesToTheLowestNumberWithAnAudioDelay() async throws {
             try await startInputs(["R", "A", "B"])
             try feed(["R": .speech(0), "A": .noisySpeech(0.5), "B": .speech(0.2)])

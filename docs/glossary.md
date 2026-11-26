@@ -441,11 +441,12 @@ is unchanged.
 The device every audio delay of a recording is against: the first
 audio input whose file is written, its files' audio delay 0 while it is
 the reference, the default microphone or not; a new file of it after
-the reference moved away is measured like any other input (D85). Only
-when the reference moves to an input without an audio delay does that
-input become the new anchor, every input then starting over (D80, D89);
-so a near-silent input 1 hands the anchor on at the first measurement
-in which two other inputs share sound.
+the reference moved away is measured like any other input (D85). When
+the reference moves to an input without an audio delay (D80), or on a
+reference miss whatever its audio delay (D89), that input becomes the
+new anchor, every input then starting over; so a near-silent input 1
+hands the anchor on at the first measurement in which two other inputs
+share sound.
 
 ## Reference
 
@@ -456,7 +457,8 @@ did not end on no audio; then the lowest-numbered input being written
 that has an audio delay, which it stays with, the anchor's returning
 file not taking it back (D80, D85). Until the sync is established, a
 reference miss moves it to the input the most other inputs' windows
-count against, if any; only a counted window moves it (D89). Not the
+count against, if any; a reference miss with no counted window between
+the other inputs moves nothing (D89). Not the
 "Reference implementation" above.
 
 ## Reference miss
@@ -469,8 +471,8 @@ counted pair, nothing moves.
 
 ## Established sync
 
-An input other than the anchor having 2 counted windows since the anchor
-became the anchor (`audioDelayEstablishingWindows`, D89); from then on a
+An input having 2 counted windows since the anchor became the anchor,
+the anchor's own new file included (`audioDelayEstablishingWindows`, D89); from then on a
 reference miss moves nothing, the reference moving only on no audio or
 its capture's end.
 

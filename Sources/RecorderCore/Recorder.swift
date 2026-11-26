@@ -1059,7 +1059,7 @@ public final class Recorder {
         // than a window behind the reference does not hold the others back.
         let end = others.compactMap { audioDelayFeed.endIndex(of: writing[$0]!) }
             .filter { $0 > referenceEnd - Int64(count) }.reduce(referenceEnd, min)
-        var jobs: [(file: String, uid: String, reference: [Float], other: [Float])] = []
+        var jobs: [(file: String, reference: [Float], other: [Float])] = []
         for file in others {
             let uid = writing[file]!
             guard audioDelayFeed.endIndex(of: uid) != nil,
@@ -1070,12 +1070,12 @@ public final class Recorder {
                 RecorderLog.detail("\(file): not measured, it or the reference \(referenceFile) has less than a window of sound", category: "recorder")
                 continue
             }
-            jobs.append((file, uid, referenceWindow, other))
+            jobs.append((file, referenceWindow, other))
         }
         guard !jobs.isEmpty else { return }
         let measuresPairs = !audioDelays.isSyncEstablished
         let measurement = await Task.detached(priority: .utility) {
-            AudioDelays.measure(reference: (referenceFile, reference.uid), others: jobs, measuresPairs: measuresPairs)
+            AudioDelays.measure(reference: referenceFile, others: jobs, measuresPairs: measuresPairs)
         }.value
         guard !isStopped else { return }
         applyAudioDelays(measurement: measurement, at: Double(end) / Double(AudioDelay.sampleRate))

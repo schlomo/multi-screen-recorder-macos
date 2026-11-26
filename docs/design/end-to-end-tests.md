@@ -285,9 +285,9 @@ The named scenarios, each about 10 to 25 s of recording:
 The tone scenarios record only BlackHole, made the default microphone
 for the run, so it is the anchor and in the guide track "Audio inputs"
 from the start (D80). The anchor is the first input whose file starts
-(a reference miss moves the reference only to an input that two other
-inputs' windows count against, D89, which the VM's two inputs cannot
-give, so it never moves), and with
+(a reference miss moves the reference only to an input that the window
+of one input other than the reference counts against, D89, which the
+VM's two inputs cannot give, so it never moves), and with
 every input recorded that is a race between the VM's two:
 in the run of 2026-11-24 at 2628b9d, the two files' starts in the tone
 scenario's `recording.json` were 0.1333 s for BlackHole and 0.1667 s

@@ -3190,9 +3190,8 @@ architect's reading.
 - **Decision:** The reference moves only on evidence. A **reference
   miss** is a measurement with no counted window against the reference
   while another input had sound. The sync is **established** once an
-  input other than the anchor has 2 counted windows since the anchor
-  became the anchor (`audioDelayEstablishingWindows`, *data*). While it
-  is not, a reference miss correlates the other inputs with sound
+  input has 2 counted windows since the anchor became the anchor
+  (`audioDelayEstablishingWindows`, *data*). While it is not, a reference miss correlates the other inputs with sound
   pairwise over the same windows; if a pair counts, the reference moves
   to the input the most others count against (a tie to the lowest
   number), as a start-over whose lags against the new reference are
@@ -3208,18 +3207,11 @@ architect's reading.
     "flat" was a guess tuned on one replay.
   - Not blind tries: each try is a start-over that throws syncs away;
     their bounds needed a try episode, a tried set and a move back.
-- **Decided while building (the builder's reading, for the owner to
-  confirm):**
-  - Establishing counts each device's counted windows since the last
-    start-over, not latched: after a capture's end starts over onto an
-    input that matches nothing, the sync is no longer established.
-  - The anchor's own windows (its new file after the reference moved
-    away) do not establish it.
-  - Every window of a measurement ends at one common end, so the pairs
-    line up; an input more than a window behind the reference does not
-    hold the others back.
-  - Only the files being written lose their entries; a file that ended
-    keeps its list, as `recording.json` promises.
+- **Decided while building, to put to the owner:** establishment
+  counts each device's windows since the last start-over, not latched;
+  every window of a measurement ends at one common end; a file that
+  ended keeps its entries; the known cost of two inputs carrying one
+  signal (below).
 - **Consequences:** an empty, dead or humming input 1 hands the
   reference on at the first measurement in which two other inputs share
   sound, and those are synced from that measurement on. Two talkers who
@@ -3228,9 +3220,15 @@ architect's reading.
   that stops matching stays, as before D89: an input that cannot sync to
   it ends at "no clear sound". An input that only correlates with an
   input other than the reference in use waits until the reference
-  changes, a known cost (1 of 3,200 generated recordings, none of the
-  owner's 15). The measurement does up to n(n-1)/2 extra
-  cross-correlations, only while the sync is not established and nothing
+  changes, a known cost: at the end in 1 of 3,200 generated recordings,
+  for a while in 9 more (up to 80 s), none of the owner's 15. Two inputs
+  carrying one signal the room's microphones do not hear (two loopbacks
+  of a call, two inputs of one device) take the reference and establish
+  the sync if the room is quiet at the start, and the room's microphones
+  then never sync; accepted, as the audio mode Wired, the default,
+  records no virtual input but the default microphone
+  (`RecorderTests.twoInputsOfOneCallTakeTheReferenceBeforeTheRoomSpeaks`).
+  The measurement does up to n(n-1)/2 extra cross-correlations, only while the sync is not established and nothing
   counts against the reference.
 - **Evidence:** the owner's recording on 0.20261125.116; the replay of
   the owner's 15 recordings against main's rules: every audio delay main
@@ -3248,8 +3246,9 @@ architect's reading.
   (`aNearSilentInput1HandsTheReferenceToAMicrophoneAtTheFirstMeasurement`,
   `aReferenceMissBeforeTheSyncIsEstablishedMovesToAProvenInput`,
   `aSingleCountedWindowDoesNotEstablishTheSync`,
-  `aReferenceMissOnceTheSyncIsEstablishedMovesNothing`, the pause tests);
-  `AudioDelayTests.theVectorisedWindowIsTheScalarOneBitForBit`; 22 of
-  29 deliberate breaks of the rules caught, the other 7 changing cost
-  only or edge cases named in the PR; [design/recorder.md](design/recorder.md),
+  `aReferenceMissOnceTheSyncIsEstablishedMovesNothing`,
+  `anInputSlightlyBehindStillSyncs`, the pause tests);
+  `AudioDelayTests.theVectorisedWindowIsTheScalarOneBitForBit`; 26 of
+  30 deliberate breaks of the rules caught, the other 4 changing only
+  the cost or an input's count of unclear measurements; [design/recorder.md](design/recorder.md),
   "Audio delay".

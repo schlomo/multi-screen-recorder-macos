@@ -41,7 +41,7 @@ public enum AudioRowsFinal {
             } else if let drift = detail.firstMatch(of: #/^Audio (\d+) - .*: clock drift (?!corrected)(.*)$/#) {
                 sources[Int(drift.1)!, default: Source()].showsClockDrift = !drift.2.hasPrefix("not measured yet")
             } else if let startOver = detail.firstMatch(
-                of: #/^reference .* → (.*? Audio (\d+) - .*?\.mov): it has no audio delay, so it is the new anchor and every input starts over$/#) {
+                of: #/^reference .* → (.*? Audio (\d+) - .*?\.mov): (?:it has no audio delay|moved on a reference miss), so it is the new anchor and every input starts over$/#) {
                 for number in sources.keys { sources[number]!.showsSync = false }
                 sources[Int(startOver.2)!, default: Source()].showsSync = true
             } else if !detail.hasPrefix("reference "), let delay = detail.firstMatch(of: #/^.*? Audio (\d+) - .*?\.mov: (.*)$/#),
