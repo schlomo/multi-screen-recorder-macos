@@ -63,10 +63,6 @@ extension RecorderValues {
 /// clear sound to sync.
 extension RecorderValues {
     public static let audioDelayUnclearMeasurements = 3
-    /// The stalls in a row (no counted window against the reference while another input had sound) after which
-    /// the reference is tried on another input, once an input other than the anchor has had an audio delay;
-    /// before, one stall (D89).
-    public static let referenceUnsyncedMeasurements = 3
     /// An action score (D89) is the spread of the levels of a window's slices with sound, each slice this long:
     /// the level of `actionScoreHighPercentile` of them less that of `actionScoreLowPercentile`, in dB; with
     /// fewer than `actionScoreMinimumSlices` slices with sound, 0.
@@ -74,9 +70,10 @@ extension RecorderValues {
     public static let actionScoreLowPercentile = 0.1
     public static let actionScoreHighPercentile = 0.9
     public static let actionScoreMinimumSlices = 10
-    /// Below this action score an input is flat, never tried as the reference: an empty line-in scored 2.2 to
-    /// 2.6 dB on the owner's recordings, speech 15 to 40 dB.
-    public static let actionScoreFlat = 6.0
+    /// Below this action score an input is flat, never tried as the reference: the owner's dock line-in with
+    /// nothing connected scored 1.9 to 2.9 dB in the replayed recordings, speech behind a gate from 4.1 dB in the
+    /// generated scenarios, real microphones' medians 7.4 to 39.6 dB.
+    public static let actionScoreFlat = 4.0
     /// Action scores this close to the highest are a tie, which goes to the lowest number.
     public static let actionScoreTie = 3.0
     public static let audioDelayChangeWindowSeconds = 60.0
