@@ -250,13 +250,16 @@ One row per entry, the error text exactly as in the entry.
 - **Observed:** 2026-11-26, PR #34; one passing run, 45786893084 on
   4c0ef05 (whole run 510.1 s), with a thin margin:
   `aLongLastMixIsNotDroppedWhileTheWriterWaits` took 106.7 s against
-  its 120 s bound, the two other ticker tests 89.5 s each. The pool is
+  its 120 s bound, the two other ticker tests 89.5 s each, and
+  `GuideTrackFeedTests.theLastMixWaitsForSamplesThatComeLate` passed
+  after 73.4 s, past its 60 s wait (not explained by the log). The pool is
   still short of threads for minutes: the serialized
   `ClockDriftCorrectionTests` (294.5 s) and `ClockDriftTrackerTests`
   (342.5 s) hold two of the runner's three threads without yielding
   while the invariant cases share the third. A slower runner can fail
-  these tests again; cutting the invariant suite's CPU is the lasting
-  fix.
+  these tests again. The levers, the owner's to choose: a cheaper
+  implementation of the measurement the invariant cases run (no case
+  dropped), or the two clock drift suites yielding too.
 
 ## A virtual screen comes back at its last mode
 
