@@ -10,7 +10,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var aboutWindow: NSWindow?
     private var model: StartModel?
     private var session: RecordingSession?
-    /// Stop in progress, for a logout that comes meanwhile to wait for.
+    /// Stop in progress from the moment it is asked for, before its task runs: a second Stop
+    /// returns, and a logout that comes meanwhile waits for it.
     private var stopping: Task<Void, Never>?
     /// For the rest of the process's life.
     private var audioWatch: AudioInputWatch?
@@ -88,6 +89,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     /// Stop in the status window: finalizes, opens the recording folder and quits.
     private func stopAndQuit() {
+        guard stopping == nil else { return }
         stopping = Task {
             await stopRecording(openFolder: true)
             NSApp.terminate(nil)
@@ -98,7 +100,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// opens the status window.
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         guard let session else { return .terminateNow }
-        switch QuitDecision(isStopping: session.isStopping, endsTheSession: quitEndsTheSession(reason: currentQuitReason())) {
+        switch QuitDecision(isStopping: stopping != nil, endsTheSession: quitEndsTheSession(reason: currentQuitReason())) {
         case .ignore:
             return .terminateCancel
         case .waitForTheStop:

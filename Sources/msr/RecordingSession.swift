@@ -19,7 +19,7 @@ final class RecordingSession: RecorderObserver {
     private var meterTask: Task<Void, Never>?
     private let statusWindow = StatusWindow()
     /// Stop is in progress: a Dock click or a quit does nothing more.
-    private(set) var isStopping = false
+    private var isStopping = false
     private let homeFolder: URL
     /// Why the state file does not remember this recording, if it does not.
     private(set) var notRemembered: StateFileError?
