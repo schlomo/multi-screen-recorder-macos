@@ -282,6 +282,14 @@ public struct AudioDelays: Sendable {
         var lines: [String] = []
         var lags: [String: Double] = [:]
         var unclear: Set<String> = []
+        /// The update's outcome, this measurement's lines first.
+        func updated(
+            reference: String, lags: [String: Double] = [:], unclear: Set<String> = [], isMiss: Bool = false
+        ) -> Outcome {
+            var outcome = update(files: newest, reference: reference, lags: lags, unclear: unclear, at: at, isMiss: isMiss)
+            outcome.lines = lines + outcome.lines
+            return outcome
+        }
         for measured in measurement.files {
             guard let window = measured.window else {
                 lines.append("\(measured.file): not measured, it or the reference \(measurement.reference) is silent")
@@ -296,14 +304,10 @@ public struct AudioDelays: Sendable {
                 lines.append("counted lags of \(lags.keys.sorted().joined(separator: ", ")) dropped: measured against "
                     + "\(measurement.reference), the reference is now \(reference.file)")
             }
-            var outcome = update(files: newest, reference: reference.file, at: at)
-            outcome.lines = lines + outcome.lines
-            return outcome
+            return updated(reference: reference.file)
         }
         guard lags.isEmpty else {
-            var outcome = update(files: newest, reference: reference.file, lags: lags, unclear: unclear, at: at)
-            outcome.lines = lines + outcome.lines
-            return outcome
+            return updated(reference: reference.file, lags: lags, unclear: unclear)
         }
         // Pairs are only of inputs with sound: with none, nothing moves.
         var against: [String: [String: Double]] = [:]
@@ -319,24 +323,18 @@ public struct AudioDelays: Sendable {
         let mostCounted = (synced.isEmpty ? proven : synced)
             .max { (against[$0.file]!.count, $1.number) < (against[$1.file]!.count, $0.number) }
         guard let mostCounted, let provenLags = against[mostCounted.file] else {
-            var outcome = update(files: newest, reference: reference.file, unclear: unclear, at: at)
-            outcome.lines = lines + outcome.lines
-            return outcome
+            return updated(reference: reference.file, unclear: unclear)
         }
         let isStartOver = synced.isEmpty
         guard !isStartOver || provenLags.count + 1 > anchorGroup else {
             lines.append("reference \(reference.file): \(mostCounted.file)'s group of \(provenLags.count + 1) does not outnumber the "
                 + "anchor's group of \(anchorGroup): nothing moves")
-            var outcome = update(files: newest, reference: reference.file, unclear: unclear, at: at)
-            outcome.lines = lines + outcome.lines
-            return outcome
+            return updated(reference: reference.file, unclear: unclear)
         }
         lines.append("reference \(reference.file): no counted window against it while another input had sound; \(mostCounted.file) has "
             + "counted windows of \(provenLags.count) other input\(provenLags.count == 1 ? "" : "s") against it: "
             + provenLags.keys.sorted().joined(separator: ", "))
-        var outcome = update(files: newest, reference: mostCounted.file, lags: provenLags, at: at, isMiss: isStartOver)
-        outcome.lines = lines + outcome.lines
-        return outcome
+        return updated(reference: mostCounted.file, lags: provenLags, isMiss: isStartOver)
     }
 
     private static func line(_ file: String, _ window: AudioDelay.Window, against reference: String) -> String {
