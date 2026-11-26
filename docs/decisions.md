@@ -3344,9 +3344,9 @@ architect's reading.
   turns every 10 s start over every turn. A late start-over: two inputs
   synced for an hour, then one miss in which three unsynced inputs
   match each other, starts over and clears the synced inputs' entries;
-  only possible with five or more inputs, outside the owner's main use
-  cases, and the generated recordings, with one shared talker, cannot
-  show it.
+  it needs three inputs sharing a sound the synced ones do not hear,
+  which the owner's main use cases do not have, and the generated
+  recordings, with one shared talker, cannot show it.
 - **Evidence:** the 3,200 generated recordings run side by side with
   the rules before (`faster-tests` at 3dac59c): as generated 132 seeds
   more microphone-synced steps, 0 fewer, 27 seeds more inputs synced at
