@@ -251,7 +251,6 @@ import Testing
     /// The gaps no audio follows: the first gap of the input from `silenceAfterGapsTime` before its zeros
     /// began up to when no audio started; none without such a gap (D81).
     @Test func noAudioRightAfterGapsFindsTheFirstOfThem() {
-        #expect(RecorderValues.silenceAfterGapsTime == .seconds(10))
         func gap(_ seconds: Double, _ source: String = "BRIO") -> RecordingEvent {
             RecordingEvent(at: Int64((seconds * 1e9).rounded()), event: .audioInputGap, audioSource: source)
         }

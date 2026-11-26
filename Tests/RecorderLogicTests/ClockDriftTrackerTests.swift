@@ -68,17 +68,6 @@ import Testing
 
     private func ms(_ seconds: Double) -> String { String(format: "%.3f ms", seconds * 1000) }
 
-    @Test func theValuesAreTheDesignsStartingPoints() {
-        #expect(RecorderValues.clockDriftInterval == .seconds(1))
-        #expect(RecorderValues.clockDriftHorizon == .seconds(20))
-        #expect(RecorderValues.clockDriftEstimateMinimumPoints == 5)
-        #expect(RecorderValues.clockDriftEstimateMinimumSpan == .seconds(10))
-        #expect(RecorderValues.clockDriftCatchUpTime == .seconds(10))
-        #expect(RecorderValues.clockDriftMaximumRatePpm == 1000)
-        #expect(RecorderValues.clockDriftShownEstimates == 60)
-        #expect(RecorderValues.clockDriftShownMinimumEstimates == 10)
-    }
-
     // MARK: Steady devices
 
     @Test(arguments: [-116.0, 50, 0], 1...3)

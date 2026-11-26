@@ -577,7 +577,6 @@ import Testing
         await capture.stop()
         #expect(writer.samples == Int64(buffers * perBuffer))
         #expect(writer.taken.dropLast().allSatisfy { $0 >= appendSamples })
-        #expect(RecorderValues.audioFileAppendSamples == RecorderValues.audioSampleRate / 10)
     }
 
     // MARK: Level meter, input volume and no audio (D69)

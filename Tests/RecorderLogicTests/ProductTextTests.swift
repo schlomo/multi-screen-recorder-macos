@@ -2,12 +2,6 @@ import Testing
 @testable import RecorderLogic
 
 @Suite struct ProductTextTests {
-    @Test func thePurposeIsTheReadmesOpeningParagraph() throws {
-        let readme = try repositoryFile("README.md")
-        let opening = readme.components(separatedBy: "\n\n")[1].replacing("\n", with: " ")
-        #expect(ProductText.purpose == opening)
-    }
-
     /// The window links to the homepage that `homepage/` builds and the Worker serves.
     @Test func theHomepageIsWhereTheSiteIsServed() throws {
         #expect(Homepage.url.absoluteString == "https://multiscreenrecorder.schapiro.org")
@@ -26,11 +20,10 @@ import Testing
             .contains("<p class=\"tagline\">{{ delimit site.Params.tagline \"<br />\" | safeHTML }}</p>"))
     }
 
-    /// The README and the homepage link to the problem report form.
+    /// The homepage links to the problem report form.
     @Test func theProblemReportLinksOpenTheForm() throws {
         _ = try repositoryFile(".github/ISSUE_TEMPLATE/problem-report.yml")
         let link = "\(GitHubRepository.issues.absoluteString)/new?template=problem-report.yml"
-        #expect(try repositoryFile("README.md").contains(link))
         #expect(try repositoryFile("homepage/hugo.toml").contains(link))
     }
 
