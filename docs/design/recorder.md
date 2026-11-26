@@ -1081,7 +1081,7 @@ checked, reported or rewritten at the next start (D47).
   its capture ended otherwise). A failure of a file whose source has
   started a newer file is over when told, so it never shows a line; a
   full disk or a file lost in part never is. A line
-  only shown, as a video file's end the manifest lists already, never
+  only tracked, as a video file's end the manifest lists already, never
   keeps a problem of its kind told after it from the manifest. Each
   kind has its own words and names its source, such as `Screen 1 DELL not
   captured`, `Disk full`, `File <name> incomplete`, and one line:

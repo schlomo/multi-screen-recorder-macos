@@ -185,9 +185,9 @@ import Testing
         ])
     }
 
-    /// A line only shown, as a video file's end, keeps no tell of its kind from the manifest; and only a
+    /// A line only tracked, as a video file's end, keeps no tell of its kind from the manifest; and only a
     /// failure that ends with a new file can be over when told: a full disk or a lost file never are.
-    @Test func aShownLineNeitherSwallowsATellNorEndsWhatANewFileDoesNotEnd() {
+    @Test func aTrackedLineNeitherSwallowsATellNorEndsWhatANewFileDoesNotEnd() {
         var told = ProblemsTold()
         var manifest = manifest()
         told.track(problem(5 * second, "Camera file c.mov"), kind: .cameraNotCaptured("C"), source: "BRIO")

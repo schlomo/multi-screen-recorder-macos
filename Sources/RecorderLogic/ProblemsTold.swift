@@ -132,7 +132,7 @@ extension ProblemKind {
 /// The problems a recording has told and the status window's lines: a told
 /// problem goes into the recording manifest, which is written at once, unless
 /// writing it is the problem; one of a kind that was told and has not ended
-/// since is not told again. Some are only shown (`show`): the manifest lists
+/// since is not told again. Some are only tracked (`track`): the manifest lists
 /// them already.
 public struct ProblemsTold: Sendable {
     public enum Outcome: Equatable, Sendable {
@@ -178,13 +178,13 @@ public struct ProblemsTold: Sendable {
 
     public init() {}
 
-    /// Into the manifest and followed for its call to action and its line, unless one of its kind told before has
+    /// Into the manifest and tracked for its call to action and its line, unless one of its kind told before has
     /// not ended; one only tracked does not keep it from the manifest. `source` names the screen or camera of a kind keyed by its ID;
     /// `endedAt`: already over when told, for a failure that ends with a new file (`endsWithANewFile`) after a
     /// newer file of its source started, or after its source went away (`ending`); `withoutCallToAction` for a
     /// problem whose call to action another one gives, such as a screen that showed another screen's picture or a
     /// file a full disk cut short (D84); a tell without it replaces a lasting line that has
-    /// it, told or only shown, its wait starting then.
+    /// it, told or only tracked, its wait starting then.
     public mutating func add(
         _ problem: RecordingProblem, kind: ProblemKind, source: String? = nil, note: String? = nil, endedAt: Int64? = nil,
         ending: Ending = .recovered, withoutCallToAction: Bool = false, to manifest: inout RecordingManifest
@@ -194,14 +194,14 @@ public struct ProblemsTold: Sendable {
         // A failure of its own after another screen's picture replaces that told line.
         if let lasting, told[lasting].isTold, !(told[lasting].withoutCallToAction && !withoutCallToAction) { return .alreadyTold }
         manifest.problems.append(problem)
-        if let shown = lasting {
-            told[shown].problem = problem
-            told[shown].isTold = true
-            if told[shown].withoutCallToAction && !withoutCallToAction {
+        if let tracked = lasting {
+            told[tracked].problem = problem
+            told[tracked].isTold = true
+            if told[tracked].withoutCallToAction && !withoutCallToAction {
                 // A failure of its own after another screen's picture: its wait counts from now.
-                told[shown].began = Int64((problem.at * 1_000_000_000).rounded())
+                told[tracked].began = Int64((problem.at * 1_000_000_000).rounded())
             }
-            told[shown].withoutCallToAction = withoutCallToAction
+            told[tracked].withoutCallToAction = withoutCallToAction
         } else {
             track(problem, kind: kind, source: source, endedAt: endedAt, ending: ending, withoutCallToAction: withoutCallToAction)
             told[told.count - 1].isTold = true
@@ -210,7 +210,7 @@ public struct ProblemsTold: Sendable {
         return .tell(writeManifest: kind != .manifestNotWritten)
     }
 
-    /// Followed for its call to action and its line, without a manifest entry, for a problem the manifest already
+    /// Tracked for its call to action and its line, without a manifest entry, for a problem the manifest already
     /// lists (a video file's end); none while one of its kind lasts. `endedAt` as for `add`.
     public mutating func track(
         _ problem: RecordingProblem, kind: ProblemKind, source: String? = nil, endedAt: Int64? = nil, ending: Ending = .recovered,
