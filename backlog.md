@@ -63,7 +63,18 @@ Still open from D34: what AGC does and whether it is on in auto mode;
   with or without a recording; before, it did not. The owner suspects
   Amphetamine's closed-lid helper, installed recently. The recorder
   handled the sleep as designed (recording 2026-11-27 06.43.39: every
-  file finalized, about 3 s lost per source). Being diagnosed.
+  file finalized, about 3 s lost per source). Diagnosed from the logs
+  (2026-11-27): the kernel sleeps at a lid close unless powerd has
+  disabled it; powerd disabled it only right after the dock or power
+  was plugged in (it left the disable set after the transient plug-in
+  assertions), so the earlier lid closes that did not sleep came soon
+  after docking. Docked for hours, a lid close sleeps, powerd stops the
+  sleep at once (external screens on power) and the displays' off-on
+  locks the screen. Amphetamine held no session then, and its closed
+  display setting applies only during a session, so it is not the
+  cause; macOS 27.2.1, installed the same day as Amphetamine, may be.
+  Next: the owner's test, re-plug the dock, then close the lid
+  (expected: no sleep).
 
 ## Queued
 
