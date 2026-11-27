@@ -10,7 +10,7 @@ extension RecordingDuration: ExpressibleByArgument {
     }
 }
 
-/// Exit 3: a file not finalized or ended by a failure, or a camera stalled (D47), the final manifest not written, or no start.
+/// Exit 3: the result `problems`, a call to action given or a file not finalized (D47, D91), the final manifest not written, or no start.
 let recordingEndedWithErrorExitCode: Int32 = 3
 
 extension CommandLineInterface {
@@ -20,7 +20,7 @@ extension CommandLineInterface {
             discussion: "Prints what will be recorded, runs the ready check, then records with the app's Dock icon. "
                 + "Standard output carries one line, the recording folder's path, when recording starts; everything for people goes to standard error, "
                 + "on a terminal with a status line redrawn once a second. "
-                + "Exits 0 when every file is finalized, no file was ended by a failure and no camera stalled, 1 when not ready, 3 otherwise or when it could not start.")
+                + "Exits 0 when every file is finalized and no problem called for action, 1 when not ready, 3 otherwise or when it could not start.")
 
         @OptionGroup var flags: SettingsFlags
 
@@ -30,7 +30,7 @@ extension CommandLineInterface {
         @Flag(help: "Also prints the detail lines on standard error, and writes them at debug level in the unified log.")
         var debug = false
 
-        @Flag(help: "No output for people: only the recording folder's path on standard output, and on standard error a failing ready check, errors, the settings file note, each failure and problem as it happens with the count of a failure's repeats, and the summary of a run that exits 3 or asks to report it. Not with --debug.")
+        @Flag(help: "No output for people: only the recording folder's path on standard output, and on standard error a failing ready check, errors, the settings file note, each problem whose call to action is given, and the summary of a run that exits 3 or asks to report it. Not with --debug.")
         var quiet = false
 
         func validate() throws {
@@ -198,16 +198,22 @@ final class RecordCommandDelegate: NSObject, NSApplicationDelegate {
     }
 }
 
-/// What `msr record` tells when asked to stop: the first request starts the
+/// A stop under way from its first request, in `msr record` and the app, and
+/// what `msr record` tells when asked to stop: the first request starts the
 /// stop, any later one only tells that it goes on.
 struct StopRequests {
     static let stopping = "Stopping the recording and finalizing the files…"
     static let stillFinalizing = "Still finalizing the files…"
     private(set) var isStopping = false
 
+    /// Whether this request started the stop: only the first does.
+    mutating func start() -> Bool {
+        defer { isStopping = true }
+        return !isStopping
+    }
+
     /// The line for standard error; the first request starts the stop.
     mutating func request() -> String {
-        defer { isStopping = true }
-        return isStopping ? Self.stillFinalizing : Self.stopping
+        start() ? Self.stopping : Self.stillFinalizing
     }
 }

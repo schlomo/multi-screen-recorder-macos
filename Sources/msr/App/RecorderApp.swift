@@ -10,6 +10,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var aboutWindow: NSWindow?
     private var model: StartModel?
     private var session: RecordingSession?
+    /// Under way from the first Stop or logout, before its task runs: a second Stop
+    /// returns, and a logout that comes meanwhile waits for `stopping`.
+    private var stopRequests = StopRequests()
     /// Stop in progress, for a logout that comes meanwhile to wait for.
     private var stopping: Task<Void, Never>?
     /// For the rest of the process's life.
@@ -88,6 +91,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     /// Stop in the status window: finalizes, opens the recording folder and quits.
     private func stopAndQuit() {
+        guard stopRequests.start() else { return }
         stopping = Task {
             await stopRecording(openFolder: true)
             NSApp.terminate(nil)
@@ -98,7 +102,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// opens the status window.
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         guard let session else { return .terminateNow }
-        switch QuitDecision(isStopping: session.isStopping, endsTheSession: quitEndsTheSession(reason: currentQuitReason())) {
+        switch QuitDecision(isStopping: stopRequests.isStopping, endsTheSession: quitEndsTheSession(reason: currentQuitReason())) {
         case .ignore:
             return .terminateCancel
         case .waitForTheStop:
@@ -112,6 +116,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             session.showStatus { [weak self] in self?.stopAndQuit() }
             return .terminateCancel
         case .finalizeWithoutAsking:
+            _ = stopRequests.start()
             stopping = Task {
                 await stopRecording(openFolder: false)
                 NSApp.reply(toApplicationShouldTerminate: true)

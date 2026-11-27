@@ -58,18 +58,21 @@ own clock is resampled continuously to stay with the screen files
     separate recording. Each microphone is placed in the audio inputs' guide
     track by its measured delay, so a late one is in sync there. A
     microphone joins it only once measured: for the first 10 to 20 s only
-    the anchor microphone (the first to start) is in it. Until the sync
-    is established, a measurement that matches nothing compares the other
-    microphones with each other and makes the one they match the anchor,
-    so an empty line-in as the first input holds nothing up; the one that
-    was the anchor then leaves the guide track until it is measured
-    against the new one. Two inputs carrying the same other sound (two
+    the anchor microphone (the first to start) is in it. The microphones
+    are measured against one of them, the reference, chosen by what they
+    hear, never by which is the default: when it matches nothing, the
+    others are compared with each other and the reference moves to the one
+    they match, keeping every sync made when that one is synced already;
+    else it starts over, every microphone measured again, but only when
+    more of them match it than match the anchor, so an empty line-in as
+    the first input holds nothing up. Two inputs carrying the same other sound (two
     loopbacks of a call) during a quiet start can win that instead, and
     the room's microphones then stay out; the audio mode Wired, the
     default, records no virtual input but the default microphone. One never measured
     never joins;
-    one more than 0.8 s off the others leaves it rather than echo in it;
-    its own audio track is still recorded.
+    one more than 0.8 s off the others is left out rather than echo in
+    it, its row in the status window saying so; its own audio track is
+    still recorded.
 - **Scriptable.** Everything also works from the command line.
 - **Nothing leaves your Mac.** The app makes no network connections.
 
@@ -183,9 +186,11 @@ When a recording had a problem worth reporting (a lost or incomplete
 file, or a source that failed and did not come back), the app says so
 the next time it starts: **Report a problem** opens the problem report form in your
 browser with the version and what went wrong filled in, and shows that
-recording's `recording.json` and `recording.log` in Finder. `msr record`
-ends such a recording's summary with the same link (`Report it:`) and
-the files to attach (`Attach:`). Otherwise use the
+recording's `recording.json` and `recording.log` in Finder; its link
+lists every failure and problem in `recording.json`. `msr record`
+ends such a recording's summary with a link of its own (`Report it:`),
+listing only what it asked you to act on and the files not finalized,
+and the files to attach (`Attach:`). Otherwise use the
 [problem report form](https://github.com/schlomo/multi-screen-recorder-macos/issues/new?template=problem-report.yml)
 (a GitHub account is needed). It asks for the output of `msr version`
 (see "Command line" below; About Multi Screen Recorder in the app's
@@ -234,7 +239,9 @@ lower right corner beside Start, quits without recording.
 Click Start: the window closes; the Dock icon shows a "!" badge and
 bounces when the disk runs low or something went wrong that you have
 to do something about, such as free up disk space or plug a microphone
-in again; anything else is only listed in the status window. Click the Dock icon or quit to open the status
+in again; anything else, such as a camera that stalls for a moment or
+a microphone that drops out and comes back, shows nothing and is only
+kept in the recording's log and manifest. Click the Dock icon or quit to open the status
 window: each screen, camera and audio source with its files, the data written
 and its state (hold the mouse over a row for its details and, while it
 records, its late frames, stall or clock drift), each audio source's level meter (red from −1 dBFS) and,
@@ -243,8 +250,8 @@ where macOS lets it be set, a slider for an audio input's input volume
 set after Stop), the time recorded (`h:mm:ss`, every second), data and
 free space, the CPU use of Multi Screen Recorder itself (encoding and
 capture also run in macOS's own processes, which it does not include),
-and any problems, red for something broken, orange for a hiccup, at most 5 lines with more scrolling, with a line naming the two files a report
-needs. Stop there finalizes the files, opens the
+and, in red, any problem you have to do something about, at most 5 lines with more scrolling, with a line naming the two files a report
+needs when one of them asks you to report it. Stop there finalizes the files, opens the
 recording folder in Finder and quits; Continue keeps recording. The
 recording folder holds a video file per screen, a new one each time a
 screen comes back or changes its frame size, an audio file per audio
@@ -273,7 +280,7 @@ so it shows the app's version and runs with its signature.
 |---|---|
 | `msr list` | Shows what will be recorded, the same table as `msr check` (the settings line, the screens by number, then the cameras by number, then the audio sources by number, the system audio first; a camera or an audio input not recorded comes last and is named with its reason, such as `(virtual)`), without the ready check and without asking for a permission, and whether the program running `msr` (a terminal app) may record the system audio |
 | `msr check [flags] [--debug]` | Prints the banner (name, version, build date, homepage) and what will be recorded, then runs the ready check; exits 0 when ready, 1 when not; creates the output folder if it is missing |
-| `msr record [flags] [--duration 1h30m] [--debug \| --quiet]` | Prints the banner and what will be recorded and runs the ready check, then records until Ctrl-C, the duration or Stop in the status window (click the Dock icon); shows the app's Dock icon while it records and prints each event; standard output carries one line, the recording folder's path, when recording starts, and everything for people (banner, table, ready check, events, summary, with `--debug` the detail lines) goes to standard error, where a terminal also gets the status line, redrawn once a second: the count of problems whose call to action was given, if any, then time, size, files, free space, CPU and sources; `--quiet` leaves out all of it but the path, and on standard error a failing ready check, errors, the settings file note, each failure as it happens (a repeat of it counted, not printed) and the summary of a run that exits 3 or asks to report it, and is refused together with `--debug`; `--duration` without a suffix is minutes; exits 0 when every file is finalized, no file was ended by a failure and no camera stalled (a problem told alone, an unplugged microphone, a gap, no audio or a change of an input volume is listed but still exits 0), 1 when not ready, 3 when a file is not finalized, a file was ended by a failure, a camera stalled, the recording manifest could not be written at the end, or the recording could not start |
+| `msr record [flags] [--duration 1h30m] [--debug \| --quiet]` | Prints the banner and what will be recorded and runs the ready check, then records until Ctrl-C, the duration or Stop in the status window (click the Dock icon); shows the app's Dock icon while it records and prints each event; standard output carries one line, the recording folder's path, when recording starts, and everything for people (banner, table, ready check, events, summary, with `--debug` the detail lines) goes to standard error, where a terminal also gets the status line, redrawn once a second: the count of problems whose call to action was given, if any, then time, size, files, free space, CPU and sources; `--quiet` leaves out all of it but the path, and on standard error a failing ready check, errors, the settings file note, each problem you have to do something about as it is told, and the summary of a run that exits 3 or asks to report it, and is refused together with `--debug`; `--duration` without a suffix is minutes; exits 0 when every file is finalized and no problem called for action (a camera stall, a failure that came back within 10 s, an unplugged microphone, a gap, no audio or a change of an input volume is listed in the recording log and `recording.json` but still exits 0), 1 when not ready, 3 when a problem called for action (such as a full disk, or a source not back within 10 s), a file is not finalized, the recording manifest could not be written at the end, or the recording could not start |
 | `msr settings [flags]` | Without flags prints the effective settings as JSON; with a settings flag saves the effective settings into the settings file and prints them, the only way a command writes it |
 | `msr timeline <folder>` | Writes the [OpenTimelineIO](http://opentimeline.io/) timeline file of a recording folder from its `recording.json` (the app and `msr record` write it at Stop), replacing an older one, and prints its path; writes nothing else; exits 1 with the error when `recording.json` cannot be read, a file's length cannot be read or the file cannot be written |
 | `msr version` | Prints the version and commit |

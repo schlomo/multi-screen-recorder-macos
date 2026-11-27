@@ -150,8 +150,6 @@ final class AudioCapture: @unchecked Sendable {
     private var finishing: [Task<Void, Never>] = []
     private var isEnding = false
     private var guideChannels: Int?
-    /// The input is out of its guide track (D79), its next files too, until it rejoins (D80).
-    private var isOutOfTheGuideTrack = false
     /// The samples its sound is placed earlier in its guide track (D80); nil while an audio input is not in it
     /// yet, which the recorder decides for each file. The system audio's is 0.
     private var guideEarlierBy: Int64?
@@ -321,34 +319,13 @@ final class AudioCapture: @unchecked Sendable {
     }
 
     /// The file `name`, if the current one, or any name while none is open (the recorder names its device's
-    /// newest file, and the next file carries on), leaves its guide track with the input's next files until
-    /// it rejoins; whether it did (D79, D80).
-    func leaveTheGuideTrack(file name: String) -> Bool {
-        queue.sync {
-            guard open.map({ $0.entry.name == name }) ?? true else { return false }
-            isOutOfTheGuideTrack = true
-            leaveGuide()
-            return true
-        }
-    }
-
-    /// The file `name`, if the current one, or any name while none is open (as for a leave), is placed
-    /// `earlierBy` samples earlier in its guide track, nil: not in it yet; whether it is (D80).
+    /// newest file, and the next file carries on), is placed `earlierBy` samples earlier in its guide track, nil:
+    /// not mixed; whether it is (D80, D90).
     func placeInTheGuideTrack(file name: String, earlierBy: Int64?) -> Bool {
         queue.sync {
             guard open.map({ $0.entry.name == name }) ?? true else { return false }
             guideEarlierBy = earlierBy
             if guideChannels != nil { guides.place(source: label, earlierBy: earlierBy, in: guide) }
-            return true
-        }
-    }
-
-    /// The file `name`, if the current one, or any name while none is open (as for a leave), and out of its
-    /// guide track, joins it again with its next buffer; whether it did (D79).
-    func rejoinTheGuideTrack(file name: String) -> Bool {
-        queue.sync {
-            guard open.map({ $0.entry.name == name }) ?? true, isOutOfTheGuideTrack else { return false }
-            isOutOfTheGuideTrack = false
             return true
         }
     }
@@ -607,7 +584,7 @@ final class AudioCapture: @unchecked Sendable {
     // MARK: Guide track
 
     private func joinGuide(channelCount: Int) {
-        guard !isOutOfTheGuideTrack, guideChannels != channelCount else { return }
+        guard guideChannels != channelCount else { return }
         if guideChannels != nil { guides.remove(source: label, from: guide) }
         guides.add(source: label, channelCount: channelCount, earlierBy: guideEarlierBy, to: guide)
         guideChannels = channelCount

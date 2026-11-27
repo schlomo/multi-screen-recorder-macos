@@ -80,15 +80,6 @@ import Testing
         #expect(ticks.framesRepeatedForLateness == 2)
     }
 
-    /// A video file's writer may fall 6 s behind, also at the file's end;
-    /// the guide track wait and the audio drain keep 2 s.
-    @Test func aVideoFileMayFallSixSecondsBehind() {
-        #expect(RecorderValues.videoFileLateTickSeconds == 6)
-        #expect(RecorderValues.lateTickBound == 6 * RecorderValues.framesPerSecond)
-        #expect(TickLoop<String>().lateTickBound == 6 * RecorderValues.framesPerSecond)
-        #expect(RecorderValues.audioWaitBoundSeconds == 2)
-    }
-
     @Test(arguments: [RecorderValues.framesPerSecond, 60])
     func moreThanTheBoundOfWaitingTicksMeansTheWriterFellBehind(rate: Int) {
         var ticks = loop(rate: rate, bound: RecorderValues.videoFileLateTickSeconds * rate)

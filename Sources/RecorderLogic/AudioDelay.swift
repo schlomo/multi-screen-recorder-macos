@@ -1,4 +1,5 @@
 import Accelerate
+import Synchronization
 
 /// How much later an audio input's sound arrives than the reference's
 /// (D77, D80): measured while recording by cross-correlating the
@@ -76,6 +77,16 @@ public enum AudioDelay {
             self.delay = delay
             isCarriedOver = true
         }
+
+        /// The anchor's own 0, as against the anchor: its first window against another reference is a change of
+        /// reference, so hindsight keeps the 0 for the stretch before (D90).
+        public init(anchor: String) {
+            delay = 0
+            latestReferenceDevice = anchor
+        }
+
+        /// Whether it has an own counted window.
+        public var isMeasured: Bool { !windows.isEmpty }
 
         /// The rule the latest window's lag was evaluated by and its outcome, or why no rule was, for the
         /// recording log.
@@ -187,9 +198,7 @@ public enum AudioDelay {
         let log2n = vDSP_Length(Int.bitWidth - (2 * a.count - 1).leadingZeroBitCount)
         let n = 1 << Int(log2n)
         let half = n / 2
-        guard let fft = vDSP.FFT(log2n: log2n, radix: .radix2, ofType: DSPSplitComplex.self) else {
-            preconditionFailure("vDSP cannot set up an FFT of \(n) points")
-        }
+        let fft = fftSetup(log2n).fft
         func spectrum(_ signal: [Float]) -> (real: [Float], imaginary: [Float]) {
             var padded = [Float](repeating: 0, count: n)
             padded.replaceSubrange(0..<signal.count, with: signal)
@@ -218,6 +227,26 @@ public enum AudioDelay {
             }
         }
         return result
+    }
+
+    /// One FFT setup per size for the process: creating one per call dominated the measurement's cost.
+    /// Sharing is safe: Apple's vDSP.h says FFT/DFT setups need only read-only access, so concurrent execution is safe.
+    /// The recorder holds one 2^18 setup, about 17 MB, from its first measurement to the process's end.
+    final class SharedFFT: @unchecked Sendable {
+        let fft: vDSP.FFT<DSPSplitComplex>
+        init(_ fft: vDSP.FFT<DSPSplitComplex>) { self.fft = fft }
+    }
+    private static let setups = Mutex<[vDSP_Length: SharedFFT]>([:])
+    static func fftSetup(_ log2n: vDSP_Length) -> SharedFFT {
+        setups.withLock { bySize in
+            if let shared = bySize[log2n] { return shared }
+            guard let fft = vDSP.FFT(log2n: log2n, radix: .radix2, ofType: DSPSplitComplex.self) else {
+                preconditionFailure("vDSP cannot set up an FFT of 2^\(log2n) points")
+            }
+            let shared = SharedFFT(fft)
+            bySize[log2n] = shared
+            return shared
+        }
     }
 
     static func median(_ values: [Double]) -> Double? {

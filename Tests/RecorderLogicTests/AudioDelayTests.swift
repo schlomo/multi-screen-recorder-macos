@@ -42,6 +42,18 @@ import Testing
         #expect(AudioDelay.window(reference: reference, other: [Float](repeating: 0, count: count)) == nil)
     }
 
+    /// An FFT setup is made once per size for the process, and shared by every call, also from other threads.
+    @Test func eachSizeHasOneFFTSetupSharedByEveryCaller() async {
+        let first = AudioDelay.fftSetup(12)
+        #expect(AudioDelay.fftSetup(12) === first)
+        #expect(AudioDelay.fftSetup(13) !== first)
+        let others = await withTaskGroup(of: AudioDelay.SharedFFT.self) { group in
+            for _ in 0..<8 { group.addTask { AudioDelay.fftSetup(12) } }
+            return await group.reduce(into: []) { $0.append($1) }
+        }
+        #expect(others.allSatisfy { $0 === first })
+    }
+
     /// The vectorised cross-correlation and window give, bit for bit, what main's scalar code gave (`Scalar`):
     /// speech-like bursts against a shifted copy, unrelated noise, and a near-silent window.
     @Test func theVectorisedWindowIsTheScalarOneBitForBit() {

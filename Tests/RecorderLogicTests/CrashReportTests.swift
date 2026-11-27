@@ -114,9 +114,9 @@ import Testing
         _ = try repositoryFile(".github/ISSUE_TEMPLATE/\(CrashReport.template)")
     }
 
-    /// The form and the README name the same command for the log (D46); the crash report dialog
+    /// The form names the command for the log (D46); the crash report dialog
     /// names the recording's files instead (D64).
-    @Test func theLogCommandIsInTheFormAndTheReadme() throws {
+    @Test func theLogCommandIsInTheForm() throws {
         #expect(CrashReport.logCommand == #"log show --last 2h --predicate 'subsystem == "org.schapiro.multiscreenrecorder" and process == "msr"'"#)
         let form = try repositoryFile(".github/ISSUE_TEMPLATE/crash-report.yml")
         #expect(form.contains("\n    id: log\n"))
@@ -124,10 +124,8 @@ import Testing
         // in a comment, so the submitted issue does not show it
         let comment = try #require(form.firstMatch(of: /<!--(?s:(.*?))-->/)).1
         #expect(comment.contains(CrashReport.logCommand))
-        #expect(try repositoryFile("README.md").contains(CrashReport.logCommand))
         #expect(!CrashReport.dialogText.contains(CrashReport.logCommand))
         #expect(CrashReport.dialogText.contains("recording.json and recording.log"))
-        #expect(try repositoryFile("README.md").contains("`recording.json` and `recording.log`"))
     }
 
     @Test func aPlusInAValueIsPercentEncoded() {

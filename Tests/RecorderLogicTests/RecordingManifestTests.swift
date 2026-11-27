@@ -45,16 +45,11 @@ import Testing
         #expect(manifest.result == .ok)
     }
 
-    /// D47: the result is ok when every file is finalized and no screen
-    /// file was ended by a failure or a camera stalled; a problem told alone does not change it.
-    @Test(arguments: [
-        RecordingEvent.Kind.screenStreamFailed, .screenFileWriterFailed, .diskFull, .screenFileWriterFellBehind,
-        .screenShowsAnotherScreensPicture,
-    ])
-    func aScreenFileEndedByAFailureMakesTheResultProblems(failure: RecordingEvent.Kind) {
+    /// D91: a call to action given makes the result `problems`.
+    @Test func aCallToActionGivenMakesTheResultProblems() {
         var manifest = manifest()
-        manifest.events.append(RecordingEvent(at: 0, event: failure, screen: "A"))
-        manifest.finalize(ended: start + 60, timeZone: berlin)
+        manifest.problems.append(RecordingProblem(at: 2_000_000_000, problem: "Cannot write the recording log", error: "full"))
+        manifest.finalize(ended: start + 60, timeZone: berlin, calledToAction: true)
         #expect(manifest.result == .problems)
     }
 
@@ -66,10 +61,11 @@ import Testing
         #expect(manifest.result == .problems)
     }
 
-    @Test func aProblemToldOrAnEventThatIsNoFailureLeavesTheResultOk() {
+    /// D91: a problem without a call to action and any event, a failure too, leave the result ok.
+    @Test func aProblemOrAnEventWithoutACallToActionLeavesTheResultOk() {
         var manifest = manifest()
         manifest.problems.append(RecordingProblem(at: 2_000_000_000, problem: "The screens cannot be read", error: "denied"))
-        for kind in RecordingEvent.Kind.allCases where !kind.isFailure {
+        for kind in RecordingEvent.Kind.allCases {
             manifest.events.append(RecordingEvent(at: 0, event: kind, screen: "A"))
         }
         manifest.finalize(ended: start + 60, timeZone: berlin)
@@ -95,11 +91,15 @@ import Testing
     }
 
     /// D47: `result` `problems` never comes with empty `problems`. When
-    /// nothing was told, finalizing adds one problem naming the first
-    /// failure and how many failures there were.
+    /// a file is not finalized and nothing was told, finalizing adds one
+    /// problem naming the first failure and how many failures there were.
     @Test(arguments: RecordingEvent.Kind.allCases.filter(\.isFailure))
-    func aFailureNotToldGivesOneProblemAtTheEnd(failure: RecordingEvent.Kind) {
+    func aFailureNotToldWithAFileNotFinalizedGivesOneProblemAtTheEnd(failure: RecordingEvent.Kind) {
         var manifest = manifest()
+        var screen = RecordingManifest.ScreenFile(
+            name: "d.mov", screen: "LG", screenUUID: "U", frameSize: FrameSize(width: 2, height: 2), start: 1, timecode: "t")
+        screen.state = .notFinalized
+        manifest.files = [screen]
         let isAudio = failure.rawValue.contains("audio")
         var event = RecordingEvent(at: 36_778_000_000, event: failure, screen: isAudio ? nil : "DELL", audioSource: isAudio ? "BRIO" : nil)
         event.errorDetail = "it broke"
@@ -113,18 +113,15 @@ import Testing
     }
 
     /// The recording `2026-11-16 12.24.51`: two `screen file writer fell
-    /// behind` and no problem told: exactly one problem.
-    @Test func theRecordingWithFailuresAndNothingToldGetsExactlyOneProblem() {
+    /// behind`, every file finalized and no problem told: ok, nothing added (D91).
+    @Test func theRecordingWithFailuresAndNothingToldStaysOk() {
         var manifest = manifest()
         manifest.events.append(RecordingEvent(at: 36_778_000_000, event: .screenFileWriterFellBehind, screen: "DELL P3421W"))
         manifest.events.append(RecordingEvent(at: 49_618_000_000, event: .audioInputDisconnected, audioSource: "Razer"))
         manifest.events.append(RecordingEvent(at: 72_098_000_000, event: .screenFileWriterFellBehind, screen: "DELL P3421W"))
         manifest.finalize(ended: start + 60, timeZone: berlin)
-        #expect(manifest.result == .problems)
-        #expect(manifest.problems == [RecordingProblem(
-            atSeconds: 36.778, problem: "A failure was not told while recording",
-            error: "Screen DELL P3421W: screen file writer fell behind (2 failure events, see events)",
-            errorDetail: ErrorDetail(message: "screen file writer fell behind"))])
+        #expect(manifest.result == .ok)
+        #expect(manifest.problems.isEmpty)
     }
 
     @Test func repeatedSystemAudioFailuresToldLiveAddNothing() {
@@ -137,7 +134,7 @@ import Testing
             manifest.events.append(failed)
         }
         manifest.finalize(ended: start + 60, timeZone: berlin)
-        #expect(manifest.result == .problems)
+        #expect(manifest.result == .ok)
         #expect(manifest.problems == [told])
     }
 
@@ -392,11 +389,11 @@ import Testing
         #expect(text.contains(#""errorDetail" : null"#))
     }
 
-    /// A recording log not complete on disk at the end makes the result `problems` (D64).
+    /// A recording log not complete on disk at the end calls to free up disk space: the result is `problems` (D64, D91).
     @Test func aRecordingLogNotWrittenAtTheEndIsAnError() {
         var manifest = manifest()
         manifest.problems = [RecordingProblem(at: 0, problem: "Cannot write the recording log recording.log", error: "full")]
-        manifest.finalize(ended: start + 60, timeZone: berlin, recordingLogWritten: false)
+        manifest.finalize(ended: start + 60, timeZone: berlin, calledToAction: true)
         #expect(manifest.result == .problems)
         #expect(RecordingSummary(manifest: manifest, recordingFolder: "/r", seconds: 60, manifestWritten: true, problemsAskToReportIt: false, filesEndedByAFullDisk: []).endedWithError)
     }
@@ -604,15 +601,16 @@ import Testing
         #expect(summary.text == "Recorded 1h02m05s into /r\n  f0.mov  finalized\n")
     }
 
-    @Test func aFileNotFinalizedOrAnErrorEventIsAnError() {
+    /// A file not finalized is an error; an error event alone is neither an error nor listed (D91).
+    @Test func aFileNotFinalizedIsAnErrorAndAnErrorEventIsNotListed() {
         #expect(RecordingSummary(manifest: manifest([.notFinalized]), recordingFolder: "/r", seconds: 1, manifestWritten: true, problemsAskToReportIt: false, filesEndedByAFullDisk: []).endedWithError)
         var failed = RecordingEvent(at: 65_000_000_000, event: .screenStreamFailed, screen: "LG")
         failed.errorDetail = "-3811"
         let summary = RecordingSummary(
             manifest: manifest([.finalized, .finalized], events: [failed, RecordingEvent(at: 0, event: .sleep)]),
             recordingFolder: "/r", seconds: 70, manifestWritten: true, problemsAskToReportIt: false, filesEndedByAFullDisk: [])
-        #expect(summary.endedWithError)
-        #expect(summary.text.hasSuffix("Error at 1m05s: screen stream failed, LG (-3811)\n"))
+        #expect(!summary.endedWithError)
+        #expect(summary.text == "Recorded 1m10s into /r\n  f0.mov  finalized\n  f1.mov  finalized\n")
     }
 
     /// F3: the final manifest not written is a failure; the file on disk has no `ended`.
@@ -632,7 +630,7 @@ import Testing
         }
         #expect(!summary([.finalized]).asksToReportIt)
         let stalled = summary([.finalized], events: [RecordingEvent(at: 1_000_000_000, event: .cameraStalled, camera: "C")])
-        #expect(stalled.endedWithError && !stalled.asksToReportIt)
+        #expect(!stalled.endedWithError && !stalled.asksToReportIt)
         #expect(summary([.notFinalized]).asksToReportIt)
         // A file a full disk left not finalized: the person was asked to free up disk space.
         let fullDisk = RecordingSummary(manifest: manifest([.notFinalized]), recordingFolder: "/r", seconds: 1, manifestWritten: true,
@@ -644,12 +642,36 @@ import Testing
         #expect(summary([.finalized], problems: true).asksToReportIt)
     }
 
-    @Test func aProblemIsListedWithItsTimeAndIsNoErrorByItself() {
+    /// A positive list (D91): the problems whose call to action was given, never another one in the manifest,
+    /// such as a problem a later tell replaced; a problem listed is no error by itself.
+    @Test func onlyAProblemCalledToActionIsListed() {
         var told = manifest([.finalized])
-        told.problems = [RecordingProblem(at: 65_000_000_000, problem: "The screens cannot be read", error: "denied")]
-        let summary = RecordingSummary(manifest: told, recordingFolder: "/r", seconds: 70, manifestWritten: true, problemsAskToReportIt: false, filesEndedByAFullDisk: [])
+        let picture = RecordingProblem(at: 1_000_000_000, problem: "Screen 1 LG", error: "shows another screen's picture")
+        let failed = RecordingProblem(at: 5_000_000_000, problem: "Screen 1 LG failed", error: "stream failed")
+        let full = RecordingProblem(at: 65_000_000_000, problem: "The audio file of Mic ended", error: "disk full")
+        told.problems = [picture, failed, full]
+        let summary = RecordingSummary(
+            manifest: told, recordingFolder: "/r", seconds: 70, manifestWritten: true, problemsAskToReportIt: false,
+            filesEndedByAFullDisk: [], problemsCalledToAction: [full])
         #expect(!summary.endedWithError)
-        #expect(summary.text.hasSuffix("Problem at 1m05s: The screens cannot be read: denied\n"))
+        #expect(summary.text.hasSuffix("  f0.mov  finalized\nProblem at 1m05s: The audio file of Mic ended: disk full\n"))
+        #expect(summary.whatWentWrong.map(\.line) == ["Problem at 1m05s: The audio file of Mic ended: disk full"])
+        let none = RecordingSummary(
+            manifest: told, recordingFolder: "/r", seconds: 70, manifestWritten: true, problemsAskToReportIt: false,
+            filesEndedByAFullDisk: [], problemsCalledToAction: [])
+        #expect(none.whatWentWrong.isEmpty)
+    }
+
+    /// Each file not finalized is listed, by its end, with the problems called to action, in time order (D91).
+    @Test func eachFileNotFinalizedIsListed() {
+        var recorded = manifest([.finalized, .notFinalized])
+        recorded.files[1].end = 30
+        let full = RecordingProblem(at: 20_000_000_000, problem: "Disk full", error: nil)
+        recorded.problems = [full]
+        let summary = RecordingSummary(
+            manifest: recorded, recordingFolder: "/r", seconds: 70, manifestWritten: true, problemsAskToReportIt: false,
+            filesEndedByAFullDisk: ["f1.mov"], problemsCalledToAction: [full])
+        #expect(summary.whatWentWrong.map(\.line) == ["Problem at 20s: Disk full", "Problem at 30s: File f1.mov not finalized"])
     }
 
     @Test func theSummaryListsTheAudioFilesAndTheCPUUse() {
@@ -685,6 +707,8 @@ import Testing
         recorded.files = [screen(2, "B", at: 0), screen(1, "A", at: 840), screen(1, "A", at: 0)]
         recorded.audioFiles = [audio(input(4, "D"), at: 0), audio(.systemAudio, at: 0), audio(input(10, "K"), at: 0),
                                audio(input(1, "C"), at: 900), audio(input(1, "C"), at: 0)]
+        for index in recorded.files.indices { recorded.files[index].state = .finalized }
+        for index in recorded.audioFiles.indices { recorded.audioFiles[index].state = .finalized }
         let lines = RecordingSummary(manifest: recorded, recordingFolder: "/r", seconds: 5, manifestWritten: true, problemsAskToReportIt: false, filesEndedByAFullDisk: [])
             .text.split(separator: "\n").dropFirst().map { $0.dropFirst(2).dropLast(11) }
         let names = lines.map { String($0) }
@@ -695,12 +719,13 @@ import Testing
             "Screen 1 - A", "Screen 1 - A", "Screen 2 - B", "Audio 0 - System", "Audio 1 - C", "Audio 1 - C", "Audio 4 - D", "Audio 10 - K"])
     }
 
-    @Test func aWriterThatFailedIsAnError() {
+    /// Neither listed nor an error by itself: its source starts again (D91).
+    @Test func aWriterThatFailedIsNoErrorAndNotListedByItself() {
         var failed = RecordingEvent(at: 0, event: .screenFileWriterFailed, screen: "LG")
         failed.errorDetail = "cannot write"
         let summary = RecordingSummary(manifest: manifest([.finalized], events: [failed]), recordingFolder: "/r", seconds: 1, manifestWritten: true, problemsAskToReportIt: false, filesEndedByAFullDisk: [])
-        #expect(summary.endedWithError)
-        #expect(summary.text.contains("screen file writer failed, LG (cannot write)"))
+        #expect(!summary.endedWithError)
+        #expect(!summary.text.contains("screen file writer failed"))
     }
 }
 

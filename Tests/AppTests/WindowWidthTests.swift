@@ -176,17 +176,32 @@ import Testing
         return controller.view.fittingSize.height
     }
 
-    /// The problems area grows to 5 lines, more scroll inside it: the window is no taller with 6 or 30 (D78).
+    /// The problems area grows to 5 lines, more scroll inside it: the window is no taller with 6 or 30 (D78);
+    /// the line naming the files for a report shows only when asked, below it (D91).
     @Test func theProblemsAreaGrowsToFiveLinesAndNoFurther() {
-        func heightWith(_ count: Int) -> CGFloat {
+        func heightWith(_ count: Int, forAReport: Bool = false) -> CGFloat {
             let model = statusModel(name: "Mic", cpu: "CPU 3 %")
-            model.problems = (0..<count).map { ProblemLine(text: "Screen DELL not captured since 0:\($0 % 6)0: failed", isRed: $0 % 2 == 0) }
+            model.problems = (0..<count).map { "Screen DELL not captured since 0:\($0 % 6)0: failed" }
+            model.showsForAReport = forAReport
             return height(status(model))
         }
         let one = heightWith(1), five = heightWith(5)
         #expect(one < five)
         #expect(heightWith(6) == five)
         #expect(heightWith(30) == five)
+        let tallest = heightWith(30, forAReport: true)
+        #expect(tallest > five)
+        #expect(heightWith(5, forAReport: true) == tallest)
+        // Without a problem line there is no report line either.
+        #expect(heightWith(0, forAReport: true) == heightWith(0))
+    }
+
+    /// The tallest problems layout, 5 lines and the report line, keeps the window's width (D91).
+    @Test func theReportLineKeepsTheWidth() {
+        let model = statusModel(name: "Mic", cpu: "CPU 3 %")
+        model.problems = (0..<30).map { "Screen DELL not captured since 0:\($0 % 6)0: failed" }
+        let without = width(status(model))
+        model.showsForAReport = true
+        #expect(width(status(model)) == without)
     }
 }
-

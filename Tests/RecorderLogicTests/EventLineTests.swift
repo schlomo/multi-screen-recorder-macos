@@ -19,7 +19,8 @@ import Testing
         #expect(EventLine.text(failed, started: start, timeZone: berlin) == "22:15:32 +61.3s screen stream failed: LG (-3811)")
     }
 
-    /// An input that left the guide track says its offset; written and read back as `offset` (D79).
+    /// An input that left the guide track, in a recording made before D90, says its offset; written and read back as
+    /// `offset` (D79).
     @Test func anInputThatLeftTheGuideTrackSaysItsOffset() throws {
         var left = RecordingEvent(at: 0, event: .audioInputLeftTheGuideTrack, audioSource: "Razer")
         left.offset = 0.5

@@ -134,10 +134,11 @@ public enum RecordingStatusTable {
     }
 
     /// Short, as the column is narrow: "synced 553 ms", "synced 533 ms (carried)", "not synced yet", "no clear
-    /// sound"; the mouse-over says why (`audioDelayDetail`).
+    /// sound", "not in the guide track, 950 ms from the others"; the mouse-over says why (`audioDelayDetail`).
     static func audioDelayText(_ shown: AudioDelays.Shown) -> String {
         switch shown {
         case .notInTheGuideTrackYet: "not synced yet"
+        case .notInTheGuideTrack(let apart): "not in the guide track, \(Int((apart * 1000).rounded())) ms from the others"
         case .noClearSoundToSync: "no clear sound"
         case .synced(let placed, let carriedOver): "synced \(Int((abs(placed) * 1000).rounded())) ms" + (carriedOver ? " (carried)" : "")
         case .anchor(let placed): "synced \(Int((abs(placed) * 1000).rounded())) ms"
@@ -155,6 +156,9 @@ public enum RecordingStatusTable {
         }
         return switch shown {
         case .notInTheGuideTrackYet: "Not in the guide track until its audio delay is measured; its own audio track is recorded"
+        case .notInTheGuideTrack(let apart):
+            "Not in the guide track: its audio delay lies \(Int((apart * 1000).rounded())) ms from the inputs it mixes, more than the "
+                + "\(Int((RecorderValues.guideTrackSyncLimit * 1000).rounded())) ms it can shift; its own audio track is recorded"
         case .noClearSoundToSync:
             "Not in the guide track: no clear sound to measure its audio delay against; its own audio track is recorded"
         case .synced(let seconds, carriedOver: false): "\(placed(seconds)); measured"

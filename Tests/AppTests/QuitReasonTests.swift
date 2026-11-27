@@ -40,4 +40,15 @@ import Testing
         #expect(requests.request() == "Still finalizing the files…")
         #expect(requests.request() == "Still finalizing the files…")
     }
+
+    /// The app's Stop: under way from its first request, before the stop's task runs, so a second Stop starts
+    /// none and a logout waits for the first.
+    @Test func aStopIsUnderWayFromItsFirstRequestSoASecondStopStartsNoneAndALogoutWaits() {
+        var requests = StopRequests()
+        let first = requests.start()
+        let second = requests.start()
+        #expect(first && !second)
+        #expect(QuitDecision(isStopping: requests.isStopping, endsTheSession: true) == .waitForTheStop)
+        #expect(QuitDecision(isStopping: requests.isStopping, endsTheSession: false) == .ignore)
+    }
 }

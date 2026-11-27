@@ -3260,3 +3260,240 @@ architect's reading.
   30 deliberate breaks of the rules caught, the other 4 changing only
   the cost or an input's count of unclear measurements; [design/recorder.md](design/recorder.md),
   "Audio delay".
+
+## D90: One rule for the audio reference, a stateless guide track (2026-11-26)
+
+- **Status:** in force. Supersedes D89's two phases ("before" and
+  "after the sync is established") and D79's leave and rejoin of the
+  "Audio inputs" guide track, its event and its problem line; amends
+  D85 (the anchor's file is measured once the reference is another
+  input).
+- **Context:** The owner, 2026-11-26: "it feels like we added a lot of
+  complexity to cover edge cases and I'm afraid that we are starting to
+  hurt the main and regular use cases". The owner's main use cases,
+  2026-11-26, to stay simple and always work: a laptop alone or with
+  one or two external screens, recording every screen, the default
+  microphone and the system audio; the same with a USB camera or more
+  (a speaker camera, one on the hands or the desk) and one or two USB
+  microphones;
+  screens and devices plugged in or out and the lid opened or closed
+  during a recording (sleep is not a main case); stop or a crash never
+  loses more than the last 5 seconds. Everything else is an edge case,
+  which may cost some quality for simplicity but never a lost
+  recording. On the owner's Mac the same day a healthy reference fell
+  just short once (clarity 11 against 12) before the sync was
+  established and every input started over. The owner signed off the
+  design (2026-11-26) with the "matched twice" count, and
+  without the "not in the guide track" problem line and its event: "we
+  in any case want to trigger human attention only on actionable
+  problems".
+- **Decision:** One rule for the reference for the whole recording. A
+  reference miss always compares the other inputs with sound pairwise;
+  if a pair counts, the reference moves to the input with an audio
+  delay the most others count against, a re-base that keeps every
+  audio delay; with none such, to the input the most others count
+  against, as a start-over, but only when its group (it and those
+  counted against it) outnumbers the anchor's group: the anchor and
+  each other input being written with 2 counted windows since it became
+  the anchor (`audioDelayGroupWindows`, *data*, formerly
+  `audioDelayEstablishingWindows`). Every start-over clears the entries
+  of the files being written. Once the reference is another input, the
+  anchor's file being written is measured like any other from its own
+  0, which hindsight keeps for the stretch before. The
+  "Audio inputs" guide track mixes every input with an audio delay
+  unless they lie further apart than 0.8 s; then the largest set within
+  0.8 s of each other, on a tie the reference's, decided afresh each
+  time, nothing remembered. An input left out says so in its status row
+  only (`not in the guide track, 950 ms from the others`): no event, no
+  problem, no Dock bounce, as nobody can act on it, and only actionable
+  problems call for a person's attention.
+  - Gone: the established sync, "once established nothing moves", the
+    leave/rejoin memory, the problem kind for an input out of the guide
+    track, `audio input left the guide track` and its `offset` (still
+    read from recordings made before, so `msr timeline` loads them).
+  - The reference is chosen by what the inputs hear, never as the
+    default microphone, which macOS moves on its own (D80): it starts as
+    the first input that records and moves only on counted windows (the
+    owner, 2026-11-26: the default microphone moves automatically and has
+    no top-level user control, "so us being smart about the primary mic
+    (!= default) is valuable").
+  - Not the distance from the reference instead of sets: in 3,200
+    generated recordings with lags widened to ±0.9 s, 155 placed an
+    input up to 1.5 s off in a mix that shifts 0.8 s, and an Osmo-like
+    late input 1 would keep only itself.
+  - Not V1 (start over when the group outnumbers every input synced
+    now): a stray burst on two junk inputs then keeps the room's
+    microphones unsynced for the whole recording.
+  - Two deviations from the signed design, both more conservative: on
+    a miss a synced input the others count against is preferred, a
+    re-base, over an unsynced one more inputs count against, a
+    start-over; and the anchor's group counts each device's counted
+    windows since the anchor became the anchor, not each file's own.
+- **What got worse:** in the 3,200 generated recordings as generated,
+  nothing. With lags widened ×2.6: seed 2650 syncs one input fewer
+  (after a re-base its lag from the new reference is beyond the ±1 s
+  search; today it synced but was out of the guide track), and 9 seeds
+  mix a synced microphone in 19 fewer steps in all (a tie now goes to
+  the reference's set, not the set that stayed before). A reference
+  miss now measures pairs also after the sync was made: up to
+  n(n-1)/2 extra cross-correlations, measured in a release build on an
+  M3 Pro at 0.016 s for 4 inputs, 0.075 s for 8 and 0.18 s for 12 per
+  miss (a normal measurement 0.008, 0.019 and 0.029 s, unchanged).
+  Known costs kept: two loopbacks of a call during a quiet start keep
+  the reference from the room's two microphones; two rooms taking
+  turns every 10 s start over every turn. A late start-over: two inputs
+  synced for an hour, then one miss in which three unsynced inputs
+  match each other, starts over and clears the synced inputs' entries;
+  it needs three inputs sharing a sound the synced ones do not hear,
+  which the owner's main use cases do not have, and the generated
+  recordings, with one shared talker, cannot show it.
+- **Evidence:** the 3,200 generated recordings run side by side with
+  the rules before (`faster-tests` at 3dac59c): as generated 132 seeds
+  more microphone-synced steps, 0 fewer, 27 seeds more inputs synced at
+  the end, 0 fewer, 0 wrong placements, 0 inputs synced under both more
+  than a frame apart, first sync never later, 1,844 start-overs against
+  1,886; `AudioDelayInvariantTests` holds on all 3,200 (200 committed).
+  The owner's 16 recordings replayed: every file's entries, hindsight,
+  status and the reference changes identical. `AudioSyncCaseTests` (the
+  cases A to J and the drift: worst placement error 41 ms, as before,
+  117 ms without measuring the anchor's file), `ReferenceChoiceTests`,
+  `AudioDelaysTests`, `GuideTrackMembershipTests`, `RecorderTests`
+  (`anAudioInputBeyondTheLimitIsNotMixedOnlyItsRowSayingSo`,
+  `aHealthyReferenceThatMissesOnceKeepsEverySync`,
+  `aReferenceMissAfterTheSyncMovesToASyncedInputKeepingEveryAudioDelay`);
+  6 of 6 deliberate breaks of the new rules caught;
+  [design/recorder.md](design/recorder.md), "Audio delay" and "Guide
+  tracks".
+
+## D91: Only an actionable problem notifies a person; a camera stall at another camera's start is macOS's (2026-11-26)
+
+- **Status:** in force. Amends D78 (every problem a line in the status
+  window, red when broken, orange for a hiccup), D84 (every problem
+  listed in the status window; the result and exit status 3 still
+  reporting every failure event) and D47 (a failure event or a camera
+  stall made the result `problems`).
+- **Context:** The owner, 2026-11-26: "we in any case want to trigger
+  human attention only on actionable problems"; "If it is broken right
+  now but the user can't do anything about it then don't notify.
+  Actionable means 'go and do X'. Losing up to several seconds for a
+  device change can be unavoidable and is then as it is." Of a camera
+  stall while another camera starts: "we can't beat the limitations of
+  MacOS here."
+- **Decision:** a problem notifies a person only when its call to
+  action (D84: free up disk space, grant the permission, unplug and
+  plug in again, report it, start again and report it) was given, a
+  failing source's only once it lasted 10 s without coming back, as
+  before. Notifying is everything a person sees: the status window's
+  problem line, the Dock bounce and badge, `msr record`'s status line
+  count, the notice of the last recording's problems at the next start,
+  the report prompts, the "For a report ... attach them" line (shown
+  only when a shown problem's call to action includes "report it",
+  never under a full disk, a permission or a replug line alone),
+  `msr record`'s end summary (its lines of what went wrong, and so its
+  `Report it:` link, are a positive list: the problems whose call to
+  action was given and one line per file not finalized; failure events
+  and every other problem are no longer listed there), and the
+  recording's `result`: `problems` only
+  when a call to action was given (at Stop too, for a source still
+  failing) or a file is not finalized, so exit 3 for `msr record` too.
+  A failing source's failures add up: once its lost time since the
+  recording's start reaches `unrecoveredAfter` (the same 10 s) in
+  total, its call to action is given as if unrecovered, once (a
+  source failing for 8 s every 12 s calls to action during its second
+  failure). A shown line that has ended stays: it explains the bounce
+  a person saw. A problem without one is still written to the
+  recording log, to standard error by `msr record` (which mirrors the
+  log for people running the command; under `--quiet` it prints only
+  the problems whose call to action was given) and into `recording.json`'s
+  `problems` and `events`, but shows nothing and leaves the result
+  `ok`. The app's report of the last recording, read from
+  `recording.json` alone, still lists every failure event and problem. A shown
+  line is one colour, red; the orange of D78 goes.
+- **Camera stall at another camera's start:** in one process
+  CoreMediaIO holds a process-wide lock while a camera's capture
+  starts, so the other cameras deliver no frame for as long as it
+  takes, 0.8 s to 4 s; in separate processes not (measured 2026-11-26,
+  [troubleshooting.md](troubleshooting.md), "A camera stalls while
+  another camera starts"). Accepted, no workaround: a stall has no call
+  to action, so it is now quiet.
+- **What `result` means:** `result` and exit 3 change meaning from
+  "nothing lost" to "nothing for a person to do": a stall or a
+  recovered failure loses picture or sound and still ends `ok`, so a
+  script that needs to know about loss reads `recording.json`'s
+  `problems` and `events`. The free space not read has no call to
+  action, so while it cannot be read the low-disk warning cannot fire;
+  accepted, per the owner-signed table of D84.
+- **What changes for a person:** a recording with a camera stall, a
+  screen, camera or microphone that failed and came back within 10 s,
+  a file failure followed by a new file, or a problem such as the free
+  space not read shows no line, does not bounce, and ends `ok` (exit 0),
+  where before it showed an orange or red line and could end
+  `problems` (exit 3). A full disk, a permission missing, a silent
+  input after its gaps, a lost file or a source that does not come
+  back still shows its red line, bounces and ends `problems`.
+- **Evidence:** `ProblemsToldTests`
+  (`onlyAProblemWithACallToActionShowsALine`,
+  `aFailingSourceShowsItsLineOnlyOnceUnrecovered`),
+  `RecordingManifestTests`, `RecorderTests`
+  (`aCameraThatFailsIsAFailureToldOnceAndStartsAgain`,
+  `aCameraThatPausesIsStalledAndItsFileGoesOn`,
+  `aSourceCapturedAgainBeforeTheWaitStaysQuiet`,
+  `anAudioSourceEndedByAFullDiskCallsToFreeUpDiskSpace`);
+  [design/recorder.md](design/recorder.md), "The app" and "Cameras".
+
+## D92: A source's first 2 s are not measured for its clock drift (2026-11-26)
+
+- **Status:** in force; the architect's ruling, a detail of D57.
+- **Context:** The system audio's correction settled at about +20 ms in
+  nearly every recording since 2026-11-22 while its clock drift read
+  about 0 ppm (the owner's recording of 2026-11-26 18.35.24: +19.2 ms at
+  -9 ppm). A debug run on the owner's Mac the same day showed why: in
+  its first second the system audio's buffers arrive about 22 ms less
+  late than from then on; the first estimate's line, and with it the
+  reference that is never revised, was laid under that second.
+- **Decision:** a source's buffers in the first 2 s (*data*,
+  `clockDriftStartSkipped`) from its start are not measured. The drift
+  during the time from the start to the first point is the kept slope
+  over it, as at a gap, fixed once the clock drift is shown.
+- **Consequences:** a steady drift such as the Razer's is still followed
+  (within 0.34 ms in the tests' simulation); the reference's dependence
+  on where a source's lowest second falls moves with the start (the
+  measured 4 s pattern within 0.74 ms instead of 0.32 ms in its worst
+  phase, a source at its lowest once in 8 s up to 4.1 ms instead of
+  3.4 ms); bursts like the system audio's within 0.34 ms instead of
+  0.22 ms; a rate alternating by ±100 ppm every 12 s up to 1.98 ms
+  instead of 1.84 ms. Three bounds of `ClockDriftTrackerTests` are
+  restated by the suite's rule (the 20-seed worst plus a margin) for
+  these measured costs, not loosened checks:
+  `theMeasuredBurstsInEveryPhase` 0.5 ms to 1.0 ms (worst 0.74 ms),
+  `aSourceAtItsLowestOnlyOnceInEightSeconds` 0.8 ms to 1.2 ms in its
+  three good phases (worst 0.93 ms) and 4.0 ms to 4.6 ms in the others
+  (worst 4.05 ms). Two limits: a less-late start longer than 2 s is
+  still taken in full (2.2 s simulated: 24 ms off, as before), and 2 of
+  13 recent recordings showed no shift, so the start varies; a stall at
+  the start (buffers 0.5 to 4 s late for 4 s) that begins 1 to 2 s after
+  it now leaves 7.9 to 9.9 ms off for good (0.3 to 0.4 ms before),
+  while one beginning at 4 to 6 s improves (3.2 to 4.6 ms before, 0.3
+  to 3.2 ms now), at -116 ppm over 20 seeds.
+- **Evidence:** [design/recorder.md](design/recorder.md), "Clock
+  drift"; `ClockDriftTrackerTests.aLessLateStartIsNotTakenAsDrift`;
+  [troubleshooting.md](troubleshooting.md), "The system audio is
+  corrected by about 20 ms for good".
+
+## D93: The system audio keeps its file through an output device change (2026-11-26)
+
+- **Status:** in force; the owner's ruling.
+- **Context:** The owner, 2026-11-26: "system audio should keep the
+  file if possible. after all, there is no technical reason for system
+  audio to 'disconnect'".
+- **Decision:** the system audio keeps its file through device
+  changes where it can. The architect's reading: no code reacts to an
+  output device change, so that keeps the file today (not yet tried
+  with a real output switch); but the system audio's stream is tied to
+  the main screen, so when the main screen goes (an undock) its file
+  ends and a new one starts (the owner's recording 2026-11-26 19.38.01
+  has three); keeping the file there is open work, backlog item 56.
+- **Consequences:** a helper-process design (backlog item 56) should
+  keep the system audio's file through a change of the main screen or
+  the output device where it can.
+- **Evidence:** PR #35; backlog item 56.

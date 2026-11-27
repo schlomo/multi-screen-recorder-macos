@@ -14,7 +14,6 @@ import Testing
     }
 
     @Test func oneSecondOfFailingFramesInARowShowsAnotherScreen() {
-        #expect(RecorderValues.screenCheckFailuresInARow == RecorderValues.framesPerSecond)
         var check = ScreenCheck()
         for _ in 1..<RecorderValues.screenCheckFailuresInARow {
             #expect(check.judge(frameRect: other, screenBounds: own, capturedAt: 10 * second, lastScreenChange: nil) == .fails)

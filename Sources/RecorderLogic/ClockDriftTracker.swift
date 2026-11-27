@@ -5,13 +5,17 @@
 /// buffer gives a point: its smallest lateness, at the arrival of that
 /// buffer. The device's clock is the lower support line of the points of
 /// the horizon: the line on or below every point, no steeper than the
-/// largest rate, closest to them in sum. Late stretches, bursts and sparse
-/// intervals lie above it and do not move it; the measurement never
-/// depends on the correction. Once the points are enough (an estimate),
-/// the first estimate's line at the first point is the reference, and the
-/// line now minus the reference is `target`, the sound that must have
-/// been added so far. The rate is the line's slope plus what is still off
-/// over the catch-up time; without a fresh estimate for the catch-up time,
+/// largest rate, closest to them in sum. The buffers of the start's
+/// first seconds are not measured: a source can arrive less late while it
+/// starts (the system audio for about its first second). Late
+/// stretches, bursts and sparse intervals lie above it and do not move
+/// it; the measurement never depends on the correction. Once the points
+/// are enough (an estimate), the first estimate's line at the first point
+/// is the reference, and the line now minus the reference, plus the kept
+/// slope over the time from the start to the first point (fixed once the
+/// clock drift is shown), is `target`, the sound that must have been
+/// added so far. The rate is the line's slope plus what is still off over
+/// the catch-up time; without a fresh estimate for the catch-up time,
 /// and at a gap until the next estimate, it is the kept slope, the median
 /// of the latest estimates' slopes. Its limits: late points that outweigh
 /// the others in the horizon (a long stall, or empty intervals and a
@@ -19,7 +23,9 @@
 /// estimates make up half or more of the kept slopes adds the kept
 /// slope's error over the gap's length; one early buffer pulls the line
 /// down for the horizon; the reference, taken from the first estimate's
-/// points, is never revised. Times are nanoseconds on the shared clock;
+/// points, is never revised; a less-late start longer than the skipped
+/// seconds is taken in full, and a stall beginning just after them can
+/// leave several milliseconds off for good. Times are nanoseconds on the shared clock;
 /// lateness, `target` and `applied` are seconds; a rate or a slope is
 /// output samples per input sample minus 1 (seconds of lateness per second).
 public struct ClockDriftTracker: Sendable {
@@ -33,6 +39,7 @@ public struct ClockDriftTracker: Sendable {
     }
 
     public let interval: Int64
+    public let startSkipped: Int64
     public let horizon: Double
     public let minimumPoints: Int
     public let minimumSpan: Double
@@ -51,6 +58,8 @@ public struct ClockDriftTracker: Sendable {
     /// it was); nil before the first estimate.
     private(set) var remaining: Double?
 
+    /// The first buffer's arrival, and the first measured one's.
+    private var startArrival: Int64?
     private var firstArrival: Int64?
     private var intervalIndex: Int64 = 0
     private var intervalLateness = Double.infinity
@@ -60,6 +69,11 @@ public struct ClockDriftTracker: Sendable {
     private var points: [(time: Double, lateness: Double)] = []
     private var firstPointTime: Double?
     private var reference: Double?
+    /// From the start to the first point, in seconds, and the drift over
+    /// it: the kept slope's, fixed once the clock drift is shown.
+    private var unmeasured = 0.0
+    private var unmeasuredDrift = 0.0
+    private var unmeasuredDriftFixed = false
     /// The latest estimates' slopes, for the clock drift shown and the kept slope.
     private var slopes: [Double] = []
     /// The median of `slopes`, 0 with none.
@@ -69,6 +83,7 @@ public struct ClockDriftTracker: Sendable {
 
     public init(
         interval: Duration = RecorderValues.clockDriftInterval,
+        startSkipped: Duration = RecorderValues.clockDriftStartSkipped,
         horizon: Duration = RecorderValues.clockDriftHorizon,
         minimumPoints: Int = RecorderValues.clockDriftEstimateMinimumPoints,
         minimumSpan: Duration = RecorderValues.clockDriftEstimateMinimumSpan,
@@ -78,9 +93,11 @@ public struct ClockDriftTracker: Sendable {
         shownMinimum: Int = RecorderValues.clockDriftShownMinimumEstimates
     ) {
         precondition(interval > .zero && horizon > minimumSpan, "the clock drift tracker needs an interval and a horizon longer than an estimate's span")
+        precondition(startSkipped >= .zero, "the start's skipped time cannot be negative")
         precondition(minimumPoints >= 2 && catchUpTime > .zero, "an estimate needs two points and a positive catch-up time")
         precondition(shownEstimates >= shownMinimum && shownMinimum > 0, "the clock drift shown needs an estimate")
         self.interval = interval.nanoseconds
+        self.startSkipped = startSkipped.nanoseconds
         self.horizon = Self.seconds(horizon)
         self.minimumPoints = minimumPoints
         self.minimumSpan = Self.seconds(minimumSpan)
@@ -113,6 +130,9 @@ public struct ClockDriftTracker: Sendable {
     /// A buffer whose first sample has the timestamp `time` arrived at
     /// `arrival`; `applied` is the correction applied before it.
     public mutating func record(time: Int64, arrival: Int64, applied: Double) {
+        let start = startArrival ?? arrival
+        startArrival = start
+        guard arrival - start >= startSkipped else { return }
         let first = firstArrival ?? arrival
         firstArrival = first
         closeInterval(before: arrival, applied: applied)
@@ -146,15 +166,22 @@ public struct ClockDriftTracker: Sendable {
         points.removeAll { $0.time <= now - horizon }
         guard points.count >= minimumPoints, points.last!.time - points.first!.time >= minimumSpan else { return }
         let line = Self.supportLine(points, maximumSlope: maximumRate)
-        if reference == nil { reference = line.value(at: firstPointTime!) }
-        let target = line.value(at: now) - reference!
-        self.target = target
-        remaining = target - applied
+        if reference == nil {
+            reference = line.value(at: firstPointTime!)
+            unmeasured = firstPointTime! - Double(startArrival! - firstArrival!) / 1e9
+        }
         slopes.append(line.slope)
         if slopes.count > shownEstimates { slopes.removeFirst() }
         let sorted = slopes.sorted()
         let middle = sorted.count / 2
         keptSlope = sorted.count % 2 == 1 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2
+        if !unmeasuredDriftFixed {
+            unmeasuredDrift = keptSlope * unmeasured
+            unmeasuredDriftFixed = slopes.count >= shownMinimum
+        }
+        let target = line.value(at: now) - reference! + unmeasuredDrift
+        self.target = target
+        remaining = target - applied
         estimatedAt = now
         rate = min(maximumRate, max(-maximumRate, line.slope + (target - applied) / catchUpTime))
     }

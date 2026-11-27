@@ -109,6 +109,7 @@ public final class Recorder {
     /// The camera captures whose end was reported to the camera tracker.
     private var cameraCapturesGone: Set<Int> = []
     private var delayTask: Task<Void, Never>?
+    /// The audio inputs as read last, used when a read fails; none before the first read.
     private var audioInputsRead: [AudioInputInfo] = []
     private var endReports = CaptureEndReports()
     private var problemsTold = ProblemsTold()
@@ -236,7 +237,7 @@ public final class Recorder {
         apply(tracker.begin(screens, at: context.now()))
         if readsCameras { applyCameras(cameraTracker.begin(readCameras(), at: context.now())) }
         applyAudio(audioTracker.begin(
-            inputs: readAudioInputs() ?? [], mainDisplayID: screens.first(where: \.isMain)?.displayID,
+            inputs: readAudioInputs() ?? audioInputsRead, mainDisplayID: screens.first(where: \.isMain)?.displayID,
             screens: Set(screens.map(\.displayID)), at: context.now()))
         freeSpaceTask = Task { [weak self] in
             while !Task.isCancelled {
@@ -282,14 +283,17 @@ public final class Recorder {
     /// Seconds since the recording started, on the shared clock.
     public var elapsedSeconds: Double { Double(context.now()) / 1_000_000_000 }
 
-    /// The status window's problem lines, read now (D78).
-    public func problemLines() -> [ProblemLine] { problemsTold.lines(now: context.now()) }
+    /// The status window's problem lines, read now: only problems whose call to action was given (D78, D91).
+    public func problemLines() -> [String] { problemsTold.lines(now: context.now()) }
 
     /// `msr record` could not show its Dock icon: a problem; the recording goes on.
     public func dockIconNotShown() {
         tell("The Dock icon cannot be shown", error: "macOS refused the regular activation policy; stop with Ctrl-C",
              kind: .dockIconNotShown)
     }
+
+    /// A call to action given includes "report it": the status window names the files for a report (D91).
+    public var problemsAskToReportIt: Bool { problemsTold.asksToReportIt }
 
     /// The problems whose call to action was given and that have not ended (D84).
     public func problemsCalledToAction() -> [RecordingProblem] { problemsTold.callsToActionOngoing }
@@ -456,12 +460,13 @@ public final class Recorder {
             if let logFailure {
                 tell("Cannot write the recording log \(RecordingNames.recordingLog)", error: logFailure, kind: .recordingLogNotWritten)
             }
-            // A source still failing does not come back in this recording: it decides the report, nothing live (D84).
+            // A source still failing does not come back in this recording: it decides the report and the result,
+            // nothing live (D84, D91).
             for problem in problemsTold.callsToAction(now: context.now(), unrecoveredAfter: unrecoveredAfter, atStop: true) {
                 RecorderLog.detail("asks to report it at Stop: \(problem.text)", category: "recorder")
             }
             manifest.finalize(
-                ended: Date(), timeZone: context.timeZone, cpu: cpu.manifestEntry, recordingLogWritten: logFailure == nil)
+                ended: Date(), timeZone: context.timeZone, cpu: cpu.manifestEntry, calledToAction: problemsTold.gaveACallToAction)
             do {
                 try writeManifest()
             } catch {
@@ -475,7 +480,7 @@ public final class Recorder {
         return RecordingSummary(
             manifest: manifest, recordingFolder: folder.path(percentEncoded: false), seconds: elapsedSeconds,
             manifestWritten: finalManifestWritten, problemsAskToReportIt: problemsTold.asksToReportIt,
-            filesEndedByAFullDisk: filesEndedByAFullDisk)
+            filesEndedByAFullDisk: filesEndedByAFullDisk, problemsCalledToAction: problemsTold.everyProblemCalledToAction)
     }
 
     // MARK: Screen changes
@@ -581,20 +586,20 @@ public final class Recorder {
         if readsCameras { applyCameras(cameraTracker.wake(readCameras(), at: context.now())) }
         guard readsScreens else {
             apply(tracker.wake([], at: context.now()))
-            applyAudio(audioTracker.wake(readAudioInputs() ?? [], at: context.now()))
+            applyAudio(audioTracker.wake(readAudioInputs() ?? audioInputsRead, at: context.now()))
             return
         }
         guard let screens = readScreens() else {
             apply(tracker.wakeUnread(at: context.now()))
             // The audio's wake does not depend on the screens, only the system audio's main screen does.
-            applyAudio(audioTracker.wake(readAudioInputs() ?? [], at: context.now()))
+            applyAudio(audioTracker.wake(readAudioInputs() ?? audioInputsRead, at: context.now()))
             return
         }
         let step = tracker.wake(screens, at: context.now())
         context.update(screens, lastScreenChange: tracker.lastScreenChange)
         apply(step)
         screensForAudio(screens)
-        applyAudio(audioTracker.wake(readAudioInputs() ?? [], at: context.now()))
+        applyAudio(audioTracker.wake(readAudioInputs() ?? audioInputsRead, at: context.now()))
     }
 
     // MARK: Actions
@@ -707,12 +712,12 @@ public final class Recorder {
         if let report, let problem = report.problem {
             let kind = report.problemKind(notCaptured: notCaptured)
             let over = gone(kind) ?? newerFileStart.map { (Int64(($0 * 1_000_000_000).rounded()), .recovered) }
-            problemsTold.show(problem, kind: kind, source: label, endedAt: over?.at, ending: over?.ending ?? .recovered,
+            problemsTold.track(problem, kind: kind, source: label, endedAt: over?.at, ending: over?.ending ?? .recovered,
                               withoutCallToAction: reason == .showsAnotherScreen)
             told(problem, ofAnEvent: report.event != nil)
         }
         if let report, let lost = report.lostProblem {
-            problemsTold.show(lost, kind: report.lostKind, withoutCallToAction: report.event?.event == .diskFull)
+            problemsTold.track(lost, kind: report.lostKind, withoutCallToAction: report.event?.event == .diskFull)
             told(lost)
         }
         // Both end paths may report the same end: said once.
@@ -797,7 +802,7 @@ public final class Recorder {
         guard !isStopped else { return }
         for camera in cameraTracker.sources where camera.state == .disconnected {
             problemsTold.cleared(.cameraNotCaptured(camera.uniqueID), at: context.now(), ending: .disconnected)
-            problemsTold.cleared(.cameraStalled(camera.uniqueID), at: context.now(), ending: .disconnected)
+            problemsTold.cleared(.cameraStalled(camera.uniqueID), at: context.now())
         }
         manifest.events += step.events
         if !step.events.isEmpty { try? writeManifest() }
@@ -859,7 +864,7 @@ public final class Recorder {
             capture.start()
         case .stop(let uniqueID):
             guard let (captureNumber, capture) = cameraCaptures.removeValue(forKey: uniqueID) else { return }
-            problemsTold.cleared(.cameraStalled(uniqueID), at: context.now(), ending: .stopped)
+            problemsTold.cleared(.cameraStalled(uniqueID), at: context.now())
             stopInProgress { [weak self] in
                 let file = await capture.stop()
                 guard let self else { return }
@@ -892,7 +897,7 @@ public final class Recorder {
 
     private func cameraStallEnded(uniqueID: String, captureNumber: Int, length: Int64) {
         guard !isStopped, cameraCaptures[uniqueID]?.0 == captureNumber else { return }
-        problemsTold.cleared(.cameraStalled(uniqueID), at: context.now(), length: length)
+        problemsTold.cleared(.cameraStalled(uniqueID), at: context.now())
         applyCameras(cameraTracker.stallEnded(uniqueID, length: length, at: context.now()))
     }
 
@@ -948,7 +953,7 @@ public final class Recorder {
         // No second read: `streamEnded` observes this fresh reading, taken once our capture no longer counts.
         let step = cameraTracker.streamEnded(uniqueID, reason, connected: readCameras(), at: context.now())
         applyCameras(step)
-        problemsTold.cleared(.cameraStalled(uniqueID), at: context.now(), ending: .stopped)
+        problemsTold.cleared(.cameraStalled(uniqueID), at: context.now())
         for failure in step.events where failure.event.isFailure {
             var problem = failure.problem
             if reason == .captureSourceGone, failure.event == .cameraStreamFailed {
@@ -1045,9 +1050,10 @@ public final class Recorder {
     /// off the main thread, and hands the measurement to the audio delays (D77, D80). Nothing after Stop.
     func measureAudioDelays() async {
         guard !isStopped else { return }
-        let ended = Set(manifest.audioFiles.filter { $0.end != nil }.map(\.name))
-        let writing = audioInputFiles().filter { !ended.contains($0.key) }
-        guard let reference = audioDelays.reference(among: delayCandidates(among: audioInputFiles())) else { return }
+        let files = audioInputFiles()
+        let ended = endedFiles(among: files)
+        let writing = files.filter { !ended.contains($0.key) }
+        guard let reference = audioDelays.reference(among: delayCandidates(among: files, ended: ended)) else { return }
         let referenceFile = reference.file
         let others = writing.filter { $0.value != reference.uid }.keys.sorted()
         guard writing[referenceFile] != nil, let referenceEnd = audioDelayFeed.endIndex(of: reference.uid) else {
@@ -1073,9 +1079,8 @@ public final class Recorder {
             jobs.append((file, referenceWindow, other))
         }
         guard !jobs.isEmpty else { return }
-        let measuresPairs = !audioDelays.isSyncEstablished
         let measurement = await Task.detached(priority: .utility) {
-            AudioDelays.measure(reference: referenceFile, others: jobs, measuresPairs: measuresPairs)
+            AudioDelays.measure(reference: referenceFile, others: jobs)
         }.value
         guard !isStopped else { return }
         applyAudioDelays(measurement: measurement, at: Double(end) / Double(AudioDelay.sampleRate))
@@ -1088,23 +1093,22 @@ public final class Recorder {
         }))
     }
 
-    /// The audio delays after a measurement (its windows ending at `at` seconds) or a file's start or end: files
-    /// leave and rejoin the guide track, every file being written is placed in it, and changed delays go into the
-    /// manifest, from where the mix is now (D79, D80). Nothing after Stop.
+    /// The audio delays after a measurement (its windows ending at `at` seconds) or a file's start or end: every
+    /// file being written is placed in the guide track or not mixed, and changed delays go into the manifest, from
+    /// where the mix is now (D80, D90). Nothing after Stop.
     private func applyAudioDelays(measurement: AudioDelays.Measurement? = nil, at: Double = 0) {
         guard !isStopped else { return }
         let files = audioInputFiles()
-        let candidates = delayCandidates(among: files)
+        let ended = endedFiles(among: files)
+        let candidates = delayCandidates(among: files, ended: ended)
         let outcome: AudioDelays.Outcome
         if let measurement {
-            outcome = audioDelays.measured(measurement, files: files, candidates: candidates, at: at)
+            outcome = audioDelays.measured(measurement, files: files, candidates: candidates, at: at, ended: ended)
         } else {
             guard let reference = audioDelays.reference(among: candidates) else { return }
-            outcome = audioDelays.update(files: files, reference: reference.file)
+            outcome = audioDelays.update(files: files, reference: reference.file, ended: ended)
         }
         for line in outcome.lines { RecorderLog.detail(line, category: "recorder") }
-        for (file, offset) in outcome.leaving.sorted(by: { $0.key < $1.key }) { leaveTheGuideTrack(file: file, offset: offset) }
-        for file in outcome.rejoining.sorted() { rejoinTheGuideTrack(file: file) }
         let rate = Double(RecorderValues.audioSampleRate)
         for (file, earlierBy) in outcome.earlierBy {
             guard let uid = files[file] else { continue }
@@ -1119,7 +1123,7 @@ public final class Recorder {
         let mixedUpTo = mixedPosition.map { Double($0) / rate }
             ?? Double(context.now() - RecorderValues.guideTrackDelay.nanoseconds) / 1e9
         var changed = false
-        // A file that ended keeps its list, though it stays its device's newest while the capture runs (D89).
+        // A file that ended keeps its list, though it stays its device's newest while the capture runs (D90).
         for file in outcome.cleared.sorted() where manifest.audioFiles.first(where: { $0.name == file })?.end == nil {
             changed = manifest.audioDelaysReplaced([], file: file) != nil || changed
         }
@@ -1142,51 +1146,21 @@ public final class Recorder {
         }
     }
 
-    /// An audio input's file out of sync with the staying group leaves the "Audio inputs" guide track, its own
-    /// file unchanged; its event and problem once its capture took it out (D79). By design: no Dock bounce,
-    /// badge or count. Internal, so a test can ask for a leave its capture does not carry out.
-    func leaveTheGuideTrack(file name: String, offset: Double) {
-        guard let file = manifest.audioFiles.first(where: { $0.name == name }), let uid = file.audioSourceUID,
-              audioCaptures[.input(uid)]?.1.leaveTheGuideTrack(file: name) == true else {
-            RecorderLog.detail("\(name): its capture did not take the leave, the file no longer its current one", category: "recorder")
-            return
-        }
-        var event = RecordingEvent(at: context.now(), event: .audioInputLeftTheGuideTrack, audioSource: file.audioSource)
-        event.offset = (offset * 10_000).rounded() / 10_000
-        guard manifest.record([event]) else { return }
-        try? writeManifest()
-        told([event])
-        let number = audioTracker.sourcesShown.first { $0.id == .input(uid) }?.number
-        let problem = RecordingProblem(
-            atSeconds: event.at, problem: event.problem.problem,
-            error: ErrorDetail(message: event.event.rawValue, underlying: [ErrorDetail(message: AudioDelay.text(offset))]))
-        tell(problem, kind: .audioInputOutOfTheGuideTrack(uid), source: number.map { "Audio \($0) \(file.audioSource)" } ?? file.audioSource,
-             note: AudioDelay.text(offset), ofAnEvent: true, notifies: false)
-    }
-
-    /// A file that left the guide track rejoins it; its line turns to the past (D79).
-    private func rejoinTheGuideTrack(file name: String) {
-        guard let file = manifest.audioFiles.first(where: { $0.name == name }), let uid = file.audioSourceUID,
-              audioCaptures[.input(uid)]?.1.rejoinTheGuideTrack(file: name) == true else {
-            RecorderLog.detail("\(name): its capture did not take the rejoin, the file no longer its current one or not out", category: "recorder")
-            return
-        }
-        problemsTold.cleared(.audioInputOutOfTheGuideTrack(uid), at: context.now())
-    }
-
-    /// An audio input whose capture ended is out of the guide track no more, and no longer places the
-    /// others (D79, D80).
+    /// An audio input whose capture ended no longer places the others (D80).
     private func audioInputCaptureEnded(_ id: AudioTracker.SourceID) {
-        guard case .input(let uid) = id else { return }
-        problemsTold.cleared(.audioInputOutOfTheGuideTrack(uid), at: context.now())
+        guard case .input = id else { return }
         applyAudioDelays()
+    }
+
+    /// The files among `files` that ended, their capture still running.
+    private func endedFiles(among files: [String: String]) -> Set<String> {
+        Set(manifest.audioFiles.filter { $0.end != nil && files[$0.name] != nil }.map(\.name))
     }
 
     /// The files among `files` that may be the reference (D80, D85): those being written, and the reference's
     /// file ended otherwise than on no audio (a gap or a channel change, its next file following); with none
     /// being written, them all. The audio delays pick the reference among them.
-    private func delayCandidates(among files: [String: String]) -> [AudioDelays.Candidate] {
-        let ended = Set(manifest.audioFiles.filter { $0.end != nil }.map(\.name))
+    private func delayCandidates(among files: [String: String], ended: Set<String>) -> [AudioDelays.Candidate] {
         let writing = files.filter { name, uid in
             !ended.contains(name) || (uid == audioDelays.referenceDevice && !audioTracker.hasNoAudio(.input(uid)))
         }
@@ -1539,14 +1513,14 @@ public final class Recorder {
 
     private func tell(
         _ problem: RecordingProblem, kind: ProblemKind, source: String? = nil, note: String? = nil, endedAt: Int64? = nil,
-        ending: ProblemsTold.Ending = .recovered, ofAnEvent: Bool = false, notifies: Bool = true, withoutCallToAction: Bool = false
+        ending: ProblemsTold.Ending = .recovered, ofAnEvent: Bool = false, withoutCallToAction: Bool = false
     ) {
         switch problemsTold.add(
             problem, kind: kind, source: source, note: note, endedAt: endedAt, ending: ending, withoutCallToAction: withoutCallToAction,
             to: &manifest) {
         case .tell(let writesManifest):
             if writesManifest { try? writeManifest() }
-            told(problem, ofAnEvent: ofAnEvent, notifies: notifies)
+            told(problem, ofAnEvent: ofAnEvent)
         case .alreadyTold:
             break
         case .afterTheEnd:
@@ -1556,12 +1530,11 @@ public final class Recorder {
         }
     }
 
-    /// To the logs and, if it `notifies`, the observer (`msr record`'s standard error, D79); then the calls to
-    /// action due.
-    private func told(_ problem: RecordingProblem, ofAnEvent: Bool = false, notifies: Bool = true) {
+    /// To the logs and the observer (`msr record`'s standard error); then the calls to action due.
+    private func told(_ problem: RecordingProblem, ofAnEvent: Bool = false) {
         RecorderLog.error("at \(problem.at)s: \(problem.text)", category: "recorder")
         recordingLog?.problem(problem)
-        if notifies { observer?.recorder(self, problem: problem, ofAnEvent: ofAnEvent) }
+        observer?.recorder(self, problem: problem, ofAnEvent: ofAnEvent)
         callToAction()
     }
 

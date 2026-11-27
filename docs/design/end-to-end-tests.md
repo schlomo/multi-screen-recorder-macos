@@ -508,9 +508,10 @@ video from the e2e runs"):
     name's `/` and `:`; a `startInput` detail line maps a device name to
     N): the clock drift from the source's latest `clock drift` detail
     line, not `not measured yet`; the sync from a detail line of one of
-    its files that `joins the guide track`, `rejoins the guide track`,
-    `carries over` a delay, is `in` or `out of the guide track with` the
-    carried-over audio delay, `leaves the guide track`, has its `audio
+    its files that `joins the guide track`, `carries over` a delay, is
+    `in the guide track with` the carried-over audio delay, is `not in
+    the guide track` (with the carried-over audio delay, or too far from
+    the others to mix, D90), has its `audio
     delay set by its first counted window` (an input placed before a
     start-over that syncs in the same measurement logs no new join) or
     has `no clear sound to sync`, which the source's newer files keep (the anchor's own
@@ -695,11 +696,11 @@ apart, a test cannot either:
   lasted longer than the median covers (a stall of 40 s, then a 600 s
   gap within 30 s: 530 ms).
 - **The reference is never revised.** It comes from the first
-  estimate's about 10 s of points: a source at its lowest only once in
-  8 s can start up to 3.4 ms off for good, depending on where its
-  lowest second falls (within 0.57 ms in three of its eight phases);
-  the system audio's measured 4 s pattern is within 0.32 ms in all
-  four phases.
+  estimate's about 10 s of points, after the start's 2 s that are not
+  measured: a source at its lowest only once in 8 s can start up to
+  4.1 ms off for good, depending on where its lowest second falls
+  (within 0.93 ms in three of its eight phases); the system audio's
+  measured 4 s pattern is within 0.74 ms in all four phases.
 - **One early buffer pulls the line down, amplified.** A buffer early
   by a glitch of its timestamp or arrival puts the line under it for
   the horizon: 20 ms early up to 12.3 ms off, 6 ms early 8.9 ms, 3 ms

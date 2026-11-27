@@ -41,7 +41,8 @@ public enum RecorderValues {
     public static let cameraFrameGapLimit = Duration.seconds(10)
     public static let cameraStallLimit = Duration.seconds(2)
     /// The seconds within which the audio delays of the audio inputs the "Audio inputs" guide track mixes lie
-    /// of each other, early or late; an input outside the largest such group leaves it (D79, D80).
+    /// of each other, early or late: the most the mix shifts an input; an input outside the largest such set is
+    /// not mixed (D80, D90).
     public static let guideTrackSyncLimit = 0.8
     /// The largest a camera file is: a camera's box is the recording
     /// resolution's limited to this, turned upright for a portrait format (D74).

@@ -37,9 +37,6 @@ public enum ProblemKind: Hashable, Sendable {
     case inputVolumeNotSet(String)
     /// An audio input whose input volume changes cannot be followed, by its name; clears when following it works (D69).
     case inputVolumeNotFollowed(String)
-    /// An audio input, by its UID, whose file is out of the "Audio inputs" guide track, `source` naming the
-    /// input and the note its offset; ends when it rejoins, its file ends or it disconnects (D79).
-    case audioInputOutOfTheGuideTrack(String)
     /// An audio input, by its UID, whose no audio began right after its gaps, `source` naming the input and
     /// the note its gaps' time; ends when its sound returns or it disconnects (D81).
     case audioInputSilentAfterGaps(String)
@@ -51,30 +48,9 @@ public enum ProblemKind: Hashable, Sendable {
     case guideTracksCut(String)
 }
 
-extension ProblemKind {
-    /// Whether its line is red (D78, the owner's rule): something broken that a person must fix,
-    /// or a recording not usable as it is. Red while it lasts and its source is not recorded or
-    /// saved, or a person must act; a damaged file and changes of the audio inputs not followed
-    /// always. Orange, a hiccup in a recording that worked: everything once it is over, and always
-    /// what never touches what is recorded, and a stall, whose file goes on.
-    func isRed(ongoing: Bool) -> Bool {
-        switch self {
-        case .audioFileLost, .videoFileLost, .audioInputChangesNotFollowed, .audioInputNotRecordable:
-            true
-        case .dockIconNotShown, .inputVolumeNotSet, .inputVolumeNotFollowed, .timelineFileNotWritten, .cameraStalled,
-             .guideTracksCut, .audioInputOutOfTheGuideTrack:
-            false
-        case .diskFull, .cameraPermissionMissing, .screenNotCaptured, .cameraNotCaptured, .audioSourceFailed, .audioFileFailed,
-             .recordingLogNotWritten, .manifestNotWritten, .freeSpaceNotRead, .screensNotRead, .audioInputsNotRead,
-             .audioInputSilentAfterGaps:
-            ongoing
-        }
-    }
-}
-
-/// What a person has to do about a problem (D84, the owner's rule): only a problem with one bounces the Dock
-/// icon, sets the badge and counts in `msr record`'s status line; one without stays quiet, listed in the status
-/// window, `recording.json` and the recording log.
+/// What a person has to do about a problem (D84, D91, the owner's rule): only a problem whose call to action was
+/// given shows a line in the status window, bounces the Dock icon, sets the badge, counts in `msr record`'s status
+/// line and makes the result `problems`; one without stays quiet, listed in `recording.json` and the recording log.
 public enum CallToAction: Equatable, Sendable {
     case freeUpDiskSpace
     case grantThePermission
@@ -99,7 +75,7 @@ extension ProblemKind {
         case .screenNotCaptured, .cameraNotCaptured, .audioSourceFailed, .audioFileFailed, .audioInputNotRecordable,
              .audioInputChangesNotFollowed:
             .startAgainAndReportIt
-        case .cameraStalled, .audioInputOutOfTheGuideTrack, .guideTracksCut, .dockIconNotShown, .inputVolumeNotSet,
+        case .cameraStalled, .guideTracksCut, .dockIconNotShown, .inputVolumeNotSet,
              .inputVolumeNotFollowed, .screensNotRead, .audioInputsNotRead, .freeSpaceNotRead, .timelineFileNotWritten:
             nil
         }
@@ -148,26 +124,15 @@ extension ProblemKind {
         case .inputVolumeNotFollowed(let name): "Input volume of \(name) not followed"
         case .diskFull: "Disk full"
         case .guideTracksCut(let name): "Guide tracks of \(name) cut"
-        case .audioInputOutOfTheGuideTrack(let uid), .audioInputSilentAfterGaps(let uid): source ?? uid
+        case .audioInputSilentAfterGaps(let uid): source ?? uid
         }
-    }
-}
-
-/// A line of the status window's problems: red when broken, orange for a hiccup (D78).
-public struct ProblemLine: Equatable, Sendable {
-    public var text: String
-    public var isRed: Bool
-
-    public init(text: String, isRed: Bool) {
-        self.text = text
-        self.isRed = isRed
     }
 }
 
 /// The problems a recording has told and the status window's lines: a told
 /// problem goes into the recording manifest, which is written at once, unless
 /// writing it is the problem; one of a kind that was told and has not ended
-/// since is not told again. Some are only shown (`show`): the manifest lists
+/// since is not told again. Some are only tracked (`track`): the manifest lists
 /// them already.
 public struct ProblemsTold: Sendable {
     public enum Outcome: Equatable, Sendable {
@@ -198,9 +163,9 @@ public struct ProblemsTold: Sendable {
         var began: Int64
         var ended: Int64?
         var ending = Ending.recovered
-        /// Told with `add`, not only shown: a tell of its kind waits for it to end.
+        /// Told with `add`, not only tracked: a tell of its kind waits for it to end.
         var isTold = false
-        /// What its line says besides its source, for a kind whose line is its own (D79).
+        /// What its line says besides its source, for a kind whose line is its own (D81).
         var note: String?
         /// Its call to action was given (D84).
         var calledToAction = false
@@ -213,13 +178,13 @@ public struct ProblemsTold: Sendable {
 
     public init() {}
 
-    /// Into the manifest and the window's lines, unless one of its kind told before has not ended; a line only
-    /// shown does not keep it from the manifest. `source` names the screen or camera of a kind keyed by its ID;
+    /// Into the manifest and tracked for its call to action and its line, unless one of its kind told before has
+    /// not ended; one only tracked does not keep it from the manifest. `source` names the screen or camera of a kind keyed by its ID;
     /// `endedAt`: already over when told, for a failure that ends with a new file (`endsWithANewFile`) after a
     /// newer file of its source started, or after its source went away (`ending`); `withoutCallToAction` for a
     /// problem whose call to action another one gives, such as a screen that showed another screen's picture or a
     /// file a full disk cut short (D84); a tell without it replaces a lasting line that has
-    /// it, told or only shown, its wait starting then.
+    /// it, told or only tracked, its wait starting then.
     public mutating func add(
         _ problem: RecordingProblem, kind: ProblemKind, source: String? = nil, note: String? = nil, endedAt: Int64? = nil,
         ending: Ending = .recovered, withoutCallToAction: Bool = false, to manifest: inout RecordingManifest
@@ -229,48 +194,45 @@ public struct ProblemsTold: Sendable {
         // A failure of its own after another screen's picture replaces that told line.
         if let lasting, told[lasting].isTold, !(told[lasting].withoutCallToAction && !withoutCallToAction) { return .alreadyTold }
         manifest.problems.append(problem)
-        if let shown = lasting {
-            told[shown].problem = problem
-            told[shown].isTold = true
-            if told[shown].withoutCallToAction && !withoutCallToAction {
+        if let tracked = lasting {
+            told[tracked].problem = problem
+            told[tracked].isTold = true
+            if told[tracked].withoutCallToAction && !withoutCallToAction {
                 // A failure of its own after another screen's picture: its wait counts from now.
-                told[shown].began = Int64((problem.at * 1_000_000_000).rounded())
+                told[tracked].began = Int64((problem.at * 1_000_000_000).rounded())
             }
-            told[shown].withoutCallToAction = withoutCallToAction
+            told[tracked].withoutCallToAction = withoutCallToAction
         } else {
-            show(problem, kind: kind, source: source, endedAt: endedAt, ending: ending, withoutCallToAction: withoutCallToAction)
+            track(problem, kind: kind, source: source, endedAt: endedAt, ending: ending, withoutCallToAction: withoutCallToAction)
             told[told.count - 1].isTold = true
             told[told.count - 1].note = note
         }
         return .tell(writeManifest: kind != .manifestNotWritten)
     }
 
-    /// Into the window's lines only, for a problem the manifest already lists (a video file's end); none while
-    /// one of its kind lasts. `endedAt` as for `add`.
-    public mutating func show(
+    /// Tracked for its call to action and its line, without a manifest entry, for a problem the manifest already
+    /// lists (a video file's end); none while one of its kind lasts. `endedAt` as for `add`.
+    public mutating func track(
         _ problem: RecordingProblem, kind: ProblemKind, source: String? = nil, endedAt: Int64? = nil, ending: Ending = .recovered,
         withoutCallToAction: Bool = false
     ) {
         guard !told.contains(where: { $0.kind == kind && $0.ended == nil }) else { return }
-        let at = Int64((problem.at * 1_000_000_000).rounded())
-        // A stall is told once the camera delivered no frame for the stall limit: it began that much earlier.
-        let began = if case .cameraStalled = kind { max(0, at - RecorderValues.cameraStallLimit.nanoseconds) } else { at }
+        let began = Int64((problem.at * 1_000_000_000).rounded())
         let ended = kind.endsWithANewFile ? endedAt.map { max($0, began) } : nil
         told.append(Told(
             kind: kind, problem: problem, source: source, began: began, ended: ended, ending: ending, withoutCallToAction: withoutCallToAction))
     }
 
-    /// The kind went away at `now`: it is told again when it comes back. A
-    /// stall's `length` says when it began (its end minus its length).
-    public mutating func cleared(_ kind: ProblemKind, at now: Int64, length: Int64? = nil, ending: Ending = .recovered) {
+    /// The kind went away at `now`: it is told again when it comes back.
+    public mutating func cleared(_ kind: ProblemKind, at now: Int64, ending: Ending = .recovered) {
         guard let index = told.lastIndex(where: { $0.kind == kind && $0.ended == nil }) else { return }
         told[index].ended = now
         told[index].ending = ending
-        if let length { told[index].began = max(0, now - length) }
     }
 
     /// The problems whose call to action falls due at `now`, each given once (D84): at once, or for a source that
-    /// fails once it lasted `unrecoveredAfter`, though it ended since; `atStop`, also once it is still failing.
+    /// fails once it lasted `unrecoveredAfter`, though it ended since, or once its source's failures add up to
+    /// that (D91); `atStop`, also once it is still failing.
     public mutating func callsToAction(
         now: Int64, unrecoveredAfter: Duration = RecorderValues.unrecoveredAfter, atStop: Bool = false
     ) -> [RecordingProblem] {
@@ -278,6 +240,7 @@ public struct ProblemsTold: Sendable {
         for index in told.indices where !told[index].calledToAction && !told[index].withoutCallToAction && told[index].kind.callToAction != nil {
             let entry = told[index]
             let lasted = (entry.ended ?? now) - entry.began >= unrecoveredAfter.nanoseconds || (atStop && entry.ended == nil)
+                || (addsUp(index) && lostTime(of: entry.kind, now: now) >= unrecoveredAfter.nanoseconds)
             if entry.kind.callsToActionOnlyUnrecovered, !lasted { continue }
             told[index].calledToAction = true
             due.append(entry.problem)
@@ -285,10 +248,30 @@ public struct ProblemsTold: Sendable {
         return due
     }
 
-    /// When the next call to action of a failing source falls due, if it lasts that long (D84).
+    /// When the next call to action of a failing source falls due, if it lasts that long (D84, D91).
     public func nextCallToAction(unrecoveredAfter: Duration = RecorderValues.unrecoveredAfter) -> Int64? {
-        told.filter { !$0.calledToAction && !$0.withoutCallToAction && $0.ended == nil && $0.kind.callsToActionOnlyUnrecovered }
-            .map { $0.began + unrecoveredAfter.nanoseconds }.min()
+        let after = unrecoveredAfter.nanoseconds
+        return told.indices.filter {
+            !told[$0].calledToAction && !told[$0].withoutCallToAction && told[$0].ended == nil && told[$0].kind.callsToActionOnlyUnrecovered
+        }.map { index in
+            let entry = told[index]
+            guard addsUp(index) else { return entry.began + after }
+            // The lasting failure is the one adding to its source's earlier ones.
+            let before = lostTime(of: entry.kind, now: entry.began)
+            return entry.began + max(0, after - before)
+        }.min()
+    }
+
+    /// A source's failures add up (D91): its latest one, until one of them was called to action.
+    private func addsUp(_ index: Int) -> Bool {
+        let kind = told[index].kind
+        return told.lastIndex { $0.kind == kind && !$0.withoutCallToAction } == index
+            && !told.contains { $0.kind == kind && $0.calledToAction }
+    }
+
+    /// The time a kind lasted so far, its failures added up, leaving out those without a call to action (D91).
+    private func lostTime(of kind: ProblemKind, now: Int64) -> Int64 {
+        told.filter { $0.kind == kind && !$0.withoutCallToAction }.reduce(0) { $0 + max(0, ($1.ended ?? now) - $1.began) }
     }
 
     /// The problems whose call to action was given and that have not ended: what the badge and `msr record`'s
@@ -297,68 +280,57 @@ public struct ProblemsTold: Sendable {
         told.filter { $0.calledToAction && $0.ended == nil }.map(\.problem)
     }
 
-    /// A call to action given that includes "report it": the recording asks to report it once it ended (D84).
+    /// A call to action was given: the recording's result is `problems` (D91).
+    public var gaveACallToAction: Bool { told.contains(where: \.calledToAction) }
+
+    /// Every problem whose call to action was given, ended or not: what `msr record`'s summary lists (D91).
+    public var everyProblemCalledToAction: [RecordingProblem] { told.filter(\.calledToAction).map(\.problem) }
+
+    /// A call to action given that includes "report it": the recording asks to report it once it ended, and the
+    /// status window names the files for a report (D84, D91).
     public var asksToReportIt: Bool {
         told.contains { $0.calledToAction && $0.kind.callToAction?.includesReportIt == true }
     }
 
-    /// The status window's lines, one per kind (a kind names its source): red first, then
-    /// orange, each newest first (D78).
-    public func lines(now: Int64) -> [ProblemLine] {
+    /// The status window's lines, one per kind (a kind names its source), newest first, of the problems whose
+    /// call to action was given: one without shows nothing (D78, D91).
+    public func lines(now: Int64) -> [String] {
+        let shown = told.filter(\.calledToAction)
         var kinds: [ProblemKind] = []
-        for entry in told.reversed() where !kinds.contains(entry.kind) { kinds.append(entry.kind) }
-        let lines = kinds.map { kind in Self.line(told.filter { $0.kind == kind }, now: now) }
-        return lines.filter(\.isRed) + lines.filter { !$0.isRed }
+        for entry in shown.reversed() where !kinds.contains(entry.kind) { kinds.append(entry.kind) }
+        return kinds.map { kind in Self.line(shown.filter { $0.kind == kind }, now: now) }
     }
 
     /// `<phrase> since 0:53`, `<phrase> for 7.4 s at 0:53, recovered` (or `, then disconnected`, `, stopped`: the `Ending`),
     /// `<phrase> 3 times, 12 s in total[, <ending>]`, then the latest error after a colon, `latest: ` before it
-    /// when the errors differ; a stall reads `stalled 7.4 s`, without its error, always the same; an input out of
-    /// the guide track has its own (`outOfTheGuideTrack`).
-    private static func line(_ repeats: [Told], now: Int64) -> ProblemLine {
+    /// when the errors differ; an input silent after its gaps has its own (`silentAfterGaps`).
+    private static func line(_ repeats: [Told], now: Int64) -> String {
         let latest = repeats[repeats.count - 1]
-        if case .audioInputOutOfTheGuideTrack = latest.kind { return outOfTheGuideTrack(latest) }
         if case .audioInputSilentAfterGaps = latest.kind { return silentAfterGaps(latest, now: now) }
-        let isStall = if case .cameraStalled = latest.kind { true } else { false }
         let phrase = latest.kind.phrase(source: latest.source)
         let errors = repeats.map(\.problem.error)
-        let why = isStall ? "" : latest.problem.error.map { ": " + (Set(errors).count > 1 ? "latest: " : "") + $0 } ?? ""
+        let why = latest.problem.error.map { ": " + (Set(errors).count > 1 ? "latest: " : "") + $0 } ?? ""
         let ending = text(latest.ending)
         let text = if repeats.count > 1 {
             "\(phrase) \(repeats.count) times, \(seconds(repeats.reduce(Int64(0)) { $0 + ($1.ended ?? now) - $1.began })) in total"
                 + (latest.ended == nil ? "" : ", \(ending)")
         } else if let ended = latest.ended {
-            "\(phrase) \(isStall ? "" : "for ")\(seconds(ended - latest.began)) at \(time(latest.began)), \(ending)"
+            "\(phrase) for \(seconds(ended - latest.began)) at \(time(latest.began)), \(ending)"
         } else {
             "\(phrase) since \(time(latest.began))"
         }
-        return ProblemLine(text: text + why, isRed: latest.kind.isRed(ongoing: latest.ended == nil))
-    }
-
-    /// An input out of the guide track, the latest time, orange: "Audio 2 Mic A 553 ms late, not in the guide track;
-    /// its own audio track is recorded", once over "Audio 2 Mic A was not in the guide track from 0:50 to 1:40 (553 ms
-    /// late); its own audio track is recorded" (D79).
-    private static func outOfTheGuideTrack(_ latest: Told) -> ProblemLine {
-        let input = latest.kind.phrase(source: latest.source), note = latest.note ?? ""
-        let text = if let ended = latest.ended {
-            "\(input) was not in the guide track from \(time(latest.began)) to \(time(ended)) (\(note)); its own audio track is recorded"
-        } else {
-            "\(input) \(note), not in the guide track; its own audio track is recorded"
-        }
-        return ProblemLine(text: text, isRed: false)
+        return text + why
     }
 
     /// An input silent right after its gaps, the latest time: "Audio 3 BRIO sends only silence since its gaps at
-    /// 0:25; unplug and plug it in again", red; once over "Audio 3 BRIO sent only silence for 1:05 after its gaps
-    /// at 0:25, recovered" (or the other `Ending`), orange (D81).
-    private static func silentAfterGaps(_ latest: Told, now: Int64) -> ProblemLine {
+    /// 0:25; unplug and plug it in again"; once over "Audio 3 BRIO sent only silence for 1:05 after its gaps
+    /// at 0:25, recovered" (or the other `Ending`) (D81).
+    private static func silentAfterGaps(_ latest: Told, now: Int64) -> String {
         let input = latest.kind.phrase(source: latest.source), gaps = latest.note ?? ""
         guard let ended = latest.ended else {
-            return ProblemLine(text: "\(input) sends only silence since its gaps at \(gaps); unplug and plug it in again", isRed: true)
+            return "\(input) sends only silence since its gaps at \(gaps); unplug and plug it in again"
         }
-        return ProblemLine(
-            text: "\(input) sent only silence for \(seconds(ended - latest.began)) after its gaps at \(gaps), \(text(latest.ending))",
-            isRed: false)
+        return "\(input) sent only silence for \(seconds(ended - latest.began)) after its gaps at \(gaps), \(text(latest.ending))"
     }
 
     private static func text(_ ending: Ending) -> String {

@@ -63,10 +63,9 @@ extension RecorderValues {
 /// clear sound to sync.
 extension RecorderValues {
     public static let audioDelayUnclearMeasurements = 3
-    /// The counted windows of any input, the anchor's new file included, that establish the sync: from then on the
-    /// reference moves only on no audio or its capture's end; one window, as a burst on an empty line-in gives, does
-    /// not (D89).
-    public static let audioDelayEstablishingWindows = 2
+    /// The counted windows since the anchor became the anchor that put an input in the anchor's group, which a
+    /// reference miss's start-over must outnumber; one window, as a burst on an empty line-in gives, does not (D90).
+    public static let audioDelayGroupWindows = 2
     public static let audioDelayChangeWindowSeconds = 60.0
     public static let audioDelayChangeWindows = 5
     /// One frame at 30 fps: closer than this, a new median changes nothing.
@@ -80,6 +79,10 @@ extension RecorderValues {
     /// Buffers are grouped by arrival in intervals of this length; each
     /// interval with a buffer gives a point, its smallest lateness.
     public static let clockDriftInterval = Duration.seconds(1)
+    /// A source's buffers in this long from its start are not measured:
+    /// the system audio's first second arrives about 22 ms less late than
+    /// the rest, which would be taken as drift and kept in the reference.
+    public static let clockDriftStartSkipped = Duration.seconds(2)
     /// Points older than this are dropped: the support line is laid under
     /// the points of the last 20 s.
     public static let clockDriftHorizon = Duration.seconds(20)

@@ -7,8 +7,7 @@ Screen Recorder, and how the recorder core produces it. Delivery
 (pipeline, versions, signing) is in [delivery.md](delivery.md). Terms
 are defined in [../glossary.md](../glossary.md).
 
-Built so far: see "Build state" at the end. Values marked *data* are
-starting points, calibrated at the v1 gate (`backlog.md`).
+Values marked *data* are starting points, calibrated at the v1 gate (`backlog.md`).
 
 ## Command line
 
@@ -26,7 +25,7 @@ signature); if that fails it exits 71 (`EX_OSERR`).
 |---|---|---|
 | `msr list` | Prints "What will be recorded" as `msr check` does, from the settings and the devices, without the ready check and without asking for any permission, then whether the program running `msr` may record the system audio | 0, 1 when the screens, the audio inputs or an audio input the settings record cannot be read |
 | `msr check [flags] [--debug]` | Prints the banner and "What will be recorded", then runs the ready check and prints each item; `--debug` also prints the detail lines on standard error (and at `.debug` in the unified log) | 0 ready, 1 not ready |
-| `msr record [flags] [--duration 1h30m] [--debug \| --quiet]` | Records the screens, the cameras and the audio sources (the recording core, D45, D49, D74). Without flags it does what Start in the window does, with the same settings file; it prints the banner (as `msr check`) and "What will be recorded" at its start, then runs the ready check, records until Ctrl-C, SIGTERM, SIGHUP, the duration or Stop in the status window (below), and prints the recording folder at the start and a summary at the end (the summary: every file with its state, the screens' by number, then the cameras' by number, then the audio sources' by number with the system audio first, and our process's CPU use, average and peak, and, when the recording asks to report it, the link to report it and the files to attach, see "Problem report offer"). It runs as a full AppKit app without a Dock icon (the `accessory` activation policy) until the ready check passed and the recording starts, then shows the icon; a run that is not ready shows none, and an icon macOS refuses is a problem, and the recording goes on (Ctrl-C stops it); while it records, the icon shows with its badge, and clicking it or Quit opens the status window as in the app (D45, D46). When it stops, for any reason, it first prints `Stopping the recording and finalizing the files…` on standard error, then finalizes and prints the summary; a Ctrl-C while it finalizes prints `Still finalizing the files…` and does nothing more. It prints every event of the recording manifest as one line on standard error, a failure's repeats counted instead (see "Logging"). `--debug` also prints the detail lines on standard error (and at `.debug` in the unified log); the recording log has them always (see "Logging"). **Output split:** standard output carries exactly one line, the recording folder's bare path, when recording starts; everything for people goes to standard error (the banner, "What will be recorded", the ready check, `Recording into <path>`, events, the status line, the summary, detail lines), all of it, and every other line this code writes on standard error (the settings file note, `Error:` lines, detail lines; ArgumentParser writes its own usage errors, before any status line exists), through one writer so nothing prints into the middle of the status line; a failed write to standard error, SIGPIPE included, is ignored, as there is nowhere left to report it, and `msr record` ignores SIGPIPE for the whole process from its start, before it writes anything, so a closed reader of standard output does not end it. **Status line:** only when standard error is a terminal whose `TERM` is set, not empty and not `dumb`, with no option: one line redrawn once a second (`\r`, the text, `ESC[K`). Its text, joined by ` · ` as the window's line is: `<n> problems` (`1 problem`) first when there are any, counting the problems whose call to action was given and that have not ended (D84: only a problem a person has to do something about counts, a source that fails only once it lasted 10 s without coming back; once a problem ended, nothing is left to do and it no longer counts; one that comes back counts again, though the window shows a kind's repeats on one line; low disk space is not a problem, though it sets the Dock badge), nothing when there are none; then the text of the window's line (time with seconds, size written, files, free space), the CPU use when known, and `<n> screens, <m> audio` for the sources being recorded (`1 screen`; a stalled camera counts, as its file is still written), with `<k> cameras` between them when cameras are recorded (`2 screens, 1 camera, 5 audio`), such as `1 problem · Recording 0:12:34 · 1.2 GB in 7 files · 143.8 GB free · CPU 23 % · 2 screens, 5 audio`. It is cut to the terminal's width minus 1, taking 80 columns when the width is unknown, so it does not wrap. An event or detail line clears it, prints, and it is drawn again, all in one write; at the end it is cleared and the summary follows. Not a terminal: no status line and no escape code. **`--quiet`:** no output for people (no banner, table, passing ready check, events, status line or summary); still written are the path on standard output and, on standard error, a failing ready check, `Error:` lines, the settings file note, each failure and problem as it happens (a failure's event line, or the problem's own line when no event tells it) with the count of a failure's repeats, and the summary of a run that exits 3 or asks to report it; exit codes are unchanged; with `--debug` it is a usage error. `--duration` takes hours, minutes and seconds (`1h30m`, `45m`, `90s`); a number without a suffix is minutes (`90` is 90 minutes) | 0 ok (every file finalized, no file ended by a failure, no camera stalled, D47), 1 not ready, 3 when the recording manifest's `result` is `problems`, the finalized manifest could not be written, or the recording could not start |
+| `msr record [flags] [--duration 1h30m] [--debug \| --quiet]` | Records the screens, the cameras and the audio sources (the recording core, D45, D49, D74). Without flags it does what Start in the window does, with the same settings file; it prints the banner (as `msr check`) and "What will be recorded" at its start, then runs the ready check, records until Ctrl-C, SIGTERM, SIGHUP, the duration or Stop in the status window (below), and prints the recording folder at the start and a summary at the end (the summary: every file with its state, the screens' by number, then the cameras' by number, then the audio sources' by number with the system audio first, and our process's CPU use, average and peak, then a `Problem at` line for each problem whose call to action was given and for each file not finalized, in time order, nothing else (D91), and, when the recording asks to report it, the link to report it and the files to attach, see "Problem report offer"). It runs as a full AppKit app without a Dock icon (the `accessory` activation policy) until the ready check passed and the recording starts, then shows the icon; a run that is not ready shows none, and an icon macOS refuses is a problem, and the recording goes on (Ctrl-C stops it); while it records, the icon shows with its badge, and clicking it or Quit opens the status window as in the app (D45, D46). When it stops, for any reason, it first prints `Stopping the recording and finalizing the files…` on standard error, then finalizes and prints the summary; a Ctrl-C while it finalizes prints `Still finalizing the files…` and does nothing more. It prints every event of the recording manifest as one line on standard error, a failure's repeats counted instead (see "Logging"). `--debug` also prints the detail lines on standard error (and at `.debug` in the unified log); the recording log has them always (see "Logging"). **Output split:** standard output carries exactly one line, the recording folder's bare path, when recording starts; everything for people goes to standard error (the banner, "What will be recorded", the ready check, `Recording into <path>`, events, the status line, the summary, detail lines), all of it, and every other line this code writes on standard error (the settings file note, `Error:` lines, detail lines; ArgumentParser writes its own usage errors, before any status line exists), through one writer so nothing prints into the middle of the status line; a failed write to standard error, SIGPIPE included, is ignored, as there is nowhere left to report it, and `msr record` ignores SIGPIPE for the whole process from its start, before it writes anything, so a closed reader of standard output does not end it. **Status line:** only when standard error is a terminal whose `TERM` is set, not empty and not `dumb`, with no option: one line redrawn once a second (`\r`, the text, `ESC[K`). Its text, joined by ` · ` as the window's line is: `<n> problems` (`1 problem`) first when there are any, counting the problems whose call to action was given and that have not ended (D84: only a problem a person has to do something about counts, a source that fails only once it lasted 10 s without coming back; once a problem ended, nothing is left to do and it no longer counts; one that comes back counts again, though the window shows a kind's repeats on one line; low disk space is not a problem, though it sets the Dock badge), nothing when there are none; then the text of the window's line (time with seconds, size written, files, free space), the CPU use when known, and `<n> screens, <m> audio` for the sources being recorded (`1 screen`; a stalled camera counts, as its file is still written), with `<k> cameras` between them when cameras are recorded (`2 screens, 1 camera, 5 audio`), such as `1 problem · Recording 0:12:34 · 1.2 GB in 7 files · 143.8 GB free · CPU 23 % · 2 screens, 5 audio`. It is cut to the terminal's width minus 1, taking 80 columns when the width is unknown, so it does not wrap. An event or detail line clears it, prints, and it is drawn again, all in one write; at the end it is cleared and the summary follows. Not a terminal: no status line and no escape code. **`--quiet`:** no output for people (no banner, table, passing ready check, events, status line or summary); still written are the path on standard output and, on standard error, a failing ready check, `Error:` lines, the settings file note, each problem whose call to action is given, as it is given (D91; without `--quiet` standard error mirrors the log, every failure and problem), and the summary of a run that exits 3 or asks to report it; exit codes are unchanged; with `--debug` it is a usage error. `--duration` takes hours, minutes and seconds (`1h30m`, `45m`, `90s`); a number without a suffix is minutes (`90` is 90 minutes) | 0 ok (every file finalized, no call to action given, D47, D91), 1 not ready, 3 when the recording manifest's `result` is `problems`, the finalized manifest could not be written, or the recording could not start |
 | `msr settings [flags]` | Without flags prints the effective settings as JSON (show); with any settings flag, `--auto` included, saves the run's effective settings into the settings file and prints them (change). The only command that writes the file; the window also writes it | 0, 1 when it cannot write the file |
 | `msr timeline <folder>` | Writes the recording folder's timeline file (see "Output on disk") from its `recording.json`, replacing an older one, and prints its path. Reads no settings. Writes nothing else and deletes nothing. A file without an end gets its length from the media file | 0, 1 with the error on standard error when `recording.json` or a file's length cannot be read, or the file cannot be written |
 | `msr version` | Prints the version and commit | 0 |
@@ -600,7 +599,8 @@ and for audio `audio input connected`, `audio input disconnected`,
 changed`, `audio input gap`, `audio input failed`, `system audio
 failed`, `audio file writer failed`, `audio file writer fell behind`,
 `audio input volume changed`, `no audio started`, `no audio stopped`,
-`audio input left the guide track`;
+and, in recordings made before D90 only, `audio input left the guide
+track`;
 each names its screen (`screen`), its camera (`camera`) or its audio
 source (`audioSource`) where it is about one; `screen` always means a
 screen. `audio file
@@ -619,7 +619,7 @@ screen mirrored) for `screen mirroring started`; `length` (seconds, to
 the millisecond) for `audio input gap` and `camera stall ended` (from
 the camera's last frame before the stall to its next); `offset` (the
 file's distance in seconds from the staying group's earliest input,
-negative when earlier, to 0.0001 s) for `audio input left the guide track` (D79); `error` (why, as one line) and
+negative when earlier, to 0.0001 s) for `audio input left the guide track` (D79, no longer written, D90); `error` (why, as one line) and
 `errorDetail` (the same error as its full chain, below) for `screen stream
 failed`, `screen file writer failed`, `camera stream failed`, `camera
 stalled`, `camera file writer failed`, `audio input failed`, `system
@@ -627,23 +627,28 @@ audio failed`, `audio file writer failed`, and `audio file writer fell
 behind` when samples were lost at a file's end. The manifest's `state`
 is `recording` or `finalized`; a file's `state` is `recording`,
 `finalized` or `not finalized`. `ended` is the local end time, as
-`started`, and `result` is `ok` when every file is finalized, no file
-was ended by a failure and no camera stalled, as a stall loses picture
+`started`, and `result` is `problems` when a problem's call to action
+was given (see "The app", "Recording") or a file is not finalized,
+otherwise `ok` (D47, D91): a failure that came back within its wait, a
+camera stall and every other problem without a call to action leave it
+`ok`, though they stay in `events` and `problems`. The failure events
 (`screen stream failed`, `screen file writer
 failed`, `disk full`, `screen file writer fell behind`, `screen shows
 another screen's picture`, `camera stream failed`, `camera stalled`,
 `camera file writer failed`, `camera file writer fell behind`, `audio
 input failed`, `system audio failed`, `audio file writer failed`,
 `audio file writer fell behind`; an unplugged audio input, a gap, a
-change of the input volume and no audio are none), otherwise `problems`
-(D47);
+change of the input volume and no audio are none) are the `Error at`
+lines of the app's problem report (see "Problem report offer");
+`msr record`'s summary lists only the problems whose call to action
+was given (D91);
 `cpu` is our process's CPU use over the recording, `averagePercent` and
 `peakPercent` in percent of one core as Activity Monitor shows it,
 sampled every second, to one decimal (encoding and capture in macOS's
 own processes, `VTEncoderXPCService`, `replayd`, `WindowServer`, are not
 in it); all three are null until the recording is finalized. `problems`
-lists every problem told to the person, also those that leave `result`
-`ok`, each with `at`, `problem` (what went wrong), `error` (the full
+lists every problem told, also those without a call to action that
+leave `result` `ok`, each with `at`, `problem` (what went wrong), `error` (the full
 error text, or null) and `errorDetail` (the error detail, or null when
 `error` is null). The **error detail** (D64) is the error with its full
 chain: `domain` and `code` (as macOS gives them, such as
@@ -663,10 +668,10 @@ errors, and line breaks become `⏎`. A problem made from an event has the event
 detail's description, with the event's error detail under it. A failure is told while recording, at its event's
 time; when the file it ended also had a writer error, that error is a
 second problem, the file's. A `result` of `problems` never comes with empty `problems` (D47):
-should nothing have been told, finalizing adds one problem, "A failure
-was not told while recording", naming the first failure and how many
-failure events there were (or, without a failure event, the first file
-not finalized). The net only guarantees that `problems` is not empty
+should a file not be finalized and nothing have been told, finalizing
+adds one problem, "A failure was not told while recording", naming the
+first failure and how many failure events there were (or, without a
+failure event, the first file not finalized). The net only guarantees that `problems` is not empty
 when the result is `problems`; a failure not told while some other
 problem was told appears only in `events`. `events` and `problems` are
 written in the order of their time. An audio file's `audioSource` is the
@@ -685,8 +690,8 @@ null when it cannot be read, absent for the system audio (D69);
 `delays` the file's audio delays (D80), for a processor of the files
 to line the audio inputs up: a list of `{at, delay}`, in order; empty
 when the file has no audio delay against the anchor: never measured
-clearly, or cleared at a start-over before the sync was established
-(D89); it is then placed as recorded.
+clearly, or cleared at a start-over (D90); it is then placed as
+recorded.
 While recording, and after a crash, it holds the live entries, one per
 change of the value; at Stop, before the timeline file is written, each
 file's list is rewritten with hindsight: its stretches are bounded
@@ -696,21 +701,24 @@ windows ending within it, one with fewer than 2 keeping its live value
 (the better estimate then), neighbours within a frame merged, but never
 across a change of the reference, the first at 0, so a file whose audio
 delay the 60 s rule never changed, measured against one reference, has
-one entry; the anchor's files and a file without own counted windows
-keep theirs (see "Audio delay", D80). `at` is the
+one entry; the anchor's files while the anchor is the reference and a
+file without own counted windows keep theirs (see "Audio delay", D80). `at` is the
 seconds into the file from which the entry holds (to the millisecond,
 never below 0; the first entry also holds before its `at`, as the best
 known); `delay` is the seconds by which the file's sound there is later
 than the recording's anchor's (see "Audio delay": the first input whose
 file is written, or the one the reference moved to while no input
-being written had an audio delay, D80, or on a reference miss, D89; to 0.0001 s, negative when earlier). To line up the recording's audio
+being written had an audio delay, D80, or a reference miss started over at, D90; to 0.0001 s, negative when earlier). To line up the recording's audio
 inputs, place each file's stretch from `at` on earlier by `delay` less
 the smallest of the files' latest `delay` (taken as 0 when that is
 above 0); a file with an empty list and the system audio are not moved;
 the timeline file does exactly this. The anchor's files list
 `{at: 0, delay: 0}` (a device that becomes the anchor later gets that
-entry from then on; a new file of the anchor's device after the
-reference moved away is measured like any other, D85); the system
+entry from then on); once the reference moved away, the anchor's file
+being written is measured like any other and may then list more
+entries after its 0, which hindsight keeps for the stretch the anchor
+was the reference, and a new file of the anchor's device is measured
+like any other (D85, D90); the system
 audio's list is always empty; a new
 file of an input starts with its earlier file's value as its first
 entry at 0. How a
@@ -945,29 +953,36 @@ checked, reported or rewritten at the next start (D47).
   the recording again, or replug, and report it (the audio inputs'
   changes not followed, and a screen, camera, audio source or audio
   file that failed or an audio input not recordable, only once it
-  lasted 10 s, `unrecoveredAfter` (*data*), without coming back, a
-  call that fell due given even if it came back before it ran; one
-  back before stays quiet; one still failing at Stop makes the
+  lasted 10 s, `unrecoveredAfter` (*data*), without coming back, or
+  once its failures since the recording's start add up to 10 s (D91:
+  a source failing for 8 s again and again calls to action during its
+  second failure, once; per kind and source, a screen file ended by
+  another screen's picture not counted), a call that fell due given
+  even if it came back before it ran; one back before stays quiet; one still failing at Stop makes the
   recording ask to report it, bouncing nothing then).
   Every other problem (a camera stall, an audio input out of the
   "Audio inputs" guide track, guide tracks cut, the Dock icon not
   shown, an input volume not set or not followed, the screens, the
   audio inputs or the free space not read, the timeline file not
-  written, which `msr timeline` writes again) bounces nothing and sets
-  no badge, nor does a screen showing another screen's picture: its
+  written, which `msr timeline` writes again) shows no line, bounces
+  nothing, sets no badge and leaves the result `ok` (D91), nor does a
+  screen showing another screen's picture: its
   file ending by that fault calls to no action, also past 10 s; a
   failure of that screen for another reason afterwards calls to action
   from its own tell. An audio source or an audio file ended by a full
   disk is told as the full disk, free up disk space, one call for the
-  full disk; the file it cut short is still a red "File … incomplete"
-  line, without a call to action of its own. The badge and the status
+  full disk; the file it cut short has no call to action of its own,
+  so no "File … incomplete" line. The badge and the status
   line's count show a call to action while its problem lasts and drop
   it once it ended; the recording still asks to report it at the end
-  when the call was to report it; low disk space keeps its own badge. Every
-  problem, with a call to action or not, is in the
-  status window (red when broken, orange for a hiccup, D78), in
-  `recording.json` and `recording.log`; `msr record` also names each
-  on standard error.
+  when the call was to report it; low disk space keeps its own badge.
+  The owner's rule (D91): "Actionable means 'go and do X'"; a problem
+  broken right now that the person can do nothing about notifies
+  nobody. Only a problem whose call to action was given shows a line in
+  the status window (red) and makes the result `problems` (exit 3 for
+  `msr record`); every problem, with a call to action or not, is in
+  `recording.json` and `recording.log`, and `msr record` also names
+  each on standard error.
 - **Status window (D46):** clicking the Dock icon while recording opens
   a small window, and Quit opens it too: a table with a row per screen,
   then a row per camera the recording records or recorded (D74; its
@@ -992,7 +1007,8 @@ checked, reported or rewritten at the next start (D47).
   uncoloured and short, `· synced 553 ms`, how much earlier the
   "Audio inputs" mix places the file, once its audio delay is set or
   confirmed by its own windows, `· synced 0 ms` for the earliest input
-  and the anchor's own file at 0 (D86), `· synced 533 ms (carried)` while it
+  and the anchor's own file at 0 (D86), also once the reference moved
+  away, until its first counted window (D90), `· synced 533 ms (carried)` while it
   holds its earlier file's, `· not synced yet` before it has one,
   `· no clear sound` once its file had sound in 3 measurements
   (`audioDelayUnclearMeasurements`, *data*) without a counted window
@@ -1007,9 +1023,11 @@ checked, reported or rewritten at the next start (D47).
   `Not in the guide track until its audio
   delay is measured; its own audio track is recorded`, `Not in the
   guide track: no clear sound to measure its audio delay against; its
-  own audio track is recorded`;
-  nothing for a file out of the guide track, which its problem line
-  tells; see "Audio delay", D80), then, drawn for an audio source only,
+  own audio track is recorded`; for a synced file not mixed, `· not in
+  the guide track, 950 ms from the others` and `Not in the guide track:
+  its audio delay lies 950 ms from the inputs it mixes, more than the
+  800 ms it can shift; its own audio track is recorded` (D90); see
+  "Audio delay", D80), then, drawn for an audio source only,
   "Level" (its level meter) and "Input volume" (an audio input's
   slider, where its input volume can be set; see "Audio", D69). Each
   row's mouse-over shows the source's details as the start window's
@@ -1049,67 +1067,44 @@ checked, reported or rewritten at the next start (D47).
   read on every check, is told once (one manifest entry, one line in
   the window, one line on standard error, one bounce if it has a call
   to action) until it clears,
-  and again if it comes back. **Problem lines (D78):** red marks something
-  broken that a person must fix, or a recording not usable as it is;
-  orange a hiccup in a recording that worked. Red while it lasts: the
-  Camera permission missing; a screen, camera or audio source whose
-  file a failure ended (its writer failed, its stream failed) and an
-  audio file whose writer failed, until a new file of that source
-  starts; a full disk, until there is room; the recording log or the
-  recording manifest not written, the free space not read (a person
-  should look at the disk), the screens or the audio inputs not read
-  until the next read works (a new source might go unrecorded). Red
-  always: a screen, camera or audio file lost in part (it lacks
-  content), an audio input that cannot be recorded, the audio inputs'
-  changes that cannot be followed. Red while it lasts, its own line: an
-  audio input silent right after its gaps (D81, see "No audio"), `Audio
-  <n> <name> sends only silence since its gaps at 0:25; unplug and plug
-  it in again`, and once its sound returns or it disconnects `Audio <n>
-  <name> sent only silence for 1:05 after its gaps at 0:25, recovered`
-  (or `, then disconnected`, `, stopped` when its capture ended
-  otherwise), orange. Orange: everything else once it is
-  over, a failure followed by a new file of its source included, and
-  always a camera stall (its file goes on), the Dock icon not shown, an
-  input volume not set or not followed, a video file's guide tracks cut
-  before its video (the video is intact) and the timeline file not
-  written (the media are intact), and an audio input out of the
-  "Audio inputs" guide track (D79), which has no call to action (D84).
-  A failure of a file whose source has
-  started a newer file is over when told, so it is orange at once; a
-  full disk, guide tracks cut or a file lost in part never is. A line
-  only shown, as a video file's end the manifest lists already, never
-  keeps a problem of its kind told after it from the manifest. A
-  problem still lasting at the end keeps its colour by this rule. Each
+  and again if it comes back. **Problem lines (D78, D91):** a line
+  shows only a problem whose call to action was given (see "Recording"
+  above), in red, one colour: a failing source's line appears once it
+  lasted 10 s without coming back or its failures added up to 10 s,
+  and one back before shows none; a line, once shown, stays, its
+  ending added when it is over: it explains the bounce a person saw. An audio
+  input silent right after its gaps has its own line (D81, see "No
+  audio"), `Audio <n> <name> sends only silence since its gaps at 0:25;
+  unplug and plug it in again`, and once its sound returns or it
+  disconnects `Audio <n> <name> sent only silence for 1:05 after its
+  gaps at 0:25, recovered` (or `, then disconnected`, `, stopped` when
+  its capture ended otherwise). A failure of a file whose source has
+  started a newer file is over when told, so it never shows a line; a
+  full disk or a file lost in part never is. A line
+  only tracked, as a video file's end the manifest lists already, never
+  keeps a problem of its kind told after it from the manifest. Each
   kind has its own words and names its source, such as `Screen 1 DELL not
-  captured`, `Camera 2 BRIO stalled`, `Free space not read`, `Disk full`,
-  `File <name> incomplete`, `Guide tracks of <name> cut`, and one line
-  (an audio input out of the guide track has its own, see "Guide
-  tracks"):
+  captured`, `Disk full`, `File <name> incomplete`, and one line:
   `<words> since 0:12` while it lasts, `<words> for 4.0 s at 0:12,
   recovered` once over because its source works again (`, then
   disconnected` when its source went away: unplugged, or a screen gone,
   also at once for a screen's or a camera's failure told after it
-  went; `, stopped` for a stall whose capture ended without recovering
-  and without a disconnect), and when it came more than once
-  `<words> 3 times, 12 s in total` (the ongoing one counted to now),
-  with its ending once none lasts; then the
+  went; `, stopped` for a capture that ended without recovering
+  and without a disconnect), and when its call to action was given more
+  than once `<words> 3 times, 12 s in total` (the ongoing one counted
+  to now), with its ending once none lasts; then the
   latest error after a colon, `latest: ` before it when the errors
-  differ. A stall reads `Camera <n> <name> stalled since 0:53` and `Camera
-  <n> <name> stalled 7.4 s at 0:53, recovered`, without its error, always
-  the same. A stall began at its end minus its length, or, while it
-  lasts, 2 s (the stall limit) before it was told; another problem
-  began when it was told. A stall ends when frames come again, when a
-  new file of the camera starts, or at its capture's end (unplugged,
-  out of the camera mode, Stop), its length then up to that end,
-  `, stopped` unless unplugged. Times
+  differ. A problem began when it was told. Times
   are `m:ss` since the start, `h:mm:ss` from an hour on; lengths have
   one decimal below 10 s as rounded, whole seconds from there (rounded
-  once, so 10.45 s is `10 s`), `m:ss` from a minute on. The red lines
-  come first, then the orange ones, each newest first; the area shows
+  once, so 10.45 s is `10 s`), `m:ss` from a minute on. The lines
+  come newest first; the area shows
   at most 5 lines, more scroll inside it, so the window never grows
   past that for problems; the line naming the files for a report stays
-  below it. The recording manifest's `problems`, the result, the exit
-  code and the lines on standard error are unchanged; the status line
+  below it, shown only when a shown problem's call to action includes
+  "report it" (D91), not under a full disk, the permission or a replug
+  alone. The recording manifest's `problems` and the lines on
+  standard error list every problem; the status line
   counts the problems whose call to action was given and that have not
   ended (D84).
 - **Stop:** Stop in the status window finalizes, opens the recording folder itself
@@ -1172,8 +1167,8 @@ checked, reported or rewritten at the next start (D47).
   Stop, the audio inputs' changes not followed), or data
   was lost (a file not finalized, unless a full disk ended it, or the
   final manifest not written); a disk full, a permission or a replug
-  asks nothing once the recording ended, and a recording that exits 3
-  for a camera stall or a failure that recovered asks nothing either.
+  asks nothing once the recording ended, and a camera stall or a
+  failure that recovered asks nothing either (its result is `ok`, D91).
   Beside it, `result` stays (`problems` when it exits 3, otherwise
   `ok`), which an earlier release reads. `noticeShown` is false. A state
   file of an earlier release, with `result` only, wants no notice; one
@@ -1187,8 +1182,8 @@ checked, reported or rewritten at the next start (D47).
   problem] [Dismiss]; `noticeShown` is stored before it shows, so it
   shows once. Report a problem opens the browser on a new issue with
   the form `.github/ISSUE_TEMPLATE/problem-report.yml`: `version` (as
-  `msr version` prints it) and `what-happened` filled, the summary's
-  `Error at` and `Problem at` lines read from the recording's
+  `msr version` prints it) and `what-happened` filled, an `Error at`
+  line per failure event and a `Problem at` line per problem, read from the recording's
   `recording.json`, the last first (and the line that it has no end,
   or that it cannot be read), as many as keep the link within 8000
   characters (*data*; GitHub's limit is about 8 kB [ASSUMED]), then `…
@@ -1199,7 +1194,8 @@ checked, reported or rewritten at the next start (D47).
   last recording", or the address when the browser cannot be opened.
   `msr record` whose recording asks to report it ends the summary, also
   with `--quiet`, with `Report it: <the same link,
-  built from the summary's lines>` and `Attach: <recording
+  built from the summary's lines, the problems whose call to action was
+  given (D91)>` and `Attach: <recording
   folder>/recording.log and recording.json`. Both the crash report and
   the problem report build their links in one place (`IssueFormLink`).
 
@@ -1397,7 +1393,7 @@ the metadata items (see "Output on disk").
   samples, *data*), as the guide tracks are handed over; silence for a
   filled gap, and the file's end, hand over what was gathered first. One
   append per buffer of 512 samples cost more CPU than the AAC encoder
-  (see "Build state", CPU). A crash loses up to about 0.1 s more than
+  (about 1.9 % of a core more per input than appends of 100 ms, measured 2026-11-16, D62). A crash loses up to about 0.1 s more than
   with one append per buffer, which the owner accepted (2026-11-16); the
   decoded audio is the same sample for sample (`AudioFileWriterTests`).
 - **No audio (D69).** An audio input that delivers exact zeros (every
@@ -1433,7 +1429,7 @@ the metadata items (see "Output on disk").
   2026-11-24 06.30.02: a red problem, `The audio input <name> sends
   only silence since its gaps at 0:25` with the error `unplug and plug
   it in again`, told and counted as any broken source, its line in the
-  window red until its sound returns (see "Status window").
+  window saying so until its sound returns (see "Status window").
 - **Level meters (D69).** Each audio source with a running capture,
   the system audio included, has a level meter: the sample peak of
   each incoming buffer (the largest absolute sample of any channel,
@@ -1492,10 +1488,17 @@ the metadata items (see "Output on disk").
   or a limit). Late stretches, the system audio's catch-up bursts (one
   second's smallest lateness is a sawtooth of up to 5.6 ms) and sparse
   intervals lie above the line and do not move it; the measurement never
-  depends on the correction. An estimate needs at least 5 points
-  (*data*) spanning at least 10 s (*data*). The first estimate's line at
-  the first point is the reference; the line at an interval's end minus
-  the reference is the sound that must have been added by then. The rate
+  depends on the correction. A source's buffers in the first 2 s
+  (*data*) from its start are not measured: the system audio's buffers
+  arrive about 22 ms less late in its first second than from then on
+  (measured on the owner's Mac, 2026-11-26), which would be taken as
+  drift and, through the reference, kept for the whole file (D92). An
+  estimate needs at least 5 points (*data*) spanning at least 10 s
+  (*data*). The first estimate's line at the first point is the
+  reference; the line at an interval's end minus the reference, plus the
+  drift from the start to the first point, is the sound that must have
+  been added by then. That drift is the kept slope over that time, as
+  at a gap, fixed once the clock drift is shown (10 estimates). The rate
   is the line's slope plus what is still off divided by 10 s (*data*,
   the catch-up time), limited to ±1000 ppm. Without a fresh estimate
   (intervals without buffers, or too few points after a pause) it stays
@@ -1506,10 +1509,12 @@ the metadata items (see "Output on disk").
   of the kept ones. What it does, simulated by the tests' simulation
   (its buffers arrive in order, so those held up by a stall queue behind
   it; the worst of 20 seeds, the correction against the true offset from
-  30 s on): a steady device within 0.29 ms over 600 s, its clock drift
+  30 s on): a steady device within 0.31 ms over 600 s, its clock drift
   shown within 1.1 ppm from 60 s and 0.65 ppm from 120 s; a source in
-  bursts like the system audio within 0.24 ms, also twice as deep, and
-  within 0.32 ms in each of the measured pattern's 4 phases; buffers of
+  bursts like the system audio within 0.34 ms, also twice as deep, and
+  within 0.74 ms in each of the measured pattern's 4 phases; the
+  system audio's start, its first second 22 ms less late, within
+  0.34 ms at 0 and -115 ppm; buffers of
   8192 samples within 0.7 ms, 16384 within 1.6 ms; a slow wander (±5 ms
   over 300 s) within 1.5 ms; a stall of 4 s within 0.34 ms; buffers
   delivered in 1 s of every 2 s, the other intervals empty, within
@@ -1533,10 +1538,14 @@ the metadata items (see "Output on disk").
   stall of 40 s, then a 600 s gap within 30 s: 530 ms). The reference
   comes from the first estimate's about 10 s of points and is never
   revised: a source at its lowest only once in 8 s can start up to
-  3.4 ms off for good, depending on where its lowest second falls
-  (within 0.57 ms in three of its eight phases; the measured 4 s pattern
-  within 0.32 ms in all four). A lasting step of the delivery delay is
-  followed as if the clock had stepped (up after about 20 s, down at
+  4.1 ms off for good, depending on where its lowest second falls after
+  the 2 s not measured (within 0.93 ms in three of its eight phases; the
+  measured 4 s pattern within 0.74 ms in all four). A less-late start
+  longer than the 2 s not measured is taken in full, as before (2.2 s
+  of 22 ms: 24 ms off), and a stall at the start (buffers 0.5 to 4 s
+  late for 4 s) beginning 1 to 2 s after it leaves 7.9 to 9.9 ms off
+  for good (one beginning at 4 to 6 s up to 3.2 ms). A lasting step of
+  the delivery delay is followed as if the clock had stepped (up after about 20 s, down at
   once) at up to 1000 ppm, and a step down overshoots (1.1 ms on 2 ms,
   2.1 ms on 4 ms). One early buffer pulls the line down for the horizon
   and is amplified: 20 ms early up to 12.3 ms off, 6 ms early 8.9 ms,
@@ -1549,12 +1558,13 @@ the metadata items (see "Output on disk").
   carries a wrong `clockDriftPpm`. A fast wander (a period under about a
   minute, as the Logitech BRIO's) is not followed and comes out worse
   corrected than not: ±0.5 ms with a period of 12 to 40 s up to 1.5 ms
-  off, a rate alternating by ±100 ppm every 12 s up to 1.84 ms (1.2 ms
+  off, a rate alternating by ±100 ppm every 12 s up to 1.98 ms (1.2 ms
   uncorrected). On the real arrivals of six sources (probes on the
   owner's Mac): BlackHole within 0.05 ms, MacBook Pro Microphone
   0.11 ms, CalDigit Thunderbolt 3 Audio 0.28 ms, Razer Seiren V3 Mini
   0.48 ms, Logitech BRIO 0.93 ms against its 5 s envelope; the system
-  audio's correction ended at 0.09 ms, its rate within ±67 ppm. The
+  audio's correction ended at 0.09 ms, its rate within ±67 ppm (that
+  probe did not cover the system audio's start). The
   resampler is a polyphase Kaiser-windowed sinc of 64 taps (*data*), its
   phases interpolated linearly; it adds no latency to the timestamps and
   holds back the 32 samples its filter needs ahead until the next buffer
@@ -1593,7 +1603,7 @@ the metadata items (see "Output on disk").
   kHz (each 6 samples averaged), into a ring of its latest 12 s
   (`AudioDelayFeed`); every 10 s, off the capture queues and the main
   thread, each audio input's newest file, while it is being written, is
-  cross-correlated (`AudioDelay`, Accelerate's FFT) with the reference's
+  cross-correlated (`AudioDelay`, Accelerate's FFT, one setup per size shared by the process: the recorder holds one 2^18 setup, about 17 MB, from its first measurement until the process ends, and a recording with one audio input never allocates it) with the reference's
   over their latest common 10 s, searching ±1 s. Every
   audio delay is against the recording's **anchor**, the first input
   whose file is written, its own 0. The reference is the anchor at
@@ -1603,26 +1613,26 @@ the metadata items (see "Output on disk").
   audio delay included; a file of it ending on a gap or a channel
   change, its next file following, neither changes the reference nor
   starts anything over, and while it has no file open nothing is
-  measured that cycle. **Moving the reference on evidence while the sync is not established (D89).**
-  The reference stays while windows count against it. A **reference
-  miss** is a measurement with no counted window against the reference
-  while another input being measured had sound. The sync is
-  **established** once an input has 2 counted windows since the anchor
-  became the anchor (the anchor's own new file, measured against the
-  reference it handed on to, included)
-  (`audioDelayEstablishingWindows`, *data*): one window, as a burst on an
-  empty line-in gives, does not establish it. While the sync is not
-  established, a reference miss also correlates the other inputs with
-  sound pairwise, over the same windows (each window of the measurement
-  ends at one common end, an input more than a window behind the
-  reference not holding the others back). If a pair's window counts,
-  the reference moves to the input the most others count against (a
-  tie goes to the lowest number); it becomes the new anchor, every
-  input starts over, and the lags of the inputs counted against it are
-  applied at once, so they are synced from that measurement on. If no
-  pair counts, nothing moves: no level, peak or other score picks a
-  reference, only a counted window. Once the sync is established, the
-  reference moves only as below. Once it is in no audio (muted,
+  measured that cycle. **One rule for the reference, the whole
+  recording (D90).** The reference stays while windows count against
+  it. A **reference miss** is a measurement with no counted window
+  against the reference while another input being measured had sound; it
+  also correlates the other inputs with sound pairwise, over the same
+  windows (each window of the measurement ends at one common end, an
+  input more than a window behind the reference not holding the others
+  back). If no pair's window counts, nothing moves: no level, peak or
+  other score picks a reference, only a counted window. If some count,
+  the reference moves to the input the most others count against (a tie
+  goes to the lowest number), the lags of the inputs counted against it
+  applied at once, so they are synced from that measurement on: to such
+  an input that has an audio delay, if there is one, as a **re-base**
+  (every audio delay kept, the lags measured against it from then on);
+  else it becomes the new anchor and every input starts over, but only
+  when its group, it and the inputs counted against it, outnumbers the
+  **anchor's group**: the anchor and each other input being written with
+  2 counted windows since it became the anchor
+  (`audioDelayGroupWindows`, *data*). One counted window, as a burst on
+  an empty line-in gives, proves nothing. Once it is in no audio (muted,
   D69) or its capture ended (unplugged), the reference goes to the
   lowest-numbered input being written that has an audio delay, whose
   own audio delay turns its lags into ones against the anchor; with
@@ -1632,19 +1642,21 @@ the metadata items (see "Output on disk").
   The reference stays with the input it moved to: the anchor's
   returning file does not take it back (D85). So a near-silent, dead or
   humming input 1 hands the reference on at the first measurement in
-  which two other inputs share sound, but a reference that stops
-  correlating once the sync is established stays, as before D89. Until
-  then, a healthy reference whose window falls just short once while two
-  other inputs match moves too (the owner's Mac, 2026-11-26: clarity 11
-  against 12, the pair at 68); the old anchor is not in the guide track
-  yet (shown "not synced yet") until the next measurement syncs it. A known cost: two inputs
-  carrying one signal the room's microphones do not hear (two loopbacks
-  of a call, two inputs of one device) can take the reference while the
-  room is quiet at the start and establish the sync, and the room's
-  microphones then never sync; the audio mode Wired, the default, keeps
-  out only the virtual case: it records no virtual input but the
-  default microphone. The default
-  microphone plays no part (D80, amending D77). The system audio is
+  which two other inputs share sound; a healthy reference whose window
+  falls just short once while two synced inputs match (the owner's Mac,
+  2026-11-26: clarity 11 against 12, the pair at 68), or that goes quiet
+  while they talk, hands on to one of them and every sync is kept. Known
+  costs: two inputs carrying one signal the room's microphones do not
+  hear (two loopbacks of a call, two inputs of one device) can take the
+  reference while the room is quiet at the start, and the room's two
+  microphones then never outnumber them (the audio mode Wired, the
+  default, keeps out only the virtual case: it records no virtual input
+  but the default microphone); two rooms taking turns every 10 s start
+  over every turn. **Why the sound picks the reference, not the default
+  microphone:** macOS moves the default microphone on its own, and
+  being the default says nothing about hearing what the other inputs
+  hear; only a counted window shows that. The default microphone plays
+  no part (D80, amending D77). The system audio is
   neither measured nor the reference. A window counts
   only when its match is clear, the peak of |correlation| at least 12
   times its median over the searched lags (the measured windows gave 13
@@ -1669,23 +1681,26 @@ the metadata items (see "Output on disk").
   also once it ended (as on no audio), until the next one starts, so a
   new file that starts before the earlier one's end is told still
   carries it over. The anchor's files, those of its device that start
-  while it is the reference, are 0, listed as such; once the reference
-  moved away, a new file of the anchor's device carries over its earlier
-  file's 0 and is measured against the reference in use like any other
-  input, so an Osmo that comes back about 100 ms less late after a
-  replug is followed (D85, the owner's recording `2026-11-24 20.55.08`).
+  while it is the reference, are 0, listed as such. Once the reference
+  is another input, the anchor's file being written starts from its own
+  0 (shown as such, not as carried over; hindsight keeps it for the
+  stretch before its first window against the new reference) and is
+  measured against the reference in use like any other input,
+  and so is a new file of the anchor's device, carrying over its earlier
+  file's audio delay: an Osmo that comes back about 100 ms less late
+  after a replug is followed (D85, the owner's recording `2026-11-24
+  20.55.08`), and so is an anchor whose audio delay creeps (D90).
   Another reference keeps every audio delay: the lags against it are
   re-based onto the anchor through its own audio delay, which stays as
   it was while it is the reference (a shortcut: it is not measured
   then), and the mix keeps every input. When the reference moves to an
-  input without an audio delay, no input being written but the anchor
-  having one, or on a reference miss whatever its audio delay (D89),
-  that input becomes the new anchor, and every input starts over (no audio delay holds, nothing is carried over), its
-  audio delay against the old anchor taken as 0 (a shortcut). Before the
-  sync is established, the entries the files being written had are
-  cleared, as they were against an anchor that no longer is one; once
-  it is established, they stay against the old anchor (a shortcut); a
-  file that ended keeps its list either way (D89). An entry is the
+  input without an audio delay (no input being written but the anchor
+  having one, or a reference miss's start-over), that input becomes the
+  new anchor, and every input starts over (no audio delay holds, nothing
+  is carried over), its audio delay against the old anchor taken as 0
+  (a shortcut); the entries the files being written had are cleared, as
+  they were against an anchor that no longer is one; a file that ended
+  keeps its list (D90). An entry is the
   file's audio delay against the anchor, negative when earlier, and
   changes only when the file's own changes: a new earliest input changes
   no other file's entries. Measuring ends at Stop. Each change goes into
@@ -1710,8 +1725,10 @@ the metadata items (see "Output on disk").
   same back-off, a failed writer at once, backing off only when it
   fails again within 10 s of that restart (D88), and after a full disk
   a new audio file starts once there is
-  room. Such an end makes the recording's `result` `problems` (D47); an
-  unplug and a gap do not. As for a screen, a source lost a second
+  room. Such an end is a failure event (D47); an unplug and a gap are
+  not. It makes the recording's `result` `problems` only with a call
+  to action (D91): a full disk, or a source not back within 10 s or
+  whose failures add up to 10 s. As for a screen, a source lost a second
   time while it is still listed and recorded, with no change of the
   audio devices (an audio input) or of the screens (the system audio)
   in between, is a failure: `audio input failed` or `system audio
@@ -1746,48 +1763,42 @@ the metadata items (see "Output on disk").
   once its file has an audio delay (see "Audio delay"; before that it
   is received but not mixed, `· not synced yet`, or `· no clear
   sound`), and a
-  file carrying its earlier file's audio delay over joins, or stays
-  out, at once. Each input is placed earlier by its audio delay less
-  the smallest latest audio delay of the inputs staying in the mix, the
-  mix's zero, so the earliest input in the mix is not moved and none
-  moves more than 0.8 s; an input whose file ended (no audio) keeps its
-  audio delay and its place in or out of the mix until its capture ends,
-  so a noise-gated earliest microphone falling silent moves no other. An input that moves
+  file carrying its earlier file's audio delay over is placed, or not
+  mixed, at once. Each input is placed earlier by its audio delay less
+  the smallest latest audio delay of the inputs mixed, the mix's zero,
+  so the earliest input in the mix is not moved and none moves more
+  than 0.8 s; an input whose file ended (no audio) keeps its audio
+  delay and its place until its capture ends, so a noise-gated earliest
+  microphone falling silent moves no other. An input that moves
   crossfades from the next sample to mix: over 20 ms
   (`guideTrackCrossfade`, *data*) where it was placed fades out
   linearly while where it is placed now fades in, then only the latter
   plays; a move repeats or skips its size of sound in the guide once.
   The mix keeps each source's samples from the next position to mix on,
   so an input moved later finds them still there. **Which audio inputs
-  "Audio inputs" mixes (D79, D80):** of the audio inputs whose capture
-  runs that have an audio delay (by their newest files; an input whose
-  capture ended is forgotten), the largest group whose audio delays lie within
-  0.8 s (`guideTrackSyncLimit`, *data*, early or late; compared with a
-  tolerance of a quarter of a sample at 8 kHz, below the half-sample
-  step of a median) of each other stays; on a tie the group holding
-  the files that stayed before, so a newcomer never evicts them, else
-  the group with the earliest input; a file outside it leaves the mix
-  of every video file alike, the anchor's included, so an Osmo as the
-  anchor more than 0.8 s late against two microphones in sync with each
-  other leaves. A file that left rejoins when its audio delay lies
-  within the limit of the staying group, or, out of it, when it no
-  longer has one (a new anchor), then not in the guide
-  track yet; the audio delay's own rules keep it from moving back and
-  forth. An input that is out stays out with its next files while its
-  capture runs, no new leave told; a new capture's file carrying its
-  audio delay over is out at once, told again. A leave is told only once the capture took
-  the file out:
-  the event `audio input left the guide track` with its `offset` (from
-  the staying group's earliest input), and a problem whose line reads,
-  while out, `Audio <n> <name> 953 ms late, not in the guide track; its
-  own audio track is recorded` (or `900 ms early` for an early input),
-  and once it rejoins or its capture ends, `Audio <n>
-  <name> was not in the guide track from 0:50 to 1:40 (953 ms late);
-  its own audio track is recorded` (or `(900 ms early)`); always
-  orange, and by design neither a Dock bounce nor the badge nor the
-  status line's count. A leaving source is cut, its samples not mixed
-  yet dropped. Its own audio file is unchanged and the timeline file
-  still places it by its audio delays. Each source is placed by its own
+  "Audio inputs" mixes (D80, D90):** decided afresh from the audio
+  delays alone at every measurement and every file's start or end,
+  nothing remembered: every audio input whose capture runs that has an
+  audio delay (by its newest file), unless their audio delays lie
+  further apart than 0.8 s (`guideTrackSyncLimit`, *data*, the most the
+  mix shifts an input, early or late; compared with a tolerance of a
+  quarter of a sample at 8 kHz, below the half-sample step of a
+  median); then the largest set within 0.8 s of each other, on a tie
+  the set holding the reference, else the one with the earliest input.
+  An input outside it is not mixed in any video file, the anchor
+  included, so an Osmo as input 1 more than 0.8 s late against two
+  microphones in sync with each other is not mixed; it is mixed again
+  once its audio delay fits, the audio delay's own rules keeping it from
+  going back and forth. Its status row says so, `· not in the guide
+  track, 950 ms from the others` (from the furthest input mixed), and so
+  do the recording log's detail lines; there is no event and no
+  problem: nobody can act on it, and only a problem a person can act on
+  calls for attention (the owner, 2026-11-26). Not the distance from the
+  reference instead of sets: that mixes inputs up to 1.6 s apart in a
+  mix that shifts at most 0.8 s, and with the reference the late one (an
+  Osmo as input 1) keeps only it, the guide late against the picture. A
+  source taken out of the mix is cut. Its own audio file is unchanged
+  and the timeline file still places it by its audio delays. Each source is placed by its own
   timestamps, placed earlier as above, and a source that is missing is
   silence in its guide track. The mix is handed to every open screen
   file every 100 ms (*data*); a video file's guide tracks cover
@@ -2072,8 +2083,13 @@ no audio of the camera's own.
   ended` gives its length. The capture goes on through a stall, as the
   stream recovers by itself, as a BRIO's 2.95 s USB stall did on the
   owner's Mac (2026-11-22), where ending and restarting the capture
-  only split the file and left a 1.17 s hole; as it loses picture, a
-  stall makes the result `problems` (D47). The capture ends as `camera stream
+  only split the file and left a 1.17 s hole. A stall has no call to
+  action: no line, the result `ok` (D84, D91). A camera starting in
+  the same process stalls the others for as long as its start takes,
+  0.8 s to 4 s, which macOS does (CoreMediaIO holds a process-wide lock
+  while a camera's capture starts; in separate processes it does not):
+  accepted, no workaround ([troubleshooting.md](../troubleshooting.md),
+  D91). The capture ends as `camera stream
   failed`, and starts again after the restart delay, only on a runtime
   error of AVFoundation's capture session
   (`AVCaptureSession.runtimeErrorNotification`), when no first frame
@@ -2184,28 +2200,30 @@ them:
   472 ms late]`.
 - A carry-over: `<file>: carries over 500 ms late from <earlier file>`
   and `<file>: in the guide track with the carried-over audio delay` (or
-  `out of the guide track`).
+  `not in the guide track`).
 - A reference change: `reference <old file> → <new file>: lags re-based
   onto the anchor by 500 ms late`, or `…: it has no audio delay, so it
   is the new anchor and every input starts over`, or, on a reference
   miss, `…: moved on a reference miss, so it is the new anchor and every
-  input starts over` after its reason (D89): `reference <file>: no counted window
+  input starts over` after its reason (D90): `reference <file>: no counted window
   against it while another input had sound; <file> has counted windows
   of 2 other inputs against it: <file>, <file>`, the pairs' windows
   before it as `<file>: lag 322 ms late against <file>, clarity 423,
-  counted`.
+  counted`; a re-base on a miss gives the same reason before its
+  `lags re-based` line; a group that does not outnumber the anchor's:
+  `reference <file>: <file>'s group of 2 does not outnumber the anchor's
+  group of 2: nothing moves`. Once the reference is another input:
+  `<file>: the anchor's file, measured against <file> from now on,
+  starting at 0 ms`, only for one being written.
 - The mix: `<file>: joins the guide track placed earlier by 500 ms (the
   mix's zero: <file>)`, `<file>: placed earlier by 555 ms → 600 ms (the
   mix's zero: <file>)` followed by `the Audio inputs guide track
-  crossfades from its sample 1440000`, `<file>: leaves the guide track,
-  953 ms late from the staying group's earliest`, `<file>: rejoins the
-  guide track`; a new file of a device placed before is no new join. A
-  leave, rejoin or placement its capture did not take: `<file>: its
-  capture did not take the placement, the file no longer its current
-  one`, or `<file>: its capture did not take the leave, the file no
-  longer its current one`, or `<file>: its capture did not take the
-  rejoin, the file no longer its current one or not out`; none is
-  retried.
+  crossfades from its sample 1440000`, and at every update while a
+  synced input is not mixed `<file>: not in the guide track, 950 ms
+  from the others`; a new file of a device placed before is no new
+  join. A placement its capture did not take: `<file>: its capture did
+  not take the placement, the file no longer its current one`; it is
+  not retried.
 - No audio (D81): `Audio 2 Razer Seiren: no audio since 0:25, right
   after its gap at 0:24: a red problem (D81)`, or `Audio 2 Razer Seiren:
   no audio since 0:25, no gap within 10 s before: no problem (D81)`.
@@ -2366,149 +2384,43 @@ Swift Argument Parser, Apple's own package for command lines.
 
 ## Tests
 
-`scripts/test` runs the unit tests of `RecorderLogic`: the tick grid
-(which frame lands on which tick, still periods of 60 s and more, late
-ticks), geometry for every recording resolution (and their slider order)
-and change case, Native as the looks-like size, auto mode's effective
-choices, the audio modes and which input each records (every transport
-type), settings read leniently with the line for standard error, flags
-(`--auto` against `--resolution` and `--audio-mode`) and their errors,
-the text `msr check` prints for "What will be recorded", file naming,
-manifest states, the screen tracker (numbers, the settle time, frame
-size changes, mirroring, the main screen, back-off, the screen check's
-fault, a full disk, sleep and wake, and no screen at the recording
-resolution None, a wake without a reading that starts the screens at
-the next one), the ready check at the recording resolution None
-(the screen permission only with the system audio, no screens item,
-nothing to record refused), the screen check, the shared clock,
-the timecode (also on a daylight saving day and at a second frame rate),
-`--duration`, the summary of `msr record`, the Dock badge and the
-problems of a recording, the audio tracker (the audio modes, inputs
-coming and going, an unplug told once, a replug, the default microphone
-followed, failures with the back-off, the system audio moving to the new
-main screen, a full disk, a channel count change, two inputs with the
-same name, sleep and wake), the camera mode and which camera each
-records (a suspended one not, an iPhone camera only under All), a
-camera's chosen format (any aspect ratio, inside the recording
-resolution's box, the slowest variant at 30 fps)
-and frame rate, the limits for a camera without frames,
-the camera tracker (numbers, the default camera first, a camera
-coming and going, failures with the back-off, a full disk, sleep and
-wake), camera files in the manifest, the timeline and the status
-window (D74), the audio file's placement on the tick grid
-(trimming, gaps filled or ending the file, jitter within 32 ms), the
-clock drift correction (the tracker against simulated devices, seeds 1
-to 3: steady, also for 30 minutes, sources in bursts like the system
-audio, buffers delivered every other second, stalls of 4 s and 9 s, a
-stall before a gap, pauses up to an hour, buffers of 8192 and
-16384 samples, lasting steps up and down, an early buffer, a slow
-wander, and fast wanders as a bound on how much worse they get; the
-support line with hand-made points and the rate; the resampler's purity,
-its sample count, chunking and a rate change; clicks, gaps with the
-drift during them, and the rate and what is still off right after a gap,
-through the whole correction; when the status and the detail line are
-due), the level meter (the peak of any channel since the last reading,
-the peak hold, dBFS and the scale, red from −1 dBFS), which samples go
-into an audio file around no audio and where it starts and stops, an
-input volume's change once it held still, and an audio file's `clockDriftPpm` and `clockDriftCorrection`
-(never `-0`), splitting interleaved and non-interleaved PCM, the guide
-track mixes, audio file names and metadata, our process's CPU use, the
-status window's rows, the version, the state file's content, the choice
-of the crash report to offer and of the last recording's problems to
-tell, the new-issue links of both (and that the issue forms have the
-fields they fill; the problem report's cut to its length), the end of
-`msr record`'s summary that offers a report, Report a problem with a
-stand-in for the browser and Finder, the name of a crash report's text copy,
-the text of the examples in this document, which the tests hold to
-the code, the status line's text and cut (it counts the problems with a
-call to action), the badge ("!" or none), each problem kind's call to
-action and when it is given (D84), that no
-source file writes on standard error but the one writer, the error
-detail (nested and multiple underlying errors, four-character codes,
-the depth guard, a Swift error's own text, its JSON), that no source
-file but the error detail's reads `localizedDescription`, and an
-error's `errorDetail` in the recording manifest. The writer
-itself is tested with a stand-in sink and on a pseudo-terminal, a pipe
-and a pipe without a reader, in `RecorderCoreTests`. `RecorderCoreTests` test the recording log with a stand-in file and a
-stand-in clock (appended, never rewritten, synchronized after each event
-and problem, detail lines written with the next event or after 10 s,
-a failing write told once until it works again, a detail line not held
-up by a slow synchronize, Stop's close giving its failure) and the real file it
-appends to, the writers' errors keeping the system's error chain, the output folder probe against
-scratch folders, and that this Mac's audio inputs can be read and a
-listener for their changes registered, which needs no permission and
-shows no prompt, the state file (missing, saved, broken, updated), the listing of
-the crash report folder (a missing one is no crash reports, an
-unreadable one an error), the text copy of a crash report, screen files
-written from synthetic frames and read back (constant frame rate,
-timecode, BT.709, fragments, a file never finalized, the guide tracks),
-audio files written from synthetic PCM and read back (a mono track per
-channel or one stereo track, the bit rates, the timecode with its reel
-name, the metadata, a filled gap decoding as silence, a file never
-finalized, appends of 100 ms decoding the same as appends of 512
-samples, stereo interleaved), the proof that an audio-only fragmented `.mov` carries a
-timecode track, a screen file's ticks with a stand-in writer (a failing
-writer, one that fell behind, a slow end, guide samples placed from the
-file's first tick), audio captures with a stand-in source and writer
-(appends of about 100 ms from buffers of 512 samples, the clock drift
-status about once a second, each file's
-`clockDriftCorrection` against a correction of the test's own, the
-second file's counted from its own start, the correction's held-back
-samples written when a capture ends by itself, dropped when its writer
-failed or fell behind, with nothing written after that, also by a Stop
-racing in; each buffer's peak in the level meter, `inputVolume` at a
-file's start, no audio from the start getting no file, a file after no
-audio starting before the sound, zeros shorter than 10 s staying in a
-file, the system audio excluded), the input volume against a stand-in
-for Core Audio (its property's address, a set clamped to 0 to 1, a
-refusal, the listener; no test reads or sets a real device's volume), a
-recorder audio only with a stand-in audio input and input volume
-and a stand-in for the screens, and with stand-in cameras (a camera
-appearing and vanishing, its stream failing, a frame without a picture,
-and the Camera permission never asked, granted, denied, refused at the
-request, not asked without a camera or under the camera mode None; a
-camera without a first frame, one whose frames stop, one that stalls
-and delivers again, and frames arriving after their tick was decided;
-Stop and sleep and wake with a camera file) (`RecorderDevices.screens`; a wake whose
-screens cannot be read still writes its wake event and restarts the
-audio inputs) (`RecorderTests`: a failure told once by its event and its repeats
-counted at Stop, D65; `inputVolume`, a change told once it held still,
-also one Core Audio does not report, the slider's set, a refused set as
-a problem, no slider where it cannot be set; the level meters; no audio
-in the window and the manifest, not a problem, unless right after a gap
-(D81); an input joining the guide track at its audio delay, leaving it,
-rejoining, and a new file carrying its audio delay over, D79, D80; the
-anchor's new file measured against the reference in use, D85; calls
-to action, D84), a stream stopped while it starts, that an action waiting for
-the main run loop's default mode runs only there, the classification of
-Core Audio's transport types, and the ready check's probes with
-stand-ins (the output folder's file access is off the main thread). The
-recorder's filter of the clock drift status by capture number, which
-drops a status from a capture already replaced, has no unit test yet;
-`RecorderTests` record no screen and open no camera. `AppTests` run the
-start window's model with stand-in probes and a stand-in for the hold:
-one check per burst of device changes, nothing applied while a menu is
-open, a stale queued refresh does nothing, choices saved only when
-changed, no ready check while recording, Start only when ready,
-which quit finalizes without asking, where each kind of text of `msr
-record` goes with and without `--quiet` (standard output the folder's
-path only), when the status line is drawn and ended, that `--quiet`
-with `--debug` is a usage error, and that the icon's frame in dark mode
-follows the tile in the icon file. `CommandTests` run the built `msr`
-with a scratch `HOME` (`msr settings`, with flags, `--resolution none`
-and `--auto`, `msr record --help`, and `msr
-version`, which prompt for nothing; also through a symbolic link into an
-app bundle), `scripts/version` in scratch git repositories and
-`scripts/unpack-app` on scratch archives (some written byte by byte, as
-no tar would write them from a file system), `scripts/sign-app` and
-`scripts/smoke-test` on a scratch bundle, and
-`scripts/publish-snapshot-release` against a stub `gh`;
-`scripts/smoke-test` runs the built app's `msr` the same way in the
-pipeline. Capture itself is verified by the end-to-end tests, which
-drive `msr record` as built and examine the recording folder, run by
-hand in a tart VM on the owner's Mac (D67), and by the v1 gate. The design of the
-end-to-end tests is [end-to-end-tests.md](end-to-end-tests.md) (D37);
-their logic is unit-tested in `EndToEndLogicTests`.
+`scripts/test` runs them all (Swift Testing, `swift test`), layered as
+the code layout above: `RecorderLogicTests` for the pure logic, with
+the examples of this document held to the code by tests that compare
+the text (so a changed output fails there until the document follows),
+`RecorderCoreTests` for the adapters with stand-ins for devices,
+permissions and the clock (a recorder with stand-in screens, cameras
+and audio inputs; nothing opens a camera, records a screen or sets a
+real device's volume), `AppTests` for the start window's model with
+stand-in probes, `CommandTests` for the built `msr` with a scratch
+`HOME` and for `scripts/` on scratch folders, git repositories, bundles
+and a stub `gh`, and `EndToEndLogicTests` for the end-to-end tests'
+logic. Capture itself is verified by the end-to-end tests, run by hand
+in a tart VM on the owner's Mac (D67), and by the v1 gate; their design
+is [end-to-end-tests.md](end-to-end-tests.md) (D37). The tests' names
+say what they hold; the history of what was built when is in
+`docs/decisions.md` and `backlog.md`.
+
+The audio sync (see "Audio delay" and "Guide tracks", D90) is proven
+four ways, as no single one covers it. Named scenario tests, one per
+recording the rules are built for (`AudioSyncCaseTests`: a dock's empty
+line-in as input 1, a stray burst on two inputs, two loopbacks of a
+call, two rooms taking turns, a healthy reference unclear once, a pause
+after the sync, a far microphone, a lone microphone, an anchor that
+drifts; `ReferenceChoiceTests`, `AudioDelaysTests`,
+`GuideTrackMembershipTests`; `RecorderTests` for the recorder's wiring
+of rows, `recording.json`, the guide track and the log). Invariants
+over 200 seeded generated recordings (`AudioDelayInvariantTests`: 2 to
+5 inputs of shared, gated or distant speech, unrelated sound, hum,
+noise, pauses and no audio, driven through the recorder's own calls,
+every measurement checked against the rules' invariants and against
+the same measurements without pairs); a change to the rules is also run
+over 3,200 seeds, as generated and with lags widened, beside the rules
+before it. A replay of the owner's real recordings through the built
+code, every audio delay compared within a frame with the rules before
+(a scratch tool outside the repository, as the recordings are the
+owner's). And the end-to-end tests in the VM, which record a tone into
+BlackHole with the built app (D67).
 
 ## Not covered, and rejected
 
@@ -2552,308 +2464,3 @@ their logic is unit-tested in `EndToEndLogicTests`.
 - Unproven until the owner's first real recording with audio (D31):
   that DaVinci Resolve reads the timecode of an audio-only `.mov`, and
   how Kdenlive places the screen files and audio files.
-
-## Build state
-
-Built (skeleton PR): `msr list`, `msr check`, `msr settings`,
-`msr version`, the ready check and the app window with it ("What will
-be recorded", "Check again", Start always disabled, "This build cannot
-record yet."), the About window, the code layout above, and the tests of
-the disk estimate, the ready check, the output folder probe, the audio
-input listing, "What will be recorded", `msr list`, the version, the
-exit codes and the scripts.
-
-Built (settings and auto mode, PR A, D44): the settings file read
-leniently and written only on save with `JSONEncoder`, auto mode, Native
-as the looks-like size, the four audio modes (the audio inputs' transport
-types read from Core Audio), the switch "Auto" and the two sliders in the
-window, `--auto` and "What will be recorded" in `msr check`, the ready
-check's probes with a seam and the window's refresh with its tests. It
-captures nothing. The recording core builds the rest, in two PRs
-(D45): B1 `msr record`, Start and Stop, the screen files with their
-timecode, screen changes and the screen check, the recording
-manifest and the Dock badge; B2 the audio files, the
-guide tracks, system audio and the default microphone followed.
-
-Built (the recording core's screens, B1, D45): `msr record` with
-`--duration`, Start and Stop in the app, the Dock icon, its badge and
-the status window also for `msr record`, the app quitting after Stop
-and not on its last window closing while it records, the ready check
-held while recording, the recording folder claim, the recording manifest with
-its screen files and events, the shared clock, the tick grid with late
-ticks, screen files (HEVC, fragments of 2 s, the timecode track,
-BT.709), the frame size, screen identity by UUID, the settle time,
-screens coming and going, failing streams with back-off, mirroring, the
-main screen, sleep and wake, the screen check, a full disk and the
-free space check, and keep awake. The frame rate is one value
-(*data*); the tick grid, the timecode, the keyframe interval, the
-late-tick bound (6 s) and the screen check's limit (1 s of frames)
-derive from it. Tested without a screen: the logic by unit tests, and
-screen files written from synthetic frames and read back (a constant
-frame rate, the timecode, BT.709, a file never finalized readable up to
-its last fragment). A finalized screen file is a regular movie:
-Apple's writer joins the fragments when it finalizes [KNOWN, the
-tests]. Live capture is verified on the owner's Mac.
-
-Built in B1 where this document leaves the detail open, provisional and
-for the architect to settle: the encoder's quality target (0.5) and
-ceiling (4 times the estimated rate); `msr record` prints `Recording
-into <folder>` at its start and, at its end, how long it recorded, each
-file with its state, each failure event and each problem; it ends with
-an error (exit 3) when the manifest's `result` is `problems` (D47): a
-file is not finalized, a file was ended by a failure or a camera
-stalled, and when the finalized manifest could not be written (the problem is told,
-the app shows an alert after the person's Stop, never at logout, restart or shutdown, and the file on disk keeps no `ended`); `at` is rounded to
-the millisecond; a screen file whose name is taken (a new file within
-the same second) gets " (2)"; the timecode of tick 0 is t0's time of
-day rounded to the nearest frame; after a full disk, new screen files
-start once the free space is above the low disk warning threshold;
-low disk space bounces the Dock icon until the app is activated; a
-frame's rectangle passes the screen check within 0.5 points of its
-screen's bounds.
-
-Built (the recording core's audio, B2, D49): an `AVCaptureSession` per
-recorded audio input, following the audio mode and the default
-microphone; an unplug ending the audio file and a replug starting a new
-one; a new audio file on a channel count change; the system audio from
-a ScreenCaptureKit stream on the main screen, moving with it; audio
-files placed on the tick grid, gaps up to 1 s filled with silence, a
-longer one ending the file; `clockDriftPpm` per audio file; the guide
-tracks "Audio inputs" and "System audio" in every screen file; audio
-sources in the status window and the summary; audio files counted in
-the low disk warning threshold; our process's CPU use in the status
-window, the summary and the manifest. Tested without a microphone or a
-screen: the logic by unit tests, audio captures with a stand-in source
-and writer, audio files and guide tracks written from synthetic PCM and
-read back. Verified live on the owner's Mac on 2026-11-16, build
-`7ad0b6b`, in two runs by the owner and five by the architect: capture
-from 4 audio inputs and the system audio into finalized files; default
-microphone changes; a USB microphone unplugged and replugged, ending
-its audio file and starting a new one; screens connected and
-disconnected, a virtual screen and main screen changes among them;
-the "System audio" guide track equal to `System audio.mov` at 0
-samples of lag; the timecode aligned in DaVinci Resolve; the
-"Microphones" (now "Audio inputs") gain of 1/√6 of that build, the rule D52 replaced,
-measured. Seen there, and not the
-recorder's: while USB devices re-enumerated, macOS delivered zeros on
-the USB inputs and on the system audio for 4 to 10 s. Not verified
-live: everything after `7ad0b6b` (the soft limiter of D52, the guide
-tracks' end, the debug times), drift over an hour, and DaVinci
-Resolve's reading of the audio files' metadata.
-
-Built in B2 where this document leaves the detail open, decided by the
-architect on review (D50): the failure events are named `audio input
-failed`, `system audio failed`, `audio file writer failed` and `audio
-file writer fell behind`; an event about an audio source names it in
-`audioSource`, never in `screen`; samples lost at an audio file's end
-are `audio file writer fell behind`, a failure; an audio source the
-audio mode records but that has no file yet shows the state `not
-recorded`; an audio input is recorded only when Core Audio gives its
-UID, which `AVCaptureDevice` opens it by; the beginning of a recording
-tells no `default microphone changed` or `audio input connected` events;
-the system audio's stream asks for 2×2 pixels at 1 frame per second and
-drops them; a screen file's guide tracks end with its video, by a last
-mix at its end (D51); the video track's name is written as QuickTime
-user data `©nam`, which ffprobe shows as `title` (track-level metadata
-items do not show and are not written; the file-level items are); `msr
-record`'s summary ends with the line `CPU N % on average, N % at the
-peak, of one core (this process only)`.
-
-Built (the clock drift correction): every audio source resampled to
-follow the shared clock (see "Audio", "Clock drift"), `clockDriftPpm`
-and `clockDriftCorrection` per audio file, the status window's "Clock
-drift" column and the detail lines. Tested by unit tests against
-simulated devices. Run on the owner's Mac on 2026-11-16 (two runs of
-90 s, wired audio mode and the system audio; their builds were not
-recorded) with one interval's smallest lateness, a follow time of 5 s
-and a rate fit over 10: the system audio reached a false correction of
-about +2 ms and wobbled 0.5 to 1.8 ms, because it arrives in bursts (see
-end-to-end-tests.md). With the rolling minimum, the start after 5
-intervals, a follow time of 15 s and a rate fit over 30, run again on
-2026-11-17 (120 s, the same sources; its build was not recorded): the
-system audio's correction stayed between +0.23 and +0.47 ms from 40 s on
-(+0.79 ms at 20 s), its clock drift shown within ±4 ppm from 70 s on,
-`clockDriftPpm` -2.7; the Razer Seiren V3 Mini -115.4 to -117.8 ppm and
-at most 0.1 ms off from 50 s on, `clockDriftPpm` -115.7; CalDigit
-Thunderbolt 3 Audio +47.9; MacBook Pro Microphone +2; Logitech BRIO
--37.7 (it wanders). Our process's CPU use was the same as before within
-the runs' spread (51 % before; 47 %, 54 % and 56 % after). Not verified:
-the correction over an hour, and by ear or by clicks in a real
-recording.
-
-A proportional-integral loop that followed a rolling minimum was built
-and run next, and replaced (D57): the rolling minimum moved older
-intervals along the loop's own integral, so the loop fed its own
-measurement and ran away on long pauses and deep bursts. Rebuilt with
-the lower support line (see "Clock drift") and run on the owner's Mac on
-2026-11-17 on the build `0.20261117.49-dev+a8f374d.dirty`, the support
-line before it was committed (180 s, wired audio mode and the system
-audio, `--debug`): the clock drift shown from about 20 s; from 30 s on
-the Razer Seiren V3 Mini -114.2 to -119.5 ppm and at most 0.15 ms off,
-`clockDriftPpm` -116.1 with +20.8 ms corrected; CalDigit Thunderbolt 3
-Audio +48.3 to +50.6 ppm and at most 0.07 ms off, +49.4; MacBook Pro
-Microphone at most 0.04 ms off, +2.4; Logitech BRIO wandering from
--116.2 to +4.8 ppm, at most 0.97 ms off, +4.4; the system audio's
-correction between -0.80 and -0.14 ms, at most 0.43 ms off, its clock
-drift shown -2.9 to +13.3 ppm, `clockDriftPpm` +2.9. No gap and no
-event. Our process's CPU use 54 % on average (51 % before the
-correction). Run again on the build of `1e5bfe7` (2026-11-17, its
-version string checked; 10 minutes, the same sources and options):
-result ok, no event and no gap, our process's CPU use 55 %;
-`clockDriftPpm` Razer Seiren V3 Mini -115.2, CalDigit Thunderbolt 3
-Audio +49.7, Logitech BRIO +5.2, MacBook Pro Microphone +2.4, the system
-audio -1.2; `clockDriftCorrection` Razer +0.0692 s, CalDigit -0.0297 s,
-MacBook -0.0012 s, BRIO +0.0021 s, the system audio +0.0002 s; from 30 s
-on at most 0.23 ms off (Razer), 0.10 (CalDigit), 0.11 (MacBook), 0.99
-(BRIO) and 0.75 (the system audio). The four inputs' files end within
-1.4 ms of each other. By the room's sound, the Razer's and the BRIO's
-files keep the same lag: -16.4 ms in six of nine 90 s stretches (the
-others -17.9 and -20.7 ms, in a quiet room), where uncorrected it would
-have moved about 55 ms. With the kept slope, then the mean of the latest
-slopes, and the rate hold, run on the build `0.20261117.49-dev+151b3b7`
-(2026-11-17, 120 s, the same sources and options): result ok, no event
-and no gap, our process's CPU use 54 %; `clockDriftPpm` Razer -115,
-CalDigit +49.6, BRIO +6.2, MacBook +1.7, the system audio +0.8;
-`clockDriftCorrection` Razer +0.0138 s, CalDigit -0.0059 s, BRIO
-+0.0041 s, MacBook -0.0002 s, the system audio +0.0001 s; from 30 s on
-at most 0.19 ms off (Razer), 0.10 (CalDigit), 0.04 (MacBook), 0.91
-(BRIO, its clock drift shown wandering from -115.3 to +0.2 ppm) and 0.22
-(the system audio). The final tracker, the median as the kept slope,
-checked by the architect on the build `0.20261117.49-dev+cdd75ad`
-(2026-11-17 05:09 Europe/Berlin, 180 s, all five audio sources and two
-screens on the owner's Mac): result ok, no event; `clockDriftPpm` Razer
--115, CalDigit +50.3, MacBook +4.5, BRIO +4.7, the system audio +0.7;
-`clockDriftCorrection` Razer +0.0206 s, CalDigit -0.009 s, MacBook
--0.0008 s, BRIO +0.0037 s, the system audio -0.0001 s; from 30 s on at
-most 0.11 ms off (Razer), 0.13 (CalDigit), 0.05 (MacBook), 1.03 (BRIO)
-and 0.32 (the system audio). Not verified: a real gap's drift, the order at a gap (the interval before it closed
-before the jump) and the median across a real gap, which no real
-recording has had yet (only the tests), and by ear or by clicks in a
-real recording.
-
-The hour run, on the build `0.20261117.49-dev+1fb8dae` (2026-11-17
-07:36 to 08:36 Europe/Berlin, one hour, five audio sources and two
-screens on the owner's Mac): result ok, no event; `clockDriftPpm` Razer
--115.2, CalDigit +50.2, BRIO +2.5, MacBook +3.2, the system audio +6.3;
-`clockDriftCorrection` Razer +0.4139 s, CalDigit -0.1804 s, BRIO
--0.0146 s, MacBook -0.0108 s, the system audio +0.0002 s; "ms off" in
-the detail lines from 30 s on at most 0.21 (Razer), 0.17 (CalDigit),
-0.83 (BRIO), 0.10 (MacBook) and 0.92 (the system audio). By room sound
-the Razer's and the BRIO's files kept the same lag, -16.1 to -16.8 ms
-in ten of twelve 60 s stretches across the hour, the other two with too
-little sound. CPU 37 % of one core on average.
-
-The status line was run for 12 s under a pseudo-terminal on the build
-`0.20261117.49-dev+4768d34`: standard output carried only the path, the
-line redrew every second and was cleared before the summary; not yet
-seen in the owner's own terminal.
-
-Answered (D50's open question): the system audio's timestamps follow its
-sample count, not the host clock. A probe of 120 s (128 s of data) of a
-ScreenCaptureKit audio stream on the owner's Mac (2026-11-17) had every
-timestamp at its sample count from the first to within a microsecond,
-and the clock drift correction corrects the output device's clock drift
-like an input's, so it shows as no `audio input gap` events.
-
-Built (audio only, the first step of the CPU work and the icon's frame
-in dark mode, D62): the recording resolution None (see "Audio only"
-and "Ready check"); the audio files' appends of about 100 ms (see
-"Appends"); `pcmSample` without an array per sample; in dark mode the
-start window's header draws a frame of white at 25 % opacity, 1 pt, on
-the edge of the icon's tile, scaled from the tile in
-`assets/icon/app-icon.svg` (inset 4.7 pt, corner radius 8.6 pt at
-48 pt; `IconTileFrame`), seen in an offscreen render of the header, not
-yet in the running app.
-
-CPU, the findings behind this step (backlog item 6, 2026-11-16, build
-`7ad0b6b`, two displays): a 20 s `sample` put the 11 AAC encoders at
-22 % (the guide tracks about 5.8 % per display), the movie writers at
-6 %, the microphone capture at 7 %, VideoToolbox at 5 % (3 % of it
-rebuilding a colour space from the frame's ICC profile, twice per
-frame) and our own code at 1.6 %; steady CPU was 11.5 % for video only,
-25.9 % with the system audio, 35.0 % with the default microphone too
-and 62.0 % with all inputs. A replica of the audio path, real-time
-paced, found the 94 appends a second, not the encoder, to be the main
-cost: appends of about 100 ms gave bit-identical files and saved about
-1.9 % of a core per input.
-
-Measured with this step (2026-11-18, the owner's Mac: two screens, LG
-Ultra HD at 2560×1440 and the built-in display at 1512×982; the system
-audio and three inputs, Jabra Evolve3 65, Logitech BRIO with two
-channels and the MacBook Pro Microphone): `msr record` for 3 minutes,
-our process's CPU from 30 s to 170 s by `ps`, the build of `main`
-(`0e179d4`) against this branch's, alternating:
-
-| Settings | `main` | this branch |
-|---|---|---|
-| Auto (two screens at Native, the system audio, three inputs) | 45.8 %, 41.0 % | 31.5 %, 32.4 % |
-| Video only (`--resolution native --audio-mode none --system-audio off`) | 11.3 % | 12.7 % |
-| Audio only (`--resolution none --audio-mode wired`) | – | 19.3 % |
-
-So about 11 percentage points of one core less with these four audio
-sources, a quarter of the process's CPU; video alone is unchanged
-within the runs' spread. `recording.json`'s `cpu` gave the same
-averages within 0.6 points.
-
-The colour space was left unchanged: with ScreenCaptureKit set to
-deliver BT.709 (`colorSpaceName` and `colorMatrix`), so VideoToolbox
-would not rebuild the colour space from the ICC profile, the decoded
-frames were not the same as before, and the step was to be taken only
-if they were (the owner, 2026-11-16; D24): recorded at the same time as
-the unchanged build, the frames' mean Y was about 6 levels (of 255)
-higher on both screens (108.1 against 114.5 on the LG, 114.8 against
-120.8 on the built-in display), where two unchanged builds recording
-together differed by under 0.05.
-
-Built (cameras, D74): the camera mode (`--camera-mode`, the setting
-`cameraMode`, the slider), a camera file per recorded camera on the
-screen files' writer path (see "Cameras"), the Camera permission in the
-ready check and while recording, cameras in "What will be recorded",
-`recording.json`, the timeline file, the status window, the status line
-and the summary. Capture from a real camera is UNVERIFIED: no test opens
-a camera, and the end-to-end VM has none.
-
-Details the design left open, as built and confirmed by the owner
-(D25, D28, D44): a key missing from the settings file takes its default;
-the output folder must start with `/` or `~`; the two number settings
-must be greater than 0 (an invalid one is ignored, see "Settings file").
-`msr version` prints the full
-version string and the commit, such as `0.20261115.2-dev+a1b2c3d (a1b2c3d)`,
-from the bundle's Info.plist keys `MSRVersion` and `MSRCommit`;
-outside a bundle it prints `development build (not bundled)`. The
-banner's build date is the key `MSRBuildDate`, the commit's date in
-UTC, the same date the version carries, so a rebuild of the same
-commit gives the same banner; a bundle without it says `built (build
-date missing from Info.plist)`, and outside a bundle the banner has no
-build date. The
-settings file is found through `HOME`. The disk estimate follows its
-rule, file by file (12.8 GB in the `msr check` example above). The
-recording resolution box turns with a portrait screen (1080×1920 for a
-2160×3840 screen at 1080p).
-
-Further details, as built and decided by the architect for PR #1: an
-unset `HOME` exits 78; `msr` that cannot re-execute
-itself at its real path exits 71. When the screens cannot be read,
-the free disk space item is left out, as when the output folder fails.
-The ready check reads each audio input by itself, so the disk estimate
-counts the default microphone's channels; when the channels of an input
-the audio mode records cannot be read, the audio item fails with
-"reconnect the audio inputs, then check again", and an input that is not
-recorded and whose channels cannot be read never fails the check or
-`msr list`. A device without input channels is not read further. The
-audio inputs as a whole cannot be read when the device list, the name
-of an audio input or, with at least one audio input, the default audio
-input cannot be read. The app does not start, with the reason in an
-alert, when it cannot register for changes of the audio devices. When the free space cannot be read, the fix says "choose an
-output folder on another disk".
-
-The owner ruled that a Mac without an audio input is ready in every
-audio mode (D44, point 5).
-
-Decided while building PR A, within D44, for the owner to confirm:
-`msr check` prints "What will be recorded" before the ready check's
-items, separated by a blank line, without the window's line "Recording
-continues …" (`msr record` and `msr list` print the same table); a settings file that cannot be read as a whole is named
-"the whole file" in the line on standard error; an input's transport
-that cannot be read is not wired; `msr settings` with a flag that cannot
-write exits 1; the window shows a red line when a save fails.

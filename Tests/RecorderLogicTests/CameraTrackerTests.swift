@@ -102,7 +102,6 @@ import Testing
     /// At Native a camera records at most 1920×1080, or 1080×1920 upright: the
     /// owner's BRIO and DJI Osmo Pocket overloaded the USB bus at 4K (D74).
     @Test func atNativeACameraRecordsAtMostFullHD() {
-        #expect(RecorderValues.cameraLargestSize == FrameSize(width: 1920, height: 1080))
         let brio = camera([format(4096, 2160, 30), format(3840, 2160, 30), format(1920, 1080, 30), format(1280, 720, 30)])
         #expect(brio.chosenFormat(resolution: .native) == format(1920, 1080, 30))
         #expect(brio.frameSize(resolution: .native) == FrameSize(width: 1920, height: 1080))

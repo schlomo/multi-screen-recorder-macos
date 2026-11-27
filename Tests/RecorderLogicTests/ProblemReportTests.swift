@@ -72,15 +72,18 @@ import Testing
 
     @Test func theSummaryEndsWithTheLinkAndTheFilesToAttach() throws {
         var manifest = RecordingManifest(app: "a", started: Date(), timeZone: .gmt, settings: .manual)
-        manifest.problems = [RecordingProblem(atSeconds: 3, problem: "The screens cannot be read", error: "denied")]
-        let summary = RecordingSummary(manifest: manifest, recordingFolder: "/r", seconds: 9, manifestWritten: false, problemsAskToReportIt: false, filesEndedByAFullDisk: [])
+        let notCaptured = RecordingProblem(atSeconds: 3, problem: "Screen 1 LG not captured", error: "denied")
+        manifest.problems = [notCaptured]
+        let summary = RecordingSummary(
+            manifest: manifest, recordingFolder: "/r", seconds: 9, manifestWritten: false, problemsAskToReportIt: false,
+            filesEndedByAFullDisk: [], problemsCalledToAction: [notCaptured])
         let lines = summary.reportText(version: "v").split(separator: "\n", omittingEmptySubsequences: false)
         #expect(lines.count == 3 && lines[2].isEmpty)
         #expect(lines[1] == "Attach: /r/recording.log and recording.json")
         let link = try #require(lines[0].wholeMatch(of: /Report it: (.+)/)?.1)
         #expect(try query(try #require(URL(string: String(link))))["what-happened"] == "The recording ended with problems. What went wrong, the last first:\n"
             + "The recording manifest could not be written at the end: recording.json has no end.\n"
-            + "Problem at 3s: The screens cannot be read: denied")
+            + "Problem at 3s: Screen 1 LG not captured: denied")
     }
 
     /// The recorder's folder path ends in a slash.

@@ -129,18 +129,11 @@ public struct TickLoop<Frame> {
             frames.removeFirst(chosen)
             nextTick += 1
         }
-        while let first = waiting.first {
-            guard try write(first.tick, first.frame) else { break }
-            if first.isLate { framesRepeatedForLateness += 1 }
-            lastWrittenTick = first.tick
-            waiting.removeFirst()
-        }
-        for index in waiting.indices { waiting[index].isLate = true }
-        return waiting.count > lateTickBound ? .writerFellBehind : .running
+        return try drain(write: write) > lateTickBound ? .writerFellBehind : .running
     }
 
-    /// At the end of the file: hands the waiting ticks to `write` until it
-    /// takes none; returns how many are left unwritten.
+    /// Hands the waiting ticks to `write` until it takes none, as at the end
+    /// of the file; returns how many are left unwritten.
     public mutating func drain(write: (Int64, Frame) throws -> Bool) rethrows -> Int {
         while let first = waiting.first {
             guard try write(first.tick, first.frame) else { break }

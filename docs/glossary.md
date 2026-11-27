@@ -100,22 +100,24 @@ printed already (D64).
 
 ## Problem
 
-Something that went wrong in a recording and that the person is told:
-a line in the status window (red when something
-is broken, orange for a hiccup, D78), a line on standard
-error in `msr record`, a line in the recording log, and an entry in the
-recording manifest's `problems` with its time and full error (D46, D64);
-the Dock badge's "!" and a bounce only with a call to action (D84).
+Something that went wrong in a recording: a line on standard error in
+`msr record`, a line in the recording log, and an entry in the
+recording manifest's `problems` with its time and full error (D46,
+D64); a red line in the status window, the Dock badge's "!", a bounce
+and the result `problems` only once its call to action was given (D78,
+D84, D91).
 
 ## Call to action
 
 What a person has to do about a problem, by its kind (`CallToAction`,
 D84): free up disk space, grant the permission, unplug and plug in the
 device again, report it, or stop and start the recording again (or
-replug) and report it; a kind without one is told but never bounces the
-Dock icon, sets the badge or counts in the status line. A source that
+replug) and report it; a kind without one is logged and listed in the
+recording manifest but never shows a line in the status window, bounces
+the Dock icon, sets the badge, counts in the status line or makes the
+result `problems` (D91). A source that
 fails gets its call to action only once it lasted 10 s without coming
-back; one still failing at Stop makes the recording ask to report it.
+back, or once its failures add up to 10 s (D91); one still failing at Stop makes the recording ask to report it.
 Only a call to action that includes "report it", or lost data, makes
 the recording ask to report it: `msr record`'s `Report it:` line and
 the app's notice at its next start. Not "action", which is a step a
@@ -128,8 +130,7 @@ status window says how long it lasted, when it began and how it ended:
 `recovered`, `then disconnected` when its source went away, or `stopped`
 when its capture ended without recovering and without a disconnect
 (Stop, out of the camera mode, the camera suspended, or the capture
-ended by a failure); it
-is orange unless the problem damaged the recording (D78).
+ended by a failure) (D78).
 
 ## Recovered
 
@@ -244,7 +245,8 @@ orientation, with the event `camera orientation changed` while recording
 A camera that delivers no frame for 2 s while recording: its camera file
 goes on, repeating its last frame, until frames come again (events
 `camera stalled` and `camera stall ended`) or, after 10 s, the stream
-counts as failing. It makes the result `problems` (D47, D74).
+counts as failing. It has no call to action: it shows nothing and
+leaves the result `ok` (D74, D91).
 
 ## Camera mode
 
@@ -372,13 +374,10 @@ which is told as a problem. "Audio inputs" is mixed 1 s behind and
 places each audio input earlier by its audio delay, less the smallest
 of those it mixes; the anchor is in it from the start, another input
 only once its file has an audio delay, an input whose file ended keeping
-its place until its capture ends (D80). An audio input out of sync
-with the others leaves it (D79): the largest group of inputs whose
-audio delays lie within 0.8 s of each other stays.
-
-## Offset (guide track)
-
-An audio input file's distance from the earliest input of the group the "Audio inputs" guide track keeps, in seconds, negative when earlier (D79).
+its place until its capture ends (D80). It mixes every input with an
+audio delay unless they lie further apart than 0.8 s; then the largest
+set within 0.8 s of each other, on a tie the reference's, decided afresh
+each time; an input left out says so in its status row only (D90).
 
 ## Level meter
 
@@ -423,7 +422,7 @@ while recording by cross-correlation against the reference: the anchor
 at first, the reference in use while its capture runs and it is not in
 no audio, else the input it moved to, its own audio delay turning the
 lags into ones against the anchor; the reference stays with the input
-it moved to (D77, D80, D85, D89).
+it moved to (D77, D80, D85, D90).
 A file's audio delay is set by its first
 counted window, once more by the median of its first 3, then only by the
 median of the latest 60 s, each time only beyond a frame (D80); a new
@@ -431,7 +430,8 @@ file of the same input starts with the earlier file's, carried over.
 Written as the audio file's `delays`, one entry per change of its own,
 rewritten with hindsight at Stop (one entry per stretch between the
 changes of the 60 s rule and of the reference); the anchor's files list
-0. The "Audio inputs" guide track places the
+0, and the anchor's file being written, measured once the reference is
+another input, may then list more after it. The "Audio inputs" guide track places the
 file's sound earlier by it less the smallest of the inputs it mixes, the
 timeline file by it less the smallest of the files' latest; the audio file itself
 is unchanged.
@@ -440,13 +440,13 @@ is unchanged.
 
 The device every audio delay of a recording is against: the first
 audio input whose file is written, its files' audio delay 0 while it is
-the reference, the default microphone or not; a new file of it after
-the reference moved away is measured like any other input (D85). When
-the reference moves to an input without an audio delay (D80), or on a
-reference miss whatever its audio delay (D89), that input becomes the
-new anchor, every input then starting over; so a near-silent input 1
-hands the anchor on at the first measurement in which two other inputs
-share sound.
+the reference, the default microphone or not; once the reference is
+another input, its file is measured like any other input's (D85, D90).
+When the reference moves to an input without an audio delay (D80),
+also on a reference miss's start-over (D90), that input becomes the new
+anchor, every input then starting over; so a near-silent input 1 hands
+the anchor on at the first measurement in which two other inputs share
+sound.
 
 ## Reference
 
@@ -455,26 +455,28 @@ measured against for its audio delay (`AudioDelays.referenceDevice`):
 the anchor at first, kept while its capture runs and its newest file
 did not end on no audio; then the lowest-numbered input being written
 that has an audio delay, which it stays with, the anchor's returning
-file not taking it back (D80, D85). Until the sync is established, a
-reference miss moves it to the input the most other inputs' windows
-count against, if any; a reference miss with no counted window between
-the other inputs moves nothing (D89). Not the
-"Reference implementation" above.
+file not taking it back (D80, D85). Chosen by what the inputs hear,
+never as the default microphone, which macOS moves on its own: a
+reference miss moves it by the other inputs' counted windows against
+each other, if any (D90). Not the "Reference implementation" above.
 
 ## Reference miss
 
 A measurement with no counted window against the reference while
-another input being measured had sound (D89). Until the sync is
-established, it correlates the other inputs with sound pairwise and moves
-the reference to the input the most others count against; with no
-counted pair, nothing moves.
+another input being measured had sound (D89). It correlates the other
+inputs with sound pairwise; with no counted pair, nothing moves. Else
+the reference moves to the input with an audio delay the most others
+count against, a re-base keeping every audio delay; with none such, to
+the input the most others count against, starting every input over,
+but only when its group outnumbers the anchor's group (D90).
 
-## Established sync
+## Anchor's group
 
-An input having 2 counted windows since the anchor became the anchor,
-the anchor's own new file included (`audioDelayEstablishingWindows`, D89); from then on a
-reference miss moves nothing, the reference moving only on no audio or
-its capture's end.
+The anchor and each other audio input being written with 2 counted
+windows since the anchor became the anchor (`audioDelayGroupWindows`):
+a reference miss starts over only for a bigger group, so one stray
+counted window, as a burst on an empty line-in gives, proves nothing
+(D90).
 
 ## Lag
 

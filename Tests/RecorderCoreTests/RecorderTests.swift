@@ -93,6 +93,7 @@ extension GlobalRecordingLog {
         }
 
         private let screensReadable = Switch()
+        private let audioInputsReadable = Switch()
         private var recorder: Recorder!
 
         /// A camera's frames, sent by the test with the host time of now.
@@ -239,13 +240,17 @@ extension GlobalRecordingLog {
             let sources = sources
             let volume = volume
             let screensReadable = screensReadable
+            let audioInputsReadable = audioInputsReadable
             let cameras = cameras
             let devices = RecorderDevices(
                 screens: { () throws(DeviceReadError) -> [ConnectedScreen] in
                     if screensReadable.isOn.withLock({ $0 }) { return [] }
                     throw DeviceReadError("the stand-in's screens cannot be read")
                 },
-                audioInputs: { inputs },
+                audioInputs: {
+                    if audioInputsReadable.isOn.withLock({ $0 }) { return inputs }
+                    throw DeviceReadError("the stand-in's audio inputs cannot be read")
+                },
                 audioInputSource: { uid in
                     let source = AudioCaptureTests.StandInSource()
                     sources.list.withLock { $0.append(source) }
@@ -385,6 +390,18 @@ extension GlobalRecordingLog {
             _ = await stop()
         }
 
+        @Test func aWakeWhoseAudioInputsCannotBeReadKeepsTheLastList() async throws {
+            try start()
+            #expect(sources.count == 1)
+            recorder.willSleep()
+            audioInputsReadable.isOn.withLock { $0 = false }
+            recorder.didWake()
+            try await wait("the audio input's restart") { sources.count == 2 }
+            #expect(observer.problems.map(\.problem.problem) == ["The audio inputs cannot be read"])
+            #expect(try manifestOnDisk().events.map(\.event) == [.sleep, .wake])
+            _ = await stop()
+        }
+
         // MARK: Cameras (D74)
 
         /// Sends a frame at each of `wait`'s checks, about every 10 ms, until `condition` holds.
@@ -427,6 +444,8 @@ extension GlobalRecordingLog {
             #expect(timeline.contains(#""name": "Camera 1 - Stand-in camera""#))
         }
 
+        /// A camera that fails and comes back has no call to action: no line, no bounce, the result ok, but its
+        /// failure is in the manifest's events and problems (D91).
         @Test func aCameraThatFailsIsAFailureToldOnceAndStartsAgain() async throws {
             cameras.connected.withLock { $0 = [Self.camera] }
             try start(cameraMode: .real)
@@ -439,9 +458,16 @@ extension GlobalRecordingLog {
             #expect(observer.problems.first?.problem.problem == "Camera Stand-in camera")
             #expect(try manifestOnDisk().events.map(\.event) == [.cameraStreamFailed])
             try await wait("the restart") { cameras.opened.withLock { $0.count } == 2 }
+            try await sendFrames(try #require(cameras.last), until: "the new camera file") {
+                (try? manifestOnDisk().cameraFiles.count) == 2
+            }
+            #expect(recorder.problemLines().isEmpty)
             let summary = await stop()
-            #expect(summary.manifest.result == .problems)
-            #expect(summary.manifest.cameraFiles.map(\.state) == [.finalized])
+            #expect(observer.callsToAction.isEmpty)
+            #expect(summary.manifest.result == .ok)
+            #expect(!summary.endedWithError && !summary.asksToReportIt)
+            #expect(summary.manifest.problems.map(\.problem) == ["Camera Stand-in camera"])
+            #expect(summary.manifest.cameraFiles.map(\.state) == [.finalized, .finalized])
         }
 
         @Test func stopFinalizesTheCameraFileItRecords() async throws {
@@ -486,15 +512,15 @@ extension GlobalRecordingLog {
             #expect(summary.manifest.events.isEmpty)
         }
 
-        /// The audio inputs' changes that cannot be followed: told, red for the whole recording (D78).
-        @Test func audioInputChangesThatCannotBeFollowedAreARedLine() async throws {
+        /// The audio inputs' changes that cannot be followed: told, a line for the whole recording (D78, D91).
+        @Test func audioInputChangesThatCannotBeFollowedAreALine() async throws {
             try start(audioInputsFollowed: false)
             #expect(observer.problems.map(\.problem.problem) == ["Changes of the audio inputs cannot be followed"])
             // Stop and start the recording again, and report it, at once (D84).
             #expect(observer.callsToAction.map(\.problem) == ["Changes of the audio inputs cannot be followed"])
-            let line = try #require(recorder.problemLines().first)
-            #expect(line.text == "Changes of the audio inputs not followed since 0:00: the stand-in's listener failed")
-            #expect(line.isRed)
+            // Its call to action includes "report it": the window names the files for a report (D91).
+            #expect(recorder.problemsAskToReportIt)
+            #expect(recorder.problemLines() == ["Changes of the audio inputs not followed since 0:00: the stand-in's listener failed"])
             _ = await stop()
         }
 
@@ -507,11 +533,7 @@ extension GlobalRecordingLog {
                 file.audioSourceUID.map { ($0, file.start) }
             }) { $1 }
             let base = Int((uids.keys.compactMap { newest[$0] }.max() ?? 0).rounded(.up))
-            var seed: UInt64 = 7
-            let noise = (0..<(15 * rate)).map { _ -> Float in
-                seed = seed &* 6_364_136_223_846_793_005 &+ 1_442_695_040_888_963_407
-                return Float(Int64(bitPattern: seed >> 11) % 2001 - 1000) / 2000
-            }
+            let noise = FedTables.noise(seed: 7)
             for (uid, lag) in uids {
                 for chunk in stride(from: rate, to: 13 * rate, by: rate / 10) {
                     let shift = Int((lag * Double(rate)).rounded())
@@ -544,33 +566,24 @@ extension GlobalRecordingLog {
                 file.audioSourceUID.map { ($0, file.start) }
             }) { $1 }
             let base = Int((sounds.keys.compactMap { newest[$0] }.max() ?? 0).rounded(.up))
-            func noise(seed start: UInt64) -> [Float] {
-                var seed = start
-                return (0..<(15 * rate)).map { _ -> Float in
-                    seed = seed &* 6_364_136_223_846_793_005 &+ 1_442_695_040_888_963_407
-                    return Float(Int64(bitPattern: seed >> 11) % 2001 - 1000) / 2000
-                }
-            }
-            func bursts(_ noise: [Float], phase: Int, slot: Int) -> [Float] {
-                noise.enumerated().map { (($0.offset + phase) / slot) % 3 == 0 ? $0.element : $0.element / 20 }
-            }
-            let speech = bursts(noise(seed: 7), phase: 0, slot: rate / 5)
-            let call = bursts(noise(seed: 991), phase: 3000, slot: rate / 4)
+            let speech = FedTables.bursts(seed: 7, phase: 0, slot: rate / 5)
+            let call = FedTables.bursts(seed: 991, phase: 3000, slot: rate / 4)
             for (uid, sound) in sounds {
-                let own = noise(seed: 100 + UInt64(uid.unicodeScalars.first!.value))
+                let first = UInt64(uid.unicodeScalars.first!.value)
+                let own = FedTables.noise(seed: 100 + first)
                 let (signal, lag): ([Float], Double) = switch sound {
                 case .speech(let lag): (speech, lag)
                 case .call(let lag): (call, lag)
-                case .noisySpeech(let lag): (zip(speech, own).map { $0 + 0.3 * $1 }, lag)
-                case .otherSpeech: (own.enumerated().map { sample in
-                    var slot = UInt64(sample.offset / (rate / 8)) &* 0x9E37_79B9_7F4A_7C15 &+ UInt64(uid.unicodeScalars.first!.value)
+                case .noisySpeech(let lag): (FedTables.cached("noisySpeech \(first)") { zip(speech, own).map { $0 + 0.3 * $1 } }, lag)
+                case .otherSpeech: (FedTables.cached("otherSpeech \(first)") { own.enumerated().map { sample in
+                    var slot = UInt64(sample.offset / (rate / 8)) &* 0x9E37_79B9_7F4A_7C15 &+ first
                     slot ^= slot >> 29
                     slot = slot &* 0xBF58_476D_1CE4_E5B9
                     slot ^= slot >> 32
                     return slot % 2 == 0 ? sample.element : sample.element / 20
-                }, 0)
-                case .quiet: (own.map { $0 / 1000 }, 0)
-                case .hum: ((0..<own.count).map { Float(0.5 * sin(2 * Double.pi * 50 * Double($0) / Double(rate))) }, 0)
+                } }, 0)
+                case .quiet: (FedTables.cached("quiet \(first)") { own.map { $0 / 1000 } }, 0)
+                case .hum: (FedTables.cached("hum") { (0..<own.count).map { Float(0.5 * sin(2 * Double.pi * 50 * Double($0) / Double(rate))) } }, 0)
                 case .noise: (own, 0)
                 }
                 let shift = Int((lag * Double(rate)).rounded())
@@ -687,9 +700,10 @@ extension GlobalRecordingLog {
             #expect(!log.contains("starts over"))
         }
 
-        /// A reference that stops matching before the sync is established moves to an input the others count against
-        /// (of those that tie, the lowest number), which becomes the new anchor, every input starting over (D89).
-        @Test func aReferenceMissBeforeTheSyncIsEstablishedMovesToAProvenInput() async throws {
+        /// A reference that stops matching while no input but the anchor is matched twice moves to an unsynced input
+        /// the others count against (of those that tie, the lowest number), which becomes the new anchor, every input
+        /// starting over (D89, D90).
+        @Test func aReferenceMissBeforeTheSyncMovesToAProvenInputStartingOver() async throws {
             try await startInputs(["R", "A", "B"])
             try feed(["R": .speech(0), "A": .quiet, "B": .quiet])
             await recorder.measureAudioDelays()
@@ -707,9 +721,10 @@ extension GlobalRecordingLog {
             #expect(log.contains("reference \(r) → \(a): moved on a reference miss, so it is the new anchor and every input starts over"), "\(log)")
         }
 
-        /// One counted window, as a burst on the dock gives, does not establish the
-        /// sync; when the reference then hums, the microphones prove one of them and all end synced (D89).
-        @Test func aSingleCountedWindowDoesNotEstablishTheSync() async throws {
+        /// The reference matches once, as a burst on the dock gives, then hums: the microphones prove input 2,
+        /// synced by that one window, and the reference moves to it keeping every audio delay; all end synced
+        /// against input 1, the anchor (D90).
+        @Test func aReferenceThatHumsAfterOneMatchHandsOnToTheSyncedInput() async throws {
             try await startInputs(["R", "A", "B", "C"])
             try feed(["R": .speech(0), "A": .speech(0.3), "B": .quiet, "C": .quiet])
             await recorder.measureAudioDelays()
@@ -717,11 +732,16 @@ extension GlobalRecordingLog {
                 try feed(["R": .hum, "A": .speech(0.3), "B": .speech(0.1), "C": .speech(0.2)])
                 await recorder.measureAudioDelays()
             }
+            let (r, a) = (try fileName(of: "R"), try fileName(of: "A"))
             _ = await stop()
-            #expect(try delays(of: "A") == [0])
-            let (b, c) = (try delays(of: "B"), try delays(of: "C"))
-            #expect(b.count == 1 && abs((b.first ?? 0) + 0.2) < 0.002, "\(b)")
-            #expect(c.count == 1 && abs((c.first ?? 0) + 0.1) < 0.002, "\(c)")
+            #expect(try delays(of: "R") == [0])
+            for (uid, expected) in [("A", 0.3), ("B", 0.1), ("C", 0.2)] {
+                let listed = try delays(of: uid)
+                #expect(listed.count == 1 && abs((listed.first ?? 0) - expected) < 0.002, "\(uid) \(listed)")
+            }
+            let log = try recordingLog()
+            #expect(log.contains("reference \(r) → \(a): lags re-based onto the anchor by 300 ms late"), "\(log)")
+            #expect(!log.contains("starts over"))
         }
 
         /// Input 1's talker starts after 30 s, input 2 has noisy speech all along,
@@ -773,26 +793,28 @@ extension GlobalRecordingLog {
             #expect(!(try recordingLog()).contains("reference "))
         }
 
-        /// Two counted windows establish the sync: the reference then goes quiet while two synced inputs share speech,
-        /// and nothing moves, as before D89.
-        @Test func aReferenceMissOnceTheSyncIsEstablishedMovesNothing() async throws {
+        /// The reference goes quiet after the sync while two synced inputs share speech: it moves to the lower
+        /// numbered of them, re-based, and every audio delay stays (D90).
+        @Test func aReferenceMissAfterTheSyncMovesToASyncedInputKeepingEveryAudioDelay() async throws {
             try await startInputs(["R", "A", "B"])
             try feed(["R": .speech(0), "A": .speech(0.5), "B": .speech(0.2)])
             for _ in 0..<2 { await recorder.measureAudioDelays() }
             try feed(["R": .quiet, "A": .speech(0.5), "B": .speech(0.2)])
             for _ in 0..<2 { await recorder.measureAudioDelays() }
+            let (r, a) = (try fileName(of: "R"), try fileName(of: "A"))
             _ = await stop()
             #expect(try delays(of: "R") == [0])
-            let delaysOfA = try delays(of: "A")
+            let (delaysOfA, delaysOfB) = (try delays(of: "A"), try delays(of: "B"))
             #expect(delaysOfA.count == 1 && abs((delaysOfA.first ?? 0) - 0.5) < 0.002, "\(delaysOfA)")
+            #expect(delaysOfB.count == 1 && abs((delaysOfB.first ?? 0) - 0.2) < 0.002, "\(delaysOfB)")
             let log = try recordingLog()
-            #expect(!log.contains("no counted window against it"), "\(log)")
+            #expect(log.contains("reference \(r) → \(a): lags re-based onto the anchor by 500 ms late"), "\(log)")
             #expect(!log.contains("starts over"))
         }
 
-        /// A measurement taken against a reference that moved while it ran counts nothing (D89): before the sync is
-        /// established, two measurements run against a quiet R at once; the first proves A and moves the reference, B
-        /// syncing against A at once; the second, against R, moves nothing more.
+        /// A measurement taken against a reference that moved while it ran counts nothing (D89): two measurements run
+        /// against a quiet R at once; the first proves A and moves the reference, B syncing against A at once; the
+        /// second, against R, moves nothing more.
         @Test func aMeasurementAgainstAReferenceThatMovedCountsNothing() async throws {
             try await startInputs(["R", "A", "B"])
             try feed(["R": .quiet, "A": .speech(0.5), "B": .speech(0.2)])
@@ -809,9 +831,10 @@ extension GlobalRecordingLog {
             #expect(delaysOfB.count == 1 && abs((delaysOfB.first ?? 0) + 0.3) < 0.002, "\(delaysOfB)")
         }
 
-        /// A known cost (D89): two inputs carrying one call's audio beside a room that is
-        /// quiet for the first 20 s take the reference and establish the sync, so the room's microphones, speaking
-        /// later, never sync. The audio mode Wired, the default, records no virtual input but the default microphone.
+        /// A known cost (D89, D90): two inputs carrying one call's audio beside a room that is quiet for the first 20 s
+        /// take the reference, the second matching it every time, so there is no miss and the room's microphones,
+        /// speaking later, never sync. The audio mode Wired, the default, records no virtual input but the default
+        /// microphone.
         @Test func twoInputsOfOneCallTakeTheReferenceBeforeTheRoomSpeaks() async throws {
             try await startInputs(["R", "M", "N", "A", "B"])
             for _ in 0..<2 {
@@ -859,10 +882,10 @@ extension GlobalRecordingLog {
             #expect(try recordingLog().contains("moved on a reference miss"))
         }
 
-        /// The owner's Mac, 2026-11-26: before the sync is established, a healthy reference whose window falls just
-        /// short once while two other inputs match moves too, a known cost (D89): the old anchor syncs against the
-        /// new one at the next measurement, and every audio delay is kept.
-        @Test func aHealthyReferenceThatMissesOnceMovesAndSyncsAgain() async throws {
+        /// The owner's Mac, 2026-11-26: a healthy reference whose window falls just short once while two synced
+        /// inputs match hands on to one of them, re-based: nothing starts over, and the old reference, the anchor,
+        /// measured against the new one from then on, stays synced at 0 (D90).
+        @Test func aHealthyReferenceThatMissesOnceKeepsEverySync() async throws {
             try await startInputs(["R", "A", "B"])
             try feed(["R": .speech(0.4), "A": .speech(0), "B": .speech(0.014)])
             await recorder.measureAudioDelays()
@@ -874,11 +897,34 @@ extension GlobalRecordingLog {
             }
             let (r, a) = (try fileName(of: "R"), try fileName(of: "A"))
             _ = await stop()
-            #expect(try recordingLog().contains("reference \(r) → \(a): moved on a reference miss"))
-            let (delaysOfR, delaysOfB) = (try delays(of: "R"), try delays(of: "B"))
-            #expect(delaysOfR.count == 1 && abs((delaysOfR.first ?? 0) - 0.4) < 0.002, "\(delaysOfR)")
-            #expect(delaysOfB.count == 1 && abs((delaysOfB.first ?? 0) - 0.014) < 0.002, "\(delaysOfB)")
-            #expect(try delays(of: "A") == [0])
+            let log = try recordingLog()
+            #expect(log.contains("reference \(r) → \(a): lags re-based onto the anchor by 400 ms early"), "\(log)")
+            #expect(!log.contains("starts over"))
+            let (delaysOfA, delaysOfB) = (try delays(of: "A"), try delays(of: "B"))
+            #expect(delaysOfA.count == 1 && abs((delaysOfA.first ?? 0) + 0.4) < 0.002, "\(delaysOfA)")
+            #expect(delaysOfB.count == 1 && abs((delaysOfB.first ?? 0) + 0.386) < 0.002, "\(delaysOfB)")
+            #expect(try delays(of: "R") == [0])
+        }
+
+        /// The anchor's file, measured after a re-base, keeps its 0 for the stretch it was the reference: Stop's
+        /// hindsight splits it where it began to be measured against the new reference (D85, D90). A is 0.5 late,
+        /// then 0.3: R, measured against A from its base of 0.5, is then 0.2 late.
+        @Test func theAnchorsStretchAsTheReferenceKeepsItsZeroAfterARebase() async throws {
+            try await startInputs(["R", "A", "B"])
+            for _ in 0..<3 {
+                try feed(["R": .speech(0), "A": .speech(0.5), "B": .speech(0.2)])
+                await recorder.measureAudioDelays()
+            }
+            try feed(["R": .quiet, "A": .speech(0.3), "B": .speech(0.2)])
+            await recorder.measureAudioDelays()
+            for _ in 0..<4 {
+                try feed(["R": .speech(0), "A": .speech(0.3), "B": .speech(0.2)])
+                await recorder.measureAudioDelays()
+            }
+            _ = await stop()
+            let entries = try #require(try manifestOnDisk().audioFiles.last { $0.audioSourceUID == "R" }?.delays)
+            #expect(entries.count == 2 && entries.first == .init(at: 0, delay: 0), "\(entries)")
+            #expect(entries.count == 2 && entries[1].at > 0 && abs(entries[1].delay - 0.2) < 0.002, "\(entries)")
         }
 
         /// The reference muted while two inputs have an audio delay: the lower-numbered one takes it (D80, D85).
@@ -983,7 +1029,6 @@ extension GlobalRecordingLog {
             try feedDelayedNoise(["R": 0, "A": 0.5, "B": 0.2])
             await recorder.measureAudioDelays()
             #expect(try delays() == measured)
-            #expect(leavesOfTheGuideTrack() == 0)
             _ = await stop()
         }
 
@@ -1181,14 +1226,17 @@ extension GlobalRecordingLog {
             try await startAudioFiles(uids)
         }
 
-        /// An input early against the others beyond the limit leaves too, its line saying so (D79).
-        @Test func anAudioInputEarlyLeavesTheGuideTrackSayingSo() async throws {
+        /// An input early against the others beyond the limit is not mixed either, its row saying so (D90).
+        @Test func anAudioInputEarlyBeyondTheLimitIsNotMixedItsRowSayingSo() async throws {
             try await startInputs(["R", "A", "B"])
+            let a = SourceLabel.audioInput(2, name: "Mic A")
             try feedDelayedNoise(["R": 0, "A": -0.9, "B": 0])
             await recorder.measureAudioDelays()
-            try await wait("A out of the guide track") { leavesOfTheGuideTrack() == 1 }
-            #expect(recorder.problemLines().map(\.text) == [
-                "Audio 2 Mic A 900 ms early, not in the guide track; its own audio track is recorded"])
+            try sendNext(0.1, buffers: 3, to: sources.last(of: "A"))
+            try await Task.sleep(for: .milliseconds(50))
+            #expect(!isInTheGuideTrack(a))
+            #expect(rowText(of: "A")?.hasSuffix("not in the guide track, 900 ms from the others") == true, "\(String(describing: rowText(of: "A")))")
+            #expect(recorder.problemLines().isEmpty)
             _ = await stop()
         }
 
@@ -1215,119 +1263,31 @@ extension GlobalRecordingLog {
 
         private func isInTheGuideTrack(_ label: String) -> Bool { recorder.guides.isMixed(source: label, in: .audioInputs) }
 
-        private func leavesOfTheGuideTrack() -> Int {
-            (try? manifestOnDisk().events.filter { $0.event == .audioInputLeftTheGuideTrack }.count) ?? 0
+        /// The status window's audio delay cell, after the clock drift, of the input `uid`.
+        private func rowText(of uid: String) -> String? {
+            recorder.status().rows.first { $0.audioSource == .input(uid) }?.clockDrift
         }
 
-        /// An input whose first counted window puts it 0.9 s after the reference leaves the "Audio inputs" guide
-        /// track: the event, an orange line without a Dock bounce, badge or count, its own file going on; its
-        /// file's end turns the line to the past, and its next file, carrying its audio delay over, is out
-        /// at once (D79, D80).
-        @Test func anAudioInputOutOfSyncLeavesTheGuideTrackUntilItsFileEnds() async throws {
+        /// An input whose first counted window puts it 0.9 s after the reference is not mixed in the "Audio inputs"
+        /// guide track, its own file going on: its row says so, and there is no event, no problem line, no Dock
+        /// bounce, badge or count; its next file, carrying its audio delay over, is not mixed either (D90).
+        @Test func anAudioInputBeyondTheLimitIsNotMixedOnlyItsRowSayingSo() async throws {
             let (r, a) = try await startTwoInputs()
             #expect(!isInTheGuideTrack(a))
             try feedDelayedNoise(["R": 0, "A": 0.9])
             await recorder.measureAudioDelays()
-            // More of its sound changes nothing: it stays out.
-            try await wait("A out of the guide track") {
-                try? sendNext(0.1, buffers: 1, to: sources.last(of: "A"))
-                return leavesOfTheGuideTrack() == 1
-            }
             try sendNext(0.1, buffers: 3, to: sources.last(of: "A"))
             try await Task.sleep(for: .milliseconds(50))
             #expect(!isInTheGuideTrack(a))
             #expect(isInTheGuideTrack(r))
-            let left = try manifestOnDisk().events.filter { $0.event == .audioInputLeftTheGuideTrack }
-            #expect(left.map(\.audioSource) == ["Mic A"])
-            #expect(abs(try #require(left.first?.offset) - 0.9) < 0.002)
-            #expect(recorder.problemLines() == [ProblemLine(
-                text: "Audio 2 Mic A 900 ms late, not in the guide track; its own audio track is recorded", isRed: false)])
-            #expect(try manifestOnDisk().problems.map(\.problem) == ["Audio source Mic A"])
-            #expect(observer.problems.isEmpty)
-            #expect(try manifestOnDisk().audioFiles.allSatisfy { $0.end == nil })
-
-            try #require(sources.last(of: "A")).lose(.captureFailed("the stand-in failed"))
-            try await wait("A's file's end") { (try? manifestOnDisk().audioFiles.first { $0.audioSource == "Mic A" }?.end) != nil }
-            let past = try #require(recorder.problemLines().first { $0.text.hasPrefix("Audio 2 Mic A") })
-            #expect(past.text.wholeMatch(of: /Audio 2 Mic A was not in the guide track from \d+:\d\d to \d+:\d\d \(900 ms late\); its own audio track is recorded/) != nil)
-            #expect(!past.isRed)
-            try await wait("A's restart") { sources.byUID.withLock { $0["A"]?.count } == 2 }
-            try await startAudioFiles(["A"], "A's new file", count: 3)
-            try await wait("A's new file out of the guide track") { leavesOfTheGuideTrack() == 2 }
-            try sendNext(0.1, buffers: 3, to: sources.last(of: "A"))
-            try await Task.sleep(for: .milliseconds(50))
-            #expect(!isInTheGuideTrack(a))
-            _ = await stop()
-        }
-
-        /// A false first counted window takes an input out; the median of its first 3 counted windows in sync
-        /// brings it back, the line turning to the past; the median of the latest minute late again takes it
-        /// out again, told again (D79, D80).
-        @Test func anAudioInputOutOnAFalseFirstWindowRejoinsOnItsMedianAndLeavesAgainOnIt() async throws {
-            let (_, a) = try await startTwoInputs()
-            try feedDelayedNoise(["R": 0, "A": 0.9])
-            await recorder.measureAudioDelays()
-            try await wait("A out of the guide track") { leavesOfTheGuideTrack() == 1 }
-            try feedDelayedNoise(["R": 0, "A": 0])
-            for _ in 0..<3 { await recorder.measureAudioDelays() }
-            try await wait("A back in the guide track") {
-                try? sendNext(0.1, buffers: 1, to: sources.last(of: "A"))
-                return isInTheGuideTrack(a)
-            }
-            let line = try #require(recorder.problemLines().first)
-            #expect(line.text.wholeMatch(of: /Audio 2 Mic A was not in the guide track from \d+:\d\d to \d+:\d\d \(900 ms late\); its own audio track is recorded/) != nil)
-            #expect(try manifestOnDisk().events.filter { $0.event == .audioInputLeftTheGuideTrack }.count == 1)
-            // Late again: once its median is out, it leaves again, told again; the line shows the latest time.
-            try feedDelayedNoise(["R": 0, "A": 0.9])
-            for _ in 0..<3 { await recorder.measureAudioDelays() }
-            try await wait("A out of the guide track again") { !isInTheGuideTrack(a) }
-            let left = try manifestOnDisk().events.filter { $0.event == .audioInputLeftTheGuideTrack }
-            #expect(left.count == 2)
-            let problems = try manifestOnDisk().problems.filter { $0.error?.hasPrefix("audio input left the guide track") == true }
-            #expect(problems.count == 2)
-            let offset = try #require(left.last?.offset)
-            #expect(recorder.problemLines().map(\.text) == [
-                "Audio 2 Mic A \(AudioDelay.text(offset)), not in the guide track; its own audio track is recorded"])
-            try #require(sources.last(of: "A")).lose(.captureFailed("the stand-in failed"))
-            try await wait("A's file's end") { (try? manifestOnDisk().audioFiles.first { $0.audioSource == "Mic A" }?.end) != nil }
-            let seconds = Int(try #require(left.last?.at))
-            let from = "\(seconds / 60):" + String(format: "%02d", seconds % 60)
-            let past = try #require(recorder.problemLines().first { $0.text.hasPrefix("Audio 2 Mic A") })
-            #expect(past.text.hasPrefix("Audio 2 Mic A was not in the guide track from \(from) to "))
-            #expect(past.text.hasSuffix(" (\(AudioDelay.text(offset))); its own audio track is recorded"))
-            _ = await stop()
-        }
-
-        /// A leave its capture did not carry out, as for a file no longer its current one, is neither an event
-        /// nor a problem, only a detail line (D79).
-        @Test func aLeaveTheCaptureDidNotCarryOutIsNotTold() async throws {
-            _ = try await startTwoInputs()
-            try #require(sources.last(of: "A")).lose(.captureFailed("the stand-in failed"))
-            try await wait("A's restart") { sources.byUID.withLock { $0["A"]?.count } == 2 }
-            try await startAudioFiles(["A"], "A's new file", count: 3)
-            let first = try #require(try manifestOnDisk().audioFiles.first { $0.audioSource == "Mic A" })
-            recorder.leaveTheGuideTrack(file: first.name, offset: 0.5)
+            #expect(rowText(of: "A")?.hasSuffix("not in the guide track, 900 ms from the others") == true, "\(String(describing: rowText(of: "A")))")
             #expect(try manifestOnDisk().events.filter { $0.event == .audioInputLeftTheGuideTrack }.isEmpty)
-            #expect(!recorder.problemLines().contains { $0.text.hasPrefix("Audio 2 Mic A") })
-            _ = await stop()
-            let log = try String(contentsOf: recorder.folder.appending(path: RecordingNames.recordingLog), encoding: .utf8)
-            #expect(log.contains("\(first.name): its capture did not take the leave, the file no longer its current one"))
-        }
+            #expect(recorder.problemLines().isEmpty)
+            #expect(try manifestOnDisk().problems.isEmpty)
+            #expect(observer.problems.isEmpty)
+            let delaysOfA = try delays(of: "A")
+            #expect(delaysOfA.count == 1 && abs((delaysOfA.first ?? 0) - 0.9) < 0.002, "\(delaysOfA)")
 
-        /// An input placed in the guide track that left it stays out with its next file while its capture goes
-        /// on, its file ending here on no audio: its next file carries its audio delay over, no new leave is
-        /// told, and its line stays current (D80).
-        @Test func anAudioInputThatLeftTheGuideTrackStaysOutWithItsNextFile() async throws {
-            let (_, a) = try await startTwoInputs()
-            try feedDelayedNoise(["R": 0, "A": 0.5])
-            await recorder.measureAudioDelays()
-            try await wait("A in the guide track") {
-                try? sendNext(0.1, buffers: 1, to: sources.last(of: "A"))
-                return isInTheGuideTrack(a)
-            }
-            try feedDelayedNoise(["R": 0, "A": 0.9])
-            for _ in 0..<2 { await recorder.measureAudioDelays() }
-            try await wait("A out of the guide track") { leavesOfTheGuideTrack() == 1 }
             let buffersOfNoAudio = Int(RecorderValues.noAudioTime.nanoseconds * Int64(RecorderValues.audioSampleRate) / 1_000_000_000)
                 / samplesPerBuffer
             try sendNext(0, buffers: buffersOfNoAudio + 10, to: sources.last(of: "A"))
@@ -1337,12 +1297,34 @@ extension GlobalRecordingLog {
             try sendNext(0.1, buffers: 3, to: sources.last(of: "A"))
             try await Task.sleep(for: .milliseconds(50))
             #expect(!isInTheGuideTrack(a))
-            #expect(leavesOfTheGuideTrack() == 1)
-            #expect(recorder.problemLines().map(\.text) == [
-                "Audio 2 Mic A 900 ms late, not in the guide track; its own audio track is recorded"])
-            let next = try #require(try manifestOnDisk().audioFiles.last { $0.audioSource == "Mic A" })
-            #expect(next.delays.map(\.at) == [0])
-            #expect(sources.byUID.withLock { $0["A"]?.count } == 1)
+            #expect(rowText(of: "A")?.hasSuffix("not in the guide track, 900 ms from the others") == true, "\(String(describing: rowText(of: "A")))")
+            #expect(recorder.problemLines().isEmpty)
+            _ = await stop()
+            let log = try recordingLog()
+            #expect(log.contains(": not in the guide track with the carried-over audio delay"), "\(log)")
+        }
+
+        /// A false first counted window leaves an input unmixed; the median of its first 3 counted windows in sync
+        /// mixes it, and the median of the latest minute late again unmixes it, each time without a problem (D90).
+        @Test func anAudioInputUnmixedOnAFalseFirstWindowIsMixedOnceItsMedianFits() async throws {
+            let (_, a) = try await startTwoInputs()
+            try feedDelayedNoise(["R": 0, "A": 0.9])
+            await recorder.measureAudioDelays()
+            try feedDelayedNoise(["R": 0, "A": 0])
+            for _ in 0..<3 { await recorder.measureAudioDelays() }
+            try await wait("A in the guide track") {
+                try? sendNext(0.1, buffers: 1, to: sources.last(of: "A"))
+                return isInTheGuideTrack(a)
+            }
+            #expect(rowText(of: "A")?.hasSuffix("synced 0 ms") == true, "\(String(describing: rowText(of: "A")))")
+            try feedDelayedNoise(["R": 0, "A": 0.9])
+            for _ in 0..<3 { await recorder.measureAudioDelays() }
+            try await wait("A out of the guide track again") {
+                try? sendNext(0.1, buffers: 1, to: sources.last(of: "A"))
+                return !isInTheGuideTrack(a)
+            }
+            #expect(recorder.problemLines().isEmpty)
+            #expect(try manifestOnDisk().problems.isEmpty)
             _ = await stop()
         }
 
@@ -1386,20 +1368,19 @@ extension GlobalRecordingLog {
                 == ["Mic R": [0], "Mic A": []])
         }
 
-        /// A video file's writer failure and a full disk reach the window's lines, red until a new file of the
-        /// camera starts or there is room (D78).
+        /// A video file's writer failure not recovered within `unrecoveredAfter` and a full disk reach the window's
+        /// lines (D78, D91).
         @Test(arguments: [
             (VideoStreamEnd.writerFailed("cannot write c.mov"), "Camera 1 Stand-in camera not captured since "),
             (.diskFull, "Disk full since "),
         ])
-        func aCameraFileEndedByItsWriterOrAFullDiskIsARedLine(end: VideoStreamEnd, line: String) async throws {
+        func aCameraFileEndedByItsWriterOrAFullDiskIsALine(end: VideoStreamEnd, line: String) async throws {
             cameras.connected.withLock { $0 = [Self.camera] }
-            try start(cameraMode: .real)
+            try start(cameraMode: .real, unrecoveredAfter: .milliseconds(300))
             let camera = try #require(cameras.last)
             try await sendFrames(camera, until: "the camera file") { (try? manifestOnDisk().cameraFiles.count) == 1 }
             camera.lose(end)
-            try await wait("the line") { recorder.problemLines().first?.text.hasPrefix(line) == true }
-            #expect(recorder.problemLines().first?.isRed == true)
+            try await wait("the line") { recorder.problemLines().first?.hasPrefix(line) == true }
             _ = await stop()
         }
 
@@ -1431,12 +1412,18 @@ extension GlobalRecordingLog {
             let camera = try #require(cameras.last)
             camera.stopTakes.withLock { $0 = .seconds(1) }
             try await sendFrames(camera, until: "the camera file") { (try? manifestOnDisk().cameraFiles.count) == 1 }
-            let asked = recorder.elapsedSeconds
+            let before = recorder.elapsedSeconds
+            // The time a busy machine takes between a test's clock reading and the recorder's.
+            try await Task.sleep(for: .milliseconds(100))
             let summary = await stop()
-            #expect(recorder.elapsedSeconds - asked >= 1)
+            let stopped = recorder.elapsedSeconds
             let end = try #require(summary.manifest.cameraFiles.first?.end)
-            #expect(end <= asked + 1.0 / 30)
-            #expect(end > asked - 0.2)
+            // The recorder asked at or before `stopped - 1`, the stream stopping one second after;
+            // the file's last tick is at or before that, and the file ends one frame duration later.
+            // A file that ended when the stream stopped, or repeated its last frame for the wait,
+            // ends after that.
+            #expect(end <= stopped - 1 + 1.0 / 30)
+            #expect(end > before - 0.2)
         }
 
         @Test func atSleepTheCameraFileEndsAndAtWakeANewOneStarts() async throws {
@@ -1566,8 +1553,9 @@ extension GlobalRecordingLog {
             #expect(stalledRow.details.contains("\nThis file so far: "))
             #expect(recorder.status().rows.allSatisfy { $0.details.hasPrefix($0.source.text) })
             #expect(observer.problems.map(\.problem.text) == ["Camera Stand-in camera: camera stalled: \(CameraTracker.stalledError.text)"])
-            // Nothing a person can do about a stall: no call to action (D84).
+            // Nothing a person can do about a stall: no call to action, no line (D84, D91).
             #expect(observer.callsToAction.isEmpty)
+            #expect(recorder.problemLines().isEmpty)
             try await sendFrames(camera, until: "the stall's end") { (try? manifestOnDisk().events.count) == 2 }
             let ended = try #require(try manifestOnDisk().events.last)
             #expect(ended.event == .cameraStallEnded)
@@ -1577,25 +1565,57 @@ extension GlobalRecordingLog {
             #expect(cameras.opened.withLock { $0.count } == 1)
             #expect(summary.manifest.cameraFiles.map(\.state) == [.finalized])
             #expect(summary.manifest.problems.count == 1)
-            // A stall loses picture (D47), but asks for no report (D84).
-            #expect(summary.manifest.result == .problems)
-            #expect(summary.endedWithError && !summary.asksToReportIt)
+            // A stall that ended calls to no action: the result is ok, and it asks for no report (D84, D91).
+            #expect(summary.manifest.result == .ok)
+            #expect(!summary.endedWithError && !summary.asksToReportIt)
+            #expect(try recordingLog().contains("camera stalled"))
+            #expect(summary.whatWentWrong.isEmpty)
         }
 
-        /// A stalled camera unplugged: its stall ends there, then disconnected, orange (D78).
-        @Test func aStalledCameraUnpluggedEndsItsStallLine() async throws {
+        /// A camera's stall ends when its frames come again, or with its capture when it is unplugged, and a
+        /// stall after that is told again: two problems in `recording.json` and the recording log (D46, D91).
+        @Test(arguments: [false, true])
+        func aCameraThatStallsAgainIsToldAgain(unplugged: Bool) async throws {
+            cameras.connected.withLock { $0 = [Self.camera] }
+            try start(cameraMode: .real, cameraFrameWatch: Self.quickFrameWatch)
+            let first = try #require(cameras.last)
+            func stalls() -> Int {
+                (try? manifestOnDisk().problems.filter { $0.text.hasPrefix("Camera Stand-in camera: camera stalled") }.count) ?? 0
+            }
+            try await sendFrames(first, until: "the camera file") { (try? manifestOnDisk().cameraFiles.count) == 1 }
+            try await wait("the stall") { stalls() == 1 }
+            if unplugged {
+                cameras.connected.withLock { $0 = [] }
+                recorder.camerasChanged()
+                try await wait("the capture's end") { first.isStopped }
+                cameras.connected.withLock { $0 = [Self.camera] }
+                recorder.camerasChanged()
+                try await wait("the camera again") { cameras.opened.withLock { $0.count } == 2 }
+                try await sendFrames(try #require(cameras.last), until: "the second camera file") {
+                    (try? manifestOnDisk().cameraFiles.count) == 2
+                }
+            } else {
+                try await sendFrames(first, until: "the stall's end") {
+                    (try? manifestOnDisk().events.contains { $0.event == .cameraStallEnded }) == true
+                }
+            }
+            try await wait("the second stall") { stalls() == 2 }
+            _ = await stop()
+            let log = try recordingLog()
+            #expect(log.components(separatedBy: " problem: Camera Stand-in camera: camera stalled").count - 1 == 2, "\(log)")
+        }
+
+        /// A stalled camera shows no line, unplugged too (D91).
+        @Test func aStalledCameraShowsNoLine() async throws {
             cameras.connected.withLock { $0 = [Self.camera] }
             try start(cameraMode: .real, cameraFrameWatch: Self.quickFrameWatch)
             let camera = try #require(cameras.last)
             try await sendFrames(camera, until: "the camera file") { (try? manifestOnDisk().cameraFiles.count) == 1 }
             try await wait("the stall") { (try? manifestOnDisk().events.map(\.event)) == [.cameraStalled] }
-            #expect(recorder.problemLines().map(\.text) == ["Camera 1 Stand-in camera stalled since 0:00"])
+            #expect(recorder.problemLines().isEmpty)
             cameras.connected.withLock { $0 = [] }
             recorder.camerasChanged()
-            let line = try #require(recorder.problemLines().first)
-            #expect(line.text.hasPrefix("Camera 1 Stand-in camera stalled "))
-            #expect(line.text.hasSuffix(" s at 0:00, then disconnected"))
-            #expect(!line.isRed)
+            #expect(recorder.problemLines().isEmpty)
             _ = await stop()
         }
 
@@ -1734,8 +1754,8 @@ extension GlobalRecordingLog {
             _ = await stop()
         }
 
-        /// A camera file a full disk cut short: its lost tail is a red line without a call to action of its own, and
-        /// the recording asks for no report (D84).
+        /// A camera file a full disk cut short: its lost tail has no call to action of its own, so no line, and the
+        /// recording asks for no report (D84, D91).
         @Test func aCameraFileAFullDiskCutShortAsksForNoReport() async throws {
             cameras.connected.withLock { $0 = [Self.camera] }
             try start(cameraMode: .real)
@@ -1745,8 +1765,7 @@ extension GlobalRecordingLog {
             recorder.cameraCaptureEnded(
                 uniqueID: "StandInCamera", captureNumber: 1, camera: "Stand-in camera", reason: .diskFull,
                 file: failedEnd(of: file, lost: "its last 2 s", isDiskFull: true))
-            let lost = try #require(recorder.problemLines().first { $0.text.hasPrefix("File \(file.name) incomplete") })
-            #expect(lost.isRed)
+            #expect(!recorder.problemLines().contains { $0.hasPrefix("File \(file.name) incomplete") })
             #expect(observer.callsToAction.allSatisfy { !$0.problem.contains("incomplete") && !$0.problem.contains("its last 2 s") })
             #expect(observer.callsToAction.count == 1)
             let summary = await stop()
@@ -1755,7 +1774,7 @@ extension GlobalRecordingLog {
         }
 
         /// A failure of a camera's file, reported after a newer file of the camera started, is over when
-        /// told: orange at once (D78).
+        /// told: no line (D78, D91).
         @Test func aCameraFileFailureReportedAfterANewerFileIsOverAtOnce() async throws {
             cameras.connected.withLock { $0 = [Self.camera] }
             try start(cameraMode: .real)
@@ -1769,14 +1788,12 @@ extension GlobalRecordingLog {
             recorder.cameraCaptureEnded(
                 uniqueID: "StandInCamera", captureNumber: 1, camera: "Stand-in camera", reason: .writerFailed("cannot write"),
                 file: failedEnd(of: file))
-            let line = try #require(recorder.problemLines().first { $0.text.hasPrefix("Camera 1 Stand-in camera not captured") })
-            #expect(line.text.contains(", recovered: "))
-            #expect(!line.isRed)
+            #expect(!recorder.problemLines().contains { $0.hasPrefix("Camera 1 Stand-in camera not captured") })
             _ = await stop()
         }
 
-        /// A failure of a camera's file reported after the camera was unplugged ends at once, then disconnected;
-        /// the part of the file lost is a red line of its own (D78).
+        /// A failure of a camera's file reported after the camera was unplugged ends at once, no line; the part of
+        /// the file lost is a line of its own: report it (D78, D91).
         @Test func aCameraFileFailureReportedAfterItsCameraWentIsOverAndItsLostPartRed() async throws {
             _ = try await recordThenStop(nil)
             try await wait("the file's end") { (try? manifestOnDisk().cameraFiles.first?.state) == .finalized }
@@ -1785,32 +1802,30 @@ extension GlobalRecordingLog {
                 uniqueID: "StandInCamera", captureNumber: 1, camera: "Stand-in camera", reason: .writerFailed("cannot write"),
                 file: failedEnd(of: file, lost: "its last 2 s"))
             let lines = recorder.problemLines()
-            let lost = try #require(lines.first { $0.text.hasPrefix("File \(file.name) incomplete since ") })
-            #expect(lost.isRed)
-            let failure = try #require(lines.first { $0.text.hasPrefix("Camera 1 Stand-in camera not captured") })
-            #expect(failure.text.contains(", then disconnected: "))
-            #expect(!failure.isRed)
+            #expect(lines.contains { $0.hasPrefix("File \(file.name) incomplete since ") })
+            #expect(!lines.contains { $0.hasPrefix("Camera 1 Stand-in camera not captured") })
             _ = await stop()
         }
 
-        /// A full disk is red until the free space check finds room (D78).
+        /// A full disk lasts until the free space check finds room (D78).
         @Test func aFullDiskEndsOnceThereIsRoom() async throws {
             cameras.connected.withLock { $0 = [Self.camera] }
             try start(cameraMode: .real)
             let camera = try #require(cameras.last)
             try await sendFrames(camera, until: "the camera file") { (try? manifestOnDisk().cameraFiles.count) == 1 }
             camera.lose(.diskFull)
-            try await wait("the line") { recorder.problemLines().first?.text.hasPrefix("Disk full since ") == true }
-            #expect(recorder.problemLines().first?.isRed == true)
+            try await wait("the line") { recorder.problemLines().first?.hasPrefix("Disk full since ") == true }
             // The next free space check, at most 5 s on.
-            try await wait("the room", seconds: 7) { recorder.problemLines().first { $0.text.hasPrefix("Disk full ") }?.isRed == false }
+            try await wait("the room", seconds: 7) {
+                recorder.problemLines().first { $0.hasPrefix("Disk full ") }?.contains(", recovered") == true
+            }
             _ = await stop()
         }
 
         /// Two audio inputs of the same name: a new file of one ends only its own failed files' lines (D78).
         @Test func aNewAudioFileEndsOnlyItsOwnInputsFailedFiles() async throws {
             let inputs = ["X", "Y"].map { AudioInputInfo(name: "Mic", channelCount: 1, isDefault: $0 == "X", transport: .usb, uid: $0) }
-            try start(inputs: inputs)
+            try start(inputs: inputs, unrecoveredAfter: .milliseconds(300))
             try await wait("the audio inputs' captures") { sources.byUID.withLock { $0.count } == 2 }
             try await startAudioFiles(["X", "Y"])
             let x = try #require(try manifestOnDisk().audioFiles.first { $0.audioSourceUID == "X" })
@@ -1818,12 +1833,11 @@ extension GlobalRecordingLog {
             try #require(sources.last(of: "Y")).lose(.captureFailed("the stand-in failed"))
             try await wait("Y's restart") { sources.byUID.withLock { $0["Y"]?.count } == 2 }
             try await startAudioFiles(["Y"], "Y's new file", count: 3)
-            let line = try #require(recorder.problemLines().first { $0.text.hasPrefix("File \(x.name) failed") })
-            #expect(line.isRed)
+            try await wait("X's line") { recorder.problemLines().contains { $0.hasPrefix("File \(x.name) failed since ") } }
             _ = await stop()
         }
 
-        /// A failure of an audio file reported after a newer file of its input started is over when told (D78).
+        /// A failure of an audio file reported after a newer file of its input started is over when told: no line (D78, D91).
         @Test func anAudioFileFailureReportedAfterANewerFileIsOverAtOnce() async throws {
             try start()
             try await startAudioFiles([uid])
@@ -1832,8 +1846,7 @@ extension GlobalRecordingLog {
             try await startAudioFiles([uid], "the new file", count: 2)
             let first = try #require(try manifestOnDisk().audioFiles.first)
             recorder.audioFileEnded(failedEnd(of: first))
-            let line = try #require(recorder.problemLines().first { $0.text.hasPrefix("File \(first.name) failed") })
-            #expect(!line.isRed)
+            #expect(!recorder.problemLines().contains { $0.hasPrefix("File \(first.name) failed") })
             _ = await stop()
         }
 
@@ -1843,22 +1856,6 @@ extension GlobalRecordingLog {
             file.end = file.end ?? file.start + 0.5
             file.state = .notFinalized
             return AudioFileEnd(file: file, error: AudioFileWriterError(nil, while: "cannot write \(file.name)"))
-        }
-
-        /// A stalled camera the recorder stops, here as it is suspended: its stall ends with its capture,
-        /// neither recovered nor disconnected (D78).
-        @Test func aStalledCameraStoppedEndsItsStallLine() async throws {
-            cameras.connected.withLock { $0 = [Self.camera] }
-            try start(cameraMode: .real, cameraFrameWatch: Self.quickFrameWatch)
-            let camera = try #require(cameras.last)
-            try await sendFrames(camera, until: "the camera file") { (try? manifestOnDisk().cameraFiles.count) == 1 }
-            try await wait("the stall") { (try? manifestOnDisk().events.map(\.event)) == [.cameraStalled] }
-            cameras.connected.withLock { $0 = [Self.suspended] }
-            recorder.camerasChanged()
-            let line = try #require(recorder.problemLines().first)
-            #expect(line.text.hasPrefix("Camera 1 Stand-in camera stalled "))
-            #expect(line.text.hasSuffix(" s at 0:00, stopped"))
-            _ = await stop()
         }
 
         /// The writer takes only decoded pictures; a frame without one ends the capture, never silently.
@@ -2011,9 +2008,9 @@ extension GlobalRecordingLog {
             #expect(recorder.meters().levels.isEmpty)
         }
 
-        /// No audio right after a gap is the input broken by it: a red line saying what to do, told as a
-        /// problem, orange in the past once its sound returns (D81).
-        @Test func noAudioRightAfterAGapIsARedProblemUntilTheSoundReturns() async throws {
+        /// No audio right after a gap is the input broken by it: a line saying what to do, told as a
+        /// problem, in the past once its sound returns (D81).
+        @Test func noAudioRightAfterAGapIsAProblemUntilTheSoundReturns() async throws {
             try start()
             let buffersOfNoAudio = Int(RecorderValues.noAudioTime.nanoseconds * Int64(RecorderValues.audioSampleRate) / 1_000_000_000)
                 / samplesPerBuffer
@@ -2023,15 +2020,13 @@ extension GlobalRecordingLog {
             try send(0, buffers: buffersOfNoAudio + 10, after: 13, from: origin)
             try await wait("the problem") { !observer.problems.isEmpty }
             #expect(try manifestOnDisk().events.map(\.event) == [.audioInputGap, .noAudioStarted])
-            #expect(recorder.problemLines() == [ProblemLine(
-                text: "Audio 1 \(name) sends only silence since its gaps at 0:00; unplug and plug it in again", isRed: true)])
+            #expect(recorder.problemLines() == ["Audio 1 \(name) sends only silence since its gaps at 0:00; unplug and plug it in again"])
             #expect(observer.callsToAction.map(\.problem) == ["The audio input \(name) sends only silence since its gaps at 0:00"])
             #expect(try manifestOnDisk().problems.map(\.problem) == ["The audio input \(name) sends only silence since its gaps at 0:00"])
             try send(0.25, buffers: 10, after: buffersOfNoAudio + 23, from: origin)
             try await wait("the sound") { recorder.status().rows.first?.state == "recording" }
             let past = try #require(recorder.problemLines().first)
-            #expect(!past.isRed)
-            #expect(past.text.wholeMatch(of: /Audio 1 .+ sent only silence for .+ after its gaps at 0:00, recovered/) != nil, "\(past.text)")
+            #expect(past.wholeMatch(of: /Audio 1 .+ sent only silence for .+ after its gaps at 0:00, recovered/) != nil, "\(past)")
             _ = await stop()
             let log = try String(contentsOf: recorder.folder.appending(path: RecordingNames.recordingLog), encoding: .utf8)
             #expect(log.contains("Audio 1 \(name): no audio since 0:00, right after its gap at 0:00: a red problem (D81)"))
@@ -2050,7 +2045,8 @@ extension GlobalRecordingLog {
             #expect(summary.asksToReportIt)
         }
 
-        /// A source captured again before `unrecoveredAfter` stays quiet, at Stop too (D84).
+        /// A source captured again before `unrecoveredAfter` stays quiet, at Stop too: no line, the result ok, but
+        /// its problem in the manifest and the recording log (D84, D91).
         @Test func aSourceCapturedAgainBeforeTheWaitStaysQuiet() async throws {
             try start(unrecoveredAfter: .seconds(60))
             try send(0.25, buffers: 2)
@@ -2062,9 +2058,14 @@ extension GlobalRecordingLog {
                 try? sendNext(0.25, buffers: 1, to: sources.last)
                 return (try? manifestOnDisk().audioFiles.count) == 2
             }
+            #expect(recorder.problemLines().isEmpty)
             let summary = await stop()
             #expect(observer.callsToAction.isEmpty)
             #expect(!summary.asksToReportIt)
+            #expect(summary.manifest.result == .ok)
+            #expect(summary.manifest.problems.map(\.problem) == ["The audio input \(name) failed"])
+            let log = try String(contentsOf: recorder.folder.appending(path: RecordingNames.recordingLog), encoding: .utf8)
+            #expect(log.contains("The audio input \(name) failed"))
         }
 
         /// A source still failing at Stop makes the recording ask to report it, without waiting for
@@ -2090,9 +2091,13 @@ extension GlobalRecordingLog {
             source.lose(.diskFull)
             try await wait("the problem") { !observer.problems.isEmpty }
             #expect(observer.callsToAction.map(\.problem) == ["The audio file of \(name) ended"])
-            #expect(recorder.problemLines().first?.text.hasPrefix("Disk full since ") == true)
+            #expect(recorder.problemLines().first?.hasPrefix("Disk full since ") == true)
+            // Free up disk space includes no report: no line naming the files for one (D91).
+            #expect(!recorder.problemsAskToReportIt)
             let summary = await stop()
+            #expect(summary.whatWentWrong.contains { $0.line.hasPrefix("Problem at ") && $0.line.contains("The audio file of \(name) ended") })
             #expect(!summary.problemsAskToReportIt)
+            #expect(summary.manifest.result == .problems)
         }
 
         /// An audio file whose writer failed because the disk is full is the full disk, free up disk space, told
@@ -2109,10 +2114,9 @@ extension GlobalRecordingLog {
             var end = AudioFileEnd(file: file, error: AudioFileWriterError(POSIXError(.ENOSPC), while: "cannot write \(file.name)"))
             end.lost = "its last 0.5 s were not written"
             recorder.audioFileEnded(end)
-            // Its lost tail is still a red line, but the full disk is the one call to action (D84).
+            // The full disk is the one call to action, its lost tail without a line (D84, D91).
             #expect(observer.callsToAction.map(\.problem) == ["The audio file of \(name) ended"])
-            #expect(recorder.problemLines().map(\.text).filter { $0.hasPrefix("File ") }.map { $0.hasPrefix("File \(file.name) incomplete") }
-                == [true])
+            #expect(!recorder.problemLines().contains { $0.hasPrefix("File ") })
             let summary = await stop()
             #expect(summary.manifest.audioFiles.map(\.state) == [.notFinalized])
             #expect(!summary.asksToReportIt)
@@ -2135,9 +2139,8 @@ extension GlobalRecordingLog {
                 try? sendNext(0.25, buffers: 1, to: sources.last)
                 return recorder.status().rows.first?.state == "recording"
             }
-            let past = try #require(recorder.problemLines().first { $0.text.hasPrefix("Audio 1") })
-            #expect(!past.isRed)
-            #expect(past.text.wholeMatch(of: /Audio 1 .+ sent only silence for .+ after its gaps at 0:00, stopped/) != nil, "\(past.text)")
+            let past = try #require(recorder.problemLines().first { $0.hasPrefix("Audio 1") })
+            #expect(past.wholeMatch(of: /Audio 1 .+ sent only silence for .+ after its gaps at 0:00, stopped/) != nil, "\(past)")
             _ = await stop()
         }
 
@@ -2182,6 +2185,35 @@ extension GlobalRecordingLog {
             #expect(observer.eventLines.allSatisfy { !$0.isFailure })
             let log = try String(contentsOf: recorder.folder.appending(path: RecordingNames.recordingLog), encoding: .utf8)
             #expect(log.contains("Audio 1 \(name): no audio since 0:00, no gap within 10 s before: no problem (D81)"))
+        }
+    }
+}
+
+/// The noise and the sounds built from it that `feed` and `feedDelayedNoise` send, each built once per process:
+/// pure functions of their seed and length.
+private enum FedTables {
+    private static let tables = Mutex<[String: [Float]]>([:])
+
+    static func cached(_ key: String, _ make: () -> [Float]) -> [Float] {
+        if let table = tables.withLock({ $0[key] }) { return table }
+        let table = make()
+        tables.withLock { $0[key] = table }
+        return table
+    }
+
+    static func noise(seed start: UInt64) -> [Float] {
+        cached("noise \(start)") {
+            var seed = start
+            return (0..<(15 * RecorderValues.audioSampleRate)).map { _ -> Float in
+                seed = seed &* 6_364_136_223_846_793_005 &+ 1_442_695_040_888_963_407
+                return Float(Int64(bitPattern: seed >> 11) % 2001 - 1000) / 2000
+            }
+        }
+    }
+
+    static func bursts(seed: UInt64, phase: Int, slot: Int) -> [Float] {
+        cached("bursts \(seed) \(phase) \(slot)") {
+            noise(seed: seed).enumerated().map { (($0.offset + phase) / slot) % 3 == 0 ? $0.element : $0.element / 20 }
         }
     }
 }

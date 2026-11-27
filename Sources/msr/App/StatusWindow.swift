@@ -11,8 +11,10 @@ final class StatusModel {
     var line = ""
     /// "CPU 23 %", our process only.
     var cpu = ""
-    /// One line per kind of problem: red when broken, orange for a hiccup, red ones first (D78).
-    var problems: [ProblemLine] = []
+    /// One line per kind of problem whose call to action was given, newest first (D78, D91).
+    var problems: [String] = []
+    /// A shown problem's call to action includes "report it": the line naming the files for a report shows (D91).
+    var showsForAReport = false
     /// Each audio source's level meter, drawn 10 times a second while the window is open (D69).
     var levels: [AudioTracker.SourceID: AudioLevel] = [:]
     /// The input volume of each audio input whose volume can be set: only those have a slider.
@@ -133,18 +135,20 @@ struct StatusView: View {
                     ScrollView {
                         VStack(alignment: .leading, spacing: Self.problemSpacing) {
                             ForEach(Array(model.problems.enumerated()), id: \.offset) { _, problem in
-                                Text(problem.text).foregroundStyle(problem.isRed ? .red : .orange).fixedSize(horizontal: false, vertical: true)
+                                Text(problem).foregroundStyle(.red).fixedSize(horizontal: false, vertical: true)
                             }
                         }
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { problemsHeight = $0 }
                     }
                     .frame(height: min(problemsHeight, Self.problemsMaxHeight))
-                    Text(Self.forAReport)
-                        .font(.callout)
-                        .foregroundStyle(.secondary)
-                        .textSelection(.enabled)
-                        .fixedSize(horizontal: false, vertical: true)
+                    if model.showsForAReport {
+                        Text(Self.forAReport)
+                            .font(.callout)
+                            .foregroundStyle(.secondary)
+                            .textSelection(.enabled)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
                 }
             }
             HStack {

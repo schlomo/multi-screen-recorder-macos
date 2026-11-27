@@ -4,7 +4,8 @@ import RecorderCore
 /// Where each text of `msr record` goes: standard output carries the
 /// recording folder's path and nothing else; everything for people goes
 /// to standard error through the one writer; `--quiet` leaves out all of
-/// it but the failures and the problems. A failure is told once: by its
+/// it but the errors, the problems whose call to action was given and the
+/// summary that asks for attention (D91). A failure is told once: by its
 /// event's line, or by its problem when no event tells it (D65).
 struct RecordOutput {
     enum Kind: CaseIterable {
@@ -22,6 +23,8 @@ struct RecordOutput {
         case problem
         /// A problem whose failure event's line tells it: not printed.
         case problemOfAnEvent
+        /// A problem's call to action, given: its own line only with `--quiet`, where its problem's is not (D91).
+        case callToAction
         case summary
         /// The summary of a run that exits 3 or asks to report it: `--quiet` still tells it.
         case summaryAlwaysTold
@@ -62,9 +65,11 @@ struct RecordOutput {
     func destination(of kind: Kind) -> Destination {
         switch kind {
         case .recordingFolder: .standardOutput
-        case .readyCheckFailed, .failureEvent, .problem, .summaryAlwaysTold, .error: .standardError
+        case .readyCheckFailed, .summaryAlwaysTold, .error: .standardError
         case .problemOfAnEvent: .nowhere
-        case .banner, .whatWillBeRecorded, .readyCheckPassed, .recordingFolderNotice, .stopMessage, .event, .summary:
+        case .callToAction: quiet ? .standardError : .nowhere
+        case .banner, .whatWillBeRecorded, .readyCheckPassed, .recordingFolderNotice, .stopMessage, .event, .failureEvent, .problem,
+             .summary:
             quiet ? .nowhere : .standardError
         }
     }

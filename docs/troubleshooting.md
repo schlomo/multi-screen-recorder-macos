@@ -38,6 +38,9 @@ One row per entry, the error text exactly as in the entry.
 | `The job was not acquired by Runner of type hosted even after multiple attempts` | [No macOS runner: the pipeline job is cancelled](#no-macos-runner-the-pipeline-job-is-cancelled) |
 | `Multi Screen Recorder quit unexpectedly` (the app's crash dialog) after running the tests, with no crash of the app | [Crash dialog for crash reports the tests wrote](#crash-dialog-for-crash-reports-the-tests-wrote) |
 | `Expectation failed: (made.guideRefusals → 2) == 4` | [Timing tests fail while the audio delay invariants run](#timing-tests-fail-while-the-audio-delay-invariants-run) |
+| `Audio 0 - System: clock drift -1000.0 ppm, corrected +12.00 ms so far, 8.17 ms off`, then a lasting correction of about +20 ms at about 0 ppm | [The system audio is corrected by about 20 ms for good](#the-system-audio-is-corrected-by-about-20-ms-for-good) |
+| `Expectation failed: (end → 0.1) <= (asked + 1.0 / 30 → 0.09997991733333333)`, later `Expectation failed: (end → 0.16666666666666666) <= (stopped - 1 → 0.15834970800000003)` | [A camera file's end is checked against a clock reading taken before Stop](#a-camera-files-end-is-checked-against-a-clock-reading-taken-before-stop) |
+| `camera stalled: FaceTime HD Camera (the camera delivered no frame for 2 s` | [A camera stalls while another camera starts](#a-camera-stalls-while-another-camera-starts) |
 
 ## Format
 
@@ -257,9 +260,29 @@ One row per entry, the error text exactly as in the entry.
   `ClockDriftCorrectionTests` (294.5 s) and `ClockDriftTrackerTests`
   (342.5 s) hold two of the runner's three threads without yielding
   while the invariant cases share the third. A slower runner can fail
-  these tests again. The levers, the owner's to choose: a cheaper
-  implementation of the measurement the invariant cases run (no case
-  dropped), or the two clock drift suites yielding too.
+  these tests again.
+- **Observed again** (PR #35): the
+  measurement built an FFT setup per cross-correlation, 68 % of the
+  invariant suite's time in `vDSP_create_fftsetup` [KNOWN: sampled
+  locally]; `AudioDelay` now keeps one setup per size for the process
+  (the vectorised result stays bit-equal to the scalar one). The
+  invariant harness measures main's rules once when they share the new
+  rules' reference and windows, and `RecorderTests` builds each noise
+  and burst table once per process, bit-identical samples. Measured locally from a clean build (12
+  cores, same machine, `scripts/test` including the build): whole run
+  3:25.91 wall and 717.6 s user CPU on `main` against 2:23.84 to 2:27.85
+  wall and 461.7 s to 481.9 s user CPU on this PR's head (two runs); `AudioDelayInvariantTests`
+  36.8 s to 15.6 s; the `RecorderCoreTests` target 107.4 s to 64.8 s;
+  the `RecorderLogicTests` target 49.5 s to 30.3 s. On CI (run
+  45802785455 on 67ccea2): the `scripts/test` step 5 min 16 s against
+  11 min 26 s, the test run 172.0 s against 510.1 s (`main` before
+  PR #34: 140.6 s), `theReferenceRulesHold` 82.0 s against 294.6 s,
+  `VideoFileTickerTests` 44.4 s and `GuideTrackFeedTests` 40.1 s
+  against their 120 s and 60 s bounds. What remains:
+  the CPU-bound suites (the invariant cases, the two clock drift suites)
+  still share the cooperative pool with the real-time-bounded tests, so
+  a slow runner can still push those near their bounds; the lever left,
+  the owner's to choose, is the two clock drift suites yielding too.
 
 ## A virtual screen comes back at its last mode
 
@@ -366,6 +389,12 @@ One row per entry, the error text exactly as in the entry.
   pushed head.
 - **Observed:** 2026-11-23, PR #27, runner Xcode 26.6; resolved
   (the pipeline on abc1953 passed).
+- **Since D90:** an input no longer leaves or rejoins the guide track
+  and has no problem line for it; the two tests became
+  `anAudioInputUnmixedOnAFalseFirstWindowIsMixedOnceItsMedianFits`
+  (whose wait reads `A out of the guide track again`) and
+  `anAudioInputBeyondTheLimitIsNotMixedOnlyItsRowSayingSo`, both
+  sending with `sendNext`.
 
 ## A slow runner's pause gives a stand-in input a gap before its no audio
 
@@ -390,6 +419,10 @@ One row per entry, the error text exactly as in the entry.
   gives its camera a first-frame limit of 600 s.
 - **Verify:** the guide-track tests pass 10 of 10 runs under the same
   load; CI's `scripts/test` passes on the pushed head.
+- **Since D90:** the test is
+  `anAudioInputBeyondTheLimitIsNotMixedOnlyItsRowSayingSo`, which
+  expects no problem line at all; the guide track's line in the error
+  text is no longer told.
 
 ## Swift 6.3 rejects self in a later argument after callbacks capture it
 
@@ -478,3 +511,105 @@ One row per entry, the error text exactly as in the entry.
 - **Verify:** 20 runs of `InstallAppScriptTests` write no new
   `msr-*.ips`.
 - **Observed:** 2026-11-17, PR #20; resolved.
+
+## A camera file's end is checked against a clock reading taken before Stop
+
+- **Error:** `Expectation failed: (end → 0.1) <= (asked + 1.0 / 30 → 0.09997991733333333)`
+- **Symptom:** in CI (run 45811289731, PR #36), `RecorderTests.aCameraFileEndsWhereTheStopWasAskedThoughItsStreamStopsLate`
+  fails at its first bound; it passes locally, also under 24 `yes` processes on 12 cores.
+- **Why:** [KNOWN: the test code before the fix] the test read the clock
+  (`asked`), then called `stop()`; the recorder takes its own reading
+  when the camera file's finishing begins (`VideoFileFeed.beginFinishing`),
+  and the file ends at the tick at or before that reading. The bound
+  `asked + 1/30` held only while the two readings were less than a
+  tick (33 ms) apart, which a loaded runner's scheduling breaks. The
+  product was right: the file ended at Stop, a tick (67 ms) after the
+  test's reading. [KNOWN: reproduced locally, 2026-11-26] a 100 ms
+  sleep between the reading and `stop()` fails the old bound with the
+  same message form, and passes the new one.
+- **Fix:** the bound no longer uses a reading taken before Stop. The
+  stream stops one second after the recorder asked, so the file's end
+  must be `<=` the clock reading after `stop()` returns, minus 1 s;
+  a file that ended with the stream or repeated its last frame for
+  the wait would end after that. The test keeps the 100 ms gap.
+- **Second cause:** that fix failed now and then locally with
+  `Expectation failed: (end → 0.16666666666666666) <= (stopped - 1 → 0.15834970800000003)`.
+  [KNOWN:
+  `VideoFileTicker.finish`] the file's `end` is the time after its last
+  tick (`lastWrittenTick + 1`), the end of the last frame's duration,
+  and that last tick is at or before the recorder's reading, so `end`
+  can be up to one tick (33 ms at 30 fps) after it. The bound failed
+  whenever finalizing after the stream's 1 s took less than that. The
+  recorder is right; the test's bound now adds that one tick,
+  `end <= stopped - 1 + 1.0 / 30`, which a file that ended with the
+  stream or repeated its last frame for the wait still breaks.
+- **Verify:** `swift test --filter aCameraFileEndsWhereTheStopWasAsked
+  --maximum-repetitions 200` passes; the fix is argued from
+  `VideoFileTicker.finish` above, not reproduced, as the failure is
+  rare.
+- **Observed:** 2026-11-26, Swift 6.3, Xcode 26: 3 failures in 200
+  runs of the old bound when found; a rerun of the old bound the same
+  day had none in 200. Resolved (test), fix argued, not reproduced.
+
+## A camera stalls while another camera starts
+
+- **Error:** `camera stalled: FaceTime HD Camera (the camera delivered no frame for 2 s`
+- **Symptom:** in a recording's `recording.log` and `recording.json`
+  (event `camera stalled`, then `camera stall ended`), a running camera
+  stalls at the moment another camera starts its capture, such as after
+  a screen switch or a camera plugged in; its file goes on, repeating
+  its last frame. Since D91 it shows nothing to the person.
+- **Why:** [KNOWN: measured on the owner's Mac, 2026-11-26, with a probe
+  that opens the FaceTime HD Camera and a Logitech BRIO without file
+  output and starts the BRIO's capture session again and again] in one
+  process, CoreMediaIO holds a process-wide lock while a camera's
+  `AVCaptureSession.startRunning` runs, so every other camera of the
+  process delivers no frame for as long as that start takes: the
+  FaceTime camera's longest frame gap was 821 ms to 862 ms for each
+  BRIO start of 823 ms to 841 ms. With each camera in its own process,
+  the same starts left gaps of 43 ms at most. A stack sample of the one
+  process during a start shows CoreMediaIO's frame thread
+  (`CMIOGraph::PullOutputUnits`) in `__psynch_mutexwait` for 636
+  samples, beside `startRunning` itself. A start of 4 s
+  [KNOWN: as observed in a recording, per the architect's brief of
+  2026-11-26] passes the stall limit of 2 s and is logged as this stall.
+- **Fix:** none; macOS's limit. The owner, 2026-11-26: "we can't beat
+  the limitations of MacOS here." A stall has no call to action, so it
+  shows no line, bounces nothing and leaves the result `ok` (D91).
+  Running each camera in its own process would avoid it and was not
+  chosen.
+- **Verify:** the stall ends while the other camera starts: in the
+  owner's recording of 2026-11-26 the FaceTime HD Camera's `camera
+  stall ended` came at 24.554 s, 5.0 s after the BRIO's `camera
+  connected` and 8 ms before its `camera disconnected`; the probe's
+  frame gaps of 0.82 s to 0.86 s match each BRIO start's length.
+- **Observed:** 2026-11-26, macOS 26, Apple silicon; open (macOS).
+
+## The system audio is corrected by about 20 ms for good
+
+- **Error:** in `recording.log`, `Audio 0 - System: clock drift -1000.0 ppm, corrected +12.00 ms so far, 8.17 ms off`
+  about 20 to 35 s after the system audio started, then the clock drift
+  near 0 ppm while the correction stays at about +20 ms; the manifest's
+  `clockDriftCorrection` about 0.02 at a `clockDriftPpm` near 0.
+- **Symptom:** the system audio's file is shifted by about 20 ms against
+  the other sources for the whole file; seen in nearly every recording
+  from 2026-11-22 to 2026-11-26, also after the system audio restarts.
+- **Why:** [KNOWN: a debug run on the owner's Mac, 2026-11-26] in its
+  first second the system audio's buffers arrive about 22 ms less late
+  (smallest lateness about 21 ms, then about 44 ms from 1.0 s on). The
+  first estimate's support line lay under that second at 1000 ppm, and
+  the reference taken from it is never revised, so the 22 ms stayed in
+  the correction.
+- **Fix:** a source's first 2 s are not measured (D92,
+  `RecorderValues.clockDriftStartSkipped`); the drift over them is the
+  kept slope's.
+- **Verify:** `swift test --filter aLessLateStartIsNotTakenAsDrift`
+  (22 ms without the fix, under 0.5 ms with it); in a recording, the
+  system audio's `clockDriftCorrection` near 0 at a drift near 0 ppm.
+- **Observed:** 2026-11-26, PR #35; fixed in PR #35: the owner's
+  recording of 2026-11-26 19.38.01 (build 6620fc9; undocked and docked
+  again, the Logitech BRIO unplugged, the lid closed) shows the system
+  audio's clock drift +38.3, then +3.7 to +8.4 ppm and its correction
+  under 1 ms (-0.49 ms at +92.8 s, 0 ms after its restart at +106.3 s);
+  its three system audio files' `clockDriftCorrection` are 0, -0.0007
+  and 0.0002, where recordings before had about 0.02.

@@ -40,7 +40,6 @@ public enum JSONValue: Equatable, Sendable, Decodable, CustomStringConvertible {
     public var number: Double? { if case .number(let value) = self { value } else { nil } }
     public var array: [JSONValue]? { if case .array(let value) = self { value } else { nil } }
     public var keys: Set<String>? { if case .object(let members) = self { Set(members.keys) } else { nil } }
-    public var isNull: Bool { self == .null }
 
     /// A whole number, or nil.
     public var integer: Int? {
