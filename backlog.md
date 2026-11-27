@@ -4,15 +4,11 @@
 
 Simplification first (the owner, 2026-11-26: "it feels like we added a
 lot of complexity to cover edge cases and I'm afraid that we are
-starting to hurt the main and regular use cases"). PR #35 is the
-first simplification PR, waiting for the owner's merge: the CI test
-time cut (CI's test step 5 min 16 s, was 11 min 26 s), one audio sync
-rule and a stateless guide track (D90), only actionable problems
-notify (D91), the clock drift skips a source's first 2 s (D92), the
-fixes of a top-tier audit, and the owner's system audio ruling (D93).
-At its merge: this section, "Done (recent)", items 4 and 53 checked
-against what it settled, the release installed. Then the next
-cuts the owner picks from the main use cases (below). Item 22 is
+starting to hurt the main and regular use cases"). PR #35, the first
+simplification PR, is merged (see "Done (recent)"). Next: the cuts
+the owner picks from the main use cases (below); item 4's rest folds
+in. The owner's lid close slept the Mac on 2026-11-27, also without
+recording, unlike before (see "In flight"). Item 22 is
 deferred; item 51 follows the simplification unless GitHub's outages
 block PRs again.
 
@@ -62,7 +58,12 @@ Still open from D34: what AGC does and whether it is on in auto mode;
 
 ## In flight
 
-- PR #35, the first simplification PR (above), branch `faster-tests`.
+- **The lid close sleeps the Mac** (the owner, 2026-11-27): closing
+  the lid with external screens now sleeps it briefly and locks it,
+  with or without a recording; before, it did not. The owner suspects
+  Amphetamine's closed-lid helper, installed recently. The recorder
+  handled the sleep as designed (recording 2026-11-27 06.43.39: every
+  file finalized, about 3 s lost per source). Being diagnosed.
 
 ## Queued
 
@@ -125,10 +126,10 @@ Still open from D34: what AGC does and whether it is on in auto mode;
    `leftToRight`); settings flags validated once; quit handling in
    `RecordingSession`; no double end path (`stop()` returns nil when
    already finishing); `sign-app`'s `version_form` goes; the smoke test
-   trimmed; doc-prose and test-the-compiler tests deleted, duplicate
-   tests merged; `Recorder` tests through a `DisplayCapture` stand-in;
+   trimmed; doc-prose and test-the-compiler tests deleted (in part
+   by PR #35), duplicate tests merged; `Recorder` tests through a `DisplayCapture` stand-in;
    missing `DisplayTracker`, `DisplayFileTicker` and `TickLoop` tests;
-   the test inventory in `recorder.md` cut to a few lines; the review's
+   the review's
    NITs 12 to 16; finding 17 (`StreamLifecycle`) is the owner's call;
    findings 3 and 6 on audio code now apply. Plus B2's leftover NITs:
    a drain error labelled as a writer timeout in `guideTracksCut`; no
@@ -764,6 +765,15 @@ Still open from D34: what AGC does and whether it is on in auto mode;
   the README (D46). Revisit when people struggle with it.
 
 ## Done (recent)
+
+- 2026-11-27: PR #35 merged by the owner: the CI test time cut
+  (`scripts/test` on CI 5 min 16 s, was 11 min 26 s, no case dropped),
+  one audio sync rule and a stateless guide track (D90), only
+  actionable problems notify (D91), a source's first 2 s not measured
+  for its clock drift (D92, the system audio's +20 ms gone in the
+  owner's recordings), the owner's system audio ruling (D93), a
+  top-tier audit's fixes. End-to-end 7 of 7 on 30fb2ac; the owner's
+  try-out 2026-11-27 06.43.39 finalized every file.
 
 - 2026-11-26: PR #36 merged by the owner: the homepage screenshots
   from release 0.20261126.118.

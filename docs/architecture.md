@@ -135,7 +135,9 @@ D28).
   input channel its own mono track (D22, D31); each screen file
   carries two guide tracks, microphones and system audio, for playback
   and syncing (D31); audio only has no screen file, so no guide track,
-  and its system audio still needs a readable main screen (D62). Camera
+  and its system audio still needs a readable main screen (D62). The
+  system audio keeps its file through device changes where it can
+  (D93); today it starts a new file when the main screen goes. Camera
   files carry the same two guide tracks (D74).
 - Built (PR #9, D44): auto mode, on by default, records every screen
   at Native (its "looks like" size; the drawn-at size is never
